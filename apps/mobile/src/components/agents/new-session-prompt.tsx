@@ -30,12 +30,17 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import {
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_DEFAULT_LINES,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  NEW_SESSION_PROMPT_LINE_HEIGHT,
+  NEW_SESSION_PROMPT_VERTICAL_PADDING,
   resolveComposerMaxHeight,
+  resolveNewSessionPromptHeight,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { resolveNewSessionPromptMinHeight } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
@@ -59,12 +64,10 @@ import {
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
-const PROMPT_INPUT_DEFAULT_LINES = 3;
-const PROMPT_INPUT_LINE_HEIGHT = 24;
+// Mirrors the input's `text-base`.
 const PROMPT_INPUT_FONT_SIZE = 16;
-// Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
-// iOS (16 total) / the 24pt-per-side Android inset (48 total).
-const PROMPT_INPUT_VERTICAL_PADDING = 16;
+// Must mirror the TextInput's actual horizontal padding: px-2 on iOS (16
+// total) / the 24pt-per-side Android inset (48 total).
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
@@ -83,9 +86,9 @@ type NewSessionPromptComponentProps = NewSessionPromptProps & {
 };
 
 /**
- * New-session prompt surface: attachment strip, full-width multiline text
- * input, bottom action row (paperclip leading, voice toggle trailing), and
- * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * New-session prompt surface: model/mode toolbar, attachment strip,
+ * full-width multiline text input, and bottom action row (paperclip leading,
+ * voice toggle trailing). Owns the prompt ref (for voice input to read), the
  * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
  * route listens to `onChangeText` so the create handler can read the live
  * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
@@ -118,6 +121,8 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
+  frameHeight,
+  cardTop = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -147,9 +152,31 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
-  const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
-  const promptMinHeight =
-    promptLineHeight * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
+  const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  // The card rows that render only in some states, read by name in the render
+  // below (the measured card chrome covers their height without a static
+  // budget, so they need no separate reservation here).
+  const showsAttachmentStatus = attachments.some(
+    attachment => attachment.metadataStripFailed === true
+  );
+  const showsCounter =
+    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
+  // The chrome the card renders around the input, measured by the card's
+  // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
+  // the frame leaves for the input.
+  const [cardChromeHeight, setCardChromeHeight] = useState(0);
+  const promptMinHeight = resolveNewSessionPromptMinHeight({
+    frameHeight: frameHeight ?? 0,
+    cardTop,
+    cardChromeHeight,
+    // The shared helper keeps the preferred 3-line floor in one place.
+    preferredMinHeight: resolveNewSessionPromptHeight(
+      promptLineHeight,
+      NEW_SESSION_PROMPT_DEFAULT_LINES
+    ),
+    lineHeight: promptLineHeight,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
@@ -187,10 +214,10 @@ export function NewSessionPrompt({
   const promptMeasure = useTextHeight({
     minHeight: promptMinHeight,
     maxHeight: promptMaxHeight,
-    verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
+    verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
     textContentWidth: promptInputWidth - PROMPT_INPUT_HORIZONTAL_PADDING,
     fontSize: PROMPT_INPUT_FONT_SIZE,
-    lineHeight: PROMPT_INPUT_LINE_HEIGHT,
+    lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
     fontScale,
   });
 
@@ -300,6 +327,17 @@ export function NewSessionPrompt({
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
+  function handleCardLayout(event: LayoutChangeEvent) {
+    const { height } = event.nativeEvent.layout;
+    // Everything the card renders other than the input itself. The input's
+    // height changes when the fit yields and the card's height changes with it,
+    // so this is stable across the yielding re-render. The card's `y` is not
+    // read here: it is relative to the padding-free host wrapper, so the host
+    // passes the frame-relative offset as `cardTop` instead.
+    const nextChromeHeight = height - promptMeasure.height;
+    setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
+  }
+
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
   }
@@ -361,7 +399,37 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <View
+      onLayout={handleCardLayout}
+      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]"
+    >
+      {isModelsError && modelOptions.length === 0 ? (
+        <QueryError
+          placement="top"
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => {
+            onRefetchModels();
+          }}
+          className="border-b border-border py-4"
+        />
+      ) : (
+        <ChatToolbar
+          mode={mode}
+          onModeChange={onModeChange}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
+      )}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}
@@ -369,7 +437,7 @@ export function NewSessionPrompt({
         onMove={onMoveAttachment}
         onReorder={onReorderAttachments}
       />
-      {attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+      {showsAttachmentStatus ? (
         <AccessibleStatus
           tone="error"
           message={t('agentChat.composer.photoMetadataNotRemoved')}
@@ -410,7 +478,7 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
+        {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
@@ -450,33 +518,6 @@ export function NewSessionPrompt({
           ) : null}
         </NewSessionPromptControls>
       </View>
-      {isModelsError && modelOptions.length === 0 ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('agentChat.newSession.couldNotLoadModels')}
-          message={t('organization.boundary.loadErrorMessage')}
-          onRetry={() => {
-            onRefetchModels();
-          }}
-          className="border-t border-border py-4"
-        />
-      ) : (
-        <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          disabled={isCreating}
-          isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-        />
-      )}
     </View>
   );
 }

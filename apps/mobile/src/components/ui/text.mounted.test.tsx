@@ -2,13 +2,17 @@ import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// `Text` reads the native direction at render time, so the mutable flag drives
+// each render; the host text element is the assertion target.
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
   Text: 'Text',
 }));
+// `@rn-primitives/slot` ships untranspiled JSX and is only reached by `asChild`.
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -22,8 +26,15 @@ function mount(element: ReactElement) {
   return renderer.root;
 }
 
-function tokens(className: unknown): string[] {
-  return (className as string).split(' ');
+// Both assertions are kept: `hostText` reaches the host node to read its inline
+// style, `hostClasses` reads the resolved class list.
+function hostText(root: TestRenderer.ReactTestInstance) {
+  return root.find(node => Object.is(node.type, 'Text'));
+}
+
+function hostClasses(root: TestRenderer.ReactTestInstance): string[] {
+  const node = root.find(candidate => Object.is(candidate.type, 'Text'));
+  return String(node.props.className).split(' ');
 }
 
 beforeEach(() => {
@@ -35,54 +46,139 @@ afterEach(() => {
   renderer = undefined;
 });
 
-describe('Text Latin label treatment', () => {
-  it('drops the family and the tracking for an Arabic eyebrow in RTL', () => {
-    i18nManager.isRTL = true;
-    const root = mount(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'));
-    const node = root.find(instance => Object.is(instance.type, 'Text'));
-    const classes = tokens(node.props.className);
+describe('Text mounted letter spacing', () => {
+  // The reset belongs to the RTL interface: RTL-script copy takes it there,
+  // while a joined script in an LTR screen keeps the tracking its class asks
+  // for (`text.rtl-labels` pins that LTR case).
+  it.each([false, true])(
+    'resets the tracking for Arabic children in RTL only (isRTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+      const text = hostText(
+        mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+      );
 
-    expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
-    expect(classes.some(token => token.startsWith('tracking'))).toBe(false);
-    expect(classes).toEqual(expect.arrayContaining(['text-[10px]', 'text-muted-foreground']));
-    expect(node.props.style).toContainEqual({ writingDirection: 'rtl' });
+      if (isRTL) {
+        expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+      } else {
+        expect(text.props.style).toBeUndefined();
+      }
+    }
+  );
+
+  it('leaves Latin children untouched and keeps LTR style undefined', () => {
+    const text = hostText(
+      mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+    );
+
+    expect(text.props.style).toBeUndefined();
   });
 
-  it('keeps the tracked capitals for Latin copy in RTL', () => {
+  it('resets the eyebrow variant tracking for Arabic children in RTL', () => {
     i18nManager.isRTL = true;
-    const root = mount(createElement(Text, { variant: 'eyebrow' }, 'LIVE NOW'));
-    const node = root.find(instance => Object.is(instance.type, 'Text'));
-    const classes = tokens(node.props.className);
+    const text = hostText(mount(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
 
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  it('resets the tab label tracking for Arabic children in RTL', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mount(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
+    );
+
+    expect(text.props.className as string).toContain('tracking-[0.2px]');
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  // An RTL interface keeps the paragraph direction for a Latin run and leaves
+  // its tracking alone: the reset is for RTL-script copy (`text.rtl-labels`).
+  it('keeps the RTL paragraph direction and no reset for Latin children', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+    );
+
+    expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
+    expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
+  });
+});
+
+describe('Text eyebrow letterspacing', () => {
+  // Finding home-ar-loading: an Arabic section label carried the Latin
+  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The
+  // display treatment is dropped for RTL-script copy (Arabic, Hebrew) in an
+  // RTL interface.
+  it.each([false, true])('keeps the eyebrow display treatment for Latin copy (RTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));
     expect(classes).toEqual(
-      expect.arrayContaining(['font-mono-medium', 'uppercase', 'tracking-[1.5px]'])
+      expect.arrayContaining([
+        'font-mono-medium',
+        'text-[10px]',
+        'text-muted-foreground',
+        'uppercase',
+        'tracking-[1.5px]',
+      ])
     );
   });
 
-  it('keeps the treatment for Arabic copy in an LTR interface', () => {
-    i18nManager.isRTL = false;
-    const root = mount(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'));
-    const node = root.find(instance => Object.is(instance.type, 'Text'));
-    const classes = tokens(node.props.className);
-
-    expect(classes).toEqual(
-      expect.arrayContaining(['font-mono-medium', 'uppercase', 'tracking-[1.5px]'])
+  it.each([false, true])('drops the treatment from Arabic copy in RTL (RTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const classes = hostClasses(
+      mount(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
     );
+    if (isRTL) {
+      expect(classes).not.toContain('uppercase');
+      expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+    } else {
+      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+    }
   });
 
+  it('leaves a non-eyebrow variant untouched in either direction', () => {
+    i18nManager.isRTL = true;
+    const classes = hostClasses(mount(createElement(Text, null, 'Live now')));
+    expect(classes).not.toContain('uppercase');
+    expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+  });
+
+  it.each([false, true])('applies the same rule to the Eyebrow component (RTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const classes = hostClasses(
+      mount(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
+    );
+    expect(classes).toEqual(expect.arrayContaining(['text-[10px]']));
+    if (isRTL) {
+      // Arabic copy in an RTL interface also drops the mono family.
+      expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
+      expect(classes).not.toContain('uppercase');
+      expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+    } else {
+      expect(classes).toEqual(
+        expect.arrayContaining(['font-mono-medium', 'uppercase', 'tracking-[1.5px]'])
+      );
+    }
+  });
+});
+
+describe('Text mono variant in an RTL interface', () => {
+  // The mono variant carries a font that ships no RTL-script glyphs, so RTL
+  // copy loses the family in RTL while a Latin run such as a session id keeps
+  // it.
   it('drops the mono family for an Arabic mono variant in RTL', () => {
     i18nManager.isRTL = true;
-    const root = mount(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'));
-    const node = root.find(instance => Object.is(instance.type, 'Text'));
+    const classes = hostClasses(
+      mount(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
+    );
 
-    expect(tokens(node.props.className).some(token => token.startsWith('font-mono'))).toBe(false);
+    expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
   });
 
   it('keeps the mono family for a session id in RTL', () => {
     i18nManager.isRTL = true;
-    const root = mount(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b'));
-    const node = root.find(instance => Object.is(instance.type, 'Text'));
+    const classes = hostClasses(mount(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b')));
 
-    expect(tokens(node.props.className)).toContain('font-mono-medium');
+    expect(classes).toContain('font-mono-medium');
   });
 });

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter.",
     "featureFlags": "Funktionsflag",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "fjern · ≥ {{min}}",
+    "featureFlagSkipped": "standard · < {{min}}",
+    "featureFlagNotLoaded": "standard · ikke indlæst",
     "gatewayTranscription": "Transskription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transskribér stemmeinput med en Kilo Gateway-model i stedet for enhedens stemmegenkendelse. Din optagelse sendes til Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "Chatbeskeder",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",
-      "security": "Sikkerhedsfund"
+      "security": "Sikkerhedsfund",
+      "spend": "Forbrugsadvarsler"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "afsluttet / mislykket / klar til styring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for at få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
-      "securityFindingsSubtitle": "nye fund og SLA-påmindelser"
+      "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få saldoadvarsler.",
+      "securityFindingsSubtitle": "nye fund og SLA-påmindelser",
+      "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten på et område for at få sikkerhedsfund.",
+      "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
+      "spendAlertsToggle": "Kategorien forbrugsadvarsler"
     },
     "action": {
       "openSession": "Åbn session"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
+      "stopped": "Sessionen er stoppet",
+      "committing": "Committer…",
+      "committed": "Commit gennemført",
+      "commitFailed": "Commit mislykkedes",
       "renameSession": "Omdøb session",
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} linje",
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
-      "matchesBadge_other": "{{displayCount}} resultater"
+      "matchesBadge_other": "{{displayCount}} resultater",
+      "noOutput": "Ingen output."
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "For mange loginforsøg. Vent lidt, og prøv igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanceret",
+      "balanced": "Auto Afbalanceret",
+      "efficient": "Auto Effektiv",
+      "small": "Auto Lille",
+      "free": "Auto Gratis",
+      "organization": "Organisation-Auto"
+    },
     "dataCollected": "Data indsamles",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Kunne ikke opdatere favoritterne.",
@@ -3155,7 +3174,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
-    "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen."
+    "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Din computer",
     "remoteOptionBody": "Kør Kilo på din egen maskin via `kilo remote`-CLI'en.",
     "skip": "Spring omvisning over",
-    "tutorialLabel": "Vejledning",
-    "remoteTitle": "Start din første remote-session",
-    "remoteBody": "Tilslut din computer, og start derefter sessionen herfra.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ingen computer tilsluttet endnu",
-    "remoteEmptyBody": "For at tilslutte den, kør `kilo remote` på din computer.",
-    "remoteFound": "Computer tilsluttet",
-    "checkAgain": "Tjek igen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vejledning"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Åbn seneste session"
+  },
+  "spendAlerts": {
+    "subtitle": "Send en advarsel via e-mail eller push til faktureringskontakterne, når dette områdes forbrug overskrider en grænse eller stiger over den sædvanlige timesats.",
+    "enable": "Aktivér forbrugsadvarsler",
+    "thresholdTitle": "Grænseoverskridelse",
+    "thresholdSubtitle": "Løbende forbrug overskrider din grænse",
+    "anomalyTitle": "Spike pr. time",
+    "anomalySubtitle": "En time er langt over dette områdes sædvanlige sats",
+    "limitLabel": "Grænse (USD)",
+    "windowLabel": "Vindue",
+    "window24h": "24 timer",
+    "window7d": "7 dage",
+    "window30d": "30 dage",
+    "multiplierLabel": "Spike-multiplikator",
+    "saved": "Indstillinger for forbrugsadvarsler er gemt",
+    "loadError": "Forbrugsadvarsler kunne ikke indlæses.",
+    "saveError": "Forbrugsadvarsler kunne ikke gemmes.",
+    "empty": "Forbrugsadvarsler er slået fra. Slå dem til for at advare dette områdes faktureringskontakter.",
+    "noSpend": "Der er endnu ikke registreret noget forbrug",
+    "spend24h": "Forbrug de seneste 24 timer",
+    "multiplierError": "Angiv en multiplikator på 1 eller mere",
+    "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
+    "pushOffByCategory": "Fra i Notifikationer"
   }
 }

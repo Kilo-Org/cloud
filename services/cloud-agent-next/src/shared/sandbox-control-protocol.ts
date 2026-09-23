@@ -1,5 +1,48 @@
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
+
+// Bounded assistant-failure facts are duplicated locally (type-only import
+// above) so the standalone wrapper bundle never contains worker-utils. The
+// exhaustiveness guards and the equality test in
+// control-plane-failure-fence.test.ts contain the drift risk.
+export const CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES = [
+  'insufficient_credits',
+  'rate_limited',
+  'model_unavailable',
+  'provider_authentication',
+  'provider_unavailable',
+  'timeout',
+  'invalid_request',
+  'context_limit',
+  'output_limit',
+  'content_filter',
+  'structured_output',
+  'unknown',
+] as const satisfies readonly CloudAgentAssistantFailureReason[];
+
+export const CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES = [
+  'managed',
+  'byok',
+  'unknown',
+] as const satisfies readonly CloudAgentProviderOwnership[];
+
+type AssertNever<_T extends never> = true;
+type _AssistantFailureReasonDriftGuard = AssertNever<
+  Exclude<
+    CloudAgentAssistantFailureReason,
+    (typeof CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES)[number]
+  >
+>;
+type _ProviderOwnershipDriftGuard = AssertNever<
+  Exclude<CloudAgentProviderOwnership, (typeof CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES)[number]>
+>;
+
+const cloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES);
+const cloudAgentProviderOwnershipSchema = z.enum(CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES);
 
 export {
   MAX_WORKTREE_CHANGES_BYTES,
@@ -52,11 +95,30 @@ export class SandboxAcquisitionLostError extends Error {
   }
 }
 
-export function isSandboxAcquisitionLostError(error: unknown): boolean {
+export const SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE =
+  'Sandbox acquisition was superseded by a bindable live replacement allocation';
+
+export class SandboxAcquisitionSupersededError extends Error {
+  constructor(message: string = SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE) {
+    super(message);
+    this.name = 'SandboxAcquisitionSupersededError';
+  }
+}
+
+export function isSandboxAcquisitionSupersededError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.name === 'SandboxAcquisitionLostError' ||
-      error.message === SANDBOX_ACQUISITION_LOST_MESSAGE)
+    (error.name === 'SandboxAcquisitionSupersededError' ||
+      error.message === SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE)
+  );
+}
+
+export function isSandboxAcquisitionLostError(error: unknown): boolean {
+  return (
+    isSandboxAcquisitionSupersededError(error) ||
+    (error instanceof Error &&
+      (error.name === 'SandboxAcquisitionLostError' ||
+        error.message === SANDBOX_ACQUISITION_LOST_MESSAGE))
   );
 }
 
@@ -206,15 +268,14 @@ export const sandboxHelloPayloadSchema = z.object({
   capabilities: z
     .object({
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
 });
@@ -226,14 +287,12 @@ export const sandboxHelloResultSchema = z.object({
     .object({
       kiloVersionHeartbeat: z.boolean().optional(),
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
+      kiloLocalPhase: z.literal(true).optional(),
     })
     .optional(),
 });
@@ -724,8 +783,20 @@ export const sessionMessageOutcomeSchema = z
     messageId: z.string().min(1).max(128),
     status: z.enum(['completed', 'failed', 'cancelled']),
     reason: z.string().max(4096).optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
+    assistantReason: cloudAgentAssistantFailureReasonSchema.optional(),
+    providerOwnership: cloudAgentProviderOwnershipSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status !== 'completed' && value.gateResult !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Only completed results can include gateResult',
+        path: ['gateResult'],
+      });
+    }
+  });
 
 export type SessionMessageOutcome = z.infer<typeof sessionMessageOutcomeSchema>;
 
@@ -1015,13 +1086,12 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   capabilities: z
     .object({
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

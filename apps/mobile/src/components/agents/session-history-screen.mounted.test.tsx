@@ -56,6 +56,32 @@ const appState = vi.hoisted(() => {
   };
 });
 
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
+
+const keyboardState = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  return {
+    addListener: (event: string, listener: (payload: unknown) => void) => {
+      const set = listeners.get(event) ?? new Set<(payload: unknown) => void>();
+      set.add(listener);
+      listeners.set(event, set);
+      return {
+        remove: () => {
+          set.delete(listener);
+        },
+      };
+    },
+    emit: (event: string, payload: unknown): void => {
+      for (const listener of listeners.get(event) ?? []) {
+        listener(payload);
+      }
+    },
+    clear: (): void => {
+      listeners.clear();
+    },
+  };
+});
+
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
@@ -68,7 +94,17 @@ vi.mock('react-native', () => ({
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Platform: platformState,
+  Keyboard: { addListener: keyboardState.addListener },
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   AppState: { addEventListener: appState.addEventListener },
+}));
+// The modal mock below still loads the real module through `importOriginal`,
+// which imports `react-native-safe-area-context`; that package's `react-native`
+// entry points at its untranspiled `src/` TypeScript, which vitest cannot parse,
+// so stub the hook here.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', X: 'X' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -261,9 +297,35 @@ async function renderScreen(
   return renderer;
 }
 
+function hasType(node: TestRenderer.ReactTestInstance, type: string): boolean {
+  return typeof node.type === 'string' && node.type === type;
+}
+
+/** The single screen-level body container wrapping the list content. */
+function isHistoryBodyContainer(node: TestRenderer.ReactTestInstance): boolean {
+  return (
+    hasType(node, 'View') &&
+    node.props.className === 'flex-1' &&
+    node.findAllByType('AgentSessionListContent').length === 1
+  );
+}
+
+function findHistoryBodyContainer(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance {
+  return renderer.root.find(isHistoryBodyContainer);
+}
+
+function bodyPaddingBottom(node: TestRenderer.ReactTestInstance): number {
+  const style = node.props.style as [unknown, { paddingBottom: number }];
+  return style[1].paddingBottom;
+}
+
 describe('SessionHistoryScreen', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    platformState.OS = 'ios';
+    keyboardState.clear();
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
@@ -356,8 +418,65 @@ describe('SessionHistoryScreen', () => {
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
         tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
+      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
     }
+  });
+
+  it('offers a filter row for every recent repository, not only the first three', async () => {
+    const gitUrls = [
+      'https://github.com/kilo/alpha.git',
+      'https://github.com/kilo/beta.git',
+      'https://github.com/kilo/gamma.git',
+      'https://github.com/kilo/delta.git',
+      'https://github.com/kilo/epsilon.git',
+    ];
+    listState.storedSessions = [
+      ...gitUrls.map((git_url, index) => ({
+        session_id: `s${index}`,
+        organization_id: null,
+        git_url,
+        created_on_platform: 'cloud-agent',
+      })),
+      // The same repository again: the sheet must not render a duplicate row.
+      {
+        session_id: 'alpha-again',
+        organization_id: null,
+        git_url: gitUrls[0],
+        created_on_platform: 'cli',
+      },
+    ];
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
+  });
+
+  it('keeps a selected project row that is no longer in the recent repositories', async () => {
+    const recent = 'https://github.com/kilo/alpha.git';
+    const stale = 'https://github.com/kilo/removed.git';
+    listState.storedSessions = [
+      {
+        session_id: 's0',
+        organization_id: null,
+        git_url: recent,
+        created_on_platform: 'cloud-agent',
+      },
+    ];
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [stale], platformFilter: [] })
+    );
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual([recent, stale]);
   });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {
@@ -648,5 +767,32 @@ describe('SessionHistoryScreen', () => {
     });
 
     expect(handleRefetchSpy).not.toHaveBeenCalled();
+  });
+
+  // Regression: the finding's empty-state subtitle sat half-drawn behind the
+  // on-screen keyboard. The whole body (empty state, list, refresh band) must
+  // live inside one permanently mounted keyboard container so it lifts with the
+  // keyboard while the header and search field above it stay put.
+  it('mounts the history body inside the iOS keyboard-avoiding container', async () => {
+    const renderer = await renderScreen();
+
+    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(container.props.className).toBe('flex-1');
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  it('pads the history body above the Android keyboard without remounting it', async () => {
+    platformState.OS = 'android';
+    const renderer = await renderScreen();
+    expect(bodyPaddingBottom(findHistoryBodyContainer(renderer))).toBe(0);
+
+    act(() => {
+      keyboardState.emit('keyboardDidShow', { endCoordinates: { height: 320 } });
+    });
+
+    const container = findHistoryBodyContainer(renderer);
+    expect(bodyPaddingBottom(container)).toBe(320);
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 });

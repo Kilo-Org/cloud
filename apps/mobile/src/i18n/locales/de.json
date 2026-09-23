@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich.",
     "featureFlags": "Feature-Flags",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "vom Server · ≥ {{min}}",
+    "featureFlagSkipped": "Standard · < {{min}}",
+    "featureFlagNotLoaded": "Standard · nicht geladen",
     "gatewayTranscription": "Gateway-Transkription",
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -323,7 +323,8 @@
       "chat": "Chat-Nachrichten",
       "kiloclaw": "KiloClaw-Aktivitäten",
       "balance": "Guthaben-Warnungen",
-      "security": "Sicherheitsbefunde"
+      "security": "Sicherheitsbefunde",
+      "spend": "Ausgaben-Warnungen"
     },
     "category": {
       "chatMessagesSubtitle": "antworten in deinen Unterhaltungen",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "Sitzungsstatus",
       "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
+      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivität zu erhalten.",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
-      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen"
+      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Guthabenwarnungen zu erhalten.",
+      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
+      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten in einem Bereich, um Sicherheitsbefunde zu erhalten.",
+      "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
+      "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
     },
     "action": {
       "openSession": "Sitzung öffnen"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "Die Sitzung konnte nicht geladen werden.",
       "failedToLoadDetails": "Die Sitzungsdetails konnten nicht geladen werden.",
       "failedToStopExecution": "Die Ausführung konnte nicht gestoppt werden.",
+      "stopped": "Sitzung gestoppt",
+      "committing": "Wird committet…",
+      "committed": "Committet",
+      "commitFailed": "Committen fehlgeschlagen",
       "renameSession": "Sitzung umbenennen",
       "renamePlaceholder": "Sitzungsname",
       "transcriptAccessibility": "Sitzungsprotokoll",
@@ -1712,7 +1722,8 @@
       "linesBadge_one": "{{displayCount}} Zeile",
       "linesBadge_other": "{{displayCount}} Zeilen",
       "matchesBadge_one": "{{displayCount}} Treffer",
-      "matchesBadge_other": "{{displayCount}} Treffer"
+      "matchesBadge_other": "{{displayCount}} Treffer",
+      "noOutput": "Keine Ausgabe."
     },
     "readToolMarkdown": {
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Du hast zu viele Anmeldeversuche unternommen. Bitte warte einen Moment und versuche es erneut."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Spitzenmodell",
+      "balanced": "Auto Ausgewogen",
+      "efficient": "Auto Effizient",
+      "small": "Auto Klein",
+      "free": "Auto Kostenlos",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Daten werden erfasst",
     "free": "Kostenlos",
     "couldNotUpdateFavorites": "Die Favoriten konnten nicht aktualisiert werden.",
@@ -3155,7 +3174,8 @@
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
-    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen."
+    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
+    "newestResult": "Neuestes Ergebnis"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Dein Computer",
     "remoteOptionBody": "Führe Kilo über die `kilo remote`-CLI auf deinem eigenen Rechner aus.",
     "skip": "Tour überspringen",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Starte deine erste Remote-Sitzung",
-    "remoteBody": "Verbinde deinen Computer und starte die Sitzung dann von hier.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Noch kein Computer verbunden",
-    "remoteEmptyBody": "Um ihn zu verbinden, führe `kilo remote` auf deinem Computer aus.",
-    "remoteFound": "Computer verbunden",
-    "checkAgain": "Erneut prüfen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Letzte Sitzung öffnen"
+  },
+  "spendAlerts": {
+    "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
+    "enable": "Ausgaben-Warnungen aktivieren",
+    "thresholdTitle": "Schwellenwertüberschreitung",
+    "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
+    "anomalyTitle": "Stündliche Spitze",
+    "anomalySubtitle": "Eine Stunde liegt weit über der üblichen Rate dieses Bereichs",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Zeitfenster",
+    "window24h": "24 Stunden",
+    "window7d": "7 Tage",
+    "window30d": "30 Tage",
+    "multiplierLabel": "Spitzen-Multiplikator",
+    "saved": "Einstellungen für Ausgaben-Warnungen gespeichert",
+    "loadError": "Ausgaben-Warnungen konnten nicht geladen werden.",
+    "saveError": "Ausgaben-Warnungen konnten nicht gespeichert werden.",
+    "empty": "Ausgaben-Warnungen sind aus. Schalte sie ein, um die Abrechnungskontakte dieses Bereichs zu warnen.",
+    "noSpend": "Noch keine Ausgaben erfasst",
+    "spend24h": "Ausgaben der letzten 24 Stunden",
+    "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
+    "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
+    "pushOffByCategory": "In Benachrichtigungen aus"
   }
 }

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Wepụ mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ.",
     "featureFlags": "Ọkọ atụmatụ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "site na sava · ≥ {{min}}",
+    "featureFlagSkipped": "ndabara · < {{min}}",
+    "featureFlagNotLoaded": "ndabara · ebudobeghị",
     "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "Ozi nkata",
       "kiloclaw": "Ihe omume KiloClaw",
       "balance": "Ọkwa gbasara ego fọdụrụ",
-      "security": "Ihe achọpụtara gbasara nchebe"
+      "security": "Ihe achọpụtara gbasara nchebe",
+      "spend": "Ọkwa gbasara mmefu"
     },
     "category": {
       "chatMessagesSubtitle": "azịza na mkparịta ụka gị",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Ọnọdụ nnọkọ",
       "sessionStatusSubtitle": "agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
+      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ọrụ KiloClaw.",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
-      "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA"
+      "balanceAlertsUnavailable": "Sonye na ụlọ ọrụ iji nweta ịdọ aka na ntị ego.",
+      "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
+      "securityFindingsUnavailable": "Gbanye Onye enyemaka nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
+      "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
+      "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
     "action": {
       "openSession": "Mepee nnọkọ"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Enweghị ike ibudata nnọkọ ahụ.",
       "failedToLoadDetails": "Enweghị ike ibudata nkọwa nnọkọ ahụ.",
       "failedToStopExecution": "Enweghị ike ịkwụsị ọrụ ahụ.",
+      "stopped": "A kwụsịrị nnọkọ ahụ",
+      "committing": "A na-echekwa…",
+      "committed": "Echekwara",
+      "commitFailed": "Nchekwa dara",
       "renameSession": "Gbanwee aha nnọkọ",
       "renamePlaceholder": "Aha nnọkọ",
       "transcriptAccessibility": "Ndekọ nnọkọ",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "ahịrị {{displayCount}}",
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
-      "matchesBadge_other": "ndakọrịta {{displayCount}}"
+      "matchesBadge_other": "ndakọrịta {{displayCount}}",
+      "noOutput": "Enweghị mpụta."
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."
   },
   "models": {
+    "auto": {
+      "frontier": "Akpaaka Kachasị elu",
+      "balanced": "Akpaaka Nhatanha",
+      "efficient": "Akpaaka Na-arụ ọrụ nke ọma",
+      "small": "Akpaaka Nta",
+      "free": "Akpaaka N'efu",
+      "organization": "Akpaaka Òtù"
+    },
     "dataCollected": "Data anakọtara",
     "free": "N'efu",
     "couldNotUpdateFavorites": "Enweghị ike imelite ihe kacha amasị gị.",
@@ -3155,7 +3174,8 @@
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
-    "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ."
+    "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ.",
+    "newestResult": "Nsonaazụ kacha ọhụrụ"
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Kọmputa gị",
     "remoteOptionBody": "Gbaa Kilo na igwe gị site na CLI nke `kilo remote`.",
     "skip": "Kwụsị njem",
-    "tutorialLabel": "Ntuziaka",
-    "remoteTitle": "Malite nnọkọ remote mbụ gị",
-    "remoteBody": "Jikọta kọmputa gị, mesịa malitee nnọkọ ahụ site ebe a.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Onweghị kọmputa jikọrọ ruo ugbu a",
-    "remoteEmptyBody": "Iji jikọta ya, gbaa `kilo remote` na kọmputa gị.",
-    "remoteFound": "Ejikọrọ kọmputa",
-    "checkAgain": "Lelee ọzọ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ntuziaka"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Mepee nnọkọ ikpeazụ"
+  },
+  "spendAlerts": {
+    "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
+    "enable": "Gbanye ọkwa gbasara mmefu",
+    "thresholdTitle": "Ịgafe oke",
+    "thresholdSubtitle": "Mmefu na-aga n'ihu na-agafe oke gị",
+    "anomalyTitle": "Mmụba kwa awa",
+    "anomalySubtitle": "Otu awa dị nnọọ elu karịa ọnụ ọgụgụ mpaghara a",
+    "limitLabel": "Oke (USD)",
+    "windowLabel": "Oge",
+    "window24h": "Awa 24",
+    "window7d": "Ụbọchị 7",
+    "window30d": "Ụbọchị 30",
+    "multiplierLabel": "Ọnụọgụ mmụba",
+    "saved": "Echekwara ntọala ọkwa gbasara mmefu",
+    "loadError": "Enweghị ike ibudata ọkwa gbasara mmefu.",
+    "saveError": "Enweghị ike ichekwa ọkwa gbasara mmefu.",
+    "empty": "Ọkwa gbasara mmefu gbanyụrụ. Gbanye ya iji kwaa ndị kọntaktị ịgba ụgwọ nke mpaghara a aka na ntị.",
+    "noSpend": "Edebebeghị mmefu ọ bụla",
+    "spend24h": "Mmefu n'ime awa 24 gara aga",
+    "multiplierError": "Tinye ọnụọgụ mmụba nke 1 ma ọ bụ karịa",
+    "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
+    "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa"
   }
 }

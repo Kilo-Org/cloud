@@ -27,6 +27,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -36,6 +37,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
+  X: 'X',
 }));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
@@ -144,6 +146,35 @@ describe('repository picker Bitbucket scope note', () => {
       changeSearch('');
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
+  });
+});
+
+describe('repository picker search placeholder', () => {
+  const copy = 'Search repositories...';
+
+  it('renders a single tail-ellipsized line instead of a wrapping native hint', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    // The native hint is what Android lays out at the field width with no line
+    // cap, wrapping onto a second line the fixed-height field then clips.
+    expect(input.props.placeholder).toBeUndefined();
+
+    const placeholder = hosts(renderer, 'Text').find(node => node.props.children === copy);
+    if (!placeholder) {
+      throw new Error('Search placeholder overlay did not mount');
+    }
+    expect(placeholder.props.numberOfLines).toBe(1);
+    expect(placeholder.props.ellipsizeMode).toBe('tail');
+    expect(placeholder.parent?.props.pointerEvents).toBe('none');
+
+    const changeSearch = input.props.onChangeText as (text: string) => void;
+    act(() => {
+      changeSearch('org/repo');
+    });
+    expect(hosts(renderer, 'Text').some(node => node.props.children === copy)).toBe(false);
   });
 });
 

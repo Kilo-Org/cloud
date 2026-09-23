@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
     "featureFlags": "Funktsioonilipud",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "serverist · ≥ {{min}}",
+    "featureFlagSkipped": "vaikeväärtus · < {{min}}",
+    "featureFlagNotLoaded": "vaikeväärtus · laadimata",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "Vestlussõnumid",
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
-      "security": "Turvaleiud"
+      "security": "Turvaleiud",
+      "spend": "Kulutushoiatused"
     },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
+      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClawi tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
-      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada saldo hoiatusi.",
+      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
+      "securityFindingsUnavailable": "Luba Kilo turvaagent ühes ulatuses, et saada turvalisuse leide.",
+      "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
+      "spendAlertsToggle": "Kulutushoiatuste kategooria"
     },
     "action": {
       "openSession": "Ava seanss"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
+      "stopped": "Seanss peatati",
+      "committing": "Kinnitamine…",
+      "committed": "Kinnitatud",
+      "commitFailed": "Kinnitamine ebaõnnestus",
       "renameSession": "Nimeta seanss ümber",
       "renamePlaceholder": "Seansi nimi",
       "transcriptAccessibility": "Seansi vestlusajalugu",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} rida",
       "linesBadge_other": "{{displayCount}} rida",
       "matchesBadge_one": "{{displayCount}} vastet",
-      "matchesBadge_other": "{{displayCount}} vastet"
+      "matchesBadge_other": "{{displayCount}} vastet",
+      "noOutput": "Väljund puudub."
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaatne Tipptasemel",
+      "balanced": "Automaatne Tasakaalustatud",
+      "efficient": "Automaatne Tõhus",
+      "small": "Automaatne Väike",
+      "free": "Automaatne Tasuta",
+      "organization": "Organisatsiooni automaatne"
+    },
     "dataCollected": "Andmeid kogutakse",
     "free": "Tasuta",
     "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus.",
@@ -3155,7 +3174,8 @@
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
-    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve)."
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
+    "newestResult": "Uusim tulemus"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Sinu arvuti",
     "remoteOptionBody": "Käivita Kilo omas arvutis `kilo remote` CLI kaudu.",
     "skip": "Jäta tiivustus vahele",
-    "tutorialLabel": "Õpetus",
-    "remoteTitle": "Alusta oma esimest kaugseanssi",
-    "remoteBody": "Ühenda oma arvuti ja käivita seejärel seanss siit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ühtegi arvutit veel ühendatud pole",
-    "remoteEmptyBody": "Selle ühendamiseks käivita oma arvutis `kilo remote`.",
-    "remoteFound": "Arvuti ühendatud",
-    "checkAgain": "Kontrolli uuesti",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Õpetus"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Ava viimane seanss"
+  },
+  "spendAlerts": {
+    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle piirkonna kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
+    "enable": "Luba kulutushoiatused",
+    "thresholdTitle": "Lävendi ületamine",
+    "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
+    "anomalyTitle": "Tunnipõhine tõus",
+    "anomalySubtitle": "Üks tund on selle piirkonna tavapärasest määrast tunduvalt kõrgem",
+    "limitLabel": "Limiit (USD)",
+    "windowLabel": "Aken",
+    "window24h": "24 tundi",
+    "window7d": "7 päeva",
+    "window30d": "30 päeva",
+    "multiplierLabel": "Tõusu kordaja",
+    "saved": "Kulutushoiatuste seaded on salvestatud",
+    "loadError": "Kulutushoiatuste laadimine ebaõnnestus.",
+    "saveError": "Kulutushoiatuste salvestamine ebaõnnestus.",
+    "empty": "Kulutushoiatused on välja lülitatud. Lülita need sisse, et hoiatada selle piirkonna faktureerimiskontakte.",
+    "noSpend": "Kulutusi pole veel registreeritud",
+    "spend24h": "Viimase 24 tunni kulutus",
+    "multiplierError": "Sisesta kordaja 1 või suurem",
+    "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
+    "pushOffByCategory": "Teavitustes väljas"
   }
 }

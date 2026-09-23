@@ -4,6 +4,7 @@ import {
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
   shouldFollowSessionContentSize,
+  shouldFollowSessionViewportResize,
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
@@ -168,6 +169,43 @@ describe('shouldScheduleSessionAutoScroll', () => {
       })
     ).toBe(false);
   });
+
+  it('does not schedule when only an older page was prepended (newest key unchanged)', () => {
+    // The item count grew, but the tail of the list did not move: an older
+    // page landed. Scheduling a scroll here would yank the viewport back to
+    // the newest message while the user is reading history.
+    expect(
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: false,
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        newestKeyChanged: false,
+      })
+    ).toBe(false);
+  });
+
+  it('schedules when the newest item key changed', () => {
+    expect(
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: false,
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        newestKeyChanged: true,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps scheduling for callers that do not track the newest key', () => {
+    // Layout and keyboard triggers have no item identity; omitting the new
+    // guard must preserve the previous behavior.
+    expect(
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: false,
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+      })
+    ).toBe(true);
+  });
 });
 
 describe('shouldRetrySessionAutoScroll', () => {
@@ -249,6 +287,58 @@ describe('shouldFollowSessionContentSize', () => {
         isUserScrolling: false,
         shouldAutoScroll: false,
         didContentHeightChange: true,
+      })
+    ).toBe(false);
+  });
+});
+
+describe('shouldFollowSessionViewportResize', () => {
+  it('permits a viewport-resize follow scroll while a programmatic scroll is still in flight', () => {
+    // The fixed status row (working indicator / session status indicator)
+    // mounts outside the list, so the viewport shrinks while the offset stays
+    // put. During streaming that resize lands inside the 150ms programmatic
+    // window, and gating on `!isAutoScrolling` would leave the newest row
+    // below the fold — drawn over the status row, because the list does not
+    // clip.
+    expect(
+      shouldFollowSessionViewportResize({
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        didViewportHeightChange: true,
+      })
+    ).toBe(true);
+  });
+
+  it('blocks the follow when the viewport height has not actually changed', () => {
+    // A redundant layout pass (same height) must keep the guarded scheduler
+    // instead of taking the bypass, so it cannot stack scrolls on top of a
+    // programmatic scroll already in flight.
+    expect(
+      shouldFollowSessionViewportResize({
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        didViewportHeightChange: false,
+      })
+    ).toBe(false);
+  });
+
+  it('blocks the follow while the user is actively dragging or in momentum fling', () => {
+    expect(
+      shouldFollowSessionViewportResize({
+        isUserScrolling: true,
+        shouldAutoScroll: true,
+        didViewportHeightChange: true,
+      })
+    ).toBe(false);
+  });
+
+  it('blocks the follow when the user has scrolled away from the bottom', () => {
+    // A keyboard or row resize must never yank a reader who scrolled back.
+    expect(
+      shouldFollowSessionViewportResize({
+        isUserScrolling: false,
+        shouldAutoScroll: false,
+        didViewportHeightChange: true,
       })
     ).toBe(false);
   });

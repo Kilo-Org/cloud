@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla.",
     "featureFlags": "Indicadors de funcions",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "remot · ≥ {{min}}",
+    "featureFlagSkipped": "per defecte · < {{min}}",
+    "featureFlagNotLoaded": "per defecte · no carregat",
     "gatewayTranscription": "Transcripció amb Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcriu el dictat amb un model de Kilo Gateway en lloc del reconeixement de veu del dispositiu. Enviarem la teva gravació a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -843,7 +843,8 @@
       "chat": "Missatges de xat",
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
-      "security": "Problemes de seguretat"
+      "security": "Problemes de seguretat",
+      "spend": "Alertes de despesa"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
@@ -854,8 +855,13 @@
       "sessionStatusTitle": "Estat de la sessió",
       "sessionStatusSubtitle": "finalitzada / fallida / a punt per controlar",
       "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
+      "kiloclawActivityUnavailable": "Inicia una instància de KiloClaw per rebre activitat de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
-      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA"
+      "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo.",
+      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
+      "securityFindingsUnavailable": "Activa l'Agent de seguretat de Kilo en un àmbit per rebre deteccions de seguretat.",
+      "spendAlertsSubtitle": "superacions de llindars i pics horaris",
+      "spendAlertsToggle": "Categoria d'alertes de despesa"
     },
     "action": {
       "openSession": "Obre la sessió"
@@ -2104,6 +2110,10 @@
       "couldNotLoad": "No s'ha pogut carregar la sessió.",
       "failedToLoadDetails": "No s'han pogut carregar els detalls de la sessió.",
       "failedToStopExecution": "No s'ha pogut aturar l'execució.",
+      "stopped": "Sessió aturada",
+      "committing": "S'està consignant…",
+      "committed": "Consignat",
+      "commitFailed": "No s'ha pogut consignar",
       "renameSession": "Reanomena la sessió",
       "renamePlaceholder": "Nom de la sessió",
       "transcriptAccessibility": "Transcripció de la sessió",
@@ -2248,7 +2258,8 @@
       "linesBadge_many": "{{displayCount}} línies",
       "matchesBadge_one": "{{displayCount}} coincidència",
       "matchesBadge_other": "{{displayCount}} coincidències",
-      "matchesBadge_many": "{{displayCount}} coincidències"
+      "matchesBadge_many": "{{displayCount}} coincidències",
+      "noOutput": "No hi ha cap sortida."
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -3151,6 +3162,14 @@
     "tooManySignInAttempts": "Has fet massa intents d'inici de sessió. Espera un moment i torna-ho a provar."
   },
   "models": {
+    "auto": {
+      "frontier": "Automàtic Avançat",
+      "balanced": "Automàtic Equilibrat",
+      "efficient": "Automàtic Eficient",
+      "small": "Automàtic Petit",
+      "free": "Automàtic Gratuït",
+      "organization": "Automàtic d'organització"
+    },
     "dataCollected": "Recull dades",
     "free": "Gratuït",
     "couldNotUpdateFavorites": "No s'han pogut actualitzar els preferits.",
@@ -3198,7 +3217,8 @@
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
-    "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar."
+    "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
+    "newestResult": "Resultat més recent"
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
@@ -3223,15 +3243,7 @@
     "remoteOptionTitle": "El teu ordinador",
     "remoteOptionBody": "Executa el Kilo a la teva pròpia màquina mitjançant el CLI `kilo remote`.",
     "skip": "Salta el tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicia la teva primera sessió remota",
-    "remoteBody": "Connecta el teu ordinador i després inicia la sessió des d'aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Encara no hi ha cap ordinador connectat",
-    "remoteEmptyBody": "Per connectar-lo, executa `kilo remote` al teu ordinador.",
-    "remoteFound": "Ordinador connectat",
-    "checkAgain": "Torna-ho a comprovar",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3242,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "Obre l'última sessió"
+  },
+  "spendAlerts": {
+    "subtitle": "Envia una alerta per correu o notificació push als contactes de facturació quan la despesa d'aquest àmbit superi un límit o augmenti per sobre de la seva taxa horària habitual.",
+    "enable": "Activa les alertes de despesa",
+    "thresholdTitle": "Superació del llindar",
+    "thresholdSubtitle": "La despesa acumulada supera el teu límit",
+    "anomalyTitle": "Pic horari",
+    "anomalySubtitle": "Una hora està molt per sobre de la taxa habitual d'aquest àmbit",
+    "limitLabel": "Límit (USD)",
+    "windowLabel": "Finestra",
+    "window24h": "24 hores",
+    "window7d": "7 dies",
+    "window30d": "30 dies",
+    "multiplierLabel": "Multiplicador del pic",
+    "saved": "S'ha desat la configuració de les alertes de despesa",
+    "loadError": "No s'han pogut carregar les alertes de despesa.",
+    "saveError": "No s'han pogut desar les alertes de despesa.",
+    "empty": "Les alertes de despesa estan desactivades. Activa-les per avisar els contactes de facturació d'aquest àmbit.",
+    "noSpend": "Encara no s'ha registrat cap despesa",
+    "spend24h": "Despesa de les últimes 24 hores",
+    "multiplierError": "Introdueix un multiplicador d'1 o més",
+    "permissionDenied": "No tens permís per gestionar les alertes de despesa.",
+    "pushOffByCategory": "Desactivat a Notificacions"
   }
 }

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ.",
     "featureFlags": "ທຸງຄຸນສົມບັດ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "ຈາກເຊີບເວີ · ≥ {{min}}",
+    "featureFlagSkipped": "ຄ່າເລີ່ມຕົ້ນ · < {{min}}",
+    "featureFlagNotLoaded": "ຄ່າເລີ່ມຕົ້ນ · ຍັງບໍ່ໂຫຼດ",
     "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "ຂໍ້ຄວາມສົນທະນາ",
       "kiloclaw": "ກິດຈະກຳ KiloClaw",
       "balance": "ການແຈ້ງເຕືອນຍອດເງິນ",
-      "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ"
+      "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ",
+      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ"
     },
     "category": {
       "chatMessagesSubtitle": "ຄຳຕອບໃນການສົນທະນາຂອງທ່ານ",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "ສະຖານະເຊສຊັນ",
       "sessionStatusSubtitle": "ສຳເລັດ / ບໍ່ສຳເລັດ / ພ້ອມໃຫ້ຄວບຄຸມ",
       "kiloclawActivitySubtitle": "ອິນສະແຕນພ້ອມໃຊ້ງານ/ຂັດຂ້ອງ, ວຽກທີ່ຕັ້ງເວລາໄວ້",
+      "kiloclawActivityUnavailable": "ເລີ່ມອິນສະແຕນ KiloClaw ເພື່ອຮັບກິດຈະກຳ KiloClaw.",
       "balanceAlertsSubtitle": "ຄຳເຕືອນເມື່ອຍອດເງິນຂອງອົງກອນຕໍ່າ",
-      "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA"
+      "balanceAlertsUnavailable": "ເຂົ້າຮ່ວມອົງກອນ ເພື່ອຮັບການແຈ້ງເຕືອນຍອດເງິນ.",
+      "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA",
+      "securityFindingsUnavailable": "ເປີດເອເຈນດ້ານຄວາມປອດໄພ Kilo ໃນຂອບເຂດ ເພື່ອຮັບບັນຫາຄວາມປອດໄພ.",
+      "spendAlertsSubtitle": "ການຂ້າມຂີດຈຳກັດ ແລະ ການເພີ່ມຂຶ້ນຕໍ່ຊົ່ວໂມງ",
+      "spendAlertsToggle": "ໝວດການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ"
     },
     "action": {
       "openSession": "ເປີດເຊສຊັນ"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນໄດ້.",
       "failedToLoadDetails": "ບໍ່ສາມາດໂຫຼດລາຍລະອຽດເຊດຊັນໄດ້.",
       "failedToStopExecution": "ບໍ່ສາມາດຢຸດການເຮັດວຽກໄດ້.",
+      "stopped": "ຢຸດເຊດຊັນແລ້ວ",
+      "committing": "ກຳລັງບັນທຶກ…",
+      "committed": "ບັນທຶກແລ້ວ",
+      "commitFailed": "ບັນທຶກລົ້ມເຫຼວ",
       "renameSession": "ປ່ຽນຊື່ເຊດຊັນ",
       "renamePlaceholder": "ຊື່ເຊດຊັນ",
       "transcriptAccessibility": "ບັນທຶກການສົນທະນາໃນເຊດຊັນ",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} ບັນທັດ",
       "linesBadge_other": "{{displayCount}} ບັນທັດ",
       "matchesBadge_one": "ພົບ {{displayCount}} ລາຍການ",
-      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ"
+      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ",
+      "noOutput": "ບໍ່ມີຜົນອອກ."
     },
     "readToolMarkdown": {
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "ທ່ານລອງເຂົ້າສູ່ລະບົບຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ."
   },
   "models": {
+    "auto": {
+      "frontier": "ອັດຕະໂນມັດ ລ້ຳໜ້າ",
+      "balanced": "ອັດຕະໂນມັດ ສົມດຸນ",
+      "efficient": "ອັດຕະໂນມັດ ປະສິດທິພາບ",
+      "small": "ອັດຕະໂນມັດ ນ້ອຍ",
+      "free": "ອັດຕະໂນມັດ ຟຣີ",
+      "organization": "ອົງກອນ ອັດຕະໂນມັດ"
+    },
     "dataCollected": "ມີການເກັບຂໍ້ມູນ",
     "free": "ຟຣີ",
     "couldNotUpdateFavorites": "ບໍ່ສາມາດອັບເດດລາຍການທີ່ມັກໄດ້.",
@@ -3155,7 +3174,8 @@
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
-    "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ."
+    "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
+    "newestResult": "ຜົນຫຼ້າສຸດ"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "ຄອມພິວເຕີຂອງທ່ານ",
     "remoteOptionBody": "ແລ່ນ Kilo ໃນເຄື່ອງຂອງທ່ານເອງຜ່ານ CLI `kilo remote`.",
     "skip": "ຂ້າມການທ່ອງທ່ຽວ",
-    "tutorialLabel": "ຄູ່ມື",
-    "remoteTitle": "ເລີ່ມເຊດຊັນໄກທຳອິດຂອງທ່ານ",
-    "remoteBody": "ເຊື່ອມຕໍ່ຄອມພິວເຕີຂອງທ່ານ, ແລ້ວເລີ່ມເຊດຊັນຈາກທີ່ນີ້.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ຍັງບໍ່ມີຄອມພິວເຕີເຊື່ອມຕໍ່",
-    "remoteEmptyBody": "ເພື່ອເຊື່ອມຕໍ່ມັນ, ໃຫ້ແລ່ນ `kilo remote` ໃນຄອມພິວເຕີຂອງທ່ານ.",
-    "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
-    "checkAgain": "ກວດສອບອີກຄັ້ງ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ຄູ່ມື"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "ເປີດເຊສຊັນລ່າສຸດ"
+  },
+  "spendAlerts": {
+    "subtitle": "ສົ່ງການແຈ້ງເຕືອນຜ່ານອີເມວ ຫຼື push ໄປຫາຜູ້ຕິດຕໍ່ການຮຽກເກັບເງິນ ເມື່ອການໃຊ້ຈ່າຍຂອງຂອບເຂດນີ້ຂ້າມຂີດຈຳກັດ ຫຼື ເພີ່ມຂຶ້ນເໜືອອັດຕາຕໍ່ຊົ່ວໂມງປົກກະຕິ.",
+    "enable": "ເປີດການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ",
+    "thresholdTitle": "ການຂ້າມຂີດຈຳກັດ",
+    "thresholdSubtitle": "ການໃຊ້ຈ່າຍປັດຈຸບັນຂ້າມຂີດຈຳກັດຂອງທ່ານ",
+    "anomalyTitle": "ການເພີ່ມຂຶ້ນຕໍ່ຊົ່ວໂມງ",
+    "anomalySubtitle": "ໜຶ່ງຊົ່ວໂມງສູງກວ່າອັດຕາປົກກະຕິຂອງຂອບເຂດນີ້ຫຼາຍ",
+    "limitLabel": "ຂີດຈຳກັດ (USD)",
+    "windowLabel": "ໄລຍະເວລາ",
+    "window24h": "24 ຊົ່ວໂມງ",
+    "window7d": "7 ວັນ",
+    "window30d": "30 ວັນ",
+    "multiplierLabel": "ຕົວຄູນການເພີ່ມຂຶ້ນ",
+    "saved": "ບັນທຶກການຕັ້ງຄ່າການແຈ້ງເຕືອນການໃຊ້ຈ່າຍແລ້ວ",
+    "loadError": "ບໍ່ສາມາດໂຫຼດການແຈ້ງເຕືອນການໃຊ້ຈ່າຍໄດ້.",
+    "saveError": "ບໍ່ສາມາດບັນທຶກການແຈ້ງເຕືອນການໃຊ້ຈ່າຍໄດ້.",
+    "empty": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍປິດຢູ່. ເປີດມັນເພື່ອແຈ້ງເຕືອນຜູ້ຕິດຕໍ່ການຮຽກເກັບເງິນຂອງຂອບເຂດນີ້.",
+    "noSpend": "ຍັງບໍ່ມີການບັນທຶກການໃຊ້ຈ່າຍ",
+    "spend24h": "ການໃຊ້ຈ່າຍໃນ 24 ຊົ່ວໂມງຜ່ານມາ",
+    "multiplierError": "ໃສ່ຕົວຄູນ 1 ຫຼື ຫຼາຍກວ່າ",
+    "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ.",
+    "pushOffByCategory": "ປິດໃນການແຈ້ງເຕືອນ"
   }
 }

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά.",
     "featureFlags": "Σημαίες λειτουργιών",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "από τον διακομιστή · ≥ {{min}}",
+    "featureFlagSkipped": "προεπιλογή · < {{min}}",
+    "featureFlagNotLoaded": "προεπιλογή · δεν φορτώθηκε",
     "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "Μηνύματα συνομιλίας",
       "kiloclaw": "Δραστηριότητα KiloClaw",
       "balance": "Ειδοποιήσεις υπολοίπου",
-      "security": "Ευρήματα ασφάλειας"
+      "security": "Ευρήματα ασφάλειας",
+      "spend": "Ειδοποιήσεις δαπανών"
     },
     "category": {
       "chatMessagesSubtitle": "απαντήσεις στις συνομιλίες σου",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Κατάσταση συνεδρίας",
       "sessionStatusSubtitle": "ολοκληρώθηκε / απέτυχε / έτοιμη για έλεγχο",
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
+      "kiloclawActivityUnavailable": "Ξεκινήστε ένα περιβάλλον KiloClaw για να λαμβάνετε δραστηριότητα KiloClaw.",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
-      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA"
+      "balanceAlertsUnavailable": "Συνδεθείτε σε έναν οργανισμό για να λαμβάνετε ειδοποιήσεις υπολοίπου.",
+      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA",
+      "securityFindingsUnavailable": "Ενεργοποιήστε τον Πράκτορα ασφάλειας Kilo σε ένα εύρος για να λαμβάνετε ευρήματα ασφάλειας.",
+      "spendAlertsSubtitle": "υπερβάσεις ορίων και ωριαίες κορυφώσεις",
+      "spendAlertsToggle": "Κατηγορία ειδοποιήσεων δαπανών"
     },
     "action": {
       "openSession": "Άνοιγμα συνεδρίας"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της συνεδρίας.",
       "failedToLoadDetails": "Δεν ήταν δυνατή η φόρτωση των λεπτομερειών της συνεδρίας.",
       "failedToStopExecution": "Δεν ήταν δυνατή η διακοπή της εκτέλεσης.",
+      "stopped": "Η συνεδρία σταμάτησε",
+      "committing": "Γίνεται καταχώριση…",
+      "committed": "Καταχωρίστηκε",
+      "commitFailed": "Η καταχώριση απέτυχε",
       "renameSession": "Μετονομασία συνεδρίας",
       "renamePlaceholder": "Όνομα συνεδρίας",
       "transcriptAccessibility": "Ιστορικό συνομιλίας της συνεδρίας",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} γραμμή",
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
-      "matchesBadge_other": "{{displayCount}} αντιστοιχίες"
+      "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
+      "noOutput": "Δεν υπάρχει έξοδος."
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Έγιναν πάρα πολλές προσπάθειες σύνδεσης. Περίμενε λίγο και δοκίμασε ξανά."
   },
   "models": {
+    "auto": {
+      "frontier": "Αυτόματο Αιχμής",
+      "balanced": "Αυτόματο Ισορροπημένο",
+      "efficient": "Αυτόματο Αποδοτικό",
+      "small": "Αυτόματο Μικρό",
+      "free": "Αυτόματο Δωρεάν",
+      "organization": "Αυτόματο Οργανισμού"
+    },
     "dataCollected": "Συλλογή δεδομένων",
     "free": "Δωρεάν",
     "couldNotUpdateFavorites": "Δεν ήταν δυνατή η ενημέρωση των αγαπημένων.",
@@ -3155,7 +3174,8 @@
     "channelName": "Ενεργοί πράκτορες",
     "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος.",
     "openSession": "Άνοιξε",
-    "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά."
+    "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά.",
+    "newestResult": "Νεότερο αποτέλεσμα"
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Ο υπολογιστής σου",
     "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
     "skip": "Παράλειξη ξενάγησης",
-    "tutorialLabel": "Οδηγός",
-    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
-    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
-    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
-    "remoteFound": "Ο υπολογιστής συνδέθηκε",
-    "checkAgain": "Έλεγχος ξανά",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Οδηγός"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Άνοιγμα τελευταίας συνεδρίας"
+  },
+  "spendAlerts": {
+    "subtitle": "Στείλε ειδοποίηση με email ή push στις επαφές χρέωσης όταν η δαπάνη αυτού του πεδίου ξεπερνά ένα όριο ή αυξάνεται πάνω από τη συνήθη ωριαία τιμή του.",
+    "enable": "Ενεργοποίηση ειδοποιήσεων δαπανών",
+    "thresholdTitle": "Υπέρβαση ορίου",
+    "thresholdSubtitle": "Η τρέχουσα δαπάνη ξεπερνά το όριό σου",
+    "anomalyTitle": "Ωριαία κορύφωση",
+    "anomalySubtitle": "Μια ώρα είναι πολύ πάνω από τη συνήθη τιμή αυτού του πεδίου",
+    "limitLabel": "Όριο (USD)",
+    "windowLabel": "Παράθυρο",
+    "window24h": "24 ώρες",
+    "window7d": "7 ημέρες",
+    "window30d": "30 ημέρες",
+    "multiplierLabel": "Πολλαπλασιαστής κορύφωσης",
+    "saved": "Οι ρυθμίσεις ειδοποιήσεων δαπανών αποθηκεύτηκαν",
+    "loadError": "Δεν ήταν δυνατή η φόρτωση των ειδοποιήσεων δαπανών.",
+    "saveError": "Δεν ήταν δυνατή η αποθήκευση των ειδοποιήσεων δαπανών.",
+    "empty": "Οι ειδοποιήσεις δαπανών είναι ανενεργές. Ενεργοποίησέ τις για να ειδοποιείς τις επαφές χρέωσης αυτού του πεδίου.",
+    "noSpend": "Δεν έχει καταγραφεί ακόμη καμία δαπάνη",
+    "spend24h": "Δαπάνη τις τελευταίες 24 ώρες",
+    "multiplierError": "Εισήγαγε πολλαπλασιαστή 1 ή μεγαλύτερο",
+    "permissionDenied": "Δεν έχεις δικαίωμα να διαχειρίζεσαι τις ειδοποιήσεις δαπανών.",
+    "pushOffByCategory": "Ανενεργό στις Ειδοποιήσεις"
   }
 }

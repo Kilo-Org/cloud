@@ -1,12 +1,17 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import {
   getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
   shouldFollowSessionContentSize,
+  shouldFollowSessionViewportResize,
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
@@ -14,6 +19,13 @@ import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type UseSessionListAutoScrollParams = {
   itemCount: number;
+  /**
+   * Key of `items.at(-1)` (the newest item) or `null` for an empty list.
+   * The item-count effect only schedules a scroll when this key changes, so
+   * prepending an older page (count grows, newest unchanged) can never yank
+   * the viewport back to the newest message.
+   */
+  newestItemKey: string | null;
   resetKey: string;
   /**
    * Whether the session opens following the newest message. Default true keeps
@@ -42,6 +54,7 @@ type UseSessionListAutoScrollParams = {
  */
 export function useSessionListAutoScroll<ItemT>({
   itemCount,
+  newestItemKey,
   resetKey,
   initialAutoScroll = true,
   resumeKey = null,
@@ -76,6 +89,13 @@ export function useSessionListAutoScroll<ItemT>({
   // (see the reset effect) while a drag's claim outranks the link.
   const sendTakeoverRef = useRef(false);
   const lastContentHeightRef = useRef(0);
+  // Newest item key seen by the previous render. The item-count effect
+  // compares against it to tell a genuine append (newest key changed) from
+  // an older page landing (count grew, newest key untouched).
+  const lastNewestItemKeyRef = useRef<string | null>(null);
+  // The list's own height, tracked so a viewport resize (the fixed status row
+  // mounting outside the list) can re-pin the tail. See `handleListLayout`.
+  const lastViewportHeightRef = useRef(0);
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -193,35 +213,39 @@ export function useSessionListAutoScroll<ItemT>({
     [clearAutoScrollResetTimeout]
   );
 
-  const scheduleScrollToLatestMessage = useCallback(() => {
-    if (
-      !shouldScheduleSessionAutoScroll({
-        isAutoScrolling: isAutoScrollingRef.current,
-        isUserScrolling: isUserScrollingRef.current,
-        shouldAutoScroll: shouldAutoScrollRef.current,
-      })
-    ) {
-      return;
-    }
-    scrollToLatestMessage();
-    clearAutoScrollRetryTimeout();
-    autoScrollRetryTimeoutRef.current = setTimeout(() => {
-      autoScrollRetryTimeoutRef.current = null;
-      // The 80ms safety-net retry must not gate on `isAutoScrolling`:
-      // a programmatic scroll that's still within its 150ms window
-      // would otherwise suppress the retry and make it dead during the
-      // highest-frequency streaming window. It still honours the
-      // user-facing and follow-bottom guards.
+  const scheduleScrollToLatestMessage = useCallback(
+    (newestKeyChanged = true) => {
       if (
-        shouldRetrySessionAutoScroll({
+        !shouldScheduleSessionAutoScroll({
+          isAutoScrolling: isAutoScrollingRef.current,
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
+          newestKeyChanged,
         })
       ) {
-        scrollToLatestMessage();
+        return;
       }
-    }, 80);
-  }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
+      scrollToLatestMessage();
+      clearAutoScrollRetryTimeout();
+      autoScrollRetryTimeoutRef.current = setTimeout(() => {
+        autoScrollRetryTimeoutRef.current = null;
+        // The 80ms safety-net retry must not gate on `isAutoScrolling`:
+        // a programmatic scroll that's still within its 150ms window
+        // would otherwise suppress the retry and make it dead during the
+        // highest-frequency streaming window. It still honours the
+        // user-facing and follow-bottom guards.
+        if (
+          shouldRetrySessionAutoScroll({
+            isUserScrolling: isUserScrollingRef.current,
+            shouldAutoScroll: shouldAutoScrollRef.current,
+          })
+        ) {
+          scrollToLatestMessage();
+        }
+      }, 80);
+    },
+    [clearAutoScrollRetryTimeout, scrollToLatestMessage]
+  );
 
   // A new session resets the follow policy and the sticky takeover flag. A
   // policy that flips on its own mid-session — a `?at=` resume whose anchor
@@ -251,16 +275,19 @@ export function useSessionListAutoScroll<ItemT>({
     const initial = getInitialSessionListAutoScrollVisibility({ followTail: initialAutoScroll });
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
+    lastNewestItemKeyRef.current = null;
     userInteractedRef.current = false;
     sendTakeoverRef.current = false;
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
   }, [resetKey, initialAutoScroll, resumeKey]);
 
   useEffect(() => {
-    if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
-      scheduleScrollToLatestMessage();
+    const newestKeyChanged = lastNewestItemKeyRef.current !== newestItemKey;
+    lastNewestItemKeyRef.current = newestItemKey;
+    if (itemCount > 0) {
+      scheduleScrollToLatestMessage(newestKeyChanged);
     }
-  }, [itemCount, scheduleScrollToLatestMessage]);
+  }, [itemCount, newestItemKey, scheduleScrollToLatestMessage]);
 
   useEffect(
     () => () => {
@@ -352,9 +379,8 @@ export function useSessionListAutoScroll<ItemT>({
       // to the bottom. Gating on `!isAutoScrolling` here would silently
       // drop every streaming update that lands inside the debounce
       // window. Bypass `scheduleScrollToLatestMessage` (which keeps
-      // the `!isAutoScrolling` guard for the initial itemCount /
-      // handleListLayout triggers) and trigger the programmatic scroll
-      // directly.
+      // the `!isAutoScrolling` guard for the initial itemCount trigger)
+      // and trigger the programmatic scroll directly.
       if (
         shouldFollowSessionContentSize({
           isUserScrolling: isUserScrollingRef.current,
@@ -368,17 +394,41 @@ export function useSessionListAutoScroll<ItemT>({
     [scrollToLatestMessage]
   );
 
-  const handleListLayout = useCallback(() => {
-    if (
-      shouldScheduleSessionAutoScroll({
-        isAutoScrolling: isAutoScrollingRef.current,
-        isUserScrolling: isUserScrollingRef.current,
-        shouldAutoScroll: shouldAutoScrollRef.current,
-      })
-    ) {
-      scheduleScrollToLatestMessage();
-    }
-  }, [scheduleScrollToLatestMessage]);
+  const handleListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      const didViewportHeightChange = height !== lastViewportHeightRef.current;
+      lastViewportHeightRef.current = height;
+      // A viewport resize is the same hazard as a content-size change: the
+      // fixed status rows mount OUTSIDE the list, so the list gets shorter
+      // while its offset stays put and the newest row is left below the fold,
+      // drawn over the transparent status row. Re-pin the tail directly —
+      // bypassing `scheduleScrollToLatestMessage`'s `!isAutoScrolling` guard
+      // for the same reason `handleContentSizeChange` does: the resize lands
+      // inside the streaming follow window, and the guarded scheduler would
+      // swallow exactly the correction this exists for.
+      if (
+        shouldFollowSessionViewportResize({
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+          didViewportHeightChange,
+        })
+      ) {
+        scrollToLatestMessage();
+        return;
+      }
+      if (
+        shouldScheduleSessionAutoScroll({
+          isAutoScrolling: isAutoScrollingRef.current,
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+        })
+      ) {
+        scheduleScrollToLatestMessage();
+      }
+    },
+    [scheduleScrollToLatestMessage, scrollToLatestMessage]
+  );
 
   const handleKeyboardShow = useCallback(() => {
     // Reuse the guarded scheduler so a keyboard opening never yanks the list

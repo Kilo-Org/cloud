@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   diagnosticDetail,
   emitControlDiagnostic,
@@ -113,6 +114,7 @@ export type SessionOperationDependencies = {
     options?: { retained?: true; nativeRuntimeId?: string }
   ) => unknown;
   sendOperationResult?: OperationResultSender;
+  consumeGateResult?: () => 'pass' | 'fail' | undefined;
   onLocalCompletion: (retain: boolean) => void;
   onCleanupConfirmed: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -140,6 +142,13 @@ function fail(message: string, retryable: boolean): ControlHandlerResult {
 
 function kiloFailure(error: unknown): ControlHandlerResult {
   return fail('Kilo request failed', isKiloServerUnreachableError(error));
+}
+
+function assistantFailureFacts(
+  source: unknown
+): Pick<SessionMessageOutcome, 'assistantReason' | 'providerOwnership'> {
+  const failure = classifyAssistantFailure(source);
+  return { assistantReason: failure.reason, providerOwnership: failure.providerOwnership };
 }
 
 export class SessionOperation {
@@ -170,6 +179,7 @@ export class SessionOperation {
   private deadlineCleanup?: Promise<boolean>;
   private publicationScoped?: PublicationScope;
   private publicationScopeNotified = false;
+  private abortedByMessageScope = false;
 
   constructor(
     session: SessionRequestIdentity,
@@ -307,6 +317,14 @@ export class SessionOperation {
     return this.publicationScoped;
   }
 
+  markMessageScopedAbort(): void {
+    this.abortedByMessageScope = true;
+  }
+
+  get messageScopedAbort(): boolean {
+    return this.abortedByMessageScope;
+  }
+
   waitForPublicationScope(): Promise<PublicationScope> {
     return this.publicationScoped
       ? Promise.resolve(this.publicationScoped)
@@ -399,7 +417,12 @@ export class SessionOperation {
   }
 
   requestRetirement(reason: string, deadlineAt: number): void {
-    if (this.publicationScoped || this.cleanupOwner.cleanupState === 'confirmed') return;
+    if (
+      this.abortedByMessageScope ||
+      this.publicationScoped ||
+      this.cleanupOwner.cleanupState === 'confirmed'
+    )
+      return;
     this.deps.retireRuntime(reason, this.captureCleanupDeadline(deadlineAt), this.nativeTarget());
   }
 
@@ -646,6 +669,7 @@ export class SessionOperation {
     const { runtime } = work;
     const { kiloClient, env } = runtime;
     this.captureRuntime(runtime);
+    this.deps.consumeGateResult?.();
     const assertCurrent = (submitting = false) => {
       signal.throwIfAborted();
       if (
@@ -798,6 +822,7 @@ export class SessionOperation {
             messageId,
             status: error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
             reason: `Kilo execution ended with ${error.name}`,
+            ...(error.name === 'MessageAbortedError' ? {} : assistantFailureFacts(error)),
           }
         : { messageId, status: 'completed' };
     } catch (error) {
@@ -844,6 +869,9 @@ export class SessionOperation {
           messageId,
           status: original.error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
           reason: `Kilo execution ended with ${original.error.name}`,
+          ...(original.error.name === 'MessageAbortedError'
+            ? {}
+            : assistantFailureFacts(original.error)),
         };
       else if (
         this.native.state === 'unknown' &&
@@ -866,6 +894,10 @@ export class SessionOperation {
             this.finalization.condensation.result === true))
       )
         outcome = { messageId, status: 'completed' };
+    }
+    const gateResult = this.deps.consumeGateResult?.();
+    if (outcome.status === 'completed' && gateResult !== undefined) {
+      outcome = { ...outcome, gateResult };
     }
     this.outcome = sessionMessageOutcomeSchema.parse(outcome);
     if (!this.authorization) {

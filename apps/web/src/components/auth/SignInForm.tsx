@@ -1,6 +1,7 @@
 'use client';
 
 import { MagicLinkSentConfirmation } from '@/components/auth/MagicLinkSentConfirmation';
+import { SsoAccountMismatchNotice } from '@/components/auth/SsoAccountMismatchNotice';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { TurnstileView } from '@/components/auth/sign-in/TurnstileView';
 import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView';
@@ -11,6 +12,7 @@ import { SignInButton } from '@/components/auth/SigninButton';
 import { Separator } from '@/components/ui/separator';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
+import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
 import Link from 'next/link';
 import { SquareUserRound } from 'lucide-react';
@@ -19,6 +21,7 @@ import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
 import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 
 /**
@@ -43,6 +46,7 @@ type SignInFormProps = {
   subtitle?: string;
   emailOnly?: boolean; // If true, only show email input (for SSO page)
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
+  accountMismatch?: SsoAccountMismatch; // SSO request for a different account than the session
   storybookInitialState?: SignInFormInitialState;
 };
 
@@ -55,6 +59,7 @@ export function SignInForm({
   subtitle,
   emailOnly = false,
   ssoMode = false,
+  accountMismatch,
   storybookInitialState,
 }: SignInFormProps) {
   const flow = useSignInFlow({
@@ -76,6 +81,13 @@ export function SignInForm({
     setSubmittedEmail(flow.email);
     flow.handleEmailSubmit(event);
   };
+
+  // An Enterprise SSO request for a different address than the signed-in
+  // session cannot proceed; offer the one-tap switch before any normal
+  // sign-in UI renders (including the returning-user hint loading state).
+  if (accountMismatch) {
+    return <SsoAccountMismatchNotice mismatch={accountMismatch} searchParams={searchParams} />;
+  }
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -193,7 +205,7 @@ export function SignInForm({
                   <p className="text-foreground mb-2 text-xl font-medium">{flow.hint.lastEmail}</p>
                   <button
                     onClick={flow.handleClearHint}
-                    className="text-muted-foreground mb-8 cursor-pointer text-sm hover:underline"
+                    className="text-muted-foreground mb-8 cursor-pointer text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                   >
                     Not you? Use a different account
                   </button>
@@ -255,7 +267,7 @@ export function SignInForm({
 
                     <button
                       onClick={flow.handleClearHint}
-                      className="text-muted-foreground text-sm hover:underline"
+                      className="text-muted-foreground text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       or see other sign-in methods
                     </button>
@@ -279,7 +291,7 @@ export function SignInForm({
               />
               <button
                 onClick={flow.handleBack}
-                className="text-muted-foreground mt-6 text-sm hover:underline"
+                className="text-muted-foreground mt-6 text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
               >
                 ← Back to sign in options
               </button>
@@ -304,7 +316,7 @@ export function SignInForm({
                   </div>
                   <button
                     onClick={flow.handleClearInvite}
-                    className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline"
+                    className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                   >
                     Use a different account
                   </button>
@@ -335,7 +347,7 @@ export function SignInForm({
                     // In SSO mode, show a link back to the main sign-in page
                     <Link
                       href={buildNormalSignInHref(searchParams)}
-                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline"
+                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       ← Back to sign in options
                     </Link>
@@ -343,7 +355,7 @@ export function SignInForm({
                     // In regular email input mode (not emailOnly), show back button
                     <button
                       onClick={flow.handleBack}
-                      className="text-muted-foreground mt-6 text-sm hover:underline"
+                      className="text-muted-foreground mt-6 text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       ← Back to sign in options
                     </button>
@@ -373,7 +385,7 @@ export function SignInForm({
                           href="https://kilo.ai/terms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-foreground underline underline-offset-4 transition-colors"
+                          className={`hover:text-foreground underline underline-offset-4 transition-colors ${INLINE_LINK_TOUCH_TARGET}`}
                         >
                           Terms &amp; Conditions
                         </a>
@@ -403,7 +415,7 @@ export function SignInForm({
                       href="https://kilo.ai/terms"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-foreground underline underline-offset-4 transition-colors"
+                      className={`hover:text-foreground underline underline-offset-4 transition-colors ${INLINE_LINK_TOUCH_TARGET}`}
                     >
                       Terms &amp; Conditions
                     </a>
@@ -418,7 +430,7 @@ export function SignInForm({
             <div className="border-border mt-8 flex flex-col items-center gap-3 border-t pt-6">
               <Link
                 href={buildEnterpriseSsoHref(searchParams)}
-                className="w-full flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0"
+                className="w-full flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0 pointer-coarse:min-h-11"
               >
                 <SquareUserRound className="size-4" />
                 Enterprise SSO
@@ -426,7 +438,7 @@ export function SignInForm({
               {!flow.showEmailInput && (
                 <Link
                   href="/get-started"
-                  className="mt-4 text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
+                  className="mt-4 inline-block text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                 >
                   Install Kilo Code
                 </Link>
@@ -442,7 +454,7 @@ export function SignInForm({
                   Already have an account?{' '}
                   <Link
                     href={buildNormalSignInHref(searchParams)}
-                    className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                    className={`text-brand-primary font-medium underline-offset-4 hover:underline ${INLINE_LINK_TOUCH_TARGET}`}
                   >
                     Sign in
                   </Link>
@@ -460,7 +472,7 @@ export function SignInForm({
               <p className="text-muted-foreground text-sm">
                 <Link
                   href="/get-started"
-                  className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                  className="text-brand-primary font-medium underline-offset-4 hover:underline pointer-coarse:inline-block pointer-coarse:min-h-11 pointer-coarse:content-center"
                 >
                   Install Kilo Code
                 </Link>

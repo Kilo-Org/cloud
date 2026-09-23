@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "செயலியைத் தொடங்கும்போதும், பின்னணியில் ஐந்து நிமிடங்கள் இருந்த பிறகும் பூட்டைத் திறக்க வேண்டும்.",
     "featureFlags": "அம்சக் கொடிகள்",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "சேவையகத்திலிருந்து · ≥ {{min}}",
+    "featureFlagSkipped": "இயல்புநிலை · < {{min}}",
+    "featureFlagNotLoaded": "இயல்புநிலை · ஏற்றப்படவில்லை",
     "gatewayTranscription": "Kilo Gateway மூலம் பேச்சு உரையாக்கம்",
     "gatewayTranscriptionSubtitle": "சாதனத்தின் பேச்சு அடையாளப்படுத்தலுக்குப் பதிலாக Kilo Gateway மாதிரியைப் பயன்படுத்தி குரல் உள்ளீட்டை உரையாக்குங்கள். உங்கள் பதிவு Kilo Gateway-க்கு அனுப்பப்படுகிறது.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "அரட்டைச் செய்திகள்",
       "kiloclaw": "KiloClaw செயல்பாடு",
       "balance": "கணக்கு இருப்பு எச்சரிக்கைகள்",
-      "security": "கண்டறிந்த பாதுகாப்புச் சிக்கல்கள்"
+      "security": "கண்டறிந்த பாதுகாப்புச் சிக்கல்கள்",
+      "spend": "செலவு எச்சரிக்கைகள்"
     },
     "category": {
       "chatMessagesSubtitle": "உங்கள் உரையாடல்களில் வரும் பதில்கள்",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "அமர்வு நிலை",
       "sessionStatusSubtitle": "முடிந்தது / தோல்வியடைந்தது / கட்டுப்படுத்தத் தயார்",
       "kiloclawActivitySubtitle": "இயக்கப் பிரதி தயார் / தோல்வி, திட்டமிட்ட செயல்கள்",
+      "kiloclawActivityUnavailable": "KiloClaw செயல்பாட்டைப் பெற ஒரு KiloClaw இயக்கப் பிரதியைத் தொடங்கவும்.",
       "balanceAlertsSubtitle": "நிறுவனத்தின் இருப்பு குறையும்போது வரும் எச்சரிக்கைகள்",
-      "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்"
+      "balanceAlertsUnavailable": "இருப்பு எச்சரிக்கைகளைப் பெற ஒரு நிறுவனத்தில் சேருங்கள்.",
+      "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்",
+      "securityFindingsUnavailable": "பாதுகாப்புக் கண்டறிதல்களைப் பெற ஒரு வரம்பில் Kilo பாதுகாப்பு முகவரை இயக்கவும்.",
+      "spendAlertsSubtitle": "வரம்பு மீறல்கள் மற்றும் மணிநேர உயர்வுகள்",
+      "spendAlertsToggle": "செலவு எச்சரிக்கை வகை"
     },
     "action": {
       "openSession": "அமர்வைத் திறக்கவும்"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "அமர்வை ஏற்ற முடியவில்லை.",
       "failedToLoadDetails": "அமர்வு விவரங்களை ஏற்ற முடியவில்லை.",
       "failedToStopExecution": "இயக்கத்தை நிறுத்த முடியவில்லை.",
+      "stopped": "அமர்வு நிறுத்தப்பட்டது",
+      "committing": "கமிட் செய்யப்படுகிறது…",
+      "committed": "கமிட் செய்யப்பட்டது",
+      "commitFailed": "கமிட் தோல்வியடைந்தது",
       "renameSession": "அமர்வின் பெயரை மாற்றவும்",
       "renamePlaceholder": "அமர்வின் பெயர்",
       "transcriptAccessibility": "அமர்வின் உரையாடல் பதிவு",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} வரி",
       "linesBadge_other": "{{displayCount}} வரிகள்",
       "matchesBadge_one": "{{displayCount}} பொருத்தம்",
-      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்"
+      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்",
+      "noOutput": "வெளியீடு இல்லை."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "உள்நுழைவு முயற்சிகளின் வரம்பை மீறிவிட்டீர்கள். சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்."
   },
   "models": {
+    "auto": {
+      "frontier": "தானியங்கி முன்னணி",
+      "balanced": "தானியங்கி சமநிலை",
+      "efficient": "தானியங்கி திறன்மிக்க",
+      "small": "தானியங்கி சிறிய",
+      "free": "தானியங்கி இலவச",
+      "organization": "நிறுவன தானியங்கி"
+    },
     "dataCollected": "தரவு சேகரிக்கப்படும்",
     "free": "இலவசம்",
     "couldNotUpdateFavorites": "பிடித்தவற்றைப் புதுப்பிக்க முடியவில்லை.",
@@ -3155,7 +3174,8 @@
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்.",
     "openSession": "திற",
-    "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்."
+    "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்.",
+    "newestResult": "சமீபத்திய முடிவு"
   },
   "transcriptionModel": {
     "title": "உரையாக்க மாதிரி",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "உங்கள் கணினி",
     "remoteOptionBody": "உங்கள் சொந்த இயந்திரத்தில் `kilo remote` CLI மூலம் Kilo-ஐ இயக்கவும்.",
     "skip": "சுற்றுலாவைத் தவிர்",
-    "tutorialLabel": "பயிற்சி",
-    "remoteTitle": "உங்கள் முதல் தொலை அமர்வைத் தொடங்கு",
-    "remoteBody": "உங்கள் கணினியை இணைத்து, பின்னர் இங்கிருந்து அமர்வைத் தொடங்கு.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "இதுவரை எந்தக் கணினியும் இணைக்கப்படவில்லை",
-    "remoteEmptyBody": "அதை இணைக்க உங்கள் கணினியில் `kilo remote`-ஐ இயக்கவும்.",
-    "remoteFound": "கணினி இணைக்கப்பட்டது",
-    "checkAgain": "மீண்டும் சரிபார்",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "பயிற்சி"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "கடைசி அமர்வைத் திறக்கவும்"
+  },
+  "spendAlerts": {
+    "subtitle": "இந்த நோக்கத்தின் செலவு ஒரு வரம்பை மீறும்போது அல்லது அதன் வழக்கமான மணிநேர விகிதத்திற்கு மேல் உயரும்போது பில்லிங் தொடர்புகளுக்கு மின்னஞ்சல் அல்லது புஷ் மூலம் எச்சரிக்கை அனுப்பு.",
+    "enable": "செலவு எச்சரிக்கைகளை இயக்கு",
+    "thresholdTitle": "வரம்பு மீறல்",
+    "thresholdSubtitle": "தற்போதைய செலவு உங்கள் வரம்பை மீறுகிறது",
+    "anomalyTitle": "மணிநேர உயர்வு",
+    "anomalySubtitle": "ஒரு மணிநேரம் இந்த நோக்கத்தின் வழக்கமான விகிதத்தை விட மிக அதிகம்",
+    "limitLabel": "வரம்பு (USD)",
+    "windowLabel": "கால அளவு",
+    "window24h": "24 மணிநேரம்",
+    "window7d": "7 நாட்கள்",
+    "window30d": "30 நாட்கள்",
+    "multiplierLabel": "உயர்வு பெருக்கி",
+    "saved": "செலவு எச்சரிக்கை அமைப்புகள் சேமிக்கப்பட்டன",
+    "loadError": "செலவு எச்சரிக்கைகளை ஏற்ற முடியவில்லை.",
+    "saveError": "செலவு எச்சரிக்கைகளை சேமிக்க முடியவில்லை.",
+    "empty": "செலவு எச்சரிக்கைகள் அணைக்கப்பட்டுள்ளன. இந்த நோக்கத்தின் பில்லிங் தொடர்புகளுக்கு எச்சரிக்க அவற்றை இயக்கு.",
+    "noSpend": "இதுவரை எந்த செலவும் பதிவாகவில்லை",
+    "spend24h": "கடந்த 24 மணிநேர செலவு",
+    "multiplierError": "1 அல்லது அதற்கு மேற்பட்ட பெருக்கியை உள்ளிடு",
+    "permissionDenied": "செலவு எச்சரிக்கைகளை நிர்வகிக்க உங்களுக்கு அனுமதி இல்லை.",
+    "pushOffByCategory": "அறிவிப்புகளில் அணைக்கப்பட்டது"
   }
 }

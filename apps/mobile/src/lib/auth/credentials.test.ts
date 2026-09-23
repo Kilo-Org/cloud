@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive credential suite: the bearer writes, the refresh rotation, and the unreadable-credential cases share the SecureStore mock and the serialized-write seam */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -26,8 +27,6 @@ vi.mock('expo-secure-store', () => ({
     store.delete(key);
   }),
 }));
-
-vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 
 // The sign-out deletes live in auth-context.tsx; mounting it pulls in the full
 // teardown graph, so stub every side-effecting collaborator.
@@ -148,6 +147,21 @@ vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
 
+// The artifact mirror members of the same teardown read expo-file-system and
+// the native provider bridge. This suite asserts the credential deletes, and
+// the mirror's own suite covers the wipe and its provider signal.
+vi.mock('@/lib/artifacts/artifact-mirror', () => ({
+  clearArtifactMirror: vi.fn(),
+}));
+
+vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
+  resetArtifactMirrorSyncState: vi.fn(),
+}));
+
+vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
+  notifyArtifactsChanged: vi.fn(),
+}));
+
 // The sign-out teardown's OS search clear reaches the root `expo` entry, which
 // reads `__DEV__` at import time and does not parse under the node test
 // environment. The clear is a no-op here.
@@ -156,7 +170,7 @@ vi.mock('@/lib/native-system-search', () => ({
 }));
 
 import * as SecureStore from 'expo-secure-store';
-import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
+import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import {
@@ -224,6 +238,161 @@ describe('bearer credential writes', () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_EXPIRES_AT_KEY, expectedOptions);
+  });
+});
+
+describe('refresh rotation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    clearActiveToken();
+    setSignOutTeardownActive(false);
+  });
+
+  it('retries a rejected refresh-token read and still rotates the token', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'r1');
+    // The keychain rejects the first read — the transient class on a device
+    // that just foregrounded — and resolves the stored value on the retry.
+    let reads = 0;
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      reads += 1;
+      if (reads === 1) {
+        throw new Error('keychain temporarily unavailable');
+      }
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome.ok).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        REFRESH_TOKEN_KEY,
+        'r2',
+        expectedOptions
+      );
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        TOKEN_EXPIRES_AT_KEY,
+        expect.any(String),
+        expectedOptions
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // The defect this slice removes: a null refresh-token read used to be read
+  // as "no session" and refused, which signed a healthy person out. It is a
+  // failed read of one member, not an absent credential set.
+  it('returns unreadable, not refused, when the refresh token is absent but the token is present', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toEqual({
+        ok: false,
+        refused: false,
+        unreadable: true,
+        presentKeys: [AUTH_TOKEN_KEY],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      // The stored token is untouched: nothing was deleted or published.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('stored-token');
+      expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns unreadable with no present keys for an empty credential set', async () => {
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      // A null member never refuses: even an empty set is an unreadable read,
+      // not a signed-out session.
+      expect(outcome).toEqual({
+        ok: false,
+        refused: false,
+        unreadable: true,
+        presentKeys: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rotates when a null refresh-token read is followed by a stored value', async () => {
+    let refreshReads = 0;
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === REFRESH_TOKEN_KEY) {
+        refreshReads += 1;
+        return refreshReads === 1 ? null : 'stored-refresh';
+      }
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome.ok).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        REFRESH_TOKEN_KEY,
+        'r2',
+        expectedOptions
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('still refuses when the server answers 401 for a stored refresh token', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ error: 'invalid' }, { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toEqual({ ok: false, refused: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

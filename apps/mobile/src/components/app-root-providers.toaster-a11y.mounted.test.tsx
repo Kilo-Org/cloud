@@ -1,12 +1,35 @@
 import { type ElementType } from 'react';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import type * as AppAwareKeyboardPadding from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { act } from '@/test/renderer';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
+  keyboard,
   mount,
+  platform,
   resetUnlockMocks,
+  route,
   unlockRoot,
   unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { MIN_BOTTOM_CHROME_HEIGHT, TOAST_BOTTOM_GAP } from '@/lib/toast-offset';
+
+// One keyboard read for the whole app: the Toaster must import the hook the
+// screens reserve padding with, not run its own listener pair, or the toast's
+// height can drift from theirs. The counter is a plain object so
+// `resetUnlockMocks` (which resets every `vi.fn`) cannot clear it.
+const sharedKeyboardHook = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', async importOriginal => {
+  const actual = await importOriginal<typeof AppAwareKeyboardPadding>();
+  return {
+    ...actual,
+    useAppAwareKeyboardPadding: () => {
+      sharedKeyboardHook.calls += 1;
+      return actual.useAppAwareKeyboardPadding();
+    },
+  };
+});
 
 beforeEach(resetUnlockMocks);
 afterEach(unmountUnlock);
@@ -30,4 +53,173 @@ it('anchors the toast container to the window so toasts reach the accessibility 
 
   expect(toasters).toHaveLength(1);
   expect(toasters[0]?.props.positionerStyle).toEqual({ top: 0 });
+});
+
+/**
+ * The safe-area inset is not a reliable floor for the bottom chrome: on Android
+ * it is only `navigationBars()`, it does not grow while the IME's navigation
+ * row is on screen, and it can be reported as `0`. A toast anchored to the
+ * inset alone had its last line clipped under that chrome (2026-09-18 device
+ * finding), so the offset is floored at one shared bottom-chrome height for
+ * both platforms — no platform branch.
+ */
+it('floors the toast offset at the shared bottom-chrome height', async () => {
+  platform.OS = 'android';
+  // Default route: a screen pushed over the tabs, so no tab bar is on screen
+  // and the bottom-chrome floor decides the offset.
+  await mount();
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  // The mocked inset (12) is below the floor, so the floor decides the offset.
+  expect(toasters[0]?.props.offset).toBe(MIN_BOTTOM_CHROME_HEIGHT + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The floating tab bar is an absolute overlay over the screen bottom: the
+ * reported bottom inset does not include it, and a toast anchored to the
+ * inset landed over the tab icons (2026-09-19 visual spot check, p1 — the
+ * manual-review error toast covered the navigation row). While a tab screen
+ * is on top, the offset must clear the bar's full rendered height.
+ */
+it('clears the floating tab bar while a tab screen is on top', async () => {
+  platform.OS = 'android';
+  route.segments = ['(app)', '(tabs)', '(3_profile)', 'code-reviewer', 'personal', 'manual-review'];
+  route.pathname = '/code-reviewer/personal/manual-review';
+  await mount();
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  // Same predicate and height source as the tab bar's own layout
+  // (`(tabs)/_layout.tsx`), so the toast clears whatever the bar renders.
+  const tabOverlayHeight = getEffectiveTabBarHeight({
+    bottomInset: 12,
+    platform: 'android',
+    fontScale: 1,
+  });
+  expect(toasters[0]?.props.offset).toBe(tabOverlayHeight + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The bar's own layout hides it on two in-tab routes (`shouldHideTabBar`);
+ * there the toast must fall back to the resting offset instead of floating
+ * over a bar that is not there.
+ */
+it('keeps the resting offset when the route hides the tab bar', async () => {
+  platform.OS = 'android';
+  route.segments = ['(app)', '(tabs)', '(1_kiloclaw)', 'chat', 'sandbox', 'conversation'];
+  route.pathname = '/chat/sandbox/conversation';
+  await mount();
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  expect(toasters[0]?.props.offset).toBe(MIN_BOTTOM_CHROME_HEIGHT + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The keyboard read lives in one hook (`useAppAwareKeyboardPadding`) so the
+ * padding view and the reveal hook cannot disagree with the toast. The Toaster
+ * imports that hook instead of running its own `Keyboard`/`AppState` listener
+ * pair; this test fails if a second implementation grows back here.
+ */
+it('reads the keyboard height through the shared app-aware hook', async () => {
+  sharedKeyboardHook.calls = 0;
+
+  await mount();
+
+  expect(sharedKeyboardHook.calls).toBeGreaterThan(0);
+});
+
+/**
+ * Android's `endCoordinates.height` stops at the navigation bar
+ * (`ReactRootView` sends `imeInsets.bottom − barInsets.bottom`), so the raw
+ * height sits below the IME's true top edge by the bar inset. The toast is
+ * anchored to the screen bottom, so the Toaster resolves the occlusion through
+ * the same rule the screens reserve padding with (`resolveKeyboardBottomPadding`)
+ * — a raw height left the toast's last line behind the IME's navigation row
+ * (2026-09-20 review finding). The mocked bottom inset is 12.
+ */
+it('clears the Android IME navigation row by adding the bottom inset', async () => {
+  platform.OS = 'android';
+  await mount();
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  expect(toasters[0]?.props.offset).toBe(300 + 12 + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * iOS reports the keyboard window frame, which reaches the screen bottom and
+ * so already includes the home-indicator inset. Adding the bottom inset there
+ * would float the toast above the keyboard, so the iOS height passes through
+ * unchanged — the platform-parity half of the keyboard rule.
+ */
+it('keeps the iOS keyboard height, which already reaches the screen bottom', async () => {
+  platform.OS = 'ios';
+  await mount();
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  // The hook's occlusion is the keyboard's overlap with the screen bottom,
+  // which the iOS frame already reaches: the toast clears the reported height
+  // and keeps the standard gap above it.
+  expect(toasters[0]?.props.offset).toBe(300 + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The harness keeps every keyboard subscriber, one set per direction (see the
+ * Keyboard mock in the test helpers). A second consumer — here an extra
+ * listener standing in for a screen on top of the Toaster — must not shadow the
+ * Toaster's listener, and disposing it must not detach the Toaster's. A single
+ * slot per direction failed both halves.
+ */
+it('delivers a keyboard event to every subscriber and detaches only the disposed one', async () => {
+  platform.OS = 'android';
+  await mount();
+
+  const extra = vi.fn((_event: { endCoordinates: { height: number } }) => undefined);
+  const subscription = keyboard.addListener('keyboardDidShow', extra);
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+  // Both the Toaster's hook and the extra subscriber received the height.
+  expect(extra).toHaveBeenCalledWith({ endCoordinates: { height: 300 } });
+  expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
+    300 + 12 + TOAST_BOTTOM_GAP
+  );
+
+  subscription.remove();
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 240 } });
+  });
+  // The disposed subscriber is gone; the Toaster's listener is still attached.
+  expect(extra).toHaveBeenCalledTimes(1);
+  expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
+    240 + 12 + TOAST_BOTTOM_GAP
+  );
+});
+
+/**
+ * The same rule runs on iOS: the offset module reads no platform, so the
+ * resting offset is the shared bottom-chrome floor plus the standard gap, not
+ * the raw iOS inset (12 here). This is the platform-parity assertion for the
+ * toast path — if a per-platform branch grows back, one of the two platforms
+ * stops matching the shared floor.
+ */
+it('uses the same bottom-chrome floor on iOS', async () => {
+  platform.OS = 'ios';
+  await mount();
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  expect(toasters[0]?.props.offset).toBe(MIN_BOTTOM_CHROME_HEIGHT + TOAST_BOTTOM_GAP);
 });

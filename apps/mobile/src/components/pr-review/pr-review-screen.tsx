@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import { Check, GitPullRequest, Share as ShareIcon } from '@/components/ui/icons';
+import { Check, GitMerge, GitPullRequest, Share as ShareIcon } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Share, View } from 'react-native';
+import { Share, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
@@ -19,6 +19,10 @@ import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import {
+  defaultMergeMethodFor,
+  getMergeabilityStatus,
+} from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
@@ -27,6 +31,7 @@ import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
+const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
 
 type PrReviewScreenProps = {
   readonly owner: string;
@@ -98,6 +103,26 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // a single network round-trip even though both components subscribe.
   const overviewOptions = queries.overviewOptions();
   const pr = useQuery(overviewOptions);
+
+  // Owner request item 3: the header Merge CTA opens the same confirmation
+  // sheet the Overview merge section pushes. GitHub carries the repo's default
+  // merge method on its own route; a provider arm pushes the sheet under the
+  // ref's own route (s6), which reads `getMergeState` for the restrictions.
+  const openMerge = useCallback(() => {
+    const data = pr.data;
+    if (!data) {
+      return;
+    }
+    const method = defaultMergeMethodFor(data.repo);
+    const href: Href =
+      queries.ref.platform === 'github'
+        ? {
+            pathname: MERGE_PATH,
+            params: { owner, repo, number: String(data.number), mode: 'merge', method },
+          }
+        : providerPrSheetHref(queries.ref, 'merge', { mode: 'merge', method });
+    router.push(href);
+  }, [router, owner, repo, queries.ref, pr.data]);
 
   // Recents backfill. This is the ONLY writer that creates an entry: a
   // successful load upserts the real title with `lastResult: 'ok'`, which
@@ -207,6 +232,19 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // a Bitbucket PR without a selected organization waits at the boundary
   // instead of opening a sheet that cannot load.
   const canSubmitReview = queries.isReady;
+  // The header Merge affordance mirrors the Overview merge section's gate so
+  // the two never disagree: GitHub reads the mergeability off the overview DTO
+  // (a merged/closed PR is terminal, a blocked one keeps the section's
+  // blocked-reasons panel), while a GitLab/Bitbucket arm normalizes `mergeable`
+  // to null and offers the action for any open request — the sheet itself
+  // reads the provider restrictions and refuses an unsafe merge.
+  const canMerge =
+    queries.isReady &&
+    !loadFailed &&
+    pr.data !== undefined &&
+    (queries.ref.platform === 'github'
+      ? getMergeabilityStatus(pr.data) === 'mergeable'
+      : pr.data.state === 'open');
 
   let body: ReactNode = null;
   if (!queries.isReady) {
@@ -268,23 +306,23 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             : t('prReview.screen.title', { number })
         }
         eyebrow={`${owner}/${repo}`}
+        eyebrowNumberOfLines={1}
         headerRight={
           <View className="flex-row items-center gap-1">
             {webUrl ? (
-              <Pressable
+              <Button
+                size="icon"
+                variant="ghost"
                 onPress={sharePullRequest}
                 disabled={loadFailed}
-                accessibilityRole="button"
                 accessibilityLabel={
                   isMergeRequest
                     ? t('prReview.terms.shareMergeRequest')
                     : t('prReview.screen.shareA11y')
                 }
-                accessibilityState={{ disabled: loadFailed }}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               >
                 <ShareIcon size={18} color={colors.foreground} />
-              </Pressable>
+              </Button>
             ) : null}
             {/* P1-F-46b: the Submit-review affordance is reachable from the
                 Overview tab (header right) and the Files tab (floating
@@ -296,10 +334,28 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
                 onPress={openReviewSubmit}
                 disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
-                className={cn('px-3')}
+                // ScreenHeader caps a trailing action at half the row. A label
+                // that cannot shrink overflows that cap and is clipped by the
+                // screen edge at large font scales, so the button and its
+                // label shrink and wrap (as the Agents header action does)
+                // instead of drawing off-screen.
+                className={cn('min-w-0 shrink px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>{t('prReview.submit.submitReview')}</Text>
+                <Text className="shrink text-center">{t('prReview.submit.submitReview')}</Text>
+              </Button>
+            ) : null}
+            {/* Owner request item 3: a Merge CTA at the top right, present only
+                while the PR is actually mergeable. The Overview merge section
+                stays the source of truth for why a blocked PR cannot merge. */}
+            {canMerge ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                onPress={openMerge}
+                accessibilityLabel={t('prReview.merge.mergeNow')}
+              >
+                <GitMerge size={18} color={colors.foreground} />
               </Button>
             ) : null}
           </View>

@@ -68,10 +68,10 @@ export function describePrState(args: {
   return { labelKey: 'prReview.overview.stateOpen', tone: 'muted', icon: GitPullRequest };
 }
 
-// Theme colors are CSS variables — Tailwind opacity modifiers like
-// `bg-good/10` don't work on them. The chip uses a flat muted background
-// and lets the foreground color carry the tone so it stays legible in
-// both themes without needing per-tone backgrounds.
+// Theme colors are CSS variables, so Tailwind opacity modifiers on them are
+// silently dropped. The chip uses a flat muted background and lets the
+// foreground color carry the tone so it stays legible in both themes
+// without needing per-tone backgrounds.
 const TONE_FG_CLASS = {
   good: 'text-good',
   warn: 'text-warn',
@@ -176,7 +176,12 @@ export function PrRefsRow({
       <Text variant="muted" className="shrink-0 text-sm">
         ←
       </Text>
-      <Text variant="mono" className="shrink-0 text-[13px]" numberOfLines={1}>
+      <Text
+        variant="mono"
+        className="max-w-1/2 shrink-0 text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {baseRef}
       </Text>
     </View>

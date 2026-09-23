@@ -45,7 +45,7 @@ import {
   agent_configs,
   passkey_credentials,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -64,6 +64,7 @@ import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { refreshGlanceableScope } from '@/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
@@ -294,6 +295,13 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Scope key for the per-(user, organization) activity-token registration lock.
+// The empty organization stands for the personal scope, matching the `coalesce`
+// in `UQ_user_activity_tokens_live_ios_activity`.
+function activityTokenScopeLockKey(userId: string, organizationId: string | null): string {
+  return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
+}
+
 function getDeductionKind(
   creditCategory: string | null
 ): z.infer<typeof CreditDeductionKindSchema> {
@@ -427,7 +435,7 @@ async function enrichDeductionsWithInstanceNames(
   });
 }
 
-// The seven notification category keys are owned by the mobile app:
+// The eight notification category keys are owned by the mobile app:
 // `NOTIFICATION_CATEGORY_KEYS` / `NotificationCategoryKey` in
 // `apps/mobile/src/lib/hooks/agent-push-preference.ts`. The server hard-codes
 // the same string literals; do not define a duplicate server category-key type.
@@ -438,10 +446,22 @@ const NOTIFICATION_CATEGORY_KEYS = [
   'sessionStatus',
   'kiloclawActivity',
   'balanceAlerts',
+  'spendAlerts',
   'securityFindings',
 ] as const;
 
-type NotificationCapability = { available: boolean; unavailableReason: string | null };
+/** Machine-readable reason a gated category is unavailable. The client owns the
+ *  wording: it maps each code to a catalog key, so the row reads in the reader's
+ *  language. A server sentence rendered in English on every locale. */
+type NotificationCapabilityReason =
+  | 'organizationRequired'
+  | 'securityAgentRequired'
+  | 'kiloclawInstanceRequired';
+
+type NotificationCapability = {
+  available: boolean;
+  unavailableReasonCode: NotificationCapabilityReason | null;
+};
 type NotificationCapabilities = Record<
   (typeof NOTIFICATION_CATEGORY_KEYS)[number],
   NotificationCapability
@@ -449,15 +469,15 @@ type NotificationCapabilities = Record<
 
 const ALWAYS_AVAILABLE_CAPABILITY: NotificationCapability = {
   available: true,
-  unavailableReason: null,
+  unavailableReasonCode: null,
 };
 
-function unavailableCapability(reason: string): NotificationCapability {
-  return { available: false, unavailableReason: reason };
+function unavailableCapability(reason: NotificationCapabilityReason): NotificationCapability {
+  return { available: false, unavailableReasonCode: reason };
 }
 
 /**
- * Compute the per-category availability map for the signed-in user. The four
+ * Compute the per-category availability map for the signed-in user. The five
  * always-on categories need no data; the three gated categories each run one
  * read-only existence check.
  */
@@ -498,13 +518,16 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
     sessionStatus: ALWAYS_AVAILABLE_CAPABILITY,
     balanceAlerts: hasOrganization
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Join an organization to get balance alerts.'),
+      : unavailableCapability('organizationRequired'),
+    // Every signed-in account has a personal scope, so spend alerts are always
+    // available; the spend view offers the same switch for that scope.
+    spendAlerts: ALWAYS_AVAILABLE_CAPABILITY,
     securityFindings: hasSecurityConfig
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Enable Kilo Security Agent on a scope to get security findings.'),
+      : unavailableCapability('securityAgentRequired'),
     kiloclawActivity: hasKiloclawInstance
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Start a KiloClaw instance to get KiloClaw activity.'),
+      : unavailableCapability('kiloclawInstanceRequired'),
   };
 }
 
@@ -517,6 +540,21 @@ export const userRouter = createTRPCRouter({
       isAdmin: ctx.user.is_admin,
     });
   }),
+
+  // Whether the caller has any Kilo gateway usage. Any `microdollar_usage` row
+  // for the user counts (org-scoped and zero-cost free-model rows included), so
+  // this reads the primary DB rather than a replica that may lag the first
+  // request. The lookup is an indexed `LIMIT 1` on
+  // `idx_kilo_user_id_created_at2`, so a cold-boot call is cheap.
+  hasGatewayUsage: baseProcedure
+    .output(z.object({ hasUsage: z.boolean() }))
+    .query(async ({ ctx }) => {
+      const row = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.kilo_user_id, ctx.user.id),
+        columns: { id: true },
+      });
+      return { hasUsage: row !== undefined };
+    }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {
     const providers = await getUserAuthProviders(ctx.user.id);
@@ -1297,7 +1335,9 @@ export const userRouter = createTRPCRouter({
 
   // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
   // Android ongoing). Upsert on `token` so a re-registration of the same
-  // device token replaces the row instead of failing the unique index.
+  // device token replaces the row instead of failing the unique index, and
+  // retire the scope's previous live `ios_activity` row in the same
+  // transaction so one scope never has two live cards.
 
   registerActivityToken: baseProcedure
     .input(
@@ -1309,25 +1349,88 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
-        .insert(user_activity_tokens)
-        .values({
-          user_id: ctx.user.id,
-          token: input.token,
-          kind: input.kind,
-          platform: input.platform,
-          organization_id: input.organizationId,
-        })
-        .onConflictDoUpdate({
-          target: [user_activity_tokens.token],
-          set: {
+      const retiredTokens = await db.transaction(async tx => {
+        // Registration is a replace. An `ios_activity` token is the app adopting
+        // its Lock Screen card, and only one card may be live per (user,
+        // organization) scope. Retire the scope's previous live row in the same
+        // transaction as the insert, so two live rows cannot exist and the
+        // partial unique index cannot reject the replacement.
+        let supersededTokens: string[] = [];
+        if (input.kind === 'ios_activity') {
+          // Registration is a replace, so two concurrent registrations for one
+          // scope would both retire the same previous row and then both insert;
+          // the second collides on the partial unique index
+          // `UQ_user_activity_tokens_live_ios_activity` and its transaction
+          // rolls back instead of converging. Serialize the replace per scope
+          // with a transaction-scoped advisory lock, so the later registration
+          // sees and supersedes the earlier one's just-inserted row.
+          const scopeKey = activityTokenScopeLockKey(ctx.user.id, input.organizationId);
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`);
+
+          const orgPredicate =
+            input.organizationId === null
+              ? isNull(user_activity_tokens.organization_id)
+              : eq(user_activity_tokens.organization_id, input.organizationId);
+          const superseded = await tx
+            .update(user_activity_tokens)
+            .set({ superseded_at: sql`now()` })
+            .where(
+              and(
+                eq(user_activity_tokens.user_id, ctx.user.id),
+                orgPredicate,
+                eq(user_activity_tokens.kind, 'ios_activity'),
+                isNull(user_activity_tokens.superseded_at),
+                ne(user_activity_tokens.token, input.token)
+              )
+            )
+            // The retired tokens are what the notification below must end.
+            .returning({ token: user_activity_tokens.token });
+          supersededTokens = superseded.map(row => row.token);
+        }
+
+        await tx
+          .insert(user_activity_tokens)
+          .values({
             user_id: ctx.user.id,
+            token: input.token,
             kind: input.kind,
             platform: input.platform,
             organization_id: input.organizationId,
-            updated_at: sql`now()`,
-          },
+          })
+          .onConflictDoUpdate({
+            target: [user_activity_tokens.token],
+            set: {
+              user_id: ctx.user.id,
+              kind: input.kind,
+              platform: input.platform,
+              organization_id: input.organizationId,
+              // The app re-adopting its own card must not leave its row marked
+              // dead: a re-registration of the same token un-supersedes it.
+              superseded_at: null,
+              updated_at: sql`now()`,
+            },
+          });
+
+        return supersededTokens;
+      });
+
+      // Retiring the row is not enough on its own: the retired card stays
+      // stacked on the Lock Screen until a delivery pass sends it an `end`, and
+      // those are driven by agent-session transitions, which can be minutes
+      // away during a long-running task. Ask the notifications worker for a
+      // scope refresh now so the replaced card is ended at registration. The
+      // row is already retired and the DB holds the one-live-card invariant, so
+      // this is best-effort: a failure only leaves the end to the next
+      // scheduled refresh and must never fail the registration.
+      if (retiredTokens.length > 0) {
+        await refreshGlanceableScope({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        }).catch(error => {
+          console.error('[registerActivityToken] Failed to request glanceable refresh:', error);
         });
+      }
+
       return { success: true };
     }),
 
@@ -1379,6 +1482,7 @@ export const userRouter = createTRPCRouter({
         session_status_enabled: user_notification_preferences.session_status_enabled,
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
         balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+        spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
         security_findings_enabled: user_notification_preferences.security_findings_enabled,
         notification_previews: user_notification_preferences.notification_previews,
       })
@@ -1396,6 +1500,7 @@ export const userRouter = createTRPCRouter({
       sessionStatus: row?.session_status_enabled ?? true,
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
       balanceAlerts: row?.balance_alerts_enabled ?? true,
+      spendAlerts: row?.spend_alerts_enabled ?? true,
       securityFindings: row?.security_findings_enabled ?? true,
       notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
@@ -1412,6 +1517,7 @@ export const userRouter = createTRPCRouter({
         sessionStatus: z.boolean().optional(),
         kiloclawActivity: z.boolean().optional(),
         balanceAlerts: z.boolean().optional(),
+        spendAlerts: z.boolean().optional(),
         securityFindings: z.boolean().optional(),
         notificationPreviews: z.enum(['generic', 'full']).optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
@@ -1449,6 +1555,10 @@ export const userRouter = createTRPCRouter({
         set.balance_alerts_enabled = input.balanceAlerts;
         values.balance_alerts_enabled = input.balanceAlerts;
       }
+      if (input.spendAlerts !== undefined) {
+        set.spend_alerts_enabled = input.spendAlerts;
+        values.spend_alerts_enabled = input.spendAlerts;
+      }
       if (input.securityFindings !== undefined) {
         set.security_findings_enabled = input.securityFindings;
         values.security_findings_enabled = input.securityFindings;
@@ -1482,6 +1592,7 @@ export const userRouter = createTRPCRouter({
           session_status_enabled: user_notification_preferences.session_status_enabled,
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
           balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+          spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
           security_findings_enabled: user_notification_preferences.security_findings_enabled,
           notification_previews: user_notification_preferences.notification_previews,
         })
@@ -1496,6 +1607,7 @@ export const userRouter = createTRPCRouter({
         sessionStatus: row?.session_status_enabled ?? true,
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
         balanceAlerts: row?.balance_alerts_enabled ?? true,
+        spendAlerts: row?.spend_alerts_enabled ?? true,
         securityFindings: row?.security_findings_enabled ?? true,
         notificationPreviews: row?.notification_previews ?? 'generic',
         agentPushEnabled: effectiveAgentPush,

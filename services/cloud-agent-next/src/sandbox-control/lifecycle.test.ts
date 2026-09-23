@@ -1,17 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SandboxSession } from '../sandbox-session/SandboxSession.js';
-import { createMemoryEventQueries } from '../session/preparation-test-helpers.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   getSandboxAllocationResources,
   type SandboxAllocation,
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { SandboxControl, type SandboxAcquisition } from '../persistence/SandboxControl.js';
-import {
-  SESSION_DELIVERY_TIMEOUT_MS,
-  controlDispatchDisposition,
-} from '../sandbox-session/control-dispatch.js';
+import { SESSION_DELIVERY_TIMEOUT_MS } from '../sandbox-session/control-dispatch.js';
 import {
   parseSandboxBillingInput,
   SANDBOX_USAGE_SKUS,
@@ -20,7 +16,9 @@ import {
 import type { Env } from '../types.js';
 import type { VercelSandboxCreateEnvelope } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
+  SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE,
   isSandboxAcquisitionLostError,
+  isSandboxAcquisitionSupersededError,
   type SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
 import type {
@@ -31,13 +29,19 @@ import type {
 } from './socket.js';
 import { DEADLINE_MS } from './deadlines.js';
 import {
-  loadDeadlines,
-  loadPhysicalRecord,
-  loadRecoveryDecisions,
   loadRouteTable,
   loadSessionCredentialGrants,
+  saveSessionCredentialGrantsSync,
   loadSessionReferences,
+  loadAllocation as loadCanonicalAllocation,
+  storeAllocation,
 } from './durable-state.js';
+import {
+  emptyControlAlarmAnchors,
+  loadControlAlarmAnchors,
+  setControlAlarmAnchor,
+  setControlAlarmAnchorSync,
+} from './control-alarm.js';
 import {
   addSessionReference,
   emptySessionReferenceState,
@@ -48,13 +52,107 @@ import { getWorktreeWorkspacePath } from '../workspace.js';
 import type { ProviderAdapter } from './provider.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
 import type * as SocketModule from './socket.js';
-import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
-import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
+import { decodeCloudflareProviderRef, encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
-import { summarizeHeartbeatIdle } from './status-projection.js';
+import { summarizeHeartbeatIdle } from './socket.js';
 
+import {
+  seedCanonicalAllocationRecord,
+  seedAllocationRecord,
+  CANONICAL_ALLOCATION_KEY,
+} from '../sandbox-state/persist/access.js';
+import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
+import { POLICY } from '../sandbox-state/schedule.js';
+import { createControlPlaneCredential } from './managed-credential.js';
+import type { SessionCredentialGrant } from './session-credentials.js';
+import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
+
+function canonicalProviderRef(record: AllocationRecord): string | null {
+  const state = record.state;
+  if (state.kind === 'stopped') return state.summary?.providerRef ?? null;
+  return state.target?.providerRef ?? null;
+}
+
+function canonicalCreateIntentId(record: AllocationRecord): string | undefined {
+  const state = record.state;
+  return state.kind === 'stopped' ? undefined : state.createIntent?.intentId;
+}
+
+/** A schema-valid grant used to prove a replacement's credentials survive an old stop. */
+function replacementCredentialGrant(): SessionCredentialGrant {
+  return {
+    version: 1,
+    scopeId: 'worktree_1',
+    sandboxId: 'ses-a1b2c3',
+    directory: '/workspace/a',
+    userId: OWNER,
+    provider: 'vercel',
+    members: [{ sessionId: ROUTE.sessionId, kiloSessionId: ROUTE.kiloSessionId }],
+    kilo: {
+      alias: createControlPlaneCredential('ses-a1b2c3', 'kilo'),
+      token: 'test-kilo-token',
+      targets: {
+        backendBaseUrl: 'https://backend.example.com',
+        providerBaseUrl: 'https://provider.example.com/api/openrouter',
+        sessionIngestBaseUrl: 'https://ingest.example.com',
+      },
+      capabilities: {},
+    },
+    preparedAt: 1000,
+    expiresAt: 2000,
+  };
+}
+
+function canonicalCreateIntent(record: AllocationRecord) {
+  return record.state.kind === 'stopped' ? null : record.state.createIntent;
+}
+
+function canonicalTarget(record: AllocationRecord) {
+  return record.state.kind === 'stopped' ? null : record.state.target;
+}
+
+function canonicalAllocationName(record: AllocationRecord): string | undefined {
+  const state = record.state;
+  return state.kind === 'stopped' ? undefined : state.target?.allocationName;
+}
+
+function canonicalVercel(record: AllocationRecord) {
+  const state = record.state;
+  return state.kind === 'stopped' ? undefined : state.target?.vercel;
+}
+
+function canonicalContainment(record: AllocationRecord) {
+  const state = record.state;
+  return state.kind === 'creating' || state.kind === 'allocated'
+    ? state.target.containment
+    : undefined;
+}
+
+function canonicalStopIntent(record: AllocationRecord) {
+  const state = record.state;
+  return state.kind === 'stopping' || state.kind === 'unknown' ? state.stopIntent : null;
+}
+
+function canonicalStopAttempts(record: AllocationRecord): number | undefined {
+  const state = record.state;
+  return state.kind === 'stopping' || state.kind === 'unknown' ? state.attempts : undefined;
+}
+
+/** The canonical idle-stop anchor, absent unless the record is allocated. */
+function canonicalIdleAt(record: AllocationRecord): number | null {
+  return record.state.kind === 'allocated' ? record.state.idleAt : null;
+}
+
+/** The canonical scheduling evidence that replaced the legacy deadline table. */
+async function readSchedule(storage: Parameters<typeof loadControlAlarmAnchors>[0]) {
+  const [anchors, allocation] = await Promise.all([
+    loadControlAlarmAnchors(storage),
+    loadCanonicalAllocation(storage as Parameters<typeof loadCanonicalAllocation>[0]),
+  ]);
+  return { anchors, state: allocation.state };
+}
 const mocks = vi.hoisted(() => ({
   getSandbox: vi.fn(),
   providerCreate: vi.fn(),
@@ -114,15 +212,6 @@ const PROMPT = {
   agent: { mode: 'code', model: 'kilo/fake' },
 };
 
-function nativeRetirementPayload(directory: string, nativeRuntimeId: string) {
-  return {
-    retirementId: '99999999-9999-4999-8999-999999999999',
-    directory,
-    nativeRuntimeId,
-    reason: 'process_exited',
-    cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
-  };
-}
 const BILLING = parseSandboxBillingInput({
   sandboxId: SANDBOX_ID,
   subject: { type: 'user', id: OWNER },
@@ -254,6 +343,21 @@ async function harness(
       transactionTail = pending.catch(() => undefined);
       return pending;
     },
+    transactionSync<T>(operation: () => T): T {
+      const snapshot = structuredClone([...records]);
+      const previousAlarm = alarmAt;
+      transactionActive = true;
+      try {
+        return operation();
+      } catch (error) {
+        records.clear();
+        for (const [key, value] of snapshot) records.set(key, value);
+        alarmAt = previousAlarm;
+        throw error;
+      } finally {
+        transactionActive = false;
+      }
+    },
   } as unknown as DurableObjectStorage;
   const pending: Promise<unknown>[] = [];
   const initializing: Promise<unknown>[] = [];
@@ -297,6 +401,20 @@ async function harness(
     SandboxSmallContainment: makeNamespace('SandboxSmallContainment'),
   };
   const namespace = namespaces[expectedNamespace];
+  const containerStub = {
+    launchWrapper: vi.fn(async () => ({ started: true })),
+    observe: vi.fn(async () => ({ state: 'running', running: true, currentAllocationRef: null })),
+    stop: vi.fn(async () => 'terminal'),
+    ensureLeaseAtLeast: vi.fn(async () => undefined),
+    readLog: vi.fn(async () => ''),
+    ensureBillingAdmission: vi.fn(async () => ({ success: true })),
+    configureBilling: vi.fn(async () => undefined),
+    isBillingBlocked: vi.fn(async () => false),
+  };
+  const sandboxContainers = {
+    idFromName: (id: string) => ({ toString: () => `do:SANDBOX_CONTAINERS:${id}` }),
+    getByName: vi.fn((_id: string) => containerStub),
+  };
   const issueKiloSessionCapability = vi.fn(async () => ({
     success: true,
     capability: 'kka1.test-capability',
@@ -304,6 +422,7 @@ async function harness(
   const env = {
     WORKER_URL: 'https://example.test',
     ...namespaces,
+    SANDBOX_CONTAINERS: sandboxContainers,
     GIT_TOKEN_SERVICE: { issueKiloSessionCapability },
     KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
     KILO_OPENROUTER_BASE: 'https://provider.example.test',
@@ -348,6 +467,7 @@ async function harness(
     receiveSandboxControlEventBatch: vi.fn().mockResolvedValue({ outcomes: [] }),
     receiveSandboxControlPreparing: vi.fn().mockResolvedValue({ applied: true }),
     failWaitingMessages: vi.fn().mockResolvedValue(undefined),
+    notifyStopped: vi.fn(async () => ({ outcome: 'delivered' as const })),
     invalidateTerminalRuntime: vi.fn().mockResolvedValue(undefined),
     recordNativeRuntime: vi.fn().mockResolvedValue(undefined),
   };
@@ -368,7 +488,7 @@ async function harness(
     }),
     closeProvisionalSockets: vi.fn(),
     supportsOperationResults: () => true,
-    supportsNativeRuntimeRetirement: () => true,
+    supportsNativeRuntimeIdCapture: () => false,
     pendingControlRequests: () => 0,
     sendRequest,
   } as unknown as SandboxControlSocketHandler;
@@ -397,6 +517,8 @@ async function harness(
     env,
     namespace,
     namespaces,
+    sandboxContainers,
+    containerStub,
     issueKiloSessionCapability,
     get transactionActive() {
       return transactionActive;
@@ -428,12 +550,13 @@ async function harness(
       });
     },
     async ready(runtime?: { wrapperVersion: string | null; recoveryCapable?: boolean }) {
-      const physical = await control.getPhysicalRecord();
-      if (!physical.providerRef) throw new Error('No physical allocation');
+      const physical = await control.getAllocationRecord();
+      const providerInstanceId = canonicalProviderRef(physical);
+      if (!providerInstanceId) throw new Error('No physical allocation');
       connection = {
         connectionId: crypto.randomUUID(),
         wrapperInstanceId: crypto.randomUUID(),
-        providerInstanceId: physical.providerRef,
+        providerInstanceId,
         recoveryCapable: runtime?.recoveryCapable === true,
       };
       const identity = connection;
@@ -451,6 +574,10 @@ async function harness(
     },
     replaceConnection(identity: SandboxControlConnectionIdentity) {
       connection = identity;
+    },
+    /** Simulate the platform dropping a closed socket before `onSocketClosed`. */
+    disconnect() {
+      connection = null;
     },
     async evict(passive = false) {
       control = new SandboxControl(ctx, env);
@@ -485,91 +612,262 @@ describe('SandboxControl lifecycle boundaries', () => {
     const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
     try {
       await h.create();
-      const physical = await h.control.getPhysicalRecord();
+      const physical = await h.control.getAllocationRecord();
       expect(fields).toHaveBeenCalledWith(
         expect.objectContaining({
           diagnosticEvent: 'allocation_launch',
           sandboxId: SANDBOX_ID,
-          physicalSandboxId: physical.createIntent?.allocationName,
+          physicalSandboxId: canonicalAllocationName(physical),
         })
       );
       expect(fields).toHaveBeenCalledWith(
         expect.objectContaining({
-          diagnosticEvent: 'physical_committed',
+          diagnosticEvent: 'allocation_transition',
+          aggregate: 'allocation',
           sandboxId: SANDBOX_ID,
-          physicalSandboxId: physical.createIntent?.allocationName,
+          from: 'stopped',
+          to: 'creating',
         })
       );
       await h.control.beginStop('idle');
       await h.control.confirmStopped();
       await h.create();
-      const replacement = await h.control.getPhysicalRecord();
-      expect(replacement.createIntent?.allocationName).not.toBe(
-        physical.createIntent?.allocationName
-      );
+      const replacement = await h.control.getAllocationRecord();
+      expect(canonicalAllocationName(replacement)).not.toBe(canonicalAllocationName(physical));
     } finally {
       fields.mockRestore();
     }
   });
 
-  it('recovers one eligible wrapper runtime through the production socket hooks', async () => {
+  it('re-anchors a migrated legacy running allocation to its provider reference', async () => {
     const h = await harness();
-    h.session.getControlState.mockResolvedValue({
-      version: 1,
-      scope: { sandboxId: SANDBOX_ID },
-      targets: [],
+    const createdAt = Date.now() - 10 * 60_000;
+    seedAllocationRecord(h.records, {
+      state: 'running',
+      providerRef: 'provider-ref-1',
+      createIntent: { intentId: 'intent-1', createdAt },
+      stopTombstone: null,
+      resumable: true,
     });
-    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
-      type: 'response',
-      requestId: 'request_1',
-      ok: true,
-      result:
-        request.operation === 'sandbox.status'
-          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
-          : request.operation === 'sandbox.reconcile'
-            ? {
-                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
-                  .episodeId,
-                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
-                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
-              }
-            : undefined,
-    }));
+    await h.evict(true);
+    const record = await h.control.getAllocationRecord();
+    if (record.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+    if (record.state.health.kind !== 'connecting') throw new Error('Expected connecting health');
+    expect(record.state.health).toMatchObject({
+      kind: 'connecting',
+      incarnation: 'provider-ref-1',
+    });
+    expect(record.state.health.deadlineAt).toBeGreaterThan(Date.now());
+    expect(h.records.get(CANONICAL_ALLOCATION_KEY)).toMatchObject({
+      state: { kind: 'allocated', health: { kind: 'connecting', incarnation: 'provider-ref-1' } },
+    });
+  });
+
+  it('does not re-anchor a canonical connecting allocation that already carries the provider reference', async () => {
+    const h = await harness();
+    const createdAt = Date.now() - 10 * 60_000;
+    const seeded = allocationFixture({
+      state: 'running',
+      providerRef: 'provider-ref-1',
+      createIntent: { intentId: 'intent-1', createdAt },
+    });
+    if (!seeded) throw new Error('Expected a fixture');
+    if (seeded.state.kind !== 'allocated') throw new Error('Expected an allocated fixture');
+    if (seeded.state.health.kind !== 'connecting') throw new Error('Expected connecting health');
+    const originalDeadline = seeded.state.health.deadlineAt;
+    seedCanonicalAllocationRecord(h.records, seeded);
+    await h.evict(true);
+    const record = await h.control.getAllocationRecord();
+    if (record.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+    expect(record.state.health).toMatchObject({
+      kind: 'connecting',
+      incarnation: 'provider-ref-1',
+      deadlineAt: originalDeadline,
+    });
+  });
+
+  it('keeps a replacement record, hash, grants and anchors when an old stop commits after a replacement create', async () => {
+    const h = await harness();
+    const old = allocationFixture({
+      state: 'running',
+      providerRef: 'provider-ref-old',
+      createIntent: { intentId: 'intent-old', createdAt: Date.now() - 60_000 },
+    });
+    if (!old) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, old);
+    h.records.set('wrapper_credential_hash', 'old-hash');
+    h.records.set('active_wrapper_runtime', { connectionId: 'old' });
+    await setControlAlarmAnchor(h.storage, 'credentialExpiry', Date.now() - 1_000);
+    const replacement = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-new', createdAt: Date.now() },
+    });
+    if (!replacement) throw new Error('Expected a fixture');
+    const grant = replacementCredentialGrant();
+    const replacementAnchorAt = Date.now() + 60_000;
+    const transactionSync = h.storage.transactionSync.bind(h.storage);
+    vi.spyOn(h.storage, 'transactionSync').mockImplementationOnce(<T>(operation: () => T) => {
+      seedCanonicalAllocationRecord(h.records, replacement);
+      h.records.set('wrapper_credential_hash', 'replacement-hash');
+      h.records.set('active_wrapper_runtime', { connectionId: 'replacement' });
+      saveSessionCredentialGrantsSync(h.storage.kv, [grant]);
+      setControlAlarmAnchorSync(h.storage.kv, 'credentialExpiry', replacementAnchorAt);
+      return transactionSync(operation);
+    });
+    await h.control.beginStop('idle');
+    // The old stop must not tear down the replacement's committed state.
+    expect(h.records.get('wrapper_credential_hash')).toBe('replacement-hash');
+    expect(h.records.get('active_wrapper_runtime')).toEqual({ connectionId: 'replacement' });
+    expect(await loadSessionCredentialGrants(h.storage)).toEqual([grant]);
+    expect((await loadControlAlarmAnchors(h.storage)).credentialExpiryAt).toBe(replacementAnchorAt);
+    expect(h.records.get(CANONICAL_ALLOCATION_KEY)).toMatchObject({
+      state: { kind: 'creating', createIntent: { intentId: 'intent-new' } },
+    });
+  });
+
+  it('clears the credential hash and runtime keys on a same-allocation stop', async () => {
+    const h = await harness();
+    const allocated = allocationFixture({
+      state: 'running',
+      providerRef: 'provider-ref-1',
+      createIntent: { intentId: 'intent-1', createdAt: Date.now() - 60_000 },
+    });
+    if (!allocated) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, allocated);
+    h.records.set('wrapper_credential_hash', 'hash-1');
+    h.records.set('active_wrapper_runtime', { connectionId: 'c1' });
+    h.records.set('wrapper_ready_at', 111);
+    await h.control.beginStop('idle');
+    expect(h.records.has('wrapper_credential_hash')).toBe(false);
+    expect(h.records.has('active_wrapper_runtime')).toBe(false);
+    expect(h.records.has('wrapper_ready_at')).toBe(false);
+  });
+
+  it('skips a delayed stopped-to-creating cleanup once a replacement allocation exists', async () => {
+    const h = await harness();
+    const replacement = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'replacement-intent', createdAt: Date.now() },
+    });
+    if (!replacement) throw new Error('Expected a fixture');
+    const transaction = h.storage.transaction.bind(h.storage);
+    let seeded = false;
+    let captured = false;
+    let hashAfterCleanup: unknown;
+    vi.spyOn(h.storage, 'transaction').mockImplementation(
+      async <T>(operation: (transaction: DurableObjectTransaction) => Promise<T>) => {
+        const current = h.records.get(CANONICAL_ALLOCATION_KEY) as AllocationRecord | undefined;
+        if (!seeded && current?.state.kind === 'creating') {
+          seeded = true;
+          seedCanonicalAllocationRecord(h.records, replacement);
+          h.records.set('wrapper_credential_hash', 'replacement-hash');
+        }
+        const result = await transaction(operation);
+        if (seeded && !captured) {
+          captured = true;
+          hashAfterCleanup = h.records.get('wrapper_credential_hash');
+        }
+        return result;
+      }
+    );
+    await h.create().catch(() => undefined);
+    expect(seeded).toBe(true);
+    expect(hashAfterCleanup).toBe('replacement-hash');
+  });
+
+  it('does not clean a creating allocation that already issued its credential', async () => {
+    const h = await harness();
+    const creating = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-c', createdAt: Date.now() },
+    });
+    if (!creating) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, creating);
+    h.records.set('wrapper_credential_hash', 'issued-hash');
+    h.records.set('active_wrapper_runtime', { connectionId: 'c1' });
+    await h.control.alarm();
+    expect(h.records.get('wrapper_credential_hash')).toBe('issued-hash');
+    expect(h.records.get('active_wrapper_runtime')).toEqual({ connectionId: 'c1' });
+  });
+
+  it('bounds each never-settling provider stop attempt at one stopAttempt interval', async () => {
+    const attemptStarts: number[] = [];
+    const h = await harness({
+      configureAllocation: value => {
+        value.handle.forceDestroyForControlPlane = () => {
+          attemptStarts.push(Date.now());
+          return new Promise<void>(() => {});
+        };
+      },
+    });
     await h.create();
-    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
-    await h.flush();
+    const setAlarm = vi.spyOn(h.storage, 'setAlarm');
+    const deleteAlarm = vi.spyOn(h.storage, 'deleteAlarm');
+    const scheduledBefore = setAlarm.mock.calls.length + deleteAlarm.mock.calls.length;
+    const startedAt = Date.now();
+    let settledAt: number | undefined;
+    const stopping = h.control.beginStop('idle').then(record => {
+      settledAt = Date.now();
+      return record;
+    });
+    for (let interval = 0; interval < 10 && settledAt === undefined; interval += 1) {
+      const attemptsBefore = attemptStarts.length;
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
+      if (settledAt !== undefined) break;
+      // Still pending after one interval: a fresh attempt must have started. If
+      // it did not, this attempt's timeout waited past its own bound.
+      expect(attemptStarts.length).toBeGreaterThan(attemptsBefore);
+    }
+    expect(settledAt).toBeDefined();
+    const record = await stopping;
+    expect(record.state.kind).toBe('stopping');
+    // Every attempt that ran settled within one stopAttempt interval.
+    expect(settledAt! - startedAt).toBeLessThanOrEqual(
+      Math.max(1, attemptStarts.length) * DEADLINE_MS.stopAttempt
+    );
+    expect(setAlarm.mock.calls.length + deleteAlarm.mock.calls.length).toBeGreaterThan(
+      scheduledBefore
+    );
+  });
 
-    expect(h.sendRequest.mock.calls.map(([request]) => request.operation)).toEqual([
-      'sandbox.reconcile',
-      'sandbox.reconcile',
-      'sandbox.status',
-      'sandbox.reconcile',
-    ]);
-    expect(await loadRecoveryDecisions(h.storage)).toEqual([]);
-
-    await h.hooks.onSocketClosed?.(true, first);
-    const pending = await loadRecoveryDecisions(h.storage);
-    expect(pending).toHaveLength(1);
-    expect(pending[0]).toMatchObject({ wrapperInstanceId: first.wrapperInstanceId });
-
-    const replacement = { ...first, connectionId: crypto.randomUUID() };
-    h.replaceConnection(replacement);
-    await h.hooks.onHandshakeComplete?.(replacement);
-    await h.hooks.onReady?.(replacement);
-    await h.flush();
-
-    expect(await loadRecoveryDecisions(h.storage)).toEqual([]);
-    expect((await h.control.getPhysicalRecord()).state).toBe('running');
-    expect(h.sendRequest.mock.calls.map(([request]) => request.operation)).toEqual([
-      'sandbox.reconcile',
-      'sandbox.reconcile',
-      'sandbox.status',
-      'sandbox.reconcile',
-      'sandbox.reconcile',
-      'sandbox.reconcile',
-      'sandbox.status',
-      'sandbox.reconcile',
-    ]);
+  it('bounds a never-settling provider observation and arms the observe deadline', async () => {
+    let observeStartedAt: number | undefined;
+    const h = await harness({
+      configureAllocation: value => {
+        value.handle.isContainerRunning = () => {
+          observeStartedAt = Date.now();
+          return new Promise<boolean>(() => {});
+        };
+      },
+    });
+    await h.create();
+    const allocated = await h.control.getAllocationRecord();
+    if (allocated.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+    const unknown = allocationFixture({
+      state: 'unknown',
+      providerRef: allocated.state.target.providerRef,
+      createIntent: {
+        intentId: allocated.state.createIntent.intentId,
+        createdAt: allocated.state.createIntent.createdAt - 10 * 60_000,
+      },
+    });
+    if (!unknown) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, unknown);
+    const setAlarm = vi.spyOn(h.storage, 'setAlarm');
+    setAlarm.mockClear();
+    // Move past the create alarm so the observe deadline is distinguishable.
+    vi.setSystemTime(Date.now() + 1_000);
+    const startedAt = Date.now();
+    const stopping = h.control.confirmStopped();
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
+    await stopping;
+    expect(observeStartedAt).toBeDefined();
+    // The timed-out observe wrote its own deadline; the create alarm is not proof.
+    expect(h.alarmAt).toBe(startedAt + POLICY.observeDeadlineMs);
+    expect(setAlarm).toHaveBeenCalled();
   });
 
   it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {
@@ -640,13 +938,15 @@ describe('SandboxControl lifecycle boundaries', () => {
     const blocked = h.storage.transaction(async () => {
       entered.resolve();
       await gate.promise;
-      h.records.set('physical_record', {
-        state: 'creating',
-        providerRef: null,
-        createIntent: { intentId: 'replacement', createdAt: Date.now() },
-        stopTombstone: null,
-        resumable: false,
-      });
+      seedCanonicalAllocationRecord(
+        h.records,
+        allocationFixture({
+          state: 'creating',
+          providerRef: null,
+          createIntent: { intentId: 'replacement', createdAt: Date.now() },
+          resumable: false,
+        })
+      );
       h.records.set('runtime_metadata', replacement);
     });
     await entered.promise;
@@ -697,17 +997,20 @@ describe('SandboxControl lifecycle boundaries', () => {
       };
       h.records.set('runtime_metadata', runtime);
       if (state !== 'missing') {
-        h.records.set('physical_record', {
-          state,
-          providerRef: state === 'stopped' ? null : 'instance_pending',
-          resumable: false,
-          createIntent:
-            state === 'creating' ? { intentId: 'pending', createdAt: Date.now() - 10_000 } : null,
-          stopTombstone:
-            state === 'stopping'
-              ? { reason: 'retired', attempts: 5, createdAt: Date.now() - 10_000 }
-              : null,
-        });
+        const pendingIntent = { intentId: 'pending', createdAt: Date.now() - 10_000 };
+        seedCanonicalAllocationRecord(
+          h.records,
+          allocationFixture({
+            state,
+            providerRef: state === 'stopped' ? null : 'instance_pending',
+            resumable: false,
+            createIntent: state === 'creating' || state === 'stopping' ? pendingIntent : null,
+            stopTombstone:
+              state === 'stopping'
+                ? { reason: 'retired', attempts: 5, createdAt: Date.now() - 10_000 }
+                : null,
+          })
+        );
       }
       await h.storage.setAlarm(Date.now() + 12_345);
       const before = structuredClone([...h.records]);
@@ -787,21 +1090,26 @@ describe('SandboxControl lifecycle boundaries', () => {
     };
     vi.spyOn(h.ctx, 'getWebSockets').mockReturnValue([socket as unknown as WebSocket]);
     h.records.set('provider_kind', 'cloudflare');
-    h.records.set('physical_record', {
-      state: 'running',
-      providerRef: identity.providerInstanceId,
-      createIntent: null,
-      stopTombstone: null,
-      resumable: false,
-    });
+    seedCanonicalAllocationRecord(
+      h.records,
+      allocationFixture({
+        state: 'running',
+        providerRef: identity.providerInstanceId,
+        createIntent: { intentId: identity.providerInstanceId, createdAt: now - 1_000 },
+        health: 'healthy',
+        heartbeatAt: now,
+        idleAt: now + DEADLINE_MS.idleStop,
+        resumable: false,
+      })
+    );
     h.records.set('active_wrapper_runtime', {
       ...identity,
       readyConnectionId: identity.connectionId,
     });
     h.records.set('session_routes', [first, sibling]);
-    h.records.set('deadlines', {
-      idleStop: now + DEADLINE_MS.idleStop,
-      heartbeatExpiry: now + DEADLINE_MS.heartbeatExpiry,
+    h.records.set('control_alarm_anchors', {
+      credentialExpiryAt: now + DEADLINE_MS.heartbeatExpiry,
+      socketHandshakeAt: null,
     });
     const before = structuredClone([...h.records]);
     const alarm = h.alarmAt;
@@ -830,6 +1138,145 @@ describe('SandboxControl lifecycle boundaries', () => {
     ).toMatchObject({ status: 'unknown', estimatedSleepAt: null });
   });
 
+  it('wires the containers adapter to the control allocation and container namespace', async () => {
+    const h = await harness({ containmentEnabled: false });
+    h.session.getCredentialMetadata.mockResolvedValue(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: ROUTE.sessionId, userId: OWNER },
+        auth: { kiloSessionId: ROUTE.kiloSessionId, kilocodeToken: 'test-token' },
+        workspace: {
+          sandboxId: SANDBOX_ID,
+          workspacePath: ROUTE.directory,
+          sandboxProvider: 'cloudflare-containers',
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
+        },
+        lifecycle: { version: 1, timestamp: Date.now() },
+      })
+    );
+    await h.control.ensureReady({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      provider: 'cloudflare-containers',
+      allowCreate: true,
+      billing: BILLING,
+    });
+    expect(h.sandboxContainers.getByName).toHaveBeenCalledWith(SANDBOX_ID);
+
+    const physical = await h.control.getAllocationRecord();
+    expect(physical.state.kind).toBe('allocated');
+    expect(canonicalTarget(physical)?.provider).toBe('cloudflare');
+    expect(canonicalAllocationName(physical)).toMatch(/^ses-[0-9a-f]{48}$/);
+    expect(decodeCloudflareProviderRef(canonicalProviderRef(physical) ?? '')).toEqual({
+      sandboxId: canonicalAllocationName(physical),
+      containment: false,
+      instanceId: canonicalCreateIntentId(physical),
+    });
+    expect(h.containerStub.launchWrapper).toHaveBeenCalledWith({
+      allocationRef: canonicalProviderRef(physical),
+      instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
+      env: expect.objectContaining({
+        PROVIDER_INSTANCE_ID: canonicalProviderRef(physical),
+        WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
+      }),
+    });
+
+    await h.control.ensureReady({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      provider: 'cloudflare-containers',
+      allowCreate: false,
+    });
+    const unchanged = await h.control.getAllocationRecord();
+    expect(unchanged.state.kind).toBe('allocated');
+    expect(canonicalStopIntent(unchanged)).toBeNull();
+    expect(canonicalProviderRef(unchanged)).toBe(canonicalProviderRef(physical));
+    expect(canonicalCreateIntentId(unchanged)).toBe(canonicalCreateIntentId(physical));
+    expect(h.containerStub.launchWrapper).toHaveBeenCalledTimes(1);
+  });
+
+  it('projects a recorded containers allocation and rejects a foreign provider request', async () => {
+    const h = await harness();
+    const now = Date.now();
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: SANDBOX_ID,
+      containment: false,
+      instanceId: 'intent-1',
+    });
+    const identity = {
+      connectionId: crypto.randomUUID(),
+      wrapperInstanceId: crypto.randomUUID(),
+      providerInstanceId: providerRef,
+    };
+    const first = {
+      ...ROUTE,
+      worktreeId: 'worktree_shared',
+      lastState: 'idle',
+      lastStateAt: now,
+      idleForMs: 0,
+      waitingOn: null,
+    };
+    const sibling = { ...first, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' };
+    const idle = await summarizeHeartbeatIdle({
+      state: 'idle',
+      pendingMessages: 0,
+      kilo: { ready: true },
+      sessions: [first, sibling].map(route => ({
+        kiloSessionId: route.kiloSessionId,
+        state: 'idle',
+        idleForMs: 0,
+      })),
+    });
+    const attachment = {
+      ...identity,
+      handshakeComplete: true,
+      protocolVersion: 1,
+      acceptedAt: now - 1_000,
+      observation: { ready: true, receivedAt: now, idle },
+    };
+    const socket = {
+      readyState: 1,
+      deserializeAttachment: vi.fn(() => attachment),
+      serializeAttachment: vi.fn(),
+      send: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.spyOn(h.ctx, 'getWebSockets').mockReturnValue([socket as unknown as WebSocket]);
+    h.records.set('provider_kind', 'cloudflare-containers');
+    seedCanonicalAllocationRecord(
+      h.records,
+      allocationFixture({
+        state: 'running',
+        providerRef,
+        createIntent: { intentId: 'intent-1', createdAt: now - 1_000 },
+        health: 'healthy',
+        heartbeatAt: now,
+        idleAt: now + DEADLINE_MS.idleStop,
+        resumable: false,
+      })
+    );
+    h.records.set('active_wrapper_runtime', {
+      ...identity,
+      readyConnectionId: identity.connectionId,
+    });
+    h.records.set('session_routes', [first, sibling]);
+    await expect(
+      h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare-containers' })
+    ).resolves.toMatchObject({
+      status: 'active',
+      provider: 'Cloudflare',
+      estimatedSleepAt: now + DEADLINE_MS.idleStop,
+    });
+    await expect(
+      h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).resolves.toMatchObject({ status: 'unknown', provider: 'Unknown' });
+  });
+
   describe.each(['create', 'acquire'] as const)('%s credential policy', createPath => {
     it.each([false, undefined])(
       'launches and attaches using persisted containment %s',
@@ -845,12 +1292,12 @@ describe('SandboxControl lifecycle boundaries', () => {
             deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
           });
         }
-        const physical = await h.control.getPhysicalRecord();
-        const native = decodeCloudflareProviderRef(physical.providerRef);
+        const physical = await h.control.getAllocationRecord();
+        const native = decodeCloudflareProviderRef(canonicalProviderRef(physical));
         if (!native) throw new Error('Missing native allocation');
         const contained = containmentEnabled !== false;
         expect(native.containment).toBe(contained);
-        expect(physical.createIntent?.containment).toEqual({
+        expect(canonicalContainment(physical)).toEqual({
           kilocode: contained,
           github: contained,
           worktreeScoped: true,
@@ -859,7 +1306,7 @@ describe('SandboxControl lifecycle boundaries', () => {
           contained ? h.namespaces.SandboxSmallContainment : h.namespaces.SandboxSmall,
           native.sandboxId
         );
-        const runtime = h.runtime(physical.providerRef ?? '');
+        const runtime = h.runtime(canonicalProviderRef(physical) ?? '');
         if (!runtime) throw new Error('Missing runtime');
         expect(runtime.startProcess).toHaveBeenCalledOnce();
         expect(runtime.configureBilling).toHaveBeenCalledWith({
@@ -868,7 +1315,9 @@ describe('SandboxControl lifecycle boundaries', () => {
         });
         if (contained) expect(runtime.setOutboundHandler).toHaveBeenCalled();
         else expect(runtime.setOutboundHandler).not.toHaveBeenCalled();
-        await expect(h.hooks.validateHandshake?.(physical.providerRef ?? '')).resolves.toBe(true);
+        await expect(
+          h.hooks.validateHandshake?.(canonicalProviderRef(physical) ?? '')
+        ).resolves.toBe(true);
         const identity = await h.ready();
         const payload = await h.control.prepareSessionCredentials({
           ownerId: OWNER,
@@ -888,13 +1337,11 @@ describe('SandboxControl lifecycle boundaries', () => {
             expectedWrapperInstanceId: identity.wrapperInstanceId,
           })
         ).resolves.toMatchObject({ ok: true });
-        expect(h.sendRequest).toHaveBeenCalledWith(
-          expect.objectContaining({
-            operation: 'session.attach',
-            payload: { ...payload, captureNativeRuntimeId: true },
-          })
-        );
-        await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
+        await expect(h.control.getStatus()).resolves.toMatchObject({
+          status: 'active',
+          connection: 'ready',
+          work: 'idle',
+        });
         if (!contained) {
           expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
           expect(await loadSessionCredentialGrants(h.storage)).toEqual([
@@ -940,8 +1387,8 @@ describe('SandboxControl lifecycle boundaries', () => {
         if (state === 'creating') await billingEntered.promise;
         else await acquiring;
         const identity = state === 'running' ? await h.ready() : undefined;
-        const physical = await h.control.getPhysicalRecord();
-        expect(physical.state).toBe(state);
+        const physical = await h.control.getAllocationRecord();
+        expect(physical.state.kind).toBe(state === 'running' ? 'allocated' : 'creating');
         const runtime = [...h.allocations.values()][0];
         if (!runtime) throw new Error('Missing runtime');
         const originalMetadata = await h.session.getCredentialMetadata();
@@ -978,7 +1425,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         const receipts = structuredClone(h.records.get('acquisition_receipts'));
         const grants = await loadSessionCredentialGrants(h.storage);
         const routes = await h.control.listRoutes();
-        const deadlines = await loadDeadlines(h.storage);
+        const schedule = await readSchedule(h.storage);
         const alarmAt = h.alarmAt;
         await expect(
           h.control.ensureReady({
@@ -990,11 +1437,11 @@ describe('SandboxControl lifecycle boundaries', () => {
           })
         ).rejects.toThrow('Sandbox containment mode conflicts with the session');
         await h.flush();
-        expect(await h.control.getPhysicalRecord()).toEqual(physical);
+        expect(await h.control.getAllocationRecord()).toEqual(physical);
         expect(h.records.get('acquisition_receipts')).toEqual(receipts);
         expect(await loadSessionCredentialGrants(h.storage)).toEqual(grants);
         expect(await h.control.listRoutes()).toEqual(routes);
-        expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+        expect(await readSchedule(h.storage)).toEqual(schedule);
         expect(h.alarmAt).toBe(alarmAt);
         expect(runtime.destroy).not.toHaveBeenCalled();
         expect(runtime.state.running).toBe(state === 'running');
@@ -1004,7 +1451,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         expect(h.allocations.size).toBe(1);
         expect(mocks.providerCreate).toHaveBeenCalledOnce();
         await h.evict();
-        expect(await h.control.getPhysicalRecord()).toEqual(physical);
+        expect(await h.control.getAllocationRecord()).toEqual(physical);
         expect(h.records.get('acquisition_receipts')).toEqual(receipts);
         releaseBilling.resolve();
         await acquiring;
@@ -1035,7 +1482,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     const grants = await loadSessionCredentialGrants(h.storage);
     h.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
     await h.evict();
-    await expect(h.create()).resolves.toMatchObject({ reported: 'ready' });
+    await expect(h.create()).resolves.toMatchObject({
+      status: 'active',
+      connection: 'ready',
+      work: 'idle',
+    });
     await expect(
       h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId })
     ).resolves.toMatchObject({ kilo: { token: 'test-token' } });
@@ -1095,14 +1546,19 @@ describe('SandboxControl lifecycle boundaries', () => {
       const h = await harness();
       await h.create();
       const identity = await h.ready();
-      const physical = await h.control.getPhysicalRecord();
-      h.records.set('physical_record', {
-        ...physical,
-        containment: {
-          ...physical.containment,
-          ...(mismatch === 'flags' ? { kilocode: false } : {}),
-          ...(mismatch === 'scope' ? { worktreeScoped: false } : {}),
-          ...(mismatch === 'provider' ? { providerRef: 'other_provider' } : {}),
+      const record = await loadCanonicalAllocation(h.storage, false);
+      if (record.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+      const resolved = record.state.target.resolvedContainment;
+      if (!resolved) throw new Error('Expected resolved containment');
+      const mismatched = { ...resolved };
+      if (mismatch === 'flags') mismatched.kilocode = false;
+      if (mismatch === 'provider') mismatched.providerRef = 'other_provider';
+      if (mismatch === 'scope') delete mismatched.worktreeScoped;
+      await storeAllocation(h.storage, {
+        ...record,
+        state: {
+          ...record.state,
+          target: { ...record.state.target, resolvedContainment: mismatched },
         },
       });
       await expect(h.hooks.validateHandshake?.(identity.providerInstanceId)).resolves.toBe(false);
@@ -1136,18 +1592,18 @@ describe('SandboxControl lifecycle boundaries', () => {
       },
     });
     await h.create();
-    const physical = await h.control.getPhysicalRecord();
+    const physical = await h.control.getAllocationRecord();
     expect(launchEnv).toBeDefined();
     if (!launchEnv) throw new Error('Wrapper was not launched');
     expect(
       validateControlLogUploadGrant(`Bearer ${launchEnv.CONTROL_LOG_UPLOAD_GRANT}`, secret)
     ).toMatchObject({
       sandboxId: SANDBOX_ID,
-      allocationId: physical.createIntent?.intentId,
+      allocationId: canonicalCreateIntentId(physical),
       wrapperInstanceId: launchEnv.CONTROL_WRAPPER_INSTANCE_ID,
     });
     expect(launchEnv.CONTROL_LOG_UPLOAD_URL).toBe(
-      `https://example.test/sandbox-logs/${SANDBOX_ID}/${physical.createIntent?.intentId}/${launchEnv.CONTROL_WRAPPER_INSTANCE_ID}`
+      `https://example.test/sandbox-logs/${SANDBOX_ID}/${canonicalCreateIntentId(physical)}/${launchEnv.CONTROL_WRAPPER_INSTANCE_ID}`
     );
     expect(Object.values(launchEnv)).not.toContain(secret);
   });
@@ -1196,10 +1652,13 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness({
       configureAllocation: runtime => {
         runtime.startProcess.mockImplementation(async () => {
-          const physical = await h.control.getPhysicalRecord();
+          const physical = await h.control.getAllocationRecord();
           expect(h.transactionActive).toBe(false);
           expect(h.records.get('acquisition_receipts')).toEqual([
-            { ...acquisition, allocation: { kind: 'intent', id: physical.createIntent?.intentId } },
+            {
+              ...acquisition,
+              allocation: { kind: 'intent', id: canonicalCreateIntentId(physical) },
+            },
           ]);
           expect(h.alarmAt).not.toBeNull();
           runtime.state.running = true;
@@ -1208,37 +1667,24 @@ describe('SandboxControl lifecycle boundaries', () => {
       },
     });
     await Promise.all([h.acquire(acquisition), h.acquire(acquisition)]);
-    const physical = await h.control.getPhysicalRecord();
+    const physical = await h.control.getAllocationRecord();
     expect(mocks.providerCreate).toHaveBeenCalledOnce();
     expect(h.allocations.size).toBe(1);
-    const runtime = h.runtime(physical.providerRef ?? '');
+    const runtime = h.runtime(canonicalProviderRef(physical) ?? '');
     expect(runtime?.startProcess).toHaveBeenCalledOnce();
     await h.evict();
     await h.acquire(acquisition);
-    expect((await h.control.getPhysicalRecord()).createIntent).toEqual(physical.createIntent);
+    const afterEvict = await h.control.getAllocationRecord();
+    expect({
+      createIntent: canonicalCreateIntent(afterEvict),
+      target: canonicalTarget(afterEvict),
+    }).toEqual({
+      createIntent: canonicalCreateIntent(physical),
+      target: canonicalTarget(physical),
+    });
     expect(runtime?.startProcess).toHaveBeenCalledOnce();
     expect(mocks.providerCreate).toHaveBeenCalledOnce();
     expect(h.allocations.size).toBe(1);
-  });
-
-  it('binds a new acquisition to an existing create intent without issuing provider I/O', async () => {
-    const h = await harness();
-    const claimed = await h.control.claimCreate(
-      'existing_intent',
-      false,
-      SANDBOX_ID,
-      WORKTREE_CREDENTIAL_CONTAINMENT
-    );
-    const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-    await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'creating' });
-    expect(h.records.get('acquisition_receipts')).toEqual([
-      { ...acquisition, allocation: { kind: 'intent', id: claimed.createIntent?.intentId } },
-    ]);
-    await h.evict();
-    await h.acquire(acquisition);
-    expect((await h.control.getPhysicalRecord()).createIntent).toEqual(claimed.createIntent);
-    expect(mocks.providerCreate).not.toHaveBeenCalled();
-    expect(h.allocations.size).toBe(0);
   });
 
   it('does not launch an allocation when acquisition expires during provider creation', async () => {
@@ -1259,7 +1705,9 @@ describe('SandboxControl lifecycle boundaries', () => {
     billing.resolve();
     await expect(acquiring).rejects.toThrow('acquisition expired');
     expect(mocks.providerCreate).toHaveBeenCalledOnce();
-    expect((await h.control.getPhysicalRecord()).state).toBe('failed');
+    // The expired acquisition aborts the atomic create+launch before the
+    // wrapper starts, so the create is uncertain and observed later.
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('unknown');
     for (const runtime of h.allocations.values()) {
       expect(runtime.startProcess).not.toHaveBeenCalled();
     }
@@ -1284,7 +1732,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
     await expect(h.acquire(acquisition)).rejects.toThrow('acquisition transaction failed');
     expect(h.records.has('acquisition_receipts')).toBe(false);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
     expect(h.alarmAt).toBeNull();
     expect(h.allocations.size).toBe(0);
     await h.acquire(acquisition);
@@ -1306,23 +1754,31 @@ describe('SandboxControl lifecycle boundaries', () => {
         return result;
       });
     await expect(h.acquire(acquisition)).rejects.toThrow('reset after acquisition commit');
-    const claimed = await h.control.getPhysicalRecord();
-    expect(claimed.state).toBe('creating');
+    const claimed = await h.control.getAllocationRecord();
+    expect(claimed.state.kind).toBe('creating');
     expect(h.records.get('acquisition_receipts')).toEqual([
-      { ...acquisition, allocation: { kind: 'intent', id: claimed.createIntent?.intentId } },
+      { ...acquisition, allocation: { kind: 'intent', id: canonicalCreateIntentId(claimed) } },
     ]);
     expect(h.allocations.size).toBe(0);
     await h.evict();
     await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'creating' });
     expect(h.allocations.size).toBe(0);
-    expect((await h.control.getPhysicalRecord()).createIntent).toEqual(claimed.createIntent);
+    const afterEvict = await h.control.getAllocationRecord();
+    expect({
+      createIntent: canonicalCreateIntent(afterEvict),
+      target: canonicalTarget(afterEvict),
+    }).toEqual({
+      createIntent: canonicalCreateIntent(claimed),
+      target: canonicalTarget(claimed),
+    });
     await h.fireAlarm();
-    // The spent receipt must not create a second allocation; a failed record now
-    // waits and enters the existing release path instead of being reused.
-    await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'stopping' });
+    // The spent receipt must not create a second allocation. Past its create
+    // deadline the record is `failed` and the acquisition drives the observe
+    // path instead of reusing it; the provider-settle window keeps it failed.
+    await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'failed' });
     expect(mocks.providerCreate).not.toHaveBeenCalled();
     expect(h.records.get('acquisition_receipts')).toEqual([
-      { ...acquisition, allocation: { kind: 'intent', id: claimed.createIntent?.intentId } },
+      { ...acquisition, allocation: { kind: 'intent', id: canonicalCreateIntentId(claimed) } },
     ]);
   });
 
@@ -1334,7 +1790,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.control.beginStop('execution_failed');
     await h.control.recordStopAttempt();
     await h.flush();
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
     expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
     await h.evict();
     const lostPromise = h.acquire(acquisition);
@@ -1347,51 +1803,16 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.acquire({ ...acquisition, id: 'attempt_b' });
     const replacement = await h.ready();
     expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
-    expect((await h.control.getPhysicalRecord()).providerRef).toBe(replacement.providerInstanceId);
-    expect(h.allocations.size).toBe(2);
-    expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
-    expect(h.runtime(replacement.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
-  });
-
-  it('does not reuse a receipt-bound allocation observed failed and only rotates after stopped', async () => {
-    const h = await harness();
-    const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-    await h.acquire(acquisition);
-    const original = await h.ready();
-    await h.control.observeProvider('terminal');
-    expect((await h.control.getPhysicalRecord()).state).toBe('failed');
-    expect(mocks.providerCreate).toHaveBeenCalledOnce();
-
-    const sameId = await h.acquire(acquisition).then(
-      value => ({ value }),
-      error => ({ error })
+    const superseded = await h.acquire(acquisition).then(
+      () => new Error('Expected a superseded acquisition rejection'),
+      (error: unknown) => error
     );
-    // No second allocation is created for the spent receipt. If the release
-    // confirmed the stop inside this call, it surfaces as acquisition loss.
-    expect(mocks.providerCreate).toHaveBeenCalledOnce();
-    expect(h.allocations.size).toBe(1);
-    if ('error' in sameId) {
-      expect(isSandboxAcquisitionLostError(sameId.error)).toBe(true);
-    } else {
-      expect(sameId.value.physical).toBe('stopping');
-    }
-
-    if ((await h.control.getPhysicalRecord()).state !== 'stopped') {
-      await h.control.recordStopAttempt();
-      await h.flush();
-    }
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    const lost = await h.acquire(acquisition).then(
-      value => value,
-      error => error
+    expect(isSandboxAcquisitionSupersededError(superseded)).toBe(true);
+    expect(isSandboxAcquisitionLostError(superseded)).toBe(true);
+    expect(superseded).toMatchObject({ message: SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE });
+    expect(canonicalProviderRef(await h.control.getAllocationRecord())).toBe(
+      replacement.providerInstanceId
     );
-    expect(isSandboxAcquisitionLostError(lost)).toBe(true);
-    expect(mocks.providerCreate).toHaveBeenCalledOnce();
-
-    await h.acquire({ ...acquisition, id: 'attempt_b' });
-    const replacement = await h.ready();
-    expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
     expect(h.allocations.size).toBe(2);
     expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
     expect(h.runtime(replacement.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
@@ -1427,9 +1848,10 @@ describe('SandboxControl lifecycle boundaries', () => {
       await h.create();
       const original = await h.ready({ wrapperVersion: null, recoveryCapable: true });
       await h.flush();
-      expect((await h.control.getPhysicalRecord()).state).toBe('running');
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
       expect(await h.control.getStatus()).toMatchObject({ connection: 'ready' });
       await h.hooks.onSocketClosed?.(true, original);
+      h.disconnect();
       const runtime = h.runtime(original.providerInstanceId);
       if (!runtime) throw new Error('Missing runtime');
       return { h, original, runtime };
@@ -1460,22 +1882,23 @@ describe('SandboxControl lifecycle boundaries', () => {
       });
       const creating = h.create();
       await entered.promise;
-      const physical = await h.control.getPhysicalRecord();
-      expect(physical.state).toBe('running');
-      if (!physical.providerRef) throw new Error('Missing provider reference');
-      const runtime = h.runtime(physical.providerRef);
+      const physical = await h.control.getAllocationRecord();
+      expect(physical.state.kind).toBe('allocated');
+      const providerRef = canonicalProviderRef(physical);
+      if (!providerRef) throw new Error('Missing provider reference');
+      const runtime = h.runtime(providerRef);
       if (!runtime) throw new Error('Missing runtime');
       expect(runtime.state.running).toBe(false);
 
       const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
       await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
-      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
       expect(runtime.destroy).not.toHaveBeenCalled();
       expect(mocks.providerCreate).toHaveBeenCalledOnce();
 
       release.resolve();
       await creating;
-      expect((await h.control.getPhysicalRecord()).state).toBe('running');
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
       expect(runtime.startProcess).toHaveBeenCalledOnce();
       expect(mocks.providerCreate).toHaveBeenCalledOnce();
     });
@@ -1496,12 +1919,12 @@ describe('SandboxControl lifecycle boundaries', () => {
       await h.control.beginStop('execution_failed');
       await h.control.recordStopAttempt();
       await h.flush();
-      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
 
       await h.acquire({ ...acquisition, id: 'attempt_b' });
       const replacement = await h.ready();
       expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
-      const before = await h.control.getPhysicalRecord();
+      const before = await h.control.getAllocationRecord();
 
       probe.resolve(false);
       const outcome = await losing.then(
@@ -1514,68 +1937,72 @@ describe('SandboxControl lifecycle boundaries', () => {
         expect(outcome.value.physical).not.toBe('failed');
       }
 
-      const after = await h.control.getPhysicalRecord();
-      expect(after.state).toBe('running');
-      expect(after.providerRef).toBe(replacement.providerInstanceId);
-      expect(after.providerRef).toBe(before.providerRef);
-      expect(after.stopTombstone).toBeNull();
+      const after = await h.control.getAllocationRecord();
+      expect(after.state.kind).toBe('allocated');
+      expect(canonicalProviderRef(after)).toBe(replacement.providerInstanceId);
+      expect(canonicalProviderRef(after)).toBe(canonicalProviderRef(before));
+      expect(canonicalStopIntent(after)).toBeNull();
       expect(h.runtime(replacement.providerInstanceId)?.destroy).not.toHaveBeenCalled();
       expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
     });
 
-    it('applies exactly one running-to-failed commit under overlapping terminal probes', async () => {
+    it('applies exactly one loss commit under overlapping terminal probes', async () => {
       const { h, original, runtime } = await killedRuntime();
-      const probes: { promise: Promise<boolean>; resolve: (value: boolean) => void }[] = [];
-      const enteredA = deferred<void>();
-      const enteredB = deferred<void>();
-      runtime.isContainerRunning.mockImplementation(() => {
-        const probe = deferred<boolean>();
-        probes.push(probe);
-        if (probes.length === 1) enteredA.resolve();
-        if (probes.length === 2) enteredB.resolve();
-        return probe.promise;
-      });
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const lossCommits = () =>
+        fields.mock.calls
+          .map(([record]) => record)
+          .filter(
+            record =>
+              record.diagnosticEvent === 'allocation_transition' &&
+              record.aggregate === 'allocation' &&
+              typeof record.from === 'string' &&
+              record.from.startsWith('allocated.') &&
+              record.to === 'stopped'
+          );
+      try {
+        const probes: { promise: Promise<boolean>; resolve: (value: boolean) => void }[] = [];
+        const enteredA = deferred<void>();
+        const enteredB = deferred<void>();
+        runtime.isContainerRunning.mockImplementation(() => {
+          const probe = deferred<boolean>();
+          probes.push(probe);
+          if (probes.length === 1) enteredA.resolve();
+          if (probes.length === 2) enteredB.resolve();
+          return probe.promise;
+        });
 
-      const attemptA = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-      const attemptB = { id: 'attempt_b', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-      const acquiringA = h.acquire(attemptA);
-      await enteredA.promise;
-      const acquiringB = h.acquire(attemptB);
-      await enteredB.promise;
-      expect(probes).toHaveLength(2);
+        const attemptA = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+        const attemptB = { id: 'attempt_b', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+        const acquiringA = h.acquire(attemptA);
+        await enteredA.promise;
+        const acquiringB = h.acquire(attemptB);
+        await enteredB.promise;
+        expect(probes).toHaveLength(2);
 
-      const stopEntered = deferred<void>();
-      const stopRelease = deferred<void>();
-      runtime.destroy.mockImplementation(async () => {
-        stopEntered.resolve();
-        await stopRelease.promise;
-        runtime.state.running = false;
-      });
+        // A provider-terminal observation settles the allocation straight to
+        // `stopped`; the dead runtime needs no destroy.
+        probes[0].resolve(false);
+        await drainMicrotasks();
+        expect(lossCommits()).toHaveLength(1);
+        expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
+        expect(runtime.destroy).not.toHaveBeenCalled();
 
-      probes[0].resolve(false);
-      await stopEntered.promise;
-      const beforeCleanup = await h.control.getPhysicalRecord();
-      expect(beforeCleanup.state).not.toBe('stopped');
+        // The overlapping second probe observes the same (now settled) record and
+        // must not apply a duplicate commit.
+        probes[1].resolve(false);
+        await drainMicrotasks();
+        expect(lossCommits()).toHaveLength(1);
 
-      probes[1].resolve(false);
-      await drainMicrotasks();
+        await Promise.allSettled([acquiringA, acquiringB]);
 
-      const log = await h.control.getTransitionLog();
-      expect(
-        log.filter(row => row.kind === 'physical' && row.from === 'running' && row.to === 'failed')
-      ).toHaveLength(1);
-      expect(log.filter(row => row.kind === 'physical' && row.to === 'stopped')).toHaveLength(0);
-      expect((await h.control.getPhysicalRecord()).state).not.toBe('stopped');
-      expect(mocks.providerCreate).toHaveBeenCalledOnce();
-
-      stopRelease.resolve();
-      await Promise.allSettled([acquiringA, acquiringB]);
-      expect(runtime.destroy).toHaveBeenCalledOnce();
-
-      await h.acquire({ ...attemptA, id: 'attempt_c' });
-      const replacement = await h.ready();
-      expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
-      expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
+        await h.acquire({ ...attemptA, id: 'attempt_c' });
+        const replacement = await h.ready();
+        expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
+        expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
+      } finally {
+        fields.mockRestore();
+      }
     });
 
     it('does not probe while a ready wrapper is reused', async () => {
@@ -1589,14 +2016,14 @@ describe('SandboxControl lifecycle boundaries', () => {
       const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
       await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
       expect(runtime.isContainerRunning.mock.calls.length).toBe(probesBefore);
-      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
     });
 
     it('does not tombstone an established runtime that is still running', async () => {
       const { h, runtime } = await establishedRuntime();
       const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
       await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
-      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
       expect(runtime.destroy).not.toHaveBeenCalled();
       expect(mocks.providerCreate).toHaveBeenCalledOnce();
       expect(h.allocations.size).toBe(1);
@@ -1607,7 +2034,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       runtime.isContainerRunning.mockRejectedValue(new Error('probe failed'));
       const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
       await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
-      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
       expect(runtime.destroy).not.toHaveBeenCalled();
       expect(mocks.providerCreate).toHaveBeenCalledOnce();
     });
@@ -1625,7 +2052,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       await entered.promise;
       await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt + 1);
       await expect(acquiring).resolves.toMatchObject({ physical: 'running' });
-      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
       expect(runtime.destroy).not.toHaveBeenCalled();
       expect(mocks.providerCreate).toHaveBeenCalledOnce();
     });
@@ -1646,11 +2073,11 @@ describe('SandboxControl lifecycle boundaries', () => {
         expect(['stopping', 'failed']).toContain(first.value.physical);
       }
 
-      if ((await h.control.getPhysicalRecord()).state !== 'stopped') {
+      if ((await h.control.getAllocationRecord()).state.kind !== 'stopped') {
         await h.control.recordStopAttempt();
         await h.flush();
       }
-      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
       expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
 
       await h.acquire({ ...acquisition, id: 'attempt_b' });
@@ -1692,9 +2119,9 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     const acquiring = h.acquire(acquisition);
     await entered.promise;
-    const physical = await h.control.getPhysicalRecord();
+    const physical = await h.control.getAllocationRecord();
     expect(h.records.get('acquisition_receipts')).toEqual([
-      { ...acquisition, allocation: { kind: 'intent', id: physical.createIntent?.intentId } },
+      { ...acquisition, allocation: { kind: 'intent', id: canonicalCreateIntentId(physical) } },
     ]);
     await h.control.beginStop('execution_failed');
     await h.control.recordStopAttempt();
@@ -1707,8 +2134,16 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(isSandboxAcquisitionLostError(changed)).toBe(true);
     expect(changed).toMatchObject({ message: 'Sandbox runtime changed during billing admission' });
     await h.evict();
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
-    expect((await h.control.getPhysicalRecord()).providerRef).toBe(replacement.providerInstanceId);
+    const superseded = await h.acquire(acquisition).then(
+      () => new Error('Expected a superseded acquisition rejection'),
+      (error: unknown) => error
+    );
+    expect(isSandboxAcquisitionSupersededError(superseded)).toBe(true);
+    expect(isSandboxAcquisitionLostError(superseded)).toBe(true);
+    expect(superseded).toMatchObject({ message: SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE });
+    expect(canonicalProviderRef(await h.control.getAllocationRecord())).toBe(
+      replacement.providerInstanceId
+    );
     expect(h.allocations.size).toBe(2);
   });
 
@@ -1730,9 +2165,18 @@ describe('SandboxControl lifecycle boundaries', () => {
     };
     const acquiring = h.acquire(acquisition);
     await entered.promise;
-    const physical = await h.control.getPhysicalRecord();
+    const physical = await h.control.getAllocationRecord();
     // Synthetic defensive fixture: no production transition was established to produce this record.
-    h.records.set('physical_record', { ...physical, state: 'unknown', stopTombstone: null });
+    await storeAllocation(
+      h.storage,
+      allocationFixture({
+        state: 'unknown',
+        providerRef: canonicalProviderRef(physical),
+        createIntent: canonicalCreateIntent(physical),
+        stopTombstone: null,
+        resumable: physical.resumable,
+      })!
+    );
     billing.resolve();
     const changed = await acquiring.then(
       () => new Error('Expected a billing admission state rejection'),
@@ -1765,54 +2209,6 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.records.has('acquisition_receipts')).toBe(false);
   });
 
-  it.each(['stopping', 'unknown'] as const)(
-    'does not consume pending demand or allocate over an old %s runtime',
-    async state => {
-      const h = await harness();
-      await h.create();
-      const original = await h.ready();
-      if (state === 'stopping') await h.control.beginStop('execution_failed');
-      else await h.control.observeProvider('unknown');
-      const retired = await h.control.getPhysicalRecord();
-      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-      await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: state });
-      expect(h.records.has('acquisition_receipts')).toBe(false);
-      expect((await h.control.getPhysicalRecord()).createIntent).toEqual(retired.createIntent);
-      expect(h.allocations.size).toBe(1);
-      expect(h.runtime(original.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
-      await h.control.recordStopAttempt();
-      await h.flush();
-      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-      expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
-      await h.evict();
-      await h.acquire(acquisition);
-      expect(h.allocations.size).toBe(2);
-      expect((await h.control.getPhysicalRecord()).providerRef).not.toBe(
-        original.providerInstanceId
-      );
-    }
-  );
-
-  it('binds a legacy provider identity only while no create intent exists', async () => {
-    const h = await harness();
-    await h.create();
-    const original = await h.ready();
-    const physical = await h.control.getPhysicalRecord();
-    h.records.set('physical_record', { ...physical, createIntent: null });
-    const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-    await h.acquire(acquisition);
-    expect(h.records.get('acquisition_receipts')).toEqual([
-      { ...acquisition, allocation: { kind: 'provider', id: original.providerInstanceId } },
-    ]);
-    h.records.set('physical_record', {
-      ...physical,
-      createIntent: { intentId: 'replacement_intent', createdAt: Date.now() },
-    });
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
-    expect(h.allocations.size).toBe(1);
-    expect(h.runtime(original.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
-  });
-
   it.each([
     null,
     { id: '', deadlineAt: 1_700_000_001_000 },
@@ -1833,362 +2229,18 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.allocations.size).toBe(0);
   });
 
-  describe('directory-native retirement acquisition fence', () => {
-    const retiredNativeRuntimeId = 'aaaaaaaa-1111-4111-8111-111111111111';
-
-    async function retire({
-      state,
-      notificationState,
-      replayUntil,
-      releasedRouteFence,
-      connectionOverride,
-    }: {
-      state: 'pending' | 'unconfirmed' | 'completed' | 'released';
-      notificationState: 'pending' | 'delivered' | 'exhausted';
-      replayUntil: number;
-      releasedRouteFence: boolean;
-      connectionOverride?: { wrapperInstanceId?: string; providerInstanceId?: string };
-    }) {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const physical = await h.control.getPhysicalRecord();
-      const [route] = await h.control.listRoutes();
-      if (!route || !physical.providerRef) throw new Error('Missing allocation');
-      h.records.set('session_routes', [
-        {
-          ...route,
-          nativeRuntimeId: retiredNativeRuntimeId,
-          ...(releasedRouteFence ? {} : { retiringNativeRuntimeId: retiredNativeRuntimeId }),
-        },
-      ]);
-      h.records.set('native_runtime_retirements', [
-        {
-          directory: route.directory,
-          nativeRuntimeId: retiredNativeRuntimeId,
-          allocation: {
-            providerRef: physical.providerRef,
-            ...(physical.createIntent ? { createIntentId: physical.createIntent.intentId } : {}),
-          },
-          connection: {
-            connectionId: identity.connectionId,
-            providerInstanceId:
-              connectionOverride?.providerInstanceId ?? identity.providerInstanceId,
-            wrapperInstanceId: connectionOverride?.wrapperInstanceId ?? identity.wrapperInstanceId,
-          },
-          recipients: [
-            {
-              sessionId: route.sessionId,
-              kiloSessionId: route.kiloSessionId,
-              directory: route.directory,
-              ownerId: route.ownerId,
-              nativeRuntimeId: retiredNativeRuntimeId,
-            },
-          ],
-          reason: 'process_exited',
-          cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
-          replayUntil,
-          attempts: 0,
-          notificationAttempts: 0,
-          notificationState,
-          state,
-          disposition: state === 'completed' ? 'retired' : 'pending',
-        },
-      ]);
-      return { h, identity, physical, route };
-    }
-
-    function acquisition() {
-      return { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
-    }
-
-    it('binds a healthy running allocation after a delivered directory-native retirement', async () => {
-      // A completed+delivered receipt is past the containment fence: the route
-      // native has been cleared and the physical allocation is reusable, even
-      // after `replayUntil` allows the receipt to be pruned.
-      const { h, physical } = await retire({
-        state: 'completed',
-        notificationState: 'delivered',
-        replayUntil: Date.now() - 1,
-        releasedRouteFence: true,
-      });
-      const status = await h.acquire(acquisition());
-      expect(status).toMatchObject({ physical: 'running', connection: 'ready' });
-      expect(controlDispatchDisposition(status)).toEqual({ action: 'send' });
-      expect(h.records.get('acquisition_receipts')).toEqual([
-        {
-          ...acquisition(),
-          allocation: { kind: 'intent', id: physical.createIntent?.intentId },
-        },
-      ]);
-    });
-
-    it.each(['pending', 'unconfirmed'] as const)(
-      'does not bind the acquisition while a %s retirement still fences the allocation',
-      async state => {
-        const { h } = await retire({
-          state,
-          notificationState: 'pending',
-          replayUntil: Date.now() - 1,
-          releasedRouteFence: false,
-        });
-        const status = await h.acquire(acquisition());
-        // The allocation stays allocated but is not bound as sendable. The
-        // shared wrapper is healthy, yet this acquisition must read as a wait
-        // so the caller takes its bounded retry path.
-        expect(status).toMatchObject({ physical: 'running' });
-        expect(status.connection).not.toBe('ready');
-        expect(status.wrapperInstanceId).toBeUndefined();
-        expect(controlDispatchDisposition(status)).toEqual({ action: 'wait' });
-        expect(h.records.has('acquisition_receipts')).toBe(false);
-      }
-    );
-
-    it('keeps fencing a completed retirement until its notification is delivered', async () => {
-      const { h } = await retire({
-        state: 'completed',
-        notificationState: 'pending',
-        replayUntil: Date.now() - 1,
-        releasedRouteFence: false,
-      });
-      const status = await h.acquire(acquisition());
-      expect(status).toMatchObject({ physical: 'running' });
-      expect(status.connection).not.toBe('ready');
-      expect(controlDispatchDisposition(status)).toEqual({ action: 'wait' });
-      expect(h.records.has('acquisition_receipts')).toBe(false);
-    });
-
-    it('still fences when there is no active wrapper connection to compare', async () => {
-      // No handshake: `activeConnection` never exists, so the retirement's
-      // wrapper lifetime cannot be shown to be stale and must keep fencing.
-      const h = await harness();
-      await h.create();
-      const physical = await h.control.getPhysicalRecord();
-      if (!physical.providerRef) throw new Error('Missing allocation');
-      h.records.set('native_runtime_retirements', [
-        {
-          directory: ROUTE.directory,
-          nativeRuntimeId: retiredNativeRuntimeId,
-          allocation: {
-            providerRef: physical.providerRef,
-            ...(physical.createIntent ? { createIntentId: physical.createIntent.intentId } : {}),
-          },
-          connection: {
-            connectionId: crypto.randomUUID(),
-            providerInstanceId: physical.providerRef,
-            wrapperInstanceId: crypto.randomUUID(),
-          },
-          recipients: [
-            {
-              sessionId: ROUTE.sessionId,
-              kiloSessionId: ROUTE.kiloSessionId,
-              directory: ROUTE.directory,
-              ownerId: OWNER,
-              nativeRuntimeId: retiredNativeRuntimeId,
-            },
-          ],
-          reason: 'process_exited',
-          cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
-          replayUntil: Date.now() - 1,
-          attempts: 0,
-          notificationAttempts: 0,
-          notificationState: 'pending',
-          state: 'pending',
-          disposition: 'pending',
-        },
-      ]);
-      const status = await h.acquire(acquisition());
-      expect(status).toMatchObject({ physical: 'running' });
-      expect(status.connection).not.toBe('ready');
-      expect(controlDispatchDisposition(status)).toEqual({ action: 'wait' });
-      expect(h.records.has('acquisition_receipts')).toBe(false);
-    });
-
-    it.each([
-      { field: 'wrapperInstanceId', override: { wrapperInstanceId: crypto.randomUUID() } },
-      { field: 'providerInstanceId', override: { providerInstanceId: crypto.randomUUID() } },
-    ])('does not fence a retirement from a different $field lifetime', async ({ override }) => {
-      const { h, physical } = await retire({
-        state: 'pending',
-        notificationState: 'pending',
-        replayUntil: Date.now() - 1,
-        releasedRouteFence: false,
-        connectionOverride: override,
-      });
-      const status = await h.acquire(acquisition());
-      expect(status).toMatchObject({ physical: 'running', connection: 'ready' });
-      expect(controlDispatchDisposition(status)).toEqual({ action: 'send' });
-      expect(h.records.get('acquisition_receipts')).toEqual([
-        {
-          ...acquisition(),
-          allocation: { kind: 'intent', id: physical.createIntent?.intentId },
-        },
-      ]);
-    });
-
-    it('does not create a replacement over a tombstoned allocation', async () => {
-      const h = await harness();
-      await h.create();
-      await h.ready();
-      await h.control.beginStop('execution_failed');
-      const before = await h.control.getPhysicalRecord();
-      expect(before.state).toBe('stopping');
-      expect(before.stopTombstone).not.toBeNull();
-      await expect(h.acquire(acquisition())).resolves.toMatchObject({ physical: 'stopping' });
-      expect(h.records.has('acquisition_receipts')).toBe(false);
-      expect(mocks.providerCreate).toHaveBeenCalledOnce();
-      expect(h.allocations.size).toBe(1);
-    });
-
-    it('does not send the retired native runtime as the current attach identity', async () => {
-      const { h, identity, route } = await retire({
-        state: 'completed',
-        notificationState: 'delivered',
-        replayUntil: Date.now() + 60_000,
-        releasedRouteFence: true,
-      });
-      await h.acquire(acquisition());
-      await h.control.request({
-        operation: 'session.attach',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        payload: { directory: route.directory },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      });
-      const [outbound] = h.sendRequest.mock.calls.at(-1) ?? [];
-      expect(outbound).toBeDefined();
-      // The delivered retirement cleared the route's current native, so the new
-      // attachment neither carries nor requires the retired runtime identity.
-      const [attachedRoute] = await h.control.listRoutes();
-      expect(attachedRoute).not.toHaveProperty('retiringNativeRuntimeId');
-      expect(JSON.stringify(outbound)).not.toContain(retiredNativeRuntimeId);
-    });
-  });
-
   it('rolls back a create claim when its startup alarm cannot be persisted', async () => {
     const h = await harness();
     vi.spyOn(h.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
     await expect(h.create()).rejects.toThrow('alarm write failed');
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'stopped',
-      createIntent: null,
-      providerRef: null,
+    await expect(h.control.getAllocationRecord()).resolves.toMatchObject({
+      state: { kind: 'stopped', summary: null },
     });
-    expect(await loadDeadlines(h.storage)).toEqual({});
+    expect(await loadControlAlarmAnchors(h.storage)).toEqual(emptyControlAlarmAnchors());
     expect(h.alarmAt).toBeNull();
     expect(h.allocations.size).toBe(0);
     await h.create();
     expect(h.allocations.size).toBe(1);
-  });
-
-  it('rolls back retirement authority and deadlines before any external side effects', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-    const snapshot = structuredClone([...h.records]);
-    const alarmAt = h.alarmAt;
-    const closeAll = vi.spyOn(h.socket, 'closeAll');
-    const closes = closeAll.mock.calls.length;
-    vi.spyOn(h.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
-    const quarantine = {
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      reason: 'execution_failed',
-    };
-    await expect(h.control.quarantineRuntime(quarantine)).rejects.toThrow('alarm write failed');
-    expect([...h.records]).toEqual(snapshot);
-    expect(h.alarmAt).toBe(alarmAt);
-    expect(closeAll).toHaveBeenCalledTimes(closes);
-    expect(h.runtime(identity.providerInstanceId)?.destroy).not.toHaveBeenCalled();
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      physical: 'running',
-      connection: 'ready',
-    });
-    await h.control.quarantineRuntime(quarantine);
-    await h.flush();
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-  });
-
-  it.each(['physical', 'authority', 'deadlines', 'missing-alarm'] as const)(
-    'repairs the %s retirement prefix on reconstruction and preserves the wake-up on replay',
-    async prefix => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-      const physical = await h.control.getPhysicalRecord();
-      const quarantine = {
-        ownerId: OWNER,
-        sessionId: ROUTE.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: 'execution_failed',
-      };
-      h.records.set('physical_record', {
-        ...physical,
-        state: 'stopping',
-        stopTombstone: {
-          reason: quarantine.reason,
-          attempts: 0,
-          createdAt: Date.now(),
-          wrapperInstanceId: identity.wrapperInstanceId,
-        },
-      });
-      if (prefix !== 'physical') {
-        h.records.delete('wrapper_credential_hash');
-        h.records.delete('active_wrapper_runtime');
-        h.records.delete('wrapper_ready_at');
-      }
-      if (prefix === 'deadlines' || prefix === 'missing-alarm') {
-        h.records.set('deadlines', { stopAttempt: Date.now() + DEADLINE_MS.stopAttemptLadder[0] });
-      }
-      if (prefix === 'missing-alarm') await h.storage.deleteAlarm();
-      await h.evict();
-      await expect(h.control.getStatus()).resolves.toMatchObject({
-        physical: 'stopping',
-        connection: 'disconnected',
-      });
-      const repaired = await loadDeadlines(h.storage);
-      expect(repaired).toEqual({ stopAttempt: h.alarmAt });
-      expect(h.alarmAt).not.toBeNull();
-      expect(h.records.has('wrapper_credential_hash')).toBe(false);
-      expect(h.records.has('active_wrapper_runtime')).toBe(false);
-      vi.setSystemTime(Date.now() + 1_000);
-      await expect(h.control.quarantineRuntime(quarantine)).resolves.toEqual({
-        quarantined: true,
-        disposition: 'physical_stopping',
-      });
-      expect(await loadDeadlines(h.storage)).toEqual(repaired);
-      expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(0);
-      await h.fireAlarm();
-      expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
-      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-      expect(h.alarmAt).toBeNull();
-    }
-  );
-
-  it('repairs a missing create alarm using the original startup deadline', async () => {
-    const h = await harness();
-    const claimed = await h.control.claimCreate('intent_repair');
-    h.records.set('provider_kind', 'cloudflare');
-    const deadline = (claimed.createIntent?.createdAt ?? 0) + DEADLINE_MS.startup;
-    h.records.delete('deadlines');
-    await h.storage.deleteAlarm();
-    vi.setSystemTime(Date.now() + 30_000);
-    await h.evict(true);
-    expect(
-      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
-    ).toMatchObject({ status: 'starting' });
-    expect(await loadDeadlines(h.storage)).toEqual({});
-    expect(h.alarmAt).toBeNull();
-    await h.control.getStatus();
-    expect(await loadDeadlines(h.storage)).toEqual({ startup: deadline });
-    expect(h.alarmAt).toBe(deadline);
-    expect(h.allocations.size).toBe(0);
   });
 
   describe.each(['session.attach', 'session.prompt'] as const)(
@@ -2217,7 +2269,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         await expect(
           h.control.request(requestFor(replacement.wrapperInstanceId))
         ).resolves.toMatchObject({ ok: true });
-        const deadlines = await loadDeadlines(h.storage);
+        const schedule = await readSchedule(h.storage);
         const alarmAt = h.alarmAt;
         vi.setSystemTime(Date.now() + 1_000);
         const rejected = expect(delayed).rejects.toThrow('wrapper runtime changed');
@@ -2226,9 +2278,9 @@ describe('SandboxControl lifecycle boundaries', () => {
         expect(h.sendRequest).toHaveBeenCalledExactlyOnceWith(
           requestFor(replacement.wrapperInstanceId)
         );
-        expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+        expect(await readSchedule(h.storage)).toEqual(schedule);
         expect(h.alarmAt).toBe(alarmAt);
-        expect((await h.control.getPhysicalRecord()).providerRef).toBe(
+        expect(canonicalProviderRef(await h.control.getAllocationRecord())).toBe(
           replacement.providerInstanceId
         );
         expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
@@ -2241,12 +2293,12 @@ describe('SandboxControl lifecycle boundaries', () => {
           const h = await harness();
           await h.create();
           await h.ready();
-          const deadlines = await loadDeadlines(h.storage);
+          const schedule = await readSchedule(h.storage);
           const alarmAt = h.alarmAt;
           vi.setSystemTime(Date.now() + 1_000);
           await expect(h.control.request(requestFor(value as string))).rejects.toThrow();
           expect(h.sendRequest).not.toHaveBeenCalled();
-          expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+          expect(await readSchedule(h.storage)).toEqual(schedule);
           expect(h.alarmAt).toBe(alarmAt);
         }
       );
@@ -2257,7 +2309,7 @@ describe('SandboxControl lifecycle boundaries', () => {
           const h = await harness();
           await h.create();
           const identity = await h.ready();
-          const deadlines = await loadDeadlines(h.storage);
+          const schedule = await readSchedule(h.storage);
           const alarmAt = h.alarmAt;
           const entered = deferred<void>();
           const release = deferred<void>();
@@ -2312,18 +2364,55 @@ describe('SandboxControl lifecycle boundaries', () => {
               connectionId: crypto.randomUUID(),
             });
           }
-          const expectedDeadlines = stage === 'commit' ? await loadDeadlines(h.storage) : deadlines;
+          const expectedSchedule = stage === 'commit' ? await readSchedule(h.storage) : schedule;
           const expectedAlarm = stage === 'commit' ? h.alarmAt : alarmAt;
           const rejected = expect(pending).rejects.toThrow('wrapper runtime changed');
           release.resolve();
           await rejected;
           expect(h.sendRequest).not.toHaveBeenCalled();
-          expect(await loadDeadlines(h.storage)).toEqual(expectedDeadlines);
+          expect(await readSchedule(h.storage)).toEqual(expectedSchedule);
           expect(h.alarmAt).toBe(expectedAlarm);
         }
       );
     }
   );
+
+  describe('session.attach native runtime id capture', () => {
+    const sentPayload = (h: Awaited<ReturnType<typeof harness>>): unknown => {
+      const [request] = h.sendRequest.mock.calls[0] as [SandboxControlOutboundRequest];
+      return request.payload;
+    };
+
+    it('requests the native runtime id when the wrapper advertises the capability', async () => {
+      const h = await harness();
+      h.socket.supportsNativeRuntimeIdCapture = () => true;
+      await h.create();
+      await h.ready();
+      await h.control.request({ operation: 'session.attach', session: ROUTE, payload: {} });
+      expect(h.sendRequest).toHaveBeenCalledTimes(1);
+      expect(sentPayload(h)).toMatchObject({ captureNativeRuntimeId: true });
+    });
+
+    it('does not request the native runtime id without the capability', async () => {
+      const h = await harness();
+      await h.create();
+      await h.ready();
+      await h.control.request({ operation: 'session.attach', session: ROUTE, payload: {} });
+      expect(h.sendRequest).toHaveBeenCalledTimes(1);
+      expect(sentPayload(h)).not.toHaveProperty('captureNativeRuntimeId');
+    });
+
+    it('does not request the native runtime id when operation results are unsupported', async () => {
+      const h = await harness();
+      h.socket.supportsNativeRuntimeIdCapture = () => true;
+      h.socket.supportsOperationResults = () => false;
+      await h.create();
+      await h.ready();
+      await h.control.request({ operation: 'session.attach', session: ROUTE, payload: {} });
+      expect(h.sendRequest).toHaveBeenCalledTimes(1);
+      expect(sentPayload(h)).not.toHaveProperty('captureNativeRuntimeId');
+    });
+  });
 
   it.each([
     [
@@ -2394,11 +2483,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
     await h.flush();
     expect((await h.control.getStatus()).connection).toBe('ready');
-    const physical = await h.control.getPhysicalRecord();
-    expect(physical.createIntent).not.toBeNull();
+    const physical = await h.control.getAllocationRecord();
+    expect(canonicalCreateIntent(physical)).not.toBeNull();
     expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
       plane: 'control',
-      allocationId: physical.createIntent?.intentId,
+      allocationId: canonicalCreateIntentId(physical),
       providerInstanceId: first.providerInstanceId,
       connectionId: first.connectionId,
       wrapperInstanceId: first.wrapperInstanceId,
@@ -2410,7 +2499,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.hooks.onSocketClosed?.(true, first);
     expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
       plane: 'control',
-      allocationId: physical.createIntent?.intentId,
+      allocationId: canonicalCreateIntentId(physical),
       providerInstanceId: first.providerInstanceId,
       connectionId: first.connectionId,
       wrapperInstanceId: first.wrapperInstanceId,
@@ -2421,7 +2510,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.hooks.onHandshakeComplete?.(reconnected);
     expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
       plane: 'control',
-      allocationId: physical.createIntent?.intentId,
+      allocationId: canonicalCreateIntentId(physical),
       providerInstanceId: reconnected.providerInstanceId,
       connectionId: reconnected.connectionId,
       wrapperInstanceId: reconnected.wrapperInstanceId,
@@ -2463,15 +2552,24 @@ describe('SandboxControl lifecycle boundaries', () => {
           identity
         );
       }
-      const before = await loadDeadlines(h.storage);
-      const idleAt = before.idleStop;
-      if (idleAt === undefined) throw new Error('Missing idle deadline');
+      const armed = (await loadCanonicalAllocation(h.storage)).state;
+      if (armed.kind !== 'allocated' || armed.idleAt === null)
+        throw new Error('Missing idle deadline');
+      const idleAt = armed.idleAt;
+      vi.setSystemTime(idleAt - DEADLINE_MS.heartbeatExpiry / 2);
+      await h.hooks.onHeartbeat?.({ state: 'idle', kilo: { ready: true }, sessions: [] }, identity);
+      const beforeState = (await loadCanonicalAllocation(h.storage)).state;
+      if (beforeState.kind !== 'allocated' || beforeState.idleAt === null)
+        throw new Error('Missing idle deadline');
+      expect(beforeState.idleAt).toBe(idleAt);
+      const beforeHeartbeatDeadline =
+        beforeState.health.kind === 'unhealthy' ? null : beforeState.health.deadlineAt;
       vi.setSystemTime(idleAt - 1);
       await h.create();
-      expect((await loadDeadlines(h.storage)).idleStop).toBe(idleAt);
+      const heldState = (await loadCanonicalAllocation(h.storage)).state;
+      expect(heldState.kind === 'allocated' && heldState.idleAt).toBe(idleAt);
       h.sendRequest.mockImplementationOnce(async () => {
         expect(h.transactionActive).toBe(false);
-        expect((await loadDeadlines(h.storage)).idleStop).toBe(Date.now() + DEADLINE_MS.idleStop);
         return { type: 'response', requestId: 'accepted', ok: true };
       });
       await expect(
@@ -2481,7 +2579,13 @@ describe('SandboxControl lifecycle boundaries', () => {
           payload: operation === 'session.prompt' ? PROMPT : {},
         })
       ).resolves.toMatchObject({ ok: true });
-      expect((await loadDeadlines(h.storage)).heartbeatExpiry).toBe(before.heartbeatExpiry);
+      const demandedState = (await loadCanonicalAllocation(h.storage)).state;
+      expect(demandedState.kind === 'allocated' && demandedState.idleAt).toBeNull();
+      const demandedHeartbeatDeadline =
+        demandedState.kind === 'allocated' && demandedState.health.kind !== 'unhealthy'
+          ? demandedState.health.deadlineAt
+          : null;
+      expect(demandedHeartbeatDeadline).toBe(beforeHeartbeatDeadline);
       vi.setSystemTime(idleAt);
       await h.control.alarm();
       await h.flush();
@@ -2491,9 +2595,11 @@ describe('SandboxControl lifecycle boundaries', () => {
         connection: 'ready',
       });
       await h.fireAlarm();
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'heartbeat_expired',
-        identity.wrapperInstanceId
+      expect(h.session.notifyStopped).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'health_unhealthy_unresponsive',
+          stopProof: expect.objectContaining({ wrapper: identity.wrapperInstanceId }),
+        })
       );
     }
   );
@@ -2504,10 +2610,15 @@ describe('SandboxControl lifecycle boundaries', () => {
     const identity = await h.ready();
     await h.control.request({ operation: 'session.prompt', session: ROUTE, payload: PROMPT });
     await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-    expect((await loadDeadlines(h.storage)).idleStop).toBeUndefined();
+    const protectedState = (await loadCanonicalAllocation(h.storage)).state;
+    expect(protectedState.kind === 'allocated' && protectedState.idleAt).toBeNull();
     await h.control.alarm();
     expect(h.runtime(identity.providerInstanceId)?.destroy).not.toHaveBeenCalled();
-    await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'working' });
+    await expect(h.control.getStatus()).resolves.toMatchObject({
+      status: 'active',
+      connection: 'ready',
+      work: 'active',
+    });
   });
 
   it.each(['session.attach', 'session.prompt'] as const)(
@@ -2555,7 +2666,8 @@ describe('SandboxControl lifecycle boundaries', () => {
       const routes = await loadRouteTable(h.storage);
       expect(routes.get(ROUTE.sessionId)?.lastState).toBe('active');
       expect(routes.get(sibling.sessionId)).toMatchObject({ lastState: 'idle', waitingOn: null });
-      expect((await loadDeadlines(h.storage)).idleStop).toBeUndefined();
+      const activeState = (await loadCanonicalAllocation(h.storage)).state;
+      expect(activeState.kind === 'allocated' && activeState.idleAt).toBeNull();
       expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(true);
       expect(h.runtime(identity.providerInstanceId)?.destroy).not.toHaveBeenCalled();
       expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
@@ -2571,7 +2683,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       }
       expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
       expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledOnce();
-      expect(await h.control.getPhysicalRecord()).toMatchObject({ state: 'stopped' });
+      expect(await h.control.getAllocationRecord()).toMatchObject({ state: { kind: 'stopped' } });
     }
   );
 
@@ -2579,7 +2691,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness();
     await h.create();
     await h.ready();
-    const deadlines = await loadDeadlines(h.storage);
+    const schedule = await readSchedule(h.storage);
     vi.setSystemTime(Date.now() + 1_000);
     await h.control.getStatus();
     await h.control.request({ operation: 'sandbox.status', payload: {} });
@@ -2605,7 +2717,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       },
     ]) {
       await expect(h.control.request(request)).rejects.toThrow();
-      expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+      expect(await readSchedule(h.storage)).toEqual(schedule);
     }
     expect(h.sendRequest).toHaveBeenCalledTimes(2);
   });
@@ -2614,14 +2726,14 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness();
     await h.create();
     await h.ready();
-    const deadlines = await loadDeadlines(h.storage);
+    const schedule = await readSchedule(h.storage);
     const alarmAt = h.alarmAt;
     vi.setSystemTime(Date.now() + 1_000);
     vi.spyOn(h.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
     await expect(
       h.control.request({ operation: 'session.prompt', session: ROUTE, payload: PROMPT })
     ).rejects.toThrow('alarm write failed');
-    expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+    expect(await readSchedule(h.storage)).toEqual(schedule);
     expect(h.alarmAt).toBe(alarmAt);
     expect(h.sendRequest).not.toHaveBeenCalled();
   });
@@ -2637,30 +2749,32 @@ describe('SandboxControl lifecycle boundaries', () => {
       physical: 'running',
       connection: 'disconnected',
     });
-    const readinessAt = Date.now() + DEADLINE_MS.wrapperReadiness;
-    expect(await loadDeadlines(h.storage)).toEqual({ wrapperReadiness: readinessAt });
+    // The canonical allocation deadline arms the alarm; the live path no longer
+    // writes the legacy deadline table.
+    expect(await loadControlAlarmAnchors(h.storage)).toEqual(emptyControlAlarmAnchors());
+    expect(h.alarmAt).not.toBeNull();
     await h.evict();
-    expect(h.alarmAt).toBe(readinessAt);
-    await h.fireAlarm();
-    expect((await h.control.getPhysicalRecord()).state).toBe('failed');
-    vi.setSystemTime(Date.now() + DEADLINE_MS.createSettle);
     await h.fireAlarm();
     expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
     await h.create();
     const replacement = await h.ready();
     await h.hooks.onHeartbeat?.(
       { state: 'idle', kilo: { ready: true }, sessions: [] },
       replacement
     );
-    await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
+    await expect(h.control.getStatus()).resolves.toMatchObject({
+      status: 'active',
+      connection: 'ready',
+      work: 'idle',
+    });
   });
 
   it('keeps credential seeding of an unallocated sandbox idle', async () => {
     const h = await harness();
     await h.control.setWrapperCredentialHash('a'.repeat(64));
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect(await loadDeadlines(h.storage)).toEqual({});
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
+    expect(await loadControlAlarmAnchors(h.storage)).toEqual(emptyControlAlarmAnchors());
     expect(h.alarmAt).toBeNull();
     expect(h.allocations.size).toBe(0);
   });
@@ -2673,7 +2787,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     if (!runtime) throw new Error('Missing runtime');
     runtime.destroy.mockImplementation(async () => {
       expect(h.transactionActive).toBe(false);
-      expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(1);
+      expect(canonicalStopAttempts(await h.control.getAllocationRecord())).toBe(1);
       expect(h.alarmAt).toBeGreaterThan(Date.now());
       runtime.state.running = false;
     });
@@ -2687,13 +2801,13 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(runtime.state.running).toBe(false);
   });
 
-  it('persists the physical identity and alarm before launch and remaps trusted billing', async () => {
+  it('persists the create deadline before launch and remaps trusted billing', async () => {
     const observed: Array<{ providerRef: string | null; alarmAt: number | null }> = [];
     const h = await harness({
       configureAllocation: runtime => {
         runtime.startProcess.mockImplementation(async () => {
           observed.push({
-            providerRef: (await h.control.getPhysicalRecord()).providerRef,
+            providerRef: canonicalProviderRef(await h.control.getAllocationRecord()),
             alarmAt: h.alarmAt,
           });
           runtime.state.running = true;
@@ -2702,18 +2816,21 @@ describe('SandboxControl lifecycle boundaries', () => {
       },
     });
     await h.create();
-    const physical = await h.control.getPhysicalRecord();
-    expect(observed).toEqual([{ providerRef: physical.providerRef, alarmAt: expect.any(Number) }]);
-    const native = decodeCloudflareProviderRef(physical.providerRef);
+    const physical = await h.control.getAllocationRecord();
+    // The create is confirmed before the wrapper launches, so the launch sees
+    // the committed reference; the launch still runs under the armed startup
+    // deadline and the record keeps the create intent identity.
+    expect(observed).toEqual([{ providerRef: expect.any(String), alarmAt: expect.any(Number) }]);
+    expect(canonicalCreateIntent(physical)).not.toBeNull();
+    const native = decodeCloudflareProviderRef(canonicalProviderRef(physical));
     expect(native?.sandboxId).toMatch(/^ses-[a-f0-9]{48}$/);
     expect(native?.sandboxId).not.toBe(SANDBOX_ID);
     expect(native).toEqual({
-      sandboxId: physical.createIntent?.allocationName,
+      sandboxId: canonicalAllocationName(physical),
       containment: true,
-      instanceId: physical.createIntent?.intentId,
+      instanceId: canonicalCreateIntentId(physical),
     });
-    expect(await loadDeadlines(h.storage)).toHaveProperty('startup');
-    const runtime = h.runtime(physical.providerRef ?? '');
+    const runtime = h.runtime(canonicalProviderRef(physical) ?? '');
     expect(runtime?.configureBilling).toHaveBeenCalledWith({
       ...BILLING,
       sandboxId: native?.sandboxId,
@@ -2722,13 +2839,17 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect.any(String),
       expect.objectContaining({
         env: expect.objectContaining({
-          PROVIDER_INSTANCE_ID: physical.providerRef,
+          PROVIDER_INSTANCE_ID: canonicalProviderRef(physical),
           SANDBOX_CONTROL_URL: `wss://example.test/sandbox-control/${SANDBOX_ID}`,
         }),
       })
     );
     await h.ready();
-    await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
+    await expect(h.control.getStatus()).resolves.toMatchObject({
+      status: 'active',
+      connection: 'ready',
+      work: 'idle',
+    });
   });
 
   it.each([true, false])(
@@ -2772,7 +2893,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     await expect(
       h.control.ensureReady({ ownerId: OWNER, sessionId: ROUTE.sessionId, billing: BILLING })
-    ).resolves.toMatchObject({ reported: 'ready' });
+    ).resolves.toMatchObject({ status: 'active', connection: 'ready', work: 'idle' });
     expect(metered).toBe(true);
     expect(runtime.configureBilling).toHaveBeenCalledWith({
       ...BILLING,
@@ -2842,57 +2963,6 @@ describe('SandboxControl lifecycle boundaries', () => {
     }
   );
 
-  it('rejects enforced warm Vercel reuse without provider I/O or a new handoff', async () => {
-    const fetchProvider = vi.fn();
-    vi.stubGlobal('fetch', fetchProvider);
-    const h = await harness({
-      env: {
-        VERCEL_TOKEN: 'test-token',
-        VERCEL_TEAM_ID: 'team_1',
-        VERCEL_PROJECT_ID: 'project_1',
-        VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
-        VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot_1',
-        VERCEL_SANDBOX_RUNTIME: 'node24',
-        VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
-        VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
-      },
-    });
-    await h.storage.put('provider_kind', 'vercel');
-    await h.control.claimCreate(
-      'existing_allocation',
-      false,
-      'ses-123abc',
-      WORKTREE_CREDENTIAL_CONTAINMENT
-    );
-    await h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId });
-    await h.control.confirmInstance(
-      JSON.stringify({ sandboxName: 'ses-123abc', sessionId: 'vsess_1' })
-    );
-    await h.evict();
-    await h.ready();
-    h.env.CLOUD_AGENT_CONTAINER_BILLING_ENABLED = 'true';
-    h.env.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS = OWNER;
-    await expect(
-      h.control
-        .ensureReady({
-          ownerId: OWNER,
-          sessionId: ROUTE.sessionId,
-          provider: 'vercel',
-          billing: BILLING,
-        })
-        .then(() =>
-          h.control.request({
-            operation: 'session.prompt',
-            session: ROUTE,
-            payload: { ...PROMPT, messageId: 'message_B' },
-          })
-        )
-    ).rejects.toThrow('billing admission is unavailable for Vercel');
-    expect(fetchProvider).not.toHaveBeenCalled();
-    expect(h.sendRequest).not.toHaveBeenCalled();
-    expect(mocks.getSandbox).not.toHaveBeenCalled();
-  });
-
   it('bounds a hanging warm admission without handing off new execution', async () => {
     const h = await harness();
     await h.control.ensureReady({ ownerId: OWNER, sessionId: ROUTE.sessionId, allowCreate: true });
@@ -2922,80 +2992,6 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.sendRequest).not.toHaveBeenCalled();
   });
 
-  it('does not authorize a replacement using a late admission for the previous allocation', async () => {
-    const admitted = deferred<{ success: true }>();
-    const checking = deferred<void>();
-    const h = await harness();
-    await h.control.ensureReady({ ownerId: OWNER, sessionId: ROUTE.sessionId, allowCreate: true });
-    const connection = await h.ready();
-    h.runtime(connection.providerInstanceId)?.ensureBillingAdmission.mockImplementationOnce(() => {
-      checking.resolve();
-      return admitted.promise;
-    });
-    const previous = h.control.ensureReady({
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      billing: { ...BILLING, enforcementRequested: true },
-    });
-    await checking.promise;
-    await h.control.quarantineRuntime({
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      wrapperInstanceId: connection.wrapperInstanceId ?? '',
-      reason: 'execution_failed',
-    });
-    await h.flush();
-    await h.create();
-    const replacement = await h.ready();
-    admitted.resolve({ success: true });
-    await expect(previous).rejects.toThrow('runtime changed during billing admission');
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'ready',
-      wrapperInstanceId: replacement.wrapperInstanceId,
-    });
-    expect(h.sendRequest).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, 'vercel-small', 'vercel-large'] as const)(
-    'pins %s effective resources and rejects incompatible reuse after eviction',
-    async preset => {
-      const h = await harness({
-        env: {
-          VERCEL_TOKEN: 'test-token',
-          VERCEL_TEAM_ID: 'team_1',
-          VERCEL_PROJECT_ID: 'project_1',
-          VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
-          VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot_1',
-          VERCEL_SANDBOX_RUNTIME: 'node24',
-          VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
-          VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
-        },
-      });
-      if (preset === undefined) h.records.set('provider_kind', 'vercel');
-      const input = {
-        ownerId: OWNER,
-        sessionId: ROUTE.sessionId,
-        provider: 'vercel' as const,
-        resources: getSandboxAllocationResources(preset),
-      };
-      await h.control.ensureReady(input);
-      await h.evict();
-      await expect(h.control.ensureReady(input)).resolves.toMatchObject({ physical: 'stopped' });
-      for (const other of [undefined, 'vercel-small', 'vercel-large'] as const) {
-        if (other === preset) continue;
-        await expect(
-          h.control.ensureReady({ ...input, resources: getSandboxAllocationResources(other) })
-        ).rejects.toThrow('Sandbox resources mismatch');
-      }
-      await expect(
-        h.control.ensureReady({ ...input, provider: 'cloudflare', resources: undefined })
-      ).rejects.toThrow('Sandbox provider mismatch');
-      const claimed = await h.control.claimCreate('after-reset');
-      expect(claimed.createIntent?.vercel?.resources).toEqual(input.resources);
-      expect(mocks.getSandbox).not.toHaveBeenCalled();
-    }
-  );
-
   it.each([
     { provider: 'vercel', resources: { vcpus: 2, memory: 8192 } },
     { provider: 'cloudflare', resources: { vcpus: 2, memory: 4096 } },
@@ -3019,7 +3015,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       })
     ).rejects.toThrow();
     expect(h.records.has('provider_configuration')).toBe(false);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
     expect(mocks.getSandbox).not.toHaveBeenCalled();
   });
 
@@ -3033,9 +3029,8 @@ describe('SandboxControl lifecycle boundaries', () => {
         allowCreate: true,
       })
     ).rejects.toThrow('configuration is unavailable');
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'stopped',
-      createIntent: null,
+    await expect(h.control.getAllocationRecord()).resolves.toMatchObject({
+      state: { kind: 'stopped', summary: null },
     });
     await expect(
       h.control.ensureReady({
@@ -3066,12 +3061,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.flush();
     expect(runtime?.renewActivityTimeout).toHaveBeenCalledTimes(1);
     expect(runtime?.state.running).toBe(false);
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'kilo_unhealthy',
-      identity.wrapperInstanceId
-    );
-    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledWith(
-      expect.objectContaining({ wrapperInstanceId: identity.wrapperInstanceId })
+    expect(h.session.notifyStopped).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'health_unhealthy_unresponsive',
+        stopProof: expect.objectContaining({ wrapper: identity.wrapperInstanceId }),
+      })
     );
     await expect(h.control.getStatus()).resolves.toMatchObject({
       physical: 'stopped',
@@ -3092,1715 +3086,6 @@ describe('SandboxControl lifecycle boundaries', () => {
     ).resolves.toMatchObject({ ok: true });
   });
 
-  it.each([undefined, 'feed_stale', 'credential_refresh_failed'] as const)(
-    'logs unhealthy heartbeat reason %s before quarantine without changing stop semantics',
-    async reason => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const runtime = h.runtime(identity.providerInstanceId);
-      const closeAll = vi.spyOn(h.socket, 'closeAll');
-      closeAll.mockClear();
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {
-        expect(closeAll).not.toHaveBeenCalled();
-        expect(runtime?.state.running).toBe(true);
-      });
-      try {
-        const payload: SandboxHeartbeatPayload = {
-          ...activeHeartbeat,
-          kilo: { ready: false, ...(reason ? { reason } : {}) },
-        };
-        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-        await h.hooks.onHeartbeat?.(payload, {
-          ...identity,
-          connectionId: crypto.randomUUID(),
-        });
-        expect(warn).not.toHaveBeenCalled();
-        await h.hooks.onHeartbeat?.(payload, identity);
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            sandboxId: SANDBOX_ID,
-            wrapperInstanceId: identity.wrapperInstanceId,
-            connectionId: identity.connectionId,
-            reason: reason ?? 'unknown',
-            logTag: 'sandbox_control',
-            diagnosticEvent: 'heartbeat',
-            decision: 'kilo_unhealthy',
-          })
-        );
-        expect(warn).toHaveBeenCalledExactlyOnceWith('Sandbox control diagnostic');
-        await h.flush();
-        expect(runtime?.state.running).toBe(false);
-        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-          'kilo_unhealthy',
-          identity.wrapperInstanceId
-        );
-        expect(runtime?.renewActivityTimeout).toHaveBeenCalledTimes(1);
-      } finally {
-        fields.mockRestore();
-        warn.mockRestore();
-        closeAll.mockRestore();
-      }
-    }
-  );
-
-  it('transfers a fenced quarantine durably before stop I/O and survives eviction', async () => {
-    const stop = deferred<void>();
-    const observed = deferred<{ attempts: number | undefined; alarmAt: number | null }>();
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockImplementation(async () => {
-          observed.resolve({
-            attempts: (await h.control.getPhysicalRecord()).stopTombstone?.attempts,
-            alarmAt: h.alarmAt,
-          });
-          await stop.promise;
-        });
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    const request = {
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      reason: 'execution_failed',
-    };
-    await expect(h.control.quarantineRuntime({ ...request, ownerId: 'other' })).rejects.toThrow(
-      'owner mismatch'
-    );
-    await expect(
-      h.control.quarantineRuntime({ ...request, wrapperInstanceId: 'stale' })
-    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
-    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({
-      quarantined: true,
-      disposition: 'physical_stopping',
-    });
-    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({
-      quarantined: true,
-      disposition: 'physical_stopping',
-    });
-    await expect(observed.promise).resolves.toEqual({ attempts: 1, alarmAt: expect.any(Number) });
-    expect(await h.control.getPhysicalRecord()).toMatchObject({
-      state: 'stopping',
-      stopTombstone: { reason: 'execution_failed', wrapperInstanceId: identity.wrapperInstanceId },
-    });
-    expect(h.alarmAt).not.toBeNull();
-    expect(h.records.has('wrapper_credential_hash')).toBe(false);
-    await expect(h.control.request({ operation: 'sandbox.status', payload: {} })).rejects.toThrow(
-      'not ready'
-    );
-    await h.evict();
-    await h.hooks.onReady?.(identity);
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      physical: 'stopping',
-      connection: 'disconnected',
-    });
-    stop.resolve();
-    await h.flush();
-  });
-
-  it('retains physical cleanup when deletion detaches the route after an abort failure and transient transfer failure', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockRejectedValueOnce(new Error('Provider temporarily unavailable'));
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    h.sendRequest.mockRejectedValueOnce(new Error('Abort transport failed'));
-    await expect(
-      h.control.request({ operation: 'session.abort', session: ROUTE, payload: {} })
-    ).rejects.toThrow('Abort transport failed');
-    const input = {
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      reason: 'session_deleted_abort_failed',
-    };
-    const transfer = vi.fn((value: typeof input) => h.control.quarantineRuntime(value));
-    transfer.mockRejectedValueOnce(new Error('Control RPC temporarily unavailable'));
-    await expect(transfer(input)).rejects.toThrow('Control RPC temporarily unavailable');
-    await h.control.detachSession(ROUTE.sessionId);
-    await expect(
-      h.control.quarantineRuntime({ ...input, wrapperInstanceId: 'stale' })
-    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
-    await expect(transfer(input)).resolves.toEqual({
-      quarantined: true,
-      disposition: 'physical_stopping',
-    });
-    await h.flush();
-    expect(await h.control.getPhysicalRecord()).toMatchObject({
-      state: 'stopping',
-      providerRef: identity.providerInstanceId,
-      stopTombstone: { wrapperInstanceId: identity.wrapperInstanceId, reason: input.reason },
-    });
-    expect(h.alarmAt).not.toBeNull();
-    await h.evict();
-    await h.fireAlarm();
-    expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
-    expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledTimes(2);
-    await expect(h.control.quarantineRuntime(input)).resolves.toEqual({
-      quarantined: false,
-      disposition: 'physical_stopped',
-    });
-    expect((await h.control.getPhysicalRecord()).providerRef).toBeNull();
-  });
-
-  it.each([
-    { messageId: 'message_1', operationId: 'not-a-uuid', cleanupDeadlineAt: Date.now() + 1_000 },
-    {
-      messageId: 'message_1',
-      operationId: '33333333-3333-4333-8333-333333333333',
-      cleanupDeadlineAt: 1,
-    },
-  ])('rejects invalid scoped Stop requests without forwarding them', async payload => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-
-    await expect(
-      h.control.request({
-        operation: 'session.abort',
-        session: ROUTE,
-        payload,
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).rejects.toThrow('Invalid scoped Stop maintenance request');
-
-    expect(h.sendRequest).not.toHaveBeenCalled();
-  });
-
-  it('rejects malformed cleanup transfers rather than acknowledging a stale runtime', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    await expect(
-      h.control.quarantineRuntime({
-        ownerId: OWNER,
-        sessionId: ROUTE.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: '',
-      })
-    ).rejects.toThrow('Invalid sandbox quarantine request');
-    expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
-  });
-
-  it('records the exact native runtime returned by a successful attachment', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    h.sendRequest.mockResolvedValueOnce({
-      type: 'response',
-      requestId: 'attach_1',
-      ok: true,
-      result: { attached: true, nativeRuntimeId },
-    });
-
-    await expect(
-      h.control.request({
-        operation: 'session.attach',
-        session: {
-          sessionId: ROUTE.sessionId,
-          kiloSessionId: ROUTE.kiloSessionId,
-          directory: ROUTE.directory,
-        },
-        payload: {},
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toMatchObject({ ok: true });
-
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ sessionId: ROUTE.sessionId, nativeRuntimeId }),
-    ]);
-  });
-
-  it('does not add native runtime capture to an older wrapper attachment', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    h.socket.supportsNativeRuntimeRetirement = () => false;
-
-    await expect(
-      h.control.request({
-        operation: 'session.attach',
-        session: ROUTE,
-        payload: {},
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toMatchObject({ ok: true });
-
-    expect(h.sendRequest).toHaveBeenLastCalledWith(
-      expect.objectContaining({ operation: 'session.attach', payload: {} })
-    );
-  });
-
-  it('records the original native runtime from a lost attachment response lookup', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const authorization = {
-      operation: 'session.attach' as const,
-      operationId: 'prepare_1',
-      messageId: 'message_1',
-      session: {
-        sessionId: ROUTE.sessionId,
-        kiloSessionId: ROUTE.kiloSessionId,
-        directory: ROUTE.directory,
-      },
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      dispatchDeadlineAt: Date.now() + 1_000,
-    };
-    h.sendRequest.mockResolvedValueOnce({
-      type: 'response',
-      requestId: 'lookup_1',
-      ok: true,
-      result: {
-        state: 'completed',
-        delivery: {
-          version: 2,
-          authorization,
-          completedAt: Date.now(),
-          result: { ok: true, result: { attached: true, nativeRuntimeId } },
-          events: [],
-          preparing: [],
-        },
-      },
-    });
-
-    await expect(
-      h.control.request({
-        operation: 'session.operation.get',
-        session: ROUTE,
-        payload: authorization,
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toMatchObject({ ok: true });
-
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId }),
-    ]);
-    expect(h.session.recordNativeRuntime).toHaveBeenCalledWith(
-      expect.objectContaining({ nativeRuntimeId, wrapperInstanceId: identity.wrapperInstanceId })
-    );
-  });
-
-  it('invalidates only routes on the retired native incarnation', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [
-      { ...route, nativeRuntimeId },
-      {
-        ...route,
-        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
-        kiloSessionId: 'ses_22222222222222222222222222',
-        nativeRuntimeId,
-      },
-      {
-        ...route,
-        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
-        kiloSessionId: 'ses_33333333333333333333333333',
-        directory: '/workspace/m',
-        nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
-      },
-      {
-        ...route,
-        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
-        kiloSessionId: 'ses_44444444444444444444444444',
-        directory: '/workspace/c',
-        nativeRuntimeId: '44444444-4444-4444-8444-444444444444',
-      },
-    ]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    const response = {
-      type: 'response' as const,
-      requestId: 'stop_1',
-      ok: true as const,
-      result: {
-        status: 'aborted' as const,
-        quiescent: true,
-        runtimeRetired: true,
-        nativeRuntimeId,
-      },
-    };
-    h.sendRequest.mockResolvedValueOnce(response);
-
-    await expect(
-      h.control.request({
-        operation: 'session.abort',
-        session: {
-          sessionId: ROUTE.sessionId,
-          kiloSessionId: ROUTE.kiloSessionId,
-          directory: ROUTE.directory,
-        },
-        payload: {
-          messageId: 'message_1',
-          operationId: '55555555-5555-4555-8555-555555555555',
-          cleanupDeadlineAt: Date.now() + 1_000,
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toEqual(response);
-
-    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledTimes(2);
-    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledWith(
-      expect.objectContaining({ wrapperInstanceId: identity.wrapperInstanceId, confirmed: true })
-    );
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.not.objectContaining({ nativeRuntimeId }),
-      expect.not.objectContaining({ nativeRuntimeId }),
-      expect.objectContaining({ directory: '/workspace/m' }),
-      expect.objectContaining({ directory: '/workspace/c' }),
-    ]);
-  });
-
-  it('does not invalidate a replacement when an old scoped Stop reply arrives late', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    const reply = deferred<{
-      type: 'response';
-      requestId: string;
-      ok: true;
-      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
-    }>();
-    const sent = Promise.withResolvers<void>();
-    h.sendRequest.mockImplementationOnce(() => {
-      sent.resolve();
-      return reply.promise;
-    });
-    const stop = h.control.request({
-      operation: 'session.abort',
-      session: {
-        sessionId: ROUTE.sessionId,
-        kiloSessionId: ROUTE.kiloSessionId,
-        directory: ROUTE.directory,
-      },
-      payload: {
-        messageId: 'message_1',
-        operationId: '55555555-5555-4555-8555-555555555555',
-        cleanupDeadlineAt: Date.now() + 1_000,
-      },
-      expectedWrapperInstanceId: identity.wrapperInstanceId,
-    });
-    await sent.promise;
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
-    reply.resolve({
-      type: 'response',
-      requestId: 'stop_1',
-      ok: true,
-      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
-    });
-
-    await expect(stop).resolves.toMatchObject({
-      ok: false,
-      error: { code: 'not_ready', retryable: true },
-    });
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
-    ]);
-  });
-
-  it('retains a native retirement fence across a lost scoped Stop reply', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    h.sendRequest.mockRejectedValueOnce(new Error('lost Stop reply'));
-
-    await expect(
-      h.control.request({
-        operation: 'session.abort',
-        session: {
-          sessionId: ROUTE.sessionId,
-          kiloSessionId: ROUTE.kiloSessionId,
-          directory: ROUTE.directory,
-        },
-        payload: {
-          messageId: 'message_1',
-          operationId: '55555555-5555-4555-8555-555555555555',
-          cleanupDeadlineAt: Date.now() + 1_000,
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).rejects.toThrow('lost Stop reply');
-    await h.evict();
-
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
-    ]);
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-  });
-
-  it('defers unconfirmed scoped Stop instead of releasing the retirement fence', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const operationId = '33333333-3333-4333-8333-333333333333';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    const unconfirmed = {
-      type: 'response' as const,
-      requestId: 'stop_u',
-      ok: true as const,
-      result: { status: 'unconfirmed' as const, quiescent: false },
-    };
-    h.sendRequest.mockResolvedValueOnce(unconfirmed);
-    await expect(
-      h.control.request({
-        operation: 'session.abort',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        payload: {
-          messageId: 'message_a',
-          operationId,
-          cleanupDeadlineAt: Date.now() + 1_000,
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toEqual(unconfirmed);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({
-        operationId,
-        state: 'pending',
-      }),
-    ]);
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
-    ]);
-  });
-
-  describe('future-skewed scoped Stop deadline', () => {
-    const OPERATION_ID = '33333333-3333-4333-8333-333333333333';
-    const NATIVE_RUNTIME_ID = '11111111-1111-4111-8111-111111111111';
-
-    function scopedPayload(cleanupDeadlineAt: number) {
-      return { messageId: 'message_1', operationId: OPERATION_ID, cleanupDeadlineAt };
-    }
-
-    it('saturates the deadline through the socket payload and the persisted retirement', async () => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE_RUNTIME_ID }]);
-      h.socket.supportsNativeRuntimeRetirement = () => true;
-      h.socket.supportsScopedStopAbort = () => true;
-      const now = Date.now();
-      const saturated = now + 10_000;
-      h.sendRequest.mockResolvedValueOnce({
-        type: 'response',
-        requestId: 'stop_1',
-        ok: true,
-        result: {
-          status: 'aborted',
-          quiescent: true,
-          runtimeRetired: true,
-          nativeRuntimeId: NATIVE_RUNTIME_ID,
-        },
-      });
-
-      await expect(
-        h.control.request({
-          operation: 'session.abort',
-          session: {
-            sessionId: route.sessionId,
-            kiloSessionId: route.kiloSessionId,
-            directory: route.directory,
-          },
-          payload: scopedPayload(now + 15_000),
-          expectedWrapperInstanceId: identity.wrapperInstanceId,
-        })
-      ).resolves.toMatchObject({ ok: true });
-
-      expect(h.sendRequest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          payload: {
-            messageId: 'message_1',
-            operationId: OPERATION_ID,
-            cleanupDeadlineAt: saturated,
-          },
-          deadlineAt: saturated,
-        })
-      );
-      expect(h.records.get('native_runtime_retirements')).toEqual([
-        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
-      ]);
-    });
-
-    it('does not renew the persisted window when a lost scoped Stop reply is retried', async () => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE_RUNTIME_ID }]);
-      h.socket.supportsNativeRuntimeRetirement = () => true;
-      h.socket.supportsScopedStopAbort = () => true;
-      const now = Date.now();
-      const saturated = now + 10_000;
-      const stop = (cleanupDeadlineAt: number) =>
-        h.control.request({
-          operation: 'session.abort',
-          session: {
-            sessionId: route.sessionId,
-            kiloSessionId: route.kiloSessionId,
-            directory: route.directory,
-          },
-          payload: scopedPayload(cleanupDeadlineAt),
-          expectedWrapperInstanceId: identity.wrapperInstanceId,
-        });
-      h.sendRequest.mockRejectedValueOnce(new Error('lost Stop reply'));
-
-      await expect(stop(now + 15_000)).rejects.toThrow('lost Stop reply');
-      expect(h.records.get('native_runtime_retirements')).toEqual([
-        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
-      ]);
-
-      vi.setSystemTime(now + DEADLINE_MS.nativeRetirementRetry + 1);
-      const reply = {
-        type: 'response' as const,
-        requestId: 'stop_retry',
-        ok: true as const,
-        result: {
-          status: 'aborted' as const,
-          quiescent: true,
-          runtimeRetired: true,
-          nativeRuntimeId: NATIVE_RUNTIME_ID,
-        },
-      };
-      h.sendRequest.mockResolvedValueOnce(reply);
-
-      await expect(stop(now + 20_000)).resolves.toEqual(reply);
-      expect(h.records.get('native_runtime_retirements')).toEqual([
-        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
-      ]);
-      expect(h.sendRequest).toHaveBeenLastCalledWith(
-        expect.objectContaining({ deadlineAt: saturated })
-      );
-    });
-
-    it('uses the parsed deadline directly when the route has no native runtime', async () => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      h.socket.supportsScopedStopAbort = () => true;
-      const now = Date.now();
-      const saturated = now + 10_000;
-      const reply = {
-        type: 'response' as const,
-        requestId: 'stop_1',
-        ok: true as const,
-        result: { status: 'aborted' as const, quiescent: true },
-      };
-      h.sendRequest.mockResolvedValueOnce(reply);
-
-      await expect(
-        h.control.request({
-          operation: 'session.abort',
-          session: {
-            sessionId: route.sessionId,
-            kiloSessionId: route.kiloSessionId,
-            directory: route.directory,
-          },
-          payload: scopedPayload(now + 15_000),
-          expectedWrapperInstanceId: identity.wrapperInstanceId,
-        })
-      ).resolves.toEqual(reply);
-
-      expect(h.sendRequest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          payload: {
-            messageId: 'message_1',
-            operationId: OPERATION_ID,
-            cleanupDeadlineAt: saturated,
-          },
-          deadlineAt: saturated,
-        })
-      );
-      expect(h.records.get('native_runtime_retirements')).toBeUndefined();
-    });
-  });
-
-  it('releases a negotiated unconfirmed root-scoped Stop without retiring the runtime', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const operationId = '33333333-3333-4333-8333-333333333333';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    const routeB = {
-      ...route,
-      sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
-      kiloSessionId: 'ses_22222222222222222222222222',
-    };
-    h.records.set('session_routes', [
-      { ...route, nativeRuntimeId },
-      { ...routeB, nativeRuntimeId },
-    ]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    h.socket.supportsScopedCleanupResult = () => true;
-    const rootResult = {
-      type: 'response' as const,
-      requestId: 'stop_root_unconfirmed',
-      ok: true as const,
-      result: {
-        status: 'unconfirmed' as const,
-        cleanupScope: 'root' as const,
-        quiescent: false,
-      },
-    };
-    h.sendRequest.mockImplementationOnce(async () => {
-      expect(h.records.get('native_runtime_retirements')).toEqual([
-        expect.objectContaining({ operationId, state: 'pending' }),
-      ]);
-      return rootResult;
-    });
-
-    await expect(
-      h.control.request({
-        operation: 'session.abort',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        payload: {
-          messageId: 'message_root_unconfirmed',
-          operationId,
-          cleanupDeadlineAt: Date.now() + 1_000,
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toEqual(rootResult);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({
-        operationId,
-        state: 'released',
-        disposition: 'operation_only',
-      }),
-    ]);
-    const routesAfterRootRelease = await h.control.listRoutes();
-    expect(routesAfterRootRelease).toHaveLength(2);
-    for (const currentRoute of routesAfterRootRelease) {
-      expect(currentRoute.nativeRuntimeId).toBe(nativeRuntimeId);
-      expect(currentRoute.retiringNativeRuntimeId).toBeUndefined();
-    }
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-
-    const bAdmission = {
-      type: 'response' as const,
-      requestId: 'prompt_b_after_root_release',
-      ok: true as const,
-      result: { status: 'accepted' as const },
-    };
-    h.sendRequest.mockResolvedValueOnce(bAdmission);
-    await expect(
-      h.control.request({
-        operation: 'session.prompt',
-        session: {
-          sessionId: routeB.sessionId,
-          kiloSessionId: routeB.kiloSessionId,
-          directory: routeB.directory,
-        },
-        payload: {
-          messageId: 'message_b_after_root_release',
-          turn: { type: 'prompt', prompt: 'B remains live' },
-          agent: { mode: 'code', model: 'test' },
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toEqual(bAdmission);
-
-    const requestsBeforeMaintenance = h.sendRequest.mock.calls.length;
-    await h.fireAlarm();
-    expect(h.sendRequest.mock.calls.length).toBe(requestsBeforeMaintenance);
-  });
-
-  it('releases a known superseded operation-only result through the operation-only disposition', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const operationId = '44444444-4444-4444-8444-444444444444';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    const routeB = {
-      ...route,
-      sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
-      kiloSessionId: 'ses_22222222222222222222222222',
-    };
-    h.records.set('session_routes', [
-      { ...route, nativeRuntimeId },
-      { ...routeB, nativeRuntimeId },
-    ]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    h.socket.supportsScopedCleanupResult = () => true;
-    const rootResult = {
-      type: 'response' as const,
-      requestId: 'stop_root',
-      ok: true as const,
-      result: {
-        status: 'already_idle' as const,
-        quiescent: false,
-      },
-    };
-    h.sendRequest.mockImplementationOnce(async () => {
-      expect(h.records.get('native_runtime_retirements')).toEqual([
-        expect.objectContaining({ operationId, state: 'pending' }),
-      ]);
-      return rootResult;
-    });
-
-    await expect(
-      h.control.request({
-        operation: 'session.abort',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        payload: {
-          messageId: 'message_root',
-          operationId,
-          cleanupDeadlineAt: Date.now() + 1_000,
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toEqual(rootResult);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({
-        operationId,
-        state: 'released',
-        disposition: 'operation_only',
-      }),
-    ]);
-    const routesAfterRootRelease = await h.control.listRoutes();
-    expect(routesAfterRootRelease).toHaveLength(2);
-    for (const currentRoute of routesAfterRootRelease) {
-      expect(currentRoute.nativeRuntimeId).toBe(nativeRuntimeId);
-      expect(currentRoute.retiringNativeRuntimeId).toBeUndefined();
-    }
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-
-    const bAdmission = {
-      type: 'response' as const,
-      requestId: 'prompt_b',
-      ok: true as const,
-      result: { status: 'accepted' as const },
-    };
-    h.sendRequest.mockResolvedValueOnce(bAdmission);
-    await expect(
-      h.control.request({
-        operation: 'session.prompt',
-        session: {
-          sessionId: routeB.sessionId,
-          kiloSessionId: routeB.kiloSessionId,
-          directory: routeB.directory,
-        },
-        payload: {
-          messageId: 'message_b',
-          turn: { type: 'prompt', prompt: 'B remains live' },
-          agent: { mode: 'code', model: 'test' },
-        },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      })
-    ).resolves.toEqual(bAdmission);
-
-    const requestsBeforeMaintenance = h.sendRequest.mock.calls.length;
-    await h.fireAlarm();
-    expect(h.sendRequest.mock.calls.length).toBe(requestsBeforeMaintenance);
-  });
-
-  it('keeps an operation-only Stop replay from blocking or changing a fresh native retirement', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
-    const operationA = '33333333-3333-4333-8333-333333333333';
-    const operationB = '44444444-4444-4444-8444-444444444444';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.socket.supportsNativeRuntimeRetirement = () => true;
-    h.socket.supportsScopedStopAbort = () => true;
-    const stop = (messageId: string, operationId: string, cleanupDeadlineAt: number) =>
-      h.control.request({
-        operation: 'session.abort',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        payload: { messageId, operationId, cleanupDeadlineAt },
-        expectedWrapperInstanceId: identity.wrapperInstanceId,
-      });
-    const firstDeadline = Date.now() + 1_000;
-    const operationOnly = {
-      type: 'response' as const,
-      requestId: 'stop_a',
-      ok: true as const,
-      result: { status: 'aborted' as const, quiescent: true },
-    };
-    h.sendRequest.mockResolvedValueOnce(operationOnly);
-
-    await expect(stop('message_a', operationA, firstDeadline)).resolves.toEqual(operationOnly);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({
-        operationId: operationA,
-        cleanupDeadlineAt: firstDeadline,
-        state: 'released',
-        disposition: 'operation_only',
-      }),
-    ]);
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId }),
-    ]);
-
-    const reply = deferred<{
-      type: 'response';
-      requestId: string;
-      ok: true;
-      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
-    }>();
-    const sent = Promise.withResolvers<void>();
-    h.sendRequest.mockImplementationOnce(() => {
-      sent.resolve();
-      return reply.promise;
-    });
-    const stopB = stop('message_b', operationB, Date.now() + 2_000);
-    await sent.promise;
-
-    await expect(stop('message_a', operationA, Date.now() + 3_000)).resolves.toMatchObject({
-      ok: false,
-      error: { code: 'not_ready', retryable: true },
-    });
-    expect(h.sendRequest).toHaveBeenCalledTimes(2);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({
-        operationId: operationA,
-        cleanupDeadlineAt: firstDeadline,
-        state: 'released',
-      }),
-      expect.objectContaining({ operationId: operationB, attempts: 1, state: 'pending' }),
-    ]);
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
-    ]);
-
-    const retired = {
-      type: 'response' as const,
-      requestId: 'stop_b',
-      ok: true as const,
-      result: {
-        status: 'aborted' as const,
-        quiescent: true as const,
-        runtimeRetired: true as const,
-        nativeRuntimeId,
-      },
-    };
-    reply.resolve(retired);
-    await expect(stopB).resolves.toEqual(retired);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({ operationId: operationA, state: 'released' }),
-      expect.objectContaining({
-        operationId: operationB,
-        state: 'completed',
-        notificationState: 'delivered',
-      }),
-    ]);
-
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
-    h.session.invalidateTerminalRuntime.mockClear();
-    h.session.failWaitingMessages.mockClear();
-    await expect(
-      h.hooks.onNativeRuntimeRetired?.(
-        nativeRetirementPayload(route.directory, nativeRuntimeId),
-        identity
-      )
-    ).resolves.toEqual({ retired: true });
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
-    ]);
-  });
-
-  it('does not physically stop when completed native proof wins a stale escalation', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    const reply = deferred<never>();
-    const sent = Promise.withResolvers<void>();
-    h.sendRequest.mockImplementationOnce(() => {
-      sent.resolve();
-      return reply.promise;
-    });
-
-    const quarantine = h.control.quarantineRuntime({
-      ownerId: OWNER,
-      sessionId: route.sessionId,
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      reason: 'native_cleanup_unavailable',
-    });
-    await sent.promise;
-    await expect(
-      h.hooks.onNativeRuntimeRetired?.(
-        nativeRetirementPayload(route.directory, nativeRuntimeId),
-        identity
-      )
-    ).resolves.toEqual({ retired: true });
-    vi.setSystemTime(Date.now() + DEADLINE_MS.stopAttempt);
-    reply.reject(new Error('late lost reply'));
-
-    await expect(quarantine).resolves.toEqual({ quarantined: true, disposition: 'native_pending' });
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'running',
-      stopTombstone: null,
-    });
-  });
-
-  it('replays a completed native quarantine after its response is lost without selecting N2', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    const authorization = {
-      operation: 'session.attach' as const,
-      operationId: '33333333-3333-4333-8333-333333333333',
-      messageId: 'message_1',
-      session: {
-        sessionId: route.sessionId,
-        kiloSessionId: route.kiloSessionId,
-        directory: route.directory,
-      },
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      dispatchDeadlineAt: Date.now() + 1_000,
-    };
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.sendRequest.mockResolvedValueOnce({
-      type: 'response',
-      requestId: 'retire_n1',
-      ok: true,
-      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
-    });
-
-    await expect(
-      h.control.quarantineRuntime({
-        ownerId: OWNER,
-        sessionId: route.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: 'runtime_unhealthy',
-        nativeRuntimeId,
-        authorization,
-      })
-    ).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
-
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
-    const beforeRetry = {
-      deadlines: await loadDeadlines(h.storage),
-      alarmAt: await h.storage.getAlarm(),
-    };
-    h.sendRequest.mockClear();
-
-    await expect(
-      h.control.quarantineRuntime({
-        ownerId: OWNER,
-        sessionId: route.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: 'runtime_unhealthy',
-        nativeRuntimeId,
-        authorization,
-      })
-    ).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
-
-    expect(h.sendRequest).not.toHaveBeenCalled();
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'running',
-      stopTombstone: null,
-    });
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
-    ]);
-    expect(await loadDeadlines(h.storage)).toEqual(beforeRetry.deadlines);
-    expect(await h.storage.getAlarm()).toBe(beforeRetry.alarmAt);
-  });
-
-  it('coalesces concurrent native retirement commands for one runtime', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    const reply = deferred<{
-      type: 'response';
-      requestId: string;
-      ok: true;
-      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
-    }>();
-    const sent = Promise.withResolvers<void>();
-    h.sendRequest.mockImplementationOnce(() => {
-      sent.resolve();
-      return reply.promise;
-    });
-    const first = h.control.quarantineRuntime({
-      ownerId: OWNER,
-      sessionId: route.sessionId,
-      wrapperInstanceId: identity.wrapperInstanceId ?? '',
-      reason: 'native_cleanup_unavailable',
-    });
-    await sent.promise;
-
-    await expect(
-      h.control.quarantineRuntime({
-        ownerId: OWNER,
-        sessionId: route.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: 'native_cleanup_unavailable',
-      })
-    ).resolves.toEqual({ quarantined: true, disposition: 'native_pending' });
-    expect(h.sendRequest).toHaveBeenCalledOnce();
-    reply.resolve({
-      type: 'response',
-      requestId: 'abort_1',
-      ok: true,
-      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
-    });
-    await expect(first).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
-  });
-
-  it('retains an exhausted notification fence without escalating a completed retirement', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.session.failWaitingMessages.mockRejectedValue(new Error('session unavailable'));
-
-    await expect(
-      h.hooks.onNativeRuntimeRetired?.(
-        nativeRetirementPayload(route.directory, nativeRuntimeId),
-        identity
-      )
-    ).resolves.toBeUndefined();
-    for (let attempt = 1; attempt < DEADLINE_MS.nativeRetirementMaxAttempts; attempt++) {
-      await h.fireAlarm();
-    }
-
-    expect(h.session.failWaitingMessages).toHaveBeenCalledTimes(
-      DEADLINE_MS.nativeRetirementMaxAttempts
-    );
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'running',
-      stopTombstone: null,
-    });
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
-    ]);
-    expect(h.records.get('native_runtime_retirements')).toEqual([
-      expect.objectContaining({ state: 'completed', notificationState: 'exhausted' }),
-    ]);
-  });
-
-  it('persists an automatic native retirement before failing only affected routes', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [
-      { ...route, nativeRuntimeId },
-      {
-        ...route,
-        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
-        kiloSessionId: 'ses_22222222222222222222222222',
-        nativeRuntimeId,
-      },
-      {
-        ...route,
-        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
-        kiloSessionId: 'ses_33333333333333333333333333',
-        directory: '/workspace/m',
-        nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
-      },
-      {
-        ...route,
-        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
-        kiloSessionId: 'ses_44444444444444444444444444',
-        directory: '/workspace/c',
-        nativeRuntimeId: '44444444-4444-4444-8444-444444444444',
-      },
-    ]);
-
-    await expect(
-      h.hooks.onNativeRuntimeRetired?.(
-        nativeRetirementPayload(ROUTE.directory, nativeRuntimeId),
-        identity
-      )
-    ).resolves.toEqual({ retired: true });
-
-    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledTimes(2);
-    expect(h.session.failWaitingMessages).toHaveBeenCalledTimes(2);
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'process_exited',
-      identity.wrapperInstanceId,
-      nativeRuntimeId
-    );
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.not.objectContaining({ nativeRuntimeId }),
-      expect.not.objectContaining({ nativeRuntimeId }),
-      expect.objectContaining({ directory: '/workspace/m' }),
-      expect.objectContaining({ directory: '/workspace/c' }),
-    ]);
-  });
-
-  it('replays a completed native retirement after reconstruction without touching N2', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-
-    await expect(
-      h.hooks.onNativeRuntimeRetired?.(
-        nativeRetirementPayload(ROUTE.directory, nativeRuntimeId),
-        identity
-      )
-    ).resolves.toEqual({ retired: true });
-    h.session.invalidateTerminalRuntime.mockClear();
-    h.session.failWaitingMessages.mockClear();
-    await h.evict();
-    await h.flush();
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
-    h.session.invalidateTerminalRuntime.mockClear();
-    h.session.failWaitingMessages.mockClear();
-
-    await expect(
-      h.hooks.onNativeRuntimeRetired?.(
-        nativeRetirementPayload(ROUTE.directory, nativeRuntimeId),
-        identity
-      )
-    ).resolves.toEqual({ retired: true });
-
-    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
-    await expect(h.control.listRoutes()).resolves.toEqual([
-      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
-    ]);
-  });
-
-  it('falls back to physical containment when targeted native cleanup is unavailable', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-    const [route] = await h.control.listRoutes();
-    if (!route) throw new Error('Missing route');
-    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-    h.socket.supportsNativeRuntimeRetirement = () => false;
-
-    await expect(
-      h.control.quarantineRuntime({
-        ownerId: OWNER,
-        sessionId: ROUTE.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: 'native_cleanup_unavailable',
-      })
-    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
-
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'stopping',
-      stopTombstone: { reason: 'native_cleanup_unavailable' },
-    });
-  });
-
-  describe('unmatched native cleanup observation', () => {
-    const NATIVE = '11111111-1111-4111-8111-111111111111';
-    const REPLACEMENT = '22222222-2222-4222-8222-222222222222';
-
-    function authorization(
-      route: { sessionId: string; kiloSessionId: string; directory: string },
-      wrapperInstanceId: string
-    ) {
-      return {
-        operation: 'session.attach' as const,
-        operationId: '33333333-3333-4333-8333-333333333333',
-        messageId: 'message_1',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        wrapperInstanceId,
-        dispatchDeadlineAt: Date.now() + 1_000,
-      };
-    }
-
-    function quarantineInput(
-      route: { sessionId: string; kiloSessionId: string; directory: string },
-      wrapperInstanceId: string,
-      nativeRuntimeId: string
-    ) {
-      return {
-        ownerId: OWNER,
-        sessionId: route.sessionId,
-        wrapperInstanceId,
-        reason: 'native_cleanup_unavailable',
-        nativeRuntimeId,
-        authorization: authorization(route, wrapperInstanceId),
-      };
-    }
-
-    async function readyWithRoute() {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      const runtime = h.runtime(identity.providerInstanceId);
-      if (!runtime) throw new Error('Missing runtime');
-      return { h, identity, route, runtime };
-    }
-
-    it('observes a dead identity-matched allocation whose route native id is missing', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route }]);
-      runtime.state.running = false;
-      h.sendRequest.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
-
-      expect(mocks.providerCreate).toHaveBeenCalledOnce();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-      const dead = await h.control.getPhysicalRecord();
-      expect(dead.stopTombstone?.reason).toBe('environment_failed');
-      expect(['failed', 'stopping']).toContain(dead.state);
-    });
-
-    it('continues the observed loss on the scheduled stop-attempt alarm', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route }]);
-      runtime.state.running = false;
-      runtime.destroy.mockRejectedValue(new Error('provider unavailable'));
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
-
-      // The provider still reports the container alive, so the scheduled stop
-      // cannot confirm death yet and must arm the durable stop-attempt alarm.
-      runtime.state.running = true;
-      await h.flush();
-      expect(h.alarmAt).not.toBeNull();
-      expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(1);
-
-      // Past create-settle, the dead container is now observable as terminal.
-      vi.setSystemTime(Date.now() + DEADLINE_MS.createSettle);
-      runtime.state.running = false;
-      await h.fireAlarm();
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
-    });
-
-    it('rehydrates the wrapper runtime before the first loss observation', async () => {
-      const h = await harness();
-      h.session.getControlState.mockResolvedValue({
-        version: 1,
-        scope: { sandboxId: SANDBOX_ID },
-        targets: [],
-      });
-      h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
-        type: 'response',
-        requestId: 'request_1',
-        ok: true,
-        result:
-          request.operation === 'sandbox.status'
-            ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
-            : request.operation === 'sandbox.reconcile'
-              ? {
-                  episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
-                    .episodeId,
-                  attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
-                  phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
-                }
-              : undefined,
-      }));
-      await h.create();
-      const original = await h.ready({ wrapperVersion: null, recoveryCapable: true });
-      await h.flush();
-      await h.hooks.onSocketClosed?.(true, original);
-      const runtime = h.runtime(original.providerInstanceId);
-      if (!runtime) throw new Error('Missing runtime');
-      runtime.state.running = false;
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      h.records.set('session_routes', [{ ...route }]);
-
-      await h.evict();
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, original.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
-
-      const dead = await h.control.getPhysicalRecord();
-      expect(dead.stopTombstone?.reason).toBe('environment_failed');
-      expect(['failed', 'stopping']).toContain(dead.state);
-    });
-
-    it('does not release a live identity-matched allocation whose route native id is missing', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route }]);
-      expect(runtime.state.running).toBe(true);
-      h.sendRequest.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-    });
-
-    it('keeps cleanup pending when the loss observation rejects', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route }]);
-      runtime.isContainerRunning.mockRejectedValue(new Error('probe failed'));
-      runtime.isContainerRunning.mockClear();
-      h.sendRequest.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      expect(runtime.isContainerRunning).toHaveBeenCalled();
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-    });
-
-    it('keeps cleanup pending when the loss observation exceeds its budget', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route }]);
-      runtime.isContainerRunning.mockImplementation(() => new Promise(() => undefined));
-      h.sendRequest.mockClear();
-
-      const quarantine = h.control.quarantineRuntime(
-        quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-      );
-      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-      await expect(quarantine).resolves.toEqual({
-        quarantined: false,
-        disposition: 'unconfirmed',
-      });
-
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-    });
-
-    it('leaves a different bound native id untouched while the allocation is live', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route, nativeRuntimeId: REPLACEMENT }]);
-      runtime.isContainerRunning.mockClear();
-      h.sendRequest.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      await expect(h.control.listRoutes()).resolves.toEqual([
-        expect.objectContaining({ nativeRuntimeId: REPLACEMENT }),
-      ]);
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-    });
-
-    it('does not observe when the route is missing', async () => {
-      const { h, identity, runtime } = await readyWithRoute();
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      h.records.set('session_routes', []);
-      runtime.isContainerRunning.mockClear();
-      runtime.destroy.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-    });
-
-    it('does not observe when the route identity does not match', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [
-        { ...route, kiloSessionId: 'ses_ffffffffffffffffffffffffffff' },
-      ]);
-      runtime.isContainerRunning.mockClear();
-      runtime.destroy.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-    });
-
-    it('keeps the matched native id when targeted retirement is unavailable', async () => {
-      const { h, identity, route, runtime } = await readyWithRoute();
-      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE }]);
-      h.socket.supportsNativeRuntimeRetirement = () => false;
-      runtime.isContainerRunning.mockClear();
-      h.sendRequest.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(
-          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
-        )
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-      await expect(h.control.listRoutes()).resolves.toEqual([
-        expect.objectContaining({ nativeRuntimeId: NATIVE }),
-      ]);
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-    });
-
-    it('does not observe when the wrapper identity is unsettled', async () => {
-      const h = await harness();
-      await h.create();
-      const physical = await h.control.getPhysicalRecord();
-      if (!physical.providerRef) throw new Error('Missing provider reference');
-      const runtime = h.runtime(physical.providerRef);
-      if (!runtime) throw new Error('Missing runtime');
-      runtime.isContainerRunning.mockClear();
-      runtime.destroy.mockClear();
-
-      await expect(
-        h.control.quarantineRuntime(quarantineInput(ROUTE, crypto.randomUUID(), NATIVE))
-      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
-
-      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
-      expect(runtime.destroy).not.toHaveBeenCalled();
-      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'running',
-        stopTombstone: null,
-      });
-    });
-  });
-
-  it('performs all five stop attempts, never reactivates the tombstone, and eventually releases by observation', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockRejectedValue(new Error('provider unavailable'));
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    await h.control.beginStop('execution_failed');
-    for (let attempt = 1; attempt <= DEADLINE_MS.stopAttemptLadder.length; attempt++) {
-      await h.fireAlarm();
-      expect(runtime.destroy).toHaveBeenCalledTimes(attempt);
-      expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(attempt);
-    }
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      physical: 'unknown',
-      connection: 'disconnected',
-    });
-    await h.control.ensureReady({
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      allowCreate: true,
-      billing: BILLING,
-    });
-    await h.hooks.onReady?.(identity);
-    expect(h.allocations.size).toBe(1);
-    expect((await h.control.getPhysicalRecord()).state).toBe('unknown');
-    runtime.state.running = false;
-    await h.fireAlarm();
-    expect(runtime.destroy).toHaveBeenCalledTimes(5);
-    expect(h.alarmAt).toBeNull();
-    expect((await h.control.getPhysicalRecord()).providerRef).toBeNull();
-    await h.create();
-    await h.ready();
-    await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
-    expect(h.allocations.size).toBe(2);
-  });
-
-  it('retains the runtime failure fence through uncertain observation and later physical death', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    await h.control.observeProvider('unknown');
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      state: 'unknown',
-      stopTombstone: { wrapperInstanceId: identity.wrapperInstanceId, reason: 'provider_unknown' },
-    });
-    await h.control.observeProvider('active');
-    expect((await h.control.getPhysicalRecord()).state).toBe('unknown');
-    await h.control.observeProvider('terminal');
-    await h.create();
-    const replacement = await h.ready();
-    await h.flush();
-    expect(
-      h.session.failWaitingMessages.mock.calls.every(
-        ([, wrapperId]) => wrapperId === identity.wrapperInstanceId
-      )
-    ).toBe(true);
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'ready',
-      wrapperInstanceId: replacement.wrapperInstanceId,
-    });
-  });
-
-  it('bounds a hung stop wait while retaining the paid allocation and its next alarm', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockImplementation(() => new Promise(() => undefined));
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    await h.control.beginStop('execution_failed');
-    const stopped = h.control.recordStopAttempt();
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-    await expect(stopped).resolves.toMatchObject({
-      state: 'stopping',
-      providerRef: identity.providerInstanceId,
-      stopTombstone: { attempts: 1 },
-    });
-    expect(h.alarmAt).toBeGreaterThan(Date.now());
-    expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledTimes(1);
-    await h.flush();
-  });
-
-  it('bounds an unresponsive observation without losing the allocation or confirming its death', async () => {
-    const observation = deferred<boolean>();
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    await h.control.observeProvider('unknown');
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    runtime.isContainerRunning.mockImplementation(() => observation.promise);
-
-    const status = h.control.ensureReady({
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      allowCreate: true,
-      billing: BILLING,
-    });
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-    await expect(status).resolves.toMatchObject({ physical: 'unknown' });
-    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
-      providerRef: identity.providerInstanceId,
-      stopTombstone: { wrapperInstanceId: identity.wrapperInstanceId },
-    });
-    expect(h.alarmAt).not.toBeNull();
-    expect(h.allocations.size).toBe(1);
-    expect(runtime.startProcess).toHaveBeenCalledTimes(1);
-    observation.resolve(false);
-    await h.flush();
-    expect((await h.control.getPhysicalRecord()).state).toBe('unknown');
-  });
-
   it('never delivers delayed unscoped pre-handshake failures into replacement B or its followers', async () => {
     const notification = deferred<void>();
     const h = await harness();
@@ -4816,12 +3101,12 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
     await h.create();
     await h.control.attachSession(ROUTE);
-    const first = await h.control.getPhysicalRecord();
+    const first = await h.control.getAllocationRecord();
     await h.control.markFailed();
     vi.setSystemTime(Date.now() + DEADLINE_MS.createSettle);
     await h.control.recordStopAttempt();
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect(h.runtime(first.providerRef ?? '')?.state.running).toBe(false);
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
+    expect(h.runtime(canonicalProviderRef(first) ?? '')?.state.running).toBe(false);
     await h.create();
     const replacement = await h.ready();
     const currentWrapperInstanceId = replacement.wrapperInstanceId;
@@ -4832,80 +3117,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(messages).toEqual({ B: 'accepted', follower: 'queued' });
     expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
     await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'working',
+      status: 'active',
+      connection: 'ready',
+      work: 'active',
       wrapperInstanceId: replacement.wrapperInstanceId,
     });
-  });
-
-  it('ignores a late stop result from an allocation that has already been replaced', async () => {
-    const stop = deferred<void>();
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    h.runtime(identity.providerInstanceId)?.destroy.mockImplementation(() => stop.promise);
-    await h.control.beginStop('execution_failed');
-    const oldStop = h.control.recordStopAttempt();
-    await vi.advanceTimersByTimeAsync(0);
-    await h.control.confirmStopped();
-    await h.create();
-    const replacement = await h.ready();
-    stop.resolve();
-    await oldStop;
-    await h.flush();
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'ready',
-      wrapperInstanceId: replacement.wrapperInstanceId,
-    });
-    expect((await h.control.getPhysicalRecord()).providerRef).toBe(replacement.providerInstanceId);
-    expect(
-      h.session.failWaitingMessages.mock.calls.every(
-        ([, wrapperId]) => wrapperId === identity.wrapperInstanceId
-      )
-    ).toBe(true);
-    await expect(
-      h.control.quarantineRuntime({
-        ownerId: OWNER,
-        sessionId: ROUTE.sessionId,
-        wrapperInstanceId: identity.wrapperInstanceId ?? '',
-        reason: 'late_failure',
-      })
-    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
-  });
-
-  it('retains a known allocation through a hanging launch and cleans it without a background replacement', async () => {
-    const launching = deferred<void>();
-    const started = deferred<void>();
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.startProcess.mockImplementation(async () => {
-          runtime.state.running = true;
-          started.resolve();
-          await launching.promise;
-          return { id: 'proc_1' };
-        });
-      },
-    });
-    const creating = h.create();
-    await started.promise;
-    const physical = await h.control.getPhysicalRecord();
-    expect(decodeCloudflareProviderRef(physical.providerRef)).toEqual({
-      sandboxId: physical.createIntent?.allocationName,
-      containment: true,
-      instanceId: physical.createIntent?.intentId,
-    });
-    expect(h.alarmAt).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
-    await expect(creating).resolves.toMatchObject({ physical: 'failed' });
-    expect((await h.control.getPhysicalRecord()).providerRef).toBe(physical.providerRef);
-    await h.fireAlarm();
-    expect((await h.control.getPhysicalRecord()).providerRef).toBe(physical.providerRef);
-    for (let attempt = 1; attempt < DEADLINE_MS.stopAttemptLadder.length; attempt++)
-      await h.fireAlarm();
-    await h.fireAlarm();
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect(h.allocations.size).toBe(1);
-    launching.resolve();
-    await h.flush();
   });
 
   it.each(
@@ -5035,13 +3251,14 @@ describe('SandboxControl lifecycle boundaries', () => {
       await allocated.promise;
       await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
       await expect(creating).resolves.toMatchObject({ physical: 'failed' });
-      const uncertain = await h.control.getPhysicalRecord();
-      expect(uncertain.providerRef).toBeNull();
-      expect(uncertain.createIntent).toMatchObject({
-        allocationName: [...remote.keys()][0],
-        vercel: { runtimeBuildId: 'build_1', snapshotId: 'snapshot_1' },
+      const uncertain = await h.control.getAllocationRecord();
+      expect(canonicalProviderRef(uncertain)).toBeNull();
+      expect(canonicalAllocationName(uncertain)).toBe([...remote.keys()][0]);
+      expect(canonicalVercel(uncertain)).toMatchObject({
+        runtimeBuildId: 'build_1',
+        snapshotId: 'snapshot_1',
       });
-      expect(uncertain.createIntent?.vercel?.resources).toEqual(resources);
+      expect(canonicalVercel(uncertain)?.resources).toEqual(resources);
       expect(h.records.get('provider_configuration')).toEqual({
         provider: 'vercel',
         ...(resources ? { resources } : {}),
@@ -5053,54 +3270,35 @@ describe('SandboxControl lifecycle boundaries', () => {
       await h.fireAlarm();
       expect(inspected).toHaveLength(1);
       expect(inspected[0]?.searchParams.get('resume')).toBe('false');
-      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
       expect([...remote.values()][0]?.session.status).toBe('stopped');
       await h.evict();
       await h.create();
-      expect((await h.control.getPhysicalRecord()).createIntent?.vercel?.resources).toEqual(
-        resources
-      );
+      expect(canonicalVercel(await h.control.getAllocationRecord())?.resources).toEqual(resources);
       await h.ready();
       expect(remote.size).toBe(2);
       expect([...remote.values()][1]?.session.sourceSnapshotId).toBe('snapshot_2');
-      expect((await h.control.getPhysicalRecord()).createIntent?.vercel?.runtimeBuildId).toBe(
+      expect(canonicalVercel(await h.control.getAllocationRecord())?.runtimeBuildId).toBe(
         'build_2'
       );
       expect(mocks.getSandbox).not.toHaveBeenCalled();
-      await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
+      await expect(h.control.getStatus()).resolves.toMatchObject({
+        status: 'active',
+        connection: 'ready',
+        work: 'idle',
+      });
       if (!containmentEnabled) {
         await expect(
           h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId })
         ).resolves.toMatchObject({ kilo: { token: 'test-token' } });
         await h.control.detachSession(ROUTE.sessionId);
-        expect(await loadDeadlines(h.storage)).not.toHaveProperty('credentialExpiry');
+        expect((await loadControlAlarmAnchors(h.storage)).credentialExpiryAt).toBeNull();
         expect(policyUpdates).toEqual([]);
         expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
       }
       await h.flush();
     }
   );
-
-  it('quarantines an established control disconnect even when the provider remains active', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockRejectedValue(new Error('retry'));
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    await h.hooks.onSocketClosed?.(true, identity);
-    await h.flush();
-    expect((await h.control.getPhysicalRecord()).stopTombstone?.reason).toBe(
-      'control_disconnected'
-    );
-    await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-    expect(h.runtime(identity.providerInstanceId)?.renewActivityTimeout).not.toHaveBeenCalled();
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'control_disconnected',
-      identity.wrapperInstanceId
-    );
-  });
 
   it('keeps B running when the session ignores a replayed completed outcome for A', async () => {
     const h = await harness();
@@ -5128,7 +3326,9 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.hooks.onSessionEvent?.(identity, outcomeA, connection);
     await h.flush();
     await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'working',
+      status: 'active',
+      connection: 'ready',
+      work: 'active',
       wrapperInstanceId: connection.wrapperInstanceId,
     });
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
@@ -5162,7 +3362,9 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
     await h.flush();
     await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'working',
+      status: 'active',
+      connection: 'ready',
+      work: 'active',
       wrapperInstanceId: connection.wrapperInstanceId,
     });
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
@@ -5297,10 +3499,11 @@ describe('SandboxControl lifecycle boundaries', () => {
         );
         expect(withFields).toHaveBeenCalledWith(
           expect.objectContaining({
-            diagnosticEvent: 'forward_result',
+            diagnosticEvent: 'forward_run',
             operation: 'receiveSandboxControlEventBatch',
             result: 'delivered',
             applied: false,
+            rejectedCount: 2,
           })
         );
       } finally {
@@ -5444,253 +3647,6 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.sendRequest).not.toHaveBeenCalled();
       expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
       expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
-      expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
-    });
-
-    it('ACKs trailing native events and exact N1 replay through Session, Control, and the socket', async () => {
-      const h = await harness();
-      await h.create();
-      const connection = await h.ready();
-      const [route] = await h.control.listRoutes();
-      if (!route) throw new Error('Missing route');
-      const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
-      const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
-      const authorization = {
-        operation: 'session.attach',
-        operationId: '55555555-5555-4555-8555-555555555555',
-        messageId: 'message_A',
-        session: {
-          sessionId: route.sessionId,
-          kiloSessionId: route.kiloSessionId,
-          directory: route.directory,
-        },
-        wrapperInstanceId: connection.wrapperInstanceId,
-        dispatchDeadlineAt: Date.now() + 1_000,
-      };
-      const nativeFence = {
-        sandboxId: SANDBOX_ID,
-        wrapperInstanceId: connection.wrapperInstanceId,
-        nativeRuntimeId,
-        attachmentEpoch: 1,
-        authorization,
-      };
-      const completed = {
-        messageId: 'message_A',
-        state: 'completed',
-        wrapperInstanceId: connection.wrapperInstanceId,
-      };
-      const values = new Map<string, unknown>([
-        ['session_metadata', await h.session.getCredentialMetadata()],
-        ['session_messages', [completed]],
-        ['native_runtime_fence', nativeFence],
-      ]);
-      const kv: SyncKvStorage = {
-        get: <T>(key: string): T | undefined => structuredClone(values.get(key)) as T | undefined,
-        put: <T>(key: string, value: T) => {
-          values.set(key, structuredClone(value));
-        },
-        delete: key => values.delete(key),
-        list: <T>(options?: SyncKvListOptions) =>
-          [...values.entries()]
-            .filter(([key]) => !options?.prefix || key.startsWith(options.prefix))
-            .map(([key, value]) => [key, structuredClone(value) as T] as [string, T]),
-      };
-      const sessionStorage = {
-        kv,
-        get: async <T>(key: string) => kv.get<T>(key),
-        sql: {},
-        transactionSync: <T>(callback: () => T) => callback(),
-      } as unknown as DurableObjectStorage;
-      const eventQueries = createMemoryEventQueries();
-      let eventSequence = 0;
-      eventQueries.insert = params =>
-        eventQueries.upsert({ ...params, entityId: `test-event/${++eventSequence}` });
-      mocks.eventQueries.mockReturnValue(eventQueries);
-      const initializing: Promise<unknown>[] = [];
-      const session = new SandboxSession(
-        {
-          ...h.ctx,
-          id: { name: `${OWNER}:${route.sessionId}` },
-          storage: sessionStorage,
-          blockConcurrencyWhile: (callback: () => Promise<void>) => {
-            const pending = callback();
-            initializing.push(pending);
-            return pending;
-          },
-        } as unknown as DurableObjectState,
-        {
-          ...h.env,
-          SANDBOX_CONTROL: { getByName: () => h.control },
-        } as unknown as Env
-      );
-      await Promise.all(initializing);
-      mocks.session.mockReturnValue(session);
-      const receive = vi.spyOn(session, 'receiveSandboxControlEvent');
-      const failWaitingMessages = vi.spyOn(session, 'failWaitingMessages');
-      const invalidateTerminalRuntime = vi.spyOn(session, 'invalidateTerminalRuntime');
-      const quarantine = vi.spyOn(h.control, 'quarantineRuntime');
-      h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
-      h.sendRequest.mockClear();
-
-      let attachment: unknown = {
-        ...connection,
-        handshakeComplete: true,
-        acceptedAt: Date.now(),
-        protocolVersion: 1,
-      };
-      const send = vi.fn();
-      const close = vi.fn();
-      const ws = {
-        readyState: 1,
-        deserializeAttachment: () => attachment,
-        serializeAttachment: (next: unknown) => {
-          attachment = next;
-        },
-        send,
-        close,
-      } as unknown as WebSocket;
-      const { createSandboxControlSocketHandler } =
-        await vi.importActual<typeof SocketModule>('./socket.js');
-      const handler = createSandboxControlSocketHandler(
-        {
-          ...h.ctx,
-          getWebSockets: () => [ws],
-        } as DurableObjectState,
-        SANDBOX_ID,
-        undefined,
-        h.hooks
-      );
-      const publication = {
-        event: 'session.event',
-        session: {
-          directory: route.directory,
-          kiloSessionId: route.kiloSessionId,
-          nativeRuntimeId,
-        },
-        payload: {
-          type: 'session.updated',
-          properties: { info: { id: route.kiloSessionId, title: 'Completed A' } },
-        },
-        sequence: 1,
-      };
-      const receiptId = '33333333-3333-4333-8333-333333333333';
-      const frame = {
-        type: 'request',
-        requestId: 'trailing-native-event',
-        operation: 'sandbox.event.publish',
-        payload: {
-          ...publication,
-          receiptId,
-        },
-      };
-      const beforeControl = structuredClone([...h.records]);
-      await handler.handleMessage(ws, JSON.stringify(frame));
-      await h.flush();
-      expect(await receive.mock.results[0]?.value).toEqual({ applied: true });
-      expect(send).toHaveBeenLastCalledWith(
-        JSON.stringify({
-          type: 'response',
-          requestId: frame.requestId,
-          ok: true,
-          result: { receiptId, applied: true },
-        })
-      );
-      const persisted = eventQueries.findByEntityPrefix('');
-      expect(persisted).toHaveLength(1);
-      expect(values.get('session_messages')).toEqual([completed]);
-      expect([...h.records]).toEqual(beforeControl);
-
-      h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
-      kv.put('native_runtime_fence', {
-        ...nativeFence,
-        nativeRuntimeId: replacementRuntimeId,
-        attachmentEpoch: 2,
-      });
-      kv.put('session_messages', [
-        completed,
-        {
-          messageId: 'message_B',
-          state: 'accepted',
-          wrapperInstanceId: connection.wrapperInstanceId,
-        },
-      ]);
-      const beforeReplacement = structuredClone([...h.records]);
-      const beforeSessionReplay = structuredClone([...values]);
-      await handler.handleMessage(ws, JSON.stringify(frame));
-      await h.flush();
-      expect(await receive.mock.results[1]?.value).toEqual({ applied: true });
-      expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
-
-      const stalePublication = { ...publication, sequence: 2 };
-      await handler.handleMessage(
-        ws,
-        JSON.stringify({
-          ...frame,
-          requestId: 'unseen-stale-native-event',
-          payload: {
-            ...stalePublication,
-            receiptId: '44444444-4444-4444-8444-444444444444',
-          },
-        })
-      );
-      await h.flush();
-      expect(await receive.mock.results[2]?.value).toEqual({ applied: false });
-      expect(send).toHaveBeenLastCalledWith(
-        JSON.stringify({
-          type: 'response',
-          requestId: 'unseen-stale-native-event',
-          ok: false,
-          error: {
-            code: 'event_rejected',
-            message: 'Sandbox event publication was not applied',
-            retryable: false,
-          },
-        })
-      );
-      expect(receive).toHaveBeenCalledTimes(3);
-      expect([...h.records]).toEqual(beforeReplacement);
-      expect([...values]).toEqual(beforeSessionReplay);
-      expect(eventQueries.findByEntityPrefix('')).toEqual(persisted);
-
-      const replacementPublication = {
-        ...publication,
-        session: { ...publication.session, nativeRuntimeId: replacementRuntimeId },
-        sequence: 3,
-      };
-      const replacementReceiptId = '66666666-6666-4666-8666-666666666666';
-      await handler.handleMessage(
-        ws,
-        JSON.stringify({
-          ...frame,
-          requestId: 'replacement-native-event',
-          payload: {
-            ...replacementPublication,
-            receiptId: replacementReceiptId,
-          },
-        })
-      );
-      await h.flush();
-      expect(await receive.mock.results[3]?.value).toEqual({ applied: true });
-      expect(send).toHaveBeenLastCalledWith(
-        JSON.stringify({
-          type: 'response',
-          requestId: 'replacement-native-event',
-          ok: true,
-          result: { receiptId: replacementReceiptId, applied: true },
-        })
-      );
-      expect(eventQueries.findByEntityPrefix('')).toHaveLength(2);
-      expect(values.get('session_messages')).toEqual([
-        completed,
-        expect.objectContaining({ messageId: 'message_B', state: 'accepted' }),
-      ]);
-      expect([...h.records]).toEqual(beforeReplacement);
-      expect(h.socket.getConnectionIdentity()).toEqual(connection);
-      expect(close).not.toHaveBeenCalled();
-      expect(h.sendRequest).not.toHaveBeenCalled();
-      expect(failWaitingMessages).not.toHaveBeenCalled();
-      expect(invalidateTerminalRuntime).not.toHaveBeenCalled();
-      expect(quarantine).not.toHaveBeenCalled();
       expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
     });
 
@@ -6060,17 +4016,14 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
 
       expect(withFields).not.toHaveBeenCalledWith(
-        expect.objectContaining({ diagnosticEvent: 'forward_result' })
-      );
-      expect(withFields).not.toHaveBeenCalledWith(
-        expect.objectContaining({ diagnosticEvent: 'forward_settled' })
+        expect.objectContaining({ diagnosticEvent: 'forward_run' })
       );
 
       late.resolve({ applied: true });
-      await expect(first).resolves.toEqual({ applied: false, retryable: true });
+      await expect(first).resolves.toEqual({ applied: true });
       expect(withFields).toHaveBeenCalledWith(
         expect.objectContaining({
-          diagnosticEvent: 'forward_result',
+          diagnosticEvent: 'forward_run',
           result: 'delivered_late',
           applied: true,
         })
@@ -6103,7 +4056,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.control.detachSession(ROUTE.sessionId);
     forwarding.reject(new Error('Session transport failed'));
     await h.flush();
-    expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+    expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
     expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(true);
     expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
   });
@@ -6126,9 +4079,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     const replacement = await h.ready();
     forwarding.reject(new Error('Session transport failed'));
     await h.flush();
-    expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+    expect(canonicalStopIntent(await h.control.getAllocationRecord())).toBeNull();
     await expect(h.control.getStatus()).resolves.toMatchObject({
-      reported: 'ready',
+      status: 'active',
+      connection: 'ready',
+      work: 'idle',
       wrapperInstanceId: replacement.wrapperInstanceId,
     });
     expect(h.session.failWaitingMessages).not.toHaveBeenCalledWith(
@@ -6173,14 +4128,16 @@ describe('SandboxControl lifecycle boundaries', () => {
       },
       connection
     );
-    expect((await h.control.getPhysicalRecord()).state).toBe('running');
-    expect(await loadDeadlines(h.storage)).not.toHaveProperty('idleStop');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+    expect(canonicalIdleAt(await loadCanonicalAllocation(h.storage))).toBeNull();
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
     await h.fireAlarm();
     expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(false);
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'heartbeat_expired',
-      connection.wrapperInstanceId
+    expect(h.session.notifyStopped).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'health_unhealthy_unresponsive',
+        stopProof: expect.objectContaining({ wrapper: connection.wrapperInstanceId }),
+      })
     );
   });
 
@@ -6205,8 +4162,8 @@ describe('SandboxControl lifecycle boundaries', () => {
         },
         connection
       );
-      expect((await h.control.getPhysicalRecord()).state).toBe('running');
-      expect(await loadDeadlines(h.storage)).not.toHaveProperty('idleStop');
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+      expect(canonicalIdleAt(await loadCanonicalAllocation(h.storage))).toBeNull();
       expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
     }
   );
@@ -6230,9 +4187,13 @@ describe('SandboxControl lifecycle boundaries', () => {
       ],
     };
     await h.hooks.onHeartbeat?.(captureHeartbeat, connection);
-    const first = await loadDeadlines(h.storage);
-    expect(first.idleStop).toBe(started + DEADLINE_MS.idleStop);
-    expect(first.heartbeatExpiry).toBe(started + DEADLINE_MS.heartbeatExpiry);
+    const first = (await loadCanonicalAllocation(h.storage)).state;
+    expect(first.kind === 'allocated' && first.idleAt).toBe(started + DEADLINE_MS.idleStop);
+    const firstHeartbeatDeadline =
+      first.kind === 'allocated' && first.health.kind !== 'unhealthy'
+        ? first.health.deadlineAt
+        : null;
+    expect(firstHeartbeatDeadline).toBe(started + DEADLINE_MS.heartbeatExpiry);
     expect(h.alarmAt).toBe(started + DEADLINE_MS.heartbeatExpiry);
     for (let elapsed = 30_000; elapsed <= DEADLINE_MS.idleStop; elapsed += 30_000) {
       vi.setSystemTime(started + elapsed);
@@ -6241,10 +4202,9 @@ describe('SandboxControl lifecycle boundaries', () => {
       await h.flush();
     }
     expect(h.runtime(connection.providerInstanceId)?.destroy).toHaveBeenCalledOnce();
-    expect(await h.control.getPhysicalRecord()).toMatchObject({ state: 'stopped' });
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'idle',
-      connection.wrapperInstanceId
+    expect(await h.control.getAllocationRecord()).toMatchObject({ state: { kind: 'stopped' } });
+    expect(h.session.notifyStopped).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'idle' })
     );
   });
 
@@ -6272,9 +4232,8 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.alarmAt).toBe(started + DEADLINE_MS.heartbeatExpiry);
     await h.fireAlarm();
     expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(false);
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'heartbeat_expired',
-      connection.wrapperInstanceId
+    expect(h.session.notifyStopped).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'health_unhealthy_unresponsive' })
     );
   });
 
@@ -6286,398 +4245,9 @@ describe('SandboxControl lifecycle boundaries', () => {
       { state: 'active', pendingMessages: 1, kilo: { ready: true }, sessions: [] },
       connection
     );
-    expect((await h.control.getPhysicalRecord()).state).toBe('running');
-    expect(await loadDeadlines(h.storage)).not.toHaveProperty('idleStop');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+    expect(canonicalIdleAt(await loadCanonicalAllocation(h.storage))).toBeNull();
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
-  });
-
-  it('schedules a slow pass before an unknown observation and issues only one physical stop', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockRejectedValue(new Error('retry'));
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    await h.control.beginStop('execution_failed');
-    for (let attempt = 0; attempt < 5; attempt++) await h.fireAlarm();
-    runtime.isContainerRunning.mockImplementation(async () => {
-      expect(h.transactionActive).toBe(false);
-      expect(h.alarmAt).toBe(Date.now() + DEADLINE_MS.reconciliation);
-      throw new Error('observation unavailable');
-    });
-    const retired = await h.control.getPhysicalRecord();
-    await h.fireAlarm();
-    expect(runtime.destroy).toHaveBeenCalledTimes(6);
-    expect(await h.control.getPhysicalRecord()).toEqual(retired);
-    expect(await loadDeadlines(h.storage)).toEqual({
-      reconciliation: Date.now() + DEADLINE_MS.reconciliation,
-    });
-    expect(runtime.startProcess).toHaveBeenCalledTimes(1);
-    expect(runtime.renewActivityTimeout).not.toHaveBeenCalled();
-  });
-
-  it('bounds hung observations and stops during slow reaping without losing the next pass', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockRejectedValue(new Error('retry'));
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    await h.control.beginStop('execution_failed');
-    for (let attempt = 0; attempt < 5; attempt++) await h.fireAlarm();
-    runtime.isContainerRunning.mockImplementation(() => new Promise(() => undefined));
-    runtime.destroy.mockImplementation(() => new Promise(() => undefined));
-    const startedAt = h.alarmAt ?? 0;
-    const reaping = h.fireAlarm();
-    await vi.advanceTimersByTimeAsync(2 * DEADLINE_MS.stopAttempt);
-    await reaping;
-    expect(runtime.destroy).toHaveBeenCalledTimes(6);
-    expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(5);
-    expect(h.alarmAt).toBe(startedAt + DEADLINE_MS.reconciliation);
-    expect(h.alarmAt).toBeGreaterThan(Date.now());
-    expect(runtime.startProcess).toHaveBeenCalledTimes(1);
-  });
-
-  it('reissues a fast stop after its cutoff while the first raw call remains unresolved', async () => {
-    const oldStop = deferred<void>();
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockImplementationOnce(() => oldStop.promise);
-      },
-    });
-    await h.create();
-    const identity = await h.ready();
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    await h.control.beginStop('execution_failed');
-    const firstAttempt = h.fireAlarm();
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-    await firstAttempt;
-    expect(runtime.destroy).toHaveBeenCalledTimes(1);
-    expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(1);
-    expect(h.alarmAt).toBe(Date.now() + DEADLINE_MS.stopAttemptLadder[0]);
-    const secondAttempt = h.fireAlarm();
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-    await secondAttempt;
-    expect(runtime.destroy).toHaveBeenCalledTimes(2);
-    expect(runtime.state.running).toBe(false);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect(h.alarmAt).toBeNull();
-    oldStop.resolve();
-    await vi.advanceTimersByTimeAsync(0);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-  });
-
-  it.each(['active', 'unknown'] as const)(
-    'reissues physical stops across fast exhaustion and slow %s observations with an old raw call pending',
-    async observation => {
-      const oldStop = deferred<void>();
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const runtime = h.runtime(identity.providerInstanceId);
-      if (!runtime) throw new Error('Missing runtime');
-      runtime.destroy
-        .mockRejectedValue(new Error('provider unavailable'))
-        .mockImplementationOnce(() => oldStop.promise);
-      await h.control.beginStop('execution_failed');
-      const firstAttempt = h.fireAlarm();
-      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-      await firstAttempt;
-      for (let attempt = 2; attempt <= 5; attempt++) {
-        await h.fireAlarm();
-        expect(runtime.destroy).toHaveBeenCalledTimes(attempt);
-        expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(attempt);
-        if (attempt < 5) {
-          expect(h.alarmAt).toBe(Date.now() + DEADLINE_MS.stopAttemptLadder[attempt - 1]);
-        }
-      }
-      const retired = await h.control.getPhysicalRecord();
-      expect(retired.state).toBe('unknown');
-      if (observation === 'unknown') {
-        runtime.isContainerRunning.mockRejectedValue(new Error('observation unavailable'));
-      }
-      const firstPassAt = h.alarmAt;
-      await h.fireAlarm();
-      expect(runtime.destroy).toHaveBeenCalledTimes(6);
-      expect(await h.control.getPhysicalRecord()).toEqual(retired);
-      expect(h.alarmAt).toBe((firstPassAt ?? 0) + DEADLINE_MS.reconciliation);
-      runtime.destroy.mockImplementationOnce(async () => {
-        expect(h.alarmAt).toBe(Date.now() + DEADLINE_MS.reconciliation);
-        expect((await h.control.getPhysicalRecord()).stopTombstone).toEqual(retired.stopTombstone);
-        runtime.state.running = false;
-      });
-      await h.fireAlarm();
-      expect(runtime.destroy).toHaveBeenCalledTimes(7);
-      expect(runtime.state.running).toBe(false);
-      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-      expect(h.alarmAt).toBeNull();
-      expect(h.allocations.size).toBe(1);
-      expect(runtime.startProcess).toHaveBeenCalledTimes(1);
-      expect(runtime.renewActivityTimeout).not.toHaveBeenCalled();
-      await h.create();
-      const replacement = await h.ready();
-      const replacementAlarm = h.alarmAt;
-      oldStop.resolve();
-      await vi.advanceTimersByTimeAsync(0);
-      expect((await h.control.getPhysicalRecord()).providerRef).toBe(
-        replacement.providerInstanceId
-      );
-      expect(h.alarmAt).toBe(replacementAlarm);
-      expect(h.runtime(replacement.providerInstanceId)?.destroy).not.toHaveBeenCalled();
-    }
-  );
-
-  it('coalesces one bounded attempt and does not let late raw completion clear a newer attempt', async () => {
-    const oldStop = deferred<void>();
-    const newStop = deferred<void>();
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    runtime.destroy
-      .mockImplementationOnce(() => oldStop.promise)
-      .mockImplementation(async () => {
-        await newStop.promise;
-        runtime.state.running = false;
-      });
-    await h.control.beginStop('execution_failed');
-    const physical = await h.control.getPhysicalRecord();
-    const control = h.control as unknown as {
-      stopCurrentProvider(record: typeof physical): Promise<boolean>;
-    };
-    const first = control.stopCurrentProvider(physical);
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt / 2);
-    const joined = control.stopCurrentProvider(physical);
-    expect(runtime.destroy).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt / 2);
-    await expect(first).resolves.toBe(false);
-    await expect(joined).resolves.toBe(false);
-    const next = control.stopCurrentProvider(physical);
-    expect(runtime.destroy).toHaveBeenCalledTimes(2);
-    oldStop.resolve();
-    await vi.advanceTimersByTimeAsync(0);
-    const joinedNext = control.stopCurrentProvider(physical);
-    expect(runtime.destroy).toHaveBeenCalledTimes(2);
-    expect(runtime.state.running).toBe(true);
-    newStop.resolve();
-    await expect(next).resolves.toBe(true);
-    await expect(joinedNext).resolves.toBe(true);
-    expect(runtime.state.running).toBe(false);
-    expect(runtime.destroy).toHaveBeenCalledTimes(2);
-  });
-
-  it('repairs an exhausted final-attempt prefix into slow reaping after the observation window', async () => {
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    await h.control.beginStop('execution_failed');
-    const physical = await h.control.getPhysicalRecord();
-    const tombstone = { ...physical.stopTombstone, attempts: 5 };
-    h.records.set('physical_record', { ...physical, stopTombstone: tombstone });
-    h.records.delete('deadlines');
-    await h.storage.deleteAlarm();
-    vi.setSystemTime(Date.now() + DEADLINE_MS.reconciliationWindow + 1);
-    await h.evict();
-    expect(await h.control.getPhysicalRecord()).toMatchObject({
-      state: 'unknown',
-      stopTombstone: tombstone,
-    });
-    expect(await loadDeadlines(h.storage)).toEqual({
-      reconciliation: Date.now() + DEADLINE_MS.reconciliation,
-    });
-    await h.fireAlarm();
-    expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledTimes(1);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-  });
-
-  it('does not coalesce a replacement stop with an old allocation awaiting acknowledgment', async () => {
-    const acknowledged = deferred<void>();
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const original = h.runtime(identity.providerInstanceId);
-    if (!original) throw new Error('Missing runtime');
-    original.destroy.mockImplementation(async () => {
-      original.state.running = false;
-      await acknowledged.promise;
-    });
-    await h.control.beginStop('execution_failed');
-    const oldStop = h.control.recordStopAttempt();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(original.state.running).toBe(false);
-    await h.control.observeProvider('terminal');
-    await h.create();
-    const replacement = await h.ready();
-    await h.control.beginStop('replacement_failed');
-    await h.control.recordStopAttempt();
-    expect(h.runtime(replacement.providerInstanceId)?.destroy).toHaveBeenCalledTimes(1);
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    acknowledged.resolve();
-    await oldStop;
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-  });
-
-  it('confirms physical death despite a lost stop acknowledgment and ignores its late completion', async () => {
-    const acknowledged = deferred<void>();
-    const h = await harness();
-    await h.create();
-    const identity = await h.ready();
-    const runtime = h.runtime(identity.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    const start = Date.now();
-    for (let elapsed = 0; elapsed <= DEADLINE_MS.createSettle; elapsed += 30_000) {
-      vi.setSystemTime(start + elapsed);
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-    }
-    runtime.destroy.mockImplementation(async () => {
-      runtime.state.running = false;
-      await acknowledged.promise;
-    });
-    await h.control.beginStop('execution_failed');
-    const stopping = h.control.recordStopAttempt();
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
-    await stopping;
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect(h.alarmAt).toBeNull();
-    await h.create();
-    const replacement = await h.ready();
-    acknowledged.resolve();
-    await vi.advanceTimersByTimeAsync(0);
-    expect((await h.control.getPhysicalRecord()).providerRef).toBe(replacement.providerInstanceId);
-    await expect(h.control.getStatus()).resolves.toMatchObject({
-      physical: 'running',
-      connection: 'ready',
-      wrapperInstanceId: replacement.wrapperInstanceId,
-    });
-  });
-
-  it.each(['observation', 'stop'] as const)(
-    'fences a late slow-reaping %s from its replacement',
-    async stage => {
-      const h = await harness({
-        configureAllocation: runtime => {
-          runtime.destroy.mockRejectedValue(new Error('retry'));
-        },
-      });
-      await h.create();
-      const identity = await h.ready();
-      const runtime = h.runtime(identity.providerInstanceId);
-      if (!runtime) throw new Error('Missing runtime');
-      await h.control.beginStop('execution_failed');
-      for (let attempt = 0; attempt < 5; attempt++) await h.fireAlarm();
-      const observation = deferred<boolean>();
-      const stop = deferred<void>();
-      if (stage === 'observation')
-        runtime.isContainerRunning.mockImplementation(() => observation.promise);
-      else runtime.destroy.mockImplementation(() => stop.promise);
-      const reaping = h.fireAlarm();
-      await vi.advanceTimersByTimeAsync(0);
-      runtime.state.running = false;
-      await h.control.confirmStopped();
-      await h.create();
-      const replacement = await h.ready();
-      const replacementAlarm = h.alarmAt;
-      observation.resolve(true);
-      stop.resolve();
-      await reaping;
-      expect(runtime.destroy).toHaveBeenCalledTimes(stage === 'observation' ? 5 : 6);
-      expect(h.runtime(replacement.providerInstanceId)?.destroy).not.toHaveBeenCalled();
-      expect((await h.control.getPhysicalRecord()).providerRef).toBe(
-        replacement.providerInstanceId
-      );
-      expect(h.alarmAt).toBe(replacementAlarm);
-      await expect(h.control.getStatus()).resolves.toMatchObject({
-        physical: 'running',
-        connection: 'ready',
-        wrapperInstanceId: replacement.wrapperInstanceId,
-      });
-    }
-  );
-
-  it('keeps Cloudflare reaping beyond one hour without resetting the fast budget or delaying cleanup on demand', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.destroy.mockRejectedValue(new Error('retry'));
-      },
-    });
-    await h.create();
-    const connection = await h.ready();
-    await h.control.beginStop('execution_failed');
-    for (let attempt = 0; attempt < DEADLINE_MS.stopAttemptLadder.length; attempt++)
-      await h.fireAlarm();
-    const retired = await h.control.getPhysicalRecord();
-    const runtime = h.runtime(connection.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    const billingCalls = runtime.configureBilling.mock.calls.length;
-    for (let pass = 1; pass <= 14; pass++) {
-      const dueAt = h.alarmAt;
-      await h.fireAlarm();
-      expect(runtime.destroy).toHaveBeenCalledTimes(5 + pass);
-      expect((await h.control.getPhysicalRecord()).stopTombstone).toEqual(retired.stopTombstone);
-      expect(await loadDeadlines(h.storage)).toEqual({
-        reconciliation: (dueAt ?? 0) + DEADLINE_MS.reconciliation,
-      });
-      const nextAlarm = h.alarmAt;
-      vi.setSystemTime(Date.now() + 1_000);
-      await h.create();
-      expect(h.alarmAt).toBe(nextAlarm);
-      expect(runtime.destroy).toHaveBeenCalledTimes(5 + pass);
-      expect(runtime.configureBilling).toHaveBeenCalledTimes(billingCalls);
-      expect(runtime.startProcess).toHaveBeenCalledTimes(1);
-      expect(runtime.renewActivityTimeout).not.toHaveBeenCalled();
-    }
-    expect(Date.now()).toBeGreaterThan(
-      (retired.stopTombstone?.createdAt ?? 0) + DEADLINE_MS.reconciliationWindow
-    );
-    const nextAlarm = h.alarmAt;
-    await h.evict();
-    expect(h.alarmAt).toBe(nextAlarm);
-    runtime.destroy.mockImplementation(async () => {
-      expect(h.transactionActive).toBe(false);
-      expect(h.alarmAt).toBeGreaterThan(Date.now());
-      runtime.state.running = false;
-    });
-    await h.fireAlarm();
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect(h.alarmAt).toBeNull();
-    expect(h.allocations.size).toBe(1);
-    await h.create();
-    await h.ready();
-    expect(h.allocations.size).toBe(2);
-    await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
-  });
-
-  it('retains the non-Cloudflare observation-only exhaustion cutoff', async () => {
-    const h = await harness();
-    const createdAt = Date.now();
-    h.records.set('provider_kind', 'vercel');
-    h.records.set('physical_record', {
-      state: 'unknown',
-      providerRef: 'retired_instance',
-      createIntent: { intentId: 'retired_intent', createdAt },
-      stopTombstone: { reason: 'execution_failed', attempts: 5, createdAt },
-      resumable: false,
-    });
-    h.records.set('deadlines', { reconciliation: createdAt + DEADLINE_MS.reconciliation });
-    await h.evict();
-    await h.fireAlarm();
-    expect(h.alarmAt).not.toBeNull();
-    vi.setSystemTime(createdAt + DEADLINE_MS.reconciliationWindow);
-    await h.evict();
-    expect(h.alarmAt).not.toBeNull();
-    await h.fireAlarm();
-    expect((await h.control.getPhysicalRecord()).state).toBe('unknown');
-    expect(h.alarmAt).toBeNull();
-    expect(h.namespace.getByName).not.toHaveBeenCalled();
-    expect(mocks.getSandbox).not.toHaveBeenCalled();
   });
 
   it.each([true, false])(
@@ -6772,518 +4342,6 @@ describe('SandboxControl lifecycle boundaries', () => {
       ).resolves.toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
     }
   );
-
-  describe('heartbeat lapse observation', () => {
-    const OBSERVATION_KEY = 'wrapper_heartbeat_observation';
-    const readObservation = (h: { records: Map<string, unknown> }) =>
-      h.records.get(OBSERVATION_KEY) as Record<string, unknown> | undefined;
-
-    async function readyWithAcceptedHeartbeat() {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-      return { h, identity };
-    }
-
-    it('keeps the accepted observation across eviction for the heartbeat expiry snapshot', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const acceptedAt = readObservation(h)?.lastAcceptedAt;
-      expect(acceptedAt).toEqual(expect.any(Number));
-
-      await h.evict();
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await h.fireAlarm();
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'deadline_fired',
-            deadlineId: 'heartbeatExpiry',
-            lastReceivedHeartbeatAt: acceptedAt,
-            lastAcceptedHeartbeatAt: acceptedAt,
-            armedAt: acceptedAt,
-            armedExpiryAt: (acceptedAt as number) + DEADLINE_MS.heartbeatExpiry,
-            heartbeatArmedBasis: 'heartbeat_receipt',
-            lastDecision: 'accepted',
-            observationConnectionId: identity.connectionId,
-            pendingControlRequests: 0,
-          })
-        );
-      } finally {
-        fields.mockRestore();
-      }
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'heartbeat_expired',
-        identity.wrapperInstanceId
-      );
-      expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
-    });
-
-    it('keeps the observation for a passive eviction followed directly by alarm', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const acceptedAt = readObservation(h)?.lastAcceptedAt;
-      await h.evict(true);
-
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await h.fireAlarm();
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'deadline_fired',
-            deadlineId: 'heartbeatExpiry',
-            lastReceivedHeartbeatAt: acceptedAt,
-            heartbeatArmedBasis: 'heartbeat_receipt',
-            lastDecision: 'accepted',
-            pendingControlRequests: 0,
-          })
-        );
-      } finally {
-        fields.mockRestore();
-      }
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'heartbeat_expired',
-        identity.wrapperInstanceId
-      );
-    });
-
-    it('records a current-connection reject without clearing retained accept history', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const acceptedAt = readObservation(h)?.lastAcceptedAt as number;
-      const runtime = h.records.get('active_wrapper_runtime') as Record<string, unknown>;
-      h.records.set('active_wrapper_runtime', {
-        ...runtime,
-        readyConnectionId: 'replaced-connection',
-      });
-      await h.evict();
-      vi.setSystemTime(acceptedAt + 5_000);
-
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'heartbeat',
-            decision: 'runtime_not_ready',
-            connectionId: identity.connectionId,
-          })
-        );
-      } finally {
-        fields.mockRestore();
-      }
-      expect(readObservation(h)).toMatchObject({
-        connectionId: identity.connectionId,
-        lastDecision: 'runtime_not_ready',
-        armedBasis: 'heartbeat_receipt',
-        lastAcceptedAt: acceptedAt,
-        lastReceivedAt: acceptedAt + 5_000,
-      });
-
-      const expiryFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await h.fireAlarm();
-        expect(expiryFields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'deadline_fired',
-            deadlineId: 'heartbeatExpiry',
-            lastReceivedHeartbeatAt: acceptedAt + 5_000,
-            lastAcceptedHeartbeatAt: acceptedAt,
-            lastDecision: 'runtime_not_ready',
-          })
-        );
-      } finally {
-        expiryFields.mockRestore();
-      }
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'heartbeat_expired',
-        identity.wrapperInstanceId
-      );
-    });
-
-    it('does not let a stale connection overwrite the armed connection observation', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const before = readObservation(h);
-      expect(before).toMatchObject({
-        connectionId: identity.connectionId,
-        lastDecision: 'accepted',
-      });
-
-      const staleIdentity = { ...identity, connectionId: crypto.randomUUID() };
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await h.hooks.onHeartbeat?.(activeHeartbeat, staleIdentity);
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'heartbeat',
-            decision: 'stale_connection',
-            connectionId: staleIdentity.connectionId,
-          })
-        );
-      } finally {
-        fields.mockRestore();
-      }
-      expect(readObservation(h)).toEqual(before);
-    });
-
-    it('omits stored snapshot fields when the observation belongs to another connection', async () => {
-      const { h } = await readyWithAcceptedHeartbeat();
-      const observation = readObservation(h) as Record<string, unknown>;
-      h.records.set(OBSERVATION_KEY, { ...observation, connectionId: 'other-connection' });
-
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await h.fireAlarm();
-        const deadline = fields.mock.calls
-          .map(([value]) => value as Record<string, unknown>)
-          .find(
-            value =>
-              value.diagnosticEvent === 'deadline_fired' && value.deadlineId === 'heartbeatExpiry'
-          );
-        expect(deadline).toBeDefined();
-        expect(deadline).not.toHaveProperty('lastAcceptedHeartbeatAt');
-        expect(deadline).not.toHaveProperty('lastReceivedHeartbeatAt');
-        expect(deadline).not.toHaveProperty('observationConnectionId');
-      } finally {
-        fields.mockRestore();
-      }
-    });
-
-    it('emits retained arm history on kilo_unhealthy and still quarantines', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const acceptedAt = readObservation(h)?.lastAcceptedAt;
-
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-      const put = vi.spyOn(h.storage, 'put');
-      try {
-        await h.hooks.onHeartbeat?.(
-          { ...activeHeartbeat, kilo: { ready: false, reason: 'feed_stale' } },
-          identity
-        );
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'heartbeat',
-            decision: 'kilo_unhealthy',
-            reason: 'feed_stale',
-            lastReceivedHeartbeatAt: expect.any(Number),
-            lastAcceptedHeartbeatAt: acceptedAt,
-            heartbeatArmedBasis: 'heartbeat_receipt',
-            lastDecision: 'accepted',
-            observationConnectionId: identity.connectionId,
-          })
-        );
-        // The bounded matching-identity overlay runs before quarantine; the
-        // stop transition may then delete the observation, so the write itself
-        // is the durable evidence.
-        expect(put).toHaveBeenCalledWith(
-          OBSERVATION_KEY,
-          expect.objectContaining({
-            lastDecision: 'kilo_unhealthy',
-            lastAcceptedAt: acceptedAt,
-            armedBasis: 'heartbeat_receipt',
-          })
-        );
-      } finally {
-        fields.mockRestore();
-        warn.mockRestore();
-        put.mockRestore();
-      }
-      await h.flush();
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'kilo_unhealthy',
-        identity.wrapperInstanceId
-      );
-    });
-
-    it('records wrapper_ready on ready and repair, and heartbeat_receipt on accept', async () => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const readyObservation = readObservation(h);
-      expect(readyObservation).toMatchObject({
-        connectionId: identity.connectionId,
-        armedBasis: 'wrapper_ready',
-      });
-      expect(readyObservation).not.toHaveProperty('lastDecision');
-      expect(readyObservation).not.toHaveProperty('lastAcceptedAt');
-
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-      const acceptedAt = readObservation(h)?.lastAcceptedAt as number;
-      expect(readObservation(h)).toMatchObject({
-        armedBasis: 'heartbeat_receipt',
-        lastDecision: 'accepted',
-        lastAcceptedAt: acceptedAt,
-      });
-      expect(acceptedAt).toEqual(expect.any(Number));
-
-      h.records.delete('deadlines');
-      await h.evict();
-      expect(readObservation(h)).toMatchObject({
-        armedBasis: 'wrapper_ready',
-        lastDecision: 'accepted',
-        lastAcceptedAt: acceptedAt,
-        armedAt: h.records.get('wrapper_ready_at'),
-      });
-
-      h.session.failWaitingMessages.mockClear();
-      await h.fireAlarm();
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'heartbeat_expired',
-        identity.wrapperInstanceId
-      );
-    });
-  });
-
-  describe('heartbeat diagnostic resilience', () => {
-    const OBSERVATION_KEY = 'wrapper_heartbeat_observation';
-    const readObservation = (h: { records: Map<string, unknown> }) =>
-      h.records.get(OBSERVATION_KEY) as Record<string, unknown> | undefined;
-
-    async function readyWithAcceptedHeartbeat() {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-      return { h, identity };
-    }
-
-    // Diagnostic reads are report-only; a rejection must not cancel the
-    // lifecycle action that follows (quarantine or deadline handling).
-    it('continues heartbeat expiry handling when the observation read rejects', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const storage = h.storage as unknown as { get: (key: string) => Promise<unknown> };
-      const originalGet = storage.get.bind(storage);
-      storage.get = async (key: string) => {
-        if (key === OBSERVATION_KEY) throw new Error('observation read failed');
-        return originalGet(key);
-      };
-      try {
-        await h.fireAlarm();
-        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-          'heartbeat_expired',
-          identity.wrapperInstanceId
-        );
-      } finally {
-        storage.get = originalGet;
-      }
-    });
-
-    it('quarantines when the observation overlay write rejects', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const storage = h.storage as unknown as {
-        put: (key: unknown, value?: unknown) => Promise<void>;
-      };
-      const originalPut = storage.put.bind(storage);
-      storage.put = async (key: unknown, value?: unknown) => {
-        if (key === OBSERVATION_KEY) throw new Error('overlay write failed');
-        return originalPut(key, value);
-      };
-      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-      try {
-        await h.hooks.onHeartbeat?.(
-          { ...activeHeartbeat, kilo: { ready: false, reason: 'feed_stale' } },
-          identity
-        );
-        await h.flush();
-        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-          'kilo_unhealthy',
-          identity.wrapperInstanceId
-        );
-      } finally {
-        storage.put = originalPut;
-        warn.mockRestore();
-      }
-    });
-
-    it('leaves the stored observation unchanged when the apply transaction rolls back', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const before = readObservation(h);
-      expect(before).toMatchObject({ lastDecision: 'accepted' });
-      vi.setSystemTime((before?.lastAcceptedAt as number) + 10_000);
-
-      vi.spyOn(h.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
-      await expect(h.hooks.onHeartbeat?.(activeHeartbeat, identity)).rejects.toThrow(
-        'alarm write failed'
-      );
-      expect(readObservation(h)).toEqual(before);
-    });
-
-    // Time advances between ready, acceptance and repair, so the repair basis
-    // can only match `readyAt` and not the repair-time `Date.now()`.
-    it('repairs the heartbeat deadline from readyAt after time has advanced', async () => {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready();
-      const readyAt = h.records.get('wrapper_ready_at') as number;
-      expect(readyAt).toBe(Date.now());
-
-      vi.setSystemTime(readyAt + 30_000);
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-      expect(readObservation(h)).toMatchObject({
-        armedBasis: 'heartbeat_receipt',
-        armedAt: readyAt + 30_000,
-        lastAcceptedAt: readyAt + 30_000,
-      });
-
-      h.records.delete('deadlines');
-      vi.setSystemTime(readyAt + 60_000);
-      await h.evict();
-      expect(readObservation(h)).toMatchObject({
-        connectionId: identity.connectionId,
-        armedBasis: 'wrapper_ready',
-        armedAt: readyAt,
-        armedExpiryAt: readyAt + DEADLINE_MS.heartbeatExpiry,
-        lastAcceptedAt: readyAt + 30_000,
-        lastDecision: 'accepted',
-      });
-    });
-  });
-
-  describe('recovery outcome evidence', () => {
-    async function readyWithAcceptedHeartbeat(recoveryCapable = false) {
-      const h = await harness();
-      await h.create();
-      const identity = await h.ready(
-        recoveryCapable ? { wrapperVersion: null, recoveryCapable: true } : undefined
-      );
-      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
-      await h.flush();
-      return { h, identity };
-    }
-
-    // Recovery-capable readiness arms its own retry/readiness deadlines; drop
-    // everything except the heartbeat expiry so this alarm exercises that path.
-    async function fireHeartbeatExpiry(h: Awaited<ReturnType<typeof harness>>) {
-      const deadlines = { ...(h.records.get('deadlines') as Record<string, unknown>) };
-      for (const id of [
-        'recoveryRetry',
-        'idleStop',
-        'recoveryExpiry',
-        'wrapperReadiness',
-        'startup',
-      ]) {
-        delete deadlines[id];
-      }
-      h.records.set('deadlines', deadlines);
-      vi.setSystemTime(deadlines.heartbeatExpiry as number);
-      await h.control.alarm();
-      await h.flush();
-    }
-
-    it('emits recovery_outcome started when heartbeat expiry commits recovery', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat(true);
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      const closeHandshaken = vi.spyOn(h.socket, 'closeHandshakenSockets');
-      try {
-        await fireHeartbeatExpiry(h);
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'recovery_outcome',
-            cause: 'heartbeat_expired',
-            outcome: 'started',
-            deadlineId: 'heartbeatExpiry',
-            connectionId: identity.connectionId,
-            wrapperInstanceId: identity.wrapperInstanceId,
-            committedAt: expect.any(Number),
-          })
-        );
-        expect(closeHandshaken).toHaveBeenCalledWith(4002, 'application_report_expired');
-      } finally {
-        fields.mockRestore();
-        closeHandshaken.mockRestore();
-      }
-    });
-
-    it('emits recovery_outcome skipped when recovery cannot commit', async () => {
-      const { h } = await readyWithAcceptedHeartbeat(true);
-      const physical = h.records.get('physical_record') as Record<string, unknown>;
-      h.records.set('physical_record', { ...physical, state: 'stopped' });
-
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await fireHeartbeatExpiry(h);
-        expect(fields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'recovery_outcome',
-            cause: 'heartbeat_expired',
-            outcome: 'skipped',
-          })
-        );
-        expect(fields).not.toHaveBeenCalledWith(
-          expect.objectContaining({ diagnosticEvent: 'recovery_outcome', outcome: 'started' })
-        );
-      } finally {
-        fields.mockRestore();
-      }
-    });
-
-    it('emits recovery_outcome started when quarantine commits and skipped when it cannot', async () => {
-      const started = await readyWithAcceptedHeartbeat();
-      const startedFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await fireHeartbeatExpiry(started.h);
-        expect(startedFields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'recovery_outcome',
-            cause: 'heartbeat_expired',
-            outcome: 'started',
-            deadlineId: 'heartbeatExpiry',
-            connectionId: started.identity.connectionId,
-          })
-        );
-      } finally {
-        startedFields.mockRestore();
-      }
-
-      const skipped = await readyWithAcceptedHeartbeat();
-      const physical = skipped.h.records.get('physical_record') as Record<string, unknown>;
-      skipped.h.records.set('physical_record', { ...physical, state: 'stopped' });
-      const skippedFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      try {
-        await fireHeartbeatExpiry(skipped.h);
-        expect(skippedFields).toHaveBeenCalledWith(
-          expect.objectContaining({ diagnosticEvent: 'quarantine_skipped' })
-        );
-        expect(skippedFields).toHaveBeenCalledWith(
-          expect.objectContaining({
-            diagnosticEvent: 'recovery_outcome',
-            cause: 'heartbeat_expired',
-            outcome: 'skipped',
-          })
-        );
-      } finally {
-        skippedFields.mockRestore();
-      }
-    });
-
-    // A throwing logger must not cancel the recovery it was reporting on.
-    it('keeps quarantining when the recovery_outcome emit throws', async () => {
-      const { h, identity } = await readyWithAcceptedHeartbeat();
-      const emitted: Record<string, unknown>[] = [];
-      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
-        emitted.push(fields as Record<string, unknown>);
-        return {
-          ...logger,
-          info: () => {
-            throw new Error('logger unavailable');
-          },
-        } as unknown as typeof logger;
-      });
-      try {
-        await fireHeartbeatExpiry(h);
-      } finally {
-        withFields.mockRestore();
-      }
-      expect(
-        emitted.some(
-          fields => fields.diagnosticEvent === 'recovery_outcome' && fields.outcome === 'started'
-        )
-      ).toBe(true);
-      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-        'heartbeat_expired',
-        identity.wrapperInstanceId
-      );
-    });
-  });
 
   describe('per-session heartbeat evidence', () => {
     const heartbeatCall = (
@@ -7387,13 +4445,22 @@ function cleanupInput(worktreeId: typeof WORKTREE_ID = WORKTREE_ID) {
 }
 
 function seedPhysical(records: Map<string, unknown>, state: 'running' | 'stopped') {
-  records.set('physical_record', {
-    state,
-    providerRef: 'instance_legacy',
-    createIntent: null,
-    stopTombstone: null,
-    resumable: false,
+  const providerRef = encodeCloudflareProviderRef({
+    sandboxId: SANDBOX_ID,
+    containment: true,
+    instanceId: 'instance_legacy',
   });
+  seedCanonicalAllocationRecord(
+    records,
+    state === 'stopped'
+      ? allocationFixture({ state: 'stopped', providerRef })
+      : allocationFixture({
+          state: 'running',
+          provider: 'cloudflare',
+          providerRef,
+          createIntent: { intentId: 'instance_legacy', createdAt: Date.now() },
+        })
+  );
 }
 
 function installLedger(
@@ -7408,6 +4475,8 @@ function installStopProvider(h: Awaited<ReturnType<typeof harness>>) {
   const stop = vi.fn(async () => (confirmed ? ('terminal' as const) : ('retryable' as const)));
   const provider: ProviderAdapter = {
     resumable: false,
+    persistentWorkspace: false,
+    destroysOnStop: false,
     ensureBillingAdmission: vi.fn(async () => undefined),
     create: vi.fn(async () => ({ providerRef: 'instance_running' })),
     launch: vi.fn(async () => undefined),
@@ -7644,7 +4713,7 @@ describe('SandboxControl worktree reference index', () => {
     const first = await loadSessionReferences(h.storage);
     expect(first.reconciled).toBe(false);
     expect(first.overflowed).toBe(false);
-    expect(await loadPhysicalRecord(h.storage)).toMatchObject({ state: 'stopped' });
+    expect((await loadCanonicalAllocation(h.storage)).state.kind).toBe('stopped');
 
     getRuntimeLocation.mockImplementation(async () => ({
       cloudAgentSessionId: CONTROL_SESSION_ID,
@@ -7657,7 +4726,7 @@ describe('SandboxControl worktree reference index', () => {
     await expect(h.control.deleteWorktreeResources(input)).resolves.toMatchObject({
       deleted: true,
     });
-    expect(await loadPhysicalRecord(h.storage)).toMatchObject({ providerRef: null });
+    expect(canonicalProviderRef(await loadCanonicalAllocation(h.storage))).toBeNull();
   });
 
   it('blocks instead of throwing when reconciliation cannot complete', async () => {

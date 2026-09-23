@@ -18,6 +18,11 @@ export const SandboxLifecycleStatusSchema = z.enum([
 
 export type SandboxLifecycleStatus = z.infer<typeof SandboxLifecycleStatusSchema>;
 
+/** Legacy flat allocation label; retained until the public projection is canonical. */
+export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
+
+export type ConnectionState = 'disconnected' | 'connected' | 'ready';
+
 export const SandboxProviderLabelSchema = z.enum(['Cloudflare', 'Vercel', 'Unknown']);
 
 export type SandboxProviderLabel = z.infer<typeof SandboxProviderLabelSchema>;
@@ -28,6 +33,8 @@ export function getSandboxProviderLabel(provider: unknown): SandboxProviderLabel
       return 'Cloudflare';
     case 'vercel':
       return 'Vercel';
+    case 'cloudflare-containers':
+      return 'Cloudflare';
     default:
       return 'Unknown';
   }
@@ -42,6 +49,7 @@ export const SandboxStatusDetailCodeSchema = z.enum([
   'connection_unavailable',
   'status_unavailable',
   'insufficient_evidence',
+  'check_needed',
 ]);
 
 export type SandboxStatusDetailCode = z.infer<typeof SandboxStatusDetailCodeSchema>;
@@ -55,6 +63,7 @@ const STATUS_FOR_DETAIL_CODE = {
   connection_unavailable: 'unreachable',
   status_unavailable: 'unknown',
   insufficient_evidence: 'unknown',
+  check_needed: 'unreachable',
 } as const satisfies Record<SandboxStatusDetailCode, SandboxLifecycleStatus>;
 
 export const SANDBOX_STATUS_DETAIL_MESSAGES = {
@@ -68,6 +77,8 @@ export const SANDBOX_STATUS_DETAIL_MESSAGES = {
   status_unavailable:
     'Sandbox status is temporarily unavailable. This does not mean the sandbox failed.',
   insufficient_evidence: "There is not enough information to confirm the sandbox's current state.",
+  check_needed:
+    'The sandbox has not confirmed its health recently. Its current state is being checked.',
 } as const satisfies Record<SandboxStatusDetailCode, string>;
 
 const timestampSchema = z.number().finite().int().nonnegative().max(8_640_000_000_000_000);

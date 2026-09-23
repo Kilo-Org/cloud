@@ -49,14 +49,17 @@ import { notifyUserSessionEvent } from '../session-events';
 import {
   applyMetadataChanges,
   CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+  CLI_DISCONNECT_STALE_BUSY_WINDOW_MS,
   computeSessionMetadataUpdates,
   resetAttentionStatusOnCliDisconnect,
 } from './metadata';
 
-type StatusRow = { status: string | null };
+type StatusRow = { status: string | null; statusUpdatedAt: string | null };
 
 function createTransactionDb(options: {
   initialStatus: string | null;
+  /** Stored status_updated_at before the call. Defaults to null (no status write). */
+  initialStatusUpdatedAt?: string | null;
   cloudAgentWorktreeId?: string | null;
   /** After the conditional update, status read-back (simulates concurrent overwrite). */
   persistedStatus?: string | null;
@@ -73,13 +76,23 @@ function createTransactionDb(options: {
     selectCall += 1;
     if (options.rowMissing) return [];
     if (selectCall === 1) {
-      return [{ status: options.initialStatus } satisfies StatusRow];
+      return [
+        {
+          status: options.initialStatus,
+          statusUpdatedAt: options.initialStatusUpdatedAt ?? null,
+        } satisfies StatusRow,
+      ];
     }
     const status =
       options.persistedStatus !== undefined
         ? options.persistedStatus
         : options.initialStatus !== null &&
-            (options.initialStatus === 'question' || options.initialStatus === 'permission')
+            (options.initialStatus === 'question' ||
+              options.initialStatus === 'permission' ||
+              (options.initialStatus === 'busy' &&
+                options.initialStatusUpdatedAt != null &&
+                new Date(options.initialStatusUpdatedAt).getTime() <=
+                  Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS))
           ? CLI_DISCONNECT_ATTENTION_RESET_STATUS
           : options.initialStatus;
     return [
@@ -293,10 +306,12 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
 function metadataDelivery(db: ReturnType<typeof createApplyMetadataDb>) {
   const messages: ExpoPushMessage[] = [];
   const tasks: Promise<unknown>[] = [];
+  const refreshParams: RefreshGlanceableSessionsParams[] = [];
   const env = {
     HYPERDRIVE: { connectionString: 'postgres://unused' },
     NOTIFICATIONS: {
       async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+        refreshParams.push(params);
         if (params.userId !== 'usr_1' || !params.cliSessionIds.includes('ses_1')) return;
         const row = db.readCommittedSession();
         await deliverGlanceableSnapshot(
@@ -329,6 +344,7 @@ function metadataDelivery(db: ReturnType<typeof createApplyMetadataDb>) {
     env,
     messages,
     tasks,
+    refreshParams,
     ctx: {
       waitUntil: (task: Promise<unknown>) => {
         tasks.push(task);
@@ -412,7 +428,112 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     );
   });
 
-  it.each(['busy', 'idle', 'retry', null] as const)(
+  it('asks for an approval-exempt refresh when a permission wait clears', async () => {
+    const db = createTransactionDb({ initialStatus: 'permission' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const refreshParams: RefreshGlanceableSessionsParams[] = [];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      NOTIFICATIONS: {
+        async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+          refreshParams.push(params);
+        },
+      },
+    } as never;
+
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    // The deferred `permission -> retry` write is what actually clears the
+    // stored attention, so it — not the socket close ten minutes earlier — must
+    // get the window exemption that makes the Approve control disappear.
+    expect(refreshParams).toEqual([
+      { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+    ]);
+  });
+
+  it('does not exempt a cleared question from the delivery window', async () => {
+    const db = createTransactionDb({ initialStatus: 'question' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const refreshParams: RefreshGlanceableSessionsParams[] = [];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      NOTIFICATIONS: {
+        async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+          refreshParams.push(params);
+        },
+      },
+    } as never;
+
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    // A question is not an approval: it keeps counting as needs-input after the
+    // clear, so no wake is worth spending the window on.
+    expect(refreshParams).toEqual([]);
+  });
+
+  it('clears a busy row whose owning CLI is gone and emits session.status.updated', async () => {
+    const db = createTransactionDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: new Date(
+        Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS - 1_000
+      ).toISOString(),
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    expect(db.applyUpdate).toHaveBeenCalled();
+    expect(db.updateSet).toHaveBeenCalledWith({
+      status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+      status_updated_at: expect.any(String),
+    });
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.status.updated',
+        data: expect.objectContaining({
+          previousStatus: 'busy',
+          status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        }),
+      }),
+      undefined
+    );
+  });
+
+  it('leaves a live busy row untouched when its status write is recent', async () => {
+    const db = createTransactionDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await resetAttentionStatusOnCliDisconnect(
+      { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never,
+      'usr_1',
+      'ses_1'
+    );
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('leaves a busy row untouched when status_updated_at is missing', async () => {
+    const db = createTransactionDb({ initialStatus: 'busy', initialStatusUpdatedAt: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await resetAttentionStatusOnCliDisconnect(
+      { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never,
+      'usr_1',
+      'ses_1'
+    );
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(['idle', 'retry', null] as const)(
     'no-ops without write or notify when stored status is %s',
     async status => {
       const db = createTransactionDb({ initialStatus: status });
@@ -613,6 +734,60 @@ describe('applyMetadataChanges', () => {
         ]);
       }
     );
+
+    it('marks a permission move as approval-relevant for the delivery window', async () => {
+      const db = createApplyMetadataDb({ initialStatus: 'question' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'permission']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+      ]);
+    });
+
+    it('marks a cleared permission wait as approval-relevant for the delivery window', async () => {
+      // `permission -> busy` leaves the `session.status === 'permission'` clause
+      // false, so only `previousStatus === 'permission'` can exempt the clearing
+      // move: the Approve control must disappear as promptly as it appears.
+      const db = createApplyMetadataDb({ initialStatus: 'permission' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+      ]);
+    });
+
+    it('does not exempt a counts-only status move from the delivery window', async () => {
+      const db = createApplyMetadataDb({ initialStatus: 'idle' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: [] },
+      ]);
+    });
 
     it('keeps committed ingestion successful when aggregate transport fails', async () => {
       const db = createApplyMetadataDb();

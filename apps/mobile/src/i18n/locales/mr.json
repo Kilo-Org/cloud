@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे.",
     "featureFlags": "वैशिष्ट्य ध्वज",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "सर्व्हरवरून · ≥ {{min}}",
+    "featureFlagSkipped": "डीफॉल्ट · < {{min}}",
+    "featureFlagNotLoaded": "डीफॉल्ट · लोड झाले नाही",
     "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",
     "gatewayTranscriptionSubtitle": "उपकरणाच्या स्पीच रेकग्निशनऐवजी Kilo Gateway मॉडेल वापरून व्हॉइस इनपुटचे लिप्यंतरण करा. तुमचे रेकॉर्डिंग Kilo Gateway कडे पाठवले जाते.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "चॅटमधील संदेश",
       "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",
-      "security": "सुरक्षा निष्कर्ष"
+      "security": "सुरक्षा निष्कर्ष",
+      "spend": "खर्चाच्या सूचना"
     },
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "सत्राची स्थिती",
       "sessionStatusSubtitle": "पूर्ण / अयशस्वी / नियंत्रणासाठी तयार",
       "kiloclawActivitySubtitle": "इन्स्टन्स तयार/अयशस्वी, नियोजित क्रिया",
+      "kiloclawActivityUnavailable": "KiloClaw क्रियाकलाप मिळवण्यासाठी KiloClaw इन्स्टन्स सुरू करा.",
       "balanceAlertsSubtitle": "संस्थेची शिल्लक कमी झाल्याच्या सूचना",
-      "securityFindingsSubtitle": "नवीन निष्कर्ष आणि SLA स्मरणपत्रे"
+      "balanceAlertsUnavailable": "शिल्लक सूचना मिळवण्यासाठी संस्थेत सामील व्हा.",
+      "securityFindingsSubtitle": "नवीन निष्कर्ष आणि SLA स्मरणपत्रे",
+      "securityFindingsUnavailable": "सुरक्षा निष्कर्ष मिळवण्यासाठी एका व्याप्तीवर Kilo सुरक्षा एजंट सुरू करा.",
+      "spendAlertsSubtitle": "मर्यादा ओलांडणे आणि प्रति तास वाढ",
+      "spendAlertsToggle": "खर्चाच्या सूचना श्रेणी"
     },
     "action": {
       "openSession": "सत्र उघडा"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "सत्र लोड करता आले नाही.",
       "failedToLoadDetails": "सत्राचे तपशील लोड करता आले नाहीत.",
       "failedToStopExecution": "चालू काम थांबवता आले नाही.",
+      "stopped": "सत्र थांबवले",
+      "committing": "कमिट करत आहे…",
+      "committed": "कमिट झाले",
+      "commitFailed": "कमिट अयशस्वी",
       "renameSession": "सत्राचे नाव बदला",
       "renamePlaceholder": "सत्राचे नाव",
       "transcriptAccessibility": "सत्रातील संभाषणाची नोंद",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} ओळ",
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
-      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम"
+      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
+      "noOutput": "कोणतेही आउटपुट नाही."
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "साइन इन करण्याचे खूप प्रयत्न झाले आहेत. कृपया थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा."
   },
   "models": {
+    "auto": {
+      "frontier": "स्वयंचलित अत्याधुनिक",
+      "balanced": "स्वयंचलित संतुलित",
+      "efficient": "स्वयंचलित कार्यक्षम",
+      "small": "स्वयंचलित लहान",
+      "free": "स्वयंचलित मोफत",
+      "organization": "संस्था स्वयंचलित"
+    },
     "dataCollected": "डेटा गोळा होतो",
     "free": "मोफत",
     "couldNotUpdateFavorites": "आवडत्या मॉडेलची यादी अद्ययावत करता आली नाही.",
@@ -3155,7 +3174,8 @@
     "channelName": "सक्रिय एजंट्स",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
-    "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा."
+    "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
+    "newestResult": "नवीनतम निकाल"
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "तुमचा संगणक",
     "remoteOptionBody": "तुमच्या स्वतःच्या मशीनवर `kilo remote` CLI मधून Kilo चालवा.",
     "skip": "सफर वगळा",
-    "tutorialLabel": "शिकवणी",
-    "remoteTitle": "तुमचे पहिले रिमोट सत्र सुरू करा",
-    "remoteBody": "तुमचा संगणक जोडा, मग इथून सत्र सुरू करा.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अजून कोणताही संगणक जोडलेला नाही",
-    "remoteEmptyBody": "जोडण्यासाठी तुमच्या संगणकावर `kilo remote` चालवा.",
-    "remoteFound": "संगणक जोडला",
-    "checkAgain": "पुन्हा तपासा",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "शिकवणी"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "शेवटचे सत्र उघडा"
+  },
+  "spendAlerts": {
+    "subtitle": "या स्कोपचा खर्च मर्यादा ओलांडतो किंवा त्याच्या नेहमीच्या प्रति तास दरापेक्षा वर जातो तेव्हा बिलिंग संपर्कांना ईमेल किंवा पुशद्वारे सूचना पाठवा.",
+    "enable": "खर्चाच्या सूचना चालू करा",
+    "thresholdTitle": "मर्यादा ओलांडणे",
+    "thresholdSubtitle": "चालू खर्च तुमची मर्यादा ओलांडत आहे",
+    "anomalyTitle": "प्रति तास वाढ",
+    "anomalySubtitle": "एक तास या स्कोपच्या नेहमीच्या दरापेक्षा खूपच जास्त आहे",
+    "limitLabel": "मर्यादा (USD)",
+    "windowLabel": "कालावधी",
+    "window24h": "24 तास",
+    "window7d": "7 दिवस",
+    "window30d": "30 दिवस",
+    "multiplierLabel": "वाढीचा गुणक",
+    "saved": "खर्चाच्या सूचना सेटिंग्ज जतन केल्या",
+    "loadError": "खर्चाच्या सूचना लोड करता आल्या नाहीत.",
+    "saveError": "खर्चाच्या सूचना जतन करता आल्या नाहीत.",
+    "empty": "खर्चाच्या सूचना बंद आहेत. या स्कोपच्या बिलिंग संपर्कांना सूचित करण्यासाठी त्या चालू करा.",
+    "noSpend": "अजून कोणताही खर्च नोंदवला गेलेला नाही",
+    "spend24h": "गेल्या 24 तासांतील खर्च",
+    "multiplierError": "1 किंवा त्याहून मोठा गुणक टाका",
+    "permissionDenied": "तुम्हाला खर्चाच्या सूचना व्यवस्थापित करण्याची परवानगी नाही.",
+    "pushOffByCategory": "सूचनांमध्ये बंद"
   }
 }

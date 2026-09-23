@@ -251,6 +251,7 @@ packageExtensions:
 patchedDependencies:
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
+  expo-dev-launcher@57.0.19: patches/expo-dev-launcher@57.0.19.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,

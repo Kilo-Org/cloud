@@ -177,6 +177,7 @@ packageExtensionsChecksum: sha256-1pgKZxx87NNMe1poF5N5u5kZB/qlEyILBQPxofM1shE=
 
 patchedDependencies:
   decode-uri-component@0.5.0: 44dc7ee3ec754d20fab8b07d7efd2442940d872ab7e8c3b61386a3d344fa3ac8
+  expo-dev-launcher@57.0.19: eb0bf1f0bd20f73906c3d8c5b8b60ec09d57b15317dbf94627f91d1edc2d8657
   expo-router@57.0.22: cb9f4edbfee501a4ddee6ca351900b2c18be660bc2e956687352236683980153
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
   expo-task-manager@57.0.19: 7b144f9d84c386dfc1bc93db75d62887c20db3f652bad1f5c01b01ebb531315c

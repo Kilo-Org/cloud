@@ -28,9 +28,22 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * catalog.
  *
  * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * catalogs, so nothing is pending translation today. The
+ * `prReview.discussion.*` / `prReview.announce.*` comment-CRUD keys are the
+ * mobile comment edit/delete copy; they are English-only until the translation
+ * slice lands them in every catalog.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>([
+  'prReview.discussion.deleteComment',
+  'prReview.discussion.deleteCommentTitle',
+  'prReview.discussion.deleteCommentMessage',
+  'prReview.discussion.commentEditFailed',
+  'prReview.discussion.commentEditUnavailable',
+  'prReview.discussion.commentDeleteFailed',
+  'prReview.discussion.commentDeleteUnavailable',
+  'prReview.announce.commentUpdated',
+  'prReview.announce.commentDeleted',
+]);
 
 /**
  * The three copy keys the feature-flag row renders: `<value> · <reason>` under

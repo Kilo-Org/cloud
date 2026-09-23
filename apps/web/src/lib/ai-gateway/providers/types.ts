@@ -10,14 +10,10 @@ export { ReasoningDetailsTransform };
 
 export type ProviderId =
   | 'openrouter'
-  | 'alibaba'
-  | 'seed'
   | 'direct-byok'
   | 'inception'
-  | 'longcat'
   | 'martian'
   | 'mistral'
-  | 'streamlake'
   | 'vercel'
   | 'openai-chatgpt'
   | 'custom'

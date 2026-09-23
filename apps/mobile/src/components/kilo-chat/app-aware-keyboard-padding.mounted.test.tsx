@@ -18,6 +18,8 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as LoginScreenState from '@/components/login-screen-state';
+
 import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 
 const platform = vi.hoisted(() => ({ OS: 'android' }));
@@ -67,6 +69,27 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 
+// Both platforms resolve the strip the keyboard hides through the one shared
+// implementation (`resolveKeyboardBottomPadding`). The spy delegates to the real
+// rule and records the platform it was asked for, so a case below can prove both
+// platforms route through it instead of a fork inside the module.
+const sharedResolver = vi.hoisted(() => ({
+  calls: [] as { platform: string; keyboardHeight: number; bottomInset: number }[],
+}));
+
+vi.mock('@/components/login-screen-state', async importOriginal => {
+  const actual = await importOriginal<typeof LoginScreenState>();
+  return {
+    ...actual,
+    resolveKeyboardBottomPadding: (
+      args: Parameters<typeof actual.resolveKeyboardBottomPadding>[0]
+    ) => {
+      sharedResolver.calls.push(args);
+      return actual.resolveKeyboardBottomPadding(args);
+    },
+  };
+});
+
 type MountProps = {
   keyboardOffset?: number;
   containerReservesBottomInset?: boolean;
@@ -114,6 +137,7 @@ describe('AppAwareKeyboardPaddingView', () => {
     keyboard.show = null;
     keyboard.hide = null;
     keyboard.appState = null;
+    sharedResolver.calls.length = 0;
   });
 
   it('reserves nothing while the keyboard is down', () => {
@@ -151,6 +175,31 @@ describe('AppAwareKeyboardPaddingView', () => {
       platform.OS === 'android' ? height + insets.bottom : height
     );
     renderer.unmount();
+  });
+
+  it('reserves the same strip on both platforms through the one shared implementation', () => {
+    // One docked keyboard hides one strip from the screen bottom. Android
+    // reports that strip minus the navigation bar, iOS the frame that reaches
+    // the screen bottom; both resolve the strip through the same shared rule.
+    const occludedStrip = 728;
+    platform.OS = 'android';
+    insets.bottom = 63;
+    const android = mount();
+    showKeyboard(occludedStrip - insets.bottom);
+    expect(paddingBottom(android)).toBe(occludedStrip);
+    android.unmount();
+
+    platform.OS = 'ios';
+    insets.bottom = 34;
+    const ios = mount();
+    showKeyboard(occludedStrip, screen.height - occludedStrip);
+    expect(paddingBottom(ios)).toBe(occludedStrip);
+    ios.unmount();
+
+    expect([...new Set(sharedResolver.calls.map(call => call.platform))]).toEqual([
+      'android',
+      'ios',
+    ]);
   });
 
   it('tracks a short keyboard and a changed screen size', () => {

@@ -9,7 +9,10 @@ import {
   createMessageSettlementOutbox,
   type MessageSettlementOutboxStorage,
 } from './message-settlement-outbox.js';
-import { storePendingSessionMessage } from './pending-messages.js';
+import {
+  findPendingSessionMessageByMessageId,
+  storePendingSessionMessage,
+} from './pending-messages.js';
 import {
   getSessionMessageState,
   putSessionMessageState,
@@ -111,6 +114,16 @@ function acceptedMessage(messageId = MESSAGE_ID): SessionMessageState {
     createdAt: 1_000,
     acceptedAt: 2_000,
     wrapperRunId: WRAPPER_RUN_ID,
+  };
+}
+
+function acceptedMessageWithIntent(messageId = MESSAGE_ID): SessionMessageState {
+  return {
+    ...acceptedMessage(messageId),
+    admissionSnapshot: {
+      turn: { type: 'prompt', messageId, prompt: 'supervise this wrapper' },
+      agent: { mode: 'code', model: 'test-model' },
+    },
   };
 }
 
@@ -1533,6 +1546,146 @@ describe('WrapperSupervisor', () => {
     expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
     expect(harness.stops).toEqual([]);
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+  });
+
+  it('re-queues an accepted turn once at the no-output deadline instead of failing it', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessageWithIntent());
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    const state = await getSessionMessageState(harness.storage, MESSAGE_ID);
+    expect(state).toMatchObject({ status: 'queued', recoveryAttempts: 1 });
+    expect(state?.acceptedAt).toBeUndefined();
+    expect(state?.wrapperRunId).toBeUndefined();
+    await expect(
+      findPendingSessionMessageByMessageId(harness.storage, MESSAGE_ID)
+    ).resolves.toMatchObject({ messageId: MESSAGE_ID });
+    expect(harness.events.map(event => event.streamEventType)).not.toContain(
+      'cloud.message.failed'
+    );
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles a completed reply instead of re-dispatching a no-output turn', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const assistantMessageId = 'ase_no_output_reconcile';
+    const harness = createHarness(
+      [
+        liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+        OWNED_WRAPPER_LEASE,
+      ],
+      {
+        getAssistantMessageForUserMessage: () =>
+          ({
+            info: {
+              id: assistantMessageId,
+              role: 'assistant',
+              time: { created: 2_500, completed: 2_600 },
+            },
+            parts: [],
+          }) as unknown as LatestAssistantMessage,
+      }
+    );
+    await putSessionMessageState(harness.storage, acceptedMessageWithIntent());
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    // The answer already reached the DO over the ingest channel while the
+    // wrapper went silent, so the turn is settled from that positive evidence.
+    // Re-dispatching it would run the turn twice and duplicate the reply and its
+    // side effects.
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      completionSource: 'idle_reconciliation',
+      assistantMessageId,
+    });
+    await expect(
+      findPendingSessionMessageByMessageId(harness.storage, MESSAGE_ID)
+    ).resolves.toBeUndefined();
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.completed']);
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('fails the second identical no-output detection with the attempt count', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageWithIntent(),
+      recoveryAttempts: 1,
+    });
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    const state = await getSessionMessageState(harness.storage, MESSAGE_ID);
+    expect(state).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+      attempts: 2,
+      recoveryAttempts: 1,
+    });
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+    expect(harness.events.map(event => JSON.parse(event.payload))).toContainEqual(
+      expect.objectContaining({ messageId: MESSAGE_ID, attempts: 2 })
+    );
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('omits the attempt count when the first no-output detection spent no recovery', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    // A predecessor record with no resolvable intent: the recovery cannot be
+    // spent, so this first detection is terminal and no retry ran to count.
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    const state = await getSessionMessageState(harness.storage, MESSAGE_ID);
+    expect(state).toMatchObject({ status: 'failed', failureCode: 'wrapper_no_output' });
+    expect(state?.attempts).toBeUndefined();
+    const payloads = harness.events.map(
+      event => JSON.parse(event.payload) as Record<string, unknown>
+    );
+    expect(payloads).not.toHaveLength(0);
+    expect(payloads.every(payload => !('attempts' in payload))).toBe(true);
+  });
+
+  it('keeps terminalizing a ping timeout on the first detection', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessageWithIntent());
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    const state = await getSessionMessageState(harness.storage, MESSAGE_ID);
+    expect(state).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_ping_timeout',
+    });
+    expect(state?.attempts).toBeUndefined();
+    expect(state?.recoveryAttempts).toBeUndefined();
+    await expect(
+      findPendingSessionMessageByMessageId(harness.storage, MESSAGE_ID)
+    ).resolves.toBeUndefined();
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
   });
 
   it('terminates an unresponsive wrapper on ping timeout before no-output expires', async () => {

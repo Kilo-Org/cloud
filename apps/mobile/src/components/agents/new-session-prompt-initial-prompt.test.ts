@@ -17,7 +17,7 @@ const TEXT_DIRECTIONS = [
   {
     direction: 'RTL',
     isRTL: true,
-    style: [{ writingDirection: 'rtl' }, { letterSpacing: 0 }, undefined],
+    style: [{ writingDirection: 'rtl' }, undefined, undefined],
   },
 ];
 
@@ -144,7 +144,7 @@ vi.mock('@/components/agents/use-text-height', () => ({
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
 
 vi.mock('@/components/query-error', () => ({
-  QueryError: () => null,
+  QueryError: 'QueryError',
 }));
 
 vi.mock('@/components/voice-input-control', () => ({
@@ -245,6 +245,46 @@ function findElementByType(
     }
   }
   return null;
+}
+
+/**
+ * Index of the first `target` node in a pre-order walk, or null when absent.
+ * Follows the same descent convention as `findElementByType` (through the
+ * `Text` and `NewSessionPromptControls` function components) so the returned
+ * order matches how the tree renders, and siblings' subtrees are visited
+ * left-to-right.
+ */
+function findFirstIndexByType(node: Node, target: ElementType): number | null {
+  let order = 0;
+  const visit = (current: Node): number | null => {
+    if (current === null || typeof current !== 'object') {
+      return null;
+    }
+    const props = current.props ?? {};
+    const children = props.children;
+    const currentOrder = order;
+    order += 1;
+    const nodeType = (current as { type?: unknown }).type;
+    if (nodeType === target) {
+      return currentOrder;
+    }
+    if (nodeType === renderText) {
+      return visit(renderText(props as React.ComponentProps<typeof renderText>));
+    }
+    if (nodeType === renderPromptControls) {
+      return visit(
+        renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>)
+      );
+    }
+    for (const child of Array.isArray(children) ? children : [children]) {
+      const found = visit(child as Node);
+      if (found !== null) {
+        return found;
+      }
+    }
+    return null;
+  };
+  return visit(node);
 }
 
 function defaultProps() {
@@ -474,24 +514,41 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(findElementByType(element, renderPromptControls)).toBeNull();
   });
 
-  it('shrinks the input min height to two lines when the viewport above the keyboard is short', async () => {
-    const { NewSessionPrompt } = await import('./new-session-prompt');
-    // 300 - 92 (header) - 125 (card chrome) = 83; floor((83 - 16) / 24) = 2 lines.
-    dimensions.current = { ...dimensions.current, height: 300 };
+  it.each([{ isLoadingModels: false }, { isLoadingModels: true }])(
+    'renders the mode/model row above the input (isLoadingModels: $isLoadingModels)',
+    async ({ isLoadingModels }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      const element = renderPrompt({ ...defaultProps(), isLoadingModels }) as Node;
 
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt(defaultProps());
+      const toolbarIndex = findFirstIndexByType(element, 'ChatToolbar') ?? -1;
+      const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
 
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
-    expect(textHeightOptions.current?.minHeight).not.toBe(88);
+      expect(toolbarIndex).toBeGreaterThanOrEqual(0);
+      expect(inputIndex).toBeGreaterThanOrEqual(0);
+      expect(toolbarIndex).toBeLessThan(inputIndex);
+    }
+  );
+
+  it('renders the models error above the input', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    const element = renderPrompt({
+      ...defaultProps(),
+      isModelsError: true,
+      modelOptions: [],
+    }) as Node;
+
+    const errorIndex = findFirstIndexByType(element, 'QueryError') ?? -1;
+    const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
+
+    expect(errorIndex).toBeGreaterThanOrEqual(0);
+    expect(inputIndex).toBeGreaterThanOrEqual(0);
+    expect(errorIndex).toBeLessThan(inputIndex);
   });
 
-  it('keeps the three-line floor at a large font scale when the viewport has room', async () => {
+  it('keeps the three-line floor at a large font scale', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
-    // 500 - 92 (header, unscaled) - 145 (card chrome: 105 fixed + 20 text * 2)
-    // = 263; floor((263 - 16) / 48) = 5 -> clamped to the three-line default.
-    // Scaling the fixed rows (the shipped regression) gives 500 - 184 - 250 = 66
-    // -> one line -> 64.
+    // Before the host reports a frame, the floor is the preferred three lines
+    // at the scaled line height: 24 * 2 * 3 + 16 = 160.
     dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -499,62 +556,5 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
     expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
     expect(textHeightOptions.current?.minHeight).not.toBe(64);
-  });
-
-  it('lets the mode/model pills wrap and reports the toolbar height to the floor', async () => {
-    const { NewSessionPrompt } = await import('./new-session-prompt');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionPrompt(defaultProps()) as Node;
-
-    // The pills wrap onto a second row when the row runs out of width, so the
-    // toolbar is allowed to grow and is measured for the input's floor (the
-    // fallback-or-measured chrome decision itself is pinned in
-    // chat-composer-input-height.test.ts).
-    const toolbarProps = findElementByType(element, 'ChatToolbar');
-    expect(toolbarProps).toMatchObject({ wrap: true });
-    expect(toolbarProps?.onLayout).toEqual(expect.any(Function));
-  });
-
-  it('reserves the attachment strip so the toolbar clears the keyboard with an attachment staged', async () => {
-    const { NewSessionPrompt } = await import('./new-session-prompt');
-    // The released density-560 frame: 203 - 125 (card chrome) - 12 = 66;
-    // floor((66 - 16) / 24) = two lines.
-    const promptViewportHeight = 203;
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt({ ...defaultProps(), promptViewportHeight });
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
-
-    // The strip's 72 leaves the frame room for one line, so the input gives the
-    // line up instead of pushing the mode/model pills under the IME.
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt({
-      ...defaultProps(),
-      attachments: [{ id: 'a1', metadataStripFailed: false }] as never[],
-      promptViewportHeight,
-    });
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
-  });
-
-  it('reserves the counter and the metadata notice above the toolbar in the floor', async () => {
-    const { NewSessionPrompt } = await import('./new-session-prompt');
-    const promptViewportHeight = 203;
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt({
-      ...defaultProps(),
-      initialPrompt: 'x'.repeat(100_000 - 5),
-      promptViewportHeight,
-    });
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt({
-      ...defaultProps(),
-      attachments: [{ id: 'a1', metadataStripFailed: true }] as never[],
-      promptViewportHeight,
-    });
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
   });
 });

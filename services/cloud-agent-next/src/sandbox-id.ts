@@ -1,4 +1,5 @@
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   sandboxAllocationRequiresControlPlane,
@@ -19,6 +20,10 @@ import {
   type VercelSandboxEnrollmentEnv,
   type VercelSandboxRuntimeConfigEnv,
 } from './agent-sandbox/vercel/vercel-runtime-config.js';
+import {
+  isCloudflareContainersEnrolled,
+  type CloudflareContainersEnrollmentEnv,
+} from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 
@@ -67,6 +72,8 @@ const SANDBOX_ALLOCATION_ID_PREFIX: Record<SandboxAllocation, 'istd' | 'ses' | u
   'isolated-standard': 'istd',
   'cloudflare-single': 'ses',
   'cloudflare-shared': undefined,
+  'cloudflare-containers-standard-3': 'ses',
+  'cloudflare-containers-standard-4': 'ses',
   'vercel-small': 'ses',
   'vercel-large': 'ses',
 };
@@ -221,7 +228,8 @@ export type SandboxSelection = {
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
 } & VercelSandboxEnrollmentEnv &
-  VercelSandboxRuntimeConfigEnv;
+  VercelSandboxRuntimeConfigEnv &
+  CloudflareContainersEnrollmentEnv;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -256,7 +264,7 @@ export function selectSandboxProvider(input: {
       sandboxAllocationRequiresControlPlane(allocation) &&
       sessionPlaneFromId(input.sessionId) !== 'control'
     ) {
-      throw new Error('Vercel sandbox allocations require a control-plane session');
+      throw new Error('Sandbox allocations for this provider require a control-plane session');
     }
     if (!sandboxIdMatchesAllocation(input.sandboxId, allocation)) {
       throw new Error('Sandbox allocation does not match the sandbox identity');
@@ -293,7 +301,15 @@ function selectDefaultSandboxProvider(input: {
     enrolled &&
     runtimeConfig !== undefined;
 
-  return useVercel ? 'vercel' : 'cloudflare';
+  if (useVercel) return 'vercel';
+
+  const useContainers =
+    input.plane === 'control' &&
+    !input.devcontainer &&
+    input.isolated &&
+    isCloudflareContainersEnrolled(input.env, { orgId: input.orgId });
+
+  return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }
 
 export function getDefaultSandboxDestination(
@@ -316,6 +332,9 @@ export function getDefaultSandboxDestination(
   });
   if (provider === 'vercel') {
     return { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' };
+  }
+  if (provider === 'cloudflare-containers') {
+    return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
   return getSandboxAllocationRequest(isolated ? 'cloudflare-single' : 'cloudflare-shared');
 }
@@ -378,7 +397,7 @@ export async function generateSandboxRoutingTarget(
       sandboxAllocationRequiresControlPlane(allocation) &&
       sessionPlaneFromId(sessionId) !== 'control'
     ) {
-      throw new Error('Vercel sandbox allocations require a control-plane session');
+      throw new Error('Sandbox allocations for this provider require a control-plane session');
     }
     const prefix = SANDBOX_ALLOCATION_ID_PREFIX[allocation];
     // `cloudflare-shared` has no isolated prefix: it falls through to the shared route.

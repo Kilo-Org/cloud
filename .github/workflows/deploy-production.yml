@@ -3,6 +3,8 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'apps/mobile/**'
 
 permissions:
   contents: read

@@ -276,7 +276,7 @@
     "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich.",
     "featureFlags": "Feature-Flags",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Remote · ≥ {{min}}",
+    "featureFlagApplied": "vom Server · ≥ {{min}}",
     "featureFlagSkipped": "Standard · < {{min}}",
     "featureFlagNotLoaded": "Standard · nicht geladen",
     "gatewayTranscription": "Gateway-Transkription",

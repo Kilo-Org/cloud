@@ -276,7 +276,7 @@
     "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে।",
     "featureFlags": "ফিচার ফ্ল্যাগ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "রিমোট · ≥ {{min}}",
+    "featureFlagApplied": "সার্ভার থেকে · ≥ {{min}}",
     "featureFlagSkipped": "ডিফল্ট · < {{min}}",
     "featureFlagNotLoaded": "ডিফল্ট · লোড হয়নি",
     "gatewayTranscription": "Kilo Gateway-এ কথা থেকে লেখা",

@@ -276,7 +276,7 @@
     "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે.",
     "featureFlags": "ફીચર ફ્લેગ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "રિમોટ · ≥ {{min}}",
+    "featureFlagApplied": "સર્વરથી · ≥ {{min}}",
     "featureFlagSkipped": "ડિફૉલ્ટ · < {{min}}",
     "featureFlagNotLoaded": "ડિફૉલ્ટ · લોડ થયું નથી",
     "gatewayTranscription": "Kilo Gateway દ્વારા અવાજને લખાણમાં ફેરવવું",

@@ -13,9 +13,13 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  *
  * Each row reads `<value> · <source> · <version relation>`, e.g.
  * `Enabled · remote · ≥ 1.0.4`: the value the UI acts on, whether it came
- * from PostHog or the flag's default, and the gate that decided. The source
- * and relation copy is technical notation (see the i18n allowlist); the
- * translated part is the value word and the section header.
+ * from PostHog or the flag's default, and the gate that decided. The value,
+ * the source and the relation are each catalog copy, so the line reads in the
+ * app language; `preferences.featureFlagApplied`,
+ * `preferences.featureFlagSkipped` and `preferences.featureFlagNotLoaded`
+ * carry the source and relation words. The non-English catalogs still hold the
+ * English copy for those three keys (`PENDING_TRANSLATION_VALUES` in
+ * `tools/i18n/check-catalogs.mjs`), which the translation slice lands.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();

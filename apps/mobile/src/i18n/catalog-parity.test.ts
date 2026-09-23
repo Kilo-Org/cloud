@@ -32,6 +32,46 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 
+/**
+ * The source and relation copy of the feature-flag status line
+ * (`components/feature-flags-section.tsx`, `<value> · <source> · <relation>`).
+ * The value word and the section header were translated when the debug surface
+ * landed; these three keys carry the English source and relation words in all
+ * 86 non-English catalogs today, which leaves the settings row half-English in
+ * Arabic (`settings-arabic-rtl`, finding 4).
+ */
+const FEATURE_FLAG_STATUS_KEYS = [
+  'preferences.featureFlagApplied',
+  'preferences.featureFlagSkipped',
+  'preferences.featureFlagNotLoaded',
+] as const;
+
+/**
+ * The feature-flag status keys whose English copy every catalog still carries.
+ * Only the translation slice may write a catalog other than `en.json`, so this
+ * slice cannot land the translations; `tools/i18n/check-catalogs.mjs` carries
+ * the same list, and the pair of checks below keeps it honest:
+ *
+ * - a pending key must still read exactly English in every catalog, so the
+ *   moment a translation lands anywhere the entry has to be deleted, and
+ * - a key that is not pending must differ from English in every catalog.
+ *
+ * Delete an entry here (and in the checker) once every catalog translates it.
+ */
+const PENDING_TRANSLATION_VALUES = new Set<string>(FEATURE_FLAG_STATUS_KEYS);
+
+/** The value `key` addresses in a loaded catalog, or `undefined`. */
+function nestedValue(catalog: unknown, key: string): unknown {
+  let node: unknown = catalog;
+  for (const part of key.split('.')) {
+    if (!node || typeof node !== 'object') {
+      return undefined;
+    }
+    node = (node as Record<string, unknown>)[part];
+  }
+  return node;
+}
+
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -46,6 +86,8 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
 
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
+const NON_ENGLISH_LANGUAGES = SUPPORTED_LANGUAGES.filter(tag => tag !== 'en');
+
 describe('catalog keys', () => {
   it('names only pending keys en.json defines', () => {
     for (const key of PENDING_TRANSLATION_KEYS) {
@@ -59,20 +101,41 @@ describe('catalog keys', () => {
     }
   });
 
-  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
-    '%s defines exactly the English key families',
-    tag => {
-      const families = keyFamilies(CATALOG_LOADERS[tag]());
-      expect(
-        [...families].filter(key => !ENGLISH_FAMILIES.has(key)),
-        `${tag} defines keys en.json does not`
-      ).toEqual([]);
-      expect(
-        [...ENGLISH_FAMILIES].filter(
-          key => !families.has(key) && !PENDING_TRANSLATION_KEYS.has(key)
-        ),
-        `${tag} is missing keys en.json defines`
-      ).toEqual([]);
+  it.each(NON_ENGLISH_LANGUAGES)('%s defines exactly the English key families', tag => {
+    const families = keyFamilies(CATALOG_LOADERS[tag]());
+    expect(
+      [...families].filter(key => !ENGLISH_FAMILIES.has(key)),
+      `${tag} defines keys en.json does not`
+    ).toEqual([]);
+    expect(
+      [...ENGLISH_FAMILIES].filter(key => !families.has(key) && !PENDING_TRANSLATION_KEYS.has(key)),
+      `${tag} is missing keys en.json defines`
+    ).toEqual([]);
+  });
+
+  it('holds every pending feature-flag translation at English until it lands', () => {
+    for (const key of PENDING_TRANSLATION_VALUES) {
+      const english = nestedValue(CATALOG_LOADERS.en(), key);
+      expect(english, `${key} is not an English key`).toBeTypeOf('string');
+      for (const tag of NON_ENGLISH_LANGUAGES) {
+        expect(
+          nestedValue(CATALOG_LOADERS[tag](), key),
+          `${tag}.${key} is translated; delete it from PENDING_TRANSLATION_VALUES`
+        ).toBe(english);
+      }
     }
-  );
+  });
+
+  it('translates every feature-flag status key the translation slice has landed', () => {
+    const landed = FEATURE_FLAG_STATUS_KEYS.filter(key => !PENDING_TRANSLATION_VALUES.has(key));
+    for (const key of landed) {
+      const english = nestedValue(CATALOG_LOADERS.en(), key);
+      for (const tag of NON_ENGLISH_LANGUAGES) {
+        expect(
+          nestedValue(CATALOG_LOADERS[tag](), key),
+          `${tag}.${key} still reads English`
+        ).not.toBe(english);
+      }
+    }
+  });
 });

@@ -881,3 +881,65 @@ describe('prepare transport', () => {
     expect(seen[0].headers['x-internal-api-key']).toBe(SECRET);
   });
 });
+
+describe('create helper session tracking', () => {
+  const SECRET = 'e2e-internal-secret-0123456789';
+  const trackingConfig: DriverConfig = { ...baseConfig, internalApiSecret: SECRET };
+
+  it('reports the returned id after prepareBrowserSession resolves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_1' }))
+    );
+    const onSessionCreated = vi.fn();
+
+    const prepared = await prepareBrowserSession(
+      { ...trackingConfig, onSessionCreated },
+      { prompt: 'echo:hi' }
+    );
+
+    expect(prepared.cloudAgentSessionId).toBe(SESSION_ID);
+    expect(onSessionCreated).toHaveBeenCalledTimes(1);
+    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID);
+  });
+
+  it('does not report an id when prepareBrowserSession rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })));
+    const onSessionCreated = vi.fn();
+
+    await expect(
+      prepareBrowserSession({ ...trackingConfig, onSessionCreated }, { prompt: 'echo:hi' })
+    ).rejects.toThrow();
+    expect(onSessionCreated).not.toHaveBeenCalled();
+  });
+
+  it('reports the returned id after createWorktreeChat resolves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_2' }))
+    );
+    const onSessionCreated = vi.fn();
+
+    const created = await createWorktreeChat(
+      { ...trackingConfig, onSessionCreated },
+      { sourceKiloSessionId: 'ses_1', sourceCloudAgentSessionId: SESSION_ID }
+    );
+
+    expect(created.cloudAgentSessionId).toBe(SESSION_ID);
+    expect(onSessionCreated).toHaveBeenCalledTimes(1);
+    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID);
+  });
+
+  it('does not report an id when createWorktreeChat rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })));
+    const onSessionCreated = vi.fn();
+
+    await expect(
+      createWorktreeChat(
+        { ...trackingConfig, onSessionCreated },
+        { sourceKiloSessionId: 'ses_1', sourceCloudAgentSessionId: SESSION_ID }
+      )
+    ).rejects.toThrow();
+    expect(onSessionCreated).not.toHaveBeenCalled();
+  });
+});

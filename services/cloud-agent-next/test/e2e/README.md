@@ -451,10 +451,10 @@ never reads `.dev.vars`, root env files, or Postgres. It is a separate runner,
 not a profile switch in `smoke.ts`: the local matrix inserts a Postgres user,
 loads `.dev.vars`, and stops Docker sandboxes.
 
-Each scenario owns its own cleanup. The runner tracks session ids through
-`onSessionCreated` and, after each scenario, repeats `interruptSession` and
-`deleteSession` as a tolerant backstop; a backstop failure is logged, never
-thrown, so one stuck session cannot hide the remaining scenarios.
+Under the deployed profile the shared gate owns session teardown: the scenario
+runs with a config whose `onSessionCreated` records every id a create reports,
+and the gate releases them after the run (interrupt then delete, newest first,
+delete bounded at 45 s). The runner adds no backstop of its own.
 
 The summary reports passed / failed / unsupported as distinct categories.
 Exit policy: `1` if any scenario failed, else `2` if any unsupported result is
@@ -467,77 +467,63 @@ missing capabilities. Local expected-unsupported is exactly `auth-reject`.
 `e2e:deployed` is the serial reference runner; use `run.ts <name> _` for a
 focused single scenario. It is not what CI runs: the `cloud-agent-e2e-tests` GitHub
 workflow (`.github/workflows/cloud-agent-e2e-tests.yml`) is `workflow_dispatch`-only and
-runs the parallel batch matrix described in the next section.
+runs the parallel runner described in the next section as one job.
 
 ### Parallel deployed runner
 
 ```bash
-E2E_BATCH=long-question-idle pnpm --filter cloud-agent-next run e2e:parallel
+pnpm --filter cloud-agent-next run e2e:parallel
 E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
 E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
 ```
 
-`smoke-parallel.ts` runs the same supported `SHARED_SCENARIOS` entries as
-`smoke-deployed.ts`, but one scenario per child process under a bounded pool,
-optionally restricted to one batch. `E2E_BATCH=<name>` selects a batch from
-`E2E_BATCHES` in `test/e2e/scenarios-batches.ts` (declared order preserved);
-`E2E_BATCH` unset runs every scenario, so job selection is unchanged.
+`smoke-parallel.ts` is the single deployed runner CI uses. It runs every entry in
+`SHARED_SCENARIOS`, one scenario per child process under one concurrency pool.
+`E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario at
+once) and overrides the pool size; when it is unset the pool defaults to `4`.
+Each child gets a unique `E2E_FAKE_SCOPE`, so its completions are counted
+separately on the shared fake and its `fetchFakeRequests`
+"unchanged"/"increased" assertions stay meaningful while other shards dispatch.
 
-The batch module owns membership and each batch's default `parallel`.
-`E2E_PARALLEL` accepts a positive integer or `all` (every selected scenario at
-once) and overrides the batch default; when it is unset, a selected batch uses
-its own `parallel` and `E2E_BATCH`-unset mode defaults to `4`. Each child gets a
-unique `E2E_FAKE_SCOPE`, so its completions are counted separately on the shared
-fake and its `fetchFakeRequests` "unchanged"/"increased" assertions stay
-meaningful while other shards dispatch.
-
-Batch membership is validated unconditionally at the top of every run, in both
-modes, against `Object.keys(SHARED_SCENARIOS)`: a scenario listed by a batch
-that is not a registry key, a scenario listed by more than one batch, a registry
-scenario missing from every batch, or a `parallel` outside `[1, 4]` prints every
-error and exits `2`. **Deliberate failure mode:** a scenario added to
-`SHARED_SCENARIOS` without a batch fails `e2e:parallel` (both modes) until it is
-batched; `e2e:deployed` and `run.ts` are unaffected. An unknown `E2E_BATCH`
-prints the known names and exits `2`.
-
-Capability-gated scenarios are filtered out up front and are never spawned.
-The end-of-run output is a machine-readable contract:
+Capability-gated scenarios are filtered out up front and are never spawned. The
+end-of-run output is a machine-readable contract:
 
 ```
-Batch: <name> (<n> scenarios, concurrency <p>)
 unsupported: <name>
 Summary: <pass> passed, <fail> failed, <unsupported> unsupported
 Wall time: <seconds>s
 ```
 
-`<name>` is `all` when `E2E_BATCH` is unset. `<n>` is the selected registry-key
-count **before** capability filtering, so `pass + fail + unsupported === n`; the
-runner asserts this and exits `2` otherwise. Because unsupported scenarios are
-filtered before spawn, a non-zero child exit is a failure: exit `1` if any
-scenario failed, else `0`. A child that exceeds its watchdog deadline (its
-scenario budget plus ten minutes) is killed and reported as a failure.
+The `<n>` count is the registry-key count **before** capability filtering, so
+`pass + fail + unsupported === n`; the runner asserts this and exits `2`
+otherwise. Because unsupported scenarios are filtered before spawn, a non-zero
+child exit is a failure: exit `1` if any scenario failed, else `0`. A child that
+exceeds its watchdog deadline (its scenario budget plus ten minutes) is killed
+and reported as a failure. When `GITHUB_STEP_SUMMARY` is set the runner appends
+its `Summary:` line to that file.
 
-The `cloud-agent-e2e-tests` GitHub workflow runs this as a matrix: a `plan` job resolves
-the batch names with `node` and no pnpm install, one `batches` matrix entry runs
-each batch (concurrency owned by the batch record; `E2E_PARALLEL` is not set)
-and uploads `e2e-batch-<name>.log`, and an `aggregate` job downloads the merged
-logs and runs `test/e2e/deploy/aggregate-batch-logs.mjs`. That consumer reports
-`ok` / `missing-log` / `no-summary` / `inconsistent` per expected batch (where
-`ok` means valid accounting, not that the tests passed), writes a combined
-`Summary:` to the job summary, and exits non-zero when any batch is not `ok` or
-when the plan or matrix result was not `success`. The workflow keeps its
-workflow-level `concurrency` only; there is no job-level `concurrency`, which
-would serialize the matrix.
+The `cloud-agent-e2e-tests` GitHub workflow runs this as ONE job — no `plan`,
+matrix, or `aggregate` jobs — with `E2E_PARALLEL=4`, and uploads `e2e.log`. Job
+failure is the runner's exit code. The workflow keeps its workflow-level
+`concurrency` only.
+
+Under the deployed profile the shared gate owns session teardown, so scenarios
+that never deleted their own sessions now release them too: `interruptSession`
+(15 s bound) then `deleteSession` (45 s bound), newest first. The 45 s delete
+bound is a CLIENT budget, not proof the container was destroyed — a returned
+teardown can leave the allocation `stopping`. Capability gaps are reported as
+`unsupported`, not failures: the deployed profile marks a Docker-only flow
+(`sandboxFaults`, `gates`) `unsupported` and does not spawn it.
 
 Cold boots contend on container provisioning, so `all` maximises the chance of a
-container cold-start timeout showing up as a false failure; the per-batch
-defaults trade wall time for stability. A batch's `parallel` is an experiment to
-recalibrate after an operator run, not a proven live-allocation bound: a
-finished scenario can retain its allocation until the idle stop, so peak live
-allocations can exceed the active-child count. The scoped counter attributes a
-completion only when its prompt carries that shard's marker; a request the
-harness dials without the scenario's prompt (for example a buggy lazy create) is
-not attributed and stays a documented limit.
+container cold-start timeout showing up as a false failure; the default trades
+wall time for stability. The pool size is an experiment to recalibrate after an
+operator run, not a proven live-allocation bound: a finished scenario can retain
+its allocation until the idle stop, so peak live allocations can exceed the
+active-child count. The scoped counter attributes a completion only when its
+prompt carries that shard's marker; a request the harness dials without the
+scenario's prompt (for example a buggy lazy create) is not attributed and stays a
+documented limit.
 
 Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
 Worker names keep the stack addressable separately from production; they do
@@ -571,21 +557,26 @@ container identity. The absence of hot-turn preparation events is not proof that
 the same container served the turns; identity stays a local-only assertion.
 
 The four `sandboxFaults` scenarios' deployed statements are inference, not
-proof: the deployed matrix was not run for this change. The batch jobs'
-`timeout-minutes: 90` is a per-batch operational ceiling, not a certified or
+proof: the deployed matrix was not run for this change. The single workflow job's
+`timeout-minutes: 180` is an operational ceiling, not a certified or
 registry-derived bound; the scenarios mix per-turn and overall budgets, so no
-whole-matrix total is derivable. Their `sessionSandbox` capability over HTTP reports the
+whole-run total is derivable. Their `sessionSandbox` capability over HTTP reports the
 persisted control-plane allocation reference, so "the same container" is
 allocation-reference stability, not a live runtime observation, and the HTTP
 surface cannot enumerate containers.
 
-Cleanup and retained artifacts: cleanup against the e2e Worker runs first —
-`interruptSession` and `deleteSession`, each attempted independently and bounded
-by an abort timeout. The public `deleteSession` does not delete live
-`cli_sessions_v2` rows, so one retained row per started session survives for the
-enrolled user. The user-runnable web `cliSessionsV2.delete` flow (which targets
-the PRODUCTION Worker) is the later cleanup for those rows, not a fallback for
-failed e2e cleanup.
+Cleanup and retained artifacts: under the deployed profile the shared gate owns
+session teardown, so scenarios that never deleted their own sessions now release
+them too. Cleanup against the e2e Worker runs first — `interruptSession` (15 s
+bound) then `deleteSession` (45 s bound, newest first), each attempted
+independently and bounded by an abort timeout. The 45 s delete bound is a CLIENT
+budget, not proof the container was destroyed: a returned teardown can still
+leave the allocation `stopping`, and the abort does not roll back a committed
+retirement. The public `deleteSession` does not delete live `cli_sessions_v2`
+rows, so one retained row per started session survives for the enrolled user. The
+user-runnable web `cliSessionsV2.delete` flow (which targets the PRODUCTION
+Worker) is the later cleanup for those rows, not a fallback for failed e2e
+cleanup.
 
 Troubleshooting:
 

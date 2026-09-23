@@ -50,8 +50,16 @@ import { FAULT_SHARED_SCENARIOS } from './scenarios-shared-faults.js';
 
 /** Generous default per-turn budget for a real first container cold start. */
 const DEFAULT_TURN_TIMEOUT_MS = 240_000;
-/** Bound for each cleanup tRPC request so a wedged cleanup cannot hang the run. */
+/** Bound for the `interruptSession` cleanup request so a wedged interrupt cannot hang the run. */
 const CLEANUP_TIMEOUT_MS = 15_000;
+/**
+ * `deleteSession` client budget. Chunk A's stop can await up to
+ * DEADLINE_MS.stopAttempt (30s), so 45s exceeds it. This is a CLIENT budget,
+ * not proof the container is gone: a returned teardown can still leave the
+ * allocation `stopping`, and the abort does not roll back a committed
+ * retirement.
+ */
+const DELETE_SESSION_TIMEOUT_MS = 45_000;
 /** Bound for each direct HTTPS auth probe in `auth-reject`. */
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 /** Wrong secret for the bad-signature probe; never the deployed `NEXTAUTH_SECRET`. */
@@ -350,9 +358,11 @@ async function runHotTurn(
 
 /**
  * Cleanup for one started session. Both requests are attempted independently
- * and each is bounded; a failure is reported but never thrown. `label` names
- * the caller in the diagnostic. Callers that no longer hold the `kiloSessionId`
- * (the matrix runner backstop) pass `sessionId` alone.
+ * and each is bounded; a failure is reported but never thrown, so it never
+ * changes the caller's `result.ok`. `interruptSession` is bounded by
+ * `CLEANUP_TIMEOUT_MS`; `deleteSession` gets the larger
+ * `DELETE_SESSION_TIMEOUT_MS` (see that constant for the client-budget caveat).
+ * `label` names the caller in the diagnostic.
  */
 export async function cleanupRemoteSession(
   config: DriverConfig,
@@ -367,7 +377,7 @@ export async function cleanupRemoteSession(
     failures.push(`interruptSession: ${errorMessage(error)}`);
   }
   try {
-    await deleteSession(config, sessionId, AbortSignal.timeout(CLEANUP_TIMEOUT_MS));
+    await deleteSession(config, sessionId, AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS));
   } catch (error) {
     failures.push(`deleteSession: ${errorMessage(error)}`);
   }

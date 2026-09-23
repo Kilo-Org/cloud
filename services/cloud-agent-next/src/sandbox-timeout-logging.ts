@@ -70,10 +70,6 @@ export async function withSandboxOperationTimeoutLog<T>(
   }
 }
 
-// ---------------------------------------------------------------------------
-// timedExec – single-line wrapper that adds a timeout to exec + logs on timeout
-// ---------------------------------------------------------------------------
-
 type Executable = {
   exec(command: string, options?: ExecOptions): Promise<ExecResult>;
 };

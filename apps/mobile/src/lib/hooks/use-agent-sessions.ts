@@ -251,14 +251,28 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
 
   // Rows delivered since this hook mounted, as opposed to rows restored from
   // the query cache (in-memory or the encrypted read cache). `dataUpdatedAt`
-  // only advances when the stored query successfully delivers data, so a fresh
-  // screen mount that cannot reach the API has no fresh rows even when a
-  // previous mount left rows cached. The Agents history screen uses this to
-  // show its retryable full-screen error on a failed fresh open instead of
-  // presenting stale rows as loaded, while a failure after rows were actually
-  // delivered this mount keeps them with the inline error.
+  // advances when the stored query successfully delivers data, but
+  // `reconcileFirstPage` (the foreground edge, pull-to-refresh, retry and
+  // departure reconciles) is also a cache write: it empties `pages` and
+  // advances `dataUpdatedAt` without a delivery, so requiring at least one
+  // delivered page tells a delivery apart from that reset. The flag latches
+  // once true, because a later reconcile empties `pages` again and must not
+  // make rows already delivered this mount read as stale. A fresh screen mount
+  // that cannot reach the API therefore has no fresh rows even when a previous
+  // mount left rows cached. The Agents history screen uses this to show its
+  // retryable full-screen error on a failed fresh open instead of presenting
+  // stale rows as loaded, while a failure after rows were actually delivered
+  // this mount keeps them with the inline error.
   const [storedDataUpdatedAtAtMount] = useState(stored.dataUpdatedAt);
-  const storedFetchedSinceMount = stored.dataUpdatedAt > storedDataUpdatedAtAtMount;
+  const storedFetchedSinceMountRef = useRef(false);
+  if (
+    !storedFetchedSinceMountRef.current &&
+    stored.dataUpdatedAt > storedDataUpdatedAtAtMount &&
+    (stored.data?.pages.length ?? 0) > 0
+  ) {
+    storedFetchedSinceMountRef.current = true;
+  }
+  const storedFetchedSinceMount = storedFetchedSinceMountRef.current;
 
   // One coordinator per hook instance, shared by the stored list's next-page
   // fetch and every stored reconcile (foreground edge, pull-to-refresh, retry,

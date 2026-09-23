@@ -9,7 +9,9 @@ import {
   createManualReviewMutationFn,
   mergeReviewFirstPage,
   retriggerReviewMutationFn,
+  REVIEW_LIST_MAX_PAGES,
   REVIEW_PAGE_SIZE,
+  selectReviewFirstPageAction,
   useCancelReview,
   useCreateManualReview,
   useRetriggerReview,
@@ -350,6 +352,15 @@ function makePage(count: number, hasMore = false, status = 'completed'): ReviewP
   };
 }
 
+function makePageWithIds(ids: string[], hasMore = false): ReviewPage {
+  return {
+    success: true,
+    reviews: ids.map(id => ({ id, status: 'running' })),
+    total: ids.length,
+    hasMore,
+  };
+}
+
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function callQueryFn(options: ReviewListOptions, pageParam: number): Promise<ReviewPage> {
   const queryFn = options.queryFn as unknown as (context: {
@@ -420,6 +431,24 @@ describe('buildReviewListQueryOptions (offset pagination)', () => {
     expect(getNextPageParam(page, [page], 50)).toBe(100);
   });
 
+  it('stops forward paging at the retention bound instead of evicting the newest page', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+    const page = makePage(50, true);
+    const atBound = Array.from({ length: REVIEW_LIST_MAX_PAGES }, () => page);
+    const belowBound = atBound.slice(0, REVIEW_LIST_MAX_PAGES - 1);
+
+    // The list is newest-first, so React Query's `maxPages` trim would drop the
+    // front (newest) page. Refusing the next page keeps the newest page retained
+    // and makes `mergeReviewFirstPage`'s page-one guard reachable forever.
+    expect(
+      getNextPageParam(page, atBound, (REVIEW_LIST_MAX_PAGES - 1) * REVIEW_PAGE_SIZE)
+    ).toBeUndefined();
+    expect(getNextPageParam(page, belowBound, (REVIEW_LIST_MAX_PAGES - 2) * REVIEW_PAGE_SIZE)).toBe(
+      (REVIEW_LIST_MAX_PAGES - 1) * REVIEW_PAGE_SIZE
+    );
+  });
+
   it('stops pagination when hasMore is false or the page failed', () => {
     const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
     const getNextPageParam = readGetNextPageParam(options);
@@ -488,7 +517,7 @@ describe('buildReviewListQueryOptions (offset pagination)', () => {
   it('bounds retention with maxPages and keeps the poll off the infinite query', () => {
     const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
 
-    expect(typeof options.maxPages).toBe('number');
+    expect(options.maxPages).toBe(REVIEW_LIST_MAX_PAGES);
     expect(options.maxPages).toBeGreaterThan(0);
     expect(options).not.toHaveProperty('refetchInterval');
   });
@@ -577,12 +606,10 @@ describe('mergeReviewFirstPage', () => {
     expect(mergeReviewFirstPage(existing, asReviewPage(makePage(1)))).toBe(existing);
   });
 
-  it('leaves the list untouched once maxPages has evicted page one from the front', () => {
-    // React Query appends forward pages with `addToEnd(..., maxPages)`, which
-    // drops the oldest page, so past REVIEW_LIST_MAX_PAGES `pages[0]` and
-    // `pageParams[0]` no longer hold offset 0. Writing the probe into that slot
-    // would replace the oldest retained page with stale offset-0 rows and
-    // desynchronise it from its page param.
+  it('leaves the list untouched when the cache does not start at offset 0', () => {
+    // `buildReviewListQueryOptions` caps forward paging so page one is never
+    // evicted from the front; the guard is the defensive no-op for any cache
+    // whose head is not offset 0.
     const retainedFirst = makePage(2, true, 'running');
     const retainedSecond = makePage(2, false);
     const existing = asListCache([retainedFirst, retainedSecond], [50, 100]);
@@ -601,5 +628,53 @@ describe('mergeReviewFirstPage', () => {
   it('no-ops on a missing cache', () => {
     expect(mergeReviewFirstPage(undefined, asReviewPage(makePage(1)))).toBeUndefined();
     expect(mergeReviewFirstPage(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('selectReviewFirstPageAction', () => {
+  it('merges when the fresh page one holds the same rows in the same order', () => {
+    const existing = asListCache(
+      [makePageWithIds(['a', 'b'], true), makePageWithIds(['c'])],
+      [0, 2]
+    );
+
+    expect(
+      selectReviewFirstPageAction(existing, asReviewPage(makePageWithIds(['a', 'b'], true)))
+    ).toBe('merge');
+  });
+
+  it('refetches the retained pages when a review added at the top shifts the boundary', () => {
+    // `created_at desc`: page one is [a, b] and page two starts at offset 2. A
+    // new review at the top makes page one [new, a], so the retained page two
+    // (offset 2) now starts at the row that was page one's last entry — merging
+    // would skip the row that moved across the boundary.
+    const existing = asListCache(
+      [makePageWithIds(['a', 'b'], true), makePageWithIds(['c'])],
+      [0, 2]
+    );
+
+    expect(
+      selectReviewFirstPageAction(existing, asReviewPage(makePageWithIds(['new', 'a'], true)))
+    ).toBe('refetch');
+  });
+
+  it('merges when only one page is retained, whatever the probe holds', () => {
+    // No later page to desync: the next page param is recomputed from the new
+    // page one.
+    const existing = asListCache([makePageWithIds(['a', 'b'], true)], [0]);
+
+    expect(
+      selectReviewFirstPageAction(existing, asReviewPage(makePageWithIds(['new', 'a'], true)))
+    ).toBe('merge');
+  });
+
+  it('merges (no-op) when there is no cache or the probe failed', () => {
+    expect(selectReviewFirstPageAction(undefined, asReviewPage(makePage(1)))).toBe('merge');
+    expect(
+      selectReviewFirstPageAction(
+        asListCache([makePage(1), makePage(1)], [0, 1]),
+        asReviewPage({ success: false, reviews: [], error: 'boom' })
+      )
+    ).toBe('merge');
   });
 });

@@ -27,11 +27,18 @@ export const REVIEW_PAGE_SIZE = 50;
  * The list is browsed by scroll, so a bounded window of pages keeps the
  * browsable range reachable. The bound matters most on invalidation and app
  * foreground: a refetch of an infinite query re-requests every retained page,
- * so `maxPages` is what caps that burst. Ten pages of 50 reviews is far more
+ * so the page count is what caps that burst. Ten pages of 50 reviews is far more
  * than a user scrolls back through, while still stopping an unbounded history
  * from accumulating for the life of the screen.
+ *
+ * `listCodeReviews` orders `created_at desc`, so page one is the NEWEST page.
+ * React Query's `maxPages` trims the front element on a forward fetch
+ * (`addToEnd(..., maxPages)`), which would evict the newest reviews from the top
+ * of the list. `buildReviewListQueryOptions` therefore also stops forward paging
+ * at this bound, so the bound is reached by refusing the next page and `maxPages`
+ * never has to trim.
  */
-const REVIEW_LIST_MAX_PAGES = 10;
+export const REVIEW_LIST_MAX_PAGES = 10;
 
 /** Poll cadence for page one while a review on it is still running. */
 const REVIEW_POLL_INTERVAL_MS = 5000;
@@ -97,10 +104,12 @@ export function buildReviewListQueryOptions(trpc: ReturnType<typeof useTRPC>, sc
       },
       getNextPageParam: (
         lastPage: ReviewListPage,
-        _pages: ReviewListPage[],
+        pages: ReviewListPage[],
         lastPageParam: number
       ) =>
-        lastPage.success && lastPage.hasMore ? lastPageParam + lastPage.reviews.length : undefined,
+        lastPage.success && lastPage.hasMore && pages.length < REVIEW_LIST_MAX_PAGES
+          ? lastPageParam + lastPage.reviews.length
+          : undefined,
     },
     REVIEW_LIST_MAX_PAGES
   );
@@ -137,17 +146,64 @@ export function buildReviewFirstPageQueryOptions(
 }
 
 /**
+ * Whether the probe's fresh page one holds the same rows, in the same order, as
+ * the cached page one — i.e. replacing it cannot shift the page-one/page-two
+ * boundary.
+ *
+ * `listCodeReviews` orders `created_at desc`, so a review added or removed at
+ * the top shifts every later page's offset by one. `mergeReviewFirstPage` keeps
+ * `pageParams` and the later pages, so a changed row set would skip the row that
+ * moved across the boundary, and `dedupeById` cannot recover a gap (the row is
+ * simply absent, not duplicated). When the row set changed the caller refetches
+ * the retained pages instead, re-requesting every page at its offset.
+ */
+export function reviewFirstPageBoundaryMatches(
+  existing: ReviewListData | undefined,
+  page: ReviewListPage | undefined
+): boolean {
+  const cachedFirst = existing?.pages[0];
+  if (!cachedFirst?.success || !page?.success) {
+    return false;
+  }
+  return (
+    cachedFirst.reviews.length === page.reviews.length &&
+    cachedFirst.reviews.every((review, index) => review.id === page.reviews[index]?.id)
+  );
+}
+
+/**
+ * What the page-one probe should do with its fresh page. Pure so the decision is
+ * unit-testable.
+ *
+ * `merge` swaps page one in place. `refetch` is for the shifted-boundary case:
+ * with more than one retained page, a changed row set means every later page
+ * starts at a stale offset, so the retained pages are refetched (each at its own
+ * param) instead of skipping the row that moved across the boundary. A single
+ * retained page has no boundary to desync — the next page param is recomputed
+ * from the new page one — so it always merges.
+ */
+export function selectReviewFirstPageAction(
+  existing: ReviewListData | undefined,
+  page: ReviewListPage | undefined
+): 'merge' | 'refetch' {
+  if (!page?.success) {
+    return 'merge';
+  }
+  if (existing && existing.pages.length > 1 && !reviewFirstPageBoundaryMatches(existing, page)) {
+    return 'refetch';
+  }
+  return 'merge';
+}
+
+/**
  * Replace page one of a cached review list with a fresh page. Pure so the merge
  * is unit-testable. Returns `existing` unchanged when there is no cache, no
  * page one, or the incoming page failed — pageParams and later pages are kept.
  *
- * The `pageParams[0] === 0` guard matters because `REVIEW_LIST_MAX_PAGES` makes
- * React Query evict the oldest page once the list passes the bound: forward
- * pages are appended with `addToEnd(..., maxPages)`, which drops the front
- * element, so `pages[0]`/`pageParams[0]` no longer hold offset 0. Writing the
- * offset-0 probe into that slot would replace the oldest retained page with
- * stale rows and desynchronise it from its page param. Once page one is evicted
- * the probe's rows are not part of the browsable window, so a no-op is correct.
+ * The `pageParams[0] === 0` guard keeps the write on the first page. It is also
+ * the guard that would no-op the merge if page one were ever evicted from the
+ * front; `buildReviewListQueryOptions` caps forward paging at
+ * `REVIEW_LIST_MAX_PAGES` so that cannot happen on this list.
  */
 export function mergeReviewFirstPage(
   existing: ReviewListData | undefined,
@@ -176,16 +232,28 @@ export function useReviewList(scope: string) {
     () => buildReviewListQueryKey(trpc, scope),
     [trpc, scope]
   );
+  // React Query memoizes `refetch`, but the result object is fresh each render;
+  // listing the method keeps the effect from re-running on every render.
+  const listRefetch = list.refetch;
 
   useEffect(() => {
     const page = probe.data;
     if (!page?.success) {
       return;
     }
-    queryClient.setQueryData<ReviewListData>(listKey, existing =>
-      mergeReviewFirstPage(existing, page)
+    const existing = queryClient.getQueryData<ReviewListData>(listKey);
+    if (selectReviewFirstPageAction(existing, page) === 'refetch') {
+      // The probe's page one holds a different row set, so the retained later
+      // pages start at stale offsets. Re-request every retained page at its
+      // offset (`cancelRefetch: false` joins an in-flight refetch instead of
+      // cancelling and re-issuing it) so the list stays contiguous.
+      void listRefetch({ cancelRefetch: false });
+      return;
+    }
+    queryClient.setQueryData<ReviewListData>(listKey, current =>
+      mergeReviewFirstPage(current, page)
     );
-  }, [probe.data, queryClient, listKey]);
+  }, [probe.data, queryClient, listKey, listRefetch]);
 
   return list;
 }

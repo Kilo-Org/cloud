@@ -521,4 +521,46 @@ describe('combined and live refresh callers', () => {
     ]);
     expect(state.storedTitles.every(titles => titles.length > 0)).toBe(true);
   });
+
+  it('does not report rows cached by an earlier mount as delivered when the refetch fails', async () => {
+    // The focus refetch routes through `storedReconcile`, whose
+    // `reconcileFirstPage` reset is a cache write that advances `dataUpdatedAt`
+    // without delivering. The contract must still hold: rows only cached by an
+    // earlier mount are not "fetched since mount", so a failed fresh open shows
+    // the retryable full-screen error instead of stale rows as loaded.
+    client.setQueryData(
+      STORED_KEY,
+      { pages: [history('Old history')], pageParams: [null] },
+      { updatedAt: Date.now() - 60_000 }
+    );
+    await render();
+    expect(combined().storedFetchedSinceMount).toBe(false);
+
+    state.stored.mockClear();
+    state.stored.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => {
+      await combined().refetch();
+      await flush();
+    });
+
+    expect(combined().storedIsError).toBe(true);
+    expect(combined().storedFetchedSinceMount).toBe(false);
+  });
+
+  it('reports rows the refetch delivered this mount as fresh', async () => {
+    client.setQueryData(
+      STORED_KEY,
+      { pages: [history('Old history')], pageParams: [null] },
+      { updatedAt: Date.now() - 60_000 }
+    );
+    await render();
+    expect(combined().storedFetchedSinceMount).toBe(false);
+
+    await act(async () => {
+      await combined().refetch();
+      await flush();
+    });
+
+    expect(combined().storedFetchedSinceMount).toBe(true);
+  });
 });

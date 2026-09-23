@@ -256,7 +256,14 @@ export function AgentSessionListContent({
     }
     onEndReached();
   }, [onEndReached]);
-  const handleScrollBeginDrag = useCallback(() => {
+  // The park must be released by the user's own movement, and `onScrollBeginDrag`
+  // only fires when the list can scroll: a shrink that leaves fewer rows than
+  // fill the viewport (a filter or search change, or a reconcile collapsing the
+  // list to page one) has nothing to scroll, so a drag never opened the park and
+  // `hasNextPage` stayed true behind it. `onTouchMove` is the finger's own
+  // movement, which a viewport-fitting list still reports; the PR-review diff
+  // file list wires the same two events for the same reason.
+  const releasePaginationPark = useCallback(() => {
     paginationParkedRef.current = false;
   }, []);
 
@@ -416,7 +423,8 @@ export function AgentSessionListContent({
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
-          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollBeginDrag={releasePaginationPark}
+          onTouchMove={releasePaginationPark}
           refreshControl={rowsControl}
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
         />

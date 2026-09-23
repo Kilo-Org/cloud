@@ -30,6 +30,7 @@ type ListProps = {
   extraData: number;
   onEndReached: () => void;
   onScrollBeginDrag: () => void;
+  onTouchMove: () => void;
 };
 const controls = vi.hoisted(() => ({
   scrollResets: 0,
@@ -317,6 +318,40 @@ describe('AgentSessionListContent liveness', () => {
     // The next end-reach the user's own drag produces resumes pagination.
     act(() => {
       (shrunk.props as ListProps).onScrollBeginDrag();
+    });
+    act(() => {
+      (shrunk.props as ListProps).onEndReached();
+    });
+    expect(onEndReached).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the pagination park on touch move when the list fits the viewport', () => {
+    const onEndReached = vi.fn<() => void>();
+    const retained = Array.from({ length: 12 }, (_, index) => session(`row-${index}`));
+    // The shrink leaves fewer rows than fill the viewport, so FlashList never
+    // emits `onScrollBeginDrag` (there is nothing to scroll) and only the
+    // finger's own `onTouchMove` opens the park.
+    const pageOne = retained.slice(0, 4);
+    const props = contentProps({
+      sections: [{ title: 'Today', data: retained }],
+      onEndReached,
+    });
+    const renderer = mount(props);
+    act(() => {
+      renderer.update(
+        createElement(AgentSessionListContent, {
+          ...props,
+          sections: [{ title: 'Today', data: pageOne }],
+        })
+      );
+    });
+    const shrunk = renderer.root.find(node => isHost(node, 'FlashList'));
+    act(() => {
+      (shrunk.props as ListProps).onEndReached();
+    });
+    expect(onEndReached).not.toHaveBeenCalled();
+    act(() => {
+      (shrunk.props as ListProps).onTouchMove();
     });
     act(() => {
       (shrunk.props as ListProps).onEndReached();

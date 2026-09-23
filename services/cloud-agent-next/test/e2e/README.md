@@ -494,8 +494,8 @@ Summary: <pass> passed, <fail> failed, <unsupported> unsupported
 Wall time: <seconds>s
 ```
 
-The `<n>` count is the registry-key count **before** capability filtering, so
-`pass + fail + unsupported === n`; the runner asserts this and exits `2`
+The registry-key count **before** capability filtering must equal
+`pass + fail + unsupported`; the runner asserts this and exits `2`
 otherwise. Because unsupported scenarios are filtered before spawn, a non-zero
 child exit is a failure: exit `1` if any scenario failed, else `0`. A child that
 exceeds its watchdog deadline (its scenario budget plus ten minutes) is killed

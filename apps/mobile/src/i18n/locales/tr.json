@@ -2600,7 +2600,14 @@
       "deletedUser": "silinen kullanıcı",
       "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok.",
       "moreLinesAbove_one": "… yukarıda {{displayCount}} satır daha var.",
-      "moreLinesAbove_other": "… yukarıda {{displayCount}} satır daha var."
+      "moreLinesAbove_other": "… yukarıda {{displayCount}} satır daha var.",
+      "deleteComment": "Yorumu sil",
+      "deleteCommentTitle": "Yorum silinsin mi?",
+      "deleteCommentMessage": "Bu yorum çekme isteğinden silinecek.",
+      "commentEditFailed": "Yorumun kaydedilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "commentEditUnavailable": "Bu yorum düzenlenemez. Silinmiş olabilir.",
+      "commentDeleteFailed": "Yorumun silinemedi. Bağlantını kontrol et ve tekrar dene.",
+      "commentDeleteUnavailable": "Bu yorum silinemez."
     },
     "entry": {
       "eyebrow": "URL ile bir çekme isteği veya birleştirme isteği aç",
@@ -2913,6 +2920,8 @@
     "linkPasteNotAPullRequest": "Bu bir çekme isteği veya birleştirme isteği bağlantısı değil",
     "announce": {
       "commentPosted": "Yorum gönderildi",
+      "commentUpdated": "Yorum güncellendi",
+      "commentDeleted": "Yorum silindi",
       "reviewSubmitted": "İnceleme gönderildi",
       "autoMergeEnabled": "Otomatik birleştirme açıldı"
     },

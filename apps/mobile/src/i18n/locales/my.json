@@ -571,7 +571,14 @@
       "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ",
       "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
       "moreLinesAbove_one": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။",
-      "moreLinesAbove_other": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။"
+      "moreLinesAbove_other": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။",
+      "deleteComment": "မှတ်ချက်ကို ဖျက်ပါ",
+      "deleteCommentTitle": "မှတ်ချက်ကို ဖျက်မလား?",
+      "deleteCommentMessage": "ဤမှတ်ချက်ကို PR မှ ဖျက်ပစ်မည်။",
+      "commentEditFailed": "သင့်မှတ်ချက်ကို သိမ်း၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
+      "commentEditUnavailable": "ဤမှတ်ချက်ကို တည်းဖြတ်၍မရပါ။ ၎င်းကို ဖျက်ပြီးဖြစ်နိုင်ပါသည်။",
+      "commentDeleteFailed": "သင့်မှတ်ချက်ကို ဖျက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
+      "commentDeleteUnavailable": "ဤမှတ်ချက်ကို ဖျက်၍မရပါ။"
     },
     "couldNotOpenGitHubAppSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
     "announce": {
       "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",
+      "commentUpdated": "မှတ်ချက် အပ်ဒိတ်လုပ်ပြီးပါပြီ",
+      "commentDeleted": "မှတ်ချက် ဖျက်ပြီးပါပြီ",
       "reviewSubmitted": "သုံးသပ်မှု တင်သွင်းပြီးပါပြီ",
       "autoMergeEnabled": "အလိုအလျောက် ပေါင်းစည်းမှု ဖွင့်ပြီးပါပြီ"
     },

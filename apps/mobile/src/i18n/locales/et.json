@@ -571,7 +571,14 @@
       "deletedUser": "kustutatud kasutaja",
       "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata.",
       "moreLinesAbove_one": "Ülal on veel {{displayCount}} rida.",
-      "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida."
+      "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida.",
+      "deleteComment": "Kustuta kommentaar",
+      "deleteCommentTitle": "Kustuta kommentaar?",
+      "deleteCommentMessage": "See kommentaar kustutatakse tõmbetaotlusest.",
+      "commentEditFailed": "Sinu kommentaari ei õnnestunud salvestada. Kontrolli ühendust ja proovi uuesti.",
+      "commentEditUnavailable": "Seda kommentaari ei saa muuta. Võib-olla on see kustutatud.",
+      "commentDeleteFailed": "Sinu kommentaari ei õnnestunud kustutada. Kontrolli ühendust ja proovi uuesti.",
+      "commentDeleteUnavailable": "Seda kommentaari ei saa kustutada."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "See pole tõmbetaotluse ega liitmistaotluse link",
     "announce": {
       "commentPosted": "Kommentaar on postitatud",
+      "commentUpdated": "Kommentaar uuendatud",
+      "commentDeleted": "Kommentaar kustutatud",
       "reviewSubmitted": "Ülevaatus on esitatud",
       "autoMergeEnabled": "Automaatne ühendamine on lubatud"
     },

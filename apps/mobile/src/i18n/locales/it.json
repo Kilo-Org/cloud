@@ -2630,7 +2630,14 @@
       "replyForbiddenTerm": "Non hai il permesso di rispondere a {{term}}.",
       "moreLinesAbove_one": "… altre righe sopra: {{displayCount}}.",
       "moreLinesAbove_other": "… altre righe sopra: {{displayCount}}.",
-      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}."
+      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}.",
+      "deleteComment": "Elimina commento",
+      "deleteCommentTitle": "Eliminare il commento?",
+      "deleteCommentMessage": "Questo commento verrà eliminato dalla pull request.",
+      "commentEditFailed": "Impossibile salvare il tuo commento. Controlla la connessione e riprova.",
+      "commentEditUnavailable": "Questo commento non può essere modificato. Potrebbe essere stato eliminato.",
+      "commentDeleteFailed": "Impossibile eliminare il tuo commento. Controlla la connessione e riprova.",
+      "commentDeleteUnavailable": "Questo commento non può essere eliminato."
     },
     "entry": {
       "eyebrow": "Apri una pull request o una merge request tramite URL",
@@ -2955,6 +2962,8 @@
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",
+      "commentUpdated": "Commento aggiornato",
+      "commentDeleted": "Commento eliminato",
       "reviewSubmitted": "Revisione inviata",
       "autoMergeEnabled": "Unione automatica attivata"
     },

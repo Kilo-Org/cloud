@@ -571,7 +571,14 @@
       "deletedUser": "mpampiasa voafafa",
       "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao.",
       "moreLinesAbove_one": "… mbola misy andalana {{displayCount}} etsy ambony.",
-      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony."
+      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony.",
+      "deleteComment": "Hamafa ny hevitra",
+      "deleteCommentTitle": "Hamafa ny hevitra?",
+      "deleteCommentMessage": "Ho fafana amin'ny fangatahana fampiraisana ity hevitra ity.",
+      "commentEditFailed": "Tsy afaka nitahiry ny hevitrao. Jereo ny fifandraisanao ary andramo indray.",
+      "commentEditUnavailable": "Tsy azo ovaina ity hevitra ity. Mety voafafa izy.",
+      "commentDeleteFailed": "Tsy afaka namafa ny hevitrao. Jereo ny fifandraisanao ary andramo indray.",
+      "commentDeleteUnavailable": "Tsy azo fafana ity hevitra ity."
     },
     "couldNotOpenGitHubAppSettings": "Tsy voasokatra ny fikirana ho an'ny rindranasa GitHub.",
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
     "announce": {
       "commentPosted": "Navoaka ny hevitra",
+      "commentUpdated": "Nohavaozina ny hevitra",
+      "commentDeleted": "Voafafa ny hevitra",
       "reviewSubmitted": "Nalefa ny fandinihana",
       "autoMergeEnabled": "Navela ny fampiraisana mandeha ho azy"
     },

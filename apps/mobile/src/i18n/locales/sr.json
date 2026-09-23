@@ -582,7 +582,14 @@
       "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
       "moreLinesAbove_one": "… Iznad ima još redova: {{displayCount}}.",
       "moreLinesAbove_other": "… Iznad ima još redova: {{displayCount}}.",
-      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}."
+      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}.",
+      "deleteComment": "Obriši komentar",
+      "deleteCommentTitle": "Obrisati komentar?",
+      "deleteCommentMessage": "Ovaj komentar će biti obrisan iz zahteva za spajanje.",
+      "commentEditFailed": "Nije moguće sačuvati tvoj komentar. Proveri vezu i pokušaj ponovo.",
+      "commentEditUnavailable": "Ovaj komentar se ne može urediti. Možda je obrisan.",
+      "commentDeleteFailed": "Nije moguće obrisati tvoj komentar. Proveri vezu i pokušaj ponovo.",
+      "commentDeleteUnavailable": "Ovaj komentar se ne može obrisati."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti podešavanja GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -768,6 +775,8 @@
     "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje ili merge requesta",
     "announce": {
       "commentPosted": "Komentar objavljen",
+      "commentUpdated": "Komentar ažuriran",
+      "commentDeleted": "Komentar obrisan",
       "reviewSubmitted": "Pregled poslat",
       "autoMergeEnabled": "Automatsko spajanje je uključeno"
     },

@@ -593,7 +593,14 @@
       "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}."
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "deleteComment": "Ištrinti komentarą",
+      "deleteCommentTitle": "Ištrinti komentarą?",
+      "deleteCommentMessage": "Šis komentaras bus ištrintas iš pakeitimų užklausos.",
+      "commentEditFailed": "Nepavyko išsaugoti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
+      "commentEditUnavailable": "Šio komentaro negalima redaguoti. Jis gali būti ištrintas.",
+      "commentDeleteFailed": "Nepavyko ištrinti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
+      "commentDeleteUnavailable": "Šio komentaro negalima ištrinti."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -784,6 +791,8 @@
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
+      "commentUpdated": "Komentaras atnaujintas",
+      "commentDeleted": "Komentaras ištrintas",
       "reviewSubmitted": "Peržiūra pateikta",
       "autoMergeEnabled": "Automatinis sujungimas įjungtas"
     },

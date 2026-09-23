@@ -571,7 +571,14 @@
       "deletedUser": "geskrapte gebruiker",
       "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
       "moreLinesAbove_one": "… nog {{displayCount}} reël hierbo",
-      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo"
+      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo",
+      "deleteComment": "Vee kommentaar uit",
+      "deleteCommentTitle": "Vee kommentaar uit?",
+      "deleteCommentMessage": "Hierdie kommentaar sal uit die trekversoek verwyder word.",
+      "commentEditFailed": "Kon nie jou kommentaar stoor nie. Kontroleer jou verbinding en probeer weer.",
+      "commentEditUnavailable": "Hierdie kommentaar kan nie gewysig word nie. Dit is dalk uitgevee.",
+      "commentDeleteFailed": "Kon nie jou kommentaar uitvee nie. Kontroleer jou verbinding en probeer weer.",
+      "commentDeleteUnavailable": "Hierdie kommentaar kan nie uitgevee word nie."
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",
+      "commentUpdated": "Kommentaar opgedateer",
+      "commentDeleted": "Kommentaar uitgevee",
       "reviewSubmitted": "Hersiening ingedien",
       "autoMergeEnabled": "Outomatiese samevoeging geaktiveer"
     },

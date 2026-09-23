@@ -571,7 +571,14 @@
       "deletedUser": "ջնջված օգտատեր",
       "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։",
       "moreLinesAbove_one": "… վերևում կա ևս {{displayCount}} տող։",
-      "moreLinesAbove_other": "… վերևում կա ևս {{displayCount}} տող։"
+      "moreLinesAbove_other": "… վերևում կա ևս {{displayCount}} տող։",
+      "deleteComment": "Ջնջել մեկնաբանությունը",
+      "deleteCommentTitle": "Ջնջե՞լ մեկնաբանությունը։",
+      "deleteCommentMessage": "Այս մեկնաբանությունը կջնջվի միավորման հարցումից։",
+      "commentEditFailed": "Չհաջողվեց պահպանել քո մեկնաբանությունը։ Ստուգիր կապդ և կրկին փորձիր։",
+      "commentEditUnavailable": "Այս մեկնաբանությունը հնարավոր չէ խմբագրել։ Այն կարող է ջնջված լինել։",
+      "commentDeleteFailed": "Չհաջողվեց ջնջել քո մեկնաբանությունը։ Ստուգիր կապդ և կրկին փորձիր։",
+      "commentDeleteUnavailable": "Այս մեկնաբանությունը հնարավոր չէ ջնջել։"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
     "announce": {
       "commentPosted": "Մեկնաբանությունը հրապարակվել է",
+      "commentUpdated": "Մեկնաբանությունը թարմացվել է",
+      "commentDeleted": "Մեկնաբանությունը ջնջվել է",
       "reviewSubmitted": "Վերանայումն ուղարկվել է",
       "autoMergeEnabled": "Ավտոմատ միավորումը միացված է"
     },

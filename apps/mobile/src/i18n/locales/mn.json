@@ -571,7 +571,14 @@
       "deletedUser": "устгагдсан хэрэглэгч",
       "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй.",
       "moreLinesAbove_one": "… дээр нь дахиад {{displayCount}} мөр байна.",
-      "moreLinesAbove_other": "… дээр нь дахиад {{displayCount}} мөр байна."
+      "moreLinesAbove_other": "… дээр нь дахиад {{displayCount}} мөр байна.",
+      "deleteComment": "Сэтгэгдэл устгах",
+      "deleteCommentTitle": "Сэтгэгдлийг устгах уу?",
+      "deleteCommentMessage": "Энэ сэтгэгдэл нэгтгэх хүсэлтээс устах болно.",
+      "commentEditFailed": "Таны сэтгэгдлийг хадгалж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "commentEditUnavailable": "Энэ сэтгэгдлийг засах боломжгүй. Магадгүй устгагдсан байж болно.",
+      "commentDeleteFailed": "Таны сэтгэгдлийг устгаж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "commentDeleteUnavailable": "Энэ сэтгэгдлийг устгах боломжгүй."
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Энэ татах эсвэл нэгтгэх хүсэлтийн холбоос биш байна.",
     "announce": {
       "commentPosted": "Сэтгэгдэл нийтлэгдсэн",
+      "commentUpdated": "Сэтгэгдэл шинэчлэгдсэн",
+      "commentDeleted": "Сэтгэгдэл устгагдсан",
       "reviewSubmitted": "Хяналтыг илгээсэн",
       "autoMergeEnabled": "Автоматаар нэгтгэхийг идэвхжүүлсэн"
     },

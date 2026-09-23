@@ -571,7 +571,14 @@
       "deletedUser": "olùlò tí a pa rẹ́",
       "replyForbiddenTerm": "O kò ní àṣẹ láti dáhùn sí {{term}} yìí.",
       "moreLinesAbove_one": "… ìlà {{displayCount}} sí i wà lókè",
-      "moreLinesAbove_other": "… ìlà {{displayCount}} sí i wà lókè"
+      "moreLinesAbove_other": "… ìlà {{displayCount}} sí i wà lókè",
+      "deleteComment": "Pa àsọyé rẹ́",
+      "deleteCommentTitle": "Pa àsọyé rẹ́?",
+      "deleteCommentMessage": "A ó pa àsọyé yìí rẹ́ kúrò nínú ìbéèrè ìṣọ̀kan.",
+      "commentEditFailed": "A kò lè fipamọ́ àsọyé rẹ. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+      "commentEditUnavailable": "A kò lè ṣàtúnṣe àsọyé yìí. Ó lè ti jẹ́ pípa rẹ́.",
+      "commentDeleteFailed": "A kò lè pa àsọyé rẹ rẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+      "commentDeleteUnavailable": "A kò lè pa àsọyé yìí rẹ́."
     },
     "couldNotOpenGitHubAppSettings": "A kò lè ṣí àwọn ètò ohun èlò GitHub.",
     "installKiloGitHubApp": "Fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
     "announce": {
       "commentPosted": "A ti fi àsọyé ránṣẹ́",
+      "commentUpdated": "A ti ṣe àtúnṣe àsọyé",
+      "commentDeleted": "A ti pa àsọyé rẹ́",
       "reviewSubmitted": "A ti fi àtúnyẹ̀wò ránṣẹ́",
       "autoMergeEnabled": "A ti tan ìdàpọ̀ aládàáṣiṣẹ́"
     },

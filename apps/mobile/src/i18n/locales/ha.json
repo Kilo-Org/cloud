@@ -571,7 +571,14 @@
       "deletedUser": "mai amfani da aka share",
       "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
       "moreLinesAbove_one": "… akwai ƙarin layuka {{displayCount}} a sama.",
-      "moreLinesAbove_other": "… akwai ƙarin layuka {{displayCount}} a sama."
+      "moreLinesAbove_other": "… akwai ƙarin layuka {{displayCount}} a sama.",
+      "deleteComment": "Share tsokaci",
+      "deleteCommentTitle": "A share tsokaci?",
+      "deleteCommentMessage": "Za a share wannan tsokaci daga buƙatar haɗawa.",
+      "commentEditFailed": "Ba a iya adana tsokacinka ba. Duba haɗinka na intanet ka sake gwadawa.",
+      "commentEditUnavailable": "Ba a iya gyara wannan tsokacin ba. Wataƙila an share shi.",
+      "commentDeleteFailed": "Ba a iya share tsokacinka ba. Duba haɗinka na intanet ka sake gwadawa.",
+      "commentDeleteUnavailable": "Ba a iya share wannan tsokacin ba."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Ba mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa ba ne",
     "announce": {
       "commentPosted": "An wallafa tsokaci",
+      "commentUpdated": "An sabunta tsokaci",
+      "commentDeleted": "An share tsokaci",
       "reviewSubmitted": "An aika bita",
       "autoMergeEnabled": "An kunna haɗawa ta atomatik"
     },

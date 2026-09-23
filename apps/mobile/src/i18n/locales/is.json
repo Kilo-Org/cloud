@@ -571,7 +571,14 @@
       "deletedUser": "eyddur notandi",
       "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} lína til viðbótar fyrir ofan.",
-      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan."
+      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan.",
+      "deleteComment": "Eyða athugasemd",
+      "deleteCommentTitle": "Eyða athugasemd?",
+      "deleteCommentMessage": "Þessari athugasemd verður eytt úr sameiningarbeiðninni.",
+      "commentEditFailed": "Ekki tókst að vista athugasemdina þína. Athugaðu tenginguna og reyndu aftur.",
+      "commentEditUnavailable": "Ekki er hægt að breyta þessari athugasemd. Hún gæti hafa verið eydd.",
+      "commentDeleteFailed": "Ekki tókst að eyða athugasemdinni þinni. Athugaðu tenginguna og reyndu aftur.",
+      "commentDeleteUnavailable": "Ekki er hægt að eyða þessari athugasemd."
     },
     "couldNotOpenGitHubAppSettings": "Tókst ekki að opna stillingar GitHub-forritsins.",
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
     "announce": {
       "commentPosted": "Athugasemd birt",
+      "commentUpdated": "Athugasemd uppfærð",
+      "commentDeleted": "Athugasemd eydd",
       "reviewSubmitted": "Yfirferð send",
       "autoMergeEnabled": "Sjálfvirk sameining virkjuð"
     },

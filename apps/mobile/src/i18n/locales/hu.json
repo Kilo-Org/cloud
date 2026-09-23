@@ -571,7 +571,14 @@
       "deletedUser": "törölt felhasználó",
       "replyForbiddenTerm": "Nincs jogosultságod a {{term}} megválaszolására.",
       "moreLinesAbove_one": "… még {{displayCount}} sor feljebb.",
-      "moreLinesAbove_other": "… még {{displayCount}} sor feljebb."
+      "moreLinesAbove_other": "… még {{displayCount}} sor feljebb.",
+      "deleteComment": "Hozzászólás törlése",
+      "deleteCommentTitle": "Törlöd a hozzászólást?",
+      "deleteCommentMessage": "Ez a hozzászólás törlődni fog a módosítási kérelemből.",
+      "commentEditFailed": "Nem sikerült menteni a hozzászólásodat. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "commentEditUnavailable": "Ez a hozzászólás nem szerkeszthető. Lehet, hogy törölték.",
+      "commentDeleteFailed": "Nem sikerült törölni a hozzászólásodat. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "commentDeleteUnavailable": "Ez a hozzászólás nem törölhető."
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub-alkalmazás beállításait.",
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
     "announce": {
       "commentPosted": "Hozzászólás közzétéve",
+      "commentUpdated": "Hozzászólás frissítve",
+      "commentDeleted": "Hozzászólás törölve",
       "reviewSubmitted": "Kódellenőrzés elküldve",
       "autoMergeEnabled": "Automatikus összevonás engedélyezve"
     },

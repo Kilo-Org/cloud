@@ -2600,7 +2600,14 @@
       "deletedUser": "삭제된 사용자",
       "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다.",
       "moreLinesAbove_one": "… 위에 {{displayCount}}줄이 더 있습니다.",
-      "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다."
+      "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다.",
+      "deleteComment": "댓글 삭제",
+      "deleteCommentTitle": "댓글을 삭제할까요?",
+      "deleteCommentMessage": "이 댓글은 풀 리퀘스트에서 삭제됩니다.",
+      "commentEditFailed": "댓글을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "commentEditUnavailable": "이 댓글은 수정할 수 없습니다. 삭제되었을 수 있습니다.",
+      "commentDeleteFailed": "댓글을 삭제하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다."
     },
     "entry": {
       "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
@@ -2913,6 +2920,8 @@
     "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
     "announce": {
       "commentPosted": "댓글이 게시되었습니다",
+      "commentUpdated": "댓글이 수정되었습니다",
+      "commentDeleted": "댓글이 삭제되었습니다",
       "reviewSubmitted": "리뷰가 제출되었습니다",
       "autoMergeEnabled": "자동 병합이 켜졌습니다"
     },

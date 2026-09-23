@@ -2600,7 +2600,14 @@
       "deletedUser": "gelöschter Benutzer",
       "replyForbiddenTerm": "Du hast keine Berechtigung, auf diesen {{term}} zu antworten.",
       "moreLinesAbove_one": "… darüber stehen weitere Zeilen: {{displayCount}}.",
-      "moreLinesAbove_other": "… darüber stehen weitere Zeilen: {{displayCount}}."
+      "moreLinesAbove_other": "… darüber stehen weitere Zeilen: {{displayCount}}.",
+      "deleteComment": "Kommentar löschen",
+      "deleteCommentTitle": "Kommentar löschen?",
+      "deleteCommentMessage": "Dieser Kommentar wird aus dem Pull-Request gelöscht.",
+      "commentEditFailed": "Dein Kommentar konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut.",
+      "commentEditUnavailable": "Dieser Kommentar kann nicht bearbeitet werden. Möglicherweise wurde er gelöscht.",
+      "commentDeleteFailed": "Dein Kommentar konnte nicht gelöscht werden. Prüfe deine Verbindung und versuche es erneut.",
+      "commentDeleteUnavailable": "Dieser Kommentar kann nicht gelöscht werden."
     },
     "entry": {
       "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
@@ -2913,6 +2920,8 @@
     "linkPasteNotAPullRequest": "Dieser Link führt nicht zu einem Pull-Request oder Merge-Request.",
     "announce": {
       "commentPosted": "Kommentar veröffentlicht",
+      "commentUpdated": "Kommentar aktualisiert",
+      "commentDeleted": "Kommentar gelöscht",
       "reviewSubmitted": "Review gesendet",
       "autoMergeEnabled": "Automatisches Zusammenführen aktiviert"
     },

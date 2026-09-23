@@ -571,7 +571,14 @@
       "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
       "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "moreLinesAbove_one": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲು.",
-      "moreLinesAbove_other": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳಿವೆ."
+      "moreLinesAbove_other": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳಿವೆ.",
+      "deleteComment": "ಕಾಮೆಂಟ್ ಅಳಿಸಿ",
+      "deleteCommentTitle": "ಕಾಮೆಂಟ್ ಅಳಿಸುವುದೇ?",
+      "deleteCommentMessage": "ಈ ಕಾಮೆಂಟ್ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನಿಂದ ಅಳಿಸಲಾಗುತ್ತದೆ.",
+      "commentEditFailed": "ನಿಮ್ಮ ಕಾಮೆಂಟ್ ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "commentEditUnavailable": "ಈ ಕಾಮೆಂಟ್ ಸಂಪಾದಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದನ್ನು ಅಳಿಸಿರಬಹುದು.",
+      "commentDeleteFailed": "ನಿಮ್ಮ ಕಾಮೆಂಟ್ ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "commentDeleteUnavailable": "ಈ ಕಾಮೆಂಟ್ ಅಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ಇದು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
     "announce": {
       "commentPosted": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ",
+      "commentUpdated": "ಕಾಮೆಂಟ್ ನವೀಕರಿಸಲಾಗಿದೆ",
+      "commentDeleted": "ಕಾಮೆಂಟ್ ಅಳಿಸಲಾಗಿದೆ",
       "reviewSubmitted": "ಪರಿಶೀಲನೆ ಸಲ್ಲಿಸಲಾಗಿದೆ",
       "autoMergeEnabled": "ಸ್ವಯಂ-ವಿಲೀನ ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ"
     },

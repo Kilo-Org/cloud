@@ -2660,7 +2660,14 @@
       "moreLinesAbove_one": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
       "moreLinesAbove_other": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
       "moreLinesAbove_few": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
-      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}"
+      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
+      "deleteComment": "Usuń komentarz",
+      "deleteCommentTitle": "Usunąć komentarz?",
+      "deleteCommentMessage": "Ten komentarz zostanie usunięty z PR-a.",
+      "commentEditFailed": "Nie udało się zapisać twojego komentarza. Sprawdź połączenie i spróbuj ponownie.",
+      "commentEditUnavailable": "Tego komentarza nie można edytować. Mógł zostać usunięty.",
+      "commentDeleteFailed": "Nie udało się usunąć twojego komentarza. Sprawdź połączenie i spróbuj ponownie.",
+      "commentDeleteUnavailable": "Tego komentarza nie można usunąć."
     },
     "entry": {
       "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
@@ -2997,6 +3004,8 @@
     "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
+      "commentUpdated": "Komentarz zaktualizowany",
+      "commentDeleted": "Komentarz usunięty",
       "reviewSubmitted": "Wysłano przegląd",
       "autoMergeEnabled": "Włączono automatyczne scalanie"
     },

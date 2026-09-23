@@ -571,7 +571,14 @@
       "deletedUser": "წაშლილი მომხმარებელი",
       "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
       "moreLinesAbove_one": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
-      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია."
+      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
+      "deleteComment": "კომენტარის წაშლა",
+      "deleteCommentTitle": "წავშალო კომენტარი?",
+      "deleteCommentMessage": "ეს კომენტარი წაიშლება შერწყმის მოთხოვნიდან.",
+      "commentEditFailed": "კომენტარის შენახვა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "commentEditUnavailable": "ამ კომენტარის რედაქტირება შეუძლებელია. შესაძლოა ის წაშლილია.",
+      "commentDeleteFailed": "კომენტარის წაშლა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "commentDeleteUnavailable": "ამ კომენტარის წაშლა შეუძლებელია."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",
+      "commentUpdated": "კომენტარი განახლდა",
+      "commentDeleted": "კომენტარი წაიშალა",
       "reviewSubmitted": "განხილვა გაიგზავნა",
       "autoMergeEnabled": "ავტომატური შერწყმა ჩართულია"
     },

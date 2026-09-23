@@ -2660,7 +2660,14 @@
       "moreLinesAbove_one": "… Вище є додаткові рядки: {{displayCount}}.",
       "moreLinesAbove_other": "… Вище є додаткові рядки: {{displayCount}}.",
       "moreLinesAbove_few": "… Вище є додаткові рядки: {{displayCount}}.",
-      "moreLinesAbove_many": "… Вище є додаткові рядки: {{displayCount}}."
+      "moreLinesAbove_many": "… Вище є додаткові рядки: {{displayCount}}.",
+      "deleteComment": "Видалити коментар",
+      "deleteCommentTitle": "Видалити коментар?",
+      "deleteCommentMessage": "Цей коментар буде видалено із запиту на злиття.",
+      "commentEditFailed": "Не вдалося зберегти ваш коментар. Перевірте з'єднання та спробуйте ще раз.",
+      "commentEditUnavailable": "Цей коментар не можна редагувати. Можливо, його було видалено.",
+      "commentDeleteFailed": "Не вдалося видалити ваш коментар. Перевірте з'єднання та спробуйте ще раз.",
+      "commentDeleteUnavailable": "Цей коментар не можна видалити."
     },
     "entry": {
       "eyebrow": "Відкрийте запит на злиття або merge-запит за URL",
@@ -2997,6 +3004,8 @@
     "linkPasteNotAPullRequest": "Це не посилання на запит на злиття або merge-запит",
     "announce": {
       "commentPosted": "Коментар опубліковано",
+      "commentUpdated": "Коментар оновлено",
+      "commentDeleted": "Коментар видалено",
       "reviewSubmitted": "Результат перевірки коду надіслано",
       "autoMergeEnabled": "Автоматичне злиття ввімкнено"
     },

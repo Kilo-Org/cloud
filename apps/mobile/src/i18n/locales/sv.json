@@ -571,7 +571,14 @@
       "deletedUser": "borttagen användare",
       "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
       "moreLinesAbove_one": "… fler rader ovanför: {{displayCount}}",
-      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}"
+      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}",
+      "deleteComment": "Ta bort kommentar",
+      "deleteCommentTitle": "Ta bort kommentaren?",
+      "deleteCommentMessage": "Den här kommentaren tas bort från PR:en.",
+      "commentEditFailed": "Det gick inte att spara din kommentar. Kontrollera anslutningen och försök igen.",
+      "commentEditUnavailable": "Den här kommentaren kan inte redigeras. Den kan ha tagits bort.",
+      "commentDeleteFailed": "Det gick inte att ta bort din kommentar. Kontrollera anslutningen och försök igen.",
+      "commentDeleteUnavailable": "Den här kommentaren kan inte tas bort."
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
+      "commentUpdated": "Kommentar uppdaterad",
+      "commentDeleted": "Kommentar borttagen",
       "reviewSubmitted": "Granskning skickad",
       "autoMergeEnabled": "Automatisk sammanslagning aktiverad"
     },

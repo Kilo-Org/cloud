@@ -571,7 +571,14 @@
       "deletedUser": "بەکارهێنەری سڕاوە",
       "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
       "moreLinesAbove_one": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە.",
-      "moreLinesAbove_other": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە."
+      "moreLinesAbove_other": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە.",
+      "deleteComment": "سڕینەوەی بۆچوون",
+      "deleteCommentTitle": "بۆچوون بسڕدرێتەوە؟",
+      "deleteCommentMessage": "ئەم بۆچوونە لە داواکارییەی ڕاکێشان بسڕدرێتەوە.",
+      "commentEditFailed": "نەتوانرا بۆچوونەکەت پاشەکەوت بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
+      "commentEditUnavailable": "ئەم بۆچوونە ناتوانرێت دەستکاری بکرێت. ڕەنگە سڕابێتەوە.",
+      "commentDeleteFailed": "نەتوانرا بۆچوونەکەت بسڕدرێتەوە. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
+      "commentDeleteUnavailable": "ئەم بۆچوونە ناتوانرێت بسڕدرێتەوە."
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی ئەپی GitHub بکرێنەوە.",
     "installKiloGitHubApp": "ئەپی Kilo بۆ GitHub دامەزرێنە",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ئەمە بەستەری داواکاری ڕاکێشان یان تێکەڵکردن نییە.",
     "announce": {
       "commentPosted": "بۆچوون بڵاوکرایەوە",
+      "commentUpdated": "بۆچوون نوێکرایەوە",
+      "commentDeleted": "بۆچوون سڕایەوە",
       "reviewSubmitted": "پێداچوونەوە نێردرا",
       "autoMergeEnabled": "تێکەڵکردنی ئۆتۆماتیکی چالاک کرا"
     },

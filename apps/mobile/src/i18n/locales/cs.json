@@ -593,7 +593,14 @@
       "moreLinesAbove_one": "… další řádky výše: {{displayCount}}",
       "moreLinesAbove_other": "… další řádky výše: {{displayCount}}",
       "moreLinesAbove_few": "… další řádky výše: {{displayCount}}",
-      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}"
+      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}",
+      "deleteComment": "Smazat komentář",
+      "deleteCommentTitle": "Smazat komentář?",
+      "deleteCommentMessage": "Tento komentář bude smazán z PR.",
+      "commentEditFailed": "Tvůj komentář se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.",
+      "commentEditUnavailable": "Tento komentář nelze upravit. Možná byl smazán.",
+      "commentDeleteFailed": "Tvůj komentář se nepodařilo smazat. Zkontroluj připojení a zkus to znovu.",
+      "commentDeleteUnavailable": "Tento komentář nelze smazat."
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
@@ -784,6 +791,8 @@
     "linkPasteNotAPullRequest": "Tohle není odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentář odeslán",
+      "commentUpdated": "Komentář aktualizován",
+      "commentDeleted": "Komentář smazán",
       "reviewSubmitted": "Revize odeslána",
       "autoMergeEnabled": "Automatické sloučení zapnuto"
     },

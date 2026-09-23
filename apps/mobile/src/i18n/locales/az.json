@@ -571,7 +571,14 @@
       "deletedUser": "silinmiş istifadəçi",
       "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
       "moreLinesAbove_one": "… yuxarıda daha {{displayCount}} sətir var.",
-      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var."
+      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var.",
+      "deleteComment": "Şərhi sil",
+      "deleteCommentTitle": "Şərh silinsin?",
+      "deleteCommentMessage": "Bu şərh birləşdirmə sorğusundan silinəcək.",
+      "commentEditFailed": "Şərhini yadda saxlamaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "commentEditUnavailable": "Bu şərh redaktə edilə bilməz. Silinmiş ola bilər.",
+      "commentDeleteFailed": "Şərhini silmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "commentDeleteUnavailable": "Bu şərh silinə bilməz."
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",
+      "commentUpdated": "Şərh yeniləndi",
+      "commentDeleted": "Şərh silindi",
       "reviewSubmitted": "Kod baxışı göndərildi",
       "autoMergeEnabled": "Avtomatik birləşdirmə aktivləşdirildi"
     },

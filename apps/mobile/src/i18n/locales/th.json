@@ -571,7 +571,14 @@
       "deletedUser": "ผู้ใช้ที่ถูกลบ",
       "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
       "moreLinesAbove_one": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
-      "moreLinesAbove_other": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน"
+      "moreLinesAbove_other": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
+      "deleteComment": "ลบความคิดเห็น",
+      "deleteCommentTitle": "ลบความคิดเห็นหรือไม่?",
+      "deleteCommentMessage": "ความคิดเห็นนี้จะถูกลบออกจาก PR",
+      "commentEditFailed": "ไม่สามารถบันทึกความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+      "commentEditUnavailable": "ไม่สามารถแก้ไขความคิดเห็นนี้ได้ อาจถูกลบไปแล้ว",
+      "commentDeleteFailed": "ไม่สามารถลบความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+      "commentDeleteUnavailable": "ไม่สามารถลบความคิดเห็นนี้ได้"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์พูลรีเควสต์หรือ merge request",
     "announce": {
       "commentPosted": "โพสต์ความคิดเห็นแล้ว",
+      "commentUpdated": "อัปเดตความคิดเห็นแล้ว",
+      "commentDeleted": "ลบความคิดเห็นแล้ว",
       "reviewSubmitted": "ส่งรีวิวแล้ว",
       "autoMergeEnabled": "เปิดการรวมอัตโนมัติแล้ว"
     },

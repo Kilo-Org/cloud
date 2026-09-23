@@ -571,7 +571,14 @@
       "deletedUser": "жойылған пайдаланушы",
       "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
       "moreLinesAbove_one": "… жоғарыда тағы {{displayCount}} жол бар.",
-      "moreLinesAbove_other": "… жоғарыда тағы {{displayCount}} жол бар."
+      "moreLinesAbove_other": "… жоғарыда тағы {{displayCount}} жол бар.",
+      "deleteComment": "Пікірді жою",
+      "deleteCommentTitle": "Пікір жойылсын ба?",
+      "deleteCommentMessage": "Бұл пікір біріктіру сұрауынан жойылады.",
+      "commentEditFailed": "Пікіріңізді сақтау мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+      "commentEditUnavailable": "Бұл пікірді өңдеу мүмкін емес. Ол жойылған болуы мүмкін.",
+      "commentDeleteFailed": "Пікіріңізді жою мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+      "commentDeleteUnavailable": "Бұл пікірді жою мүмкін емес."
     },
     "couldNotOpenGitHubAppSettings": "GitHub қолданбасының параметрлерін ашу мүмкін болмады.",
     "installKiloGitHubApp": "Kilo GitHub қолданбасын орнату",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Бұл тарту немесе біріктіру сұрауының сілтемесі емес.",
     "announce": {
       "commentPosted": "Пікір жарияланды",
+      "commentUpdated": "Пікір жаңартылды",
+      "commentDeleted": "Пікір жойылды",
       "reviewSubmitted": "Кодты тексеру нәтижесі жіберілді",
       "autoMergeEnabled": "Автоматты біріктіру қосылды"
     },

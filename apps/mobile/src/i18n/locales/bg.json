@@ -571,7 +571,14 @@
       "deletedUser": "изтрит потребител",
       "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}.",
       "moreLinesAbove_one": "… още {{displayCount}} ред по-горе",
-      "moreLinesAbove_other": "… още {{displayCount}} реда по-горе"
+      "moreLinesAbove_other": "… още {{displayCount}} реда по-горе",
+      "deleteComment": "Изтрий коментара",
+      "deleteCommentTitle": "Да се изтрие ли коментарът?",
+      "deleteCommentMessage": "Този коментар ще бъде изтрит от заявката за обединяване.",
+      "commentEditFailed": "Коментарът ти не можа да бъде запазен. Провери връзката си и опитай отново.",
+      "commentEditUnavailable": "Този коментар не може да бъде редактиран. Възможно е да е изтрит.",
+      "commentDeleteFailed": "Коментарът ти не можа да бъде изтрит. Провери връзката си и опитай отново.",
+      "commentDeleteUnavailable": "Този коментар не може да бъде изтрит."
     },
     "couldNotOpenGitHubAppSettings": "Настройките на приложението в GitHub не се отвориха.",
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
     "announce": {
       "commentPosted": "Коментарът е публикуван",
+      "commentUpdated": "Коментарът е обновен",
+      "commentDeleted": "Коментарът е изтрит",
       "reviewSubmitted": "Прегледът е изпратен",
       "autoMergeEnabled": "Автоматичното обединяване е активирано"
     },

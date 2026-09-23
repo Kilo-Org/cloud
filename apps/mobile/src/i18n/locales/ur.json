@@ -571,7 +571,14 @@
       "deletedUser": "حذف شدہ صارف",
       "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
       "moreLinesAbove_one": "اوپر مزید {{displayCount}} سطر ہے…",
-      "moreLinesAbove_other": "اوپر مزید {{displayCount}} سطریں ہیں…"
+      "moreLinesAbove_other": "اوپر مزید {{displayCount}} سطریں ہیں…",
+      "deleteComment": "تبصرہ حذف کریں",
+      "deleteCommentTitle": "تبصرہ حذف کریں؟",
+      "deleteCommentMessage": "یہ تبصرہ پل ریکویسٹ سے حذف کر دیا جائے گا۔",
+      "commentEditFailed": "آپ کا تبصرہ محفوظ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "commentEditUnavailable": "اس تبصرے میں ترمیم نہیں کی جا سکتی۔ ہو سکتا ہے یہ حذف ہو گیا ہو۔",
+      "commentDeleteFailed": "آپ کا تبصرہ حذف نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "commentDeleteUnavailable": "یہ تبصرہ حذف نہیں کیا جا سکتا۔"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
+      "commentUpdated": "تبصرہ اپ ڈیٹ ہو گیا",
+      "commentDeleted": "تبصرہ حذف ہو گیا",
       "reviewSubmitted": "جائزہ جمع ہو گیا",
       "autoMergeEnabled": "خودکار مرج فعال ہو گیا"
     },

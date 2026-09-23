@@ -571,7 +571,14 @@
       "deletedUser": "избришан корисник",
       "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
       "moreLinesAbove_one": "… уште {{displayCount}} ред погоре",
-      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре"
+      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре",
+      "deleteComment": "Избриши коментар",
+      "deleteCommentTitle": "Да се избрише коментарот?",
+      "deleteCommentMessage": "Овој коментар ќе биде избришан од барањето за спојување.",
+      "commentEditFailed": "Не успеа да се зачува твојот коментар. Провери ја врската и обиди се повторно.",
+      "commentEditUnavailable": "Овој коментар не може да се уреди. Можеби е избришан.",
+      "commentDeleteFailed": "Не успеа да се избрише твојот коментар. Провери ја врската и обиди се повторно.",
+      "commentDeleteUnavailable": "Овој коментар не може да се избрише."
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Ова не е врска до барање за спојување или merge барање",
     "announce": {
       "commentPosted": "Коментарот е објавен",
+      "commentUpdated": "Коментарот е ажуриран",
+      "commentDeleted": "Коментарот е избришан",
       "reviewSubmitted": "Прегледот е испратен",
       "autoMergeEnabled": "Автоматското спојување е овозможено"
     },

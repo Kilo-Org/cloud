@@ -571,7 +571,14 @@
       "deletedUser": "kaiwhakamahi kua mukua",
       "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}.",
       "moreLinesAbove_one": "… he {{displayCount}} anō ngā rārangi kei runga.",
-      "moreLinesAbove_other": "… he {{displayCount}} anō ngā rārangi kei runga."
+      "moreLinesAbove_other": "… he {{displayCount}} anō ngā rārangi kei runga.",
+      "deleteComment": "Mukua te kōrero",
+      "deleteCommentTitle": "Mukua te kōrero?",
+      "deleteCommentMessage": "Ka mukua tēnei kōrero mai i te tono kume.",
+      "commentEditFailed": "Kāore i taea tō kōrero te tiaki. Tirohia tō hononga, ka whakamātau anō.",
+      "commentEditUnavailable": "Kāore e taea tēnei kōrero te whakatika. Kua mukua pea.",
+      "commentDeleteFailed": "Kāore i taea tō kōrero te muku. Tirohia tō hononga, ka whakamātau anō.",
+      "commentDeleteUnavailable": "Kāore e taea tēnei kōrero te muku."
     },
     "couldNotOpenGitHubAppSettings": "Kāore i taea te whakatuwhera i ngā tautuhinga o te taupānga GitHub.",
     "installKiloGitHubApp": "Tāutatia te taupānga Kilo GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Ehara tēnei i te hono tono kume, tono whakakotahi rānei",
     "announce": {
       "commentPosted": "Kua tukuna te kōrero",
+      "commentUpdated": "Kua whakahōungia te kōrero",
+      "commentDeleted": "Kua mukua te kōrero",
       "reviewSubmitted": "Kua tukuna te arotake",
       "autoMergeEnabled": "Kua whakahohea te whakakotahi aunoa"
     },

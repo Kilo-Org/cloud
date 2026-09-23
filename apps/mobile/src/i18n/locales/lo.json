@@ -571,7 +571,14 @@
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
       "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
       "moreLinesAbove_one": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
-      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ."
+      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
+      "deleteComment": "ລຶບຄຳເຫັນ",
+      "deleteCommentTitle": "ລຶບຄຳເຫັນ?",
+      "deleteCommentMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄຳຂໍລວມໂຄດ.",
+      "commentEditFailed": "ບໍ່ສາມາດບັນທຶກຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentEditUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດແກ້ໄຂໄດ້. ອາດຈະຖືກລຶບໄປແລ້ວ.",
+      "commentDeleteFailed": "ບໍ່ສາມາດລຶບຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentDeleteUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດລຶບໄດ້."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
+      "commentUpdated": "ອັບເດດຄຳເຫັນແລ້ວ",
+      "commentDeleted": "ລຶບຄຳເຫັນແລ້ວ",
       "reviewSubmitted": "ສົ່ງຜົນການກວດທານແລ້ວ",
       "autoMergeEnabled": "ເປີດການລວມອັດຕະໂນມັດແລ້ວ"
     },

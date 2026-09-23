@@ -571,7 +571,14 @@
       "deletedUser": "onye ọrụ ehichapụrụ",
       "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
       "moreLinesAbove_one": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
-      "moreLinesAbove_other": "… ahịrị {{displayCount}} ọzọ dị n'elu."
+      "moreLinesAbove_other": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
+      "deleteComment": "Hichapụ nkwupụta",
+      "deleteCommentTitle": "Hichapụ nkwupụta?",
+      "deleteCommentMessage": "A ga-ehichapụ nkwupụta a na arịrịọ njikọta a.",
+      "commentEditFailed": "Enweghị ike ichekwa nkwupụta gị. Lelee njikọ gị ma nwaa ọzọ.",
+      "commentEditUnavailable": "Enweghị ike idezi nkwupụta a. O nwere ike ịbụ na ehichapụrụ ya.",
+      "commentDeleteFailed": "Enweghị ike ihichapụ nkwupụta gị. Lelee njikọ gị ma nwaa ọzọ.",
+      "commentDeleteUnavailable": "Enweghị ike ihichapụ nkwupụta a."
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub.",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
     "announce": {
       "commentPosted": "Ebipụtala okwu",
+      "commentUpdated": "Emelitere nkwupụta",
+      "commentDeleted": "Ehichapụrụ nkwupụta",
       "reviewSubmitted": "Ezigala nyocha",
       "autoMergeEnabled": "Agbanyela njikọta akpaghị aka"
     },

@@ -571,7 +571,14 @@
       "deletedUser": "తొలగించబడిన వినియోగదారు",
       "replyForbiddenTerm": "ఈ {{term}}‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
       "moreLinesAbove_one": "… పైన మరో {{displayCount}} పంక్తి ఉంది.",
-      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి."
+      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి.",
+      "deleteComment": "వ్యాఖ్యను తొలగించండి",
+      "deleteCommentTitle": "వ్యాఖ్యను తొలగించాలా?",
+      "deleteCommentMessage": "ఈ వ్యాఖ్య పుల్ రిక్వెస్ట్ నుండి తొలగించబడుతుంది.",
+      "commentEditFailed": "మీ వ్యాఖ్యను సేవ్ చేయలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+      "commentEditUnavailable": "ఈ వ్యాఖ్యను సవరించలేము. ఇది తొలగించబడి ఉండవచ్చు.",
+      "commentDeleteFailed": "మీ వ్యాఖ్యను తొలగించలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+      "commentDeleteUnavailable": "ఈ వ్యాఖ్యను తొలగించలేము."
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం.",
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ఇది పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్ కాదు",
     "announce": {
       "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
+      "commentUpdated": "వ్యాఖ్య నవీకరించబడింది",
+      "commentDeleted": "వ్యాఖ్య తొలగించబడింది",
       "reviewSubmitted": "సమీక్ష సమర్పించబడింది",
       "autoMergeEnabled": "ఆటో-మెర్జ్ ప్రారంభించబడింది"
     },

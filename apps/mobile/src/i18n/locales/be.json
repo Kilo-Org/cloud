@@ -593,7 +593,14 @@
       "moreLinesAbove_one": "… дадатковыя радкі вышэй: {{displayCount}}",
       "moreLinesAbove_other": "… дадатковыя радкі вышэй: {{displayCount}}",
       "moreLinesAbove_few": "… дадатковыя радкі вышэй: {{displayCount}}",
-      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}"
+      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "deleteComment": "Выдаліць каментар",
+      "deleteCommentTitle": "Выдаліць каментар?",
+      "deleteCommentMessage": "Гэты каментар будзе выдалены з запыту на зліццё.",
+      "commentEditFailed": "Не атрымалася захаваць твой каментар. Правер падключэнне і паспрабуй яшчэ раз.",
+      "commentEditUnavailable": "Гэты каментар нельга рэдагаваць. Магчыма, ён быў выдалены.",
+      "commentDeleteFailed": "Не атрымалася выдаліць твой каментар. Правер падключэнне і паспрабуй яшчэ раз.",
+      "commentDeleteUnavailable": "Гэты каментар нельга выдаліць."
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
@@ -784,6 +791,8 @@
     "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
     "announce": {
       "commentPosted": "Каментар апублікаваны",
+      "commentUpdated": "Каментар абноўлены",
+      "commentDeleted": "Каментар выдалены",
       "reviewSubmitted": "Праверка кода адпраўлена",
       "autoMergeEnabled": "Аўтазліццё ўключана"
     },

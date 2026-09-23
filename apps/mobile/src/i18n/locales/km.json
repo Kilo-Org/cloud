@@ -571,7 +571,14 @@
       "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី",
       "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។",
       "moreLinesAbove_one": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
-      "moreLinesAbove_other": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។"
+      "moreLinesAbove_other": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
+      "deleteComment": "លុបមតិយោបល់",
+      "deleteCommentTitle": "លុបមតិយោបល់?",
+      "deleteCommentMessage": "មតិយោបល់នេះនឹងត្រូវលុបចេញពីសំណើបញ្ចូលកូដ។",
+      "commentEditFailed": "មិនអាចរក្សាទុកមតិយោបល់របស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+      "commentEditUnavailable": "មតិយោបល់នេះមិនអាចកែសម្រួលបានទេ។ វាអាចត្រូវបានលុប។",
+      "commentDeleteFailed": "មិនអាចលុបមតិយោបល់របស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+      "commentDeleteUnavailable": "មតិយោបល់នេះមិនអាចលុបបានទេ។"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់កម្មវិធី GitHub បានទេ។",
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "មិនមែនជាតំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូលទេ",
     "announce": {
       "commentPosted": "បានបង្ហោះមតិយោបល់",
+      "commentUpdated": "មតិយោបល់ត្រូវបានធ្វើបច្ចុប្បន្នភាព",
+      "commentDeleted": "មតិយោបល់ត្រូវបានលុប",
       "reviewSubmitted": "បានដាក់ស្នើការពិនិត្យ",
       "autoMergeEnabled": "បានបើកការបញ្ចូលដោយស្វ័យប្រវត្តិ"
     },

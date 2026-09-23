@@ -2600,7 +2600,14 @@
       "deletedUser": "已刪除的使用者",
       "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
       "moreLinesAbove_one": "…上方還有 {{displayCount}} 行。",
-      "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。"
+      "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。",
+      "deleteComment": "刪除留言",
+      "deleteCommentTitle": "刪除留言？",
+      "deleteCommentMessage": "此留言將從提取請求中刪除。",
+      "commentEditFailed": "無法儲存你的留言。請檢查連線後再試一次。",
+      "commentEditUnavailable": "無法編輯此留言。它可能已被刪除。",
+      "commentDeleteFailed": "無法刪除你的留言。請檢查連線後再試一次。",
+      "commentDeleteUnavailable": "無法刪除此留言。"
     },
     "entry": {
       "eyebrow": "透過 URL 開啟提取請求或合併請求",
@@ -2913,6 +2920,8 @@
     "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",
     "announce": {
       "commentPosted": "留言已發佈",
+      "commentUpdated": "留言已更新",
+      "commentDeleted": "留言已刪除",
       "reviewSubmitted": "審查已送出",
       "autoMergeEnabled": "自動合併已啟用"
     },

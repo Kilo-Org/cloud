@@ -2660,7 +2660,14 @@
       "moreLinesAbove_one": "… строк выше: {{displayCount}}",
       "moreLinesAbove_other": "… строк выше: {{displayCount}}",
       "moreLinesAbove_few": "… строк выше: {{displayCount}}",
-      "moreLinesAbove_many": "… строк выше: {{displayCount}}"
+      "moreLinesAbove_many": "… строк выше: {{displayCount}}",
+      "deleteComment": "Удалить комментарий",
+      "deleteCommentTitle": "Удалить комментарий?",
+      "deleteCommentMessage": "Этот комментарий будет удалён из запроса на слияние.",
+      "commentEditFailed": "Не удалось сохранить ваш комментарий. Проверьте подключение и попробуйте снова.",
+      "commentEditUnavailable": "Этот комментарий нельзя редактировать. Возможно, он был удалён.",
+      "commentDeleteFailed": "Не удалось удалить ваш комментарий. Проверьте подключение и попробуйте снова.",
+      "commentDeleteUnavailable": "Этот комментарий нельзя удалить."
     },
     "entry": {
       "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
@@ -2997,6 +3004,8 @@
     "linkPasteNotAPullRequest": "Это не ссылка на пул-реквест или запрос на слияние",
     "announce": {
       "commentPosted": "Комментарий опубликован",
+      "commentUpdated": "Комментарий обновлён",
+      "commentDeleted": "Комментарий удалён",
       "reviewSubmitted": "Ревью отправлено",
       "autoMergeEnabled": "Автослияние включено"
     },

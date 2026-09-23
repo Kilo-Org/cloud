@@ -571,7 +571,14 @@
       "deletedUser": "ഇല്ലാതാക്കിയ ഉപയോക്താവ്",
       "replyForbiddenTerm": "ഈ {{term}}-ന് മറുപടി നൽകാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "moreLinesAbove_one": "… മുകളിൽ {{displayCount}} വരി കൂടിയുണ്ട്.",
-      "moreLinesAbove_other": "… മുകളിൽ {{displayCount}} വരികൾ കൂടിയുണ്ട്."
+      "moreLinesAbove_other": "… മുകളിൽ {{displayCount}} വരികൾ കൂടിയുണ്ട്.",
+      "deleteComment": "അഭിപ്രായം ഇല്ലാതാക്കുക",
+      "deleteCommentTitle": "അഭിപ്രായം ഇല്ലാതാക്കണോ?",
+      "deleteCommentMessage": "ഈ അഭിപ്രായം പുൾ റിക്വസ്റ്റിൽ നിന്ന് ഇല്ലാതാക്കും.",
+      "commentEditFailed": "നിങ്ങളുടെ അഭിപ്രായം സംരക്ഷിക്കാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+      "commentEditUnavailable": "ഈ അഭിപ്രായം തിരുത്താൻ കഴിയില്ല. അത് ഇല്ലാതാക്കിയിരിക്കാം.",
+      "commentDeleteFailed": "നിങ്ങളുടെ അഭിപ്രായം ഇല്ലാതാക്കാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+      "commentDeleteUnavailable": "ഈ അഭിപ്രായം ഇല്ലാതാക്കാൻ കഴിയില്ല."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ആപ്പിന്റെ ക്രമീകരണങ്ങൾ തുറക്കാനായില്ല.",
     "installKiloGitHubApp": "Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "ഇത് പുൾ റിക്വസ്റ്റിന്റെയോ മെർജ് റിക്വസ്റ്റിന്റെയോ ലിങ്ക് അല്ല",
     "announce": {
       "commentPosted": "അഭിപ്രായം പോസ്റ്റ് ചെയ്തു",
+      "commentUpdated": "അഭിപ്രായം അപ്ഡേറ്റ് ചെയ്തു",
+      "commentDeleted": "അഭിപ്രായം ഇല്ലാതാക്കി",
       "reviewSubmitted": "അവലോകനം സമർപ്പിച്ചു",
       "autoMergeEnabled": "ഓട്ടോ-മെർജ് ഓണാക്കി"
     },

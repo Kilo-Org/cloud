@@ -571,7 +571,14 @@
       "deletedUser": "o'chirilgan foydalanuvchi",
       "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q.",
       "moreLinesAbove_one": "… yuqorida yana {{displayCount}} ta qator bor.",
-      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor."
+      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor.",
+      "deleteComment": "Izohni o'chirish",
+      "deleteCommentTitle": "Izoh o'chirilsinmi?",
+      "deleteCommentMessage": "Bu izoh PRdan o'chiriladi.",
+      "commentEditFailed": "Izohingizni saqlab bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "commentEditUnavailable": "Bu izohni tahrirlab bo'lmaydi. U o'chirilgan bo'lishi mumkin.",
+      "commentDeleteFailed": "Izohingizni o'chirib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "commentDeleteUnavailable": "Bu izohni o'chirib bo'lmaydi."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
+      "commentUpdated": "Izoh yangilandi",
+      "commentDeleted": "Izoh o'chirildi",
       "reviewSubmitted": "Ko'rib chiqish natijasi yuborildi",
       "autoMergeEnabled": "Avtomatik birlashtirish yoqildi"
     },

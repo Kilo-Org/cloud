@@ -615,7 +615,14 @@
       "moreLinesAbove_zero": "… {{displayCount}} llinell arall uchod",
       "moreLinesAbove_two": "… {{displayCount}} llinell arall uchod",
       "moreLinesAbove_few": "… {{displayCount}} llinell arall uchod",
-      "moreLinesAbove_many": "… {{displayCount}} llinell arall uchod"
+      "moreLinesAbove_many": "… {{displayCount}} llinell arall uchod",
+      "deleteComment": "Dileu sylw",
+      "deleteCommentTitle": "Dileu'r sylw?",
+      "deleteCommentMessage": "Bydd y sylw hwn yn cael ei ddileu o'r cais tynnu.",
+      "commentEditFailed": "Ni lwyddwyd i gadw eich sylw. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "commentEditUnavailable": "Ni ellir golygu'r sylw hwn. Efallai iddo gael ei ddileu.",
+      "commentDeleteFailed": "Ni lwyddwyd i ddileu eich sylw. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "commentDeleteUnavailable": "Ni ellir dileu'r sylw hwn."
     },
     "couldNotOpenGitHubAppSettings": "Doedd dim modd agor gosodiadau ap GitHub.",
     "installKiloGitHubApp": "Gosod ap GitHub Kilo",
@@ -816,6 +823,8 @@
     "linkPasteNotAPullRequest": "Nid dolen cais tynnu neu gais uno yw hon",
     "announce": {
       "commentPosted": "Sylw wedi'i bostio",
+      "commentUpdated": "Sylw wedi'i ddiweddaru",
+      "commentDeleted": "Sylw wedi'i ddileu",
       "reviewSubmitted": "Adolygiad wedi'i gyflwyno",
       "autoMergeEnabled": "Cyfuno awtomatig wedi'i alluogi"
     },

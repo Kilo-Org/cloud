@@ -571,7 +571,14 @@
       "deletedUser": "binurang user",
       "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
       "moreLinesAbove_one": "… may {{displayCount}} pang linya sa itaas.",
-      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas."
+      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas.",
+      "deleteComment": "Alisin ang komento",
+      "deleteCommentTitle": "Alisin ang komento?",
+      "deleteCommentMessage": "Aalisin ang komentong ito sa pull request.",
+      "commentEditFailed": "Hindi mai-save ang komento mo. Suriin ang koneksyon mo at subukan muli.",
+      "commentEditUnavailable": "Hindi ma-edit ang komentong ito. Maaaring naalis na ito.",
+      "commentDeleteFailed": "Hindi maalis ang komento mo. Suriin ang koneksyon mo at subukan muli.",
+      "commentDeleteUnavailable": "Hindi maalis ang komentong ito."
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
     "announce": {
       "commentPosted": "Na-post ang komento",
+      "commentUpdated": "Na-update ang komento",
+      "commentDeleted": "Naalis ang komento",
       "reviewSubmitted": "Naisumite ang pagsusuri",
       "autoMergeEnabled": "Aktibo na ang awtomatikong pag-merge"
     },

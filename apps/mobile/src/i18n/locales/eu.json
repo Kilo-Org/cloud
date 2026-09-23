@@ -571,7 +571,14 @@
       "deletedUser": "erabiltzaile ezabatua",
       "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
       "moreLinesAbove_one": "… Beste {{displayCount}} lerro dago goian.",
-      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian."
+      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian.",
+      "deleteComment": "Ezabatu iruzkina",
+      "deleteCommentTitle": "Iruzkina ezabatu?",
+      "deleteCommentMessage": "Iruzkin hau bateratze-eskaeratik ezabatuko da.",
+      "commentEditFailed": "Ezin izan da zure iruzkina gorde. Egiaztatu konexioa eta saiatu berriro.",
+      "commentEditUnavailable": "Iruzkin hau ezin da editatu. Baliteke ezabatuta egotea.",
+      "commentDeleteFailed": "Ezin izan da zure iruzkina ezabatu. Egiaztatu konexioa eta saiatu berriro.",
+      "commentDeleteUnavailable": "Iruzkin hau ezin da ezabatu."
     },
     "couldNotOpenGitHubAppSettings": "Ezin izan dira GitHub aplikazioaren ezarpenak ireki.",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
@@ -752,6 +759,8 @@
     "linkPasteNotAPullRequest": "Ez da bateratze-eskaera edo merge-eskaera baten esteka",
     "announce": {
       "commentPosted": "Iruzkina argitaratuta",
+      "commentUpdated": "Iruzkina eguneratu da",
+      "commentDeleted": "Iruzkina ezabatu da",
       "reviewSubmitted": "Berrikuspena bidalita",
       "autoMergeEnabled": "Bateratze automatikoa gaituta"
     },

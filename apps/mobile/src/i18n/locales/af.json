@@ -2233,10 +2233,6 @@
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
       "linesOf": "reëls {{start}}–{{end}} van {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent: {{action}} het misluk ({{status}}).",
-      "failed": "Cloud Agent: {{action}} het misluk."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nie-serialiseerbare invoer]",
       "errorPrefix": "Fout: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Die verskaffer het die versoek verwerp.",
       "assistantStopped": "Die antwoord is gestop.",
       "assistantContextOverflow": "Die gesprek is te lank vir die model.",
-      "assistantFailed": "Die antwoord het misluk.",
-      "sendFailed": "Die boodskap kon nie gestuur word nie. Probeer asseblief weer."
+      "assistantFailed": "Die antwoord het misluk."
     },
     "filePart": {
       "loadingImage": "Laai afbeelding",

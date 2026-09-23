@@ -15,7 +15,7 @@ import { LiveSessionListEmptyState } from './live-session-list-empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
-import { getEmptyStateFullHeight, SESSION_ROW_PITCH } from '@/lib/agents-bottom-chrome';
+import { getEmptyStateFullHeight } from '@/lib/agents-bottom-chrome';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
@@ -359,10 +359,10 @@ type HeaderElement = {
   };
 };
 function headerActions() {
-  const context = header().props.context as {
+  const inlineActions = header().props.inlineActions as {
     props: { children: (HeaderElement | null)[] };
   };
-  return context.props.children.filter((child): child is HeaderElement => child !== null);
+  return inlineActions.props.children.filter((child): child is HeaderElement => child !== null);
 }
 function headerAction(testID = 'agents-view-history') {
   const button = headerActions().find(child => child.props.testID === testID);
@@ -599,9 +599,12 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.className).toContain('px-[22px]');
-    // The list controls sit below the title (the header's context slot), so
-    // nothing shares the title's row and squeezes it on a narrow viewport.
+    // The list controls share the title's row through `inlineActions`; the
+    // heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis and
+    // nothing stacks the controls onto a second row.
     expect(header().props.headerRight).toBeUndefined();
+    expect(header().props.context).toBeUndefined();
+    expect(header().props.inlineActions).toBeDefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -1100,7 +1103,7 @@ describe('AgentSessionListScreen live presentation', () => {
       nodes('FlashList')[0]?.props.contentContainerStyle as Record<string, number>;
     expect(contentContainerStyle()).toEqual({
       paddingTop: 0,
-      paddingBottom: 0,
+      paddingBottom: 64,
       paddingLeft: 0,
       paddingRight: 0,
     });
@@ -1111,50 +1114,50 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(contentContainerStyle()).toEqual({
       paddingTop: 0,
-      paddingBottom: 0,
+      paddingBottom: 64,
       paddingLeft: 47,
       paddingRight: 59,
     });
   });
 
-  it('insets the live list viewport by the FAB band so no row sits under the button', async () => {
+  it('keeps the list frame at the tab bar and clears the FAB in the content', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
-    // The viewport must end above the band on both platforms: a frame margin
-    // shrinks the list, where a content or frame padding would let iOS rows
-    // park under the bar (and a content inset only cleared the row under the
-    // button once the user scrolled).
+    // The frame keeps only the tab-bar inset, so the list background runs clean
+    // to the tab bar edge with no bare band. The FAB clearance is content
+    // padding instead: the button floats over the list and the last row still
+    // scrolls clear of it.
     const listStyle = () => nodes('FlashList')[0]?.props.style as Record<string, number>;
-    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
+    const contentStyle = () =>
+      nodes('FlashList')[0]?.props.contentContainerStyle as Record<string, number>;
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+    expect(contentStyle().paddingBottom).toBe(64);
   });
 
-  it('clamps the live list frame to one row pitch in a short window and scrolls the rest under the FAB', async () => {
+  it('keeps the frame at the tab bar and the FAB clearance in the content in a short window', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as Record<string, number>;
     const contentContainerStyle = () =>
       nodes('FlashList')[0]?.props.contentContainerStyle as Record<string, number>;
-    const fullBand = state.tabBarHeight + 64;
 
-    // Short landscape window: the body keeps less than the full FAB band, so
-    // the frame yields the soft band down to one row pitch — the branch line
-    // is never clipped at rest — and the yielded part rides on the content so
-    // the last row can still be scrolled clear of the button.
-    const shortHeight = 180;
+    // The frame never yields the tab bar and the FAB band never rides on it, so
+    // the split is the same after the body measures in a short landscape window
+    // as in a tall one: the viewport ends at the tab bar (no bare band) and the
+    // FAB clearance stays on the content, where the last row can still scroll
+    // clear of the button. This replaces origin/main's frame-clamp assertion,
+    // whose yield-the-band frame is exactly the band papercut 3 removes.
     act(() => {
-      layoutBody(shortHeight);
+      layoutBody(180);
     });
-    const clampedFrame = shortHeight - SESSION_ROW_PITCH;
-    expect(clampedFrame).toBeLessThan(fullBand);
-    expect(listStyle()).toEqual({ marginBottom: clampedFrame });
-    expect(contentContainerStyle().paddingBottom).toBe(fullBand - clampedFrame);
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+    expect(contentContainerStyle().paddingBottom).toBe(64);
 
-    // A tall window keeps the whole band and puts nothing on the content.
     act(() => {
       layoutBody(900);
     });
-    expect(listStyle()).toEqual({ marginBottom: fullBand });
-    expect(contentContainerStyle().paddingBottom).toBe(0);
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+    expect(contentContainerStyle().paddingBottom).toBe(64);
   });
 
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {
@@ -1192,24 +1195,32 @@ describe('AgentSessionListScreen header and admission', () => {
     const history = action('Összes megtekintése');
     const label = history.findByType(Text);
     const actionsRow = history.parent;
+    const actionsWrapper = actionsRow?.parent;
     const title = header().findByProps({ accessibilityRole: 'header' });
-    // The controls own a full-width row below the title (the header's
-    // `context` slot), so nothing shares the title's row: through the old
+    // The controls share the title's row (the header's `inlineActions` slot) as
+    // a sibling of the heading, so the heading keeps `min-w-0 flex-1` and its
+    // tail ellipsis while this label keeps the room it needs. Through the old
     // `headerRight` half-row cap the two columns squeezed each other on a
     // 480x1040 capture until "Agents" broke mid-word ("Age / nts") and this
     // label stacked ("SEE / ALL").
     expect(header().props.headerRight).toBeUndefined();
-    expect(actionsRow?.parent).toBe(title.parent);
+    expect(header().props.context).toBeUndefined();
+    expect(actionsWrapper?.parent).toBe(title.parent?.parent?.parent);
+    expect(actionsWrapper?.props.className).toContain('min-w-0');
+    expect(actionsWrapper?.props.className).toContain('shrink');
+    expect(actionsWrapper?.props.className).not.toContain('max-w-[50%]');
     expect(title.parent?.props.className).toContain('min-w-0 flex-1');
-    expect(title.parent?.parent?.props.className).toContain('flex-row');
+    expect(actionsWrapper?.parent?.props.className).toContain('flex-row');
     expect(actionsRow?.props.className).toContain('justify-end');
     expect(actionsRow?.props.className).toContain('min-h-11');
+    expect(actionsRow?.props.className).toContain('min-w-0');
+    expect(actionsRow?.props.className).toContain('shrink');
     expect(actionsRow?.props.className).not.toContain('max-w-[50%]');
     expect(history.props.className).toContain('min-w-0');
     expect(history.props.className).toContain('shrink');
     expect(actionsRow?.props.className).toContain('items-center');
     expect(label.props.className).toContain('text-center');
-    expect(label.props.numberOfLines).toBeUndefined();
+    expect(label.props.numberOfLines).toBe(1);
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(header().props.reserveEyebrow).toBe(true);
@@ -1242,16 +1253,19 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(header().props.eyebrow).toBe('1 LIVE');
   });
 
-  it('renders the list controls below the title with no account control above search', async () => {
+  it('renders the list controls in the title row with no account control above search', async () => {
     state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
-    // The controls own a full-width row under the title. Sharing the title's
-    // row squeezed both columns on a narrow viewport until the title broke
-    // mid-word and SEE ALL stacked (device capture at 480x1040).
-    const actions = header().props.context as { props: { className: string } };
+    // The controls share the title's row through `inlineActions`, trailing the
+    // heading. Sharing that row through the old `headerRight` half-row cap
+    // squeezed both columns on a narrow viewport until the title broke mid-word
+    // and SEE ALL stacked (device capture at 480x1040).
+    const actions = header().props.inlineActions as { props: { className: string } };
     expect(actions.props.className).toContain('justify-end');
     expect(actions.props.className).toContain('min-h-11');
+    expect(actions.props.className).toContain('shrink');
     expect(header().props.headerRight).toBeUndefined();
+    expect(header().props.context).toBeUndefined();
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
     ).toHaveLength(0);
@@ -1261,9 +1275,13 @@ describe('AgentSessionListScreen header and admission', () => {
     const filters = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
     const title = header().findByProps({ accessibilityRole: 'header' });
     const actionsRow = history?.parent;
-    // The title column holds the title and the controls row only, stacked:
-    // the controls never sit beside the title and squeeze it.
-    expect(actionsRow?.parent).toBe(title.parent);
+    const actionsWrapper = actionsRow?.parent;
+    // The controls row is a sibling of the heading in the row that holds the
+    // title, so the heading keeps `min-w-0 flex-1` and the title is not squeezed.
+    expect(actionsWrapper?.parent).toBe(title.parent?.parent?.parent);
+    expect(actionsWrapper?.props.className).toContain('min-w-0');
+    expect(actionsWrapper?.props.className).toContain('shrink');
+    expect(actionsWrapper?.props.className).not.toContain('max-w-[50%]');
     expect(actionsRow?.props.className).toContain('items-center');
     expect(actionsRow?.props.className).toContain('min-h-11');
     expect(filters?.parent?.parent).toBe(actionsRow);
@@ -1542,9 +1560,10 @@ describe('AgentSessionListScreen live filtering', () => {
     const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
     expect(fab()).toBeDefined();
     expect(surfaceBottomInset()).toBe(fabBand);
-    // The button's band rides the rows list's frame, where the FAB is the rows
-    // list's own overlay.
-    expect(nodes('FlashList')[0]?.props.style).toEqual({ marginBottom: fabBand });
+    // Keyboard down the rows frame ends at the tab bar and the FAB clearance
+    // rides on the content instead (papercut 3), so no bare band sits above the
+    // bar and the button floats over the list.
+    expect(nodes('FlashList')[0]?.props.style).toEqual({ marginBottom: state.tabBarHeight });
 
     act(() => {
       showKeyboard(100);
@@ -1563,10 +1582,9 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
-    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
-    // Keyboard down the container pads nothing, so the frame carries the whole
-    // band.
-    expect(listStyle()).toEqual({ marginBottom: fabBand });
+    // Keyboard down the container pads nothing and the frame ends at the tab
+    // bar: the FAB clearance rides on the content, not the frame.
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
     expect(keyboardContainerPadding()).toBe(0);
 
     act(() => {
@@ -1584,7 +1602,7 @@ describe('AgentSessionListScreen live filtering', () => {
       hideKeyboard();
     });
     expect(keyboardContainerPadding()).toBe(0);
-    expect(listStyle()).toEqual({ marginBottom: fabBand });
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
   it('keeps the rows viewport clear of the FAB when a raised IME is shorter than the button', async () => {
@@ -1614,7 +1632,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       hideKeyboard();
     });
-    expect(listStyle()).toEqual({ marginBottom: fabBand });
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
   it('subscribes to the keyboard once for the bands, not once per band consumer', async () => {

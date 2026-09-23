@@ -2233,10 +2233,6 @@
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",
       "linesOf": "imigqa {{start}}–{{end}} kweyingu-{{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Isenzo se-Cloud Agent sehlulekile: {{action}} ({{status}}).",
-      "failed": "Isenzo se-Cloud Agent sehlulekile: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[okufakiwe okungaguqulelwa kufomethi yokugcina idatha]",
       "errorPrefix": "Iphutha: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Umhlinzeki wenqabe isicelo.",
       "assistantStopped": "Impendulo yamiswa.",
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
-      "assistantFailed": "Impendulo yehlulekile.",
-      "sendFailed": "Asikwazanga ukuthumela umlayezo. Sicela uzame futhi."
+      "assistantFailed": "Impendulo yehlulekile."
     },
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",

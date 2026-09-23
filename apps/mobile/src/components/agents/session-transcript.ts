@@ -270,8 +270,11 @@ export function condenseTranscriptToolRuns(
   };
 
   // The maximal run of consecutive condensable tool parts, each with its source
-  // message so a run of one can fall back to that message's plain rendering.
-  let run: { message: StoredMessage; part: ToolPart }[] = [];
+  // message so a run of one can fall back to that message's plain rendering. The
+  // message's visible-part count rides on every entry too: a run can straddle
+  // messages, so a run of one must fall back with its own message's count, and
+  // counting it here reuses the filter `appendVisibleParts` already ran.
+  let run: { message: StoredMessage; part: ToolPart; visibleCount: number }[] = [];
 
   // The marker of the message that opened the current run, moved onto the run
   // item when it closes.
@@ -331,9 +334,6 @@ export function condenseTranscriptToolRuns(
     }
   };
 
-  const visiblePartCount = (message: StoredMessage): number =>
-    message.parts.filter(part => partRendersContent(part)).length;
-
   const flushRun = () => {
     if (run.length === 0) {
       return;
@@ -358,7 +358,7 @@ export function condenseTranscriptToolRuns(
         // consumed it), so resetting it after the append cannot drop a live
         // marker meant for the next message.
         pendingMarker = runMarker;
-        appendPlain(only.message, only.part, visiblePartCount(only.message));
+        appendPlain(only.message, only.part, only.visibleCount);
         pendingMarker = undefined;
       }
     }
@@ -386,7 +386,7 @@ export function condenseTranscriptToolRuns(
           runMarker = pendingMarker;
           pendingMarker = undefined;
         }
-        run.push({ message, part });
+        run.push({ message, part, visibleCount: visible.length });
       } else {
         flushRun();
         appendPlain(message, part, visible.length);

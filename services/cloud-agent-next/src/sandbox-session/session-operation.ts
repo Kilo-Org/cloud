@@ -29,8 +29,9 @@ import {
   recordSessionOperationDispatch,
   recordSessionOperationExecutionDeadline,
   releaseUnconfirmedAttach,
-  type SessionMessageRecord,
+  type SessionMessage,
 } from './session-message-queue.js';
+import type { SessionAggregate } from '../sandbox-state/model/session.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
 import { logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
@@ -41,9 +42,18 @@ import {
 } from './control-dispatch.js';
 import { persistSessionOperationDelivery } from './session-delivery.js';
 
-type OperationMessages = {
-  read: () => SessionMessageRecord[];
-  commit: (messages: SessionMessageRecord[]) => boolean;
+type OperationMessageStore = {
+  read: () => SessionMessage[];
+  commit: (messages: SessionMessage[]) => boolean;
+};
+
+/**
+ * The message store plus the caller's aggregate projection, so a result
+ * application never invents a binding: the aggregate passed to the reducer is
+ * the caller's, with the same binding that will be persisted.
+ */
+type OperationMessages = OperationMessageStore & {
+  aggregate: () => SessionAggregate;
 };
 
 export type SessionOperationEffects = {
@@ -174,7 +184,7 @@ export async function dispatchSessionOperation(
     payload: unknown;
     expectedConnection?: SandboxControlConnectionIdentity;
   },
-  messages: OperationMessages,
+  messages: OperationMessageStore,
   effects: SessionOperationEffects & { isCurrent: () => boolean }
 ): Promise<SessionOperationDispatch> {
   const authorization = sessionOperationAuthorizationSchema.parse(input.authorization);
@@ -196,7 +206,7 @@ export async function dispatchSessionOperation(
   };
   try {
     const message = messages.read().find(item => item.messageId === authorization.messageId);
-    const proof = message?.operations?.[kind];
+    const proof = message?.proofs?.[kind];
     if (proof && !sameSessionOperation(proof.authorization, authorization))
       throw new Error('Original operation authorization changed');
     if (proof?.dispatched) {
@@ -342,10 +352,15 @@ export function commitSessionOperationResult(input: {
     const message = current.find(item => item.messageId === authorization.messageId);
     if (
       Date.now() >= input.deadlineAt &&
-      (message?.state === 'queued' || message?.state === 'accepted')
+      (message?.state.kind === 'queued' || message?.state.kind === 'accepted')
     )
       return;
-    const applied = applySessionOperationResult(current, delivery, input.hash, Date.now());
+    const applied = applySessionOperationResult(
+      messages.aggregate(),
+      delivery,
+      input.hash,
+      Date.now()
+    );
     if (!applied) return;
     if (applied.disposition === 'applied') {
       if (input.eventQueries) {

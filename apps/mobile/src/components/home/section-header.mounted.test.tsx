@@ -114,6 +114,28 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  // The inline override only has a class to beat in LTR: there the eyebrow
+  // variant and the action keep `tracking-[1.5px]`, and the joined-script
+  // children still get `letterSpacing: 0` on top of it.
+  it('clears the tracked letter-spacing on the Arabic label and action', () => {
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const actionText = action.find(node => Object.is(node.type, 'Text'));
+
+    expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
+    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(actionText.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
   it.each([{ isRTL: false }, { isRTL: true }])(
     'aligns the action with the row edges, never with a physical text align, with RTL=$isRTL',
     ({ isRTL }) => {

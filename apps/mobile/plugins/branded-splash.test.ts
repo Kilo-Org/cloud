@@ -189,8 +189,9 @@ describe('shared branded splash', () => {
     // entries to the array. The plugin's contract is that its own color is
     // present, not that it is the only one: assert the splash color this plugin
     // owns by containment, not by pinning the whole array or its exact length,
-    // the same way the styles assertion below pins its theme, so this case
-    // speaks only for the entry this plugin writes.
+    // and keep the exact `#FAF74F` value, the same way the styles assertion
+    // below pins its theme, so this case speaks only for the entry this plugin
+    // writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

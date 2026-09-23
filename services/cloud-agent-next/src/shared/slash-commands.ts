@@ -72,6 +72,12 @@ export type BoundedSlashCommandCatalog = {
   commands: SlashCommandInfo[];
   /** Non-skill rows removed to bring the catalog back inside its bounds. */
   dropped: number;
+  /**
+   * True when the returned catalog still exceeds a bound because the skill rows
+   * alone are over it. Skills are never truncated, so the caller must report
+   * the full catalog instead of hiding skills silently.
+   */
+  overLimit: boolean;
 };
 
 /**
@@ -81,12 +87,12 @@ export type BoundedSlashCommandCatalog = {
  * their original order, and if the payload is still over the byte limit,
  * non-skill rows are dropped from the end. When only skill rows remain and the
  * payload is still over the byte limit the skills are kept anyway, so a skill
- * is never truncated; the caller reports the full catalog instead of hiding
- * skills silently.
+ * is never truncated; the result is flagged `overLimit` so the caller reports
+ * the full catalog instead of hiding skills silently.
  */
 export function boundSlashCommandCatalog(commands: SlashCommandInfo[]): BoundedSlashCommandCatalog {
   if (isWithinCatalogBounds(commands)) {
-    return { commands, dropped: 0 };
+    return { commands, dropped: 0, overLimit: false };
   }
 
   const skills = commands.filter(command => command.source === 'skill');
@@ -107,7 +113,11 @@ export function boundSlashCommandCatalog(commands: SlashCommandInfo[]): BoundedS
     bounded.splice(dropIndex, 1);
   }
 
-  return { commands: bounded, dropped: commands.length - bounded.length };
+  return {
+    commands: bounded,
+    dropped: commands.length - bounded.length,
+    overLimit: !isWithinCatalogBounds(bounded),
+  };
 }
 
 function isWithinCatalogBounds(commands: SlashCommandInfo[]): boolean {

@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import type { QuestionRequest } from '@kilocode/sdk/v2';
 import {
@@ -198,6 +201,36 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       { name: 'skill-1', description: 'Guide', source: 'skill', hints: [] },
       { name: 'skill-2', description: 'Guide', source: 'skill', hints: [] },
     ]);
+  });
+
+  it('reports the full catalog when skill rows alone exceed a bound', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'kilo-api-catalog-'));
+    const logPath = join(directory, 'wrapper.log');
+    const originalLogPath = process.env.WRAPPER_LOG_PATH;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const stub = startStub(
+        200,
+        Array.from({ length: 300 }, (_, index) => ({
+          name: `skill-${index}`,
+          description: 'Guide',
+          hints: [],
+          source: 'skill',
+          template: 'y',
+        }))
+      );
+
+      const commands = await createClient(stub.url).listCommands();
+
+      // Skill rows are never truncated: the over-limit catalog is returned as
+      // the CLI reported it, and the wrapper says so instead of hiding skills.
+      expect(commands).toHaveLength(300);
+      expect(readFileSync(logPath, 'utf8')).toContain('slash command catalog over limit');
+    } finally {
+      if (originalLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = originalLogPath;
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   const questions: QuestionRequest[] = [

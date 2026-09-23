@@ -526,9 +526,11 @@ export function createWrapperKiloClient(
       // bound drops non-skill rows first and never truncates a skill row; a
       // full catalog is reported rather than silently hiding skills.
       const bounded = boundSlashCommandCatalog(commands);
-      if (bounded.dropped > 0) {
+      if (bounded.dropped > 0 || bounded.overLimit) {
         logToFile(
-          `slash command catalog full: dropped ${bounded.dropped} non-skill rows, kept ${bounded.commands.length}`
+          bounded.overLimit
+            ? `slash command catalog over limit: kept all ${bounded.commands.length} rows (skill rows are never truncated), dropped ${bounded.dropped}`
+            : `slash command catalog full: dropped ${bounded.dropped} non-skill rows, kept ${bounded.commands.length}`
         );
       }
       return bounded.commands;

@@ -175,7 +175,7 @@ describe('boundSlashCommandCatalog', () => {
         hints: [],
       },
     ];
-    expect(boundSlashCommandCatalog(commands)).toEqual({ commands, dropped: 0 });
+    expect(boundSlashCommandCatalog(commands)).toEqual({ commands, dropped: 0, overLimit: false });
   });
 
   it('drops non-skill rows first and never truncates a skill row', () => {
@@ -194,6 +194,7 @@ describe('boundSlashCommandCatalog', () => {
     expect(result.commands).toHaveLength(SLASH_COMMAND_CATALOG_MAX_COMMANDS);
     expect(result.commands.filter(command => command.source === 'skill')).toEqual(skills);
     expect(result.dropped).toBe(commands.length - SLASH_COMMAND_CATALOG_MAX_COMMANDS);
+    expect(result.overLimit).toBe(false);
   });
 
   it('keeps every skill row even when the skill rows alone exceed the count bound', () => {
@@ -207,6 +208,9 @@ describe('boundSlashCommandCatalog', () => {
 
     expect(result.commands).toEqual(skills);
     expect(result.dropped).toBe(0);
+    // The returned catalog is over the count bound, so the caller must report
+    // it rather than hide the skills.
+    expect(result.overLimit).toBe(true);
   });
 
   it('keeps every skill row even when the skill rows alone exceed the byte bound', () => {
@@ -223,6 +227,7 @@ describe('boundSlashCommandCatalog', () => {
     // silently hiding a skill the session offers.
     expect(result.commands).toEqual(skills);
     expect(result.dropped).toBe(0);
+    expect(result.overLimit).toBe(true);
   });
 
   it('trims non-skill rows until the serialized payload fits the byte bound, keeping skills', () => {
@@ -240,6 +245,7 @@ describe('boundSlashCommandCatalog', () => {
 
     expect(result.commands).toContain(skill);
     expect(result.dropped).toBeGreaterThan(0);
+    expect(result.overLimit).toBe(false);
     expect(
       new TextEncoder().encode(JSON.stringify(result.commands)).byteLength
     ).toBeLessThanOrEqual(SLASH_COMMAND_CATALOG_MAX_SERIALIZED_BYTES);

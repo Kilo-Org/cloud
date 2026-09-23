@@ -3051,7 +3051,34 @@
       "unauthorized": "A Kilo-eszközök elutasították ezt a munkamenetet",
       "unauthorizedDescription": "Jelentkezz be újra, hogy használhasd a Kilo-eszközöket ebben a csevegésben.",
       "unavailable": "A Kilo-eszközök nem érhetők el",
-      "unavailableDescription": "A Kilo-kiszolgáló nem érhető el ehhez a fiókhoz."
+      "unavailableDescription": "A Kilo-kiszolgáló nem érhető el ehhez a fiókhoz.",
+      "sheetTitle": "Csevegőeszközök",
+      "serversSection": "MCP-szerverek",
+      "addServer": "MCP-szerver hozzáadása",
+      "addServerTitle": "MCP-szerver hozzáadása",
+      "editServerTitle": "Ennek az MCP-szervernek a szerkesztése",
+      "fieldName": "Megjelenített név",
+      "fieldUrl": "Szerver URL-címe",
+      "fieldUrlInvalid": "Adj meg érvényes szerver URL-címet.",
+      "fieldToken": "Bearer token (nem kötelező)",
+      "enableServer": "Szerver engedélyezése",
+      "editServer": "Szerver szerkesztése",
+      "deleteServer": "Szerver törlése",
+      "deleteTitle": "Törlöd ezt a szervert?",
+      "deleteMessage": "Az eszközei minden csevegésből eltűnnek.",
+      "kiloBuiltIn": "Beépített. Ehhez a csevegéshez be- vagy kikapcsolható; nem szerkeszthető és nem törölhető.",
+      "serversEmptyTitle": "Még nincsenek távoli szerverek",
+      "serversEmptyDescription": "Adj hozzá egyet, hogy kínálhasd az eszközeit a csevegéseidben.",
+      "settingsToolsTitle": "Engedd, hogy a Kilo módosítsa az alkalmazás beállításait",
+      "settingsToolsSubtitle": "A témára, a nyelvre, az értesítésekre, a modellekre és a Beállítások többi részére vonatkozik.",
+      "settingsToolsOn": "Be — a beállításeszközök elküldésre kerülnek a modellnek",
+      "settingsToolsOff": "Ki — semmilyen beállításeszköz nem kerül elküldésre a modellnek",
+      "serverChecking": "Szerver ellenőrzése…",
+      "serverToolCount": "{{count}} eszköz",
+      "serverUnreachable": "Nem sikerült elérni ezt a szervert"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Megerősíted ezt a módosítást?"
   }
 }

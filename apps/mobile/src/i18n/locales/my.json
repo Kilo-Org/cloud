@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo ကိရိယာများက ဤစက်ရှင်ကို ငြင်းပယ်ခဲ့သည်",
       "unauthorizedDescription": "ဤစကားဝိုင်းတွင် Kilo ကိရိယာများ အသုံးပြုရန် ထပ်မံဝင်ရောက်ပါ။",
       "unavailable": "Kilo ကိရိယာများ မရနိုင်ပါ",
-      "unavailableDescription": "ဤအကောင့်အတွက် Kilo ဆာဗာ မရှိပါ။"
+      "unavailableDescription": "ဤအကောင့်အတွက် Kilo ဆာဗာ မရှိပါ။",
+      "sheetTitle": "စကားပြောကိရိယာများ",
+      "serversSection": "MCP ဆာဗာများ",
+      "addServer": "MCP ဆာဗာ ထည့်ပါ",
+      "addServerTitle": "MCP ဆာဗာ ထည့်ပါ",
+      "editServerTitle": "ဤ MCP ဆာဗာကို တည်းဖြတ်ပါ",
+      "fieldName": "ပြသမည့်အမည်",
+      "fieldUrl": "ဆာဗာ URL",
+      "fieldUrlInvalid": "မှန်ကန်သော ဆာဗာ URL ထည့်ပါ။",
+      "fieldToken": "Bearer တိုကင် (ရွေးချယ်နိုင်)",
+      "enableServer": "ဤဆာဗာကို ဖွင့်ပါ",
+      "editServer": "ဆာဗာ တည်းဖြတ်ပါ",
+      "deleteServer": "ဆာဗာ ဖျက်ပါ",
+      "deleteTitle": "ဤဆာဗာကို ဖျက်မလား?",
+      "deleteMessage": "၎င်း၏ကိရိယာများ စကားပြောတိုင်းမှ ထွက်ခွာမည်။",
+      "kiloBuiltIn": "ပါဝင်ပြီးသား။ ဤစကားပြောအတွက် ဖွင့် သို့မဟုတ် ပိတ်ပါ။ တည်းဖြတ်ခြင်း သို့မဟုတ် ဖျက်ခြင်း မပြုလုပ်နိုင်ပါ။",
+      "serversEmptyTitle": "အဝေးဆာဗာ မရှိသေးပါ",
+      "serversEmptyDescription": "သင်၏စကားပြောများတွင် ၎င်း၏ကိရိယာများ ပေးရန် တစ်ခုထည့်ပါ။",
+      "settingsToolsTitle": "Kilo ကို အက်ပ် ဆက်တင်များ ပြောင်းခွင့်ပြုပါ",
+      "settingsToolsSubtitle": "အပြင်အဆင်၊ ဘာသာစကား၊ အသိပေးချက်များ၊ မော်ဒယ်များနှင့် ကျန်ရွေးချယ်စရာများအတွက် သက်ဆိုင်သည်။",
+      "settingsToolsOn": "ဖွင့်ထားသည် — ဆက်တင်ကိရိယာများကို မော်ဒယ်သို့ ပေးပို့သည်",
+      "settingsToolsOff": "ပိတ်ထားသည် — ဆက်တင်ကိရိယာ တစ်ခုမှ မော်ဒယ်သို့ မပေးပို့ပါ",
+      "serverChecking": "ဤဆာဗာကို စစ်ဆေးနေသည်…",
+      "serverToolCount": "ကိရိယာ {{count}} ခု",
+      "serverUnreachable": "ဤဆာဗာသို့ မရောက်နိုင်ခဲ့ပါ"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ဤပြောင်းလဲမှုကို အတည်ပြုမလား?"
   }
 }

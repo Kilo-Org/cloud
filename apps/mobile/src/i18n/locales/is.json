@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo-verkfæri höfnuðu þessu setu",
       "unauthorizedDescription": "Skráðu þig inn aftur til að nota Kilo-verkfærin í þessu spjalli.",
       "unavailable": "Kilo-verkfæri eru ekki í boði",
-      "unavailableDescription": "Kilo-þjónninn er ekki í boði fyrir þennan reikning."
+      "unavailableDescription": "Kilo-þjónninn er ekki í boði fyrir þennan reikning.",
+      "sheetTitle": "Spjallverkfæri",
+      "serversSection": "MCP-þjónar",
+      "addServer": "Bæta við MCP-þjóni",
+      "addServerTitle": "Bæta við MCP-þjóni",
+      "editServerTitle": "Breyta þessum MCP-þjóni",
+      "fieldName": "Sýnt heiti",
+      "fieldUrl": "Slóð þjóns",
+      "fieldUrlInvalid": "Sláðu inn gilda slóð þjóns.",
+      "fieldToken": "Bearer-tákn (valfrjálst)",
+      "enableServer": "Virkja þennan þjón",
+      "editServer": "Breyta þjóni",
+      "deleteServer": "Eyða þjóni",
+      "deleteTitle": "Eyða þessum þjóni?",
+      "deleteMessage": "Verkfærin hans hverfa úr öllum spjallrásum.",
+      "kiloBuiltIn": "Innbyggt. Kveiktu eða slökktu á því fyrir þetta spjall; ekki er hægt að breyta eða eyða því.",
+      "serversEmptyTitle": "Engir fjartengdir þjónar enn",
+      "serversEmptyDescription": "Bættu einum við til að bjóða verkfærin hans í spjallrásunum þínum.",
+      "settingsToolsTitle": "Leyfa Kilo að breyta stillingum appsins",
+      "settingsToolsSubtitle": "Gildir um þema, tungumál, tilkynningar, líkön og restina af Stillingum.",
+      "settingsToolsOn": "Kveikt — stillingaverkfærin eru send til líkansins",
+      "settingsToolsOff": "Slökkt — ekkert stillingaverkfæri er sent til líkansins",
+      "serverChecking": "Athuga þennan þjón…",
+      "serverToolCount": "{{count}} verkfæri",
+      "serverUnreachable": "Náði ekki sambandi við þennan þjón"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Staðfesta þessa breytingu?"
   }
 }

@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo ਟੂਲ ਨੇ ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਅਸਵੀਕਾਰ ਕੀਤਾ",
       "unauthorizedDescription": "ਇਸ ਚੈਟ ਵਿੱਚ Kilo ਟੂਲ ਵਰਤਣ ਲਈ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰੋ।",
       "unavailable": "Kilo ਟੂਲ ਉਪਲਬਧ ਨਹੀਂ",
-      "unavailableDescription": "ਇਸ ਖਾਤੇ ਲਈ Kilo ਸਰਵਰ ਨਹੀਂ ਹੈ।"
+      "unavailableDescription": "ਇਸ ਖਾਤੇ ਲਈ Kilo ਸਰਵਰ ਨਹੀਂ ਹੈ।",
+      "sheetTitle": "ਚੈਟ ਟੂਲ",
+      "serversSection": "MCP ਸਰਵਰ",
+      "addServer": "MCP ਸਰਵਰ ਸ਼ਾਮਲ ਕਰੋ",
+      "addServerTitle": "MCP ਸਰਵਰ ਸ਼ਾਮਲ ਕਰੋ",
+      "editServerTitle": "ਇਹ MCP ਸਰਵਰ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "fieldName": "ਦਿਖਾਇਆ ਨਾਮ",
+      "fieldUrl": "ਸਰਵਰ URL",
+      "fieldUrlInvalid": "ਇੱਕ ਵੈਧ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ।",
+      "fieldToken": "Bearer ਟੋਕਨ (ਵਿਕਲਪਿਕ)",
+      "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ",
+      "editServer": "ਸਰਵਰ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "deleteServer": "ਸਰਵਰ ਮਿਟਾਓ",
+      "deleteTitle": "ਇਹ ਸਰਵਰ ਮਿਟਾਉਣਾ?",
+      "deleteMessage": "ਇਸ ਦੇ ਟੂਲ ਹਰ ਚੈਟ ਤੋਂ ਹਟ ਜਾਣਗੇ।",
+      "kiloBuiltIn": "ਬਿਲਟ-ਇਨ। ਇਸ ਚੈਟ ਲਈ ਇਸ ਨੂੰ ਚਾਲੂ ਜਾਂ ਬੰਦ ਕਰੋ; ਇਸ ਨੂੰ ਸੰਪਾਦਿਤ ਜਾਂ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
+      "serversEmptyTitle": "ਹਾਲੇ ਕੋਈ ਰਿਮੋਟ ਸਰਵਰ ਨਹੀਂ",
+      "serversEmptyDescription": "ਆਪਣੀਆਂ ਚੈਟਾਂ ਵਿੱਚ ਇਸ ਦੇ ਟੂਲ ਦੇਣ ਲਈ ਇੱਕ ਸ਼ਾਮਲ ਕਰੋ।",
+      "settingsToolsTitle": "Kilo ਨੂੰ ਐਪ ਸੈਟਿੰਗਾਂ ਬਦਲਣ ਦਿਓ",
+      "settingsToolsSubtitle": "ਥੀਮ, ਭਾਸ਼ਾ, ਸੂਚਨਾਵਾਂ, ਮਾਡਲਾਂ ਅਤੇ ਬਾਕੀ ਪਸੰਦਾਂ 'ਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ।",
+      "settingsToolsOn": "ਚਾਲੂ — ਸੈਟਿੰਗਾਂ ਟੂਲ ਮਾਡਲ ਨੂੰ ਭੇਜੇ ਜਾਂਦੇ ਹਨ",
+      "settingsToolsOff": "ਬੰਦ — ਮਾਡਲ ਨੂੰ ਕੋਈ ਸੈਟਿੰਗਾਂ ਟੂਲ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ",
+      "serverChecking": "ਇਹ ਸਰਵਰ ਜਾਂਚਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+      "serverToolCount": "{{count}} ਟੂਲ",
+      "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?"
   }
 }

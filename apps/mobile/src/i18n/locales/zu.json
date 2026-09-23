@@ -3051,7 +3051,34 @@
       "unauthorized": "Amathuluzi e-Kilo enqabile le seshini",
       "unauthorizedDescription": "Ngena futhi ukuze usebenzise amathuluzi e-Kilo kule ngxoxo.",
       "unavailable": "Amathuluzi e-Kilo awatholakali",
-      "unavailableDescription": "Iseva ye-Kilo ayitholakali kule akhawunti."
+      "unavailableDescription": "Iseva ye-Kilo ayitholakali kule akhawunti.",
+      "sheetTitle": "Amathuluzi engxoxo",
+      "serversSection": "Amaseva e-MCP",
+      "addServer": "Engeza iseva ye-MCP",
+      "addServerTitle": "Engeza iseva ye-MCP",
+      "editServerTitle": "Hlela le seve ye-MCP",
+      "fieldName": "Igama eliboniswayo",
+      "fieldUrl": "URL yeseva",
+      "fieldUrlInvalid": "Faka i-URL yeseva evumelekile.",
+      "fieldToken": "Ithokheni ye-Bearer (okukhethayo)",
+      "enableServer": "Nika amandla le seve",
+      "editServer": "Hlela iseva",
+      "deleteServer": "Susa iseva",
+      "deleteTitle": "Susa le seve?",
+      "deleteMessage": "Amathuluzi ayo ayaphuma kuyo yonke ingxoxo.",
+      "kiloBuiltIn": "Yakhelwe ngaphakathi. Yivule noma yicishe kule ngxoxo; ayikwazi ukuhlelwa noma ukususwa.",
+      "serversEmptyTitle": "Awekho amaseva akude okwamanje",
+      "serversEmptyDescription": "Engeza elilodwa ukuze unikeze amathuluzi ayo ezingxoxweni zakho.",
+      "settingsToolsTitle": "Vumela i-Kilo ukuthi ishintshe izilungiselelo zohlelo",
+      "settingsToolsSubtitle": "Kusebenza kutimu, ulimi, izaziso, amamodeli kanye nokunye kwezintandokazi.",
+      "settingsToolsOn": "Ivuliwe — amathuluzi ezilungiselelo athunyelwa kumodeli",
+      "settingsToolsOff": "Icishiwe — alikho ithuluzi lezilungiselelo elithunyelwa kumodeli",
+      "serverChecking": "Ihlola le seve…",
+      "serverToolCount": "amathuluzi angu-{{count}}",
+      "serverUnreachable": "Ayikwazanga ukufinyelela le seve"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Qinisekisa lolu shintsho?"
   }
 }

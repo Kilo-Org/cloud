@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo գործիքները մերժեցին այս նստաշրջանը",
       "unauthorizedDescription": "Նորից մուտք գործիր՝ այս զրույցում Kilo գործիքներն օգտագործելու համար։",
       "unavailable": "Kilo գործիքները հասանելի չեն",
-      "unavailableDescription": "Kilo սերվերը հասանելի չէ այս հաշվի համար։"
+      "unavailableDescription": "Kilo սերվերը հասանելի չէ այս հաշվի համար։",
+      "sheetTitle": "Զրույցի գործիքներ",
+      "serversSection": "MCP սերվերներ",
+      "addServer": "Ավելացնել MCP սերվեր",
+      "addServerTitle": "Ավելացնել MCP սերվեր",
+      "editServerTitle": "Խմբագրել այս MCP սերվերը",
+      "fieldName": "Ցուցադրվող անուն",
+      "fieldUrl": "Սերվերի URL",
+      "fieldUrlInvalid": "Մուտքագրեք սերվերի վավեր URL։",
+      "fieldToken": "Bearer թոքեն (ըստ ցանկության)",
+      "enableServer": "Միացնել այս սերվերը",
+      "editServer": "Խմբագրել սերվերը",
+      "deleteServer": "Ջնջել սերվերը",
+      "deleteTitle": "Ջնջե՞լ այս սերվերը։",
+      "deleteMessage": "Նրա գործիքները կհեռանան բոլոր զրույցներից։",
+      "kiloBuiltIn": "Ներկառուցված է։ Միացրեք կամ անջատեք այն այս զրույցի համար. այն հնարավոր չէ խմբագրել կամ ջնջել։",
+      "serversEmptyTitle": "Դեռ հեռավոր սերվերներ չկան",
+      "serversEmptyDescription": "Ավելացրեք մեկը՝ իր գործիքները ձեր զրույցներում առաջարկելու համար։",
+      "settingsToolsTitle": "Թույլ տալ Kilo-ին փոխել հավելվածի կարգավորումները",
+      "settingsToolsSubtitle": "Վերաբերում է թեմային, լեզվին, ծանուցումներին, մոդելներին և Նախապատվությունների մնացած մասին։",
+      "settingsToolsOn": "Միացված — կարգավորումների գործիքներն ուղարկվում են մոդելին",
+      "settingsToolsOff": "Անջատված — ոչ մի կարգավորումների գործիք չի ուղարկվում մոդելին",
+      "serverChecking": "Ստուգվում է այս սերվերը…",
+      "serverToolCount": "{{count}} գործիք",
+      "serverUnreachable": "Չհաջողվեց հասնել այս սերվերին"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Հաստատե՞լ այս փոփոխությունը։"
   }
 }

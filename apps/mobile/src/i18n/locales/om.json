@@ -3051,7 +3051,34 @@
       "unauthorized": "Meeshaaleen Kilo marii kana didaniiru",
       "unauthorizedDescription": "Marii kana keessatti meeshaalee Kilo fayyadamuu keetii ammas seeni.",
       "unavailable": "Meeshaaleen Kilo hin jiran",
-      "unavailableDescription": "Sarvariin Kilo herrega kanaaf hin jiru."
+      "unavailableDescription": "Sarvariin Kilo herrega kanaaf hin jiru.",
+      "sheetTitle": "Meeshaalee haasawa",
+      "serversSection": "Seerverota MCP",
+      "addServer": "Seerverii MCP dabali",
+      "addServerTitle": "Seerverii MCP dabali",
+      "editServerTitle": "Seerverii MCP kana sirreessi",
+      "fieldName": "Maqaa mul'atu",
+      "fieldUrl": "URL seerverii",
+      "fieldUrlInvalid": "URL seerverii sirrii galchi.",
+      "fieldToken": "Token Bearer (filannoo)",
+      "enableServer": "Seerverii kana dandeessisi",
+      "editServer": "Seerverii sirreessi",
+      "deleteServer": "Seerverii balleessi",
+      "deleteTitle": "Seerverii kana haquu?",
+      "deleteMessage": "Meeshaaleen isaa haasawa hunda keessaa ba'u.",
+      "kiloBuiltIn": "Keessatti ijaarame. Haasawa kanaaf isa bani ykn cufi; sirreessuu ykn haquu hin danda'amu.",
+      "serversEmptyTitle": "Amma ammaattii seerverota fagoo hin jiran",
+      "serversEmptyDescription": "Meeshaalee isaa haasawa keessatti dhiyeessuuf tokko dabali.",
+      "settingsToolsTitle": "Kilo qindaa'ina appii akka jijjiiru hayyami",
+      "settingsToolsSubtitle": "Kaayyoo, afaan, beeksisa, moodeelota fi hafe Filannoota irratti hojiirra oola.",
+      "settingsToolsOn": "Banaa — meeshaaleen qindaa'inaa moodeelaaf ergamu",
+      "settingsToolsOff": "Cufaa — meeshaan qindaa'inaa tokkoon moodeelaaf hin ergamu",
+      "serverChecking": "Seerverii kana sakatta'aa jira…",
+      "serverToolCount": "meeshaalee {{count}}",
+      "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Jijjiirama kana mirkaneessuu?"
   }
 }

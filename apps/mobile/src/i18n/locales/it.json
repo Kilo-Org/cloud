@@ -3073,7 +3073,34 @@
       "unauthorized": "Gli strumenti Kilo hanno rifiutato questa sessione",
       "unauthorizedDescription": "Accedi di nuovo per usare gli strumenti Kilo in questa chat.",
       "unavailable": "Gli strumenti Kilo non sono disponibili",
-      "unavailableDescription": "Il server Kilo non è disponibile per questo account."
+      "unavailableDescription": "Il server Kilo non è disponibile per questo account.",
+      "sheetTitle": "Strumenti della chat",
+      "serversSection": "Server MCP",
+      "addServer": "Aggiungi server MCP",
+      "addServerTitle": "Aggiungi un server MCP",
+      "editServerTitle": "Modifica questo server MCP",
+      "fieldName": "Nome visualizzato",
+      "fieldUrl": "URL del server",
+      "fieldUrlInvalid": "Inserisci un URL del server valido.",
+      "fieldToken": "Token Bearer (facoltativo)",
+      "enableServer": "Attiva questo server",
+      "editServer": "Modifica server",
+      "deleteServer": "Elimina server",
+      "deleteTitle": "Eliminare questo server?",
+      "deleteMessage": "I suoi strumenti escono da ogni chat.",
+      "kiloBuiltIn": "Integrato. Attivalo o disattivalo per questa chat; non può essere modificato né eliminato.",
+      "serversEmptyTitle": "Nessun server remoto ancora",
+      "serversEmptyDescription": "Aggiungine uno per offrire i suoi strumenti nelle tue chat.",
+      "settingsToolsTitle": "Consenti a Kilo di cambiare le impostazioni dell'app",
+      "settingsToolsSubtitle": "Si applica a tema, lingua, notifiche, modelli e al resto delle Preferenze.",
+      "settingsToolsOn": "Attivo — gli strumenti delle impostazioni vengono inviati al modello",
+      "settingsToolsOff": "Disattivo — nessuno strumento delle impostazioni viene inviato al modello",
+      "serverChecking": "Verifica di questo server…",
+      "serverToolCount": "{{count}} strumenti",
+      "serverUnreachable": "Impossibile raggiungere questo server"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Confermare questa modifica?"
   }
 }

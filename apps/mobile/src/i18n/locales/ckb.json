@@ -3051,7 +3051,34 @@
       "unauthorized": "ئامرازەکانی Kilo ئەم دانیشتنەی ڕەتکردەوە",
       "unauthorizedDescription": "دووبارە بچۆ ژوورەوە بۆ بەکارهێنانی ئامرازەکانی Kilo لەم گفتوگۆیەدا.",
       "unavailable": "ئامرازەکانی Kilo بەردەست نین",
-      "unavailableDescription": "سێرڤەری Kilo بۆ ئەم هەژمارە بەردەست نییە."
+      "unavailableDescription": "سێرڤەری Kilo بۆ ئەم هەژمارە بەردەست نییە.",
+      "sheetTitle": "ئامرازەکانی گفتوگۆ",
+      "serversSection": "سێرڤەرەکانی MCP",
+      "addServer": "زیادکردنی سێرڤەری MCP",
+      "addServerTitle": "زیادکردنی سێرڤەری MCP",
+      "editServerTitle": "دەستکاریکردنی ئەم سێرڤەری MCP",
+      "fieldName": "ناوی پیشاندراو",
+      "fieldUrl": "URL ی سێرڤەر",
+      "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
+      "fieldToken": "تۆکنی Bearer (ئارەزوومەندانە)",
+      "enableServer": "چالاککردنی ئەم سێرڤەرە",
+      "editServer": "دەستکاریکردنی سێرڤەر",
+      "deleteServer": "سڕینەوەی سێرڤەر",
+      "deleteTitle": "ئەم سێرڤەرە بسڕدرێتەوە؟",
+      "deleteMessage": "ئامرازەکانی لە هەموو گفتوگۆیەک دەردەچن.",
+      "kiloBuiltIn": "داخراوە. بۆ ئەم گفتوگۆیە چالاکی بکە یان ناچالاکی بکە؛ ناتوانرێت دەستکاری بکرێت یان بسڕدرێتەوە.",
+      "serversEmptyTitle": "هێشتا هیچ سێرڤەرێکی دوور نییە",
+      "serversEmptyDescription": "یەکێک زیاد بکە بۆ پێشکەشکردنی ئامرازەکانی لە گفتوگۆکانتدا.",
+      "settingsToolsTitle": "ڕێگە بدە بە Kilo بۆ گۆڕینی ڕێکخستنەکانی ئەپ",
+      "settingsToolsSubtitle": "بۆ ڕووکار، زمان، ئاگادارکردنەوەکان، مۆدێلەکان و ئەوانی دیکەی هەڵبژاردنەکان جێبەجێ دەبێت.",
+      "settingsToolsOn": "چالاک — ئامرازەکانی ڕێکخستن بۆ مۆدێل دەنێردرێن",
+      "settingsToolsOff": "ناچالاک — هیچ ئامرازێکی ڕێکخستن بۆ مۆدێل نانێردرێت",
+      "serverChecking": "پشکنینی ئەم سێرڤەرە…",
+      "serverToolCount": "{{count}} ئامراز",
+      "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ئەم گۆڕانکارییە پشتڕاست بکرێتەوە؟"
   }
 }

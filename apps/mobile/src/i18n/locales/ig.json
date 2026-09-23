@@ -3051,7 +3051,34 @@
       "unauthorized": "Ngwá ọrụ Kilo jụrụ nnọkọ a",
       "unauthorizedDescription": "Banye ọzọ iji ngwá ọrụ Kilo na nkata a.",
       "unavailable": "Ngwá ọrụ Kilo adịghị",
-      "unavailableDescription": "Sava Kilo adịghị maka akaụntụ a."
+      "unavailableDescription": "Sava Kilo adịghị maka akaụntụ a.",
+      "sheetTitle": "Ngwá ọrụ mkparịta ụka",
+      "serversSection": "Sava MCP",
+      "addServer": "Tinye sava MCP",
+      "addServerTitle": "Tinye sava MCP",
+      "editServerTitle": "Dezie sava MCP a",
+      "fieldName": "Aha a na-egosi",
+      "fieldUrl": "URL sava",
+      "fieldUrlInvalid": "Tinye URL sava ziri ezi.",
+      "fieldToken": "Token Bearer (nhọrọ)",
+      "enableServer": "Mee ka sava a rụọ ọrụ",
+      "editServer": "Dezie sava",
+      "deleteServer": "Hichapụ sava",
+      "deleteTitle": "Hichapụ sava a?",
+      "deleteMessage": "Ngwá ọrụ ya na-ahapụ mkparịta ụka ọ bụla.",
+      "kiloBuiltIn": "Ewuru ya n'ime. Gbanye ma ọ bụ gbanyụọ ya maka mkparịta ụka a; enweghị ike idezi ma ọ bụ ihichapụ ya.",
+      "serversEmptyTitle": "Enweghị sava dị anya ugbu a",
+      "serversEmptyDescription": "Tinye otu iji nye ngwá ọrụ ya na mkparịta ụka gị.",
+      "settingsToolsTitle": "Kwe ka Kilo gbanwee ntọala ngwa",
+      "settingsToolsSubtitle": "Metụtara isiokwu, asụsụ, ọkwa, ụdị na ndị ọzọ nke Mmasị.",
+      "settingsToolsOn": "Gbanyere — a na-eziga ngwá ọrụ ntọala na ụdị",
+      "settingsToolsOff": "Gbanyụrụ — a naghị eziga ngwá ọrụ ntọala ọ bụla na ụdị",
+      "serverChecking": "Na-enyocha sava a…",
+      "serverToolCount": "ngwá ọrụ {{count}}",
+      "serverUnreachable": "Enweghị ike iru sava a"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Kwenye mgbanwe a?"
   }
 }

@@ -3073,7 +3073,34 @@
       "unauthorized": "Las herramientas de Kilo rechazaron esta sesión",
       "unauthorizedDescription": "Inicia sesión de nuevo para usar las herramientas de Kilo en este chat.",
       "unavailable": "Las herramientas de Kilo no están disponibles",
-      "unavailableDescription": "El servidor de Kilo no está disponible para esta cuenta."
+      "unavailableDescription": "El servidor de Kilo no está disponible para esta cuenta.",
+      "sheetTitle": "Herramientas de chat",
+      "serversSection": "Servidores MCP",
+      "addServer": "Añadir servidor MCP",
+      "addServerTitle": "Añadir un servidor MCP",
+      "editServerTitle": "Editar este servidor MCP",
+      "fieldName": "Nombre mostrado",
+      "fieldUrl": "URL del servidor",
+      "fieldUrlInvalid": "Introduce una URL de servidor válida.",
+      "fieldToken": "Token Bearer (opcional)",
+      "enableServer": "Activar este servidor",
+      "editServer": "Editar servidor",
+      "deleteServer": "Eliminar servidor",
+      "deleteTitle": "¿Eliminar este servidor?",
+      "deleteMessage": "Sus herramientas salen de todos los chats.",
+      "kiloBuiltIn": "Integrado. Actívalo o desactívalo para este chat; no se puede editar ni eliminar.",
+      "serversEmptyTitle": "Aún no hay servidores remotos",
+      "serversEmptyDescription": "Añade uno para ofrecer sus herramientas en tus chats.",
+      "settingsToolsTitle": "Permitir que Kilo cambie la configuración de la app",
+      "settingsToolsSubtitle": "Se aplica al tema, el idioma, las notificaciones, los modelos y el resto de Preferencias.",
+      "settingsToolsOn": "Activado — las herramientas de configuración se envían al modelo",
+      "settingsToolsOff": "Desactivado — no se envía ninguna herramienta de configuración al modelo",
+      "serverChecking": "Comprobando este servidor…",
+      "serverToolCount": "{{count}} herramientas",
+      "serverUnreachable": "No se pudo contactar con este servidor"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "¿Confirmar este cambio?"
   }
 }

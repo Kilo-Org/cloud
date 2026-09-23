@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo alətləri bu sessiyanı rədd etdi",
       "unauthorizedDescription": "Bu söhbətdə Kilo alətlərindən istifadə etmək üçün yenidən daxil ol.",
       "unavailable": "Kilo alətləri əlçatan deyil",
-      "unavailableDescription": "Kilo serveri bu hesab üçün mövcud deyil."
+      "unavailableDescription": "Kilo serveri bu hesab üçün mövcud deyil.",
+      "sheetTitle": "Söhbət alətləri",
+      "serversSection": "MCP serverləri",
+      "addServer": "MCP serveri əlavə et",
+      "addServerTitle": "MCP serveri əlavə et",
+      "editServerTitle": "Bu MCP serverini redaktə et",
+      "fieldName": "Göstərilən ad",
+      "fieldUrl": "Server URL-i",
+      "fieldUrlInvalid": "Etibarlı server URL-i daxil edin.",
+      "fieldToken": "Bearer token (istəyə bağlı)",
+      "enableServer": "Bu serveri aktiv et",
+      "editServer": "Serveri redaktə et",
+      "deleteServer": "Serveri sil",
+      "deleteTitle": "Bu server silinsin?",
+      "deleteMessage": "Alətləri hər söhbətdən çıxacaq.",
+      "kiloBuiltIn": "Daxildir. Bu söhbət üçün yandırın və ya söndürün; redaktə və ya silmək mümkün deyil.",
+      "serversEmptyTitle": "Hələ uzaq server yoxdur",
+      "serversEmptyDescription": "Alətlərini söhbətlərinizdə təklif etmək üçün birini əlavə edin.",
+      "settingsToolsTitle": "Kilo tətbiq parametrlərini dəyişə bilsin",
+      "settingsToolsSubtitle": "Mövzu, dil, bildirişlər, modellər və Seçimlərin qalan hissəsi üçün keçərlidir.",
+      "settingsToolsOn": "Aktiv — parametr alətləri modelə göndərilir",
+      "settingsToolsOff": "Deaktiv — modelə heç bir parametr aləti göndərilmir",
+      "serverChecking": "Bu server yoxlanılır…",
+      "serverToolCount": "{{count}} alət",
+      "serverUnreachable": "Bu serverə çatmaq mümkün olmadı"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
   }
 }

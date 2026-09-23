@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo टूल ने इस सत्र को अस्वीकार किया",
       "unauthorizedDescription": "इस चैट में Kilo टूल का उपयोग करने के लिए दोबारा साइन इन करें।",
       "unavailable": "Kilo टूल उपलब्ध नहीं हैं",
-      "unavailableDescription": "इस खाते के लिए Kilo सर्वर उपलब्ध नहीं है।"
+      "unavailableDescription": "इस खाते के लिए Kilo सर्वर उपलब्ध नहीं है।",
+      "sheetTitle": "चैट टूल",
+      "serversSection": "MCP सर्वर",
+      "addServer": "MCP सर्वर जोड़ें",
+      "addServerTitle": "MCP सर्वर जोड़ें",
+      "editServerTitle": "इस MCP सर्वर को संपादित करें",
+      "fieldName": "प्रदर्शित नाम",
+      "fieldUrl": "सर्वर URL",
+      "fieldUrlInvalid": "मान्य सर्वर URL दर्ज करें।",
+      "fieldToken": "Bearer टोकन (वैकल्पिक)",
+      "enableServer": "इस सर्वर को सक्षम करें",
+      "editServer": "सर्वर संपादित करें",
+      "deleteServer": "सर्वर हटाएँ",
+      "deleteTitle": "इस सर्वर को हटाएँ?",
+      "deleteMessage": "इसके टूल हर चैट से हट जाएँगे।",
+      "kiloBuiltIn": "अंतर्निहित। इस चैट के लिए इसे चालू या बंद करें; इसे संपादित या हटाया नहीं जा सकता।",
+      "serversEmptyTitle": "अभी कोई रिमोट सर्वर नहीं",
+      "serversEmptyDescription": "अपनी चैट में इसके टूल देने के लिए एक जोड़ें।",
+      "settingsToolsTitle": "Kilo को ऐप सेटिंग्स बदलने दें",
+      "settingsToolsSubtitle": "थीम, भाषा, सूचनाओं, मॉडल और बाकी प्राथमिकताओं पर लागू होता है।",
+      "settingsToolsOn": "चालू — सेटिंग्स टूल मॉडल को भेजे जाते हैं",
+      "settingsToolsOff": "बंद — मॉडल को कोई सेटिंग्स टूल नहीं भेजा जाता",
+      "serverChecking": "इस सर्वर की जाँच हो रही है…",
+      "serverToolCount": "{{count}} टूल",
+      "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "यह बदलाव पुष्टि करें?"
   }
 }

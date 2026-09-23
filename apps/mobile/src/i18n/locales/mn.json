@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo хэрэгслүүд энэ сессийг татгалзсан",
       "unauthorizedDescription": "Энэ чатад Kilo хэрэгслүүдийг ашиглахын тулд дахин нэвтэрнэ үү.",
       "unavailable": "Kilo хэрэгслүүд боломжгүй",
-      "unavailableDescription": "Kilo сервер энэ бүртгэлд боломжгүй."
+      "unavailableDescription": "Kilo сервер энэ бүртгэлд боломжгүй.",
+      "sheetTitle": "Чатын хэрэгслүүд",
+      "serversSection": "MCP серверүүд",
+      "addServer": "MCP сервер нэмэх",
+      "addServerTitle": "MCP сервер нэмэх",
+      "editServerTitle": "Энэ MCP серверийг засах",
+      "fieldName": "Харагдах нэр",
+      "fieldUrl": "Серверийн URL",
+      "fieldUrlInvalid": "Хүчинтэй серверийн URL оруулна уу.",
+      "fieldToken": "Bearer токен (заавал биш)",
+      "enableServer": "Энэ серверийг идэвхжүүлэх",
+      "editServer": "Сервер засах",
+      "deleteServer": "Сервер устгах",
+      "deleteTitle": "Энэ серверийг устгах уу?",
+      "deleteMessage": "Түүний хэрэгслүүд бүх чатаас гарна.",
+      "kiloBuiltIn": "Суурилагдсан. Энэ чатад асаах эсвэл унтраах; засах, устгах боломжгүй.",
+      "serversEmptyTitle": "Одоогоор алсын сервер байхгүй",
+      "serversEmptyDescription": "Түүний хэрэгслүүдийг чатуудад санал болгохын тулд нэгийг нэмнэ үү.",
+      "settingsToolsTitle": "Kilo-д аппын тохиргоог өөрчлөх зөвшөөрөл өгөх",
+      "settingsToolsSubtitle": "Загвар, хэл, мэдэгдэл, загварууд болон бусад Тохиргоонд хамаарна.",
+      "settingsToolsOn": "Асаалттай — тохиргооны хэрэгслүүд загварт илгээгдэнэ",
+      "settingsToolsOff": "Унтраалттай — загварт ямар ч тохиргооны хэрэгсэл илгээгдэхгүй",
+      "serverChecking": "Энэ серверийг шалгаж байна…",
+      "serverToolCount": "{{count}} хэрэгсэл",
+      "serverUnreachable": "Энэ серверт хүрч чадсангүй"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?"
   }
 }

@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo-værktøjer afviste denne session",
       "unauthorizedDescription": "Log ind igen for at bruge Kilo-værktøjerne i denne chat.",
       "unavailable": "Kilo-værktøjer er ikke tilgængelige",
-      "unavailableDescription": "Kilo-serveren er ikke tilgængelig for denne konto."
+      "unavailableDescription": "Kilo-serveren er ikke tilgængelig for denne konto.",
+      "sheetTitle": "Chatværktøjer",
+      "serversSection": "MCP-servere",
+      "addServer": "Tilføj MCP-server",
+      "addServerTitle": "Tilføj en MCP-server",
+      "editServerTitle": "Rediger denne MCP-server",
+      "fieldName": "Vist navn",
+      "fieldUrl": "Server-URL",
+      "fieldUrlInvalid": "Indtast en gyldig server-URL.",
+      "fieldToken": "Bearer-token (valgfrit)",
+      "enableServer": "Aktivér denne server",
+      "editServer": "Rediger server",
+      "deleteServer": "Slet server",
+      "deleteTitle": "Slet denne server?",
+      "deleteMessage": "Dens værktøjer forsvinder fra alle chats.",
+      "kiloBuiltIn": "Indbygget. Slå den til eller fra for denne chat; den kan ikke redigeres eller slettes.",
+      "serversEmptyTitle": "Ingen fjernservere endnu",
+      "serversEmptyDescription": "Tilføj en for at tilbyde dens værktøjer i dine chats.",
+      "settingsToolsTitle": "Lad Kilo ændre appindstillinger",
+      "settingsToolsSubtitle": "Gælder for tema, sprog, notifikationer, modeller og resten af Indstillinger.",
+      "settingsToolsOn": "Til — indstillingsværktøjerne sendes til modellen",
+      "settingsToolsOff": "Fra — intet indstillingsværktøj sendes til modellen",
+      "serverChecking": "Tjekker denne server…",
+      "serverToolCount": "{{count}} værktøjer",
+      "serverUnreachable": "Kunne ikke nå denne server"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bekræft denne ændring?"
   }
 }

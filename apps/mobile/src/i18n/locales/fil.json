@@ -3051,7 +3051,34 @@
       "unauthorized": "Tinanggihan ng mga tool ng Kilo ang session na ito",
       "unauthorizedDescription": "Mag-sign in muli para magamit ang mga tool ng Kilo sa chat na ito.",
       "unavailable": "Hindi available ang mga tool ng Kilo",
-      "unavailableDescription": "Walang Kilo server para sa account na ito."
+      "unavailableDescription": "Walang Kilo server para sa account na ito.",
+      "sheetTitle": "Mga tool sa chat",
+      "serversSection": "Mga MCP server",
+      "addServer": "Magdagdag ng MCP server",
+      "addServerTitle": "Magdagdag ng MCP server",
+      "editServerTitle": "I-edit ang MCP server na ito",
+      "fieldName": "Pangalang ipinapakita",
+      "fieldUrl": "URL ng server",
+      "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
+      "fieldToken": "Bearer token (opsyonal)",
+      "enableServer": "Paganahin ang server na ito",
+      "editServer": "I-edit ang server",
+      "deleteServer": "Burahin ang server",
+      "deleteTitle": "Burahin ang server na ito?",
+      "deleteMessage": "Aalis ang mga tool nito sa bawat chat.",
+      "kiloBuiltIn": "Built-in. I-on o i-off ito para sa chat na ito; hindi ito maaaring i-edit o burahin.",
+      "serversEmptyTitle": "Wala pang remote na server",
+      "serversEmptyDescription": "Magdagdag ng isa para ialok ang mga tool nito sa iyong mga chat.",
+      "settingsToolsTitle": "Payagan ang Kilo na baguhin ang mga setting ng app",
+      "settingsToolsSubtitle": "Nalalapat sa tema, wika, mga notification, mga modelo at ang iba pang Mga Kagustuhan.",
+      "settingsToolsOn": "Naka-on — ipinapadala ang mga setting tool sa modelo",
+      "settingsToolsOff": "Naka-off — walang setting tool na ipinapadala sa modelo",
+      "serverChecking": "Sinusuri ang server na ito…",
+      "serverToolCount": "{{count}} tool",
+      "serverUnreachable": "Hindi maabot ang server na ito"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
   }
 }

@@ -3073,7 +3073,34 @@
       "unauthorized": "As ferramentas do Kilo recusaram esta sessão",
       "unauthorizedDescription": "Inicia sessão novamente para usar as ferramentas do Kilo nesta conversa.",
       "unavailable": "As ferramentas do Kilo não estão disponíveis",
-      "unavailableDescription": "O servidor do Kilo não está disponível para esta conta."
+      "unavailableDescription": "O servidor do Kilo não está disponível para esta conta.",
+      "sheetTitle": "Ferramentas de conversa",
+      "serversSection": "Servidores MCP",
+      "addServer": "Adicionar servidor MCP",
+      "addServerTitle": "Adicionar um servidor MCP",
+      "editServerTitle": "Editar este servidor MCP",
+      "fieldName": "Nome apresentado",
+      "fieldUrl": "URL do servidor",
+      "fieldUrlInvalid": "Introduza um URL de servidor válido.",
+      "fieldToken": "Token Bearer (opcional)",
+      "enableServer": "Ativar este servidor",
+      "editServer": "Editar servidor",
+      "deleteServer": "Eliminar servidor",
+      "deleteTitle": "Eliminar este servidor?",
+      "deleteMessage": "As ferramentas dele saem de todas as conversas.",
+      "kiloBuiltIn": "Integrado. Ative-o ou desative-o para esta conversa; não pode ser editado nem eliminado.",
+      "serversEmptyTitle": "Ainda não há servidores remotos",
+      "serversEmptyDescription": "Adicione um para oferecer as ferramentas dele nas suas conversas.",
+      "settingsToolsTitle": "Permitir que o Kilo altere as definições da aplicação",
+      "settingsToolsSubtitle": "Aplica-se ao tema, ao idioma, às notificações, aos modelos e ao resto das Preferências.",
+      "settingsToolsOn": "Ativado — as ferramentas de definições são enviadas ao modelo",
+      "settingsToolsOff": "Desativado — nenhuma ferramenta de definições é enviada ao modelo",
+      "serverChecking": "A verificar este servidor…",
+      "serverToolCount": "{{count}} ferramentas",
+      "serverUnreachable": "Não foi possível contactar este servidor"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Confirmar esta alteração?"
   }
 }

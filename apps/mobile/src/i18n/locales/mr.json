@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo साधनांनी हे सत्र नाकारले",
       "unauthorizedDescription": "या चॅटमध्ये Kilo साधने वापरण्यासाठी पुन्हा साइन इन करा.",
       "unavailable": "Kilo साधने उपलब्ध नाहीत",
-      "unavailableDescription": "या खात्यासाठी Kilo सर्व्हर उपलब्ध नाही."
+      "unavailableDescription": "या खात्यासाठी Kilo सर्व्हर उपलब्ध नाही.",
+      "sheetTitle": "चॅट साधने",
+      "serversSection": "MCP सर्व्हर",
+      "addServer": "MCP सर्व्हर जोडा",
+      "addServerTitle": "MCP सर्व्हर जोडा",
+      "editServerTitle": "हा MCP सर्व्हर संपादित करा",
+      "fieldName": "दर्शवलेले नाव",
+      "fieldUrl": "सर्व्हर URL",
+      "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
+      "fieldToken": "Bearer टोकन (ऐच्छिक)",
+      "enableServer": "हा सर्व्हर सक्षम करा",
+      "editServer": "सर्व्हर संपादित करा",
+      "deleteServer": "सर्व्हर हटवा",
+      "deleteTitle": "हा सर्व्हर हटवायचा?",
+      "deleteMessage": "याची साधने प्रत्येक चॅटमधून बाहेर पडतील.",
+      "kiloBuiltIn": "अंगभूत. या चॅटसाठी ते चालू किंवा बंद करा; ते संपादित किंवा हटवता येत नाही.",
+      "serversEmptyTitle": "अजून कोणतेही दूरस्थ सर्व्हर नाहीत",
+      "serversEmptyDescription": "तुमच्या चॅटमध्ये त्याची साधने देण्यासाठी एक जोडा.",
+      "settingsToolsTitle": "Kilo ला ॲप सेटिंग्ज बदलू द्या",
+      "settingsToolsSubtitle": "थीम, भाषा, सूचना, मॉडेल आणि उर्वरित प्राधान्यांना लागू होते.",
+      "settingsToolsOn": "चालू — सेटिंग्ज साधने मॉडेलला पाठवली जातात",
+      "settingsToolsOff": "बंद — मॉडेलला कोणतेही सेटिंग्ज साधन पाठवले जात नाही",
+      "serverChecking": "हा सर्व्हर तपासत आहे…",
+      "serverToolCount": "{{count}} साधने",
+      "serverUnreachable": "या सर्व्हरपर्यंत पोहोचता आले नाही"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "हा बदल निश्चित करायचा?"
   }
 }

@@ -3051,7 +3051,34 @@
       "unauthorized": "د Kilo وسیلو دا غونډه رد کړه",
       "unauthorizedDescription": "په دې خبرو اترو کې د Kilo وسیلو کارولو لپاره بیا ننوځئ.",
       "unavailable": "د Kilo وسیلې شتون نلري",
-      "unavailableDescription": "د Kilo سرور د دې حساب لپاره شتون نلري."
+      "unavailableDescription": "د Kilo سرور د دې حساب لپاره شتون نلري.",
+      "sheetTitle": "د چټ وسیلې",
+      "serversSection": "د MCP سرورونه",
+      "addServer": "د MCP سرور اضافه کړئ",
+      "addServerTitle": "د MCP سرور اضافه کړئ",
+      "editServerTitle": "دا د MCP سرور سم کړئ",
+      "fieldName": "ښکارېدونکی نوم",
+      "fieldUrl": "د سرور URL",
+      "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
+      "fieldToken": "Bearer ټوکن (اختیاري)",
+      "enableServer": "دا سرور فعال کړئ",
+      "editServer": "سرور سم کړئ",
+      "deleteServer": "سرور ړنګ کړئ",
+      "deleteTitle": "دا سرور ړنګ شي؟",
+      "deleteMessage": "د هغه وسیلې له هر چټ څخه وځي.",
+      "kiloBuiltIn": "جوړ شوی. د دې چټ لپاره یې فعال یا غیرفعال کړئ؛ دا د سمولو یا ړنګولو وړ نه دی.",
+      "serversEmptyTitle": "لا تر اوسه لرې سرورونه نشته",
+      "serversEmptyDescription": "د خپلو چټونو په لړ کې د هغه وسیلې وړاندې کولو لپاره یو اضافه کړئ.",
+      "settingsToolsTitle": "Kilo ته اجازه ورکړئ چې د اپ ترتیبات بدل کړي",
+      "settingsToolsSubtitle": "د بڼې، ژبې، خبرتیاوو، ماډلونو او پاتې غوره توبونو لپاره پلي کیږي.",
+      "settingsToolsOn": "فعال — د ترتیباتو وسیلې ماډل ته لېږل کیږي",
+      "settingsToolsOff": "غیرفعال — هیڅ د ترتیباتو وسیله ماډل ته نه لېږل کیږي",
+      "serverChecking": "دا سرور ګڼل کیږي…",
+      "serverToolCount": "{{count}} وسیلې",
+      "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "دا بدلون تایید شي؟"
   }
 }

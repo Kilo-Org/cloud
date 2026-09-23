@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo ഉപകരണങ്ങൾ ഈ സെഷൻ നിരസിച്ചു",
       "unauthorizedDescription": "ഈ ചാറ്റിൽ Kilo ഉപകരണങ്ങൾ ഉപയോഗിക്കാൻ വീണ്ടും സൈൻ ഇൻ ചെയ്യുക.",
       "unavailable": "Kilo ഉപകരണങ്ങൾ ലഭ്യമല്ല",
-      "unavailableDescription": "ഈ അക്കൗണ്ടിന് Kilo സെർവർ ലഭ്യമല്ല."
+      "unavailableDescription": "ഈ അക്കൗണ്ടിന് Kilo സെർവർ ലഭ്യമല്ല.",
+      "sheetTitle": "ചാറ്റ് ഉപകരണങ്ങൾ",
+      "serversSection": "MCP സെർവറുകൾ",
+      "addServer": "MCP സെർവർ ചേർക്കുക",
+      "addServerTitle": "MCP സെർവർ ചേർക്കുക",
+      "editServerTitle": "ഈ MCP സെർവർ എഡിറ്റ് ചെയ്യുക",
+      "fieldName": "പ്രദർശിപ്പിക്കുന്ന പേര്",
+      "fieldUrl": "സെർവർ URL",
+      "fieldUrlInvalid": "സാധുവായ സെർവർ URL നൽകുക.",
+      "fieldToken": "Bearer ടോക്കൺ (ഓപ്ഷണൽ)",
+      "enableServer": "ഈ സെർവർ പ്രവർത്തനക്ഷമമാക്കുക",
+      "editServer": "സെർവർ എഡിറ്റ് ചെയ്യുക",
+      "deleteServer": "സെർവർ ഇല്ലാതാക്കുക",
+      "deleteTitle": "ഈ സെർവർ ഇല്ലാതാക്കണോ?",
+      "deleteMessage": "ഇതിന്റെ ഉപകരണങ്ങൾ എല്ലാ ചാറ്റിൽ നിന്നും പോകും.",
+      "kiloBuiltIn": "അന്തർനിർമ്മിതം. ഈ ചാറ്റിനായി ഇത് ഓണോ ഓഫോ ആക്കുക; ഇത് എഡിറ്റ് ചെയ്യാനോ ഇല്ലാതാക്കാനോ കഴിയില്ല.",
+      "serversEmptyTitle": "ഇതുവരെ റിമോട്ട് സെർവറുകളില്ല",
+      "serversEmptyDescription": "നിങ്ങളുടെ ചാറ്റുകളിൽ ഇതിന്റെ ഉപകരണങ്ങൾ നൽകാൻ ഒന്ന് ചേർക്കുക.",
+      "settingsToolsTitle": "Kilo-യെ ആപ്പ് ക്രമീകരണങ്ങൾ മാറ്റാൻ അനുവദിക്കുക",
+      "settingsToolsSubtitle": "തീം, ഭാഷ, അറിയിപ്പുകൾ, മോഡലുകൾ, ബാക്കി മുൻഗണനകൾ എന്നിവയ്ക്ക് ബാധകം.",
+      "settingsToolsOn": "ഓൺ — ക്രമീകരണ ഉപകരണങ്ങൾ മോഡലിലേക്ക് അയയ്ക്കുന്നു",
+      "settingsToolsOff": "ഓഫ് — ഒരു ക്രമീകരണ ഉപകരണവും മോഡലിലേക്ക് അയയ്ക്കുന്നില്ല",
+      "serverChecking": "ഈ സെർവർ പരിശോധിക്കുന്നു…",
+      "serverToolCount": "{{count}} ഉപകരണങ്ങൾ",
+      "serverUnreachable": "ഈ സെർവറിൽ എത്തിച്ചേരാനായില്ല"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ഈ മാറ്റം സ്ഥിരീകരിക്കണോ?"
   }
 }

@@ -3051,7 +3051,34 @@
       "unauthorized": "Zouti Kilo yo refize sesyon sa a",
       "unauthorizedDescription": "Konekte ankò pou w sèvi ak zouti Kilo yo nan chat sa a.",
       "unavailable": "Zouti Kilo yo pa disponib",
-      "unavailableDescription": "Sèvè Kilo a pa disponib pou kont sa a."
+      "unavailableDescription": "Sèvè Kilo a pa disponib pou kont sa a.",
+      "sheetTitle": "Zouti chat",
+      "serversSection": "Sèvè MCP",
+      "addServer": "Ajoute sèvè MCP",
+      "addServerTitle": "Ajoute yon sèvè MCP",
+      "editServerTitle": "Modifye sèvè MCP sa a",
+      "fieldName": "Non ki parèt",
+      "fieldUrl": "URL sèvè a",
+      "fieldUrlInvalid": "Antre yon URL sèvè ki valab.",
+      "fieldToken": "Token Bearer (opsyonèl)",
+      "enableServer": "Aktive sèvè sa a",
+      "editServer": "Modifye sèvè a",
+      "deleteServer": "Efase sèvè a",
+      "deleteTitle": "Efase sèvè sa a?",
+      "deleteMessage": "Zouti li yo kite chak chat.",
+      "kiloBuiltIn": "Entegre. Limen oswa etenn li pou chat sa a; li pa ka modifye oswa efase.",
+      "serversEmptyTitle": "Poko gen sèvè aleka",
+      "serversEmptyDescription": "Ajoute youn pou ofri zouti li yo nan chat ou yo.",
+      "settingsToolsTitle": "Kite Kilo chanje paramèt aplikasyon an",
+      "settingsToolsSubtitle": "Aplike pou tèm, lang, notifikasyon, modèl ak rès Preferans yo.",
+      "settingsToolsOn": "Limen — zouti paramèt yo voye bay modèl la",
+      "settingsToolsOff": "Etenn — pa gen zouti paramèt ki voye bay modèl la",
+      "serverChecking": "N ap tcheke sèvè sa a…",
+      "serverToolCount": "{{count}} zouti",
+      "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Konfime chanjman sa a?"
   }
 }

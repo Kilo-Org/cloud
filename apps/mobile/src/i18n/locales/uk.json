@@ -3095,7 +3095,34 @@
       "unauthorized": "Інструменти Kilo відхилили цей сеанс",
       "unauthorizedDescription": "Увійдіть знову, щоб використовувати інструменти Kilo у цьому чаті.",
       "unavailable": "Інструменти Kilo недоступні",
-      "unavailableDescription": "Сервер Kilo недоступний для цього облікового запису."
+      "unavailableDescription": "Сервер Kilo недоступний для цього облікового запису.",
+      "sheetTitle": "Інструменти чату",
+      "serversSection": "Сервери MCP",
+      "addServer": "Додати сервер MCP",
+      "addServerTitle": "Додати сервер MCP",
+      "editServerTitle": "Редагувати цей сервер MCP",
+      "fieldName": "Відображувана назва",
+      "fieldUrl": "URL сервера",
+      "fieldUrlInvalid": "Введіть дійсну URL-адресу сервера.",
+      "fieldToken": "Токен Bearer (необов’язково)",
+      "enableServer": "Увімкнути цей сервер",
+      "editServer": "Редагувати сервер",
+      "deleteServer": "Видалити сервер",
+      "deleteTitle": "Видалити цей сервер?",
+      "deleteMessage": "Його інструменти зникнуть з кожного чату.",
+      "kiloBuiltIn": "Вбудований. Увімкніть або вимкніть його для цього чату; його не можна редагувати чи видаляти.",
+      "serversEmptyTitle": "Віддалених серверів ще немає",
+      "serversEmptyDescription": "Додайте один, щоб пропонувати його інструменти у ваших чатах.",
+      "settingsToolsTitle": "Дозволити Kilo змінювати налаштування застосунку",
+      "settingsToolsSubtitle": "Застосовується до теми, мови, сповіщень, моделей і решти Налаштувань.",
+      "settingsToolsOn": "Увімкнено — інструменти налаштувань надсилаються моделі",
+      "settingsToolsOff": "Вимкнено — жоден інструмент налаштувань не надсилається моделі",
+      "serverChecking": "Перевірка цього сервера…",
+      "serverToolCount": "{{count}} інструментів",
+      "serverUnreachable": "Не вдалося зв’язатися з цим сервером"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Підтвердити цю зміну?"
   }
 }

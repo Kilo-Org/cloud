@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo 工具拒绝了此会话",
       "unauthorizedDescription": "请重新登录以在此对话中使用 Kilo 工具。",
       "unavailable": "Kilo 工具不可用",
-      "unavailableDescription": "此账户无法使用 Kilo 服务器。"
+      "unavailableDescription": "此账户无法使用 Kilo 服务器。",
+      "sheetTitle": "聊天工具",
+      "serversSection": "MCP 服务器",
+      "addServer": "添加 MCP 服务器",
+      "addServerTitle": "添加 MCP 服务器",
+      "editServerTitle": "编辑此 MCP 服务器",
+      "fieldName": "显示名称",
+      "fieldUrl": "服务器 URL",
+      "fieldUrlInvalid": "请输入有效的服务器 URL。",
+      "fieldToken": "Bearer 令牌（可选）",
+      "enableServer": "启用此服务器",
+      "editServer": "编辑服务器",
+      "deleteServer": "删除服务器",
+      "deleteTitle": "删除此服务器？",
+      "deleteMessage": "其工具将从所有聊天中移除。",
+      "kiloBuiltIn": "内置。可为此聊天开启或关闭；无法编辑或删除。",
+      "serversEmptyTitle": "尚无远程服务器",
+      "serversEmptyDescription": "添加一个即可在聊天中使用其工具。",
+      "settingsToolsTitle": "允许 Kilo 更改应用设置",
+      "settingsToolsSubtitle": "适用于主题、语言、通知、模型以及其余偏好设置。",
+      "settingsToolsOn": "开启 — 设置工具会发送给模型",
+      "settingsToolsOff": "关闭 — 不会向模型发送任何设置工具",
+      "serverChecking": "正在检查此服务器…",
+      "serverToolCount": "{{count}} 个工具",
+      "serverUnreachable": "无法连接此服务器"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "确认此更改？"
   }
 }

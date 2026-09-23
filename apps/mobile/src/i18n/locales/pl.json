@@ -3095,7 +3095,34 @@
       "unauthorized": "Narzędzia Kilo odrzuciły tę sesję",
       "unauthorizedDescription": "Zaloguj się ponownie, aby używać narzędzi Kilo w tym czacie.",
       "unavailable": "Narzędzia Kilo są niedostępne",
-      "unavailableDescription": "Serwer Kilo jest niedostępny dla tego konta."
+      "unavailableDescription": "Serwer Kilo jest niedostępny dla tego konta.",
+      "sheetTitle": "Narzędzia czatu",
+      "serversSection": "Serwery MCP",
+      "addServer": "Dodaj serwer MCP",
+      "addServerTitle": "Dodaj serwer MCP",
+      "editServerTitle": "Edytuj ten serwer MCP",
+      "fieldName": "Wyświetlana nazwa",
+      "fieldUrl": "Adres URL serwera",
+      "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
+      "fieldToken": "Token Bearer (opcjonalnie)",
+      "enableServer": "Włącz ten serwer",
+      "editServer": "Edytuj serwer",
+      "deleteServer": "Usuń serwer",
+      "deleteTitle": "Usunąć ten serwer?",
+      "deleteMessage": "Jego narzędzia znikną z każdego czatu.",
+      "kiloBuiltIn": "Wbudowany. Włącz go lub wyłącz dla tego czatu; nie można go edytować ani usunąć.",
+      "serversEmptyTitle": "Nie ma jeszcze zdalnych serwerów",
+      "serversEmptyDescription": "Dodaj jeden, aby oferować jego narzędzia w swoich czatach.",
+      "settingsToolsTitle": "Zezwól Kilo zmieniać ustawienia aplikacji",
+      "settingsToolsSubtitle": "Dotyczy motywu, języka, powiadomień, modeli i pozostałych Ustawień.",
+      "settingsToolsOn": "Włączone — narzędzia ustawień są wysyłane do modelu",
+      "settingsToolsOff": "Wyłączone — żadne narzędzie ustawień nie jest wysyłane do modelu",
+      "serverChecking": "Sprawdzanie tego serwera…",
+      "serverToolCount": "{{count}} narzędzi",
+      "serverUnreachable": "Nie udało się połączyć z tym serwerem"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Potwierdzić tę zmianę?"
   }
 }

@@ -3051,7 +3051,34 @@
       "unauthorized": "ឧបករណ៍ Kilo បានបដិសេធវគ្គនេះ",
       "unauthorizedDescription": "ចូលម្តងទៀតដើម្បីប្រើឧបករណ៍ Kilo ក្នុងការជជែកនេះ។",
       "unavailable": "ឧបករណ៍ Kilo មិនអាចប្រើបានទេ",
-      "unavailableDescription": "ម៉ាស៊ីនបម្រើ Kilo មិនមានសម្រាប់គណនីនេះទេ។"
+      "unavailableDescription": "ម៉ាស៊ីនបម្រើ Kilo មិនមានសម្រាប់គណនីនេះទេ។",
+      "sheetTitle": "ឧបករណ៍ជជែក",
+      "serversSection": "ម៉ាស៊ីនបម្រើ MCP",
+      "addServer": "បន្ថែមម៉ាស៊ីនបម្រើ MCP",
+      "addServerTitle": "បន្ថែមម៉ាស៊ីនបម្រើ MCP",
+      "editServerTitle": "កែសម្រួលម៉ាស៊ីនបម្រើ MCP នេះ",
+      "fieldName": "ឈ្មោះបង្ហាញ",
+      "fieldUrl": "URL ម៉ាស៊ីនបម្រើ",
+      "fieldUrlInvalid": "បញ្ចូល URL ម៉ាស៊ីនបម្រើត្រឹមត្រូវ។",
+      "fieldToken": "តូកិន Bearer (ស្រេចចិត្ត)",
+      "enableServer": "បើកម៉ាស៊ីនបម្រើនេះ",
+      "editServer": "កែសម្រួលម៉ាស៊ីនបម្រើ",
+      "deleteServer": "លុបម៉ាស៊ីនបម្រើ",
+      "deleteTitle": "លុបម៉ាស៊ីនបម្រើនេះ?",
+      "deleteMessage": "ឧបករណ៍របស់វានឹងចេញពីរាល់ការជជែក។",
+      "kiloBuiltIn": "ភ្ជាប់មកជាមួយ។ បើក ឬបិទវាសម្រាប់ការជជែកនេះ; មិនអាចកែសម្រួល ឬលុបវាបានទេ។",
+      "serversEmptyTitle": "មិនទាន់មានម៉ាស៊ីនបម្រើពីចម្ងាយ",
+      "serversEmptyDescription": "បន្ថែមមួយដើម្បីផ្ដល់ឧបករណ៍របស់វានៅក្នុងការជជែករបស់អ្នក។",
+      "settingsToolsTitle": "អនុញ្ញាតឱ្យ Kilo ផ្លាស់ប្តូរការកំណត់កម្មវិធី",
+      "settingsToolsSubtitle": "អនុវត្តចំពោះស្បែក ភាសា ការជូនដំណឹង ម៉ូដែល និងចំណង់ចំណូលចិត្តផ្សេងទៀត។",
+      "settingsToolsOn": "បើក — ឧបករណ៍កំណត់ត្រូវបានផ្ញើទៅម៉ូដែល",
+      "settingsToolsOff": "បិទ — គ្មានឧបករណ៍កំណត់ត្រូវបានផ្ញើទៅម៉ូដែលទេ",
+      "serverChecking": "កំពុងពិនិត្យម៉ាស៊ីនបម្រើនេះ…",
+      "serverToolCount": "ឧបករណ៍ {{count}}",
+      "serverUnreachable": "មិនអាចទៅដល់ម៉ាស៊ីនបម្រើនេះបានទេ"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "បញ្ជាក់ការផ្លាស់ប្តូរនេះ?"
   }
 }

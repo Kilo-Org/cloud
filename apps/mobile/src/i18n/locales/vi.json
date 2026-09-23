@@ -3051,7 +3051,34 @@
       "unauthorized": "Công cụ Kilo đã từ chối phiên này",
       "unauthorizedDescription": "Đăng nhập lại để dùng công cụ Kilo trong cuộc trò chuyện này.",
       "unavailable": "Công cụ Kilo không khả dụng",
-      "unavailableDescription": "Máy chủ Kilo không khả dụng cho tài khoản này."
+      "unavailableDescription": "Máy chủ Kilo không khả dụng cho tài khoản này.",
+      "sheetTitle": "Công cụ trò chuyện",
+      "serversSection": "Máy chủ MCP",
+      "addServer": "Thêm máy chủ MCP",
+      "addServerTitle": "Thêm máy chủ MCP",
+      "editServerTitle": "Sửa máy chủ MCP này",
+      "fieldName": "Tên hiển thị",
+      "fieldUrl": "URL máy chủ",
+      "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
+      "fieldToken": "Mã Bearer (không bắt buộc)",
+      "enableServer": "Bật máy chủ này",
+      "editServer": "Sửa máy chủ",
+      "deleteServer": "Xóa máy chủ",
+      "deleteTitle": "Xóa máy chủ này?",
+      "deleteMessage": "Các công cụ của nó sẽ rời khỏi mọi cuộc trò chuyện.",
+      "kiloBuiltIn": "Tích hợp sẵn. Bật hoặc tắt cho cuộc trò chuyện này; không thể sửa hoặc xóa.",
+      "serversEmptyTitle": "Chưa có máy chủ từ xa",
+      "serversEmptyDescription": "Thêm một máy chủ để cung cấp công cụ của nó trong các cuộc trò chuyện của bạn.",
+      "settingsToolsTitle": "Cho phép Kilo thay đổi cài đặt ứng dụng",
+      "settingsToolsSubtitle": "Áp dụng cho chủ đề, ngôn ngữ, thông báo, mô hình và phần còn lại của Tùy chọn.",
+      "settingsToolsOn": "Bật — các công cụ cài đặt được gửi đến mô hình",
+      "settingsToolsOff": "Tắt — không có công cụ cài đặt nào được gửi đến mô hình",
+      "serverChecking": "Đang kiểm tra máy chủ này…",
+      "serverToolCount": "{{count}} công cụ",
+      "serverUnreachable": "Không thể kết nối với máy chủ này"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Xác nhận thay đổi này?"
   }
 }

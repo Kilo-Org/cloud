@@ -145,7 +145,10 @@ describe('SessionListSearchHeader typed query alignment', () => {
   it('aligns the typed query to the field start edge in RTL', async () => {
     i18nManager.isRTL = true;
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(searchInput(renderer).props.style).toEqual({ textAlign: 'right' });
+    // The shared box applies the RTL content alignment in front of the
+    // caller's own style (this field passes none), so the field's query follows
+    // the interface direction.
+    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
   });
 });
 

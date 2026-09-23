@@ -1,16 +1,25 @@
-import { createElement } from 'react';
-import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
+
+import { TestRenderer } from '@/test/renderer';
 
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { i18n } from '@/i18n';
 
-import { ModelPickerOptionRow, ModelSelector } from './model-selector';
+import {
+  checkAccessories,
+  cliCatalogOption,
+  countWithAccessibilityLabel,
+  isInstance,
+  renderRow,
+  renderSelector,
+  rowContainer,
+  textStrings,
+  trailingSlots,
+} from './model-selector.mounted.test-helpers';
 
 const keyboardDismiss = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
@@ -52,124 +61,6 @@ vi.mock('@/lib/picker-bridge', () => ({
 vi.mock('@/lib/utils', () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
 }));
-
-function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionModelOption {
-  return {
-    id: 'remote-model-0',
-    name: 'Minimax M2.5',
-    displayId: 'minimax/minimax-m2.5',
-    variants: [],
-    isPreferred: false,
-    showGatewayMetadata: false,
-    ...overrides,
-  };
-}
-
-function renderRow(
-  option: SessionModelOption,
-  overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
-): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  TestRenderer.act(() => {
-    ref.current = TestRenderer.create(
-      createElement(ModelPickerOptionRow, {
-        option,
-        selected: overrides.selected ?? false,
-        selectedVariant: '',
-        isFavorite: overrides.isFavorite ?? false,
-        onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
-        onSelectVariant: vi.fn<(variant: string) => void>(),
-        onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),
-      })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function renderSelector(
-  overrides: Partial<{
-    value: string;
-    variant: string;
-    options: SessionModelOption[];
-    isLoading: boolean;
-  }> = {}
-): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  TestRenderer.act(() => {
-    ref.current = TestRenderer.create(
-      createElement(ModelSelector, {
-        value: overrides.value ?? '',
-        variant: overrides.variant ?? '',
-        options: overrides.options ?? [],
-        isLoading: overrides.isLoading ?? false,
-        onSelect: vi.fn<(modelId: string, variant: string) => void>(),
-      })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function textStrings(root: TestRenderer.ReactTestInstance): string[] {
-  return root
-    .findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        typeof node.props.children === 'string'
-    )
-    .map(node => node.props.children as string);
-}
-
-function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label: string): number {
-  return root.findAll(node => (node.props.accessibilityLabel as string | undefined) === label)
-    .length;
-}
-
-function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {
-  return renderer.root
-    .findAll(
-      node =>
-        typeof node.type === 'string' &&
-        ((node.type as string) === 'Star' || (node.type as string) === 'Check')
-    )
-    .map(node => `${String(node.type)}:${String(node.props.size)}`);
-}
-
-function checkAccessories(
-  renderer: TestRenderer.ReactTestRenderer
-): { color: unknown; size: unknown }[] {
-  return renderer.root
-    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Check')
-    .map(node => ({ color: node.props.color, size: node.props.size }));
-}
-
-function isInstance(
-  node: TestRenderer.ReactTestInstance | string
-): node is TestRenderer.ReactTestInstance {
-  return typeof node !== 'string';
-}
-
-function rowContainer(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
-  const container = renderer.root.findAll(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'View' &&
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('gap-3 pr-4')
-  )[0];
-  if (!container) {
-    throw new Error('row container not found');
-  }
-  return container;
-}
 
 describe('ModelPickerOptionRow BYOK badge', () => {
   it('renders the BYOK badge for a CLI-catalog option with user BYOK available', () => {
@@ -277,21 +168,10 @@ describe('Kilo auto model names', () => {
   });
 
   it('names a Kilo auto model from the catalog in the chip', () => {
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    TestRenderer.act(() => {
-      ref.current = TestRenderer.create(
-        createElement(ModelSelector, {
-          value: 'kilo-auto/efficient',
-          variant: '',
-          options: [{ ...autoOption, id: 'kilo-auto/efficient', showGatewayMetadata: true }],
-          onSelect: vi.fn<(modelId: string, variant: string) => void>(),
-        })
-      );
+    const renderer = renderSelector({
+      value: 'kilo-auto/efficient',
+      options: [{ ...autoOption, id: 'kilo-auto/efficient', showGatewayMetadata: true }],
     });
-    const renderer = ref.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
     const texts = textStrings(renderer.root);
     expect(texts).toContain('Auto Efficient');
     expect(texts).not.toContain('gateway-spelled auto name');
@@ -307,21 +187,7 @@ describe('openModelPicker sheet anchoring', () => {
   it('dismisses the keyboard before opening the sheet', () => {
     keyboardDismiss.mockClear();
     routerPush.mockClear();
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    TestRenderer.act(() => {
-      ref.current = TestRenderer.create(
-        createElement(ModelSelector, {
-          value: '',
-          variant: '',
-          options: [cliCatalogOption()],
-          onSelect: vi.fn<(modelId: string, variant: string) => void>(),
-        })
-      );
-    });
-    const renderer = ref.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
+    const renderer = renderSelector({ options: [cliCatalogOption()] });
     const [chip] = renderer.root.findAllByType('Pressable');
     if (!chip) {
       throw new Error('model chip not found');

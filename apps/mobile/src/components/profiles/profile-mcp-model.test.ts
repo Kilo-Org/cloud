@@ -5,6 +5,7 @@ import {
   buildMcpServerPayload,
   commandParts,
   countSecretValues,
+  formatCommand,
   initialMcpFormState,
   type McpFormState,
   mcpServerRows,
@@ -114,6 +115,21 @@ describe('initialMcpFormState', () => {
     expect(JSON.parse(state.configJson)).toEqual({ Authorization: MASKED_MCP_VALUE });
     expect(state.timeout).toBe('5000');
   });
+
+  it('round-trips an unedited command whose argument contains a space', () => {
+    const source = localSource({
+      config: { command: ['tool', '--label=foo bar'] },
+    });
+    const state = initialMcpFormState(source);
+
+    expect(state.command).toBe('tool "--label=foo bar"');
+    expect(buildMcpServerPayload(state)).toEqual({
+      type: 'local',
+      name: 'docs',
+      enabled: true,
+      config: { command: ['tool', '--label=foo bar'] },
+    });
+  });
 });
 
 describe('commandParts', () => {
@@ -124,6 +140,20 @@ describe('commandParts', () => {
       '--flag',
     ]);
     expect(commandParts('   ')).toEqual([]);
+  });
+
+  it('keeps a quoted argument together and unescapes it', () => {
+    expect(commandParts(String.raw`tool "--label=foo bar" "say \"hi\"" ""`)).toEqual([
+      'tool',
+      '--label=foo bar',
+      'say "hi"',
+      '',
+    ]);
+  });
+
+  it('re-parses every argument formatCommand wrote', () => {
+    const parts = ['tool', '--label=foo bar', 'say "hi"', '', String.raw`C:\path\to`];
+    expect(commandParts(formatCommand(parts))).toEqual(parts);
   });
 });
 
@@ -138,6 +168,13 @@ function formState(overrides: Partial<McpFormState> = {}): McpFormState {
     timeout: '',
     ...overrides,
   };
+}
+
+/** An environment JSON fragment with `count` entries, for the record bound. */
+function envRecord(count: number): string {
+  return JSON.stringify(
+    Object.fromEntries(Array.from({ length: count }, (_, index) => [`K${index}`, 'v']))
+  );
 }
 
 describe('validateMcpForm', () => {
@@ -173,6 +210,41 @@ describe('validateMcpForm', () => {
     expect(validateMcpForm(formState({ configJson: '{' }))).toBe('json-invalid');
     expect(validateMcpForm(formState({ configJson: '{"PORT":8080}' }))).toBe('json-invalid');
     expect(validateMcpForm(formState({ configJson: '{"API_KEY":"x"}' }))).toBeNull();
+  });
+
+  it('refuses a command beyond the server argument count and length bounds', () => {
+    expect(
+      validateMcpForm(formState({ command: Array.from({ length: 51 }, () => 'x').join(' ') }))
+    ).toBe('command-too-long');
+    expect(validateMcpForm(formState({ command: 'a'.repeat(501) }))).toBe('command-too-long');
+    expect(
+      validateMcpForm(formState({ command: Array.from({ length: 50 }, () => 'x').join(' ') }))
+    ).toBeNull();
+    expect(validateMcpForm(formState({ command: 'a'.repeat(500) }))).toBeNull();
+  });
+
+  it('refuses a URL beyond the server 2048-character bound', () => {
+    const url = `https://example.com/${'a'.repeat(2048)}`;
+    expect(validateMcpForm(formState({ type: 'remote', url }))).toBe('url-too-long');
+    expect(
+      validateMcpForm(formState({ type: 'remote', url: `https://example.com/${'a'.repeat(2000)}` }))
+    ).toBeNull();
+  });
+
+  it('refuses an env/header record beyond the server entry, key and value bounds', () => {
+    expect(validateMcpForm(formState({ configJson: envRecord(51) }))).toBe('record-too-large');
+    expect(validateMcpForm(formState({ configJson: envRecord(50) }))).toBeNull();
+    expect(
+      validateMcpForm(formState({ configJson: JSON.stringify({ ['k'.repeat(129)]: 'v' }) }))
+    ).toBe('record-too-large');
+    expect(
+      validateMcpForm(formState({ configJson: JSON.stringify({ K: 'v'.repeat(4097) }) }))
+    ).toBe('record-too-large');
+    expect(
+      validateMcpForm(
+        formState({ configJson: JSON.stringify({ ['k'.repeat(128)]: 'v'.repeat(4096) }) })
+      )
+    ).toBeNull();
   });
 });
 

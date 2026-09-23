@@ -27,6 +27,7 @@ import {
   readCloneSourceTitle,
 } from '@/components/agents/new-session-prefill';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
+import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -128,6 +129,11 @@ export function NewSessionScreenBody() {
   const [hasPrompt, setHasPrompt] = useState(false);
   // The profile picked for THIS session; null keeps the effective default.
   const [overrideProfileId, setOverrideProfileId] = useState<string | null>(null);
+  // The manual env vars and setup commands typed under Advanced Configuration.
+  // Owned here (not by the panel) so the create body carries them even when the
+  // user starts without saving a profile.
+  const [manualVars, setManualVars] = useState<VariableEdit[]>([]);
+  const [manualCommands, setManualCommands] = useState<string[]>([]);
   // Commit choice for the cloud session: Leave changes (false) is the default.
   const [autoCommit, setAutoCommit] = useState(false);
   // Relative launch folder the folder picker confirmed (`""` = launch directory).
@@ -414,6 +420,18 @@ export function NewSessionScreenBody() {
     cloneNavigateBypassRef.current = true;
   }, []);
 
+  // The manual draft as the create body carries it: one plaintext value per key
+  // (the editor already refuses a key that cleans onto an existing one) and the
+  // non-blank setup commands in list order.
+  const manualEnvVars = useMemo(
+    () => Object.fromEntries(manualVars.map(variable => [variable.key, variable.value])),
+    [manualVars]
+  );
+  const setupCommands = useMemo(
+    () => manualCommands.filter(command => command.trim().length > 0),
+    [manualCommands]
+  );
+
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
     mode,
@@ -426,6 +444,8 @@ export function NewSessionScreenBody() {
     variant: displayVariant,
     autoCommit,
     profileId,
+    manualEnvVars,
+    setupCommands,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -801,6 +821,10 @@ export function NewSessionScreenBody() {
         onOpenProfilePicker={handleOpenProfilePicker}
         selectedProfileId={overrideProfileId}
         onSelectProfile={setOverrideProfileId}
+        manualVars={manualVars}
+        manualCommands={manualCommands}
+        onManualVarsChange={setManualVars}
+        onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}

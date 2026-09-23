@@ -28,12 +28,16 @@ export function VariablesSkeleton() {
 }
 
 /**
- * Inline edit copy for a refused input. Both cases are refused before a save is
- * attempted, so neither uses the screen's save-failed fallback: an empty key is
- * required, and an over-long key states the server's 256-character bound.
+ * Inline edit copy for a refused input. Every case is refused before a save is
+ * attempted, so none uses the screen's save-failed fallback: an empty key is
+ * required, an over-long key states the server's 256-character bound, and a key
+ * that cleans onto an existing one says so instead of silently overwriting it.
  */
 function variableInputErrorMessage(t: (key: string) => string, error: VariableInputError): string {
-  return error === 'empty' ? t('common.required') : t('profiles.keyTooLong');
+  if (error === 'empty') {
+    return t('common.required');
+  }
+  return error === 'duplicate' ? t('profiles.keyDuplicate') : t('profiles.keyTooLong');
 }
 
 /**
@@ -142,6 +146,12 @@ export function VariableRowView({
 type VariableEditFormProps = Readonly<{
   isNew: boolean;
   initial: VariableEdit;
+  /**
+   * The profile's stored keys, so a new key that cleans onto an existing one is
+   * refused rather than silently overwriting it (the server upserts on
+   * `(profile_id, key)`). Ignored for an edit, whose key is fixed.
+   */
+  existingKeys?: readonly string[];
   isSaving: boolean;
   onCancel: () => void;
   onSave: (edit: VariableEdit) => Promise<boolean>;
@@ -156,6 +166,7 @@ type VariableEditFormProps = Readonly<{
 export function VariableEditForm({
   isNew,
   initial,
+  existingKeys = [],
   isSaving,
   onCancel,
   onSave,
@@ -175,7 +186,7 @@ export function VariableEditForm({
   const submit = async () => {
     const key = keyRef.current;
     if (isNew) {
-      const invalid = validateVariableInput({ key, value: valueRef.current });
+      const invalid = validateVariableInput({ key, value: valueRef.current }, existingKeys);
       if (invalid !== null) {
         setError(invalid);
         return;
@@ -202,7 +213,7 @@ export function VariableEditForm({
         onChangeText={value => {
           keyRef.current = value;
           if (error !== null) {
-            setError(validateVariableInput({ key: value, value: valueRef.current }));
+            setError(validateVariableInput({ key: value, value: valueRef.current }, existingKeys));
           }
         }}
       />

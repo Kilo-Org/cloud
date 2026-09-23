@@ -62,6 +62,7 @@ export function ManualEnvVarsEditor({
             key={editingKey}
             isNew={false}
             initial={{ key: row.key, value: row.value, isSecret: row.isSecret }}
+            existingKeys={vars.map(variable => variable.key)}
             isSaving={false}
             onCancel={() => {
               setEditingKey(null);
@@ -89,6 +90,7 @@ export function ManualEnvVarsEditor({
         <VariableEditForm
           isNew
           initial={{ key: '', value: '', isSecret: false }}
+          existingKeys={vars.map(variable => variable.key)}
           isSaving={false}
           onCancel={() => {
             setEditingKey(null);

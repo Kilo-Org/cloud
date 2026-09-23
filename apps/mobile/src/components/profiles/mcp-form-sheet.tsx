@@ -23,10 +23,13 @@ const ERROR_KEYS = {
   'name-required': 'profiles.mcp.nameRequired',
   'name-invalid': 'profiles.mcp.nameInvalid',
   'command-required': 'profiles.mcp.commandRequired',
+  'command-too-long': 'profiles.mcp.commandTooLong',
   'url-required': 'profiles.mcp.urlRequired',
   'url-invalid': 'profiles.mcp.urlInvalid',
+  'url-too-long': 'profiles.mcp.urlTooLong',
   'timeout-invalid': 'profiles.mcp.timeoutInvalid',
   'json-invalid': 'profiles.mcp.jsonInvalid',
+  'record-too-large': 'profiles.mcp.jsonTooLarge',
 } satisfies Record<McpFormError, string>;
 
 function errorKeyFor(
@@ -144,7 +147,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           <FormField
             label={t('profiles.mcp.command')}
             defaultValue={initial.command}
-            error={errorKeyFor(t, error, ['command-required'])}
+            error={errorKeyFor(t, error, ['command-required', 'command-too-long'])}
             disabled={isSaving}
             required
             autoCapitalize="none"
@@ -159,7 +162,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           <FormField
             label={t('profiles.mcp.url')}
             defaultValue={initial.url}
-            error={errorKeyFor(t, error, ['url-required', 'url-invalid'])}
+            error={errorKeyFor(t, error, ['url-required', 'url-invalid', 'url-too-long'])}
             disabled={isSaving}
             required
             autoCapitalize="none"
@@ -176,7 +179,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         <FormField
           label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
           defaultValue={initial.configJson}
-          error={errorKeyFor(t, error, ['json-invalid'])}
+          error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
           disabled={isSaving}
           multiline
           textAlignVertical="top"

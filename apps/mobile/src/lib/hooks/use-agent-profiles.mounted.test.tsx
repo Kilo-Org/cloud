@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- mounted hook integration; the read, mutation, and optimistic contracts exceed the default line limit */
 import { createElement } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -211,6 +212,60 @@ describe('useAgentProfileList', () => {
     expect(current(holder).orgProfiles.map(profile => profile.id)).toEqual(['org-1']);
     expect(current(holder).personalProfiles.map(profile => profile.id)).toEqual(['personal-1']);
     expect(mocks.queries.list).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('starts empty on an organization switch instead of keeping the prior rows', async () => {
+    type Combined = {
+      orgProfiles: Record<string, unknown>[];
+      personalProfiles: Record<string, unknown>[];
+      effectiveDefaultId: string | null;
+    };
+    const first = Promise.withResolvers<Combined>();
+    const second = Promise.withResolvers<Combined>();
+    mocks.queries.listCombined
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    const holder: { current: ListResult | null } = { current: null };
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(ListProbe, { holder, organizationId: 'org-1' })
+    );
+
+    first.resolve({
+      orgProfiles: [summary({ id: 'org-1', ownerType: 'organization' })],
+      personalProfiles: [],
+      effectiveDefaultId: null,
+    });
+    await waitFor(() => current(holder).orgProfiles.length === 1);
+
+    // Switch context while the new organization's read is still pending. The
+    // previous organization's rows must not render under the new scope.
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ListProbe, { holder, organizationId: 'org-2' })
+        )
+      );
+      await Promise.resolve();
+    });
+
+    expect(current(holder).orgProfiles).toEqual([]);
+    expect(current(holder).isLoading).toBe(true);
+
+    second.resolve({
+      orgProfiles: [summary({ id: 'org-2', ownerType: 'organization' })],
+      personalProfiles: [],
+      effectiveDefaultId: null,
+    });
+    await waitFor(
+      () =>
+        current(holder)
+          .orgProfiles.map(profile => profile.id)
+          .join(',') === 'org-2'
+    );
     unmount();
   });
 });

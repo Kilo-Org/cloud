@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { splitProfilesByOwner } from '@/components/profiles/profile-owner-model';
@@ -13,12 +13,34 @@ export { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutation
 export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
 
 /**
+ * Keep the previous rows across a refetch of the SAME query key. React Query's
+ * `keepPreviousData` also keeps them across a query-key change, so switching
+ * organization would render the previous organization's profile rows while the
+ * actions already use the newly selected scope. Comparing the previous query's
+ * key to the current one drops the placeholder the moment the input changes and
+ * still keeps the rows across a same-input refetch.
+ */
+function keepPreviousDataForQueryKey<TQueryData>(
+  queryKey: readonly unknown[]
+): (
+  previousData: TQueryData | undefined,
+  previousQuery: { queryKey: readonly unknown[] } | undefined
+) => TQueryData | undefined {
+  const currentKey = JSON.stringify(queryKey);
+  return (previousData, previousQuery) =>
+    previousQuery !== undefined && JSON.stringify(previousQuery.queryKey) === currentKey
+      ? previousData
+      : undefined;
+}
+
+/**
  * List the profiles for a context. Personal context reads `list`; org context
  * reads `listCombined`, which groups org and personal profiles and already
  * resolves `effectiveDefaultId` (personal default > org default).
  *
- * `placeholderData: keepPreviousData` keeps the previous rows across a refetch,
- * so the list never blanks while a refetch is in flight.
+ * `placeholderData` keeps the previous rows across a refetch of the same key,
+ * so the list never blanks while a refetch is in flight; a different key (an
+ * organization switch) starts empty instead of showing another scope's rows.
  *
  * `isLoading` is `isPending`, not React Query's `isLoading`: in v5 `isLoading`
  * is `isPending && isFetching`, which is false while a paused (offline) first
@@ -29,15 +51,20 @@ export function useAgentProfileList(organizationId?: string) {
   const trpc = useTRPC();
   const isOrganization = organizationId !== undefined;
 
+  const personalOptions = trpc.agentProfiles.list.queryOptions({});
+  const combinedOptions = trpc.agentProfiles.listCombined.queryOptions({
+    organizationId: organizationId ?? '',
+  });
+
   const personal = useQuery({
-    ...trpc.agentProfiles.list.queryOptions({}),
+    ...personalOptions,
     enabled: !isOrganization,
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForQueryKey(personalOptions.queryKey),
   });
   const combined = useQuery({
-    ...trpc.agentProfiles.listCombined.queryOptions({ organizationId: organizationId ?? '' }),
+    ...combinedOptions,
     enabled: isOrganization,
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForQueryKey(combinedOptions.queryKey),
   });
 
   const query = isOrganization ? combined : personal;

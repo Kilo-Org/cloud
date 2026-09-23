@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
 import { type ProfileSelectorProfile } from './profile-selector-model';
+import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
 const push = vi.fn<(href: string) => void>();
 vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
@@ -134,6 +135,10 @@ function ControlledPanel({
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     initialSelectedProfileId ?? null
   );
+  // The panel's manual env vars/commands are the session's state now, so the
+  // harness owns them the way the new-session body does.
+  const [manualVars, setManualVars] = useState<VariableEdit[]>([]);
+  const [manualCommands, setManualCommands] = useState<string[]>([]);
   return createElement(AdvancedConfigPanel, {
     organizationId,
     selectedProfileId,
@@ -141,6 +146,10 @@ function ControlledPanel({
       onSelectProfile?.(id);
       setSelectedProfileId(id);
     },
+    manualVars,
+    manualCommands,
+    onManualVarsChange: setManualVars,
+    onManualCommandsChange: setManualCommands,
   });
 }
 

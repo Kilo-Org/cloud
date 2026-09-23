@@ -17,6 +17,7 @@ import { NewSessionRunTarget } from '@/components/agents/new-session-run-target'
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal-scroll';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
@@ -42,6 +43,15 @@ type NewSessionProfileOverrideProps = {
   selectedProfileId: string | null;
   /** Reports a pick (or `No profile`) from the advanced-config selector. */
   onSelectProfile: (id: string | null) => void;
+  /**
+   * The session's manual environment variables and setup commands. Owned by the
+   * new-session body (not the panel) so the create carries them; the advanced
+   * config editors only report changes.
+   */
+  manualVars: readonly VariableEdit[];
+  manualCommands: readonly string[];
+  onManualVarsChange: (next: VariableEdit[]) => void;
+  onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
 };
@@ -107,6 +117,10 @@ export function NewSessionConfigureForm({
   onOpenProfilePicker,
   selectedProfileId,
   onSelectProfile,
+  manualVars,
+  manualCommands,
+  onManualVarsChange,
+  onManualCommandsChange,
   onOpenRepoDefaults,
   autoCommit,
   onAutoCommitChange,
@@ -287,14 +301,18 @@ export function NewSessionConfigureForm({
       {
         // The advanced configuration disclosure sits under Environment. It is
         // collapsed by default, so the screen is unchanged until it is tapped;
-        // the panel owns its manual config state, while the profile pick is
-        // the session's own override so both selectors drive one submitted id.
+        // both the profile pick and the manual env/command draft are the
+        // session's own state, so one submitted create carries them all.
       }
       {!isRemote && !isCloneEntry ? (
         <AdvancedConfigPanel
           organizationId={organizationId}
           selectedProfileId={selectedProfileId}
           onSelectProfile={onSelectProfile}
+          manualVars={manualVars}
+          manualCommands={manualCommands}
+          onManualVarsChange={onManualVarsChange}
+          onManualCommandsChange={onManualCommandsChange}
           disabled={isStarting}
           onRepoDefaults={onOpenRepoDefaults}
         />

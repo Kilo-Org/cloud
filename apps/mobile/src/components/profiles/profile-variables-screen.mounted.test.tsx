@@ -182,6 +182,26 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('non-retryable: a new key that cleans onto an existing one is refused', async () => {
+    h.query.data = testProfile([{ key: 'FOO_BAR', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add variable');
+    changeText(renderer.root, 'Key', 'foo-bar');
+    changeText(renderer.root, 'Value', '2');
+    pressButton(renderer.root, 'Save');
+
+    // The server upserts on (profile_id, key), so `foo-bar` would silently
+    // replace `FOO_BAR`; the form refuses it instead of calling setVar.
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Key').props.error).toBe(
+      'This key already exists in the profile'
+    );
+
+    unmount();
+  });
+
   it('retryable: a failure with no message toasts the fallback and keeps the form', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;

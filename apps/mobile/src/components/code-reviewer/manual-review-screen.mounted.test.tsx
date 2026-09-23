@@ -35,6 +35,15 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+  Platform: { OS: 'ios' },
+  Keyboard: { addListener: () => ({ remove: vi.fn() }) },
+  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
+}));
+// The screen reserves the keyboard height through `AppAwareKeyboardPaddingView`,
+// whose module pulls in the real package; the node test environment cannot load
+// it, so the suite stubs the insets like every other mounted screen test.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

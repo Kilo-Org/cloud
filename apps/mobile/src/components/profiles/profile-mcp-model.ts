@@ -58,7 +58,7 @@ export function countSecretValues(server: McpServerSource): number {
 /** The command line (local) or URL (remote) the row shows under the name. */
 export function mcpServerSummary(server: McpServerSource): string {
   if (server.type === 'local') {
-    return (server.config.command ?? []).join(' ');
+    return formatCommand(server.config.command ?? []);
   }
   return server.config.url ?? '';
 }
@@ -109,7 +109,7 @@ export function initialMcpFormState(server?: McpServerSource): McpFormState {
     name: server.name,
     type: server.type,
     enabled: server.enabled,
-    command: server.type === 'local' ? (server.config.command ?? []).join(' ') : '',
+    command: server.type === 'local' ? formatCommand(server.config.command ?? []) : '',
     url: server.type === 'remote' ? (server.config.url ?? '') : '',
     configJson: formatRecord(
       server.type === 'local' ? server.config.environment : server.config.headers
@@ -118,27 +118,92 @@ export function initialMcpFormState(server?: McpServerSource): McpFormState {
   };
 }
 
-/** Server bounds: name pattern and max, command list, timeout range. */
+/** Server bounds: name pattern and max, command list, timeout range, url, record. */
 const MCP_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MCP_NAME_MAX_LENGTH = 100;
 const MCP_TIMEOUT_MAX = 3_600_000;
 const URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/\S+$/i;
+/** Server bound: `mcpRemoteConfigInputSchema`'s `z.string().url().max(2048)`. */
+const MCP_URL_MAX_LENGTH = 2048;
+/** Server bound: `mcpLocalConfigInputSchema`'s `z.array(...).min(1).max(50)`. */
+const MCP_COMMAND_MAX_ARGS = 50;
+/** Server bound: each command argument's `z.string().max(500)`. */
+const MCP_COMMAND_ARG_MAX_LENGTH = 500;
+/** Server bound: `MAX_MCP_ENV_OR_HEADERS` caps the env/headers record. */
+const MCP_RECORD_MAX_ENTRIES = 50;
+/** Server bound: the env/header key's `z.string().max(128)`. */
+const MCP_RECORD_KEY_MAX_LENGTH = 128;
+/** Server bound: the env/header value's `z.string().max(4096)`. */
+const MCP_RECORD_VALUE_MAX_LENGTH = 4096;
 
 export type McpFormError =
   | 'name-required'
   | 'name-invalid'
   | 'command-required'
+  | 'command-too-long'
   | 'url-required'
   | 'url-invalid'
+  | 'url-too-long'
   | 'timeout-invalid'
-  | 'json-invalid';
+  | 'json-invalid'
+  | 'record-too-large';
 
-/** Split a command line the way the web editor does: whitespace, blanks dropped. */
+/**
+ * Split a command line back into the argument array the server stores. A
+ * double-quoted run keeps its spaces (and a backslash escapes the next
+ * character inside it), so `tool "--label=foo bar"` round-trips to two
+ * arguments instead of three. Anything unquoted splits on whitespace as before.
+ */
 export function commandParts(command: string): string[] {
-  return command
-    .split(/\s+/)
-    .map(part => part.trim())
-    .filter(Boolean);
+  const parts: string[] = [];
+  let current = '';
+  let hasToken = false;
+  let quoted = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? '';
+    if (quoted && char === '\\' && index + 1 < command.length) {
+      index += 1;
+      current += command[index];
+      hasToken = true;
+    } else if (char === '"') {
+      quoted = !quoted;
+      // A quoted empty run is a real empty argument, unlike a bare blank run.
+      hasToken = true;
+    } else if (!quoted && /\s/.test(char)) {
+      if (hasToken) {
+        parts.push(current);
+      }
+      current = '';
+      hasToken = false;
+    } else {
+      current += char;
+      hasToken = true;
+    }
+  }
+  if (hasToken) {
+    parts.push(current);
+  }
+  return parts;
+}
+
+/** The escaped forms a quoted command argument carries, spelled without escaping. */
+const ESCAPED_BACKSLASH = String.raw`\\`;
+const ESCAPED_QUOTE = String.raw`\"`;
+
+/**
+ * Render a command array as one editable line. Only an argument that would
+ * lose its boundary — one holding whitespace, a quote or a backslash, or an
+ * empty argument — is quoted and escaped, so the common command reads as
+ * plain text while `commandParts` recovers every argument exactly.
+ */
+export function formatCommand(parts: readonly string[]): string {
+  return parts
+    .map(part =>
+      part.length === 0 || /[\s"\\]/.test(part)
+        ? `"${part.replaceAll('\\', ESCAPED_BACKSLASH).replaceAll('"', ESCAPED_QUOTE)}"`
+        : part
+    )
+    .join(' ');
 }
 
 function parseTimeout(raw: string): number | undefined | null {
@@ -156,9 +221,11 @@ function parseTimeout(raw: string): number | undefined | null {
 /**
  * Validate the form before a save. Returns the field at fault, or `null` when
  * valid. Mirrors the server's input schema so an invalid save never leaves the
- * device: the name pattern and length, a non-empty command for a local server,
- * a parseable URL and non-empty JSON fragment for a remote one, an integer
- * timeout, and a `Record<string,string>` JSON fragment either way.
+ * device: the name pattern and length, a non-empty command for a local server
+ * within the argument count/length bounds, a parseable URL within its length
+ * bound and a non-empty JSON fragment for a remote one, an integer timeout, and
+ * a `Record<string,string>` JSON fragment within the entry/key/value bounds
+ * either way.
  */
 export function validateMcpForm(state: McpFormState): McpFormError | null {
   const name = state.name.trim();
@@ -169,8 +236,15 @@ export function validateMcpForm(state: McpFormState): McpFormError | null {
     return 'name-invalid';
   }
   if (state.type === 'local') {
-    if (commandParts(state.command).length === 0) {
+    const args = commandParts(state.command);
+    if (args.length === 0) {
       return 'command-required';
+    }
+    if (
+      args.length > MCP_COMMAND_MAX_ARGS ||
+      args.some(argument => argument.length > MCP_COMMAND_ARG_MAX_LENGTH)
+    ) {
+      return 'command-too-long';
     }
   } else {
     const url = state.url.trim();
@@ -180,6 +254,9 @@ export function validateMcpForm(state: McpFormState): McpFormError | null {
     if (!URL_PATTERN.test(url)) {
       return 'url-invalid';
     }
+    if (url.length > MCP_URL_MAX_LENGTH) {
+      return 'url-too-long';
+    }
   }
   if (parseTimeout(state.timeout) === null) {
     return 'timeout-invalid';
@@ -187,6 +264,18 @@ export function validateMcpForm(state: McpFormState): McpFormError | null {
   const record = parseRecord(state.configJson);
   if (!record.ok) {
     return 'json-invalid';
+  }
+  if (record.value !== undefined) {
+    const entries = Object.entries(record.value);
+    if (
+      entries.length > MCP_RECORD_MAX_ENTRIES ||
+      entries.some(
+        ([key, value]) =>
+          key.length > MCP_RECORD_KEY_MAX_LENGTH || value.length > MCP_RECORD_VALUE_MAX_LENGTH
+      )
+    ) {
+      return 'record-too-large';
+    }
   }
   return null;
 }

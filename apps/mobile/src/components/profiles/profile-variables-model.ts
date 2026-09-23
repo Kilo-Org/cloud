@@ -8,7 +8,7 @@
  * edit applies.
  */
 
-import { VARIABLE_KEY_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import { cleanVariableKey, VARIABLE_KEY_MAX_LENGTH } from '@/lib/agent-profile-forms';
 
 /** The fields of a variable the screen reads. Structural, so a test needs no tRPC type. */
 export type ProfileVarSource = Readonly<{
@@ -44,16 +44,20 @@ export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
   }));
 }
 
-export type VariableInputError = 'empty' | 'too-long';
+export type VariableInputError = 'empty' | 'too-long' | 'duplicate';
 
 /**
  * Validate the edited variable before a save. Matches the server's
  * `VarSchema` key bound (`z.string().min(1).max(256)`); `value` is part of the
- * form's input but unconstrained, matching the server. Returns an error code,
- * or `null` when valid.
+ * form's input but unconstrained, matching the server. `takenKeys` are the
+ * profile's stored keys: the server upserts on `(profile_id, key)` with the
+ * cleaned key the form sends, so a new key that normalizes onto an existing one
+ * would silently replace that variable. Returns an error code, or `null` when
+ * valid.
  */
 export function validateVariableInput(
-  input: Readonly<{ key: string; value: string }>
+  input: Readonly<{ key: string; value: string }>,
+  takenKeys: readonly string[] = []
 ): VariableInputError | null {
   const key = input.key.trim();
   if (key.length === 0) {
@@ -61,6 +65,9 @@ export function validateVariableInput(
   }
   if (key.length > VARIABLE_KEY_MAX_LENGTH) {
     return 'too-long';
+  }
+  if (takenKeys.includes(cleanVariableKey(key))) {
+    return 'duplicate';
   }
   return null;
 }

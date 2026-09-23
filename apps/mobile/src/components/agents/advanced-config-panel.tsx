@@ -63,6 +63,16 @@ type AdvancedConfigPanelProps = Readonly<{
   selectedProfileId: string | null;
   /** Reports a pick (or `No profile`) to the session that owns the override. */
   onSelectProfile: (id: string | null) => void;
+  /**
+   * The session's manual environment variables and setup commands, owned by the
+   * new-session route so the create can carry them. The panel edits them through
+   * the callbacks and keeps no draft of its own, so a value entered here is
+   * never dropped when the session starts without saving a profile first.
+   */
+  manualVars: readonly VariableEdit[];
+  manualCommands: readonly string[];
+  onManualVarsChange: (next: VariableEdit[]) => void;
+  onManualCommandsChange: (next: string[]) => void;
   disabled?: boolean;
   /**
    * Opens the repo default-profile bindings. Omitted until that surface
@@ -83,6 +93,10 @@ export function AdvancedConfigPanel({
   organizationId,
   selectedProfileId,
   onSelectProfile,
+  manualVars,
+  manualCommands,
+  onManualVarsChange,
+  onManualCommandsChange,
   disabled = false,
   onRepoDefaults,
 }: Readonly<AdvancedConfigPanelProps>) {
@@ -99,8 +113,6 @@ export function AdvancedConfigPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
-  const [draftVars, setDraftVars] = useState<VariableEdit[]>([]);
-  const [commands, setCommands] = useState<string[]>([]);
   const [isSaveOpen, setIsSaveOpen] = useState(false);
 
   const orgProfiles = useMemo(() => {
@@ -150,10 +162,10 @@ export function AdvancedConfigPanel({
   );
 
   const selectedProfile = selectorState.selectedProfile;
-  const manualCommands = commands.filter(command => command.trim().length > 0);
-  const hasManualConfig = draftVars.length > 0 || manualCommands.length > 0;
-  const effectiveVars = (selectedProfile?.varCount ?? 0) + draftVars.length;
-  const effectiveCommands = (selectedProfile?.commandCount ?? 0) + manualCommands.length;
+  const setupCommands = manualCommands.filter(command => command.trim().length > 0);
+  const hasManualConfig = manualVars.length > 0 || setupCommands.length > 0;
+  const effectiveVars = (selectedProfile?.varCount ?? 0) + manualVars.length;
+  const effectiveCommands = (selectedProfile?.commandCount ?? 0) + setupCommands.length;
 
   const handleSaveProfile = async (submission: SaveProfileSubmission): Promise<boolean> => {
     try {
@@ -164,7 +176,7 @@ export function AdvancedConfigPanel({
         description: submission.description === '' ? undefined : submission.description,
       });
       await Promise.all(
-        draftVars.map(async variable => {
+        manualVars.map(async variable => {
           await setVar.mutateAsync({
             profileId,
             key: variable.key,
@@ -173,8 +185,8 @@ export function AdvancedConfigPanel({
           });
         })
       );
-      if (manualCommands.length > 0) {
-        await saveCommands.mutateAsync({ profileId, commands: manualCommands });
+      if (setupCommands.length > 0) {
+        await saveCommands.mutateAsync({ profileId, commands: setupCommands });
       }
       if (submission.setAsDefault) {
         await setAsDefault.mutateAsync({ profileId });
@@ -184,8 +196,8 @@ export function AdvancedConfigPanel({
       setCreatedProfile({
         id: profileId,
         name: submission.name,
-        varCount: draftVars.length,
-        commandCount: manualCommands.length,
+        varCount: manualVars.length,
+        commandCount: setupCommands.length,
         isDefault: submission.setAsDefault,
         ownerType: organizationId === undefined ? 'user' : 'organization',
       });
@@ -254,11 +266,15 @@ export function AdvancedConfigPanel({
             </Text>
           ) : null}
 
-          <ManualEnvVarsEditor vars={draftVars} disabled={disabled} onChange={setDraftVars} />
-          <ManualSetupCommandsEditor
-            commands={commands}
+          <ManualEnvVarsEditor
+            vars={manualVars}
             disabled={disabled}
-            onChange={setCommands}
+            onChange={onManualVarsChange}
+          />
+          <ManualSetupCommandsEditor
+            commands={manualCommands}
+            disabled={disabled}
+            onChange={onManualCommandsChange}
           />
 
           {hasManualConfig ? (
@@ -277,8 +293,8 @@ export function AdvancedConfigPanel({
 
       {isSaveOpen ? (
         <SaveProfileSheet
-          envVars={draftVars}
-          setupCommands={manualCommands}
+          envVars={manualVars}
+          setupCommands={setupCommands}
           onClose={() => {
             setIsSaveOpen(false);
           }}

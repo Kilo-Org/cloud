@@ -44,6 +44,14 @@ describe('validateVariableInput', () => {
   it('reports a key longer than 256 characters', () => {
     expect(validateVariableInput({ key: 'a'.repeat(257), value: 'x' })).toBe('too-long');
   });
+
+  it('reports a key that cleans onto an existing stored key', () => {
+    expect(validateVariableInput({ key: 'foo-bar', value: 'x' }, ['FOO_BAR'])).toBe('duplicate');
+    expect(validateVariableInput({ key: 'FOO_BAR', value: 'x' }, ['FOO_BAR'])).toBe('duplicate');
+    // A different key, or no stored keys, still passes.
+    expect(validateVariableInput({ key: 'foo-bar', value: 'x' }, ['OTHER_KEY'])).toBeNull();
+    expect(validateVariableInput({ key: 'foo-bar', value: 'x' })).toBeNull();
+  });
 });
 
 describe('applyVariableEdit', () => {

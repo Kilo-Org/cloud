@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   promote:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production

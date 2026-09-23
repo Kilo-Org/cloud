@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   check:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:

@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: inputs.worker != ''
+    if: github.repository == 'Kilo-Org/cloud' && inputs.worker != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Deploy ${{ inputs.worker }}
@@ -76,7 +76,7 @@ jobs:
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   detect-changes:
-    if: inputs.worker == '' && (inputs.base_sha != '' || inputs.target_environment != 'production')
+    if: github.repository == 'Kilo-Org/cloud' && inputs.worker == '' && (inputs.base_sha != '' || inputs.target_environment != 'production')
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -213,7 +213,7 @@ jobs:
 
   deploy-changed:
     needs: detect-changes
-    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
+    if: github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: ${{ inputs.target_environment }}

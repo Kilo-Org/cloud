@@ -9,6 +9,9 @@ on:
 jobs:
   check:
     name: Check markdown table padding
+    # Canonical-repo guard: no-op for pull_request (runs in the base-repo
+    # context, where validation is desired); skips manual dispatch runs in forks.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -13,6 +13,9 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
+// Mutable so a test can prove both platforms receive the one sheet the picker
+// builds: the current-account mark rides the gutter icon, never a label branch.
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
 // not just that the dark values are passed through. Values mirror the real
 // light/dark tokens in theme-colors.generated.ts.
@@ -51,14 +54,14 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Platform: { OS: 'android' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => theme.colors,
 }));
@@ -116,11 +119,14 @@ function nativePicker() {
     | [
         {
           options: string[];
+          icons?: (unknown | null)[];
           cancelButtonIndex: number;
           title: string;
           containerStyle: { paddingBottom: number; backgroundColor: string };
           textStyle: { color: string };
           titleTextStyle: { color: string };
+          showSeparators: boolean;
+          separatorStyle: { backgroundColor: string; height: number };
         },
         (index?: number) => void,
       ]
@@ -131,10 +137,18 @@ function nativePicker() {
   return { options: call[0], choose: call[1] };
 }
 
+/** The gutter check per row: its props, or null where the row holds no gutter. */
+function gutter(icons: (unknown | null)[] | undefined) {
+  return (icons ?? []).map(icon =>
+    icon == null ? null : (icon as { props: { color: string; size: number } }).props
+  );
+}
+
 beforeEach(() => {
   auth.token = 'token';
   persisted = null;
   rerender = undefined;
+  platform.OS = 'android';
   theme.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
@@ -201,6 +215,85 @@ describe('ContextControl', () => {
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
+
+  it.each([
+    { stored: null, current: 0 },
+    { stored: 'org-a', current: 1 },
+    { stored: 'org-missing', current: -1 },
+  ])(
+    'separates the rows and paints the current account in the left gutter (stored=$stored)',
+    async ({ stored, current }) => {
+      storage.read.mockResolvedValue(stored);
+      const ui = await mount();
+      await waitFor(() => !picker(ui).props.disabled);
+      await press(picker(ui));
+      const native = nativePicker();
+      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
+      expect(native.options.showSeparators).toBe(true);
+      expect(native.options.separatorStyle).toEqual({
+        backgroundColor: DARK_COLORS.border,
+        height: 0.5,
+      });
+      // Both account rows hold the shared gutter with a check, so the labels
+      // line up; only the current row's check is painted, and Cancel has none.
+      expect(gutter(native.options.icons)).toEqual([
+        { size: 18, color: current === 0 ? DARK_COLORS.foreground : 'transparent' },
+        { size: 18, color: current === 1 ? DARK_COLORS.foreground : 'transparent' },
+        null,
+      ]);
+    }
+  );
+
+  it.each(['android', 'ios'] as const)(
+    'marks the current account in the shared gutter on %s',
+    async os => {
+      platform.OS = os;
+      storage.read.mockResolvedValue('org-a');
+      const ui = await mount();
+      await waitFor(() => !picker(ui).props.disabled);
+      await press(picker(ui));
+      const native = nativePicker();
+      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
+      expect(gutter(native.options.icons)).toEqual([
+        { size: 18, color: 'transparent' },
+        { size: 18, color: DARK_COLORS.foreground },
+        null,
+      ]);
+    }
+  );
+
+  it('opens one sheet on both platforms, with no per-platform label branch', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    platform.OS = 'android';
+    await press(picker(ui));
+    const android = nativePicker().options;
+    platform.OS = 'ios';
+    await press(picker(ui));
+    const ios = nativePicker().options;
+    expect(ios.options).toEqual(android.options);
+    expect(ios.icons).toBeDefined();
+    expect(gutter(ios.icons)).toEqual(gutter(android.icons));
+  });
+
+  it('checks Personal when the membership list is empty', async () => {
+    list.mockResolvedValue([]);
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const native = nativePicker();
+    expect(native.options.options).toEqual(['Personal', 'Cancel']);
+    expect(native.options.showSeparators).toBe(true);
+    expect(native.options.separatorStyle).toEqual({
+      backgroundColor: DARK_COLORS.border,
+      height: 0.5,
+    });
+    expect(gutter(native.options.icons)).toEqual([
+      { size: 18, color: DARK_COLORS.foreground },
+      null,
+    ]);
+  });
 
   it('themes the native picker with the active theme colors', async () => {
     const ui = await mount();

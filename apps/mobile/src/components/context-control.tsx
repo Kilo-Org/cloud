@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ChevronDown } from '@/components/ui/icons';
+import { Check, ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -23,26 +23,49 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { setOrganizationId } = useOrganization();
+  const { setOrganizationId, organizationId } = useOrganization();
 
   return () => {
     if (!orgs) {
       return;
     }
-    const options = [
+    const labels = [
       t('common.personal'),
       ...orgs.map(org => org.organizationName),
       t('common.cancel'),
     ];
-    const cancelButtonIndex = options.length - 1;
+    const cancelButtonIndex = labels.length - 1;
+    // Personal is index 0 and the memberships follow in list order. A persisted
+    // membership that is no longer listed checks nothing, so the mark never names
+    // an account the user is not on.
+    const isCurrent = (index: number) =>
+      index === 0 ? organizationId === null : orgs[index - 1]?.organizationId === organizationId;
+    // The current account is marked by the check icon in the shared left gutter,
+    // on every platform. The native iOS action sheet renders option strings only
+    // — it has no icon API, no separator style and no palette — so iOS would show
+    // a second, unmarked implementation; `AppRootProviders` therefore mounts this
+    // library's own JS sheet (the Android sheet) on iOS too, and one option array
+    // and one icon gutter serve both platforms. Every account row holds the
+    // gutter with a check, transparent when the row is not the current account, so
+    // the labels line up; Cancel takes no gutter at all.
+    const icons = labels.map((_, index) =>
+      index === cancelButtonIndex ? null : (
+        <Check key={index} size={18} color={isCurrent(index) ? colors.foreground : 'transparent'} />
+      )
+    );
     showActionSheetWithOptions(
       {
-        options,
+        options: labels,
+        icons,
         cancelButtonIndex,
         title: t('profile.selectAccount'),
         containerStyle: { paddingBottom: bottom, backgroundColor: colors.card },
         textStyle: { color: colors.foreground },
         titleTextStyle: { color: colors.mutedForeground },
+        // A rule between rows turns the list from plain copy into distinct
+        // choices.
+        showSeparators: true,
+        separatorStyle: { backgroundColor: colors.border, height: 0.5 },
       },
       index => {
         if (index === undefined || index === cancelButtonIndex) {

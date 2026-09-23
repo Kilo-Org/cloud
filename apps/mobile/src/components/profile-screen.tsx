@@ -17,9 +17,8 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
-import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -31,7 +30,6 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
-import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -85,15 +83,6 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // Android's native alert paints every button with the theme accent, so
-  // `Alert.alert`'s destructive style never shows the red affordance there.
-  // Android opens the in-app confirmation instead; iOS keeps the native alert,
-  // which already renders the destructive sign-out choice in red.
-  // The confirmation's platform split lives in the hook, keeping this screen's
-  // shared layout path free of platform forks (`screen-insets.test.ts`).
-  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
-    () => void signOut()
-  );
   const {
     data,
     isLoading,
@@ -140,6 +129,22 @@ export function ProfileScreen() {
         text: t('profile.deleteAccountConfirm'),
         style: 'destructive',
         onPress: beginDelete,
+      },
+    ]);
+  };
+
+  // The sign-out confirmation is the shared native alert on both platforms:
+  // Android's AppCompat dialog takes its panel and action accent from the
+  // activity theme, which plugins/withAndroidAlertDialogTheme points at the app
+  // tokens, and iOS renders the same call as a `UIAlertController` that already
+  // follows the device appearance.
+  const confirmSignOut = () => {
+    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.signOut'),
+        style: 'destructive',
+        onPress: () => void signOut(),
       },
     ]);
   };
@@ -278,7 +283,13 @@ export function ProfileScreen() {
             providers (and we're not loading/erroring) so the header never dangles. */}
         {/* No layout animation on this section: siblings above mount/resize
             asynchronously; LinearTransition would animate this container's
-            position lag as a visible header overlap. Opacity fades are safe. */}
+            position lag as a visible header overlap.
+            The rows below carry no entering fade either: a Reanimated entering
+            animation does not run while the app is backgrounded, so the row
+            stayed mounted at opacity 0 and left the header alone above the tab
+            bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
+            row's height, so painting a row directly cannot shift the sections
+            below — only the skeleton's exit fade remains. */}
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
           isLoading ||
@@ -319,7 +330,7 @@ export function ProfileScreen() {
             )}
 
             {data?.providers.map((p, index) => (
-              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+              <View key={`${p.provider}-${p.email}`}>
                 <ConfigureRow
                   icon={KeyRound}
                   title={providerLabel(p.provider)}
@@ -328,7 +339,7 @@ export function ProfileScreen() {
                   className="rounded-lg bg-secondary px-3"
                   last={index === data.providers.length - 1}
                 />
-              </Animated.View>
+              </View>
             ))}
           </View>
         )}
@@ -347,7 +358,7 @@ export function ProfileScreen() {
             label={t('profile.privacyChoices')}
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={requestSignOut} />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
@@ -382,16 +393,6 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
-
-      {confirmVisible && (
-        <DestructiveConfirmDialog
-          title={t('profile.signOutTitle')}
-          message={t('profile.signOutMessage')}
-          confirmLabel={t('common.signOut')}
-          onCancel={dismissConfirm}
-          onConfirm={confirmSignOut}
-        />
-      )}
     </View>
   );
 }

@@ -324,7 +324,7 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
     );
   });
 
-  it('accepts zero-cost usage and falls back to TypeSafe when the provider is absent', async () => {
+  it('accepts zero-cost usage and leaves an absent inference provider unknown', async () => {
     mockedFetch.mockResolvedValue(
       Response.json({
         ...upstreamBody,
@@ -337,7 +337,7 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
     await runAfter();
 
     expect(logMicrodollarUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ inference_provider: 'TypeSafe', cost_mUsd: 0, market_cost: 0 }),
+      expect.objectContaining({ inference_provider: null, cost_mUsd: 0, market_cost: 0 }),
       expect.objectContaining({ provider: 'openrouter', user_byok: false })
     );
   });
@@ -532,14 +532,14 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
     expect(after).not.toHaveBeenCalled();
   });
 
-  it('maps OpenRouter credit exhaustion to a service error without charging the user', async () => {
-    mockedFetch.mockResolvedValue(
-      Response.json({ error: 'upstream credits exhausted' }, { status: 402 })
-    );
+  it('cancels the upstream body on credit exhaustion and returns a service error without charging', async () => {
+    const cancel = jest.fn();
+    mockedFetch.mockResolvedValue(new Response(new ReadableStream({ cancel }), { status: 402 }));
 
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(503);
+    expect(cancel).toHaveBeenCalledTimes(1);
     expect(await response.json()).toEqual({
       message: 'Service temporarily unavailable',
       error_type: 'upstream_error',

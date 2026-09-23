@@ -28,8 +28,9 @@ import {
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { toMicrodollars } from '@/lib/utils';
 import { errorExceptInTest } from '@/lib/utils.server';
+import type { ProxyErrorType } from '@/lib/proxy-error-types';
 
-function errorResponse(message: string, error_type: string, status: number) {
+function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
 }
 
@@ -45,7 +46,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
     expectedAudience: KILO_GATEWAY_AUDIENCE,
   });
   if (authFailedResponse) return authFailedResponse;
-  if (!user) return errorResponse('Authentication required', 'authentication_error', 401);
 
   let body: unknown;
   try {
@@ -110,6 +110,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     });
     ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
     if (response.status === 402) {
+      await response.body?.cancel();
       errorExceptInTest('OpenRouter System One balance exhausted');
       return errorResponse('Service temporarily unavailable', 'upstream_error', 503);
     }
@@ -136,7 +137,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         model,
         responseContent: '',
         hasError: false,
-        inference_provider: provider ?? 'TypeSafe',
+        inference_provider: provider ?? null,
         upstream_id: null,
         finish_reason: null,
         latency: ttfbMs,

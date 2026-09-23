@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL máy chủ",
       "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
       "fieldToken": "Mã Bearer (không bắt buộc)",
-      "enableServer": "Bật máy chủ này",
+      "enableServer": "Bật máy chủ này: {{name}}",
       "editServer": "Sửa máy chủ",
       "deleteServer": "Xóa máy chủ",
+      "editServerA11y": "Sửa máy chủ: {{name}}",
+      "deleteServerA11y": "Xóa máy chủ: {{name}}",
+      "retryServerA11y": "Thử lại máy chủ này: {{name}}",
       "deleteTitle": "Xóa máy chủ này?",
       "deleteMessage": "Các công cụ của nó sẽ rời khỏi mọi cuộc trò chuyện.",
       "kiloBuiltIn": "Tích hợp sẵn. Bật hoặc tắt cho cuộc trò chuyện này; không thể sửa hoặc xóa.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Tắt — không có công cụ cài đặt nào được gửi đến mô hình",
       "serverChecking": "Đang kiểm tra máy chủ này…",
       "serverToolCount": "{{count}} công cụ",
-      "serverUnreachable": "Không thể kết nối với máy chủ này"
+      "serverUnreachable": "Không thể kết nối với máy chủ này",
+      "serverOff": "Máy chủ này đang tắt"
     }
   },
   "settingsTools": {

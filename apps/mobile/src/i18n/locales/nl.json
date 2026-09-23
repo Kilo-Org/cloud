@@ -3061,9 +3061,12 @@
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
       "fieldToken": "Bearer-token (optioneel)",
-      "enableServer": "Deze server inschakelen",
+      "enableServer": "Deze server inschakelen: {{name}}",
       "editServer": "Server bewerken",
       "deleteServer": "Server verwijderen",
+      "editServerA11y": "Server bewerken: {{name}}",
+      "deleteServerA11y": "Server verwijderen: {{name}}",
+      "retryServerA11y": "Deze server opnieuw proberen: {{name}}",
       "deleteTitle": "Deze server verwijderen?",
       "deleteMessage": "De tools verlaten elke chat.",
       "kiloBuiltIn": "Ingebouwd. Zet het aan of uit voor deze chat; het kan niet worden bewerkt of verwijderd.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Uit — er wordt geen instellingstool naar het model gestuurd",
       "serverChecking": "Deze server controleren…",
       "serverToolCount": "{{count}} tools",
-      "serverUnreachable": "Kon deze server niet bereiken"
+      "serverUnreachable": "Kon deze server niet bereiken",
+      "serverOff": "Deze server staat uit"
     }
   },
   "settingsTools": {

@@ -3061,9 +3061,12 @@
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
       "fieldToken": "Bearer belirteci (isteğe bağlı)",
-      "enableServer": "Bu sunucuyu etkinleştir",
+      "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",
+      "editServerA11y": "Sunucuyu düzenle: {{name}}",
+      "deleteServerA11y": "Sunucuyu sil: {{name}}",
+      "retryServerA11y": "Bu sunucuyu yeniden dene: {{name}}",
       "deleteTitle": "Bu sunucu silinsin mi?",
       "deleteMessage": "Araçları her sohbetten çıkar.",
       "kiloBuiltIn": "Yerleşik. Bu sohbet için açın veya kapatın; düzenlenemez veya silinemez.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Kapalı — modele hiçbir ayar aracı gönderilmez",
       "serverChecking": "Bu sunucu denetleniyor…",
       "serverToolCount": "{{count}} araç",
-      "serverUnreachable": "Bu sunucuya ulaşılamadı"
+      "serverUnreachable": "Bu sunucuya ulaşılamadı",
+      "serverOff": "Bu sunucu kapalı"
     }
   },
   "settingsTools": {

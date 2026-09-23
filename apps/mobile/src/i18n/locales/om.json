@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL seerverii",
       "fieldUrlInvalid": "URL seerverii sirrii galchi.",
       "fieldToken": "Token Bearer (filannoo)",
-      "enableServer": "Seerverii kana dandeessisi",
+      "enableServer": "Seerverii kana dandeessisi: {{name}}",
       "editServer": "Seerverii sirreessi",
       "deleteServer": "Seerverii balleessi",
+      "editServerA11y": "Seerverii sirreessi: {{name}}",
+      "deleteServerA11y": "Seerverii balleessi: {{name}}",
+      "retryServerA11y": "Seerverii kana irra deebi'ii yaali: {{name}}",
       "deleteTitle": "Seerverii kana haquu?",
       "deleteMessage": "Meeshaaleen isaa haasawa hunda keessaa ba'u.",
       "kiloBuiltIn": "Keessatti ijaarame. Haasawa kanaaf isa bani ykn cufi; sirreessuu ykn haquu hin danda'amu.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Cufaa — meeshaan qindaa'inaa tokkoon moodeelaaf hin ergamu",
       "serverChecking": "Seerverii kana sakatta'aa jira…",
       "serverToolCount": "meeshaalee {{count}}",
-      "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne"
+      "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne",
+      "serverOff": "Seerveriin kun dhaameera"
     }
   },
   "settingsTools": {

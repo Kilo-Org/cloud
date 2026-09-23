@@ -3061,9 +3061,12 @@
       "fieldUrl": "સર્વર URL",
       "fieldUrlInvalid": "માન્ય સર્વર URL દાખલ કરો.",
       "fieldToken": "Bearer ટોકન (વૈકલ્પિક)",
-      "enableServer": "આ સર્વર સક્ષમ કરો",
+      "enableServer": "આ સર્વર સક્ષમ કરો: {{name}}",
       "editServer": "સર્વર સંપાદિત કરો",
       "deleteServer": "સર્વર કાઢી નાખો",
+      "editServerA11y": "સર્વર સંપાદિત કરો: {{name}}",
+      "deleteServerA11y": "સર્વર કાઢી નાખો: {{name}}",
+      "retryServerA11y": "આ સર્વર ફરી પ્રયાસ કરો: {{name}}",
       "deleteTitle": "આ સર્વર કાઢી નાખવું?",
       "deleteMessage": "તેના સાધનો દરેક ચેટમાંથી નીકળી જશે.",
       "kiloBuiltIn": "બિલ્ટ-ઇન. આ ચેટ માટે તેને ચાલુ કે બંધ કરો; તેને સંપાદિત કે કાઢી શકાતું નથી.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "બંધ — મોડેલને કોઈ સેટિંગ્સ સાધન મોકલવામાં આવતું નથી",
       "serverChecking": "આ સર્વર તપાસી રહ્યું છે…",
       "serverToolCount": "{{count}} સાધનો",
-      "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી"
+      "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
+      "serverOff": "આ સર્વર બંધ છે"
     }
   },
   "settingsTools": {

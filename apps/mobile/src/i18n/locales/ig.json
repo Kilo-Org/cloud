@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL sava",
       "fieldUrlInvalid": "Tinye URL sava ziri ezi.",
       "fieldToken": "Token Bearer (nhọrọ)",
-      "enableServer": "Mee ka sava a rụọ ọrụ",
+      "enableServer": "Mee ka sava a rụọ ọrụ: {{name}}",
       "editServer": "Dezie sava",
       "deleteServer": "Hichapụ sava",
+      "editServerA11y": "Dezie sava: {{name}}",
+      "deleteServerA11y": "Hichapụ sava: {{name}}",
+      "retryServerA11y": "Nwaa sava a ọzọ: {{name}}",
       "deleteTitle": "Hichapụ sava a?",
       "deleteMessage": "Ngwá ọrụ ya na-ahapụ mkparịta ụka ọ bụla.",
       "kiloBuiltIn": "Ewuru ya n'ime. Gbanye ma ọ bụ gbanyụọ ya maka mkparịta ụka a; enweghị ike idezi ma ọ bụ ihichapụ ya.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Gbanyụrụ — a naghị eziga ngwá ọrụ ntọala ọ bụla na ụdị",
       "serverChecking": "Na-enyocha sava a…",
       "serverToolCount": "ngwá ọrụ {{count}}",
-      "serverUnreachable": "Enweghị ike iru sava a"
+      "serverUnreachable": "Enweghị ike iru sava a",
+      "serverOff": "Sava a agbanyụrụ"
     }
   },
   "settingsTools": {

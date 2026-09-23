@@ -3061,9 +3061,12 @@
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Gib eine gültige Server-URL ein.",
       "fieldToken": "Bearer-Token (optional)",
-      "enableServer": "Diesen Server aktivieren",
+      "enableServer": "Diesen Server aktivieren: {{name}}",
       "editServer": "Server bearbeiten",
       "deleteServer": "Server löschen",
+      "editServerA11y": "Server bearbeiten: {{name}}",
+      "deleteServerA11y": "Server löschen: {{name}}",
+      "retryServerA11y": "Diesen Server erneut versuchen: {{name}}",
       "deleteTitle": "Diesen Server löschen?",
       "deleteMessage": "Seine Tools verschwinden aus jedem Chat.",
       "kiloBuiltIn": "Integriert. Schalte ihn für diesen Chat ein oder aus; er kann weder bearbeitet noch gelöscht werden.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Aus — kein Einstellungs-Tool wird an das Modell gesendet",
       "serverChecking": "Dieser Server wird geprüft…",
       "serverToolCount": "{{count}} Tools",
-      "serverUnreachable": "Dieser Server konnte nicht erreicht werden"
+      "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
+      "serverOff": "Dieser Server ist ausgeschaltet"
     }
   },
   "settingsTools": {

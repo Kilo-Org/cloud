@@ -3061,9 +3061,12 @@
       "fieldUrl": "Zerbitzariaren URLa",
       "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
       "fieldToken": "Bearer tokena (aukerakoa)",
-      "enableServer": "Gaitu zerbitzari hau",
+      "enableServer": "Gaitu zerbitzari hau: {{name}}",
       "editServer": "Editatu zerbitzaria",
       "deleteServer": "Ezabatu zerbitzaria",
+      "editServerA11y": "Editatu zerbitzaria: {{name}}",
+      "deleteServerA11y": "Ezabatu zerbitzaria: {{name}}",
+      "retryServerA11y": "Saiatu zerbitzari hau berriro: {{name}}",
       "deleteTitle": "Zerbitzari hau ezabatu?",
       "deleteMessage": "Bere tresnak txat guztietatik aterako dira.",
       "kiloBuiltIn": "Integratuta. Piztu edo itzali txat honetarako; ezin da editatu edo ezabatu.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Desaktibatuta — ez da ezarpen-tresnarik modelora bidaltzen",
       "serverChecking": "Zerbitzari hau egiaztatzen…",
       "serverToolCount": "{{count}} tresna",
-      "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi"
+      "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi",
+      "serverOff": "Zerbitzari hau desgaituta dago"
     }
   },
   "settingsTools": {

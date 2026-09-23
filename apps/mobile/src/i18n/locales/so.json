@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL-ka serverka",
       "fieldUrlInvalid": "Geli URL server sax ah.",
       "fieldToken": "Token Bearer (ikhtiyaari)",
-      "enableServer": "Daar serverkan",
+      "enableServer": "Daar serverkan: {{name}}",
       "editServer": "Wax ka beddel serverka",
       "deleteServer": "Tirtir serverka",
+      "editServerA11y": "Wax ka beddel serverka: {{name}}",
+      "deleteServerA11y": "Tirtir serverka: {{name}}",
+      "retryServerA11y": "Mar kale isku day serverkan: {{name}}",
       "deleteTitle": "Ma tirtiraa serverkan?",
       "deleteMessage": "Qalabkiisu wuu ka baxaa wada-hadal kasta.",
       "kiloBuiltIn": "Dhex ku jira. Daar ama dami wada-hadalkan; lama beddeli karo lama tirtiri karo.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Dami — ma jiro qalab dejin oo loo diraa moodeelka",
       "serverChecking": "Waa la hubinayaa serverkan…",
       "serverToolCount": "{{count}} qalab",
-      "serverUnreachable": "Lama gaari karin serverkan"
+      "serverUnreachable": "Lama gaari karin serverkan",
+      "serverOff": "Serverkan waa dammaan"
     }
   },
   "settingsTools": {

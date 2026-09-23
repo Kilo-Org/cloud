@@ -3061,9 +3061,12 @@
       "fieldUrl": "ဆာဗာ URL",
       "fieldUrlInvalid": "မှန်ကန်သော ဆာဗာ URL ထည့်ပါ။",
       "fieldToken": "Bearer တိုကင် (ရွေးချယ်နိုင်)",
-      "enableServer": "ဤဆာဗာကို ဖွင့်ပါ",
+      "enableServer": "ဤဆာဗာကို ဖွင့်ပါ: {{name}}",
       "editServer": "ဆာဗာ တည်းဖြတ်ပါ",
       "deleteServer": "ဆာဗာ ဖျက်ပါ",
+      "editServerA11y": "ဆာဗာ တည်းဖြတ်ပါ: {{name}}",
+      "deleteServerA11y": "ဆာဗာ ဖျက်ပါ: {{name}}",
+      "retryServerA11y": "ဤဆာဗာကို ထပ်စမ်းပါ: {{name}}",
       "deleteTitle": "ဤဆာဗာကို ဖျက်မလား?",
       "deleteMessage": "၎င်း၏ကိရိယာများ စကားပြောတိုင်းမှ ထွက်ခွာမည်။",
       "kiloBuiltIn": "ပါဝင်ပြီးသား။ ဤစကားပြောအတွက် ဖွင့် သို့မဟုတ် ပိတ်ပါ။ တည်းဖြတ်ခြင်း သို့မဟုတ် ဖျက်ခြင်း မပြုလုပ်နိုင်ပါ။",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ပိတ်ထားသည် — ဆက်တင်ကိရိယာ တစ်ခုမှ မော်ဒယ်သို့ မပေးပို့ပါ",
       "serverChecking": "ဤဆာဗာကို စစ်ဆေးနေသည်…",
       "serverToolCount": "ကိရိယာ {{count}} ခု",
-      "serverUnreachable": "ဤဆာဗာသို့ မရောက်နိုင်ခဲ့ပါ"
+      "serverUnreachable": "ဤဆာဗာသို့ မရောက်နိုင်ခဲ့ပါ",
+      "serverOff": "ဤဆာဗာ ပိတ်ထားသည်"
     }
   },
   "settingsTools": {

@@ -3083,9 +3083,12 @@
       "fieldUrl": "כתובת URL של השרת",
       "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
       "fieldToken": "אסימון Bearer (אופציונלי)",
-      "enableServer": "הפעלת השרת הזה",
+      "enableServer": "הפעלת השרת הזה: {{name}}",
       "editServer": "עריכת השרת",
       "deleteServer": "מחיקת השרת",
+      "editServerA11y": "עריכת השרת: {{name}}",
+      "deleteServerA11y": "מחיקת השרת: {{name}}",
+      "retryServerA11y": "ניסיון חוזר לשרת הזה: {{name}}",
       "deleteTitle": "למחוק את השרת הזה?",
       "deleteMessage": "הכלים שלו ייעלמו מכל צ׳אט.",
       "kiloBuiltIn": "מובנה. הפעילו או כבו אותו לצ׳אט הזה; אין אפשרות לערוך או למחוק אותו.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "כבוי — שום כלי הגדרות לא נשלח למודל",
       "serverChecking": "בודק את השרת הזה…",
       "serverToolCount": "{{count}} כלים",
-      "serverUnreachable": "לא ניתן היה להגיע לשרת הזה"
+      "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
+      "serverOff": "השרת הזה כבוי"
     }
   },
   "settingsTools": {

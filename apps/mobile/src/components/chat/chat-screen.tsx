@@ -180,7 +180,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       return (
         <EmptyState
           icon={MessageCircle}
+          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
+          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
           title={t('modelChat.empty.title')}
+          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
+          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
           description={t('modelChat.empty.description')}
         />
       );

@@ -3061,9 +3061,12 @@
       "fieldUrl": "ಸರ್ವರ್ URL",
       "fieldUrlInvalid": "ಮಾನ್ಯ ಸರ್ವರ್ URL ನಮೂದಿಸಿ.",
       "fieldToken": "Bearer ಟೋಕನ್ (ಐಚ್ಛಿಕ)",
-      "enableServer": "ಈ ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ",
+      "enableServer": "ಈ ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ: {{name}}",
       "editServer": "ಸರ್ವರ್ ಸಂಪಾದಿಸಿ",
       "deleteServer": "ಸರ್ವರ್ ಅಳಿಸಿ",
+      "editServerA11y": "ಸರ್ವರ್ ಸಂಪಾದಿಸಿ: {{name}}",
+      "deleteServerA11y": "ಸರ್ವರ್ ಅಳಿಸಿ: {{name}}",
+      "retryServerA11y": "ಈ ಸರ್ವರ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ: {{name}}",
       "deleteTitle": "ಈ ಸರ್ವರ್ ಅಳಿಸುವುದೇ?",
       "deleteMessage": "ಇದರ ಸಾಧನಗಳು ಎಲ್ಲಾ ಚಾಟ್ಗಳಿಂದ ಹೊರಟುಹೋಗುತ್ತವೆ.",
       "kiloBuiltIn": "ಅಂತರ್ಗತ. ಈ ಚಾಟ್ಗಾಗಿ ಅದನ್ನು ಆನ್ ಅಥವಾ ಆಫ್ ಮಾಡಿ; ಸಂಪಾದಿಸಲು ಅಥವಾ ಅಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ಆಫ್ — ಮಾದರಿಗೆ ಯಾವುದೇ ಸೆಟ್ಟಿಂಗ್ಸ್ ಸಾಧನ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ",
       "serverChecking": "ಈ ಸರ್ವರ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
       "serverToolCount": "{{count}} ಸಾಧನಗಳು",
-      "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+      "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ"
     }
   },
   "settingsTools": {

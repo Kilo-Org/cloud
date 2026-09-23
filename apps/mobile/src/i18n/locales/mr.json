@@ -3061,9 +3061,12 @@
       "fieldUrl": "सर्व्हर URL",
       "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
       "fieldToken": "Bearer टोकन (ऐच्छिक)",
-      "enableServer": "हा सर्व्हर सक्षम करा",
+      "enableServer": "हा सर्व्हर सक्षम करा: {{name}}",
       "editServer": "सर्व्हर संपादित करा",
       "deleteServer": "सर्व्हर हटवा",
+      "editServerA11y": "सर्व्हर संपादित करा: {{name}}",
+      "deleteServerA11y": "सर्व्हर हटवा: {{name}}",
+      "retryServerA11y": "हा सर्व्हर पुन्हा प्रयत्न करा: {{name}}",
       "deleteTitle": "हा सर्व्हर हटवायचा?",
       "deleteMessage": "याची साधने प्रत्येक चॅटमधून बाहेर पडतील.",
       "kiloBuiltIn": "अंगभूत. या चॅटसाठी ते चालू किंवा बंद करा; ते संपादित किंवा हटवता येत नाही.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "बंद — मॉडेलला कोणतेही सेटिंग्ज साधन पाठवले जात नाही",
       "serverChecking": "हा सर्व्हर तपासत आहे…",
       "serverToolCount": "{{count}} साधने",
-      "serverUnreachable": "या सर्व्हरपर्यंत पोहोचता आले नाही"
+      "serverUnreachable": "या सर्व्हरपर्यंत पोहोचता आले नाही",
+      "serverOff": "हा सर्व्हर बंद आहे"
     }
   },
   "settingsTools": {

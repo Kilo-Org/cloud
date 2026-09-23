@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL na sabar",
       "fieldUrlInvalid": "Shigar da ingantaccen URL na sabar.",
       "fieldToken": "Token Bearer (na zaɓi)",
-      "enableServer": "Kunna wannan sabar",
+      "enableServer": "Kunna wannan sabar: {{name}}",
       "editServer": "Gyara sabar",
       "deleteServer": "Share sabar",
+      "editServerA11y": "Gyara sabar: {{name}}",
+      "deleteServerA11y": "Share sabar: {{name}}",
+      "retryServerA11y": "Sake gwada wannan sabar: {{name}}",
       "deleteTitle": "A share wannan sabar?",
       "deleteMessage": "Kayan aikinta suna barin kowace hira.",
       "kiloBuiltIn": "Ginin ciki. Kunna ko kashe shi don wannan hira; ba a iya gyara ko share shi.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "A kashe — ba a aika wani kayan aikin saituna ga ƙira",
       "serverChecking": "Ana duba wannan sabar…",
       "serverToolCount": "kayan aiki {{count}}",
-      "serverUnreachable": "Ba a iya isa wannan sabar ba"
+      "serverUnreachable": "Ba a iya isa wannan sabar ba",
+      "serverOff": "An kashe wannan sabar"
     }
   },
   "settingsTools": {

@@ -3061,9 +3061,12 @@
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
       "fieldToken": "Bearer ٹوکن (اختیاری)",
-      "enableServer": "اس سرور کو فعال کریں",
+      "enableServer": "اس سرور کو فعال کریں: {{name}}",
       "editServer": "سرور میں ترمیم کریں",
       "deleteServer": "سرور حذف کریں",
+      "editServerA11y": "سرور میں ترمیم کریں: {{name}}",
+      "deleteServerA11y": "سرور حذف کریں: {{name}}",
+      "retryServerA11y": "اس سرور کو دوبارہ کوشش کریں: {{name}}",
       "deleteTitle": "یہ سرور حذف کریں؟",
       "deleteMessage": "اس کے ٹولز ہر چیٹ سے نکل جائیں گے۔",
       "kiloBuiltIn": "بلٹ اِن۔ اس چیٹ کے لیے اسے آن یا آف کریں؛ اس میں ترمیم یا حذف نہیں کیا جا سکتا۔",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "آف — ماڈل کو کوئی سیٹنگز ٹول نہیں بھیجا جاتا",
       "serverChecking": "اس سرور کی جانچ ہو رہی ہے…",
       "serverToolCount": "{{count}} ٹولز",
-      "serverUnreachable": "اس سرور تک نہیں پہنچ سکا"
+      "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
+      "serverOff": "یہ سرور بند ہے"
     }
   },
   "settingsTools": {

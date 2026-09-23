@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL ya seva",
       "fieldUrlInvalid": "Weka URL sahihi ya seva.",
       "fieldToken": "Tokeni ya Bearer (hiari)",
-      "enableServer": "Washa seva hii",
+      "enableServer": "Washa seva hii: {{name}}",
       "editServer": "Hariri seva",
       "deleteServer": "Futa seva",
+      "editServerA11y": "Hariri seva: {{name}}",
+      "deleteServerA11y": "Futa seva: {{name}}",
+      "retryServerA11y": "Jaribu tena seva hii: {{name}}",
       "deleteTitle": "Futa seva hii?",
       "deleteMessage": "Zana zake zinatoka kwenye kila gumzo.",
       "kiloBuiltIn": "Imejengwa ndani. Iwashe au izime kwa gumzo hili; haiwezi kuhaririwa au kufutwa.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Imezimwa — hakuna zana ya mipangilio inayotumwa kwa modeli",
       "serverChecking": "Inakagua seva hii…",
       "serverToolCount": "zana {{count}}",
-      "serverUnreachable": "Haikuweza kufikia seva hii"
+      "serverUnreachable": "Haikuweza kufikia seva hii",
+      "serverOff": "Seva hii imezimwa"
     }
   },
   "settingsTools": {

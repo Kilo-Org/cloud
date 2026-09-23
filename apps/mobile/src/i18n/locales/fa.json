@@ -3061,9 +3061,12 @@
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
       "fieldToken": "توکن Bearer (اختیاری)",
-      "enableServer": "فعال‌کردن این سرور",
+      "enableServer": "فعال‌کردن این سرور: {{name}}",
       "editServer": "ویرایش سرور",
       "deleteServer": "حذف سرور",
+      "editServerA11y": "ویرایش سرور: {{name}}",
+      "deleteServerA11y": "حذف سرور: {{name}}",
+      "retryServerA11y": "تلاش مجدد برای این سرور: {{name}}",
       "deleteTitle": "این سرور حذف شود؟",
       "deleteMessage": "ابزارهای آن از همهٔ گفتگوها خارج می‌شود.",
       "kiloBuiltIn": "داخلی. برای این گفتگو آن را روشن یا خاموش کنید؛ قابل ویرایش یا حذف نیست.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "خاموش — هیچ ابزار تنظیماتی به مدل ارسال نمی‌شود",
       "serverChecking": "در حال بررسی این سرور…",
       "serverToolCount": "{{count}} ابزار",
-      "serverUnreachable": "دسترسی به این سرور ممکن نشد"
+      "serverUnreachable": "دسترسی به این سرور ممکن نشد",
+      "serverOff": "این سرور خاموش است"
     }
   },
   "settingsTools": {

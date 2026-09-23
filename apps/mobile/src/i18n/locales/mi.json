@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL o te tūmau",
       "fieldUrlInvalid": "Whakaurua he URL tūmau tika.",
       "fieldToken": "Tāpaepae Bearer (kōwhiringa)",
-      "enableServer": "Whakahohea tēnei tūmau",
+      "enableServer": "Whakahohea tēnei tūmau: {{name}}",
       "editServer": "Whakatika tūmau",
       "deleteServer": "Muku tūmau",
+      "editServerA11y": "Whakatika tūmau: {{name}}",
+      "deleteServerA11y": "Muku tūmau: {{name}}",
+      "retryServerA11y": "Whakamātau anō i tēnei tūmau: {{name}}",
       "deleteTitle": "Muku i tēnei tūmau?",
       "deleteMessage": "Ka wehe ōna taputapu i ngā kōrerorero katoa.",
       "kiloBuiltIn": "Kua oti te whakauru. Whakahohea, whakawetohia rānei mō tēnei kōrerorero; kāore e taea te whakatika, te muku rānei.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Weto — kāore he taputapu tautuhinga e tukuna ana ki te tauira",
       "serverChecking": "E tirotiro ana i tēnei tūmau…",
       "serverToolCount": "{{count}} taputapu",
-      "serverUnreachable": "Kāore i taea te toro atu ki tēnei tūmau"
+      "serverUnreachable": "Kāore i taea te toro atu ki tēnei tūmau",
+      "serverOff": "Kua weto tēnei tūmau"
     }
   },
   "settingsTools": {

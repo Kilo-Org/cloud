@@ -3061,9 +3061,12 @@
       "fieldUrl": "सर्भर URL",
       "fieldUrlInvalid": "मान्य सर्भर URL प्रविष्ट गर्नुहोस्।",
       "fieldToken": "Bearer टोकन (वैकल्पिक)",
-      "enableServer": "यो सर्भर सक्षम गर्नुहोस्",
+      "enableServer": "यो सर्भर सक्षम गर्नुहोस्: {{name}}",
       "editServer": "सर्भर सम्पादन गर्नुहोस्",
       "deleteServer": "सर्भर मेट्नुहोस्",
+      "editServerA11y": "सर्भर सम्पादन गर्नुहोस्: {{name}}",
+      "deleteServerA11y": "सर्भर मेट्नुहोस्: {{name}}",
+      "retryServerA11y": "यो सर्भर फेरि प्रयास गर्नुहोस्: {{name}}",
       "deleteTitle": "यो सर्भर मेट्ने?",
       "deleteMessage": "यसका उपकरणहरू हरेक च्याटबाट हट्छन्।",
       "kiloBuiltIn": "अन्तर्निहित। यो च्याटका लागि यसलाई खोल्नुहोस् वा बन्द गर्नुहोस्; यसलाई सम्पादन वा मेट्न सकिँदैन।",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "बन्द — मोडेलमा कुनै पनि सेटिङ उपकरण पठाइँदैन",
       "serverChecking": "यो सर्भर जाँचिँदै छ…",
       "serverToolCount": "{{count}} उपकरण",
-      "serverUnreachable": "यो सर्भरसम्म पुग्न सकिएन"
+      "serverUnreachable": "यो सर्भरसम्म पुग्न सकिएन",
+      "serverOff": "यो सर्भर बन्द छ"
     }
   },
   "settingsTools": {

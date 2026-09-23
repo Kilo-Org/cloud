@@ -3061,9 +3061,12 @@
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Indtast en gyldig server-URL.",
       "fieldToken": "Bearer-token (valgfrit)",
-      "enableServer": "Aktivér denne server",
+      "enableServer": "Aktivér denne server: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slet server",
+      "editServerA11y": "Rediger server: {{name}}",
+      "deleteServerA11y": "Slet server: {{name}}",
+      "retryServerA11y": "Prøv denne server igen: {{name}}",
       "deleteTitle": "Slet denne server?",
       "deleteMessage": "Dens værktøjer forsvinder fra alle chats.",
       "kiloBuiltIn": "Indbygget. Slå den til eller fra for denne chat; den kan ikke redigeres eller slettes.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Fra — intet indstillingsværktøj sendes til modellen",
       "serverChecking": "Tjekker denne server…",
       "serverToolCount": "{{count}} værktøjer",
-      "serverUnreachable": "Kunne ikke nå denne server"
+      "serverUnreachable": "Kunne ikke nå denne server",
+      "serverOff": "Denne server er slået fra"
     }
   },
   "settingsTools": {

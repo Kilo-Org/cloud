@@ -3105,9 +3105,12 @@
       "fieldUrl": "URL strežnika",
       "fieldUrlInvalid": "Vnesi veljaven URL strežnika.",
       "fieldToken": "Žeton Bearer (neobvezno)",
-      "enableServer": "Omogoči ta strežnik",
+      "enableServer": "Omogoči ta strežnik: {{name}}",
       "editServer": "Uredi strežnik",
       "deleteServer": "Izbriši strežnik",
+      "editServerA11y": "Uredi strežnik: {{name}}",
+      "deleteServerA11y": "Izbriši strežnik: {{name}}",
+      "retryServerA11y": "Poskusi znova ta strežnik: {{name}}",
       "deleteTitle": "Izbrišem ta strežnik?",
       "deleteMessage": "Njegova orodja zapustijo vsak klepet.",
       "kiloBuiltIn": "Vgrajeno. Vklopi ali izklopi ga za ta klepet; ni ga mogoče urejati ali izbrisati.",
@@ -3119,7 +3122,8 @@
       "settingsToolsOff": "Izklopljeno — nobeno orodje za nastavitve se ne pošlje modelu",
       "serverChecking": "Preverjanje tega strežnika…",
       "serverToolCount": "{{count}} orodij",
-      "serverUnreachable": "Ni bilo mogoče doseči tega strežnika"
+      "serverUnreachable": "Ni bilo mogoče doseči tega strežnika",
+      "serverOff": "Ta strežnik je izklopljen"
     }
   },
   "settingsTools": {

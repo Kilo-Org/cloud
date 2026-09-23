@@ -3061,9 +3061,12 @@
       "fieldUrl": "Palvelimen URL",
       "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
       "fieldToken": "Bearer-tunnus (valinnainen)",
-      "enableServer": "Ota tämä palvelin käyttöön",
+      "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
       "editServer": "Muokkaa palvelinta",
       "deleteServer": "Poista palvelin",
+      "editServerA11y": "Muokkaa palvelinta: {{name}}",
+      "deleteServerA11y": "Poista palvelin: {{name}}",
+      "retryServerA11y": "Yritä tätä palvelinta uudelleen: {{name}}",
       "deleteTitle": "Poistetaanko tämä palvelin?",
       "deleteMessage": "Sen työkalut poistuvat kaikista keskusteluista.",
       "kiloBuiltIn": "Sisäänrakennettu. Kytke se päälle tai pois tässä keskustelussa; sitä ei voi muokata tai poistaa.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Pois — mallille ei lähetetä yhtään asetustyökalua",
       "serverChecking": "Tarkistetaan tätä palvelinta…",
       "serverToolCount": "{{count}} työkalua",
-      "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä"
+      "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
+      "serverOff": "Tämä palvelin on pois päältä"
     }
   },
   "settingsTools": {

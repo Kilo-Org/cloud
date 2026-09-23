@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL-n'ny server",
       "fieldUrlInvalid": "Ampidiro URL server mety.",
       "fieldToken": "Token Bearer (tsy voatery)",
-      "enableServer": "Alefaso ity server ity",
+      "enableServer": "Alefaso ity server ity: {{name}}",
       "editServer": "Ovaina ny server",
       "deleteServer": "Fafao ny server",
+      "editServerA11y": "Ovaina ny server: {{name}}",
+      "deleteServerA11y": "Fafao ny server: {{name}}",
+      "retryServerA11y": "Andramo indray ity server ity: {{name}}",
       "deleteTitle": "Fafana ity server ity?",
       "deleteMessage": "Miala amin'ny resaka rehetra ny fitaovanany.",
       "kiloBuiltIn": "Tafiditra ao. Alefaso na vonoy izy amin'ity resaka ity; tsy azo ovaina na fafana.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Vono — tsy misy fitaovana parametatra alefa any amin'ny maodely",
       "serverChecking": "Manamarina ity server ity…",
       "serverToolCount": "fitaovana {{count}}",
-      "serverUnreachable": "Tsy tratra ity server ity"
+      "serverUnreachable": "Tsy tratra ity server ity",
+      "serverOff": "Mihidy ity server ity"
     }
   },
   "settingsTools": {

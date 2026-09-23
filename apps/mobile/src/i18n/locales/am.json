@@ -3061,9 +3061,12 @@
       "fieldUrl": "የሰርቨር URL",
       "fieldUrlInvalid": "ትክክለኛ የሰርቨር URL ያስገቡ።",
       "fieldToken": "Bearer ቶከን (አማራጭ)",
-      "enableServer": "ይህን ሰርቨር አንቃ",
+      "enableServer": "ይህን ሰርቨር አንቃ: {{name}}",
       "editServer": "ሰርቨር አርትዕ",
       "deleteServer": "ሰርቨር ሰርዝ",
+      "editServerA11y": "ሰርቨር አርትዕ: {{name}}",
+      "deleteServerA11y": "ሰርቨር ሰርዝ: {{name}}",
+      "retryServerA11y": "ይህን ሰርቨር እንደገና ሞክር: {{name}}",
       "deleteTitle": "ይህን ሰርቨር ይሰረዝ?",
       "deleteMessage": "መሳሪያዎቹ ከሁሉም ውይይት ይወገዳሉ።",
       "kiloBuiltIn": "አብሮ የተሰራ። ለዚህ ውይይት ያብሩት ወይም ያጥፉት፤ ማርትዕ ወይም መሰረዝ አይቻልም።",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ጠፍቷል — ምንም የቅንብር መሳሪያ ወደ ሞዴሉ አይላክም",
       "serverChecking": "ይህን ሰርቨር በመፈተሽ ላይ…",
       "serverToolCount": "{{count}} መሳሪያዎች",
-      "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም"
+      "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
+      "serverOff": "ይህ ሰርቨር ተዘግቷል"
     }
   },
   "settingsTools": {

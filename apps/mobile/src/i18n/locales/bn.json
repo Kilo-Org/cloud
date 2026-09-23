@@ -3061,9 +3061,12 @@
       "fieldUrl": "সার্ভার URL",
       "fieldUrlInvalid": "একটি বৈধ সার্ভার URL লিখুন।",
       "fieldToken": "Bearer টোকেন (ঐচ্ছিক)",
-      "enableServer": "এই সার্ভার সক্রিয় করুন",
+      "enableServer": "এই সার্ভার সক্রিয় করুন: {{name}}",
       "editServer": "সার্ভার সম্পাদনা করুন",
       "deleteServer": "সার্ভার মুছুন",
+      "editServerA11y": "সার্ভার সম্পাদনা করুন: {{name}}",
+      "deleteServerA11y": "সার্ভার মুছুন: {{name}}",
+      "retryServerA11y": "এই সার্ভার আবার চেষ্টা করুন: {{name}}",
       "deleteTitle": "এই সার্ভার মুছবেন?",
       "deleteMessage": "এর টুল সব চ্যাট থেকে সরে যাবে।",
       "kiloBuiltIn": "অন্তর্নির্মিত। এই চ্যাটের জন্য এটি চালু বা বন্ধ করুন; এটি সম্পাদনা বা মুছে ফেলা যায় না।",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "বন্ধ — মডেলে কোনো সেটিংস টুল পাঠানো হয় না",
       "serverChecking": "এই সার্ভার যাচাই করা হচ্ছে…",
       "serverToolCount": "{{count}} টুল",
-      "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি"
+      "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি",
+      "serverOff": "এই সার্ভার বন্ধ আছে"
     }
   },
   "settingsTools": {

@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
       "fieldToken": "Testimoni Bearer (opcional)",
-      "enableServer": "Activa aquest servidor",
+      "enableServer": "Activa aquest servidor: {{name}}",
       "editServer": "Edita el servidor",
       "deleteServer": "Elimina el servidor",
+      "editServerA11y": "Edita el servidor: {{name}}",
+      "deleteServerA11y": "Elimina el servidor: {{name}}",
+      "retryServerA11y": "Torna a provar aquest servidor: {{name}}",
       "deleteTitle": "Vols eliminar aquest servidor?",
       "deleteMessage": "Les seves eines surten de tots els xats.",
       "kiloBuiltIn": "Integrat. Activa'l o desactiva'l per a aquest xat; no es pot editar ni eliminar.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Desactivat — no s'envia cap eina de configuració al model",
       "serverChecking": "S'està comprovant aquest servidor…",
       "serverToolCount": "{{count}} eines",
-      "serverUnreachable": "No s'ha pogut contactar amb aquest servidor"
+      "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
+      "serverOff": "Aquest servidor està desactivat"
     }
   },
   "settingsTools": {

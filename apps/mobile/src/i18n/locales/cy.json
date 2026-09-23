@@ -3149,9 +3149,12 @@
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
       "fieldToken": "Tocyn Bearer (dewisol)",
-      "enableServer": "Galluogi'r gweinydd hwn",
+      "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
       "editServer": "Golygu gweinydd",
       "deleteServer": "Dileu gweinydd",
+      "editServerA11y": "Golygu gweinydd: {{name}}",
+      "deleteServerA11y": "Dileu gweinydd: {{name}}",
+      "retryServerA11y": "Rhoi cynnig eto ar y gweinydd hwn: {{name}}",
       "deleteTitle": "Dileu'r gweinydd hwn?",
       "deleteMessage": "Mae ei offer yn gadael pob sgwrs.",
       "kiloBuiltIn": "Yn fewnol. Ei droi ymlaen neu i ffwrdd ar gyfer y sgwrs hon; ni ellir ei olygu na'i ddileu.",
@@ -3163,7 +3166,8 @@
       "settingsToolsOff": "I ffwrdd — ni anfonir unrhyw offeryn gosodiadau at y model",
       "serverChecking": "Yn gwirio'r gweinydd hwn…",
       "serverToolCount": "{{count}} offeryn",
-      "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn"
+      "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
+      "serverOff": "Mae'r gweinydd hwn i ffwrdd"
     }
   },
   "settingsTools": {

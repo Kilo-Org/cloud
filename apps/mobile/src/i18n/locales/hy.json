@@ -3061,9 +3061,12 @@
       "fieldUrl": "Սերվերի URL",
       "fieldUrlInvalid": "Մուտքագրեք սերվերի վավեր URL։",
       "fieldToken": "Bearer թոքեն (ըստ ցանկության)",
-      "enableServer": "Միացնել այս սերվերը",
+      "enableServer": "Միացնել այս սերվերը: {{name}}",
       "editServer": "Խմբագրել սերվերը",
       "deleteServer": "Ջնջել սերվերը",
+      "editServerA11y": "Խմբագրել սերվերը: {{name}}",
+      "deleteServerA11y": "Ջնջել սերվերը: {{name}}",
+      "retryServerA11y": "Կրկին փորձել այս սերվերը: {{name}}",
       "deleteTitle": "Ջնջե՞լ այս սերվերը։",
       "deleteMessage": "Նրա գործիքները կհեռանան բոլոր զրույցներից։",
       "kiloBuiltIn": "Ներկառուցված է։ Միացրեք կամ անջատեք այն այս զրույցի համար. այն հնարավոր չէ խմբագրել կամ ջնջել։",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Անջատված — ոչ մի կարգավորումների գործիք չի ուղարկվում մոդելին",
       "serverChecking": "Ստուգվում է այս սերվերը…",
       "serverToolCount": "{{count}} գործիք",
-      "serverUnreachable": "Չհաջողվեց հասնել այս սերվերին"
+      "serverUnreachable": "Չհաջողվեց հասնել այս սերվերին",
+      "serverOff": "Այս սերվերն անջատված է"
     }
   },
   "settingsTools": {

@@ -3127,9 +3127,12 @@
       "fieldUrl": "URL an fhreastalaí",
       "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
       "fieldToken": "Comhartha Bearer (roghnach)",
-      "enableServer": "Cumasaigh an freastalaí seo",
+      "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
       "editServer": "Cuir an freastalaí in eagar",
       "deleteServer": "Scrios an freastalaí",
+      "editServerA11y": "Cuir an freastalaí in eagar: {{name}}",
+      "deleteServerA11y": "Scrios an freastalaí: {{name}}",
+      "retryServerA11y": "Bain triail eile as an bhfreastalaí seo: {{name}}",
       "deleteTitle": "Scrios an freastalaí seo?",
       "deleteMessage": "Fágann a uirlisí gach comhrá.",
       "kiloBuiltIn": "Ionsuite. Cas air nó as é don chomhrá seo; ní féidir é a chur in eagar ná a scriosadh.",
@@ -3141,7 +3144,8 @@
       "settingsToolsOff": "As — ní sheoltar aon uirlis socruithe chuig an tsamhail",
       "serverChecking": "Ag seiceáil an fhreastalaí seo…",
       "serverToolCount": "{{count}} uirlis",
-      "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh"
+      "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh",
+      "serverOff": "Tá an freastalaí seo múchta"
     }
   },
   "settingsTools": {

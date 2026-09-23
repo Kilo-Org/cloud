@@ -3127,9 +3127,12 @@
       "fieldUrl": "URL tas-server",
       "fieldUrlInvalid": "Daħħal URL tas-server validu.",
       "fieldToken": "Token Bearer (mhux obbligatorju)",
-      "enableServer": "Ippermetti dan is-server",
+      "enableServer": "Ippermetti dan is-server: {{name}}",
       "editServer": "Editja s-server",
       "deleteServer": "Ħassar is-server",
+      "editServerA11y": "Editja s-server: {{name}}",
+      "deleteServerA11y": "Ħassar is-server: {{name}}",
+      "retryServerA11y": "Erġa' pprova dan is-server: {{name}}",
       "deleteTitle": "Ħassar dan is-server?",
       "deleteMessage": "L-għodod tiegħu joħorġu minn kull chat.",
       "kiloBuiltIn": "Integrat. Xgħelu jew itfih għal dan iċ-chat; ma jistax jiġi editjat jew imħassar.",
@@ -3141,7 +3144,8 @@
       "settingsToolsOff": "Mitfi — l-ebda għodda tas-settings ma tintbagħat lill-mudell",
       "serverChecking": "Qed jiġi ċċekkjat dan is-server…",
       "serverToolCount": "{{count}} għodod",
-      "serverUnreachable": "Ma setax jintlaħaq dan is-server"
+      "serverUnreachable": "Ma setax jintlaħaq dan is-server",
+      "serverOff": "Dan is-server huwa mitfi"
     }
   },
   "settingsTools": {

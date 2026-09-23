@@ -3061,9 +3061,12 @@
       "fieldUrl": "ସର୍ଭର URL",
       "fieldUrlInvalid": "ବୈଧ ସର୍ଭର URL ଦିଅନ୍ତୁ।",
       "fieldToken": "Bearer ଟୋକନ (ଇଚ୍ଛାଧୀନ)",
-      "enableServer": "ଏହି ସର୍ଭର ସକ୍ଷମ କରନ୍ତୁ",
+      "enableServer": "ଏହି ସର୍ଭର ସକ୍ଷମ କରନ୍ତୁ: {{name}}",
       "editServer": "ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ",
       "deleteServer": "ସର୍ଭର ବିଲୋପ କରନ୍ତୁ",
+      "editServerA11y": "ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ: {{name}}",
+      "deleteServerA11y": "ସର୍ଭର ବିଲୋପ କରନ୍ତୁ: {{name}}",
+      "retryServerA11y": "ଏହି ସର୍ଭର ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ: {{name}}",
       "deleteTitle": "ଏହି ସର୍ଭର ବିଲୋପ କରିବେ?",
       "deleteMessage": "ଏହାର ସାଧନ ସବୁ ଚାଟ୍‌ରୁ ବାହାରିଯିବ।",
       "kiloBuiltIn": "ଅନ୍ତର୍ନିହିତ। ଏହି ଚାଟ୍ ପାଇଁ ଏହାକୁ ଚାଲୁ କିମ୍ବା ବନ୍ଦ କରନ୍ତୁ; ଏହା ସମ୍ପାଦନ କିମ୍ବା ବିଲୋପ କରାଯାଇପାରିବ ନାହିଁ।",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ବନ୍ଦ — ମଡେଲ୍‌କୁ କୌଣସି ସେଟିଂସ୍ ସାଧନ ପଠାଯାଏ ନାହିଁ",
       "serverChecking": "ଏହି ସର୍ଭର ଯାଞ୍ଚ କରାଯାଉଛି…",
       "serverToolCount": "{{count}} ସାଧନ",
-      "serverUnreachable": "ଏହି ସର୍ଭର ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ"
+      "serverUnreachable": "ଏହି ସର୍ଭର ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
+      "serverOff": "ଏହି ସର୍ଭର ବନ୍ଦ ଅଛି"
     }
   },
   "settingsTools": {

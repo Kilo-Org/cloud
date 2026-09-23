@@ -3061,9 +3061,12 @@
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
       "fieldToken": "Draertoken (opsioneel)",
-      "enableServer": "Aktiveer hierdie bediener",
+      "enableServer": "Aktiveer hierdie bediener: {{name}}",
       "editServer": "Wysig bediener",
       "deleteServer": "Skrap bediener",
+      "editServerA11y": "Wysig bediener: {{name}}",
+      "deleteServerA11y": "Skrap bediener: {{name}}",
+      "retryServerA11y": "Probeer weer hierdie bediener: {{name}}",
       "deleteTitle": "Skrap hierdie bediener?",
       "deleteMessage": "Sy gereedskap verdwyn uit elke tjit.",
       "kiloBuiltIn": "Ingebou. Skakel dit vir hierdie tjit aan of af; dit kan nie gewysig of geskrap word nie.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Af — geen instellingsgereedskap word aan die model gestuur nie",
       "serverChecking": "Kontroleer hierdie bediener…",
       "serverToolCount": "{{count}} gereedskap",
-      "serverUnreachable": "Kon nie hierdie bediener bereik nie"
+      "serverUnreachable": "Kon nie hierdie bediener bereik nie",
+      "serverOff": "Hierdie bediener is af"
     }
   },
   "settingsTools": {

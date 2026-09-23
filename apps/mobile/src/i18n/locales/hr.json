@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL poslužitelja",
       "fieldUrlInvalid": "Unesite važeći URL poslužitelja.",
       "fieldToken": "Bearer token (neobavezno)",
-      "enableServer": "Omogući ovaj poslužitelj",
+      "enableServer": "Omogući ovaj poslužitelj: {{name}}",
       "editServer": "Uredi poslužitelj",
       "deleteServer": "Izbriši poslužitelj",
+      "editServerA11y": "Uredi poslužitelj: {{name}}",
+      "deleteServerA11y": "Izbriši poslužitelj: {{name}}",
+      "retryServerA11y": "Pokušaj ponovno ovaj poslužitelj: {{name}}",
       "deleteTitle": "Izbrisati ovaj poslužitelj?",
       "deleteMessage": "Njegovi alati napuštaju svaki razgovor.",
       "kiloBuiltIn": "Ugrađeno. Uključite ili isključite za ovaj razgovor; ne može se urediti ni izbrisati.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Isključeno — nijedan alat za postavke ne šalje se modelu",
       "serverChecking": "Provjera ovog poslužitelja…",
       "serverToolCount": "{{count}} alata",
-      "serverUnreachable": "Nije bilo moguće doći do ovog poslužitelja"
+      "serverUnreachable": "Nije bilo moguće doći do ovog poslužitelja",
+      "serverOff": "Ovaj poslužitelj je isključen"
     }
   },
   "settingsTools": {

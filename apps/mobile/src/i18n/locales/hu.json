@@ -3061,9 +3061,12 @@
       "fieldUrl": "Szerver URL-címe",
       "fieldUrlInvalid": "Adj meg érvényes szerver URL-címet.",
       "fieldToken": "Bearer token (nem kötelező)",
-      "enableServer": "Szerver engedélyezése",
+      "enableServer": "Szerver engedélyezése: {{name}}",
       "editServer": "Szerver szerkesztése",
       "deleteServer": "Szerver törlése",
+      "editServerA11y": "Szerver szerkesztése: {{name}}",
+      "deleteServerA11y": "Szerver törlése: {{name}}",
+      "retryServerA11y": "Újrapróbálkozás ezzel a szerverrel: {{name}}",
       "deleteTitle": "Törlöd ezt a szervert?",
       "deleteMessage": "Az eszközei minden csevegésből eltűnnek.",
       "kiloBuiltIn": "Beépített. Ehhez a csevegéshez be- vagy kikapcsolható; nem szerkeszthető és nem törölhető.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Ki — semmilyen beállításeszköz nem kerül elküldésre a modellnek",
       "serverChecking": "Szerver ellenőrzése…",
       "serverToolCount": "{{count}} eszköz",
-      "serverUnreachable": "Nem sikerült elérni ezt a szervert"
+      "serverUnreachable": "Nem sikerült elérni ezt a szervert",
+      "serverOff": "Ez a szerver ki van kapcsolva"
     }
   },
   "settingsTools": {

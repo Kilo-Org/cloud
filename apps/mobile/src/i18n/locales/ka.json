@@ -3061,9 +3061,12 @@
       "fieldUrl": "სერვერის URL",
       "fieldUrlInvalid": "შეიყვანეთ სერვერის სწორი URL.",
       "fieldToken": "Bearer ტოკენი (არასავალდებულო)",
-      "enableServer": "ამ სერვერის ჩართვა",
+      "enableServer": "ამ სერვერის ჩართვა: {{name}}",
       "editServer": "სერვერის რედაქტირება",
       "deleteServer": "სერვერის წაშლა",
+      "editServerA11y": "სერვერის რედაქტირება: {{name}}",
+      "deleteServerA11y": "სერვერის წაშლა: {{name}}",
+      "retryServerA11y": "ამ სერვერის ხელახლა ცდა: {{name}}",
       "deleteTitle": "წავშალოთ ეს სერვერი?",
       "deleteMessage": "მისი ხელსაწყოები ყველა ჩატიდან გაქრება.",
       "kiloBuiltIn": "ჩაშენებული. ჩართეთ ან გამორთეთ ამ ჩატისთვის; მისი რედაქტირება ან წაშლა შეუძლებელია.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "გამორთულია — მოდელთან არცერთი პარამეტრის ხელსაწყო არ იგზავნება",
       "serverChecking": "ამ სერვერის შემოწმება…",
       "serverToolCount": "{{count}} ხელსაწყო",
-      "serverUnreachable": "ამ სერვერთან დაკავშირება ვერ მოხერხდა"
+      "serverUnreachable": "ამ სერვერთან დაკავშირება ვერ მოხერხდა",
+      "serverOff": "ეს სერვერი გამორთულია"
     }
   },
   "settingsTools": {

@@ -3061,9 +3061,12 @@
       "fieldUrl": "Сервер URL мекенжайы",
       "fieldUrlInvalid": "Жарамды сервер URL мекенжайын енгізіңіз.",
       "fieldToken": "Bearer токені (қосымша)",
-      "enableServer": "Осы серверді қосу",
+      "enableServer": "Осы серверді қосу: {{name}}",
       "editServer": "Серверді өңдеу",
       "deleteServer": "Серверді жою",
+      "editServerA11y": "Серверді өңдеу: {{name}}",
+      "deleteServerA11y": "Серверді жою: {{name}}",
+      "retryServerA11y": "Осы серверді қайталап көру: {{name}}",
       "deleteTitle": "Осы сервер жойылсын ба?",
       "deleteMessage": "Оның құралдары әр чаттан кетеді.",
       "kiloBuiltIn": "Кірістірілген. Осы чат үшін қосыңыз немесе өшіріңіз; оны өңдеуге немесе жоюға болмайды.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Өшірулі — модельге ешбір параметр құралы жіберілмейді",
       "serverChecking": "Осы сервер тексерілуде…",
       "serverToolCount": "{{count}} құрал",
-      "serverUnreachable": "Осы серверге қосылу мүмкін болмады"
+      "serverUnreachable": "Осы серверге қосылу мүмкін болмады",
+      "serverOff": "Осы сервер өшірулі"
     }
   },
   "settingsTools": {

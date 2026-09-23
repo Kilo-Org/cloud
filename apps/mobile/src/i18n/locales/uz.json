@@ -3061,9 +3061,12 @@
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
       "fieldToken": "Bearer tokeni (ixtiyoriy)",
-      "enableServer": "Bu serverni yoqish",
+      "enableServer": "Bu serverni yoqish: {{name}}",
       "editServer": "Serverni tahrirlash",
       "deleteServer": "Serverni oʻchirish",
+      "editServerA11y": "Serverni tahrirlash: {{name}}",
+      "deleteServerA11y": "Serverni oʻchirish: {{name}}",
+      "retryServerA11y": "Bu serverni qayta urinish: {{name}}",
       "deleteTitle": "Bu server oʻchirilsinmi?",
       "deleteMessage": "Uning vositalari har bir chatdan chiqadi.",
       "kiloBuiltIn": "Oʻrnatilgan. Bu chat uchun uni yoqing yoki oʻchiring; uni tahrirlash yoki oʻchirish mumkin emas.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Oʻchiq — modelga hech qanday sozlama vositasi yuborilmaydi",
       "serverChecking": "Bu server tekshirilmoqda…",
       "serverToolCount": "{{count}} vosita",
-      "serverUnreachable": "Bu serverga yetib boʻlmadi"
+      "serverUnreachable": "Bu serverga yetib boʻlmadi",
+      "serverOff": "Bu server oʻchirilgan"
     }
   },
   "settingsTools": {

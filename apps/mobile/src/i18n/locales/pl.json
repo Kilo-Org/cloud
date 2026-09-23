@@ -3105,9 +3105,12 @@
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
       "fieldToken": "Token Bearer (opcjonalnie)",
-      "enableServer": "Włącz ten serwer",
+      "enableServer": "Włącz ten serwer: {{name}}",
       "editServer": "Edytuj serwer",
       "deleteServer": "Usuń serwer",
+      "editServerA11y": "Edytuj serwer: {{name}}",
+      "deleteServerA11y": "Usuń serwer: {{name}}",
+      "retryServerA11y": "Spróbuj ponownie ten serwer: {{name}}",
       "deleteTitle": "Usunąć ten serwer?",
       "deleteMessage": "Jego narzędzia znikną z każdego czatu.",
       "kiloBuiltIn": "Wbudowany. Włącz go lub wyłącz dla tego czatu; nie można go edytować ani usunąć.",
@@ -3119,7 +3122,8 @@
       "settingsToolsOff": "Wyłączone — żadne narzędzie ustawień nie jest wysyłane do modelu",
       "serverChecking": "Sprawdzanie tego serwera…",
       "serverToolCount": "{{count}} narzędzi",
-      "serverUnreachable": "Nie udało się połączyć z tym serwerem"
+      "serverUnreachable": "Nie udało się połączyć z tym serwerem",
+      "serverOff": "Ten serwer jest wyłączony"
     }
   },
   "settingsTools": {

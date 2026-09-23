@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL sèvè a",
       "fieldUrlInvalid": "Antre yon URL sèvè ki valab.",
       "fieldToken": "Token Bearer (opsyonèl)",
-      "enableServer": "Aktive sèvè sa a",
+      "enableServer": "Aktive sèvè sa a: {{name}}",
       "editServer": "Modifye sèvè a",
       "deleteServer": "Efase sèvè a",
+      "editServerA11y": "Modifye sèvè a: {{name}}",
+      "deleteServerA11y": "Efase sèvè a: {{name}}",
+      "retryServerA11y": "Eseye ankò sèvè sa a: {{name}}",
       "deleteTitle": "Efase sèvè sa a?",
       "deleteMessage": "Zouti li yo kite chak chat.",
       "kiloBuiltIn": "Entegre. Limen oswa etenn li pou chat sa a; li pa ka modifye oswa efase.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Etenn — pa gen zouti paramèt ki voye bay modèl la",
       "serverChecking": "N ap tcheke sèvè sa a…",
       "serverToolCount": "{{count}} zouti",
-      "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a"
+      "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
+      "serverOff": "Sèvè sa a etenn"
     }
   },
   "settingsTools": {

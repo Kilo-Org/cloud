@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Masukkan URL server yang valid.",
       "fieldToken": "Token Bearer (opsional)",
-      "enableServer": "Aktifkan server ini",
+      "enableServer": "Aktifkan server ini: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Hapus server",
+      "editServerA11y": "Edit server: {{name}}",
+      "deleteServerA11y": "Hapus server: {{name}}",
+      "retryServerA11y": "Coba lagi server ini: {{name}}",
       "deleteTitle": "Hapus server ini?",
       "deleteMessage": "Alatnya keluar dari setiap chat.",
       "kiloBuiltIn": "Bawaan. Nyalakan atau matikan untuk chat ini; tidak dapat diedit atau dihapus.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Nonaktif — tidak ada alat setelan yang dikirim ke model",
       "serverChecking": "Memeriksa server ini…",
       "serverToolCount": "{{count}} alat",
-      "serverUnreachable": "Tidak dapat menjangkau server ini"
+      "serverUnreachable": "Tidak dapat menjangkau server ini",
+      "serverOff": "Server ini nonaktif"
     }
   },
   "settingsTools": {

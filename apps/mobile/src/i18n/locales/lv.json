@@ -3083,9 +3083,12 @@
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
       "fieldToken": "Bearera pilnvara (neobligāti)",
-      "enableServer": "Iespējot šo serveri",
+      "enableServer": "Iespējot šo serveri: {{name}}",
       "editServer": "Rediģēt serveri",
       "deleteServer": "Dzēst serveri",
+      "editServerA11y": "Rediģēt serveri: {{name}}",
+      "deleteServerA11y": "Dzēst serveri: {{name}}",
+      "retryServerA11y": "Mēģināt vēlreiz šo serveri: {{name}}",
       "deleteTitle": "Dzēst šo serveri?",
       "deleteMessage": "Tā rīki pazūd no visām tērzēšanām.",
       "kiloBuiltIn": "Iebūvēts. Ieslēdz vai izslēdz to šai tērzēšanai; to nevar rediģēt vai dzēst.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Izslēgts — modelim netiek sūtīts neviens iestatījumu rīks",
       "serverChecking": "Pārbauda šo serveri…",
       "serverToolCount": "{{count}} rīki",
-      "serverUnreachable": "Neizdevās sasniegt šo serveri"
+      "serverUnreachable": "Neizdevās sasniegt šo serveri",
+      "serverOff": "Šis serveris ir izslēgts"
     }
   },
   "settingsTools": {

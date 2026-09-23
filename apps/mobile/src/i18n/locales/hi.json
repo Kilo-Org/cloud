@@ -3061,9 +3061,12 @@
       "fieldUrl": "सर्वर URL",
       "fieldUrlInvalid": "मान्य सर्वर URL दर्ज करें।",
       "fieldToken": "Bearer टोकन (वैकल्पिक)",
-      "enableServer": "इस सर्वर को सक्षम करें",
+      "enableServer": "इस सर्वर को सक्षम करें: {{name}}",
       "editServer": "सर्वर संपादित करें",
       "deleteServer": "सर्वर हटाएँ",
+      "editServerA11y": "सर्वर संपादित करें: {{name}}",
+      "deleteServerA11y": "सर्वर हटाएँ: {{name}}",
+      "retryServerA11y": "इस सर्वर को फिर से आज़माएँ: {{name}}",
       "deleteTitle": "इस सर्वर को हटाएँ?",
       "deleteMessage": "इसके टूल हर चैट से हट जाएँगे।",
       "kiloBuiltIn": "अंतर्निहित। इस चैट के लिए इसे चालू या बंद करें; इसे संपादित या हटाया नहीं जा सकता।",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "बंद — मॉडल को कोई सेटिंग्स टूल नहीं भेजा जाता",
       "serverChecking": "इस सर्वर की जाँच हो रही है…",
       "serverToolCount": "{{count}} टूल",
-      "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका"
+      "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
+      "serverOff": "यह सर्वर बंद है"
     }
   },
   "settingsTools": {

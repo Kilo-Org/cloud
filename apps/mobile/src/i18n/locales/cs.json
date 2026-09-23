@@ -3105,9 +3105,12 @@
       "fieldUrl": "URL serveru",
       "fieldUrlInvalid": "Zadejte platnou URL serveru.",
       "fieldToken": "Token Bearer (volitelné)",
-      "enableServer": "Povolit tento server",
+      "enableServer": "Povolit tento server: {{name}}",
       "editServer": "Upravit server",
       "deleteServer": "Smazat server",
+      "editServerA11y": "Upravit server: {{name}}",
+      "deleteServerA11y": "Smazat server: {{name}}",
+      "retryServerA11y": "Zkusit znovu tento server: {{name}}",
       "deleteTitle": "Smazat tento server?",
       "deleteMessage": "Jeho nástroje zmizí ze všech chatů.",
       "kiloBuiltIn": "Vestavěné. Zapněte nebo vypněte ho pro tento chat; nelze ho upravit ani smazat.",
@@ -3119,7 +3122,8 @@
       "settingsToolsOff": "Vypnuto — modelu se neodesílá žádný nástroj nastavení",
       "serverChecking": "Kontrola tohoto serveru…",
       "serverToolCount": "{{count}} nástrojů",
-      "serverUnreachable": "Nepodařilo se připojit k tomuto serveru"
+      "serverUnreachable": "Nepodařilo se připojit k tomuto serveru",
+      "serverOff": "Tento server je vypnutý"
     }
   },
   "settingsTools": {

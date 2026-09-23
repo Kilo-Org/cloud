@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Unesite važeći URL servera.",
       "fieldToken": "Bearer token (opcionalno)",
-      "enableServer": "Omogući ovaj server",
+      "enableServer": "Omogući ovaj server: {{name}}",
       "editServer": "Uredi server",
       "deleteServer": "Obriši server",
+      "editServerA11y": "Uredi server: {{name}}",
+      "deleteServerA11y": "Obriši server: {{name}}",
+      "retryServerA11y": "Pokušaj ponovo ovaj server: {{name}}",
       "deleteTitle": "Obrisati ovaj server?",
       "deleteMessage": "Njegovi alati napuštaju svako ćaskanje.",
       "kiloBuiltIn": "Ugrađeno. Uključite ili isključite za ovo ćaskanje; ne može se urediti ni obrisati.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Isključeno — nijedan alat za postavke ne šalje se modelu",
       "serverChecking": "Provjera ovog servera…",
       "serverToolCount": "{{count}} alata",
-      "serverUnreachable": "Nije bilo moguće doći do ovog servera"
+      "serverUnreachable": "Nije bilo moguće doći do ovog servera",
+      "serverOff": "Ovaj server je isključen"
     }
   },
   "settingsTools": {

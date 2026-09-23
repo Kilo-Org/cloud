@@ -3061,9 +3061,12 @@
       "fieldUrl": "സെർവർ URL",
       "fieldUrlInvalid": "സാധുവായ സെർവർ URL നൽകുക.",
       "fieldToken": "Bearer ടോക്കൺ (ഓപ്ഷണൽ)",
-      "enableServer": "ഈ സെർവർ പ്രവർത്തനക്ഷമമാക്കുക",
+      "enableServer": "ഈ സെർവർ പ്രവർത്തനക്ഷമമാക്കുക: {{name}}",
       "editServer": "സെർവർ എഡിറ്റ് ചെയ്യുക",
       "deleteServer": "സെർവർ ഇല്ലാതാക്കുക",
+      "editServerA11y": "സെർവർ എഡിറ്റ് ചെയ്യുക: {{name}}",
+      "deleteServerA11y": "സെർവർ ഇല്ലാതാക്കുക: {{name}}",
+      "retryServerA11y": "ഈ സെർവർ വീണ്ടും ശ്രമിക്കുക: {{name}}",
       "deleteTitle": "ഈ സെർവർ ഇല്ലാതാക്കണോ?",
       "deleteMessage": "ഇതിന്റെ ഉപകരണങ്ങൾ എല്ലാ ചാറ്റിൽ നിന്നും പോകും.",
       "kiloBuiltIn": "അന്തർനിർമ്മിതം. ഈ ചാറ്റിനായി ഇത് ഓണോ ഓഫോ ആക്കുക; ഇത് എഡിറ്റ് ചെയ്യാനോ ഇല്ലാതാക്കാനോ കഴിയില്ല.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ഓഫ് — ഒരു ക്രമീകരണ ഉപകരണവും മോഡലിലേക്ക് അയയ്ക്കുന്നില്ല",
       "serverChecking": "ഈ സെർവർ പരിശോധിക്കുന്നു…",
       "serverToolCount": "{{count}} ഉപകരണങ്ങൾ",
-      "serverUnreachable": "ഈ സെർവറിൽ എത്തിച്ചേരാനായില്ല"
+      "serverUnreachable": "ഈ സെർവറിൽ എത്തിച്ചേരാനായില്ല",
+      "serverOff": "ഈ സെർവർ ഓഫാണ്"
     }
   },
   "settingsTools": {

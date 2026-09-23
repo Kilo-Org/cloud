@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL-ja e serverit",
       "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
       "fieldToken": "Token bartës (opsional)",
-      "enableServer": "Aktivizo këtë server",
+      "enableServer": "Aktivizo këtë server: {{name}}",
       "editServer": "Modifiko serverin",
       "deleteServer": "Fshi serverin",
+      "editServerA11y": "Modifiko serverin: {{name}}",
+      "deleteServerA11y": "Fshi serverin: {{name}}",
+      "retryServerA11y": "Riprovo këtë server: {{name}}",
       "deleteTitle": "Të fshihet ky server?",
       "deleteMessage": "Mjetet e tij hiqen nga çdo bisedë.",
       "kiloBuiltIn": "I integruar. Aktivizoje ose çaktivizoje për këtë bisedë; nuk mund të modifikohet ose fshihet.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Joaktiv — asnjë mjet cilësimesh nuk i dërgohet modelit",
       "serverChecking": "Duke kontrolluar këtë server…",
       "serverToolCount": "{{count}} mjete",
-      "serverUnreachable": "Nuk u arrit ky server"
+      "serverUnreachable": "Nuk u arrit ky server",
+      "serverOff": "Ky server është i fikur"
     }
   },
   "settingsTools": {

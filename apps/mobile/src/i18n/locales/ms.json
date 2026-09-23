@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
       "fieldToken": "Token Bearer (pilihan)",
-      "enableServer": "Dayakan pelayan ini",
+      "enableServer": "Dayakan pelayan ini: {{name}}",
       "editServer": "Edit pelayan",
       "deleteServer": "Padam pelayan",
+      "editServerA11y": "Edit pelayan: {{name}}",
+      "deleteServerA11y": "Padam pelayan: {{name}}",
+      "retryServerA11y": "Cuba lagi pelayan ini: {{name}}",
       "deleteTitle": "Padam pelayan ini?",
       "deleteMessage": "Alatnya keluar dari setiap sembang.",
       "kiloBuiltIn": "Terbina dalam. Hidupkan atau matikannya untuk sembang ini; ia tidak boleh diedit atau dipadam.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Mati — tiada alat tetapan dihantar kepada model",
       "serverChecking": "Menyemak pelayan ini…",
       "serverToolCount": "{{count}} alat",
-      "serverUnreachable": "Tidak dapat menghubungi pelayan ini"
+      "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
+      "serverOff": "Pelayan ini dimatikan"
     }
   },
   "settingsTools": {

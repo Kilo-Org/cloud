@@ -3061,9 +3061,12 @@
       "fieldUrl": "服务器 URL",
       "fieldUrlInvalid": "请输入有效的服务器 URL。",
       "fieldToken": "Bearer 令牌（可选）",
-      "enableServer": "启用此服务器",
+      "enableServer": "启用此服务器：{{name}}",
       "editServer": "编辑服务器",
       "deleteServer": "删除服务器",
+      "editServerA11y": "编辑服务器：{{name}}",
+      "deleteServerA11y": "删除服务器：{{name}}",
+      "retryServerA11y": "重试此服务器：{{name}}",
       "deleteTitle": "删除此服务器？",
       "deleteMessage": "其工具将从所有聊天中移除。",
       "kiloBuiltIn": "内置。可为此聊天开启或关闭；无法编辑或删除。",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "关闭 — 不会向模型发送任何设置工具",
       "serverChecking": "正在检查此服务器…",
       "serverToolCount": "{{count}} 个工具",
-      "serverUnreachable": "无法连接此服务器"
+      "serverUnreachable": "无法连接此服务器",
+      "serverOff": "此服务器已关闭"
     }
   },
   "settingsTools": {

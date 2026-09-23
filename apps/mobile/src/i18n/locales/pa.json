@@ -3061,9 +3061,12 @@
       "fieldUrl": "ਸਰਵਰ URL",
       "fieldUrlInvalid": "ਇੱਕ ਵੈਧ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ।",
       "fieldToken": "Bearer ਟੋਕਨ (ਵਿਕਲਪਿਕ)",
-      "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ",
+      "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ: {{name}}",
       "editServer": "ਸਰਵਰ ਸੰਪਾਦਿਤ ਕਰੋ",
       "deleteServer": "ਸਰਵਰ ਮਿਟਾਓ",
+      "editServerA11y": "ਸਰਵਰ ਸੰਪਾਦਿਤ ਕਰੋ: {{name}}",
+      "deleteServerA11y": "ਸਰਵਰ ਮਿਟਾਓ: {{name}}",
+      "retryServerA11y": "ਇਸ ਸਰਵਰ ਨੂੰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ: {{name}}",
       "deleteTitle": "ਇਹ ਸਰਵਰ ਮਿਟਾਉਣਾ?",
       "deleteMessage": "ਇਸ ਦੇ ਟੂਲ ਹਰ ਚੈਟ ਤੋਂ ਹਟ ਜਾਣਗੇ।",
       "kiloBuiltIn": "ਬਿਲਟ-ਇਨ। ਇਸ ਚੈਟ ਲਈ ਇਸ ਨੂੰ ਚਾਲੂ ਜਾਂ ਬੰਦ ਕਰੋ; ਇਸ ਨੂੰ ਸੰਪਾਦਿਤ ਜਾਂ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ਬੰਦ — ਮਾਡਲ ਨੂੰ ਕੋਈ ਸੈਟਿੰਗਾਂ ਟੂਲ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ",
       "serverChecking": "ਇਹ ਸਰਵਰ ਜਾਂਚਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
       "serverToolCount": "{{count}} ਟੂਲ",
-      "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ"
+      "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
+      "serverOff": "ਇਹ ਸਰਵਰ ਬੰਦ ਹੈ"
     }
   },
   "settingsTools": {

@@ -3061,9 +3061,12 @@
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
       "fieldToken": "Bearer ټوکن (اختیاري)",
-      "enableServer": "دا سرور فعال کړئ",
+      "enableServer": "دا سرور فعال کړئ: {{name}}",
       "editServer": "سرور سم کړئ",
       "deleteServer": "سرور ړنګ کړئ",
+      "editServerA11y": "سرور سم کړئ: {{name}}",
+      "deleteServerA11y": "سرور ړنګ کړئ: {{name}}",
+      "retryServerA11y": "دا سرور بیا هڅه وکړئ: {{name}}",
       "deleteTitle": "دا سرور ړنګ شي؟",
       "deleteMessage": "د هغه وسیلې له هر چټ څخه وځي.",
       "kiloBuiltIn": "جوړ شوی. د دې چټ لپاره یې فعال یا غیرفعال کړئ؛ دا د سمولو یا ړنګولو وړ نه دی.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "غیرفعال — هیڅ د ترتیباتو وسیله ماډل ته نه لېږل کیږي",
       "serverChecking": "دا سرور ګڼل کیږي…",
       "serverToolCount": "{{count}} وسیلې",
-      "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول"
+      "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
+      "serverOff": "دا سرور بند دی"
     }
   },
   "settingsTools": {

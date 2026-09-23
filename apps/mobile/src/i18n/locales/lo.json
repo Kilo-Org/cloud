@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL ຂອງເຊີບເວີ",
       "fieldUrlInvalid": "ປ້ອນ URL ຂອງເຊີບເວີທີ່ຖືກຕ້ອງ.",
       "fieldToken": "ໂທເຄັນ Bearer (ທາງເລືອກ)",
-      "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້",
+      "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້: {{name}}",
       "editServer": "ແກ້ໄຂເຊີບເວີ",
       "deleteServer": "ລຶບເຊີບເວີ",
+      "editServerA11y": "ແກ້ໄຂເຊີບເວີ: {{name}}",
+      "deleteServerA11y": "ລຶບເຊີບເວີ: {{name}}",
+      "retryServerA11y": "ລອງໃໝ່ເຊີບເວີນີ້: {{name}}",
       "deleteTitle": "ລຶບເຊີບເວີນີ້ບໍ?",
       "deleteMessage": "ເຄື່ອງມືຂອງມັນຈະອອກຈາກທຸກແຊັດ.",
       "kiloBuiltIn": "ມາພ້ອມແລ້ວ. ເປີດ ຫຼື ປິດມັນສຳລັບແຊັດນີ້; ບໍ່ສາມາດແກ້ໄຂ ຫຼື ລຶບໄດ້.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ປິດ — ບໍ່ມີເຄື່ອງມືຕັ້ງຄ່າໃດໆຖືກສົ່ງໄປຫາໂມເດລ",
       "serverChecking": "ກຳລັງກວດສອບເຊີບເວີນີ້…",
       "serverToolCount": "ເຄື່ອງມື {{count}}",
-      "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້"
+      "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້",
+      "serverOff": "ເຊີບເວີນີ້ປິດຢູ່"
     }
   },
   "settingsTools": {

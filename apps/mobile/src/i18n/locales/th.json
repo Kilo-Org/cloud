@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL ของเซิร์ฟเวอร์",
       "fieldUrlInvalid": "ป้อน URL ของเซิร์ฟเวอร์ที่ถูกต้อง",
       "fieldToken": "โทเค็น Bearer (ไม่บังคับ)",
-      "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้",
+      "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้: {{name}}",
       "editServer": "แก้ไขเซิร์ฟเวอร์",
       "deleteServer": "ลบเซิร์ฟเวอร์",
+      "editServerA11y": "แก้ไขเซิร์ฟเวอร์: {{name}}",
+      "deleteServerA11y": "ลบเซิร์ฟเวอร์: {{name}}",
+      "retryServerA11y": "ลองอีกครั้งกับเซิร์ฟเวอร์นี้: {{name}}",
       "deleteTitle": "ลบเซิร์ฟเวอร์นี้หรือไม่",
       "deleteMessage": "เครื่องมือของมันจะออกจากทุกแชท",
       "kiloBuiltIn": "มาพร้อมระบบ เปิดหรือปิดสำหรับแชทนี้ได้ แต่แก้ไขหรือลบไม่ได้",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ปิด — ไม่มีเครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "serverChecking": "กำลังตรวจสอบเซิร์ฟเวอร์นี้…",
       "serverToolCount": "{{count}} เครื่องมือ",
-      "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้"
+      "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
+      "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่"
     }
   },
   "settingsTools": {

@@ -3061,9 +3061,12 @@
       "fieldUrl": "Серверийн URL",
       "fieldUrlInvalid": "Хүчинтэй серверийн URL оруулна уу.",
       "fieldToken": "Bearer токен (заавал биш)",
-      "enableServer": "Энэ серверийг идэвхжүүлэх",
+      "enableServer": "Энэ серверийг идэвхжүүлэх: {{name}}",
       "editServer": "Сервер засах",
       "deleteServer": "Сервер устгах",
+      "editServerA11y": "Сервер засах: {{name}}",
+      "deleteServerA11y": "Сервер устгах: {{name}}",
+      "retryServerA11y": "Энэ серверийг дахин оролдох: {{name}}",
       "deleteTitle": "Энэ серверийг устгах уу?",
       "deleteMessage": "Түүний хэрэгслүүд бүх чатаас гарна.",
       "kiloBuiltIn": "Суурилагдсан. Энэ чатад асаах эсвэл унтраах; засах, устгах боломжгүй.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Унтраалттай — загварт ямар ч тохиргооны хэрэгсэл илгээгдэхгүй",
       "serverChecking": "Энэ серверийг шалгаж байна…",
       "serverToolCount": "{{count}} хэрэгсэл",
-      "serverUnreachable": "Энэ серверт хүрч чадсангүй"
+      "serverUnreachable": "Энэ серверт хүрч чадсангүй",
+      "serverOff": "Энэ сервер унтарсан"
     }
   },
   "settingsTools": {

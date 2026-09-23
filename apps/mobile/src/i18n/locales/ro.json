@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Introdu un URL de server valid.",
       "fieldToken": "Token Bearer (opțional)",
-      "enableServer": "Activează acest server",
+      "enableServer": "Activează acest server: {{name}}",
       "editServer": "Editează serverul",
       "deleteServer": "Șterge serverul",
+      "editServerA11y": "Editează serverul: {{name}}",
+      "deleteServerA11y": "Șterge serverul: {{name}}",
+      "retryServerA11y": "Reîncearcă acest server: {{name}}",
       "deleteTitle": "Ștergi acest server?",
       "deleteMessage": "Instrumentele lui ies din fiecare chat.",
       "kiloBuiltIn": "Integrat. Activează-l sau dezactivează-l pentru acest chat; nu poate fi editat sau șters.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Dezactivat — niciun instrument de setări nu este trimis modelului",
       "serverChecking": "Se verifică acest server…",
       "serverToolCount": "{{count}} instrumente",
-      "serverUnreachable": "Nu s-a putut contacta acest server"
+      "serverUnreachable": "Nu s-a putut contacta acest server",
+      "serverOff": "Acest server este oprit"
     }
   },
   "settingsTools": {

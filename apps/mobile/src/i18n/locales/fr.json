@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL du serveur",
       "fieldUrlInvalid": "Saisissez une URL de serveur valide.",
       "fieldToken": "Jeton Bearer (facultatif)",
-      "enableServer": "Activer ce serveur",
+      "enableServer": "Activer ce serveur : {{name}}",
       "editServer": "Modifier le serveur",
       "deleteServer": "Supprimer le serveur",
+      "editServerA11y": "Modifier le serveur : {{name}}",
+      "deleteServerA11y": "Supprimer le serveur : {{name}}",
+      "retryServerA11y": "Réessayer ce serveur : {{name}}",
       "deleteTitle": "Supprimer ce serveur ?",
       "deleteMessage": "Ses outils quittent toutes les conversations.",
       "kiloBuiltIn": "Intégré. Activez-le ou désactivez-le pour cette conversation ; il ne peut être ni modifié ni supprimé.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Désactivé — aucun outil de réglages n'est envoyé au modèle",
       "serverChecking": "Vérification de ce serveur…",
       "serverToolCount": "{{count}} outils",
-      "serverUnreachable": "Impossible de joindre ce serveur"
+      "serverUnreachable": "Impossible de joindre ce serveur",
+      "serverOff": "Ce serveur est désactivé"
     }
   },
   "settingsTools": {

@@ -3061,9 +3061,12 @@
       "fieldUrl": "サーバーURL",
       "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
       "fieldToken": "Bearerトークン（任意）",
-      "enableServer": "このサーバーを有効にする",
+      "enableServer": "このサーバーを有効にする：{{name}}",
       "editServer": "サーバーを編集",
       "deleteServer": "サーバーを削除",
+      "editServerA11y": "サーバーを編集：{{name}}",
+      "deleteServerA11y": "サーバーを削除：{{name}}",
+      "retryServerA11y": "このサーバーを再試行：{{name}}",
       "deleteTitle": "このサーバーを削除しますか？",
       "deleteMessage": "そのツールはすべてのチャットから削除されます。",
       "kiloBuiltIn": "組み込みです。このチャットでオンまたはオフにできます。編集も削除もできません。",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "オフ — 設定ツールはモデルに送信されません",
       "serverChecking": "このサーバーを確認しています…",
       "serverToolCount": "{{count}} 個のツール",
-      "serverUnreachable": "このサーバーに接続できませんでした"
+      "serverUnreachable": "このサーバーに接続できませんでした",
+      "serverOff": "このサーバーはオフです"
     }
   },
   "settingsTools": {

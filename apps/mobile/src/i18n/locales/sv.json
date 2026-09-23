@@ -3061,9 +3061,12 @@
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Ange en giltig server-URL.",
       "fieldToken": "Bearer-token (valfritt)",
-      "enableServer": "Aktivera denna server",
+      "enableServer": "Aktivera denna server: {{name}}",
       "editServer": "Redigera server",
       "deleteServer": "Ta bort server",
+      "editServerA11y": "Redigera server: {{name}}",
+      "deleteServerA11y": "Ta bort server: {{name}}",
+      "retryServerA11y": "Försök igen med denna server: {{name}}",
       "deleteTitle": "Ta bort denna server?",
       "deleteMessage": "Dess verktyg lämnar varje chatt.",
       "kiloBuiltIn": "Inbyggd. Slå på eller av den för denna chatt; den kan inte redigeras eller tas bort.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Av — inget inställningsverktyg skickas till modellen",
       "serverChecking": "Kontrollerar denna server…",
       "serverToolCount": "{{count}} verktyg",
-      "serverUnreachable": "Kunde inte nå denna server"
+      "serverUnreachable": "Kunde inte nå denna server",
+      "serverOff": "Denna server är avstängd"
     }
   },
   "settingsTools": {

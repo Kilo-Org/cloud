@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL ی سێرڤەر",
       "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
       "fieldToken": "تۆکنی Bearer (ئارەزوومەندانە)",
-      "enableServer": "چالاککردنی ئەم سێرڤەرە",
+      "enableServer": "چالاککردنی ئەم سێرڤەرە: {{name}}",
       "editServer": "دەستکاریکردنی سێرڤەر",
       "deleteServer": "سڕینەوەی سێرڤەر",
+      "editServerA11y": "دەستکاریکردنی سێرڤەر: {{name}}",
+      "deleteServerA11y": "سڕینەوەی سێرڤەر: {{name}}",
+      "retryServerA11y": "دووبارە هەوڵدانەوە بۆ ئەم سێرڤەرە: {{name}}",
       "deleteTitle": "ئەم سێرڤەرە بسڕدرێتەوە؟",
       "deleteMessage": "ئامرازەکانی لە هەموو گفتوگۆیەک دەردەچن.",
       "kiloBuiltIn": "داخراوە. بۆ ئەم گفتوگۆیە چالاکی بکە یان ناچالاکی بکە؛ ناتوانرێت دەستکاری بکرێت یان بسڕدرێتەوە.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "ناچالاک — هیچ ئامرازێکی ڕێکخستن بۆ مۆدێل نانێردرێت",
       "serverChecking": "پشکنینی ئەم سێرڤەرە…",
       "serverToolCount": "{{count}} ئامراز",
-      "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە"
+      "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە",
+      "serverOff": "ئەم سێرڤەرە ناچالاکە"
     }
   },
   "settingsTools": {

@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Insira uma URL de servidor válida.",
       "fieldToken": "Token Bearer (opcional)",
-      "enableServer": "Ativar este servidor",
+      "enableServer": "Ativar este servidor: {{name}}",
       "editServer": "Editar servidor",
       "deleteServer": "Excluir servidor",
+      "editServerA11y": "Editar servidor: {{name}}",
+      "deleteServerA11y": "Excluir servidor: {{name}}",
+      "retryServerA11y": "Tentar novamente este servidor: {{name}}",
       "deleteTitle": "Excluir este servidor?",
       "deleteMessage": "As ferramentas dele saem de todos os chats.",
       "kiloBuiltIn": "Integrado. Ative ou desative para este chat; não pode ser editado nem excluído.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Desativado — nenhuma ferramenta de configurações é enviada ao modelo",
       "serverChecking": "Verificando este servidor…",
       "serverToolCount": "{{count}} ferramentas",
-      "serverUnreachable": "Não foi possível alcançar este servidor"
+      "serverUnreachable": "Não foi possível alcançar este servidor",
+      "serverOff": "Este servidor está desativado"
     }
   },
   "settingsTools": {

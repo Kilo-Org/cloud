@@ -3061,9 +3061,12 @@
       "fieldUrl": "URL ng server",
       "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
       "fieldToken": "Bearer token (opsyonal)",
-      "enableServer": "Paganahin ang server na ito",
+      "enableServer": "Paganahin ang server na ito: {{name}}",
       "editServer": "I-edit ang server",
       "deleteServer": "Burahin ang server",
+      "editServerA11y": "I-edit ang server: {{name}}",
+      "deleteServerA11y": "Burahin ang server: {{name}}",
+      "retryServerA11y": "Subukan muli ang server na ito: {{name}}",
       "deleteTitle": "Burahin ang server na ito?",
       "deleteMessage": "Aalis ang mga tool nito sa bawat chat.",
       "kiloBuiltIn": "Built-in. I-on o i-off ito para sa chat na ito; hindi ito maaaring i-edit o burahin.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Naka-off — walang setting tool na ipinapadala sa modelo",
       "serverChecking": "Sinusuri ang server na ito…",
       "serverToolCount": "{{count}} tool",
-      "serverUnreachable": "Hindi maabot ang server na ito"
+      "serverUnreachable": "Hindi maabot ang server na ito",
+      "serverOff": "Naka-off ang server na ito"
     }
   },
   "settingsTools": {

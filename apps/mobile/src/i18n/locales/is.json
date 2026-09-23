@@ -3061,9 +3061,12 @@
       "fieldUrl": "Slóð þjóns",
       "fieldUrlInvalid": "Sláðu inn gilda slóð þjóns.",
       "fieldToken": "Bearer-tákn (valfrjálst)",
-      "enableServer": "Virkja þennan þjón",
+      "enableServer": "Virkja þennan þjón: {{name}}",
       "editServer": "Breyta þjóni",
       "deleteServer": "Eyða þjóni",
+      "editServerA11y": "Breyta þjóni: {{name}}",
+      "deleteServerA11y": "Eyða þjóni: {{name}}",
+      "retryServerA11y": "Reyna þennan þjón aftur: {{name}}",
       "deleteTitle": "Eyða þessum þjóni?",
       "deleteMessage": "Verkfærin hans hverfa úr öllum spjallrásum.",
       "kiloBuiltIn": "Innbyggt. Kveiktu eða slökktu á því fyrir þetta spjall; ekki er hægt að breyta eða eyða því.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Slökkt — ekkert stillingaverkfæri er sent til líkansins",
       "serverChecking": "Athuga þennan þjón…",
       "serverToolCount": "{{count}} verkfæri",
-      "serverUnreachable": "Náði ekki sambandi við þennan þjón"
+      "serverUnreachable": "Náði ekki sambandi við þennan þjón",
+      "serverOff": "Þessi þjónn er óvirkur"
     }
   },
   "settingsTools": {

@@ -3083,9 +3083,12 @@
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Introduza um URL de servidor válido.",
       "fieldToken": "Token Bearer (opcional)",
-      "enableServer": "Ativar este servidor",
+      "enableServer": "Ativar este servidor: {{name}}",
       "editServer": "Editar servidor",
       "deleteServer": "Eliminar servidor",
+      "editServerA11y": "Editar servidor: {{name}}",
+      "deleteServerA11y": "Eliminar servidor: {{name}}",
+      "retryServerA11y": "Tentar novamente este servidor: {{name}}",
       "deleteTitle": "Eliminar este servidor?",
       "deleteMessage": "As ferramentas dele saem de todas as conversas.",
       "kiloBuiltIn": "Integrado. Ative-o ou desative-o para esta conversa; não pode ser editado nem eliminado.",
@@ -3097,7 +3100,8 @@
       "settingsToolsOff": "Desativado — nenhuma ferramenta de definições é enviada ao modelo",
       "serverChecking": "A verificar este servidor…",
       "serverToolCount": "{{count}} ferramentas",
-      "serverUnreachable": "Não foi possível contactar este servidor"
+      "serverUnreachable": "Não foi possível contactar este servidor",
+      "serverOff": "Este servidor está desativado"
     }
   },
   "settingsTools": {

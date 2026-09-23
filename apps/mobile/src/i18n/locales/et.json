@@ -3061,9 +3061,12 @@
       "fieldUrl": "Serveri URL",
       "fieldUrlInvalid": "Sisesta kehtiv serveri URL.",
       "fieldToken": "Beareri tunnus (valikuline)",
-      "enableServer": "Luba see server",
+      "enableServer": "Luba see server: {{name}}",
       "editServer": "Muuda serverit",
       "deleteServer": "Kustuta server",
+      "editServerA11y": "Muuda serverit: {{name}}",
+      "deleteServerA11y": "Kustuta server: {{name}}",
+      "retryServerA11y": "Proovi seda serverit uuesti: {{name}}",
       "deleteTitle": "Kas kustutada see server?",
       "deleteMessage": "Selle tööriistad kaovad igast vestlusest.",
       "kiloBuiltIn": "Sisseehitatud. Lülita see selle vestluse jaoks sisse või välja; seda ei saa muuta ega kustutada.",
@@ -3075,7 +3078,8 @@
       "settingsToolsOff": "Väljas — mudelile ei saadeta ühtegi sätete tööriista",
       "serverChecking": "Selle serveri kontrollimine…",
       "serverToolCount": "{{count}} tööriista",
-      "serverUnreachable": "Selle serverini ei õnnestunud jõuda"
+      "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
+      "serverOff": "See server on välja lülitatud"
     }
   },
   "settingsTools": {

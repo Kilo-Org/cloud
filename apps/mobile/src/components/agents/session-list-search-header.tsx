@@ -57,15 +57,18 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
-      {/* The row keeps one `min-height` floor, not two: the shared field box
-          already carries its own 44pt floor, so the first keystroke cannot grow
-          the row and shift the list below. `min-h-[51px]` is the floor that
-          still holds the clear control's 38pt box plus the row's own 10.5pt
-          vertical padding (`py-1.5` is 0.375rem at the app's 14pt rem) and its
-          2pt vertical `border` (1pt a side, inside the border box React Native
-          lays out). A second `min-h-*` class would set the same property,
-          leaving which floor wins to the order Tailwind emits its rules rather
-          than to this intent. */}
+      {/* The row's height comes from the shared field box, not from this row:
+          the field's 44pt floor plus this row's 10.5pt vertical padding
+          (`py-1.5` is 0.375rem at the app's 14pt rem) and its 2pt vertical
+          `border` (1pt a side, inside the border box React Native lays out) is
+          56.5pt, the same whether the clear control is showing or not, so the
+          first keystroke cannot grow the row and shift the list below. The
+          row's own `min-h-[51px]` (the clear control's 38pt box plus that same
+          padding and border, 50.5pt) stays as a lower bound the field's floor
+          dominates, so the row never shrinks below the control's own box. A
+          second `min-h-*` class would set the same property, leaving which
+          floor wins to the order Tailwind emits its rules rather than to this
+          intent. */}
       <View
         style={fieldMargins}
         className="my-2 min-h-[51px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"

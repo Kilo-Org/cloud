@@ -234,6 +234,39 @@ export function AgentSessionListContent({
     [showLoadingSkeletons, sections]
   );
 
+  // Pagination is user-driven. A programmatic page-one reset (the foreground,
+  // focus and pull reconciles) empties the retained pages, so the list shrinks
+  // under the viewport once the new page one lands, and FlashList reports that
+  // shrink as an end-reach. Honoring it re-fetched one page per retained page
+  // around a foreground transition instead of the single page the reconcile
+  // re-issued (device defect e2). A shrink therefore parks pagination until the
+  // next user drag; a query change that resets the list parks it too, and the
+  // drag the user makes to browse resumes it.
+  const paginationParkedRef = useRef(false);
+  const previousRowCountRef = useRef(rows.length);
+  useEffect(() => {
+    if (rows.length < previousRowCountRef.current) {
+      paginationParkedRef.current = true;
+    }
+    previousRowCountRef.current = rows.length;
+  }, [rows.length]);
+  const handleEndReached = useCallback(() => {
+    if (paginationParkedRef.current) {
+      return;
+    }
+    onEndReached();
+  }, [onEndReached]);
+  // The park must be released by the user's own movement, and `onScrollBeginDrag`
+  // only fires when the list can scroll: a shrink that leaves fewer rows than
+  // fill the viewport (a filter or search change, or a reconcile collapsing the
+  // list to page one) has nothing to scroll, so a drag never opened the park and
+  // `hasNextPage` stayed true behind it. `onTouchMove` is the finger's own
+  // movement, which a viewport-fitting list still reports; the PR-review diff
+  // file list wires the same two events for the same reason.
+  const releasePaginationPark = useCallback(() => {
+    paginationParkedRef.current = false;
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
@@ -350,8 +383,17 @@ export function AgentSessionListContent({
   // 200ms fade reads as a blank list area on a fast cold open (the skeleton
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
+  //
+  // `gap-2` is the clearance between the status band and the rows — the same
+  // gap the live surface leaves below its band (`mx-4 gap-2` in
+  // `AgentSessionsSection`). Without it the list's top edge sits flush on the
+  // band, and a row resting across that edge is cut mid-text directly under
+  // "Couldn't refresh", so the two read as colliding (device defect p5). The
+  // gap lives on the container rather than as the band's padding on purpose:
+  // the clearance must not depend on whether the status line renders, or the
+  // failure line would push the rows down by the gap as it appears.
   return (
-    <Animated.View className="flex-1">
+    <Animated.View className="flex-1 gap-2">
       {/* The band's height is allocated whenever the rows show, so the
           in-flight spinner and the failure line replace empty space instead of
           pushing the rows down (device defect uxs1). */}
@@ -379,8 +421,10 @@ export function AgentSessionListContent({
           }
           contentContainerStyle={tabBarOnlyClearanceStyle}
           keyboardDismissMode="on-drag"
-          onEndReached={onEndReached}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
+          onScrollBeginDrag={releasePaginationPark}
+          onTouchMove={releasePaginationPark}
           refreshControl={rowsControl}
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
         />

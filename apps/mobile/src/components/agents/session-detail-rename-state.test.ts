@@ -60,6 +60,22 @@ describe('getSessionDetailRenameState', () => {
     expect(state.title).not.toContain('2026-09-22');
   });
 
+  it('treats the caller fallback as opaque and never rewrites it', () => {
+    // The helper sanitizes only the server title. The screen pre-sanitizes the
+    // cached list title before it becomes `fallbackTitle`
+    // (session-detail-content.tsx), so re-running `sessionDisplayTitle` on the
+    // fallback here would be an identity call and change nothing.
+    for (const fallback of ['Session', 'New session - 2026-09-22T17:26:31.465Z', '   ']) {
+      const state = getSessionDetailRenameState({
+        fallbackTitle: fallback,
+        isLoaded: true,
+        serverTitle: undefined,
+        renameState: initialRenameState(),
+      });
+      expect(state.title).toBe(fallback);
+    }
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({

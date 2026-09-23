@@ -55,6 +55,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     isFetched: organizationsFetched,
     isFetching: organizationsFetching,
     isError: organizationsError,
+    isPaused: organizationsPaused,
     refetch: refetchOrganizations,
   } = useOrganizationsList();
   const [state, setState] = useState<OrganizationState>({
@@ -71,6 +72,10 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   // synchronously, before the list can publish over an explicit selection.
   const awaitingDefault = useRef(false);
   const defaultFence = useRef<{ operation: number; epoch: number } | null>(null);
+  // Whether the current Personal selection is an explicit choice (its marker is
+  // stored). An auto-resolved Personal — from an empty list or a failed restore
+  // — is not explicit, so selecting Personal must still write the marker.
+  const personalExplicit = useRef(false);
 
   const restore = useCallback(async () => {
     generation.current += 1;
@@ -91,11 +96,14 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
         if (stored) {
           activeId.current = stored;
+          personalExplicit.current = false;
           setState({ token, organizationId: stored, isLoaded: true, isSaving: false, error: null });
         } else if (marker === PERSONAL_MARKER) {
           activeId.current = null;
+          personalExplicit.current = true;
           setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
         } else {
+          personalExplicit.current = false;
           awaitingDefault.current = true;
           defaultFence.current = { operation, epoch };
           // Re-publish the resolving state so the list effect re-runs even when
@@ -142,25 +150,39 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     if (!awaitingDefault.current) {
       return;
     }
-    // A refetch of an already-failed list must settle before it republishes.
-    if (!organizationsFetched || organizationsFetching) {
-      return;
-    }
     const fence = defaultFence.current;
     if (generation.current !== fence?.operation || !isCurrentAuthEpoch(fence.epoch)) {
       awaitingDefault.current = false;
       defaultFence.current = null;
       return;
     }
+    // A paused list is offline and may never fetch. Waiting on it would leave
+    // `isLoaded` false forever, so publish Personal to keep the app usable, and
+    // keep `awaitingDefault` set: the default still applies when the list
+    // arrives. Only reached when nothing explicit was stored, so this never
+    // overrides a stored choice.
+    if (!organizationsFetched && organizationsPaused) {
+      if (!state.isLoaded) {
+        activeId.current = null;
+        setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
+      }
+      return;
+    }
+    // A refetch of an already-failed list must settle before it republishes.
+    if (!organizationsFetched || organizationsFetching) {
+      return;
+    }
     awaitingDefault.current = false;
     defaultFence.current = null;
     if (organizationsError) {
       activeId.current = null;
+      personalExplicit.current = false;
       setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: 'restore' });
       return;
     }
     const defaultId = organizations?.[0]?.organizationId ?? null;
     activeId.current = defaultId;
+    personalExplicit.current = false;
     setState({ token, organizationId: defaultId, isLoaded: true, isSaving: false, error: null });
     // The default must land in storage, not only in React context: every other
     // reader of the organization key (glanceable scope, widget actions, voice
@@ -177,6 +199,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     organizationsFetched,
     organizationsFetching,
     organizationsError,
+    organizationsPaused,
     token,
     persist,
   ]);
@@ -191,6 +214,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       activeId.current = null;
       awaitingDefault.current = false;
       defaultFence.current = null;
+      personalExplicit.current = false;
       setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
     }
     return () => {
@@ -210,6 +234,13 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // epoch and permanently gate the publisher, because React bails out of the
       // state update and no effect re-runs to rebuild it.
       if (id === state.organizationId && !settlingDefault) {
+        // An auto-resolved Personal is not an explicit choice yet. Write the
+        // marker so the choice survives the next launch, but skip the terminal
+        // blank above for the same publisher reason.
+        if (id === null && !personalExplicit.current) {
+          personalExplicit.current = true;
+          void persist(null);
+        }
         return;
       }
       // Blank the current surface before the selection changes so the prior
@@ -221,6 +252,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // the Expo push token (logout-only).
       void unregisterActivityTokensAndTombstone();
       activeId.current = id;
+      personalExplicit.current = id === null;
       setState(current => ({
         token,
         organizationId: id,

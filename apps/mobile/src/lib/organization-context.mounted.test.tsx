@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- test-renderer mounts the provider with the real query cache. */
 import { createElement } from 'react';
-import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -117,12 +117,14 @@ beforeEach(() => {
     await Promise.resolve();
   });
   list.mockReset().mockResolvedValue([]);
+  onlineManager.setOnline(true);
 });
 
 afterEach(() => {
   for (const ui of mounted.splice(0)) {
     ui.unmount();
   }
+  onlineManager.setOnline(true);
 });
 
 describe('OrganizationProvider default organization', () => {
@@ -173,6 +175,24 @@ describe('OrganizationProvider default organization', () => {
     expect(publications.some(value => value.loaded && value.id === null)).toBe(true);
   });
 
+  it('resolves to Personal while the list is paused offline, then applies the default when it arrives', async () => {
+    onlineManager.setOnline(false);
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    // A paused list may never fetch: waiting on it would leave the provider
+    // unresolved forever, so the app settles on Personal and stays usable.
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    // Back online the default still resolves from the list.
+    onlineManager.setOnline(true);
+    await act(() => {
+      names.resolve([orgA]);
+    });
+    await waitFor(() => scope().organizationId === 'org-a');
+    expect(scope()).toMatchObject({ isLoaded: true, error: null });
+  });
+
   it('re-resolves the default through Retry after a list failure', async () => {
     list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([orgA]);
     await mount();
@@ -182,6 +202,25 @@ describe('OrganizationProvider default organization', () => {
     });
     await waitFor(() => scope().error === null && scope().isLoaded);
     expect(scope().organizationId).toBe('org-a');
+  });
+
+  it('writes the explicit Personal marker when Personal is chosen while already auto-resolved', async () => {
+    list.mockResolvedValue([]);
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true });
+    // Auto-resolved Personal from an empty list is not an explicit choice, so
+    // no marker is written yet.
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+    await act(() => {
+      scope().setOrganizationId(null);
+    });
+    // Selecting Personal explicitly must record the choice even though the
+    // published id did not change, or a later list with organizations would
+    // move the person back to one on the next launch.
+    await waitFor(() => savedMetadata.get(MARKER_KEY) === 'personal');
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true });
   });
 
   it('keeps an explicit Personal marker across a re-mount with organizations available', async () => {

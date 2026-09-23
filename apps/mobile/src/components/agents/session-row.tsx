@@ -23,6 +23,7 @@ import {
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatMeta,
+  formatScheduledWake,
   formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
@@ -59,6 +60,12 @@ type StoredSessionRowProps = {
     git_branch: string | null;
     status: string | null;
     status_updated_at: string | null;
+    /**
+     * ISO-8601 wake time for a `scheduled` session, when the row carries one.
+     * Stored history rows have no wake time today (the column does not exist),
+     * so it is optional and the row falls back to the `SCHEDULED` label alone.
+     */
+    scheduledAt?: string | null;
     total_cost_microdollars: number | null;
     associatedPr?: { number: number } | null;
   };
@@ -127,6 +134,13 @@ export function StoredSessionRow({
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
+  // The scheduled branch keys off the status, not the `live` flag: a stored
+  // history row with status `scheduled` reads SCHEDULED (label only) rather
+  // than Idle. A stored row has no wake time today, so `scheduledWake` is null
+  // and the label carries no clock time.
+  const isScheduled = session.status === 'scheduled';
+  const scheduledWake =
+    isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status_updated_at ?? session.status ?? null;
@@ -169,17 +183,22 @@ export function StoredSessionRow({
   // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
   // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered.
   // When a cost is present, both forms fold it in first (matches the row's
-  // "$0.12 · time" order). Needs-input sessions have no persisted cost.
+  // "$0.12 · time" order). Needs-input sessions have no persisted cost. A
+  // scheduled row shows `SCHEDULED · <wake>` instead, so its spoken meta is
+  // the wake (null on a stored row, which carries none).
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
     formatMeta(timestamp)
   );
-  const spokenMeta = needsInput
+  const storedSpokenMeta = needsInput
     ? null
     : composeStoredSessionSpokenMeta(
         formatSpokenCost(session.total_cost_microdollars),
         formatSpokenTimeAgo(timestamp)
       );
+  // A scheduled row shows `SCHEDULED · <wake>` instead of the timestamp meta,
+  // so it speaks the wake (null on a stored row, which carries none).
+  const spokenMeta = isScheduled ? scheduledWake : storedSpokenMeta;
 
   // Provenance subtitle: list rows show "branch · #N", card rows keep the
   // branch-only subtitle. The spoken label mirrors this: branch text plus
@@ -194,15 +213,16 @@ export function StoredSessionRow({
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
 
   // Platform icon only on the Agents list variant, and only while the
-  // eyebrow draws no live status glyph (a glyph beside the status mark
-  // reads as a stray second mark). Home cards stay byte-identical
-  // (platformIcon defaults to undefined).
+  // eyebrow draws no status glyph (a glyph beside the status mark
+  // reads as a stray second mark). A scheduled row draws its Clock, so it
+  // suppresses the platform mark and the spoken origin with it. Home cards
+  // stay byte-identical (platformIcon defaults to undefined).
   const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
     selectRowPlatformPresentation({
       platform: session.created_on_platform,
       variant,
       needsInput,
-      statusGlyph: live,
+      statusGlyph: live || isScheduled,
       gitUrl: session.git_url,
     });
   const platformIcon =
@@ -226,6 +246,9 @@ export function StoredSessionRow({
           title,
           needsInput,
           live: variant === 'list' && live,
+          // Only the scheduled kind is named here: other stored rows keep the
+          // static LIVE word / no status word, unchanged.
+          statusKind: isScheduled ? 'scheduled' : null,
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.git_branch,
@@ -241,6 +264,7 @@ export function StoredSessionRow({
           meta={visibleMeta}
           live={live}
           statusKind={session.status === null ? null : glanceableStatusKind(session.status)}
+          scheduledWake={scheduledWake}
           metaWhileLive={metaWhileLive}
           needsInput={needsInput}
           platformIcon={platformIcon}

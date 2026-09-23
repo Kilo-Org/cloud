@@ -33,6 +33,7 @@ import {
   canExitSessionFromList,
   composeActiveSessionVisibleMeta,
   composeSessionProvenanceSubtitle,
+  formatScheduledWake,
   formatSessionTotalCost,
   remoteMeta,
   remoteSessionEyebrowLabel,
@@ -108,6 +109,12 @@ export function RemoteSessionRow({
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);
+  // A scheduled session is live but does nothing now: the eyebrow shows
+  // `SCHEDULED · <wake>` instead of the relative-time meta, and the wake
+  // rides on the same `scheduledAt` the worker relayed.
+  const isScheduled = session.status === 'scheduled';
+  const scheduledWake =
+    isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status;
@@ -123,16 +130,20 @@ export function RemoteSessionRow({
 
   // Spoken meta mirrors the visible meta the row renders. When `needsInput`
   // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. Otherwise announce the same timestamp as
-  // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
+  // so the label omits it. A scheduled row renders `SCHEDULED · <wake>`, so
+  // the label speaks the wake beside `Scheduled` instead of a timestamp.
+  // Otherwise announce the same timestamp as `remoteMeta` (prefer
+  // lastActivityAt, fall back to updatedAt).
   const metaTimestamp = activeSessionMetaTimestamp(session);
   const costSpoken = formatSpokenCost(session.totalCostMicrodollars);
   const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
-  const spokenMeta = selectRemoteRowSpokenMeta({
-    needsInput,
-    costSpoken,
-    timeSpoken,
-  });
+  const spokenMeta = isScheduled
+    ? scheduledWake
+    : selectRemoteRowSpokenMeta({
+        needsInput,
+        costSpoken,
+        timeSpoken,
+      });
 
   // Provenance subtitle: list rows show "branch · #N", card rows keep the
   // branch-only subtitle. The spoken label mirrors this, with the PR phrase
@@ -258,6 +269,7 @@ export function RemoteSessionRow({
           )}
           live
           statusKind={glanceableStatusKind(session.status)}
+          scheduledWake={scheduledWake}
           needsInput={needsInput}
           metaWhileLive
           platformIcon={platformIcon}

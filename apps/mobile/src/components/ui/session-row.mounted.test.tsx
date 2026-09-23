@@ -129,6 +129,25 @@ describe('SessionRow mounted layout', () => {
     expect(textNode(root, meta).props.ellipsizeMode).toBe('tail');
   });
 
+  it.each([
+    { name: 'with a wake time', scheduledWake: '9:00 AM', label: 'SCHEDULED · 9:00 AM' },
+    { name: 'without a wake time', scheduledWake: null, label: 'SCHEDULED' },
+  ])('renders $name on a scheduled row, not the idle ring', ({ scheduledWake, label }) => {
+    const root = renderRow({ statusKind: 'scheduled', scheduledWake, meta });
+    const values = root
+      .findAll(node => Object.is(node.type, 'Text'))
+      .flatMap(node => node.children);
+    expect(values).toContain(label);
+    expect(values).not.toContain('Idle');
+    // The scheduled branch owns the cluster: the timestamp meta and the
+    // platform mark are suppressed.
+    expect(values).not.toContain(meta);
+    expect(root.findAllByProps({ testID: 'platform-icon' })).toHaveLength(0);
+    expect(
+      root.findAll(node => Object.is(node.type, 'SessionStatusIcon')).map(glyph => glyph.props.kind)
+    ).toEqual(['scheduled']);
+  });
+
   it.each<{
     name: string;
     props: Partial<Props>;

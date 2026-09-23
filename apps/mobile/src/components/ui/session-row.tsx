@@ -36,6 +36,14 @@ type SessionRowProps = {
    */
   needsInput?: boolean;
   /**
+   * Clock time of a `scheduled` row's wake, already formatted in the active
+   * language (see `formatScheduledWake`). Only read when `statusKind` is
+   * `'scheduled'`; appended to the `SCHEDULED` label as ` · <wake>` when set,
+   * omitted when null so a scheduled row with no known wake shows the label
+   * alone.
+   */
+  scheduledWake?: string | null;
+  /**
    * Opt-in: when true AND `live` AND `meta` are set (and `needsInput` is
    * false), render the live dot AND the meta text side-by-side instead
    * of choosing one. Default false — Home passes `meta` with `live` and
@@ -78,6 +86,7 @@ export function SessionRow({
   live,
   statusKind = null,
   needsInput = false,
+  scheduledWake = null,
   metaWhileLive = false,
   platformIcon,
   onPress,
@@ -93,6 +102,7 @@ export function SessionRow({
 
   const eyebrowDecision = selectSessionRowEyebrowRight({
     needsInput,
+    scheduled: statusKind === 'scheduled',
     live: Boolean(live),
     hasMeta: Boolean(meta),
     metaWhileLive,
@@ -106,6 +116,22 @@ export function SessionRow({
         <SessionStatusIcon kind="needsInput" />
         <Text variant="mono" className="shrink text-xs text-warn">
           {t('sessionRow.needsInput')}
+        </Text>
+      </View>
+    );
+  } else if (eyebrowDecision.kind === 'scheduled') {
+    branchContent = (
+      <View className="min-w-0 shrink flex-row items-center gap-1.5">
+        <SessionStatusIcon kind="scheduled" />
+        <Text
+          variant="mono"
+          className="shrink text-xs text-ink2"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {scheduledWake
+            ? `${t('sessionRow.scheduled')} · ${scheduledWake}`
+            : t('sessionRow.scheduled')}
         </Text>
       </View>
     );

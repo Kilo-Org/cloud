@@ -134,6 +134,66 @@ describe('selectSessionRowEyebrowRight', () => {
     ).toBe('none');
   });
 
+  describe('scheduled kind', () => {
+    it('returns scheduled below needs-input and above every live/meta kind', () => {
+      expect(
+        selectSessionRowEyebrowRight({
+          needsInput: false,
+          scheduled: true,
+          live: true,
+          hasMeta: true,
+          metaWhileLive: true,
+        })
+      ).toEqual({ kind: 'scheduled', showPlatformIcon: false });
+      // The scheduled branch keys off the status, not the live flag.
+      expect(
+        selectSessionRowEyebrowRight({
+          needsInput: false,
+          scheduled: true,
+          live: false,
+          hasMeta: true,
+          metaWhileLive: false,
+        })
+      ).toEqual({ kind: 'scheduled', showPlatformIcon: false });
+    });
+
+    it('keeps needs-input above scheduled (highest priority)', () => {
+      expect(
+        selectSessionRowEyebrowRight({
+          needsInput: true,
+          scheduled: true,
+          live: true,
+          hasMeta: true,
+          metaWhileLive: true,
+        }).kind
+      ).toBe('needs-input');
+    });
+
+    it('suppresses the platform icon on the scheduled branch', () => {
+      expect(
+        selectSessionRowEyebrowRight({
+          needsInput: false,
+          scheduled: true,
+          live: false,
+          hasMeta: true,
+          metaWhileLive: false,
+          hasPlatformIcon: true,
+        })
+      ).toEqual({ kind: 'scheduled', showPlatformIcon: false });
+    });
+
+    it('treats an omitted scheduled flag as false (existing callers unchanged)', () => {
+      expect(
+        selectSessionRowEyebrowRight({
+          needsInput: false,
+          live: true,
+          hasMeta: true,
+          metaWhileLive: true,
+        })
+      ).toEqual({ kind: 'live-and-meta', showPlatformIcon: false });
+    });
+  });
+
   describe('showPlatformIcon', () => {
     it('needs-input suppresses the icon even when hasPlatformIcon is true', () => {
       expect(

@@ -100,7 +100,8 @@ export function useNewSessionCreator({
     // call prepareSession with an empty prompt. The voice controller has
     // already presented its own feedback, so a no-op here preserves the
     // user's draft and screen state without toasting.
-    const prompt = resolveNewSessionPromptForCreate(promptRef.current);
+    const draft = promptRef.current;
+    const prompt = resolveNewSessionPromptForCreate(draft);
     if (prompt === null) {
       return;
     }
@@ -116,6 +117,27 @@ export function useNewSessionCreator({
     // inside `uploadPending`; `{ ok: false }` is truthy, so test `ok`.
     const uploaded = await attachments.uploadPending();
     if (!uploaded.ok) {
+      setIsCreating(false);
+      return;
+    }
+
+    // The dispatched payload is the trimmed `prompt`, so compare the live
+    // draft through the same projection: a trailing space, or an
+    // IME/autocorrect composition commit that leaves the trimmed text
+    // identical, is not a semantic edit and must not cancel a create whose
+    // body did not change.
+    const promptChanged = (): boolean =>
+      resolveNewSessionPromptForCreate(promptRef.current) !== prompt;
+
+    // The keyboard stays up while a create is in flight (making a focused
+    // Android input non-editable drops the IME and collapses the pinned
+    // footer), so the composer keeps taking edits. This attempt holds the
+    // snapshot above: a draft the user changed mid-flight is a request for
+    // different text, so cancel before the create is dispatched instead of
+    // discarding the edit. Their edited draft stays for the next Start. The
+    // same predicate goes to the core, so the outbox-load and safe-retry
+    // windows — where the composer is also still editable — are covered too.
+    if (promptChanged()) {
       setIsCreating(false);
       return;
     }
@@ -143,6 +165,10 @@ export function useNewSessionCreator({
           writeSafeRetry,
           removeOutboxRow,
           whenLoaded,
+          // The composer stays editable until the request is sent, so the core
+          // re-checks the draft immediately before the mutate and abandons an
+          // unsent intent whose text changed.
+          shouldAbort: promptChanged,
           // Cache invalidation is React Query's; the core owns when it runs.
           invalidate: async () => {
             await invalidateAgentSessionQueries(queryClient, trpc);
@@ -151,6 +177,12 @@ export function useNewSessionCreator({
       );
 
       if (!outcome.ok) {
+        if (outcome.reason === 'aborted') {
+          // The draft changed after the snapshot was taken and the request was
+          // never sent: stay silent and keep the edited draft for the next
+          // Start. Starting over is the user's own next action, not a failure.
+          return;
+        }
         if (outcome.reason === 'outbox-unreadable') {
           // The pending rows were not read as empty: refuse rather than mint a
           // duplicate key. The user's retry re-reads the store.

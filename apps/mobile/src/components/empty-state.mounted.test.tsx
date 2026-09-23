@@ -7,12 +7,22 @@
 // full form needs ~167pt, so the state fell to the scroll anchor and its second
 // line and action were parked behind the bar (landscape spot defect e8). The
 // compact form keeps the title, its description, and the action.
+//
+// A caller that measures its own clear region passes `compact` and owns the
+// presentation decision (the Agents screen does); the explicit form must keep
+// the title, the hint, and the action too.
 
-import { act, type ComponentPropsWithRef, createElement, useImperativeHandle } from 'react';
+import {
+  act,
+  type ComponentPropsWithRef,
+  createElement,
+  type ReactNode,
+  useImperativeHandle,
+} from 'react';
 import { type LayoutChangeEvent, type ScrollView, type ViewProps } from 'react-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Bot } from '@/components/ui/icons';
+import { Bot, SearchX } from '@/components/ui/icons';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
@@ -36,10 +46,10 @@ const native = vi.hoisted(() => {
 });
 
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
-vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', Loader2: 'Loader2' }));
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', SearchX: 'SearchX', Loader2: 'Loader2' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
+  useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
@@ -241,6 +251,75 @@ describe('EmptyState compact form', () => {
 
     measureForm(mounted, 96);
     expect(formClassName(mounted)).not.toContain('opacity-0');
+    mounted.unmount();
+  });
+});
+
+const ICON_BUBBLE_CLASS = 'h-14 w-14';
+
+function presentationEmptyState(compact: boolean) {
+  return (
+    <EmptyState
+      icon={SearchX}
+      title="No sessions match"
+      description="Try a different search term."
+      compact={compact}
+      action={createElement('Action')}
+    />
+  );
+}
+
+function presentationTexts(mounted: Mounted) {
+  return mounted.renderer.root
+    .findAllByType('Text')
+    .map(node =>
+      node.children.filter((child): child is string => typeof child === 'string').join('')
+    );
+}
+
+function iconBubbles(mounted: Mounted) {
+  return mounted.renderer.root
+    .findAllByType('View')
+    .filter(node => typeof node.props.className === 'string')
+    .filter(node => (node.props.className as string).includes(ICON_BUBBLE_CLASS));
+}
+
+function assertKeptContent(mounted: Mounted) {
+  expect(presentationTexts(mounted)).toContain('No sessions match');
+  expect(presentationTexts(mounted)).toContain('Try a different search term.');
+  expect(mounted.renderer.root.findAllByType('Action')).toHaveLength(1);
+}
+
+describe('EmptyState presentation', () => {
+  beforeEach(() => {
+    native.viewportTop = 100;
+    native.viewportBottom = 800;
+    native.surface.frame = { top: 0, bottom: 800 };
+    native.surface.bottomInset = 0;
+  });
+
+  it('renders the icon bubble in the full presentation', async () => {
+    const mounted = await renderWithProviders(presentationEmptyState(false));
+    expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(1);
+    expect(iconBubbles(mounted)).toHaveLength(1);
+    assertKeptContent(mounted);
+    mounted.unmount();
+  });
+
+  it('drops the icon in the compact presentation and keeps the title, hint and action', async () => {
+    const mounted = await renderWithProviders(presentationEmptyState(true));
+    expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
+    expect(iconBubbles(mounted)).toHaveLength(0);
+    assertKeptContent(mounted);
+    mounted.unmount();
+  });
+
+  it('keeps the description node a caller owns in the compact presentation', async () => {
+    const description: ReactNode = createElement('AccessibleStatus', null, 'offline');
+    const mounted = await renderWithProviders(
+      <EmptyState icon={SearchX} title="No sessions match" description={description} compact />
+    );
+    expect(mounted.renderer.root.findAllByType('AccessibleStatus')).toHaveLength(1);
     mounted.unmount();
   });
 });

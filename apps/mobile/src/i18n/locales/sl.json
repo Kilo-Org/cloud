@@ -2078,6 +2078,7 @@
       "couldNotSearch": "Iskanje sej ni uspelo.",
       "completedWillAppear": "Dokončane seje bodo prikazane tukaj.",
       "noPastSessions": "Ni preteklih sej",
+      "pastSessions": "Pretekle seje",
       "live": "V ŽIVO",
       "updating": "Posodabljanje"
     },

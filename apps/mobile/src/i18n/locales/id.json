@@ -1524,6 +1524,7 @@
       "couldNotSearch": "Tidak dapat mencari sesi.",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tidak ada sesi sebelumnya",
+      "pastSessions": "Sesi sebelumnya",
       "live": "LANGSUNG",
       "updating": "Memperbarui"
     },

@@ -2028,6 +2028,7 @@
       "couldNotSearch": "Der kunne ikke søges i sessionerne.",
       "completedWillAppear": "Afsluttede sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
+      "pastSessions": "Tidligere sessioner",
       "live": "I REALTID",
       "updating": "Opdaterer"
     },

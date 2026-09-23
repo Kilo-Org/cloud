@@ -2128,6 +2128,7 @@
       "couldNotSearch": "Ni lwyddwyd i chwilio'r sesiynau.",
       "completedWillAppear": "Bydd sesiynau wedi'u cwblhau'n ymddangos yma.",
       "noPastSessions": "Dim sesiynau blaenorol",
+      "pastSessions": "Sesiynau blaenorol",
       "live": "BYW",
       "updating": "Yn diweddaru"
     },

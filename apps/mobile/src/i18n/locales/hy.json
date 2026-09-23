@@ -2028,6 +2028,7 @@
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը։",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Նախորդ նիստեր չկան",
+      "pastSessions": "Նախորդ նիստեր",
       "live": "ԱԿՏԻՎ",
       "updating": "Թարմացվում է"
     },

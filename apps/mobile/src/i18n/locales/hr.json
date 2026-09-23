@@ -2053,6 +2053,7 @@
       "couldNotSearch": "Nije moguće pretražiti sesije.",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prethodnih sesija",
+      "pastSessions": "Prethodne sesije",
       "live": "UŽIVO",
       "updating": "Ažuriranje"
     },

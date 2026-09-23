@@ -2028,6 +2028,7 @@
       "couldNotSearch": "ਸੈਸ਼ਨ ਖੋਜੇ ਨਹੀਂ ਜਾ ਸਕੇ।",
       "completedWillAppear": "ਮੁਕੰਮਲ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noPastSessions": "ਕੋਈ ਪਿਛਲਾ ਸੈਸ਼ਨ ਨਹੀਂ",
+      "pastSessions": "ਪਿਛਲੇ ਸੈਸ਼ਨ",
       "live": "ਲਾਈਵ",
       "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
     },

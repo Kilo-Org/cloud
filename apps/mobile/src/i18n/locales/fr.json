@@ -2423,6 +2423,7 @@
       "couldNotSearch": "Impossible de rechercher des sessions.",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session terminée",
+      "pastSessions": "Sessions terminées",
       "live": "EN DIRECT",
       "updating": "Mise à jour en cours"
     },

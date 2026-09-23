@@ -1524,6 +1524,7 @@
       "couldNotSearch": "Không thể tìm kiếm phiên.",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Chưa có phiên đã hoàn tất",
+      "pastSessions": "Các phiên trước đây",
       "live": "TRỰC TIẾP",
       "updating": "Đang cập nhật"
     },

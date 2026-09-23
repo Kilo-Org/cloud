@@ -2028,6 +2028,7 @@
       "couldNotSearch": "Istuntoja ei voitu hakea.",
       "completedWillAppear": "Päättyneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
+      "pastSessions": "Aiemmat istunnot",
       "live": "REAALIAJASSA",
       "updating": "Päivitetään"
     },

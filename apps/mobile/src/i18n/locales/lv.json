@@ -2053,6 +2053,7 @@
       "couldNotSearch": "Neizdevās meklēt sesijas.",
       "completedWillAppear": "Pabeigtās sesijas parādīsies šeit.",
       "noPastSessions": "Nav iepriekšējo sesiju",
+      "pastSessions": "Iepriekšējās sesijas",
       "live": "REĀLLAIKĀ",
       "updating": "Notiek atjaunināšana"
     },

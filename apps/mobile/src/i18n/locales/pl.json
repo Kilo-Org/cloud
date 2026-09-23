@@ -1542,6 +1542,7 @@
       "couldNotSearch": "Nie udało się wyszukać sesji.",
       "completedWillAppear": "Zakończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
+      "pastSessions": "Poprzednie sesje",
       "live": "NA ŻYWO",
       "updating": "Aktualizowanie"
     },

@@ -1560,6 +1560,7 @@
       "couldNotSearch": "تعذّر البحث في الجلسات.",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
+      "pastSessions": "الجلسات السابقة",
       "live": "مباشر",
       "updating": "جارٍ التحديث"
     },

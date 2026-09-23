@@ -2028,6 +2028,7 @@
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi.",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "Oldingi sessiyalar yo'q",
+      "pastSessions": "Oldingi sessiyalar",
       "live": "JONLI",
       "updating": "Yangilanmoqda"
     },

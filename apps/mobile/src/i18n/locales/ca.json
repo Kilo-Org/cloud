@@ -2053,6 +2053,7 @@
       "couldNotSearch": "No s'han pogut cercar les sessions.",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
+      "pastSessions": "Sessions anteriors",
       "live": "EN DIRECTE",
       "updating": "S'està actualitzant"
     },

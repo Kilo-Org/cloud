@@ -1524,6 +1524,7 @@
       "couldNotSearch": "セッションを検索できませんでした。",
       "completedWillAppear": "完了したセッションがここに表示されます。",
       "noPastSessions": "過去のセッションはありません",
+      "pastSessions": "過去のセッション",
       "live": "ライブ",
       "updating": "更新中"
     },

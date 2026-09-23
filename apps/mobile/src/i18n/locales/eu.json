@@ -2028,6 +2028,7 @@
       "couldNotSearch": "Ezin izan dira saioak bilatu.",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago aurreko saiorik",
+      "pastSessions": "Aurreko saioak",
       "live": "ZUZENEAN",
       "updating": "Eguneratzen"
     },

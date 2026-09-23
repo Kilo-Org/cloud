@@ -2053,6 +2053,7 @@
       "couldNotSearch": "Nu s-a putut căuta în sesiuni.",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune anterioară",
+      "pastSessions": "Sesiuni anterioare",
       "live": "ÎN TIMP REAL",
       "updating": "Se actualizează"
     },

@@ -2028,6 +2028,7 @@
       "couldNotSearch": "Сессүүдийг хайж чадсангүй.",
       "completedWillAppear": "Дууссан сессүүд энд гарч ирнэ.",
       "noPastSessions": "Өмнөх сесс байхгүй",
+      "pastSessions": "Өмнөх сессүүд",
       "live": "ШУУД",
       "updating": "Шинэчилж байна"
     },

@@ -2078,6 +2078,7 @@
       "couldNotSearch": "Relace se nepodařilo vyhledat.",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné předchozí relace",
+      "pastSessions": "Předchozí relace",
       "live": "ŽIVĚ",
       "updating": "Aktualizace"
     },

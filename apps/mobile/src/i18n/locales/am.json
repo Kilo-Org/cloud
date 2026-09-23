@@ -2028,6 +2028,7 @@
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም።",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
+      "pastSessions": "ያለፉ ክፈለ ጊዜዎች",
       "live": "ቀጥታ",
       "updating": "በማዘመን ላይ"
     },

@@ -1533,6 +1533,7 @@
       "couldNotSearch": "No se pudieron buscar las sesiones.",
       "completedWillAppear": "Las sesiones completadas aparecerán aquí.",
       "noPastSessions": "No hay sesiones anteriores",
+      "pastSessions": "Sesiones anteriores",
       "live": "EN DIRECTO",
       "updating": "Actualizando"
     },

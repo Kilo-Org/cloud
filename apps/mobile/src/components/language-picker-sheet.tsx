@@ -2,7 +2,7 @@ import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, I18nManager, TextInput, View } from 'react-native';
+import { FlatList, I18nManager, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
 import { PickerSheet } from '@/components/picker-sheet';
 import { SearchX } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { languagePickerItems } from '@/i18n/language-rows';
@@ -26,8 +27,6 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
-
-const SEARCH_RTL = { textAlign: 'right' } as const;
 
 export function LanguagePickerSheet({
   onClose,
@@ -209,18 +208,16 @@ export function LanguagePickerSheet({
       scrollable={false}
       headerContent={
         <View className="px-4 pb-2 pt-3">
-          <TextInput
+          <Input
             key={searchEpoch}
             accessibilityLabel={t('language.search')}
-            // leading-[normal] so no lineHeight reaches the style: iOS otherwise
-            // draws the placeholder below the typed text and clips it. min-h-*
-            // sets the height without padding, so iOS centres the text rect.
-            className="rounded-md border border-input bg-background px-3 min-h-[44px] text-sm leading-[normal] text-foreground"
+            // The shared single-line box (`@/components/ui/input`) supplies the
+            // height floor, the one line box for the placeholder and the value,
+            // and the RTL content alignment, so this field keeps only its own
+            // chrome and text size.
+            className="rounded-md border border-input bg-background px-3 text-sm text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
-            // textAlign is applied inline, not via a class: NativeWind maps it
-            // to a native prop for TextInput and crashes on it in this version.
-            style={isRtl ? SEARCH_RTL : undefined}
             // Uncontrolled: iOS drops keystrokes when state drives `value`. The
             // input remounts on focus via `searchEpoch`, so a reopen starts empty.
             onChangeText={setQuery}

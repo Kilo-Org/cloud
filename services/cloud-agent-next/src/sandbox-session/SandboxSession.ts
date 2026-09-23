@@ -249,6 +249,7 @@ import {
   streamQueuedSnapshots,
   terminalAtOf,
   terminalSourceOf,
+  terminalizeWaitingMessage,
   type ControlSessionMessageInput,
   type SessionAggregate,
   type SessionMessage,
@@ -4760,10 +4761,7 @@ export class SandboxSession extends DurableObject<Env> {
         kind === 'accepted' || (prompt !== undefined && prompt.dispatched !== false);
       if (!confirmed) return message;
       failedIds.push(message.messageId);
-      return {
-        ...message,
-        state: terminalMessageState(message.state, 'failed', now, 'coordinator', { reason }),
-      };
+      return terminalizeWaitingMessage(message, reason, now);
     });
     if (failedIds.length === 0 && !released) return;
     if (!this.saveMessages(messages, epoch)) return;

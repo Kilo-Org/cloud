@@ -246,6 +246,7 @@ import {
   getSandboxNamespace,
 } from '../sandbox-id.js';
 import {
+  validateContainersTerminalBillingRuntime,
   validateTerminalBillingRuntime,
   type SandboxTerminalAccessInput,
   type SandboxTerminalAccessResult,
@@ -2611,35 +2612,56 @@ export class SandboxControl extends DurableObject<Env> {
       ...(input.organizationId ? { orgId: input.organizationId } : {}),
     });
     if (!enforced) return this.renewTerminalCredentialLease(input, runtime);
-    if (runtime.provider !== 'cloudflare') {
+    if (runtime.provider !== 'cloudflare' && runtime.provider !== 'cloudflare-containers') {
       return { allowed: false, reason: 'billing_policy_unavailable' };
     }
 
     let billing: SandboxTerminalAccessResult;
     try {
-      const providerRef = decodeCloudflareProviderRef(canonicalProviderRefOf(runtime.physical));
-      if (!providerRef) return { allowed: false, reason: 'runtime_not_running' };
-      const allocationId = providerRef.sandboxId;
-      const namespace = getSandboxNamespace(this.env, allocationId, {
-        managedScmContainment: providerRef.containment,
-      });
-      const sandbox = getSandbox(namespace, allocationId);
-      billing = validateTerminalBillingRuntime({
-        access: runtime.route.worktreeId
-          ? {
-              ...input,
-              sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
-            }
-          : input,
-        sandboxId: allocationId,
-        providerInstanceId: runtime.connection.providerInstanceId,
-        sandboxDurableObjectId: namespace.idFromName(allocationId).toString(),
-        runtime: await withTimeout(
-          getSandboxBillingRuntimeStatus(sandbox),
-          DEADLINE_MS.stopAttempt,
-          'Sandbox billing runtime observation timed out'
-        ),
-      });
+      if (runtime.provider === 'cloudflare') {
+        const providerRef = decodeCloudflareProviderRef(canonicalProviderRefOf(runtime.physical));
+        if (!providerRef) return { allowed: false, reason: 'runtime_not_running' };
+        const allocationId = providerRef.sandboxId;
+        const namespace = getSandboxNamespace(this.env, allocationId, {
+          managedScmContainment: providerRef.containment,
+        });
+        const sandbox = getSandbox(namespace, allocationId);
+        billing = validateTerminalBillingRuntime({
+          access: runtime.route.worktreeId
+            ? {
+                ...input,
+                sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
+              }
+            : input,
+          sandboxId: allocationId,
+          providerInstanceId: runtime.connection.providerInstanceId,
+          sandboxDurableObjectId: namespace.idFromName(allocationId).toString(),
+          runtime: await withTimeout(
+            getSandboxBillingRuntimeStatus(sandbox),
+            DEADLINE_MS.stopAttempt,
+            'Sandbox billing runtime observation timed out'
+          ),
+        });
+      } else {
+        const namespace = this.env.SANDBOX_CONTAINERS;
+        const container = namespace.getByName(this.sandboxId);
+        billing = validateContainersTerminalBillingRuntime({
+          access: runtime.route.worktreeId
+            ? {
+                ...input,
+                sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
+              }
+            : input,
+          sandboxId: this.sandboxId,
+          providerInstanceId: runtime.connection.providerInstanceId,
+          sandboxDurableObjectId: namespace.idFromName(this.sandboxId).toString(),
+          runtime: await withTimeout(
+            container.getBillingRuntimeStatus(),
+            DEADLINE_MS.stopAttempt,
+            'Sandbox billing runtime observation timed out'
+          ),
+        });
+      }
     } catch {
       return { allowed: false, reason: 'billing_runtime_unavailable' };
     }

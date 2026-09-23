@@ -8135,6 +8135,60 @@ describe('message-owned delivery identity fences', () => {
     expect(save([acceptedCopy])).toBe(true);
     expect(fixture.record('a')).toEqual(terminal);
   });
+
+  it('settles a confirmed Stop as interrupted when runtime retirement reports the internal reason', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    delegateRequest(fixture, 'session.abort', async () =>
+      controlResponse({ status: 'unconfirmed' })
+    );
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({
+      success: false,
+      unconfirmed: true,
+      message: expect.any(String),
+    });
+    await fixture.flush();
+    // This exercises the retirement-notification receiver (`failWaitingMessages`
+    // with the exact reason/wrapper/native triple). It does not exercise
+    // `NativeRuntimeRetirement.complete -> notifyNativeRetirementReceivers ->
+    // stub.failWaitingMessages`.
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'accepted' },
+      cancellation: { operationId: expect.any(String) },
+    });
+
+    fixture.storage.kv.put('native_runtime_fence', {
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: NEXT_RUNTIME_ID,
+      attachmentEpoch: 1,
+      authorization: {
+        operation: 'session.attach',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        messageId: 'a',
+        session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+        wrapperInstanceId: RUNTIME_ID,
+        dispatchDeadlineAt: Date.now() + 60_000,
+      },
+    });
+
+    await fixture.session.failWaitingMessages('Scoped Stop cleanup', RUNTIME_ID, NEXT_RUNTIME_ID);
+
+    expect(fixture.record('a')?.state.kind).toBe('cancelled');
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+    const terminalEvents = fixture.terminalEvents();
+    expect(terminalEvents).toHaveLength(1);
+    expect(JSON.parse(terminalEvents[0]!.payload)).toMatchObject({
+      messageId: 'a',
+      status: 'interrupted',
+      reason: 'interrupted',
+      delivery: 'sent',
+      accepted: true,
+      error: 'The message was interrupted',
+    });
+    expect(terminalEvents[0]!.payload).not.toContain('Scoped Stop cleanup');
+  });
 });
 
 describe('streamCloudStatus', () => {

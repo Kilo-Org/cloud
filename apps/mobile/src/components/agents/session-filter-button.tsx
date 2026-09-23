@@ -1,5 +1,5 @@
 import { SlidersHorizontal } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { type Insets, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
@@ -12,6 +12,13 @@ type SessionFilterButtonProps = {
   activeCount: number;
   onPress: () => void;
   testID?: string;
+  /**
+   * Per-side reach override. The control's own default is the same slop on
+   * every side; a caller that shares a row with another control needs to state
+   * the facing sides, so the two touch regions can be checked against the row
+   * gap instead of overlapping inside it.
+   */
+  hitSlop?: number | Insets;
 };
 
 /**
@@ -43,6 +50,7 @@ export function SessionFilterButton({
   activeCount,
   onPress,
   testID,
+  hitSlop = FILTER_HIT_SLOP,
 }: Readonly<SessionFilterButtonProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -51,7 +59,11 @@ export function SessionFilterButton({
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={FILTER_HIT_SLOP}
+      // The frame is the tap target the size audit measures, not the 20pt
+      // glyph; `FILTER_HIT_SLOP` above carries it past the 44pt minimum. A
+      // caller sharing a row may state the sides it faces, so the two touch
+      // regions can meet inside the row gap instead of overlapping.
+      hitSlop={hitSlop}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".

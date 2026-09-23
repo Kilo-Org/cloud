@@ -1,4 +1,8 @@
-import { buildEnterpriseSsoHref, buildNormalSignInHref } from './sign-in-navigation';
+import {
+  buildEnterpriseSsoHref,
+  buildNormalSignInHref,
+  buildSsoAccountSwitchHref,
+} from './sign-in-navigation';
 
 describe('buildEnterpriseSsoHref', () => {
   it('preserves callback and approved attribution context', () => {
@@ -51,5 +55,35 @@ describe('buildNormalSignInHref', () => {
     ).toBe(
       '/users/sign_in?source=extension&im_ref=impact-click&utm_campaign=launch&callbackPath=%2Fclaw%2Fnew'
     );
+  });
+});
+
+describe('buildSsoAccountSwitchHref', () => {
+  it('restores the expected email and preserves a validated device callback', () => {
+    expect(
+      buildSsoAccountSwitchHref(
+        { callbackPath: '/device-auth?code=ABC&app=1', sso: 'true', email: 'a@example.com' },
+        'a@example.com'
+      )
+    ).toBe(
+      '/users/sign_in?sso=true&email=a%40example.com&callbackPath=%2Fdevice-auth%3Fcode%3DABC%26app%3D1'
+    );
+  });
+
+  it('never carries the signed-in address into the URL', () => {
+    const href = buildSsoAccountSwitchHref(
+      {
+        callbackPath: '/device-auth?code=ABC&app=1',
+        sso: 'true',
+        email: 'signed-in@example.com',
+        source: 'extension',
+      },
+      'a@example.com'
+    );
+
+    expect(href).toBe(
+      '/users/sign_in?sso=true&email=a%40example.com&source=extension&callbackPath=%2Fdevice-auth%3Fcode%3DABC%26app%3D1'
+    );
+    expect(href).not.toContain('signed-in');
   });
 });

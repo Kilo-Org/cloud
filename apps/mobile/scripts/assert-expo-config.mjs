@@ -45,6 +45,12 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// Android-only by capability: AppCompat's stock button-bar text appearance
+// forces ALL-CAPS, while iOS's `UIAlertController` draws the same shared
+// `Alert.alert` copy as given and exposes no casing transform. The plugin's one
+// platform piece is the AppTheme override; it is registered once for both
+// prebuilds, so the fix behaves the same on iOS and Android.
+const ALERT_DIALOG_BUTTON_CASE_PLUGIN = './plugins/withAndroidAlertDialogButtonCase';
 // The alert dialog theme points AppCompat's DayNight defaults
 // (`colorBackgroundFloating`, `colorAccent`) at the app's surfaces; without it
 // every `Alert.alert()` confirmation renders as a foreign grey/teal panel.
@@ -226,6 +232,13 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// Android alert-dialog actions must render in the app's sentence case: the
+// AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy
+// (DESIGN.md:350). The plugin re-cases them from the activity theme.
+check(
+  pluginNames.includes(ALERT_DIALOG_BUTTON_CASE_PLUGIN),
+  `plugins must include "${ALERT_DIALOG_BUTTON_CASE_PLUGIN}"`
 );
 // The alert dialog theme repaints AppCompat's stock dialog surface and accent
 // with the app's own tokens; without it the sign-out confirmation (and every

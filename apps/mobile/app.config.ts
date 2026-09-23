@@ -368,6 +368,14 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // One implementation for iOS and Android: the discard confirm is the same
+    // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
+    // already draws that copy as given (it exposes no casing transform to
+    // override). Android is the one platform that lacks the capability —
+    // AppCompat's stock button-bar text appearance forces ALL-CAPS — so the
+    // plugin's single platform piece is the AppTheme override it writes, and it
+    // is registered once here for both prebuilds.
+    './plugins/withAndroidAlertDialogButtonCase',
     // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
     // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
     // by capability — iOS's UIAlertController already follows the system

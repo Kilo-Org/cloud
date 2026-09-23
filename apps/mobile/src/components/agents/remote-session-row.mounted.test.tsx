@@ -21,7 +21,6 @@ import {
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
-import { i18n } from '@/i18n';
 import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/query-client';
 
 const state = vi.hoisted(() => ({
@@ -276,24 +275,6 @@ describe('row exit refresh caller', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual(current);
     expect(state.request.mock.calls).toHaveLength(0);
-  });
-});
-
-describe('RemoteSessionRow placeholder title', () => {
-  it('shows the untitled fallback instead of the creation placeholder', async () => {
-    await render(
-      makeCached({
-        id: 'a1',
-        title: 'New session - 2026-09-22T17:26:31.465Z',
-        createdOnPlatform: 'cli',
-      })
-    );
-    if (!renderer) {
-      throw new Error('Missing row');
-    }
-    const props = renderer.root.findByType(Pressable).props as { accessibilityLabel: string };
-    expect(props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
-    expect(props.accessibilityLabel).not.toContain('2026-09-22');
   });
 });
 

@@ -122,24 +122,26 @@ describe('FeatureFlagsSection', () => {
     expect(textLines(tree)).toContain('Enabled · default · not loaded');
   });
 
-  it('keeps the notation English on an Arabic screen while the value word follows the language', async () => {
-    // The finding's capture: the value word is Arabic but "default · not loaded"
-    // stays English. That is by design — `preferences.featureFlagNotLoaded` sits
-    // in `ENGLISH_IDENTICAL_ALLOWLIST` in `tools/i18n/check-catalogs.mjs`, which
-    // records a source marker plus a load state as a technical token, not
-    // translatable prose (the section header and value word are translated).
+  it('reads the reason copy in the selected language and keeps the flag key as an identifier', async () => {
+    // The finding's capture showed the English source/state words ("default ·
+    // not loaded") in an otherwise Arabic row. `preferences.featureFlagNotLoaded`
+    // is prose, not notation: it is deliberately absent from
+    // `ENGLISH_IDENTICAL_ALLOWLIST` in `tools/i18n/check-catalogs.mjs`, and
+    // `i18n/feature-flag-copy.test.ts` fails any catalog that ships the English
+    // string. The flag key stays the ASCII identifier the registry is keyed by.
     await i18n.changeLanguage('ar');
     posthog.statuses = [unloaded];
     const tree = await mount();
 
     const lines = textLines(tree);
     const reason = i18n.t('preferences.featureFlagNotLoaded');
+    expect(reason).not.toBe('default · not loaded');
     expect(lines).toContain(`${i18n.t('common.enabled')} · ${reason}`);
-    // The value word follows the selected language…
+    // The value word and the reason both follow the selected language…
     expect(i18n.t('common.enabled')).not.toBe('Enabled');
     expect(lines).not.toContain(`Enabled · ${reason}`);
-    // …and the notation stays exactly the English source string.
-    expect(reason).toBe('default · not loaded');
+    // …while the flag key remains the technical identifier it is keyed by.
+    expect(lines).toContain('mobile-pr-review');
   });
 
   it('marks a below-minimum flag with the version gate even before remote flags load', async () => {

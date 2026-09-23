@@ -12,6 +12,17 @@ const VERSION_PATTERN = /^\d+(\.\d+)*$/;
 /** Prefix of the limiter key, so the edge-client bucket is never confusable. */
 const CLIENT_KEY_PREFIX = 'client:';
 
+/** The only route this handler serves. */
+const INGEST_ROUTE = '/v1/latency';
+
+/**
+ * Route value for a request that did not match `INGEST_ROUTE`. The duration
+ * line logs this fixed value rather than the requested pathname, because an
+ * unauthenticated caller controls the pathname and would otherwise place
+ * arbitrary text in the line.
+ */
+const UNMATCHED_ROUTE = 'unmatched';
+
 const LatencySampleSchema = z
   .object({
     requestId: z.string(),
@@ -60,8 +71,9 @@ const OUTCOME_BY_STATUS: Record<number, LatencyIngestOutcome> = {
  * `/v1/latency` is attributable. This handler performs no upstream I/O, so its
  * 504 can only come from the Cloudflare runtime; the line is the server-side
  * timing that the next production pull compares against the gateway budget.
- * The line carries the allow-listed fields only: `route` is the pathname and
- * never the query string, and nothing here is caller-supplied.
+ * The line carries the allow-listed fields only: `route` is one of two fixed
+ * values — the served route, or `unmatched` — never the requested pathname or
+ * query string, and nothing here is caller-supplied.
  */
 function logIngestDuration(
   deps: LatencyIngestDeps,
@@ -71,7 +83,7 @@ function logIngestDuration(
   startedAt: number
 ): void {
   deps.log({
-    route: url.pathname,
+    route: url.pathname === INGEST_ROUTE ? INGEST_ROUTE : UNMATCHED_ROUTE,
     method: request.method,
     status,
     durationMs: Date.now() - startedAt,
@@ -169,7 +181,7 @@ async function routeLatencyIngest(
   url: URL,
   deps: LatencyIngestDeps
 ): Promise<Response> {
-  if (request.method !== 'POST' || url.pathname !== '/v1/latency') {
+  if (request.method !== 'POST' || url.pathname !== INGEST_ROUTE) {
     return errorResponse(404);
   }
 

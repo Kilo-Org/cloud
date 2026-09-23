@@ -100,9 +100,9 @@ afterEach(() => {
 });
 
 describe('handleLatencyIngest routing and auth', () => {
-  it('returns 404 on another path', async () => {
+  it('returns 404 on another path without logging the caller-supplied pathname', async () => {
     const { deps, lines } = makeDeps();
-    const request = new Request('https://latency.kiloapps.io/v1/other', {
+    const request = new Request('https://latency.kiloapps.io/v1/other?token=super-secret', {
       method: 'POST',
       headers: { authorization: `Bearer ${BEARER}`, 'x-kilo-app-version': '1.0.12' },
       body: JSON.stringify({ samples: [sample()] }),
@@ -113,8 +113,12 @@ describe('handleLatencyIngest routing and auth', () => {
     expect(response.status).toBe(404);
     expect(sampleLines(lines)).toHaveLength(0);
     expect(durationLines(lines)).toMatchObject([
-      { route: '/v1/other', method: 'POST', status: 404, outcome: 'not_found' },
+      { route: 'unmatched', method: 'POST', status: 404, outcome: 'not_found' },
     ]);
+    // The route is an allow-listed constant, so the requested pathname (which
+    // an unauthenticated caller controls) never reaches the line.
+    expect(JSON.stringify(durationLines(lines))).not.toContain('/v1/other');
+    expect(JSON.stringify(durationLines(lines))).not.toContain('super-secret');
   });
 
   it('returns 401 without a bearer authorization header', async () => {

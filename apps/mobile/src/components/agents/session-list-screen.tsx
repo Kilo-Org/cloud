@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   FlatList,
@@ -36,6 +36,7 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
@@ -207,17 +208,25 @@ export function AgentSessionListScreen() {
   const navigateToSession = useAgentSessionNavigator();
 
   const seeAllLabel = t('home.seeAll');
-  // The list controls take the header's `context` slot, one line below the
-  // title, so the 30px title owns the whole title row (Quick Chat puts its
-  // account control in the same slot). Sharing that row through `headerRight`,
-  // the slot's half-row cap squeezed both columns on a narrow viewport until
+  // The list controls share the title's row through the header's `inlineActions`
+  // slot, trailing the eyebrow + title heading. The heading keeps
+  // `min-w-0 flex-1`, so the 30px title keeps its tail ellipsis while the
+  // controls keep their full width — sharing that row through the old
+  // `headerRight` half-row cap squeezed both columns on a narrow viewport until
   // the title broke mid-word and this label stacked onto two lines (device
   // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
   // control keeps the header's full width at every display size, and the
   // reserved row height keeps the header from moving when the filter button
-  // appears with the loaded sessions.
+  // appears with the loaded sessions; the box can shrink so an extreme
+  // accessibility scale ellipsizes the label instead of wrapping it to a
+  // second line.
+  // The controls row is a section header, not a bare action: its label owns the
+  // row start and grows, so the controls keep the row end — the same shape the
+  // Home live-sessions header uses. A row holding only the trailing 'See all'
+  // read as a section header whose label was missing (e2, agents).
   const headerActions = (
-    <View className="min-h-11 min-w-0 flex-row items-center justify-end gap-4">
+    <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
+      <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
@@ -229,9 +238,9 @@ export function AgentSessionListScreen() {
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text className="shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+        <Eyebrow numberOfLines={1} className="shrink text-center text-[11px] text-primary">
           {seeAllLabel}
-        </Text>
+        </Eyebrow>
       </Pressable>
       {query.canFilter ? (
         <SessionFilterButton
@@ -257,18 +266,31 @@ export function AgentSessionListScreen() {
     [navigateToSession, organizationId]
   );
 
-  // The list's frame/content insets, the FAB style, the body measurement, and
-  // the centered states' reserve and presentation: the tab bar and the FAB are
-  // absolutely-positioned overlays, and in a short window the frame yields the
-  // soft FAB band so one row stays readable (see `useAgentsListChrome`).
-  const {
-    onBodyLayout,
-    listInsets: chromeListInsets,
-    fabStyle,
-    sidePadding,
-    centeredBottomInset,
-    compactEmptyState,
-  } = useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+  // The FAB style, the side padding, the body measurement, and the centered
+  // states' reserve and presentation come from the list-chrome owner (see
+  // `useAgentsListChrome`). The rows list's bottom split stays here: the FAB
+  // clearance rides on the list's content, so the frame keeps only the tab bar
+  // (see `listInsets` below).
+  const { onBodyLayout, fabStyle, sidePadding, centeredBottomInset, compactEmptyState } =
+    useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+
+  // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
+  // content must clear them. The tab bar keeps its viewport inset as the list
+  // frame's `marginBottom` — the same viewport inset `TabScreenScrollView` uses
+  // — so the list's own background runs clean to the tab bar edge with no bare
+  // band between the last row and the bar. The FAB's clearance rides on the
+  // list's content as `paddingBottom` instead: the button floats over the list,
+  // and the end padding still carries the last row clear of it. Frame margin
+  // plus content padding together match the screen's `StateSurfaceInsets`. The
+  // landscape side insets keep row text clear of the sensor housing; portrait
+  // insets are 0, keeping the geometry unchanged.
+  const listInsets = useMemo(() => {
+    const fabPad = showFab ? FAB_SIZE + FAB_MARGIN : 0;
+    return {
+      frame: { marginBottom: tabBarHeight },
+      content: { paddingTop: 0, paddingBottom: fabPad, paddingLeft: left, paddingRight: right },
+    };
+  }, [showFab, tabBarHeight, left, right]);
 
   // The rows list's total band, mirroring `useAgentsBottomBands`'s `listBand`
   // (the hook keeps that value private): while the FAB is admitted its overlay
@@ -287,15 +309,16 @@ export function AgentSessionListScreen() {
   const centeredBand = keyboardUp ? surfaceBand : centeredBottomInset;
 
   // The rows list's frame and content insets. While the keyboard is down the
-  // shared chrome geometry owns them: it yields the soft FAB band in a short
-  // window so one row stays readable and hands the yielded part to the content.
+  // screen's own split owns them: the frame ends at the tab bar (no bare band)
+  // and the FAB clearance rides on the content, so the button floats over the
+  // list and the last row still scrolls clear of it (see `listInsets` above).
   // While the keyboard is up the container already pads the IME's occlusion, so
   // the frame carries only the remainder of the rows band (`rowsFrameBand`) and
   // the viewport ends at the band's edge instead of a whole IME height above it
   // (review finding, session-list-screen.tsx:418). The landscape side insets
   // keep row text clear of the sensor housing.
   const keyboardRowsInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
-  const listInsets = keyboardUp ? keyboardRowsInsets : chromeListInsets;
+  const rowsInsets = keyboardUp ? keyboardRowsInsets : listInsets;
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -347,9 +370,9 @@ export function AgentSessionListScreen() {
       />
     );
   } else if (hasLiveRows) {
-    // The FAB-band inset shrinks the list's frame (`marginBottom`), so the
-    // viewport ends above the button's band and no row can scroll into it on
-    // either platform.
+    // The tab-bar inset rides on the list frame, so the viewport ends at the tab
+    // bar; the FAB clearance rides on the content's `paddingBottom`, so the
+    // button floats over the list and the last row still scrolls clear of it.
     body = (
       <FlatList
         ref={listRef}
@@ -357,8 +380,8 @@ export function AgentSessionListScreen() {
         renderItem={renderItem}
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
-        style={listInsets.frame}
-        contentContainerStyle={listInsets.content}
+        style={rowsInsets.frame}
+        contentContainerStyle={rowsInsets.content}
         refreshControl={rowsControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
@@ -430,7 +453,7 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          context={headerActions}
+          inlineActions={headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

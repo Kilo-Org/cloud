@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Raha tsy mandeha ity safidy ity, dia mampiditra andalana vaovao ao amin'ny faritra fanoratana hafatra ho an'ny mpanampy ny bokotra fampidirana.",
     "biometricUnlock": "Vahao amin'ny biometrika ny hidy",
     "biometricUnlockSubtitle": "Ilaina ny mamaha ny hidy rehefa manomboka ny rindranasa sy rehefa tsy naseho nandritra ny dimy minitra.",
-    "featureFlags": "Saina endri-javatra",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "avy amin'ny mpizara · ≥ {{min}}",
-    "featureFlagSkipped": "mahazatra · < {{min}}",
-    "featureFlagNotLoaded": "mahazatra · tsy voampiditra",
     "gatewayTranscription": "Fanovana feo ho soratra amin'ny Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Aova ho soratra amin'ny modely Kilo Gateway ny fampidirana amin'ny feo fa tsy ny famantarana ny feon'ny fitaovana. Alefa amin'ny Kilo Gateway ny rakitra nosoronanao.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
       "linesOf": "andalana {{start}}–{{end}} amin'ny {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Tsy nahomby ny {{action}} amin'ny Cloud Agent ({{status}}).",
-      "failed": "Tsy nahomby ny {{action}} amin'ny Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[angona nampidirina tsy azo avadika ho endrika fitahirizana]",
       "errorPrefix": "Hadisoana: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Nolavin'ny mpamatsy ny fangatahana.",
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
-      "assistantFailed": "Tsy nahomby ny famaliana.",
-      "sendFailed": "Tsy nahomby ny fandefasana ny hafatra. Andramo indray azafady."
+      "assistantFailed": "Tsy nahomby ny famaliana."
     },
     "filePart": {
       "loadingImage": "Maka sary",

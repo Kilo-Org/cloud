@@ -43,6 +43,7 @@ import type {
   AgentSelectionOverride,
 } from '../execution/types.js';
 import {
+  ATTACH_FAILURE_LIMIT,
   PROMPT_FAILURE_LIMIT,
   acceptQueuedMessage,
   acceptedAtOf as acceptedAtOfMessage,
@@ -62,6 +63,7 @@ import {
   hasAcceptedMessage,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
+  markSessionOperationRejection,
   noOutputRecoveryAllowed,
   recordAcceptedMessageActivity,
   recordSessionOperationDispatch,
@@ -925,6 +927,53 @@ describe('releaseCompletedRetryableAttach', () => {
   });
 });
 
+describe('markSessionOperationRejection', () => {
+  const authorization: SessionOperationAuthorization = {
+    operation: 'session.attach',
+    operationId: 'attach-a',
+    messageId: 'a',
+    session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+    wrapperInstanceId: RUNTIME_ID,
+    dispatchDeadlineAt: 100,
+  };
+  const message = (proof: SessionOperationProof): SessionMessage => ({
+    messageId: 'a',
+    state: queuedState({ wrapperInstanceId: RUNTIME_ID }),
+    proofs: { attach: proof },
+  });
+
+  it('records the git subtype from a confirmed attach rejection', () => {
+    const marked = markSessionOperationRejection(
+      [message({ authorization, dispatched: true })],
+      authorization,
+      'git_rate_limited'
+    );
+
+    expect(marked?.[0]?.proofs?.attach).toMatchObject({
+      rejectionReceived: true,
+      rejectionSubtype: 'git_rate_limited',
+    });
+  });
+
+  it('records a later subtype even when the rejection was already counted', () => {
+    const marked = markSessionOperationRejection(
+      [message({ authorization, dispatched: true, rejectionReceived: true })],
+      authorization,
+      'git_clone_timeout'
+    );
+
+    expect(marked?.[0]?.proofs?.attach).toMatchObject({
+      rejectionReceived: true,
+      rejectionSubtype: 'git_clone_timeout',
+    });
+  });
+
+  it('leaves an already-counted rejection without a subtype unchanged', () => {
+    const before = [message({ authorization, dispatched: true, rejectionReceived: true })];
+    expect(markSessionOperationRejection(before, authorization)).toEqual(before);
+  });
+});
+
 describe('releaseUnconfirmedAttach', () => {
   const authorization: SessionOperationAuthorization = {
     operation: 'session.attach',
@@ -970,6 +1019,32 @@ describe('releaseUnconfirmedAttach', () => {
     });
     expect(released?.[0]?.state).not.toHaveProperty('unresolvedDispatch');
     expect(released?.[0]?.proofs?.attach).toBeUndefined();
+  });
+
+  it('keeps the retired attach epoch when the replacement proof has none', () => {
+    const message = queuedMessage({ authorization, dispatched: true });
+    if (!message.proofs) throw new Error('Missing attach proof');
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...message,
+          proofs: {
+            ...message.proofs,
+            retiredAttach: {
+              authorization,
+              dispatched: true,
+              completedAt: 400,
+              attachmentEpoch: 3,
+            },
+          },
+        },
+      ],
+      authorization
+    );
+
+    // The dispatched attach carries no epoch until its result arrives, so the
+    // overwritten slot would drop the watermark the fence holds.
+    expect(released?.[0]?.proofs?.retiredAttach).toMatchObject({ attachmentEpoch: 3 });
   });
 
   it('refuses a message id that is not in the messages array', () => {
@@ -5622,7 +5697,10 @@ describe('SandboxSession orchestration', () => {
       expect(input.acquisition).toEqual(acquisition);
       expect(input.allowCreate).toBeUndefined();
     }
-    expect(fixture.control.getStatus).not.toHaveBeenCalled();
+    // The deadline check probes the control plane for an in-flight runtime
+    // replacement before terminalizing. Absent one, it terminalizes without
+    // dispatching or quarantining.
+    expect(fixture.control.getStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID });
     expect(fixture.control.request).not.toHaveBeenCalled();
   });
 
@@ -5802,6 +5880,27 @@ describe('SandboxSession orchestration', () => {
         state: { kind: 'failed', reason: 'preparation_timeout' },
       });
       expect(fixture.terminalEvents()).toHaveLength(1);
+    });
+  });
+
+  describe('prompt-phase rejection marking', () => {
+    it('does not mark a completed attach proof on a prompt rejection', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        operationResults: true,
+      });
+      delegateRequest(fixture, 'session.prompt', async () => controlFailure(true, 'not_ready'));
+      await fixture.admit('a');
+      await fixture.flush();
+
+      const record = fixture.record('a');
+      expect(record?.proofs?.attach?.dispatched).toBe(true);
+      expect(record?.proofs?.attach?.rejectionReceived).toBeUndefined();
+      expect(record?.proofs?.attach?.rejectionSubtype).toBeUndefined();
     });
   });
 
@@ -9126,6 +9225,181 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       expect(
         fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
       ).toHaveLength(0);
+    });
+
+    it('classifies a completed attach rejection with a git subtype as a workspace setup failure', async () => {
+      const fixture = sessionFixture();
+      const reports = captureCloudAgentReports(fixture);
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-rejected'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      seedMessages(fixture.values, [
+        queuedRecord('a', {
+          state: {
+            wrapperInstanceId: wrapper,
+            preparationAttemptId: attachAuthorization.operationId,
+            deadlineAt: attachAuthorization.dispatchDeadlineAt,
+            unresolvedDispatch: true,
+          },
+          proofs: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: {
+              ok: false,
+              error: {
+                code: 'not_ready',
+                message: 'git clone failed',
+                retryable: false,
+                subtype: 'git_rate_limited',
+              },
+            },
+            events: [],
+            preparing: [],
+          },
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'failed', reason: 'attach_exhausted' },
+        proofs: { attach: { rejectionSubtype: 'git_rate_limited' } },
+      });
+      expect(failedRunReport(reports, 'a')).toMatchObject({
+        failureStage: 'pre_dispatch',
+        failureCode: 'workspace_setup_failed',
+        failureResponsibility: 'platform',
+        failureReason: 'rate_limited',
+      });
+    });
+
+    it('keeps the git subtype when a retryable completed attach rejection exhausts the budget', async () => {
+      const fixture = sessionFixture();
+      const reports = captureCloudAgentReports(fixture);
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-rejected'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      seedMessages(fixture.values, [
+        queuedRecord('a', {
+          state: {
+            wrapperInstanceId: wrapper,
+            attachFailures: ATTACH_FAILURE_LIMIT - 1,
+            preparationAttemptId: attachAuthorization.operationId,
+            deadlineAt: attachAuthorization.dispatchDeadlineAt,
+            unresolvedDispatch: true,
+          },
+          proofs: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: {
+              ok: false,
+              error: {
+                code: 'not_ready',
+                message: 'git clone failed',
+                retryable: true,
+                subtype: 'git_clone_timeout',
+              },
+            },
+            events: [],
+            preparing: [],
+          },
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'failed', reason: 'attach_exhausted' },
+      });
+      expect(failedRunReport(reports, 'a')).toMatchObject({
+        failureStage: 'pre_dispatch',
+        failureCode: 'workspace_setup_failed',
+        failureResponsibility: 'platform',
+        failureReason: 'source_control_clone_timeout',
+      });
+    });
+
+    it('does not fall back to a retired git subtype for a current subtype-less rejection', async () => {
+      const fixture = sessionFixture();
+      const reports = captureCloudAgentReports(fixture);
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const retiredAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-retired'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      const currentAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-current'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      seedMessages(fixture.values, [
+        queuedRecord('a', {
+          state: {
+            wrapperInstanceId: wrapper,
+            attachFailures: ATTACH_FAILURE_LIMIT - 1,
+            preparationAttemptId: currentAuthorization.operationId,
+            deadlineAt: currentAuthorization.dispatchDeadlineAt,
+          },
+          proofs: {
+            retiredAttach: {
+              authorization: retiredAuthorization,
+              dispatched: true,
+              rejectionSubtype: 'git_clone_timeout',
+            },
+          },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.attach', async () => controlFailure(true));
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'failed', reason: 'attach_exhausted' },
+      });
+      expect(failedRunReport(reports, 'a')).toMatchObject({
+        failureStage: 'pre_dispatch',
+        failureCode: 'wrapper_start_failed',
+        failureResponsibility: 'platform',
+        failureReason: 'runtime_startup',
+      });
     });
   });
 

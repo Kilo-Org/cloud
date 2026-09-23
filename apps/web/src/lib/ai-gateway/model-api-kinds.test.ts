@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-api-kinds';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
 import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 
 jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () => {
@@ -22,8 +22,8 @@ jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () =>
 // 'test-exclusive/chat-only' resolves to a synthetic provider that does not support Messages.
 // 'test-exclusive/disabled' is filtered out by findKiloExclusiveModel, mirroring how
 // disabled catalog models fall back to OpenRouter.
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
   const stubModels: KiloExclusiveModel[] = [
     {
       public_id: 'test-exclusive/chat-only',

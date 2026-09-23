@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "මෙය අක්‍රීය කළ විට එන්ටර් යතුරෙන් නියෝජිත පණිවිඩ කොටුවල නව පේළියක් ඇතුළත් කරයි.",
     "biometricUnlock": "ජෛවමිතික දත්ත භාවිතයෙන් අගුළු හරින්න",
     "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ.",
-    "featureFlags": "විශේෂාංග ධ්වජ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "සේවාදායකයෙන් · ≥ {{min}}",
-    "featureFlagSkipped": "පෙරනිමි · < {{min}}",
-    "featureFlagNotLoaded": "පෙරනිමි · පූරණය වී නැත",
     "gatewayTranscription": "Kilo Gateway හරහා හඬ පෙළට හැරවීම",
     "gatewayTranscriptionSubtitle": "උපාංගයේ කථන හඳුනාගැනීම වෙනුවට Kilo Gateway ආකෘතියක් භාවිතයෙන් හඬ ආදානය පෙළ බවට හරින්න. ඔබේ පටිගත කිරීම Kilo Gateway වෙත යවනු ලැබේ.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",
       "linesOf": "පේළි {{total}} න් {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent හි {{action}} අසාර්ථක විය ({{status}}).",
-      "failed": "Cloud Agent හි {{action}} අසාර්ථක විය."
-    },
     "collectCopyableText": {
       "unserializableInput": "[අනුක්‍රමික දත්ත බවට හැරවිය නොහැකි ආදානය]",
       "errorPrefix": "දෝෂය: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "සැපයුම්කරු ඉල්ලීම ප්‍රතික්ෂේප කළේය.",
       "assistantStopped": "ප්‍රතිචාරය නතර කර ඇත.",
       "assistantContextOverflow": "මාදිලියට සැකසිය හැකි ප්‍රමාණයට වඩා සංවාදය දිගුයි.",
-      "assistantFailed": "ප්‍රතිචාරය අසාර්ථක විය.",
-      "sendFailed": "පණිවිඩය යැවිය නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
+      "assistantFailed": "ප්‍රතිචාරය අසාර්ථක විය."
     },
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",

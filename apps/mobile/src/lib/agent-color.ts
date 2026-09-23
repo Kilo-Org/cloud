@@ -122,3 +122,92 @@ export function agentColor(name: string): Tint {
   // flow-sensitive indexing resolves without `!`.
   return AGENT_RAMP[index] ?? AGENT_RAMP[0];
 }
+
+/**
+ * Curated row-hue palette — the logo yellow's own family.
+ *
+ * A menu row identifies a *destination*, so its colour is chosen once, here,
+ * and passed explicitly. It is never derived from a label, title, translation
+ * or hash of a string: the same row renders the same hue in every language.
+ *
+ * The rule: six steps walk the logo yellow's own warm band (50deg -> 105deg,
+ * an 11deg step) at one fixed chroma/value per theme, straddling the brand hue
+ * (`--primary` olive `#4f5a10`, h~71, and the yellow `#e8f27a`). The status
+ * hues sit outside the band (danger 8deg, warn 37deg, good 150deg, info
+ * 220deg), so no curated step can be mistaken for a status colour.
+ *
+ * Destination table (profile sections, reading order):
+ *
+ * | Section         | Destinations                        | Step  |
+ * | --------------- | ----------------------------------- | ----- |
+ * | Agents          | Code Reviewer, Security Agent       | honey |
+ * | Reviews         | PR Review                           | gold  |
+ * | Organization    | Manage/View organization            | lime  |
+ * | App             | Preferences, Tutorial               | sage  |
+ * | Linked accounts | provider rows                       | moss  |
+ * | Actions         | Feedback, Privacy choices, Sign out | fern  |
+ * | reserved        | Delete account                      | `danger` tone, never a family step |
+ *
+ * Growth rule: a new row takes its section's step; a new section takes the next
+ * step in reading order; when the walk passes `fern`, extend the family one
+ * 11deg step toward the cool end and register the token the same way. A
+ * destination never takes a hue from a label, title, translation or hash, and
+ * never a status hue.
+ */
+export type RowHue = 'honey' | 'gold' | 'lime' | 'sage' | 'moss' | 'fern';
+
+export const ROW_PALETTE = {
+  honey: {
+    hueClass: 'bg-row-honey',
+    hueTextClass: 'text-row-honey',
+    hueBorderClass: 'border-row-honey',
+    tileBgClass: 'bg-row-honey-tile-bg',
+    tileBorderClass: 'border-row-honey-tile-border',
+    hueThemeKey: 'rowHoney',
+  },
+  gold: {
+    hueClass: 'bg-row-gold',
+    hueTextClass: 'text-row-gold',
+    hueBorderClass: 'border-row-gold',
+    tileBgClass: 'bg-row-gold-tile-bg',
+    tileBorderClass: 'border-row-gold-tile-border',
+    hueThemeKey: 'rowGold',
+  },
+  lime: {
+    hueClass: 'bg-row-lime',
+    hueTextClass: 'text-row-lime',
+    hueBorderClass: 'border-row-lime',
+    tileBgClass: 'bg-row-lime-tile-bg',
+    tileBorderClass: 'border-row-lime-tile-border',
+    hueThemeKey: 'rowLime',
+  },
+  sage: {
+    hueClass: 'bg-row-sage',
+    hueTextClass: 'text-row-sage',
+    hueBorderClass: 'border-row-sage',
+    tileBgClass: 'bg-row-sage-tile-bg',
+    tileBorderClass: 'border-row-sage-tile-border',
+    hueThemeKey: 'rowSage',
+  },
+  moss: {
+    hueClass: 'bg-row-moss',
+    hueTextClass: 'text-row-moss',
+    hueBorderClass: 'border-row-moss',
+    tileBgClass: 'bg-row-moss-tile-bg',
+    tileBorderClass: 'border-row-moss-tile-border',
+    hueThemeKey: 'rowMoss',
+  },
+  fern: {
+    hueClass: 'bg-row-fern',
+    hueTextClass: 'text-row-fern',
+    hueBorderClass: 'border-row-fern',
+    tileBgClass: 'bg-row-fern-tile-bg',
+    tileBorderClass: 'border-row-fern-tile-border',
+    hueThemeKey: 'rowFern',
+  },
+} as const satisfies Record<RowHue, Tint>;
+
+/** Curated destination hue for a profile row. */
+export function rowTint(hue: RowHue): Tint {
+  return ROW_PALETTE[hue];
+}

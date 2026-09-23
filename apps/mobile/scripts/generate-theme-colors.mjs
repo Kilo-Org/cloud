@@ -40,6 +40,12 @@ export const TOKEN_KEYS = [
   ['agentKilocode', '--agent-kilocode'],
   ['agentCoral', '--agent-coral'],
   ['agentSky', '--agent-sky'],
+  ['rowHoney', '--row-honey'],
+  ['rowGold', '--row-gold'],
+  ['rowLime', '--row-lime'],
+  ['rowSage', '--row-sage'],
+  ['rowMoss', '--row-moss'],
+  ['rowFern', '--row-fern'],
 ];
 
 function collectDeclarations(rule) {

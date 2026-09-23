@@ -25,10 +25,6 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-// ---------------------------------------------------------------------------
-// Shared types
-// ---------------------------------------------------------------------------
-
 export type ConversationScenario = string; // e.g. "echo:hi", "slow:5:200", "hang"
 
 export type LifecycleResult = {

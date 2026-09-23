@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan.",
     "featureFlags": "Drapo fonksyon",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Adistans · ≥ {{min}}",
+    "featureFlagSkipped": "Pa defo · < {{min}}",
+    "featureFlagNotLoaded": "Pa defo · pa chaje",
     "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
       "kiloclawActivityUnavailable": "Kòmanse yon enstans KiloClaw pou jwenn aktivite KiloClaw.",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
-      "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn alèt sou balans ki ba.",
+      "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn avètisman balans.",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA",
-      "securityFindingsUnavailable": "Aktive ajan sekirite Kilo sou yon domèn pou jwenn pwoblèm sekirite detekte.",
+      "securityFindingsUnavailable": "Aktive Ajan sekirite Kilo a sou yon limit pou jwenn rezilta sekirite.",
       "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
       "spendAlertsToggle": "Kategori alèt depans"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Twòp tantativ koneksyon. Tanpri tann epi eseye ankò."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatik Pi avanse",
+      "balanced": "Otomatik Ekilibre",
+      "efficient": "Otomatik Efikas",
+      "small": "Otomatik Piti",
+      "free": "Otomatik Gratis",
+      "organization": "Otomatik Òganizasyon"
+    },
     "dataCollected": "Done kolekte",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Nou pa t ka mete favori yo ajou.",

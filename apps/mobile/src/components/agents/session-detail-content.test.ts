@@ -4,6 +4,7 @@ import {
   createElement,
   type ElementType,
   Fragment,
+  isValidElement,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -32,6 +33,7 @@ import { ChildSessionSection } from '@/components/agents/child-session-section';
 import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
+import { SessionManagerContext } from '@/components/agents/session-manager-context';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
@@ -51,6 +53,8 @@ import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import type * as SessionTranscript from '@/components/agents/session-transcript';
+import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   resolveSendAttachmentKind,
@@ -117,6 +121,9 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  // The header reads the window to decide whether its actions share the title
+  // row; this phone is wide enough for them to.
+  useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
@@ -273,7 +280,10 @@ vi.mock('@/components/agents/text-part-renderer', () => ({
 vi.mock('@/components/agents/chat-markdown-text', () => ({
   ChatMarkdownText: ({ value }: { value: string }) => createElement('Text', null, value),
 }));
-vi.mock('@/components/agents/tool-cards', () => ({ TaskToolCard: 'TaskToolCard' }));
+vi.mock('@/components/agents/tool-cards', () => ({
+  TaskToolCard: 'TaskToolCard',
+  ReadToolCard: 'ReadToolCard',
+}));
 vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: function MessageList<T>(props: ComponentProps<typeof SessionMessageList<T>>) {
@@ -401,9 +411,30 @@ vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
     setCondenseToolCalls: vi.fn(),
   }),
 }));
-vi.mock('@/lib/hooks/use-session-model-options', () => ({
-  useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
-}));
+// The part→item-key map is only read back by the condensed build, so the
+// component must not walk the transcript for it while condensing is off.
+const transcriptKeyCollection = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/components/agents/session-transcript', async importOriginal => {
+  const actual = await importOriginal<typeof SessionTranscript>();
+  return {
+    ...actual,
+    collectTranscriptItemKeysByPart: (
+      ...args: Parameters<typeof actual.collectTranscriptItemKeysByPart>
+    ) => {
+      transcriptKeyCollection.calls += 1;
+      return actual.collectTranscriptItemKeysByPart(...args);
+    },
+  };
+});
+vi.mock('@/lib/hooks/use-session-model-options', () => {
+  // The real hook memoizes its projection, so `options` keeps one identity
+  // between catalog changes. A fresh array per call would churn every
+  // `modelOptions` consumer on any re-render and hide identity regressions.
+  const options: unknown[] = [];
+  return {
+    useSessionModelOptions: () => ({ options, selectedValue: '', selectedVariant: '' }),
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -579,6 +610,23 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
 
+/**
+ * The FlashList keys the first message list would mount rows under. The list is
+ * stubbed, so read the props the stub was handed: the same `keyExtractor` the
+ * real FlashList uses for its viewport anchor.
+ */
+function transcriptKeys(renderer: ReactTestRenderer): string[] {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    return [];
+  }
+  const { items, keyExtractor } = list.props as {
+    items: readonly SessionTranscriptItem[];
+    keyExtractor: (item: SessionTranscriptItem) => string;
+  };
+  return items.map(item => keyExtractor(item));
+}
+
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
@@ -601,6 +649,8 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /** The route's cached metadata title, as `[session-id].tsx` passes it. */
+  cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
 };
@@ -613,6 +663,7 @@ async function mountDetails(
     metadataReady,
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
+    cachedTitle,
     resumeAt,
   } = options;
   const store = createStore();
@@ -703,14 +754,22 @@ async function mountDetails(
   let currentRootId: KiloSessionId = ROOT_ID;
   const element = (id: KiloSessionId, at: string | null | undefined = resumeAt) =>
     createElement(
-      Provider,
-      { store },
-      createElement(SessionDetailContent, {
-        key: id,
-        sessionId: id,
-        displayScope,
-        ...(at === undefined ? {} : { resumeAt: at }),
-      })
+      // The real screen publishes the manager so the in-transcript subagent
+      // card can subscribe to the child transcript; `session-provider` is mocked
+      // in this suite, so the scope is provided here directly.
+      SessionManagerContext.Provider,
+      { value: manager },
+      createElement(
+        Provider,
+        { store },
+        createElement(SessionDetailContent, {
+          key: id,
+          sessionId: id,
+          displayScope,
+          ...(cachedTitle === undefined ? {} : { cachedTitle }),
+          ...(at === undefined ? {} : { resumeAt: at }),
+        })
+      )
     );
   const view = await renderWithProviders(element(ROOT_ID));
   onTestFinished(view.unmount);
@@ -890,6 +949,20 @@ describe('SessionDetailContent header title', () => {
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 
+  it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
+    // The route passes its cached metadata title as `cachedTitle`, and that
+    // cache can hold the backend's ISO placeholder. It must not become the
+    // header's identity line while the session metadata is still loading.
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([], {
+      cachedTitle: 'New session - 2026-09-22T02:05:22.778Z',
+      metadataReady: metadata.promise,
+    });
+    expect(renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
@@ -963,7 +1036,7 @@ describe('session detail failed delivery retry', () => {
       );
     });
     expect(renderedText(view.renderer.root)).toContain(
-      i18n.t('agentChat.messageFailure.deliveryTitle')
+      i18n.t('agentChat.messageFailure.assistantTitle')
     );
 
     const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
@@ -1928,6 +2001,45 @@ describe('SessionDetailContent condensed tool runs', () => {
     expect(runRows).toHaveLength(1);
     expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
   });
+
+  it('keeps the condensed row key when an older tool-only page prepends', async () => {
+    condensePreference.value = true;
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm2', ['t2'])]);
+    // A lone tool part condenses to its message row, keyed by the message id.
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+
+    // Loading older messages prepends an older tool-only message whose part
+    // joins the run. The row FlashList anchored on must keep its key, or the
+    // viewport jumps (the reported defect).
+    await act(async () => {
+      void view.manager.loadOlderMessages();
+      await Promise.resolve();
+    });
+    await view.respond(ROOT_ID, [toolRunMessage(ROOT_ID, 'm1', ['t1'])]);
+
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+  });
+});
+
+describe('SessionDetailContent transcript key collection', () => {
+  it('does not walk the transcript for part keys while condensing is off', async () => {
+    condensePreference.value = false;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBe(0);
+  });
+
+  it('collects part keys once condensing is on', async () => {
+    condensePreference.value = true;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBeGreaterThan(0);
+  });
 });
 
 describe('session detail exit retry row', () => {
@@ -1965,6 +2077,69 @@ describe('session detail exit retry row', () => {
       failureHandlers.nonRetryable?.();
     });
     expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
+  });
+});
+
+describe('transcript time markers', () => {
+  it.each(['message', 'tool-run'] as const)(
+    'keeps the %s subtree mounted when a prepend moves its marker',
+    async kind => {
+      condensePreference.value = kind === 'tool-run';
+      rootPageNextCursor = 'older-cursor';
+      const message =
+        kind === 'tool-run'
+          ? toolRunMessage(ROOT_ID, 'm2', ['t2a', 't2b'])
+          : childMessage(ROOT_ID, 'Existing answer');
+      message.info.time.created = 1_000_000_000;
+      const view = await mountDetails([message]);
+      const findRow = () =>
+        kind === 'tool-run'
+          ? view.renderer.root.find(node => Object.is(node.type, 'CondensedToolRunRow'))
+          : view.renderer.root.findByProps({ children: 'Existing answer' });
+      const before = findRow();
+      expect(before).toBeDefined();
+      const keys = transcriptKeys(view.renderer);
+
+      await act(async () => {
+        void view.manager.loadOlderMessages();
+        await Promise.resolve();
+      });
+      const older = childMessage(ROOT_ID, 'Older answer');
+      older.info = { ...older.info, id: 'm1', time: { created: 999_999_000 } };
+      older.parts = [
+        stubTextPart({ id: 'text-m1', sessionID: ROOT_ID, messageID: 'm1', text: 'Older answer' }),
+      ];
+      await view.respond(ROOT_ID, [older]);
+
+      expect(transcriptKeys(view.renderer)).toEqual(['m1', ...keys]);
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+      ).toHaveLength(1);
+      expect(findRow() === before).toBe(true);
+    }
+  );
+
+  it('renders the marker in the same row as the message that opens the burst', async () => {
+    const message: StoredMessage = {
+      info: { ...assistantMessage('msg-marker').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-marker',
+          sessionID: ROOT_ID,
+          messageID: 'msg-marker',
+          text: 'Marked answer',
+        }),
+      ],
+    };
+
+    const view = await mountDetails([message]);
+
+    // The first message of the page opens the burst, so its row carries the
+    // marker above the bubble instead of the marker being an item of its own.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+    ).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain('Marked answer');
   });
 });
 
@@ -2100,6 +2275,69 @@ describe('hide thinking preference', () => {
     await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
 
     expect(renderedText(cardFor(view.renderer, RUNNING_CHILD))).toContain('Thinking');
+  });
+
+  it('keeps renderItem and the row callbacks one identity across a streaming publish', async () => {
+    // A user row so the bubble actually carries `onRetryMessage`; the task row
+    // carries `getChildMessages`. Both props are compared by identity below.
+    const retryUserId = 'msg_1761000000000_retry';
+    const retryRow = userMessage(retryUserId);
+    const rootUser: StoredMessage = {
+      info: { ...retryRow.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: `${retryUserId}-text`,
+          sessionID: ROOT_ID,
+          messageID: retryUserId,
+          text: 'retry me',
+        }),
+      ],
+    };
+    const view = await mountDetails([rootUser, taskMessage(ROOT_ID, CHILD_IDS)]);
+    pressCard(view.renderer, RUNNING_CHILD);
+
+    const listProps = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('Missing SessionMessageList');
+      }
+      return list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+    };
+    const bubblePropsFor = (messageId: string) => {
+      const props = listProps();
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+      );
+      if (!item) {
+        throw new Error(`No transcript item for ${messageId}`);
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error(`No bubble for ${messageId}`);
+      }
+      return bubble.props as Record<string, unknown>;
+    };
+
+    const renderItemBefore = listProps().renderItem;
+    const bubbleBefore = bubblePropsFor(retryUserId);
+    expect(typeof bubbleBefore.onRetryMessage).toBe('function');
+    expect(typeof bubbleBefore.getChildMessages).toBe('function');
+
+    // The child's rows arrive through the same storage publication a streaming
+    // token uses: one `partsRevision` bump that re-emits every derived atom.
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    expect(listProps().renderItem).toBe(renderItemBefore);
+    const bubbleAfter = bubblePropsFor(retryUserId);
+    expect(bubbleAfter.onRetryMessage).toBe(bubbleBefore.onRetryMessage);
+    expect(bubbleAfter.getChildMessages).toBe(bubbleBefore.getChildMessages);
   });
 
   it('renders no empty padded row for a reasoning-only child message', async () => {
@@ -2664,6 +2902,32 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 });
 
+describe('session detail composer placeholder (explorer session-detail)', () => {
+  // The explorer's `session-detail.png` shows the composer field rendering the
+  // literal developer string 'undefined'. Every placeholder the detail screen
+  // can pass is catalog copy, so the proof is that the mounted composer always
+  // receives a non-empty catalog string — never 'undefined' and never a raw key.
+  it('passes catalog copy to the composer, never the literal undefined', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.placeholder).toBe(i18n.t('common.message'));
+    expect(typeof composer.props.placeholder).toBe('string');
+    expect(composer.props.placeholder).not.toBe('undefined');
+  });
+
+  it('resolves the preparing and finalizing placeholders to catalog copy too', () => {
+    for (const key of [
+      'agentChat.composer.preparingPlaceholder',
+      'agentChat.composer.finalizingPlaceholder',
+    ]) {
+      const copy = i18n.t(key);
+      expect(copy).not.toBe(key);
+      expect(copy).not.toBe('undefined');
+      expect(copy.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('session detail duplicate failure state', () => {
   // Stored messages are ordered by id, which is time-sortable ascending, so the
   // user row must sort before the assistant row for the Retry prompt to resolve.
@@ -2753,6 +3017,23 @@ describe('session detail duplicate failure state', () => {
     expect(nodes[0]?.props).toMatchObject({
       indicator: { message: 'simulated error' },
     });
+  });
+
+  it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
+    // Explorer `session-working` showed the fixed footer line printed over the
+    // scrolling transcript row it covers. The footer must be an opaque
+    // `bg-background` sibling in the column flow, never an `absolute` overlay.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    const footer = nodes[0]?.parent;
+    const className = String(footer?.props.className ?? '');
+    expect(className).toContain('bg-background');
+    expect(className).not.toContain('absolute');
   });
 });
 

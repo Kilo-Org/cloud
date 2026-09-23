@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí.",
     "featureFlags": "Příznaky funkcí",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Vzdálené · ≥ {{min}}",
+    "featureFlagSkipped": "Výchozí · < {{min}}",
+    "featureFlagNotLoaded": "Výchozí · nenačteno",
     "gatewayTranscription": "Přepis přes Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -873,9 +873,9 @@
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
       "kiloclawActivityUnavailable": "Spusťte instanci KiloClaw, abyste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
-      "balanceAlertsUnavailable": "Přidejte se k organizaci, abyste dostávali upozornění na nízký zůstatek.",
+      "balanceAlertsUnavailable": "Připojte se k organizaci, abyste získali upozornění na zůstatek.",
       "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA",
-      "securityFindingsUnavailable": "Zapněte bezpečnostního agenta Kilo v určitém rozsahu, abyste dostávali bezpečnostní zjištění.",
+      "securityFindingsUnavailable": "Zapněte Bezpečnostního agenta Kilo v rozsahu, abyste získali bezpečnostní nálezy.",
       "spendAlertsSubtitle": "překročení prahů a hodinové špičky",
       "spendAlertsToggle": "Kategorie upozornění na útratu"
     },
@@ -3205,6 +3205,14 @@
     "tooManySignInAttempts": "Proběhlo příliš mnoho pokusů o přihlášení. Chvíli počkej a zkus to znovu."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektivní",
+      "small": "Automatický Malý",
+      "free": "Automatický Zdarma",
+      "organization": "Automatický organizace"
+    },
     "dataCollected": "Sběr dat",
     "free": "Zdarma",
     "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat.",

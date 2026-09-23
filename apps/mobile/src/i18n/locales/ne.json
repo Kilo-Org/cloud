@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।",
     "featureFlags": "विशेषता झन्डा",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "दूरस्थ · ≥ {{min}}",
+    "featureFlagSkipped": "पूर्वनिर्धारित · < {{min}}",
+    "featureFlagNotLoaded": "पूर्वनिर्धारित · लोड गरिएको छैन",
     "gatewayTranscription": "Kilo Gateway मार्फत बोलीलाई पाठमा रूपान्तरण",
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "इन्स्ट्यान्स तयार वा असफल, निर्धारित कार्यहरू",
       "kiloclawActivityUnavailable": "KiloClaw गतिविधि पाउन KiloClaw इन्स्ट्यान्स सुरु गर्नुहोस्।",
       "balanceAlertsSubtitle": "संस्थाको मौज्दात कम भएको चेतावनी",
-      "balanceAlertsUnavailable": "ब्यालेन्स सूचना पाउन कुनै संस्थामा सामेल हुनुहोस्।",
+      "balanceAlertsUnavailable": "मौज्दात चेतावनी पाउन संस्थामा सामेल हुनुहोस्।",
       "securityFindingsSubtitle": "फेला परेका नयाँ सुरक्षा समस्या र SLA का सम्झना सूचनाहरू",
-      "securityFindingsUnavailable": "सुरक्षा समस्या पाउन कुनै दायरामा Kilo सुरक्षा एजेन्ट चालु गर्नुहोस्।",
+      "securityFindingsUnavailable": "सुरक्षा समस्या पाउन एउटा दायरामा Kilo सुरक्षा एजेन्ट सक्षम गर्नुहोस्।",
       "spendAlertsSubtitle": "सीमा नाघ्ने र प्रति घण्टा वृद्धि",
       "spendAlertsToggle": "खर्चका चेतावनी श्रेणी"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "साइन इन गर्न धेरै पटक प्रयास गरियो। कृपया केही बेर पर्खेर फेरि प्रयास गर्नुहोस्।"
   },
   "models": {
+    "auto": {
+      "frontier": "स्वचालित अग्रणी",
+      "balanced": "स्वचालित सन्तुलित",
+      "efficient": "स्वचालित कुशल",
+      "small": "स्वचालित सानो",
+      "free": "स्वचालित निःशुल्क",
+      "organization": "संस्था स्वचालित"
+    },
     "dataCollected": "डेटा सङ्कलन हुन्छ",
     "free": "निःशुल्क",
     "couldNotUpdateFavorites": "मनपर्ने सूची अद्यावधिक गर्न सकिएन।",

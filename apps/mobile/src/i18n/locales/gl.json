@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Solicitar o desbloqueo ao abrir a aplicación e despois de cinco minutos en segundo plano.",
     "featureFlags": "Bandeiras de funcións",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Remoto · ≥ {{min}}",
+    "featureFlagSkipped": "Predeterminada · < {{min}}",
+    "featureFlagNotLoaded": "Predeterminada · non cargado",
     "gatewayTranscription": "Transcrición con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcribe o ditado cun modelo de Kilo Gateway no canto do recoñecemento de voz do dispositivo. A túa gravación envíaselle a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "instancia lista ou con erros, accións programadas",
       "kiloclawActivityUnavailable": "Inicia unha instancia de KiloClaw para recibir actividade de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organización",
-      "balanceAlertsUnavailable": "Únete a unha organización para recibir alertas de saldo baixo.",
+      "balanceAlertsUnavailable": "Únete a unha organización para recibir avisos de saldo.",
       "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA",
-      "securityFindingsUnavailable": "Activa o axente de seguridade de Kilo nun ámbito para recibir problemas de seguridade.",
+      "securityFindingsUnavailable": "Activa o Axente de seguridade de Kilo nun ámbito para recibir problemas de seguridade.",
       "spendAlertsSubtitle": "superacións de limiares e picos por hora",
       "spendAlertsToggle": "Categoría de alertas de gasto"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Demasiados intentos de inicio de sesión. Agarda e téntao de novo."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avanzado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Gratis",
+      "organization": "Automático de organización"
+    },
     "dataCollected": "Recolle datos",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Non se puideron actualizar os favoritos.",

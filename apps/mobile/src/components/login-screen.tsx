@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
-import { ExternalLink, Globe } from '@/components/ui/icons';
+import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -283,13 +283,12 @@ export function LoginScreen() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full flex-row flex-wrap gap-1"
+                  className="w-full"
                   onPress={() => {
                     void openBrowser();
                   }}
                   accessibilityLabel={t('login.openSignInPageInBrowser')}
                 >
-                  <ExternalLink size={14} color={colors.foreground} />
                   <Text className="text-center">{t('common.openInBrowser')}</Text>
                 </Button>
                 <Button

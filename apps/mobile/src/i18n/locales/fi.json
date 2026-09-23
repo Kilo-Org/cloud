@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia.",
     "featureFlags": "Ominaisuusliput",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Etä · ≥ {{min}}",
+    "featureFlagSkipped": "Oletus · < {{min}}",
+    "featureFlagNotLoaded": "Oletus · ei ladattu",
     "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Istunnon tila",
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
-      "kiloclawActivityUnavailable": "Käynnistä KiloClaw-instanssi saadaksesi KiloClaw-tapahtumia.",
+      "kiloclawActivityUnavailable": "Käynnistä KiloClaw-instanssi saadaksesi KiloClaw-toimintaa.",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
-      "balanceAlertsUnavailable": "Liity organisaatioon saadaksesi saldohälytyksiä.",
+      "balanceAlertsUnavailable": "Liity organisaatioon saadaksesi saldovaroituksia.",
       "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset",
-      "securityFindingsUnavailable": "Ota Kilo-tietoturva-agentti käyttöön laajuudessa saadaksesi tietoturvahavaintoja.",
+      "securityFindingsUnavailable": "Ota Kilo-tietoturva-agentti käyttöön laajuudessa saadaksesi tietoturvalöydöksiä.",
       "spendAlertsSubtitle": "raja-arvojen ylitykset ja tunneittaiset piikit",
       "spendAlertsToggle": "Kulutusvaroitusten luokka"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Liian monta kirjautumisyritystä. Odota hetki ja yritä uudelleen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaattinen Huippuluokan",
+      "balanced": "Automaattinen Tasapainoinen",
+      "efficient": "Automaattinen Tehokas",
+      "small": "Automaattinen Pieni",
+      "free": "Automaattinen Ilmainen",
+      "organization": "Organisaation automaattinen"
+    },
     "dataCollected": "Tietoja kerätään",
     "free": "Ilmainen",
     "couldNotUpdateFavorites": "Suosikkeja ei voitu päivittää.",

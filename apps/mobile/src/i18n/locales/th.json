@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที",
     "featureFlags": "แฟล็กฟีเจอร์",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "ระยะไกล · ≥ {{min}}",
+    "featureFlagSkipped": "ค่าเริ่มต้น · < {{min}}",
+    "featureFlagNotLoaded": "ค่าเริ่มต้น · ยังไม่ได้โหลด",
     "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +839,11 @@
       "sessionStatusTitle": "สถานะเซสชัน",
       "sessionStatusSubtitle": "เสร็จสิ้น / ล้มเหลว / พร้อมควบคุม",
       "kiloclawActivitySubtitle": "อินสแตนซ์พร้อมใช้งานหรือทำงานล้มเหลว และการดำเนินการตามกำหนดเวลา",
-      "kiloclawActivityUnavailable": "เริ่มอินสแตนซ์ KiloClaw เพื่อรับกิจกรรม KiloClaw",
+      "kiloclawActivityUnavailable": "เริ่มอินสแตนซ์ KiloClaw เพื่อรับกิจกรรมของ KiloClaw",
       "balanceAlertsSubtitle": "คำเตือนเมื่อยอดคงเหลือขององค์กรต่ำ",
-      "balanceAlertsUnavailable": "เข้าร่วมองค์กรเพื่อรับการแจ้งเตือนยอดคงเหลือต่ำ",
+      "balanceAlertsUnavailable": "เข้าร่วมองค์กรเพื่อรับการแจ้งเตือนยอดคงเหลือ",
       "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA",
-      "securityFindingsUnavailable": "เปิดเอเจนต์ความปลอดภัย Kilo ในขอบเขตเพื่อรับข้อค้นพบด้านความปลอดภัย",
+      "securityFindingsUnavailable": "เปิดใช้งานเอเจนต์ความปลอดภัย Kilo ในขอบเขตเพื่อรับข้อค้นพบด้านความปลอดภัย",
       "spendAlertsSubtitle": "การเกินเกณฑ์และการพุ่งขึ้นรายชั่วโมง",
       "spendAlertsToggle": "หมวดหมู่การแจ้งเตือนการใช้จ่าย"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "ลองเข้าสู่ระบบหลายครั้งเกินไป โปรดรอสักครู่แล้วลองอีกครั้ง"
   },
   "models": {
+    "auto": {
+      "frontier": "อัตโนมัติ ล้ำหน้า",
+      "balanced": "อัตโนมัติ สมดุล",
+      "efficient": "อัตโนมัติ มีประสิทธิภาพ",
+      "small": "อัตโนมัติ เล็ก",
+      "free": "อัตโนมัติ ฟรี",
+      "organization": "อัตโนมัติ องค์กร"
+    },
     "dataCollected": "มีการเก็บข้อมูล",
     "free": "ฟรี",
     "couldNotUpdateFavorites": "ไม่สามารถอัปเดตรายการโปรดได้",

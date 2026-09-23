@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Ṣí títìpa nígbà tí o bá ṣí ohun èlò àti lẹ́yìn ìṣẹ́jú márùn-ún tí kò sí níwájú iboju.",
     "featureFlags": "Àṣì ẹ̀yà",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Jíjìn · ≥ {{min}}",
+    "featureFlagSkipped": "Ìpìlẹ̀ · < {{min}}",
+    "featureFlagNotLoaded": "Ìpìlẹ̀ · kò gbé e",
     "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Ipò ìgbà iṣẹ́",
       "sessionStatusSubtitle": "ó parí / ó kùnà / ó ti ṣe tán fún ìṣàkóso",
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
-      "kiloclawActivityUnavailable": "Bẹ̀rẹ̀ ẹ̀rọ iṣẹ́ KiloClaw láti gba ìgbòkègbodò KiloClaw.",
+      "kiloclawActivityUnavailable": "Bẹ̀rẹ̀ ẹ̀rọ iṣẹ́ KiloClaw kan láti gba ìṣe KiloClaw.",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
-      "balanceAlertsUnavailable": "Dara pọ̀ mọ́ àjọ kan láti gba àwọn ìkìlọ̀ owó tó kù díẹ̀.",
+      "balanceAlertsUnavailable": "Darapọ̀ mọ́ àjọ kan láti gba àwọn ìkìlọ̀ owó tó kù.",
       "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA",
-      "securityFindingsUnavailable": "Mú Aṣojú ààbò Kilo ṣiṣẹ́ ní ìwọ̀n kan láti gba àwọn àwárí ààbò.",
+      "securityFindingsUnavailable": "Mu Aṣojú ààbò Kilo ṣiṣẹ́ ní ààyè kan láti gba àwọn àwárí ààbò.",
       "spendAlertsSubtitle": "àwọn ìkọjá ààlà àti ìgbésókè lójú wákàtí",
       "spendAlertsToggle": "Ẹ̀ka àwọn ìkìlọ̀ ìnáwó"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Ìgbìyànjú ìwọlé ti pọ̀ jù. Jọ̀wọ́ dúró, kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "models": {
+    "auto": {
+      "frontier": "Aládàáṣiṣẹ́ Tó ga jù lọ",
+      "balanced": "Aládàáṣiṣẹ́ Dọ́gba",
+      "efficient": "Aládàáṣiṣẹ́ Daradara",
+      "small": "Aládàáṣiṣẹ́ Kékeré",
+      "free": "Aládàáṣiṣẹ́ Ọ̀fẹ́",
+      "organization": "Aládàáṣiṣẹ́ Àjọ"
+    },
     "dataCollected": "A ń gba dátà",
     "free": "Ọ̀fẹ́",
     "couldNotUpdateFavorites": "A kò lè ṣe ìmúdójúìwọ̀n àwọn àyànfẹ́.",

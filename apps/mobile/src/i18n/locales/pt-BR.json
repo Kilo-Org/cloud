@@ -299,11 +299,11 @@
       "sessionStatusTitle": "Status da sessão",
       "sessionStatusSubtitle": "sessão concluída, com falha ou pronta para você controlar",
       "kiloclawActivitySubtitle": "instância pronta ou com falha, ações agendadas",
-      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber a atividade do KiloClaw.",
+      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber atividades do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "balanceAlertsUnavailable": "Entre em uma organização para receber alertas de saldo baixo.",
+      "balanceAlertsUnavailable": "Entre em uma organização para receber alertas de saldo.",
       "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA",
-      "securityFindingsUnavailable": "Ative o agente de segurança do Kilo em um âmbito para receber problemas de segurança.",
+      "securityFindingsUnavailable": "Ative o Agente de segurança do Kilo em um escopo para receber ocorrências de segurança.",
       "spendAlertsSubtitle": "ultrapassagens de limites e picos por hora",
       "spendAlertsToggle": "Categoria de alertas de gastos"
     },
@@ -2177,9 +2177,9 @@
     "biometricUnlockSubtitle": "Exigir o desbloqueio ao abrir o app e após cinco minutos em segundo plano.",
     "featureFlags": "Sinalizadores de recursos",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Remoto · ≥ {{min}}",
+    "featureFlagSkipped": "Padrão · < {{min}}",
+    "featureFlagNotLoaded": "Padrão · não carregado",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva a digitação por voz com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. Sua gravação é enviada para o Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -3162,6 +3162,14 @@
     "tooManySignInAttempts": "Muitas tentativas de login. Aguarde e tente novamente."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avançado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Grátis",
+      "organization": "Automático de organização"
+    },
     "dataCollected": "Dados coletados",
     "free": "Grátis",
     "couldNotUpdateFavorites": "Não foi possível atualizar os favoritos.",

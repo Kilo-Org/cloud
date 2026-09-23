@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { getStoreKiloPassProductsState } from './store-products-state';
+import {
+  getStoreKiloPassProductsState,
+  isStoreKiloPassProductsLoading,
+} from './store-products-state';
 import { type AppStoreKiloPassProduct } from './store-products';
 
 const products: AppStoreKiloPassProduct[] = [
@@ -54,5 +57,75 @@ describe('getStoreKiloPassProductsState', () => {
       isError: false,
       errorMessage: null,
     });
+  });
+});
+
+describe('isStoreKiloPassProductsLoading', () => {
+  const base = {
+    queryIsLoading: false,
+    isIapPlatform: true,
+    isStoreConnected: true,
+    storeErrorMessage: null,
+  };
+
+  it('paints cached products while the store reconnects on a re-entry', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: products,
+        isStoreConnected: false,
+      })
+    ).toBe(false);
+  });
+
+  it('waits for the store connection while there is nothing to paint', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: undefined,
+        isStoreConnected: false,
+      })
+    ).toBe(true);
+  });
+
+  it('waits for the store connection when the cached catalog is empty', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: [],
+        isStoreConnected: false,
+      })
+    ).toBe(true);
+  });
+
+  it('paints the empty catalog once the store connection has answered', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: [],
+        isStoreConnected: true,
+      })
+    ).toBe(false);
+  });
+
+  it('shows the skeleton while the first load runs', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: undefined,
+        queryIsLoading: true,
+      })
+    ).toBe(true);
+  });
+
+  it('does not show the skeleton once the connection wait timed out', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: undefined,
+        isStoreConnected: false,
+        storeErrorMessage: 'Could not connect.',
+      })
+    ).toBe(false);
   });
 });

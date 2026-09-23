@@ -8,6 +8,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CommentRow } from './comment-row';
+import { CommentModerationProvider } from './comment-moderation';
 import { MIN_AUDITED_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
 import {
   COMMENT_ACTIONS_FRAME_DP,
@@ -81,15 +82,19 @@ async function render(): Promise<TestRenderer.ReactTestRenderer> {
   await act(async () => {
     await Promise.resolve();
     renderer = TestRenderer.create(
-      createElement(CommentRow, {
-        comment,
-        owner: 'octocat',
-        repo: 'hello',
-        number: 7,
-        commentKind: 'review',
-        onToggleReaction: vi.fn<() => void>(),
-        viewerLogin: 'bob',
-      })
+      createElement(
+        CommentModerationProvider,
+        null,
+        createElement(CommentRow, {
+          comment,
+          owner: 'octocat',
+          repo: 'hello',
+          number: 7,
+          commentKind: 'review',
+          onToggleReaction: vi.fn<() => void>(),
+          viewerLogin: 'bob',
+        })
+      )
     );
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- act() may not assign

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond.",
     "featureFlags": "Flamujt e veçorive",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Në distancë · ≥ {{min}}",
+    "featureFlagSkipped": "Parazgjedhje · < {{min}}",
+    "featureFlagNotLoaded": "Parazgjedhje · i pa ngarkuar",
     "gatewayTranscription": "Transkriptim me Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
       "kiloclawActivityUnavailable": "Nis një instancë KiloClaw për të marrë aktivitetin e KiloClaw.",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
-      "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë njoftime për gjendje të ulët.",
+      "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë paralajmërime për gjendjen.",
       "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA",
-      "securityFindingsUnavailable": "Aktivizo agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetjet e sigurisë.",
+      "securityFindingsUnavailable": "Aktivizo Agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetje sigurie.",
       "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
       "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Ke bërë shumë përpjekje për të hyrë. Prit pak dhe provo përsëri."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatik i avancuar",
+      "balanced": "Automatik i ekuilibruar",
+      "efficient": "Automatik efikas",
+      "small": "Automatik i vogël",
+      "free": "Automatik falas",
+      "organization": "Automatik i organizatës"
+    },
     "dataCollected": "Mblidhen të dhëna",
     "free": "Falas",
     "couldNotUpdateFavorites": "Nuk u përditësuan të preferuarat.",

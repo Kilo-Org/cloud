@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം.",
     "featureFlags": "ഫീച്ചർ ഫ്ലാഗുകൾ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "റിമോട്ട് · ≥ {{min}}",
+    "featureFlagSkipped": "ഡിഫോൾട്ട് · < {{min}}",
+    "featureFlagNotLoaded": "ഡിഫോൾട്ട് · ലോഡ് ചെയ്തിട്ടില്ല",
     "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
     "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,7 +841,7 @@
       "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാറാകൽ/പരാജയപ്പെടൽ, മുൻകൂട്ടി നിശ്ചയിച്ച പ്രവർത്തനങ്ങൾ",
       "kiloclawActivityUnavailable": "KiloClaw പ്രവർത്തനം ലഭിക്കാൻ ഒരു KiloClaw ഇൻസ്റ്റൻസ് ആരംഭിക്കുക.",
       "balanceAlertsSubtitle": "ഓർഗനൈസേഷന്റെ ബാലൻസ് കുറയുമ്പോഴുള്ള മുന്നറിയിപ്പുകൾ",
-      "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു സ്ഥാപനത്തിൽ ചേരുക.",
+      "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു ഓർഗനൈസേഷനിൽ ചേരുക.",
       "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും",
       "securityFindingsUnavailable": "സുരക്ഷാ കണ്ടെത്തലുകൾ ലഭിക്കാൻ ഒരു പരിധിയിൽ Kilo സുരക്ഷാ ഏജന്റ് പ്രവർത്തനക്ഷമമാക്കുക.",
       "spendAlertsSubtitle": "പരിധി ലംഘനങ്ങളും മണിക്കൂർ തോറുമുള്ള വർധനകളും",
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "വളരെയധികം തവണ സൈൻ ഇൻ ചെയ്യാൻ ശ്രമിച്ചു. അൽപ്പം കാത്തിരുന്ന് വീണ്ടും ശ്രമിക്കുക."
   },
   "models": {
+    "auto": {
+      "frontier": "ഓട്ടോ ഫ്രന്റിയർ",
+      "balanced": "ഓട്ടോ സമതുലിതം",
+      "efficient": "ഓട്ടോ കാര്യക്ഷമം",
+      "small": "ഓട്ടോ ചെറുത്",
+      "free": "ഓട്ടോ സൗജന്യം",
+      "organization": "സംഘടന ഓട്ടോ"
+    },
     "dataCollected": "ഡാറ്റ ശേഖരിക്കുന്നു",
     "free": "സൗജന്യം",
     "couldNotUpdateFavorites": "പ്രിയപ്പെട്ടവ പുതുക്കാൻ കഴിഞ്ഞില്ല.",

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini.",
     "featureFlags": "Zastavice funkcija",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Udaljeno · ≥ {{min}}",
+    "featureFlagSkipped": "Podrazumevano · < {{min}}",
+    "featureFlagNotLoaded": "Podrazumevano · nije učitano",
     "gatewayTranscription": "Transkripcija preko Kilo Gateway-a",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gateway-a umesto prepoznavanja govora na uređaju. Snimak se šalje na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -855,11 +855,11 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspešno / spremno za upravljanje",
       "kiloclawActivitySubtitle": "spremnost ili greška instance, zakazane radnje",
-      "kiloclawActivityUnavailable": "Pokreni KiloClaw instancu da dobiješ aktivnosti KiloClaw.",
+      "kiloclawActivityUnavailable": "Pokrenite KiloClaw instancu da biste dobijali KiloClaw aktivnost.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "balanceAlertsUnavailable": "Pridruži se organizaciji da dobiješ upozorenja o niskom saldu.",
+      "balanceAlertsUnavailable": "Pridružite se organizaciji da biste dobijali upozorenja o saldu.",
       "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA",
-      "securityFindingsUnavailable": "Uključi Kilo bezbednosnog agenta na opsegu da dobiješ bezbednosne nalaze.",
+      "securityFindingsUnavailable": "Omogućite Kilo bezbednosnog agenta na opsegu da biste dobijali bezbednosne nalaze.",
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija obaveštenja o potrošnji"
     },
@@ -3162,6 +3162,14 @@
     "tooManySignInAttempts": "Previše pokušaja prijave. Sačekaj i pokušaj ponovo."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatski Napredni",
+      "balanced": "Automatski Uravnotežen",
+      "efficient": "Automatski Efikasan",
+      "small": "Automatski Mali",
+      "free": "Automatski Besplatan",
+      "organization": "Automatski organizacije"
+    },
     "dataCollected": "Prikuplja podatke",
     "free": "Besplatno",
     "couldNotUpdateFavorites": "Ažuriranje omiljenih modela nije uspelo.",

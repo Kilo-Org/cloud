@@ -273,9 +273,9 @@
       "kiloclawActivitySubtitle": "instance prête ou en échec, actions planifiées",
       "kiloclawActivityUnavailable": "Démarrez une instance KiloClaw pour recevoir l'activité KiloClaw.",
       "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
-      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde faible.",
+      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde.",
       "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
-      "securityFindingsUnavailable": "Activez l'agent de sécurité Kilo sur un périmètre pour recevoir les problèmes de sécurité.",
+      "securityFindingsUnavailable": "Activez l'Agent de sécurité Kilo sur un périmètre pour recevoir les signalements de sécurité.",
       "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
       "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },
@@ -2112,9 +2112,9 @@
     "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan.",
     "featureFlags": "Indicateurs de fonctionnalités",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Distant · ≥ {{min}}",
+    "featureFlagSkipped": "Par défaut · < {{min}}",
+    "featureFlagNotLoaded": "Par défaut · non chargé",
     "gatewayTranscription": "Transcription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrivez la saisie vocale avec un modèle Kilo Gateway au lieu de la reconnaissance vocale de l'appareil. Votre enregistrement est envoyé à Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -3162,6 +3162,14 @@
     "tooManySignInAttempts": "Trop de tentatives de connexion. Veuillez patienter et réessayer."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avancé",
+      "balanced": "Auto Équilibré",
+      "efficient": "Auto Efficace",
+      "small": "Auto Petit",
+      "free": "Auto Gratuit",
+      "organization": "Auto d'organisation"
+    },
     "dataCollected": "Données collectées",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris.",

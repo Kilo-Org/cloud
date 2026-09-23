@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ಅಪ್ಲಿಕೇಶನ್ ಪ್ರಾರಂಭಿಸಿದಾಗ ಮತ್ತು ಐದು ನಿಮಿಷ ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಇದ್ದ ನಂತರ ಅನ್‌ಲಾಕ್ ಮಾಡಬೇಕು.",
     "featureFlags": "ಫೀಚರ್ ಫ್ಲ್ಯಾಗ್ಗಳು",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "ರಿಮೋಟ್ · ≥ {{min}}",
+    "featureFlagSkipped": "ಡೀಫಾಲ್ಟ್ · < {{min}}",
+    "featureFlagNotLoaded": "ಡೀಫಾಲ್ಟ್ · ಲೋಡ್ ಆಗಿಲ್ಲ",
     "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
     "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "ಸೈನ್ ಇನ್ ಮಾಡಲು ಅತಿಯಾಗಿ ಪ್ರಯತ್ನಿಸಿದ್ದೀರಿ. ಸ್ವಲ್ಪ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "models": {
+    "auto": {
+      "frontier": "ಸ್ವಯಂ ಅತ್ಯಾಧುನಿಕ",
+      "balanced": "ಸ್ವಯಂ ಸಮತೋಲಿತ",
+      "efficient": "ಸ್ವಯಂ ಪರಿಣಾಮಕಾರಿ",
+      "small": "ಸ್ವಯಂ ಸಣ್ಣ",
+      "free": "ಸ್ವಯಂ ಉಚಿತ",
+      "organization": "ಸಂಸ್ಥೆ ಸ್ವಯಂ"
+    },
     "dataCollected": "ಡೇಟಾ ಸಂಗ್ರಹಿಸಲಾಗುತ್ತದೆ",
     "free": "ಉಚಿತ",
     "couldNotUpdateFavorites": "ಮೆಚ್ಚಿನವುಗಳನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

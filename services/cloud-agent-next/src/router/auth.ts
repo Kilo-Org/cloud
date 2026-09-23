@@ -3,7 +3,6 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { TRPCContext } from '../types.js';
 import { projectTrpcErrorData } from '../trpc-error.js';
 
-// Initialize tRPC with context and error formatter
 export const t = initTRPC.context<TRPCContext>().create({
   errorFormatter({ shape, error }) {
     return {

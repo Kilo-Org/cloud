@@ -228,10 +228,6 @@ function isAssistantCompletionSignal(info: unknown): boolean {
   return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
 };
@@ -456,10 +452,6 @@ export async function openIngestProgressChannel(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Connection Manager
-// ---------------------------------------------------------------------------
-
 export type ConnectionManager = {
   /** Open ingest WS and SSE consumer. Resolves when both are connected. */
   open: () => Promise<void>;
@@ -562,7 +554,6 @@ export function createConnectionManager(
       );
     }
 
-    // Flush buffered pre-serialized frames
     for (const buffered of eventBuffer.drain()) {
       ingestWs.send(buffered.serialized);
     }
@@ -847,7 +838,6 @@ export function createConnectionManager(
         }
       };
 
-      // Timeout for initial connection
       initialConnectTimer = setTimeout(() => {
         if (!settled) {
           logToFile(`ingest WS connection timed out: ${wsUrl}`);
@@ -1140,7 +1130,6 @@ export function createConnectionManager(
             state.observeGateResult(gateResult);
           }
 
-          // Track activity
           state.updateActivity();
 
           if (eventType === 'server.connected') {
@@ -1247,7 +1236,6 @@ export function createConnectionManager(
             }
           }
 
-          // Terminal error detection
           const terminalFailure = getTerminalFailure(eventType, properties);
           if (terminalFailure) {
             const modelNotFoundRuntimeDiagnostics = await maybeBuildModelNotFoundDiagnostics(

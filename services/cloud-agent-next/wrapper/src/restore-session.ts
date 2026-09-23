@@ -11,10 +11,6 @@ import {
   runProcess,
 } from './utils.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type RestoreResult =
   | {
       ok: true;
@@ -43,10 +39,16 @@ export type RestoreSessionOptions = {
   env?: NodeJS.ProcessEnv;
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
+  downloadTimeoutMs?: number;
+  idleTimeoutMs?: number;
+  maxSnapshotBytes?: number;
   signal?: AbortSignal;
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const KILO_DOWNLOAD_TIMEOUT_MS = 120_000;
+const KILO_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000;
+const MAX_SESSION_EXPORT_BYTES = 1024 * 1024 * 1024;
 const EMPTY_SESSION_INGEST_EXPORT = '{"info":{},"messages":[],"sessionDiff":[]}';
 const MAX_EMPTY_SNAPSHOT_BYTES = 1_024;
 const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
@@ -63,10 +65,6 @@ const JQ_SANITIZE_TRANSIENT_PARTS_FILTER =
 // Both sanitizations run in a single jq pass so the snapshot is read+rewritten
 // once per restore — exports can be very large.
 const JQ_SANITIZE_SNAPSHOT_FILTER = `${JQ_SANITIZE_TOKEN_COUNTS_FILTER} | ${JQ_SANITIZE_TRANSIENT_PARTS_FILTER}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function log(msg: string): void {
   const message = `restore-session: ${msg}`;
@@ -89,6 +87,29 @@ function fail(
     ...(subtype ? { subtype } : {}),
     ...(detail ? { detail } : {}),
   };
+}
+
+function classifyDownloadFailure(
+  callerSignal: AbortSignal | undefined,
+  idleSignal: AbortSignal,
+  timeoutSignal: AbortSignal,
+  idleTimeoutMs: number,
+  downloadTimeoutMs: number
+): Extract<RestoreResult, { ok: false }> {
+  if (callerSignal?.aborted) {
+    log('snapshot download aborted');
+    return fail('snapshot download failed', null, 'download');
+  }
+  if (idleSignal.aborted) {
+    log(`snapshot download stalled idleTimeoutMs=${idleTimeoutMs}`);
+    return fail('snapshot download stalled', null, 'download');
+  }
+  if (timeoutSignal.aborted) {
+    log(`snapshot download timed out timeoutMs=${downloadTimeoutMs}`);
+    return fail('snapshot download timed out', null, 'download');
+  }
+  log('snapshot download failed');
+  return fail('snapshot download failed', null, 'download');
 }
 
 function tryUnlink(filePath: string): void {
@@ -843,9 +864,109 @@ async function applyPatch(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main logic
-// ---------------------------------------------------------------------------
+type SnapshotDownloadOutcome =
+  | { outcome: 'ok'; bytesWritten: number }
+  | { outcome: 'aborted' }
+  | { outcome: 'over-cap' };
+
+type SnapshotChunk = { done: false; value: Uint8Array } | { done: true; value?: undefined };
+
+async function readSnapshotChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal,
+  aborted: Promise<'aborted'>
+): Promise<SnapshotChunk | 'aborted'> {
+  const read = reader.read();
+  if (signal.aborted) {
+    read.catch(() => {});
+    void reader.cancel().catch(() => {});
+    return 'aborted';
+  }
+
+  const result = await Promise.race([read, aborted]);
+  // Abort is authoritative: a cancel can fulfil the pending read with
+  // `{ done: true }` before the abort sentinel wins the race, and accepting
+  // that EOF would resume validation on a truncated body.
+  if (signal.aborted) {
+    read.catch(() => {});
+    void reader.cancel().catch(() => {});
+    return 'aborted';
+  }
+  return result;
+}
+
+async function downloadSnapshotToFile(
+  tmpPath: string,
+  body: ReadableStream<Uint8Array> | null,
+  declaredContentLength: number | null,
+  signal: AbortSignal,
+  aborted: Promise<'aborted'>,
+  maxSnapshotBytes: number,
+  restartIdle: () => void
+): Promise<SnapshotDownloadOutcome> {
+  const flags =
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
+
+  if (!body) {
+    const empty = await fs.promises.open(tmpPath, flags, 0o600);
+    await empty.close();
+    return { outcome: 'ok', bytesWritten: 0 };
+  }
+
+  if (declaredContentLength !== null && declaredContentLength > maxSnapshotBytes) {
+    log(
+      `snapshot download failed reason=content_length bytes=${declaredContentLength} cap=${maxSnapshotBytes}`
+    );
+    void body.cancel().catch(() => {});
+    return { outcome: 'over-cap' };
+  }
+
+  const handle = await fs.promises.open(tmpPath, flags, 0o600);
+  const reader = body.getReader();
+  let bytesWritten = 0;
+  try {
+    while (true) {
+      const chunk = await readSnapshotChunk(reader, signal, aborted);
+      if (chunk === 'aborted') return { outcome: 'aborted' };
+      if (chunk.done) break;
+      if (!chunk.value || chunk.value.byteLength === 0) {
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 0);
+        });
+        if (signal.aborted) return { outcome: 'aborted' };
+        continue;
+      }
+
+      const nextBytes = bytesWritten + chunk.value.byteLength;
+      if (nextBytes > maxSnapshotBytes) {
+        log(
+          `snapshot download failed reason=streamed_bytes bytes=${nextBytes} cap=${maxSnapshotBytes}`
+        );
+        void reader.cancel().catch(() => {});
+        return { outcome: 'over-cap' };
+      }
+
+      restartIdle();
+      let pending = chunk.value;
+      while (pending.byteLength > 0) {
+        const write = handle.write(pending);
+        write.catch(() => {});
+        const written = await Promise.race([
+          write.then(result => result.bytesWritten),
+          aborted.then(() => 'aborted' as const),
+        ]);
+        if (written === 'aborted' || signal.aborted) return { outcome: 'aborted' };
+        if (written === 0) throw new Error('snapshot write made no progress');
+        pending = pending.subarray(written);
+      }
+      bytesWritten = nextBytes;
+    }
+    return { outcome: 'ok', bytesWritten };
+  } finally {
+    void reader.cancel().catch(() => {});
+    await handle.close();
+  }
+}
 
 export async function restoreSession(
   kiloSessionId: string,
@@ -886,18 +1007,54 @@ export async function restoreSession(
 
       log(`ingestUrl=${ingestUrl}`);
 
-      // ---- Step 1: Download snapshot (stream directly to disk) ----
       log('downloading snapshot');
+      const downloadTimeoutMs = options.downloadTimeoutMs ?? KILO_DOWNLOAD_TIMEOUT_MS;
+      const idleTimeoutMs = options.idleTimeoutMs ?? KILO_DOWNLOAD_IDLE_TIMEOUT_MS;
+      const maxSnapshotBytes = options.maxSnapshotBytes ?? MAX_SESSION_EXPORT_BYTES;
+      const downloadTimeoutSignal = AbortSignal.timeout(downloadTimeoutMs);
+      const idleController = new AbortController();
+      const idle = Promise.withResolvers<'idle'>();
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const restartIdle = (): void => {
+        if (idleTimer !== undefined) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          idle.resolve('idle');
+          idleController.abort();
+        }, idleTimeoutMs);
+      };
+      const downloadSignal = AbortSignal.any(
+        options.signal
+          ? [options.signal, downloadTimeoutSignal, idleController.signal]
+          : [downloadTimeoutSignal, idleController.signal]
+      );
+      const downloadAbort = Promise.withResolvers<'aborted'>();
+      const onDownloadAbort = (): void => downloadAbort.resolve('aborted');
+      if (downloadSignal.aborted) {
+        downloadAbort.resolve('aborted');
+      } else {
+        downloadSignal.addEventListener('abort', onDownloadAbort, { once: true });
+      }
+      restartIdle();
       try {
         const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
-        const downloadTimeoutSignal = AbortSignal.timeout(300_000);
-        const downloadSignal = options.signal
-          ? AbortSignal.any([options.signal, downloadTimeoutSignal])
-          : downloadTimeoutSignal;
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: downloadSignal,
-        });
+        const res = await Promise.race([
+          fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: downloadSignal,
+          }),
+          idle.promise,
+          downloadAbort.promise,
+        ]);
+        if (res === 'idle' || res === 'aborted') {
+          return classifyDownloadFailure(
+            options.signal,
+            idleController.signal,
+            downloadTimeoutSignal,
+            idleTimeoutMs,
+            downloadTimeoutMs
+          );
+        }
+        restartIdle();
 
         if (!res.ok) {
           if (res.status === 404) {
@@ -908,7 +1065,34 @@ export async function restoreSession(
           return fail(`download failed status=${res.status}`, 502, 'download');
         }
 
-        const bytesWritten = await Bun.write(tmpPath, res);
+        const contentLengthHeader = res.headers.get('content-length');
+        const declaredContentLength =
+          contentLengthHeader === null ? null : Number(contentLengthHeader);
+        const download = await downloadSnapshotToFile(
+          tmpPath,
+          res.body,
+          declaredContentLength !== null && Number.isFinite(declaredContentLength)
+            ? declaredContentLength
+            : null,
+          downloadSignal,
+          downloadAbort.promise,
+          maxSnapshotBytes,
+          restartIdle
+        );
+        if (download.outcome === 'over-cap') {
+          return fail('snapshot exceeded byte cap', null, 'download');
+        }
+        if (download.outcome === 'aborted') {
+          return classifyDownloadFailure(
+            options.signal,
+            idleController.signal,
+            downloadTimeoutSignal,
+            idleTimeoutMs,
+            downloadTimeoutMs
+          );
+        }
+
+        const bytesWritten = download.bytesWritten;
         log(`snapshot downloaded bytes=${bytesWritten}`);
 
         // Validate before handing off to `kilo import`: an upstream error
@@ -949,7 +1133,16 @@ export async function restoreSession(
           return result;
         }
       } catch {
-        return fail('snapshot download failed', null, 'download');
+        return classifyDownloadFailure(
+          options.signal,
+          idleController.signal,
+          downloadTimeoutSignal,
+          idleTimeoutMs,
+          downloadTimeoutMs
+        );
+      } finally {
+        downloadSignal.removeEventListener('abort', onDownloadAbort);
+        if (idleTimer !== undefined) clearTimeout(idleTimer);
       }
     } else {
       log(`using provided file=${filePath}`);
@@ -970,7 +1163,6 @@ export async function restoreSession(
 
     await sanitizeSnapshot(tmpPath, options.signal, env);
 
-    // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
@@ -1014,7 +1206,6 @@ export async function restoreSession(
       `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
-    // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.
     const uniqueDiffs = await extractDiffs(tmpPath, options.signal, env);
@@ -1101,10 +1292,6 @@ export async function restoreSession(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// CLI entrypoint — only runs when executed directly, not when imported
-// ---------------------------------------------------------------------------
 
 if (import.meta.main) {
   const rawArgs = process.argv.slice(2);

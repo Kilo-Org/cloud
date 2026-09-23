@@ -6,6 +6,7 @@ import {
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { z } from 'zod';
 import { logger } from '../logger.js';
+import { isRecord, kiloEventSessionId } from '../shared/kilo-event.js';
 import {
   cloudAgentSessionScopeHeaders,
   cloudAgentSessionScopeProtocolVersion,
@@ -35,24 +36,11 @@ export function childSessionLineage(
   return { sessionId: parsed.data.id, parentSessionId: parsed.data.parentID };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 export function ingestKiloSessionId(
   _type: string,
   properties: Record<string, unknown>
 ): string | undefined {
-  if (typeof properties.sessionID === 'string') return properties.sessionID;
-  if (typeof properties.sessionId === 'string') return properties.sessionId;
-  if (isRecord(properties.info)) {
-    if (typeof properties.info.sessionID === 'string') return properties.info.sessionID;
-    if (typeof properties.info.id === 'string') return properties.info.id;
-  }
-  if (isRecord(properties.part) && typeof properties.part.sessionID === 'string') {
-    return properties.part.sessionID;
-  }
-  return undefined;
+  return kiloEventSessionId(properties);
 }
 
 export function controlEventToIngestItems(

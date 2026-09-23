@@ -614,6 +614,34 @@ async function rejectLegacyWrapperTokenForRuntimeGrant(
     : new Response('Legacy wrapper token is not authorized', { status: 401 });
 }
 
+type WrapperTicketAuthorization =
+  | { ok: true; claims: WrapperAuthClaims }
+  | { ok: false; response: Response };
+
+async function authorizeWrapperTicketForSession(
+  c: Context<HonoContext>,
+  userId: string,
+  sessionId: string
+): Promise<WrapperTicketAuthorization> {
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateWrapperDispatchTicket(
+    c.req.header('Authorization') ?? null,
+    nextAuthSecret
+  );
+  if (!authResult.success) return { ok: false, response: c.text(authResult.error, 401) };
+  if (authResult.claims.userId !== userId) {
+    return { ok: false, response: c.text('Token does not match session user', 403) };
+  }
+  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
+    c.env,
+    authResult.claims,
+    userId,
+    sessionId
+  );
+  if (legacyRejection) return { ok: false, response: legacyRejection };
+  return { ok: true, claims: authResult.claims };
+}
+
 async function routeToUserKiloFacade(
   c: Context<HonoContext>,
   userId: string,
@@ -853,23 +881,9 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Invalid userId encoding', 400);
   }
 
-  const authHeader = c.req.header('Authorization');
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  if (authResult.claims.userId !== userId) {
-    return c.text('Token does not match session user', 403);
-  }
-
-  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
-    c.env,
-    authResult.claims,
-    userId,
-    sessionId
-  );
-  if (legacyRejection) return legacyRejection;
+  const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
+  if (!ticketAuth.ok) return ticketAuth.response;
+  const { claims } = ticketAuth;
 
   const url = new URL(c.req.url);
   const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
@@ -878,7 +892,7 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Invalid wrapperGeneration parameter', 400);
   }
   if (
-    ticketClaimsMismatchRequestFence(authResult.claims, {
+    ticketClaimsMismatchRequestFence(claims, {
       cloudAgentSessionId: sessionId,
       kiloSessionId: url.searchParams.get('kiloSessionId'),
       wrapperRunId: url.searchParams.get('wrapperRunId'),
@@ -938,31 +952,17 @@ app.put(
       return c.text('Invalid filename', 400);
     }
 
-    const authHeader = c.req.header('Authorization');
-    const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
-    if (!authResult.success) {
-      return c.text(authResult.error, 401);
-    }
-    if (authResult.claims.userId !== userId) {
-      return c.text('Token does not match session user', 403);
-    }
-
-    const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
-      c.env,
-      authResult.claims,
-      userId,
-      sessionId
-    );
-    if (legacyRejection) return legacyRejection;
+    const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
+    if (!ticketAuth.ok) return ticketAuth.response;
+    const { claims } = ticketAuth;
 
     const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
-    if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {
+    if (!kiloSessionId && claims.type === 'wrapper_dispatch_ticket') {
       return c.text('Missing kiloSessionId parameter', 400);
     }
 
     if (
-      ticketClaimsMismatchRequestFence(authResult.claims, {
+      ticketClaimsMismatchRequestFence(claims, {
         cloudAgentSessionId: sessionId,
         kiloSessionId,
       })

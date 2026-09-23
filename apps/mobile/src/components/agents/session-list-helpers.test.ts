@@ -19,7 +19,6 @@ import {
   remoteSessionEyebrowLabel,
   repoNameFromGitUrl,
   selectRemoteRowSpokenMeta,
-  sessionDisplayTitle,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 
@@ -411,39 +410,5 @@ describe('selectRemoteRowSpokenMeta', () => {
     expect(
       selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
     ).toBeNull();
-  });
-});
-
-describe('sessionDisplayTitle', () => {
-  const fallback = 'Untitled session';
-
-  it.each(['New session - 2026-09-22T17:26:31.465Z', 'Child session - 2026-09-22T17:26:31.465Z'])(
-    'returns the fallback for the creation placeholder %s',
-    placeholder => {
-      expect(sessionDisplayTitle(placeholder, fallback)).toBe(fallback);
-    }
-  );
-
-  it('returns the fallback for the placeholder wrapped in whitespace', () => {
-    expect(sessionDisplayTitle('  New session - 2026-09-22T17:26:31.465Z  ', fallback)).toBe(
-      fallback
-    );
-  });
-
-  it.each([null, undefined, '', '   '])('returns the fallback for a blank title %s', title => {
-    expect(sessionDisplayTitle(title, fallback)).toBe(fallback);
-  });
-
-  it('returns a real title unchanged', () => {
-    expect(sessionDisplayTitle('Fix login bug', fallback)).toBe('Fix login bug');
-  });
-
-  it('passes a title that only starts with the placeholder words through untouched', () => {
-    // Web pins `New session - implementation plan` as a real title
-    // (apps/web/src/routers/cli-sessions-v2-worktree.test.ts:490); only the
-    // exact `New session - <ISO instant>` placeholder is a machine string.
-    expect(sessionDisplayTitle('New session - implementation plan', fallback)).toBe(
-      'New session - implementation plan'
-    );
   });
 });

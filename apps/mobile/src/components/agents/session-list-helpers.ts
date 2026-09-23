@@ -1,5 +1,3 @@
-import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
-
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
@@ -338,35 +336,4 @@ export function composeSessionProvenanceSubtitle(params: {
     return `#${prNumber}`;
   }
   return null;
-}
-
-/**
- * Canonical display title for every mobile session surface (list row, remote
- * row, detail header).
- *
- * A session created through cloud-agent-next carries the creation placeholder
- * `New session - <ISO instant>` (a child session `Child session - <ISO
- * instant>`) as its title until it is named. Rendering that paints a raw
- * machine timestamp that wraps mid-number, so it counts as absent and the
- * caller's `fallback` is shown instead — the rule web already applies through
- * `isDefaultSessionTitle` (`apps/web/src/routers/cli-sessions-v2-router.ts`).
- *
- * Only the exact placeholder (whitespace aside) is replaced: a real title
- * that merely starts with those words, e.g. the pinned `New session -
- * implementation plan` (`apps/web/src/routers/cli-sessions-v2-worktree.test.ts`),
- * is a user-facing name and passes through untouched. A present title is
- * returned as-is, so existing rendering is unchanged.
- */
-export function sessionDisplayTitle<T extends string | undefined>(
-  title: string | null | undefined,
-  fallback: T
-): string | T {
-  if (title == null) {
-    return fallback;
-  }
-  const trimmed = title.trim();
-  if (trimmed.length === 0 || isDefaultSessionTitle(trimmed)) {
-    return fallback;
-  }
-  return title;
 }

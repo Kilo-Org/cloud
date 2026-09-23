@@ -179,6 +179,12 @@ describe('shared branded splash', () => {
     // also carries the colors every other Android plugin contributes. This
     // suite owns only the splash color: assert it is present, as the styles
     // assertion below does, rather than pinning the whole file.
+    // Introspection runs against the real project root, so `withAndroidColors`
+    // also reads whatever the project's own prebuild has already written to
+    // `android/app/src/main/res/values/colors.xml` (that directory is
+    // gitignored, so CI sees only the splash color while a worktree with a
+    // prebuild sees the app's colors too). The plugin's contract is that its
+    // own color is present, not that it is the only one.
     // The shared app config carries the other `colors.xml` entries (icon and
     // notification colors, the app background) through the same mod chain, so
     // assert this plugin's surface is present rather than the array length.

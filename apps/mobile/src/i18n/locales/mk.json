@@ -2233,10 +2233,6 @@
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
       "linesOf": "редови {{start}}–{{end}} од {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не успеа дејството {{action}} во Cloud Agent ({{status}}).",
-      "failed": "Не успеа дејството {{action}} во Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[внес што не може да се серијализира]",
       "errorPrefix": "Грешка: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Давателот го одби барањето.",
       "assistantStopped": "Создавањето на одговорот е запрено.",
       "assistantContextOverflow": "Разговорот е премногу долг за моделот.",
-      "assistantFailed": "Не успеа создавањето на одговорот.",
-      "sendFailed": "Не успеа испраќањето на пораката. Обиди се повторно."
+      "assistantFailed": "Не успеа создавањето на одговорот."
     },
     "filePart": {
       "loadingImage": "Вчитување слика",

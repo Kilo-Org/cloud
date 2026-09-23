@@ -2233,10 +2233,6 @@
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",
       "linesOf": "ਕੁੱਲ {{total}} ਵਿੱਚੋਂ ਲਾਈਨਾਂ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent ਦੀ {{action}} ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ ({{status}})।",
-      "failed": "Cloud Agent ਦੀ {{action}} ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ਇਨਪੁੱਟ ਨੂੰ ਸੀਰੀਅਲਾਈਜ਼ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ]",
       "errorPrefix": "ਗਲਤੀ: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "ਪ੍ਰਦਾਤਾ ਨੇ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ।",
       "assistantStopped": "ਜਵਾਬ ਰੋਕ ਦਿੱਤਾ ਗਿਆ।",
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
-      "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "sendFailed": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
     },
     "filePart": {
       "loadingImage": "ਚਿੱਤਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",

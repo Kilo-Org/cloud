@@ -2233,10 +2233,6 @@
       "linesTruncated": "mistari {{start}}–{{end}} (imekatwa)",
       "linesOf": "mistari {{start}}–{{end}} kati ya {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Kitendo {{action}} cha Cloud Agent kimeshindikana ({{status}}).",
-      "failed": "Kitendo {{action}} cha Cloud Agent kimeshindikana."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ingizo lisiloweza kubadilishwa kuwa mfuatano wa data]",
       "errorPrefix": "Hitilafu: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Mtoa huduma alikataa ombi.",
       "assistantStopped": "Jibu lilisimamishwa.",
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
-      "assistantFailed": "Imeshindikana kutoa jibu.",
-      "sendFailed": "Imeshindikana kutuma ujumbe. Tafadhali jaribu tena."
+      "assistantFailed": "Imeshindikana kutoa jibu."
     },
     "filePart": {
       "loadingImage": "Inapakia picha",

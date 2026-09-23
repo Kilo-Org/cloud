@@ -44,6 +44,48 @@ export function expandPlatformFilter(filter: string[]): string[] {
   return filter.flatMap(p => platformExpansion.get(p) ?? [p]);
 }
 
+// Inverse of `expandPlatformFilter` for the UI buckets, so the live list and the
+// filter sheet speak the same vocabulary ('cloud-agent' covers
+// 'cloud-agent-web', 'extension' covers 'vscode' and 'agent-manager'). Built
+// from `expandPlatformFilter` so the mapping stays in one place.
+const BUCKET_BY_PLATFORM = new Map<string, string>(
+  PLATFORM_FILTERS.filter(bucket => bucket !== 'other').flatMap(bucket =>
+    expandPlatformFilter([bucket]).map(platform => [platform, bucket] as const)
+  )
+);
+
+const PLATFORM_BUCKETS = new Set<string>(PLATFORM_FILTERS);
+
+/**
+ * Inverse of `expandPlatformFilter` for the UI buckets: a platform variant
+ * maps to its bucket (`cloud-agent-web` -> `cloud-agent`, `vscode` and
+ * `agent-manager` -> `extension`), a bucket maps to itself, and anything else
+ * returns null. Used to collapse a persisted variant into the single row the
+ * filter sheet offers for its bucket.
+ */
+export function knownPlatformBucket(platform: string): string | null {
+  if (PLATFORM_BUCKETS.has(platform)) {
+    return platform;
+  }
+  return BUCKET_BY_PLATFORM.get(platform) ?? null;
+}
+
+/**
+ * Collapse a persisted platform selection into the bucket rows the filter sheet
+ * renders: a stored variant maps to its bucket (`cloud-agent-web` ->
+ * `cloud-agent`, `vscode` and `agent-manager` -> `extension`), a bucket maps to
+ * itself, and an unknown platform keeps its own value. Deduplicated, so a
+ * bucket saved alongside one of its variants is one entry.
+ *
+ * The badge count and the sheet already speak this vocabulary; the live-list
+ * comparison and the history query use this so a legacy selection behaves the
+ * same way everywhere: one checked row means one active filter that covers each
+ * of that row's raw platforms.
+ */
+export function normalisePlatformSelection(filter: readonly string[]): string[] {
+  return [...new Set(filter.map(platform => knownPlatformBucket(platform) ?? platform))];
+}
+
 export function formatGitUrlProject(gitUrl: string): string {
   const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];
@@ -71,6 +113,19 @@ export function formatGitUrlProject(gitUrl: string): string {
   }
 
   return gitUrl;
+}
+
+/**
+ * Identity of a repository filter option: the visible label, trimmed and
+ * case-folded. Two git URLs (https vs ssh, a `.git` suffix, host case) that
+ * `formatGitUrlProject` renders identically share one key, so the filter sheet
+ * offers them as a single row and one stored URL matches every row the merged
+ * option covers. Case-folds with the active locale (bare `toLowerCase()` is
+ * banned by `src/lib/case-guard.test.ts`); both sides of every comparison are
+ * folded in the same locale, so the key stays a stable comparison key.
+ */
+export function projectOptionKey(gitUrl: string): string {
+  return formatGitUrlProject(gitUrl).trim().toLocaleLowerCase(i18n.language);
 }
 
 export function formatMeta(timestamp: string): string {

@@ -132,6 +132,7 @@ import {
   type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -190,7 +191,6 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -1592,9 +1592,11 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session". A cached
-    // placeholder title is not a name: drop it so the fallback label shows.
-    fallbackTitle: sessionDisplayTitle(cachedTitle) ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". The route's
+    // cached metadata can hold the backend's ISO placeholder, which must not
+    // paint; `namedSessionTitle` drops a placeholder (unless the app's own
+    // rename flow wrote it), so the fallback label shows instead.
+    fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

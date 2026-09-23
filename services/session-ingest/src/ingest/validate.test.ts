@@ -91,6 +91,31 @@ describe('validateAndParseIngestPayload', () => {
     });
   });
 
+  it('keeps a scheduled session_status item instead of dropping it', () => {
+    const scheduledItem = {
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+    };
+
+    expect(validate({ data: [scheduledItem] })).toMatchObject({
+      ok: true,
+      items: [scheduledItem],
+      validItemCount: 1,
+      skippedItemCount: 0,
+    });
+  });
+
+  it('keeps a session_status item with an unrecognized status', () => {
+    const futureItem = { type: 'session_status', data: { status: 'some-future-status' } };
+
+    expect(validate({ data: [futureItem] })).toMatchObject({
+      ok: true,
+      items: [futureItem],
+      validItemCount: 1,
+      skippedItemCount: 0,
+    });
+  });
+
   it('counts non-object data array entries as skipped', () => {
     expect(
       validate({

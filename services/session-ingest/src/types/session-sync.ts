@@ -61,7 +61,17 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('session_status'),
     data: z.object({
-      status: z.enum(['idle', 'busy', 'question', 'permission', 'retry']),
+      // Permissive on purpose, mirroring `SessionStatusSchema`: a producer may
+      // report a status this worker does not know yet (`scheduled` today, others
+      // later). A strict enum would fail `SessionItemSchema` and make
+      // `validateAndParseIngestPayload` skip the whole item, so the status would
+      // never reach `cli_sessions_v2.status` or the `session.status.updated`
+      // event. Any string is relayed as-is rather than dropped or coerced to `idle`.
+      status: z.string(),
+      // Wake time for a `scheduled` session (ISO-8601). Absent for every other
+      // status and when the producer omits it; null is tolerated like the stored
+      // row schema, because a missing time must never drop the item.
+      scheduledAt: z.string().nullable().optional(),
     }),
   }),
   z.object({

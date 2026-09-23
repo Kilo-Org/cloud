@@ -170,12 +170,18 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     // second font size in a three-row list reads as a mistake.
     const textStyle = compact ? 'caption' : 'subheadline';
     // One relative time at most per row: a needs-input wait or a scheduled
-    // wake, never both, and only on the wide family that has room for it.
+    // wake, never both, and only on the wide family that has room for it. The
+    // wait renders as a relative duration ("28 min") and the wake as an
+    // absolute clock time ("9:00 AM"): a wait is an interval the user is
+    // enduring, while a wake is the moment the user asked for, and it must
+    // read as a time of day the way the session list shows it.
     let timeAt: string | null = null;
+    let timeStyle: 'relative' | 'time' = 'relative';
     if (wide && line.kind === 'needsInput') {
       timeAt = needsInputSince;
     } else if (wide && line.kind === 'scheduled') {
       timeAt = scheduledAt;
+      timeStyle = 'time';
     }
     return (
       <HStack key={line.label} alignment="center" spacing={compact ? 4 : 7}>
@@ -213,7 +219,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         {timeAt === null ? null : (
           <Text
             date={new Date(timeAt)}
-            dateStyle="relative"
+            dateStyle={timeStyle}
             modifiers={[font({ textStyle }), monospacedDigit(), lineLimit(1), mutedForeground]}
           />
         )}

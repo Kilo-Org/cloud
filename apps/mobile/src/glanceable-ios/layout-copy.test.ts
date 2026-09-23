@@ -211,4 +211,17 @@ describe('withGlanceableCopy', () => {
     expect(copy.open).toBe(i18n.t('glanceable.openSession'));
     expect(copy.open).not.toBe('glanceable.openSession');
   });
+
+  it('bakes the scheduled row label from the reviewed key', () => {
+    // The Live Activity cannot translate: the notifications Worker pushes the
+    // raw content state, so the scheduled row's label has to arrive in the
+    // baked copy. The key is the one the session list already reads, so a
+    // scheduled session is worded the same on every surface. The widget needs
+    // no baked row label — its rows arrive translated through the timeline
+    // props, and only its prop-less gallery placeholder draws the baked copy.
+    const copy = glanceableLayoutCopy();
+    expect(copy.scheduled).toBe(i18n.t('common.scheduled'));
+    expect(copy.scheduled).not.toBe('common.scheduled');
+    expect(read(LAYOUT_FILE)).toContain('COPY.scheduled');
+  });
 });

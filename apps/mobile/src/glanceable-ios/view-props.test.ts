@@ -128,10 +128,19 @@ describe('actions', () => {
       {},
       translate
     );
+    // The count row exists whether or not a wake is known, so the surface
+    // never reflows when the CLI reports a wake for a session it had none for;
+    // only the time beside the row is conditional.
+    expect(withWake.countLines.find(line => line.kind === 'scheduled')).toEqual({
+      label: 'common.scheduled',
+      kind: 'scheduled',
+      count: 2,
+    });
     expect(withWake.scheduledAt).toBe(sooner);
     expect(withWake.primaryKind).toBe('scheduled');
 
     const noWake = buildGlanceableViewProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(noWake.countLines.find(line => line.kind === 'scheduled')?.count).toBe(1);
     expect(noWake.scheduledAt).toBeNull();
   });
 

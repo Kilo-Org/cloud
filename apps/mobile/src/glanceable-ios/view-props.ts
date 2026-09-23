@@ -8,6 +8,7 @@ import { type GlanceableLiveActivityContentState } from '@kilocode/notifications
 import {
   type GlanceableCountKind,
   glanceableCountLines,
+  glanceableScheduledAt,
   glanceableSpokenLabel,
   type GlanceableStatus,
   glanceableStatusCopyKey,
@@ -184,7 +185,9 @@ export function buildGlanceableViewProps(
       newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
     },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
-    scheduledAt: showCounts && snapshot.scheduled > 0 ? snapshot.scheduledAt : null,
+    // The shared helper decides the wake, so a scheduled count with no usable
+    // time is represented the same way on this surface as on every other.
+    scheduledAt: showCounts ? glanceableScheduledAt(snapshot) : null,
     newestResultKind,
     newestResultLabel,
     newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,

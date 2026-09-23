@@ -240,10 +240,10 @@ import {
   type SandboxBillingInput,
 } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
+import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
 import {
   deriveSandboxAllocationId,
   getManagedOutboundContainerId,
-  getOutboundContainerId,
   getSandboxNamespace,
 } from '../sandbox-id.js';
 import {
@@ -1396,11 +1396,14 @@ export class SandboxControl extends DurableObject<Env> {
         const native = decodeCloudflareProviderRef(providerRef);
         if (
           alias?.sandboxId !== this.sandboxId ||
-          this.providerKind !== 'cloudflare' ||
+          !providerUsesOutboundCredentialProxy(this.providerKind) ||
           allocation.state.kind !== 'allocated' ||
           !native ||
           input.outboundContainerId !==
-            getOutboundContainerId(this.env, native.sandboxId, { managedScmContainment: true })
+            getManagedOutboundContainerId(this.providerKind, this.env, {
+              logicalSandboxId: this.sandboxId,
+              physicalSandboxId: native.sandboxId,
+            })
         ) {
           return null;
         }

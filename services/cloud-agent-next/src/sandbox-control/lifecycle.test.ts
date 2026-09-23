@@ -1201,6 +1201,100 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.containerStub.launchWrapper).toHaveBeenCalledTimes(1);
   });
 
+  it('redeems contained containers aliases against the containers outbound id', async () => {
+    const h = await harness({ containmentEnabled: true });
+    h.session.getCredentialMetadata.mockResolvedValue(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: ROUTE.sessionId, userId: OWNER },
+        auth: { kiloSessionId: ROUTE.kiloSessionId, kilocodeToken: 'test-token' },
+        workspace: {
+          sandboxId: SANDBOX_ID,
+          workspacePath: ROUTE.directory,
+          sandboxProvider: 'cloudflare-containers',
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: true,
+          },
+        },
+        lifecycle: { version: 1, timestamp: Date.now() },
+      })
+    );
+    await h.control.ensureReady({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      provider: 'cloudflare-containers',
+      allowCreate: true,
+      billing: BILLING,
+    });
+    const payload = await h.control.prepareSessionCredentials({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+    });
+    const [grant] = await loadSessionCredentialGrants(h.storage);
+    const outboundContainerId = h.sandboxContainers.idFromName(SANDBOX_ID).toString();
+    if (!grant?.kilo.alias) throw new Error('Missing contained containers grant');
+    expect(grant.provider).toBe('cloudflare-containers');
+    expect(grant.outboundContainerId).toBe(outboundContainerId);
+    expect(payload.kilo?.token).toBe(grant.kilo.alias);
+    const request = {
+      credential: grant.kilo.alias,
+      url: 'https://provider.example.test/api/openrouter/chat/completions',
+      method: 'POST',
+    };
+    await expect(h.control.resolveCredential({ ...request, outboundContainerId })).resolves.toEqual(
+      {
+        credential: 'kka1.test-capability',
+        organizationId: '',
+      }
+    );
+    const allocationName = canonicalAllocationName(await h.control.getAllocationRecord());
+    if (!allocationName) throw new Error('Missing containers allocation');
+    await expect(
+      h.control.resolveCredential({
+        ...request,
+        outboundContainerId: `do:SandboxSmallContainment:${allocationName}`,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it('redeems contained cloudflare aliases against the containment sandbox id', async () => {
+    const h = await harness();
+    await h.create();
+    await h.control.prepareSessionCredentials({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+    });
+    const [grant] = await loadSessionCredentialGrants(h.storage);
+    const native = decodeCloudflareProviderRef(
+      canonicalProviderRef(await h.control.getAllocationRecord())
+    );
+    if (!grant?.kilo.alias || !native) throw new Error('Missing contained cloudflare grant');
+    const outboundContainerId = `do:SandboxSmallContainment:${native.sandboxId}`;
+    expect(grant.outboundContainerId).toBe(outboundContainerId);
+    await expect(
+      h.control.resolveCredential({
+        credential: grant.kilo.alias,
+        outboundContainerId,
+        url: 'https://provider.example.test/api/openrouter/chat/completions',
+        method: 'POST',
+      })
+    ).resolves.toEqual({
+      credential: 'kka1.test-capability',
+      organizationId: '',
+    });
+    await expect(
+      h.control.resolveCredential({
+        credential: grant.kilo.alias,
+        outboundContainerId: `do:SANDBOX_CONTAINERS:${SANDBOX_ID}`,
+        url: 'https://provider.example.test/api/openrouter/chat/completions',
+        method: 'POST',
+      })
+    ).resolves.toBeNull();
+  });
+
   it('projects a recorded containers allocation and rejects a foreign provider request', async () => {
     const h = await harness();
     const now = Date.now();

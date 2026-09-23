@@ -48,13 +48,29 @@ const flatListMock = vi.hoisted(
     }
 );
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
-vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-  FlatList: flatListMock,
-  I18nManager: i18nManager,
-  TextInput: 'TextInput',
-  View: 'View',
-}));
+// The sheet clears its uncontrolled search field through the ref (it must not
+// remount the input), so the mock exposes the imperative `clear` the real
+// TextInput has and hosts the props on a `TextInput` node for the assertions.
+const clearSearch = vi.hoisted(() => vi.fn());
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  const MockTextInput = forwardRef<{ clear: () => void }, Record<string, unknown>>((props, ref) => {
+    useImperativeHandle(ref, () => ({ clear: clearSearch }));
+    return createMockElement('TextInput', props);
+  });
+  MockTextInput.displayName = 'MockTextInput';
+  return {
+    ActivityIndicator: 'ActivityIndicator',
+    FlatList: flatListMock,
+    I18nManager: i18nManager,
+    TextInput: MockTextInput,
+    View: 'View',
+  };
+});
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
@@ -120,6 +136,20 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+// The TextInput mock forwards its ref through a wrapper component, so a found
+// `TextInput` node's immediate test-instance parent is that wrapper, which
+// carries the input's own props. Walk up to the pill View that hosts the field.
+function findFieldContainer(input: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  let node: TestRenderer.ReactTestInstance | null = input.parent;
+  while (node) {
+    if (typeof node.props.className === 'string' && node.props.className.includes('rounded-full')) {
+      return node;
+    }
+    node = node.parent;
+  }
+  throw new Error('language search field container not found');
 }
 
 function findChoiceRow(
@@ -191,6 +221,7 @@ async function applySelection(
 describe('LanguagePickerSheet apply', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    clearSearch.mockReset();
     setLanguagePreferenceAsync.mockReset();
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
@@ -234,6 +265,30 @@ describe('LanguagePickerSheet apply', () => {
       (input.props.onChangeText as (value: string) => void)('');
     });
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('clears the live search field on focus instead of remounting the input', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+    // The focus effect empties the field through the ref, so the sheet opens
+    // empty on every focus without recreating the native input.
+    expect(clearSearch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('Deutsch');
+    });
+
+    // Typing must never recreate the field. A remount handed the recreated
+    // native EditText the text it still held, and the next keystrokes appended
+    // to that stale copy: the field read the term twice, as one unbroken run
+    // (language-search-deutsch, language-search-kb-up).
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    expect(clearSearch).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -483,15 +538,10 @@ describe('LanguagePickerSheet search field', () => {
       throw new Error('language search input not found');
     }
     // The field is the shared single-line `Input`, which renders the TextInput
-    // directly, so the pill is the input's wrapper row rather than its parent:
-    // the single-line-input guard forbids a raw <TextInput> under the pill, and
-    // the shared box is what keeps the placeholder and the value in one box.
-    const field = findByType(renderer.root, 'View').find(node =>
-      String(node.props.className).includes('rounded-full')
-    );
-    if (!field) {
-      throw new Error('language search field container not found');
-    }
+    // itself, so the pill is the input's wrapper row: walk up to it rather than
+    // stopping at the input's own node. The shared box is what keeps the
+    // placeholder and the value in one box.
+    const field = findFieldContainer(input);
 
     expect((field.props.className as string).split(/\s+/)).toEqual(
       expect.arrayContaining([

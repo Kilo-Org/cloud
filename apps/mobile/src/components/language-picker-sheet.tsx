@@ -2,7 +2,7 @@ import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, I18nManager, View } from 'react-native';
+import { FlatList, I18nManager, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -49,8 +49,10 @@ export function LanguagePickerSheet({
   const [restarting, setRestarting] = useState(false);
   const [reloadFailed, setReloadFailed] = useState(false);
   const [query, setQuery] = useState('');
-  // Bumped on every focus so the uncontrolled TextInput remounts empty.
-  const [searchEpoch, setSearchEpoch] = useState(0);
+  // The search field is uncontrolled (iOS drops keystrokes when state drives
+  // `value`), so an emptied field is cleared through this ref rather than by
+  // remounting the input.
+  const searchInputRef = useRef<TextInput>(null);
   const skipNextGuardRef = useRef(false);
   const closeRequestedRef = useRef(false);
   const navigation = useNavigation();
@@ -78,7 +80,15 @@ export function LanguagePickerSheet({
       closeRequestedRef.current = false;
       skipNextGuardRef.current = false;
       setQuery('');
-      setSearchEpoch(epoch => epoch + 1);
+      // Empty the field imperatively instead of remounting it. A remount hands
+      // the recreated native EditText the text it still holds, and the next
+      // keystroke then appends to that stale copy: the sheet's search field
+      // read the typed term twice, as one run ("DeutschDeutsch", "ArabicArabic"),
+      // which then matched nothing (language-search-deutsch,
+      // language-search-kb-up, 2026-09-20). Clearing the live field keeps the
+      // same behaviour — a reopened sheet starts empty — without recreating the
+      // view.
+      searchInputRef.current?.clear();
       setSelected(getLanguagePreference());
       setApplied(getLanguagePreference());
       setAppliedLanguage(getResolvedLanguage());
@@ -217,7 +227,7 @@ export function LanguagePickerSheet({
         <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
           <Search size={18} color={colors.mutedForeground} />
           <Input
-            key={searchEpoch}
+            ref={searchInputRef}
             accessibilityLabel={t('language.search')}
             // The pill supplies the horizontal inset, so the field zeroes the
             // shared box's `px-3` — the same `flex-1 px-0` the share and model
@@ -226,7 +236,8 @@ export function LanguagePickerSheet({
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-            // input remounts on focus via `searchEpoch`, so a reopen starts empty.
+            // focus effect clears the live field through the ref, so a reopen
+            // starts empty.
             onChangeText={setQuery}
             autoCapitalize="none"
             autoCorrect={false}

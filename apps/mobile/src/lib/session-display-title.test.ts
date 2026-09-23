@@ -37,6 +37,10 @@ describe('sessionDisplayTitle', () => {
     expect(sessionDisplayTitle('New session - implementation plan')).toBe(
       'New session - implementation plan'
     );
+    expect(sessionDisplayTitle('New session plan for the login redirect')).toBe(
+      'New session plan for the login redirect'
+    );
+    expect(sessionDisplayTitle('New session - next week')).toBe('New session - next week');
     expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45.623Z notes')).toBe(
       'New session - 2026-09-22T01:09:45.623Z notes'
     );

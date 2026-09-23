@@ -16,7 +16,8 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  * from PostHog or the flag's default, and the gate that decided. Every word
  * comes from the catalog — the value, the source and the state; only the flag
  * key, the `{{min}}`/`v{{version}}` versions and the `≥`/`<` operators are
- * notation.
+ * notation. The build string sits at the end of that header row, so it reads as
+ * an annotation on the section rather than one more settings entry.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();
@@ -47,7 +48,7 @@ export function FeatureFlagsSection() {
   }
   return (
     <View className="mt-3 gap-3">
-      <View className="flex-row items-center justify-between gap-3">
+      <View className="flex-row items-baseline justify-between gap-3">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('preferences.featureFlags')}
         </Text>

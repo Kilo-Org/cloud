@@ -521,6 +521,18 @@ describe('SessionHistoryScreen', () => {
     });
   });
 
+  it('renders a persisted platform variant as the single bucket row it matches', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [], platformFilter: ['cloud-agent-web'] })
+    );
+    listState.storedSessions = sessions;
+    const renderer = await renderScreen();
+    // The sheet shows one checked Cloud Agent row, so the badge counts 1 and
+    // the history query covers both raw platforms of that row.
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(1);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'other']);
+  });
+
   it('clears no-result filters and resets platform-only filtering through the modal', async () => {
     listState.storedSessions = sessions;
     const renderer = await renderScreen();

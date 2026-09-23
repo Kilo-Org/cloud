@@ -94,9 +94,15 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
+  // The web app mints web tickets from Session Ingest
+  // (`activeSessions.createWebTicket` / `getToken` in
+  // apps/web/src/routers/active-sessions-router.ts), so starting the web app
+  // must pull the worker in transitively — otherwise the mutation's fetch hits
+  // a dead `SESSION_INGEST_WORKER_URL` and every run that asks for a web ticket
+  // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'],
+    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'cloudflare-session-ingest'],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },

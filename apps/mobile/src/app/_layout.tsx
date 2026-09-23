@@ -376,13 +376,13 @@ function RootLayoutNav({
       if (returnTarget === 'login') {
         router.replace('/(auth)/login');
       } else if (returnTarget === 'profile') {
-        router.replace('/(app)/(tabs)/(3_profile)');
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
       } else if (returnTarget === 'preferences') {
         // Two steps, not one `replace`: the relaunched stack has no entry
         // below the reopened screen, so a lone `replace` leaves the header's
         // back control with nothing to pop.
-        router.replace('/(app)/(tabs)/(3_profile)');
-        router.push('/(app)/(tabs)/(3_profile)/preferences');
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
+        router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
       }
       try {
         // The plural-rules polyfill must be in place before the first render in the new language.

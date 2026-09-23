@@ -124,6 +124,9 @@ describe('Text tracked labels in RTL', () => {
     expect(className).not.toContain('tracking-[1.5px]');
     expect(className).not.toContain('tracking');
     expect(hostText(root).props.className as string).not.toContain('tracking-');
+    // Dropping the Latin display classes must not take the mono family with
+    // them: the eyebrow keeps `font-mono-medium` in RTL.
+    expect(className).toContain('font-mono-medium');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 

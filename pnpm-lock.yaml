@@ -407,6 +407,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../../packages/session-ingest-contracts
       '@kilocode/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
@@ -2998,7 +3001,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.112.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/mcp-gateway:
     dependencies:
@@ -17374,6 +17377,7 @@ packages:
 
   react-native-render-html@6.3.4:
     resolution: {integrity: sha512-H2jSMzZjidE+Wo3qCWPUMU1nm98Vs2SGCvQCz/i6xf0P3Y9uVtG/b0sDbG/cYFir2mSYBYCIlS1Dv0WC1LjYig==}
+    deprecated: This package has been replaced with @native-html/render
     peerDependencies:
       react: '*'
       react-native: '*'

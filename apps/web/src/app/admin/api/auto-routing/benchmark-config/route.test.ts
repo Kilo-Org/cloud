@@ -8,7 +8,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
 import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 
 jest.mock('@/lib/user/server', () => ({
@@ -39,8 +39,8 @@ jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () =>
 
 // Stub the catalog so tests don't depend on any specific provider file.
 // 'test-exclusive/chat-only' maps to a synthetic gateway that lacks Messages support.
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
   const stubModel: KiloExclusiveModel = {
     public_id: 'test-exclusive/chat-only',
     display_name: 'Test chat-only model',

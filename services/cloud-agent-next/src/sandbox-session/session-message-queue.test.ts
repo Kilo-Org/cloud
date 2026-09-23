@@ -6483,6 +6483,71 @@ describe('SandboxSession orchestration', () => {
     expect(await fixture.session.getMetadata()).toBeNull();
   });
 
+  it('clears the container session snapshot before forgetting the session reference', async () => {
+    const fixture = sessionFixture({
+      workspace: {
+        sandboxId: SANDBOX_ID,
+        workspacePath: DIRECTORY,
+        sandboxProvider: 'cloudflare-containers',
+      },
+    });
+    const order: string[] = [];
+    fixture.containers.clearSessionSnapshot.mockImplementation(async () => {
+      order.push('clear');
+    });
+    fixture.control.forgetSessionReference.mockImplementation(async () => {
+      order.push('forget');
+    });
+
+    await fixture.session.deleteSession();
+
+    expect(order).toEqual(['clear', 'forget']);
+  });
+
+  it('does not clear the session snapshot for a non-container provider', async () => {
+    const fixture = sessionFixture();
+
+    await fixture.session.deleteSession();
+
+    expect(fixture.containers.clearSessionSnapshot).not.toHaveBeenCalled();
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+  });
+
+  it('proceeds with deletion when clearing the container session snapshot throws', async () => {
+    const fixture = sessionFixture({
+      workspace: {
+        sandboxId: SANDBOX_ID,
+        workspacePath: DIRECTORY,
+        sandboxProvider: 'cloudflare-containers',
+      },
+    });
+    fixture.containers.clearSessionSnapshot.mockRejectedValue(new Error('clear failed'));
+
+    await fixture.session.deleteSession();
+
+    expect(fixture.containers.clearSessionSnapshot).toHaveBeenCalledTimes(1);
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+    expect(await fixture.session.getMetadata()).toBeNull();
+  });
+
+  it('does not block session deletion on a stalled session-snapshot clear', async () => {
+    const fixture = sessionFixture({
+      workspace: {
+        sandboxId: SANDBOX_ID,
+        workspacePath: DIRECTORY,
+        sandboxProvider: 'cloudflare-containers',
+      },
+    });
+    fixture.containers.clearSessionSnapshot.mockImplementation(() => new Promise<void>(() => {}));
+    const deletion = fixture.session.deleteSession();
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    await deletion;
+    await fixture.flush();
+    expect(fixture.containers.clearSessionSnapshot).toHaveBeenCalledTimes(1);
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+    expect(await fixture.session.getMetadata()).toBeNull();
+  });
+
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',
     async status => {

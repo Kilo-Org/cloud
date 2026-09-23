@@ -38,6 +38,7 @@ type StoredRecord = {
   allocationRef: string | null;
   stopOpId: string | null;
   lastSnapshot: { id: string; sourceAllocation: string } | null;
+  snapshotOutcome?: 'ready' | 'failed';
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
 };
@@ -152,7 +153,9 @@ class FakeContainer {
   }
 }
 
-function setup(options: { record?: StoredRecord | null; attachContainer?: boolean } = {}) {
+function setup(
+  options: { record?: StoredRecord | null; attachContainer?: boolean; env?: Env } = {}
+) {
   const container = new FakeContainer();
   let alarm: number | undefined;
   const pendingTasks: Promise<unknown>[] = [];
@@ -187,7 +190,7 @@ function setup(options: { record?: StoredRecord | null; attachContainer?: boolea
       pendingTasks.push(promise);
     },
   } as unknown as DurableObjectState;
-  const instance = new SandboxContainers(ctx, {} as Env);
+  const instance = new SandboxContainers(ctx, options.env ?? ({} as Env));
   const readRecord = () => storage.map.get(RECORD_KEY) as StoredRecord;
   return { storage, container, instance, readRecord, pendingTasks, getAlarm: () => alarm };
 }
@@ -491,6 +494,7 @@ describe('SandboxContainers stop', () => {
       allocationRef: null,
       stopOpId: null,
       lastSnapshot: { id: 'snap-2', sourceAllocation: REF_A },
+      snapshotOutcome: 'ready',
     });
   });
 
@@ -558,6 +562,7 @@ describe('SandboxContainers stop', () => {
       allocationRef: REF_A,
       stopOpId: secondOpId,
       lastSnapshot: null,
+      snapshotOutcome: 'failed',
       instance: 'standard-2',
     });
 
@@ -565,7 +570,10 @@ describe('SandboxContainers stop', () => {
     await secondStop;
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(readRecord().lastSnapshot).toEqual({ id: 'op2', sourceAllocation: REF_A });
+    expect(readRecord()).toMatchObject({
+      lastSnapshot: { id: 'op2', sourceAllocation: REF_A },
+      snapshotOutcome: 'ready',
+    });
   });
 
   it('defers a late snapshot behind a pending destroy so it cannot publish during cleanup', async () => {
@@ -600,6 +608,7 @@ describe('SandboxContainers stop', () => {
       allocationRef: REF_A,
       stopOpId: opId,
       lastSnapshot: null,
+      snapshotOutcome: 'failed',
     });
 
     container.deferredDestroy?.resolve();
@@ -613,6 +622,7 @@ describe('SandboxContainers stop', () => {
       allocationRef: null,
       stopOpId: null,
       lastSnapshot: null,
+      snapshotOutcome: 'failed',
     });
   });
 
@@ -645,6 +655,7 @@ describe('SandboxContainers stop', () => {
       allocationRef: REF_A,
       stopOpId: opId,
       lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
+      snapshotOutcome: 'ready',
     });
   });
 
@@ -698,21 +709,200 @@ describe('SandboxContainers stop', () => {
       allocationRef: null,
       stopOpId: null,
       lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
+      snapshotOutcome: 'ready',
     });
   });
 
-  it('destroys even when the snapshot fails', async () => {
+  it('records a failed capture, keeps the previous session snapshot, and reaches terminal', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: { id: 'prev-snap', sourceAllocation: REF_A },
+      },
     });
     container.running = true;
     container.snapshotBehavior = { kind: 'reject' };
 
-    const result = await instance.stop(REF_A);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
 
-    expect(result).toBe('terminal');
     expect(container.destroyCalls).toBe(1);
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: { id: 'prev-snap', sourceAllocation: REF_A },
+      snapshotOutcome: 'failed',
+    });
+  });
+
+  it('records a timed-out capture as failed without leaving the record stopping', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: { id: 'prev-snap', sourceAllocation: REF_A },
+      },
+    });
+    container.running = true;
+    container.snapshotBehavior = { kind: 'deferred' };
+
+    const stopPromise = instance.stop(REF_A);
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(stopPromise).resolves.toBe('terminal');
+    expect(container.destroyCalls).toBe(1);
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: { id: 'prev-snap', sourceAllocation: REF_A },
+      snapshotOutcome: 'failed',
+    });
+  });
+
+  it('stores the captured snapshot and a ready outcome on the terminal record', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = true;
+    container.snapshotBehavior = { kind: 'resolve', id: 'snap-ready' };
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: { id: 'snap-ready', sourceAllocation: REF_A },
+      snapshotOutcome: 'ready',
+    });
+  });
+
+  it('logs an outcome-write failure and still reaches terminal', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const { instance, container, readRecord, storage } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = true;
+    const put = storage.put.bind(storage);
+    storage.put = async (key, value) => {
+      if (
+        key === RECORD_KEY &&
+        typeof value === 'object' &&
+        value !== null &&
+        'snapshotOutcome' in value
+      ) {
+        throw new Error('outcome write failed');
+      }
+      return put(key, value);
+    };
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+
+    expect(container.destroyCalls).toBe(1);
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: null,
+    });
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Sandbox control diagnostic',
+        level: 'warn',
+        diagnosticEvent: 'session_snapshot',
+        result: 'ready',
+      })
+    );
+    log.mockRestore();
+  });
+
+  it('preserves a recorded outcome when a stopping record re-enters terminal without a container', async () => {
+    const { instance, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'stopping',
+        allocationRef: REF_A,
+        stopOpId: 'op-1',
+        lastSnapshot: { id: 'prev-snap', sourceAllocation: REF_A },
+        snapshotOutcome: 'failed',
+      },
+      attachContainer: false,
+    });
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: { id: 'prev-snap', sourceAllocation: REF_A },
+      snapshotOutcome: 'failed',
+    });
+  });
+
+  it('does not write a late snapshot after the stop attempt has settled', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = true;
+    container.snapshotBehavior = { kind: 'deferred' };
+    container.destroyBehavior = 'reject';
+
+    const stopPromise = instance.stop(REF_A);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expect(stopPromise).resolves.toBe('retryable');
+
+    const settledRecord = structuredClone(readRecord());
+    expect(settledRecord).toMatchObject({
+      state: 'stopping',
+      allocationRef: REF_A,
+      lastSnapshot: null,
+      snapshotOutcome: 'failed',
+    });
+
+    container.deferredSnapshots[0]?.resolve('late-snap');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(readRecord()).toEqual(settledRecord);
+    expect(readRecord().lastSnapshot).toBeNull();
+  });
+});
+
+describe('SandboxContainers clear session snapshot', () => {
+  it('clears lastSnapshot, preserves the recorded outcome, and does not touch the container or the warm-base record', async () => {
+    const warmBase = { get: vi.fn(), put: vi.fn(), delete: vi.fn() };
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        lastSnapshot: { id: 'snap-stored', sourceAllocation: REF_A },
+        snapshotOutcome: 'ready',
+      },
+      env: { WARM_BASE: warmBase } as unknown as Env,
+    });
+
+    await instance.clearSessionSnapshot();
+
+    expect(readRecord().lastSnapshot).toBeNull();
+    expect(readRecord().snapshotOutcome).toBe('ready');
+    expect(container.snapshotCalls).toBe(0);
+    expect(container.destroyCalls).toBe(0);
+    expect(warmBase.get).not.toHaveBeenCalled();
+    expect(warmBase.put).not.toHaveBeenCalled();
+    expect(warmBase.delete).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when no session snapshot is stored', async () => {
+    const { instance, readRecord } = setup();
+
+    await instance.clearSessionSnapshot();
+
+    expect(readRecord().lastSnapshot).toBeNull();
   });
 });
 

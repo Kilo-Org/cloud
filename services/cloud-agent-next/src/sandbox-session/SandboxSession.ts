@@ -12,7 +12,7 @@ import type {
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { TRPCError } from '@trpc/server';
-import { withTimeout } from '@kilocode/worker-utils';
+import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
   renewRuntimeAuthorization,
   RuntimeAuthorizationExpiredError,
@@ -60,6 +60,7 @@ import {
   withControlDORetry as withDORetry,
   type ControlDiagnosticFields,
 } from '../sandbox-control/diagnostics.js';
+import { withDORetry as withContainerDORetry } from '../utils/do-retry.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -2647,6 +2648,21 @@ export class SandboxSession extends DurableObject<Env> {
     if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
     const sandboxId = metadata?.workspace?.sandboxId;
     if (sandboxId && metadata) {
+      if (metadata.workspace?.sandboxProvider === 'cloudflare-containers') {
+        try {
+          await withContainerDORetry(
+            () => this.env.SANDBOX_CONTAINERS.getByName(sandboxId),
+            stub => stub.clearSessionSnapshot(),
+            'clearSessionSnapshot',
+            {
+              ...DEFAULT_DO_RETRY_CONFIG,
+              scope: { deadlineAt: Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS },
+            }
+          );
+        } catch {
+          // Clearing the session snapshot is best-effort; deletion must proceed.
+        }
+      }
       try {
         await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
           metadata.identity.sessionId

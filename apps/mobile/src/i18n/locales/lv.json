@@ -855,11 +855,11 @@
       "sessionStatusTitle": "Sesijas statuss",
       "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
       "kiloclawActivitySubtitle": "instance gatava / kļūda, ieplānotas darbības",
-      "kiloclawActivityUnavailable": "Palaid KiloClaw instanci, lai saņemtu KiloClaw darbību.",
+      "kiloclawActivityUnavailable": "Palaidiet KiloClaw instanci, lai saņemtu KiloClaw aktivitāti.",
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
-      "balanceAlertsUnavailable": "Pievienojies organizācijai, lai saņemtu brīdinājumus par mazu atlikumu.",
+      "balanceAlertsUnavailable": "Pievienojieties organizācijai, lai saņemtu bilances brīdinājumus.",
       "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
-      "securityFindingsUnavailable": "Iespējo Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
+      "securityFindingsUnavailable": "Iespējojiet Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
       "spendAlertsSubtitle": "sliekšņu pārsniegumi un stundas lēcieni",
       "spendAlertsToggle": "Izdevumu brīdinājumu kategorija"
     },
@@ -3157,6 +3157,14 @@
     "tooManySignInAttempts": "Pārāk daudz pierakstīšanās mēģinājumu. Uzgaidi un mēģini vēlreiz."
   },
   "models": {
+    "auto": {
+      "frontier": "Automātiskais Jaudīgākais",
+      "balanced": "Automātiskais Līdzsvarotais",
+      "efficient": "Automātiskais Efektīvais",
+      "small": "Automātiskais Mazais",
+      "free": "Automātiskais Bezmaksas",
+      "organization": "Organizācijas automātiskais"
+    },
     "dataCollected": "Dati tiek vākti",
     "free": "Bezmaksas",
     "couldNotUpdateFavorites": "Neizdevās atjaunināt izlasi.",

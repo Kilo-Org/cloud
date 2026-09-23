@@ -3,7 +3,7 @@
 // limit. Receives the full set of state needed to switch on item kind
 // and dispatch to the right row component.
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
 import {
@@ -61,6 +61,48 @@ export type LineTapArgs = {
   hunk: ParsedHunk;
 };
 
+/** The one item the per-line tap map is keyed on. */
+type DiffLineItem = Extract<ListItem, { kind: 'diff-line' }>;
+
+// A thin per-row host whose only job is to release the line's cached tap
+// callback + item when FlashList unmounts the row. `DiffLine`'s memo
+// comparator stays on the inner element, so the identity stability the parent
+// relies on is unchanged.
+function DiffLineRow({
+  item,
+  onTap,
+  isSelected,
+  register,
+  release,
+}: Readonly<{
+  item: DiffLineItem;
+  onTap: (() => void) | undefined;
+  isSelected: boolean;
+  register: (item: DiffLineItem) => void;
+  release: (key: string) => void;
+}>) {
+  useEffect(() => {
+    register(item);
+    return () => {
+      release(item.key);
+    };
+    // `item.key` is the row's identity and `register`/`release` are stable.
+    // The item itself is re-registered from `lineTapFor` on every render, so a
+    // rebuilt item must not re-run this effect: that would release the cached
+    // callback the memo comparator depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.key, register, release]);
+  return (
+    <DiffLine
+      line={item.line}
+      language={item.language}
+      keyId={item.lineKeyId}
+      onTap={onTap}
+      isSelected={isSelected}
+    />
+  );
+}
+
 export function useDiffRenderItem({
   viewed,
   onRetryPage,
@@ -70,6 +112,70 @@ export function useDiffRenderItem({
   onLineTap,
   selection,
 }: UseDiffRenderItemArgs) {
+  // Identity-stable per-line tap callbacks so `DiffLine`'s memo comparator —
+  // which compares `onTap` by reference — can hit. A fresh closure per line per
+  // render defeated it, so tapping one line re-rendered every mounted diff row
+  // instead of only the rows whose `isSelected` changed. Mirrors
+  // `pr-diff-file-navigator.tsx`'s `rowCallbacksRef`: the closures read the
+  // latest item and the latest `onLineTap` through refs, so they stay
+  // identity-stable (the memo keeps hitting) but never go stale when the item
+  // is rebuilt or `onLineTap` changes identity. Each row releases its entry
+  // when FlashList unmounts it (see `DiffLineRow`), so the maps stay bounded by
+  // the rows actually mounted instead of every line ever rendered.
+  const onLineTapRef = useRef(onLineTap);
+  onLineTapRef.current = onLineTap;
+
+  const lineItemRef = useRef(new Map<string, DiffLineItem>());
+  const lineTapRef = useRef(new Map<string, () => void>());
+
+  // Bind the row's current item to its line key. Called on every render of a
+  // mounted line, so the cached callback always reads the current item.
+  const registerLineItem = useCallback((item: DiffLineItem) => {
+    lineItemRef.current.set(item.key, item);
+  }, []);
+
+  // Release both maps when a row unmounts. FlashList unmounts cells as they
+  // scroll out of its render window; without this, one entry per line ever
+  // rendered would be kept for the screen's lifetime — and each retained
+  // `DiffLineItem` holds its file's whole parsed patch, so a collapsed or
+  // refetched file's lines would never be collected.
+  const releaseLine = useCallback((key: string) => {
+    lineItemRef.current.delete(key);
+    lineTapRef.current.delete(key);
+  }, []);
+
+  const lineTapFor = useCallback(
+    (item: DiffLineItem) => {
+      registerLineItem(item);
+      let onTap = lineTapRef.current.get(item.key);
+      if (!onTap) {
+        onTap = () => {
+          const current = lineItemRef.current.get(item.key);
+          if (!current) {
+            return;
+          }
+          const side = sideForDiffLineType(current.line.type);
+          const lineNumber = side === 'LEFT' ? current.line.oldLine : current.line.newLine;
+          const hunk = current.parsed.hunks[current.hunkIndex];
+          if (lineNumber === undefined || !hunk) {
+            return;
+          }
+          onLineTapRef.current({
+            filePath: current.filePath,
+            hunkKey: `${current.filePath}:${current.hunkIndex}`,
+            side,
+            line: lineNumber,
+            text: current.line.text,
+            hunk,
+          });
+        };
+        lineTapRef.current.set(item.key, onTap);
+      }
+      return onTap;
+    },
+    [registerLineItem]
+  );
+
   return useCallback(
     ({ item }: { item: ListItem }) => {
       switch (item.kind) {
@@ -123,23 +229,12 @@ export function useDiffRenderItem({
           const hunk = item.parsed.hunks[item.hunkIndex];
           const isSelectable = item.selectable !== false;
           return (
-            <DiffLine
-              line={parsedLine}
-              language={item.language}
-              keyId={item.lineKeyId}
+            <DiffLineRow
+              item={item}
+              register={registerLineItem}
+              release={releaseLine}
               onTap={
-                isSelectable && lineNumber !== undefined && hunk
-                  ? () => {
-                      onLineTap({
-                        filePath: item.filePath,
-                        hunkKey: `${item.filePath}:${item.hunkIndex}`,
-                        side,
-                        line: lineNumber,
-                        text: parsedLine.text,
-                        hunk,
-                      });
-                    }
-                  : undefined
+                isSelectable && lineNumber !== undefined && hunk ? lineTapFor(item) : undefined
               }
               isSelected={
                 selection !== null &&
@@ -178,6 +273,16 @@ export function useDiffRenderItem({
         }
       }
     },
-    [viewed, onRetryPage, onFetchAll, handleLoadContext, setExpanded, onLineTap, selection]
+    [
+      viewed,
+      onRetryPage,
+      onFetchAll,
+      handleLoadContext,
+      setExpanded,
+      lineTapFor,
+      registerLineItem,
+      releaseLine,
+      selection,
+    ]
   );
 }

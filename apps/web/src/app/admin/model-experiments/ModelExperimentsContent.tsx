@@ -55,8 +55,8 @@ import * as z from 'zod';
 const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
 
 const INITIAL_UPSTREAM: CustomLlmApiConfig = {
-  internal_id: '',
   base_url: '',
+  disable_url_suffix: false,
 };
 
 type Status = 'draft' | 'active' | 'paused' | 'completed';
@@ -725,7 +725,8 @@ function VariantsSection({
             const upstream =
               variant.current_version &&
               CustomLlmApiConfigSchema.safeParse(variant.current_version.upstream);
-            const internalId = upstream && upstream.success ? upstream.data.internal_id : '—';
+            const internalId =
+              upstream && upstream.success ? (upstream.data.internal_id ?? 'Not set') : '—';
             const share =
               totalWeight > 0 ? `${Math.round((variant.weight / totalWeight) * 100)}%` : '—';
 
@@ -1001,12 +1002,18 @@ function SwapVersionDialog({
                   automaticLayout: true,
                   tabSize: 2,
                   formatOnPaste: true,
+                  ariaLabel: 'Upstream config JSON',
                 }}
               />
             </div>
             <p className="text-muted-foreground mt-1 text-xs">
               Validated against <code>CustomLlmApiConfigSchema</code> (strict). Do not put the api
-              key in this blob; use the field below.
+              key in this blob; use the field below. Set <code>disable_url_suffix</code> to{' '}
+              <code>true</code> to use <code>base_url</code> exactly, without suffixes such as{' '}
+              <code>/messages</code>. Add{' '}
+              <code>&quot;internal_id&quot;: &quot;provider-model&quot;</code> to send an upstream{' '}
+              <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
+              the outbound request body.
             </p>
           </div>
 

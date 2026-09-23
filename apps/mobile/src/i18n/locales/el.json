@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Κατάσταση συνεδρίας",
       "sessionStatusSubtitle": "ολοκληρώθηκε / απέτυχε / έτοιμη για έλεγχο",
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
-      "kiloclawActivityUnavailable": "Ξεκίνα ένα περιβάλλον KiloClaw για να λαμβάνεις δραστηριότητα KiloClaw.",
+      "kiloclawActivityUnavailable": "Ξεκινήστε ένα περιβάλλον KiloClaw για να λαμβάνετε δραστηριότητα KiloClaw.",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
-      "balanceAlertsUnavailable": "Γίνε μέλος ενός οργανισμού για να λαμβάνεις ειδοποιήσεις χαμηλού υπολοίπου.",
+      "balanceAlertsUnavailable": "Συνδεθείτε σε έναν οργανισμό για να λαμβάνετε ειδοποιήσεις υπολοίπου.",
       "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA",
-      "securityFindingsUnavailable": "Ενεργοποίησε τον πράκτορα ασφάλειας Kilo σε ένα πεδίο για να λαμβάνεις ευρήματα ασφάλειας.",
+      "securityFindingsUnavailable": "Ενεργοποιήστε τον Πράκτορα ασφάλειας Kilo σε ένα εύρος για να λαμβάνετε ευρήματα ασφάλειας.",
       "spendAlertsSubtitle": "υπερβάσεις ορίων και ωριαίες κορυφώσεις",
       "spendAlertsToggle": "Κατηγορία ειδοποιήσεων δαπανών"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "Έγιναν πάρα πολλές προσπάθειες σύνδεσης. Περίμενε λίγο και δοκίμασε ξανά."
   },
   "models": {
+    "auto": {
+      "frontier": "Αυτόματο Αιχμής",
+      "balanced": "Αυτόματο Ισορροπημένο",
+      "efficient": "Αυτόματο Αποδοτικό",
+      "small": "Αυτόματο Μικρό",
+      "free": "Αυτόματο Δωρεάν",
+      "organization": "Αυτόματο Οργανισμού"
+    },
     "dataCollected": "Συλλογή δεδομένων",
     "free": "Δωρεάν",
     "couldNotUpdateFavorites": "Δεν ήταν δυνατή η ενημέρωση των αγαπημένων.",

@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
       "kiloclawActivityUnavailable": "Magsimula ng instance ng KiloClaw para makakuha ng aktibidad ng KiloClaw.",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
-      "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa mababang balanse.",
+      "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa balanse.",
       "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
-      "securityFindingsUnavailable": "Paganahin ang Kilo security agent sa isang saklaw para makakuha ng mga natukoy na isyu sa seguridad.",
+      "securityFindingsUnavailable": "I-enable ang Ahente sa seguridad ng Kilo sa isang saklaw para makakuha ng mga natuklasan sa seguridad.",
       "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
       "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "Masyadong maraming pagtatangkang mag-sign in. Pakihintay at subukan muli."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatikong Pinakamaunlad",
+      "balanced": "Awtomatikong Balanse",
+      "efficient": "Awtomatikong Mabisa",
+      "small": "Awtomatikong Maliit",
+      "free": "Awtomatikong Libre",
+      "organization": "Awtomatikong Organisasyon"
+    },
     "dataCollected": "Kinokolekta ang datos",
     "free": "Libre",
     "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito.",

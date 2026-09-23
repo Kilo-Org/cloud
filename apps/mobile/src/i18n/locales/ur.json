@@ -839,11 +839,11 @@
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
-      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے ایک KiloClaw انسٹینس شروع کریں۔",
+      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
-      "balanceAlertsUnavailable": "بیلنس کے انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
+      "balanceAlertsUnavailable": "بیلنس انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
       "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
-      "securityFindingsUnavailable": "سیکیورٹی مسائل حاصل کرنے کے لیے ایک دائرہ کار میں Kilo سیکیورٹی ایجنٹ فعال کریں۔",
+      "securityFindingsUnavailable": "سیکیورٹی دریافتیں حاصل کرنے کے لیے ایک دائرے پر Kilo سیکیورٹی ایجنٹ فعال کریں۔",
       "spendAlertsSubtitle": "حدوں سے تجاوز اور فی گھنٹہ اضافہ",
       "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "سائن ان کی بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم کچھ دیر انتظار کریں اور دوبارہ کوشش کریں۔"
   },
   "models": {
+    "auto": {
+      "frontier": "خودکار جدید",
+      "balanced": "خودکار متوازن",
+      "efficient": "خودکار مؤثر",
+      "small": "خودکار چھوٹا",
+      "free": "خودکار مفت",
+      "organization": "خودکار ادارہ"
+    },
     "dataCollected": "ڈیٹا جمع ہوتا ہے",
     "free": "مفت",
     "couldNotUpdateFavorites": "پسندیدہ ماڈلز اپ ڈیٹ نہیں ہو سکے۔",

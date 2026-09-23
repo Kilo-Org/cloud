@@ -309,7 +309,7 @@
       "kiloclawActivitySubtitle": "instantie klaar of mislukt, geplande acties",
       "kiloclawActivityUnavailable": "Start een KiloClaw-instantie om KiloClaw-activiteit te ontvangen.",
       "balanceAlertsSubtitle": "waarschuwingen voor laag organisatiesaldo",
-      "balanceAlertsUnavailable": "Word lid van een organisatie om waarschuwingen voor laag saldo te ontvangen.",
+      "balanceAlertsUnavailable": "Word lid van een organisatie om saldowaarschuwingen te ontvangen.",
       "securityFindingsSubtitle": "nieuwe bevindingen en SLA-herinneringen",
       "securityFindingsUnavailable": "Schakel de Kilo-beveiligingsagent in op een bereik om beveiligingsbevindingen te ontvangen.",
       "spendAlertsSubtitle": "drempeloverschrijdingen en uurlijkse pieken",
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "Te veel aanmeldpogingen. Wacht even en probeer het opnieuw."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisch Toonaangevend",
+      "balanced": "Automatisch Evenwichtig",
+      "efficient": "Automatisch Efficiënt",
+      "small": "Automatisch Klein",
+      "free": "Automatisch Gratis",
+      "organization": "Organisatie-Auto"
+    },
     "dataCollected": "Gegevensverzameling",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Je favorieten konden niet worden bijgewerkt.",

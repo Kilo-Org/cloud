@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { resolveSessionDisplayTitle } from '@/lib/session-title';
 
 export type RenameState = {
@@ -98,9 +99,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  const title = payload.session.title;
-  if (title == null || title.trim().length === 0) {
-    return undefined;
-  }
-  return title;
+  return sessionDisplayTitle(payload.session.title);
 }

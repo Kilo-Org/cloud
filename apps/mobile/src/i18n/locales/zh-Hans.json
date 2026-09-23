@@ -335,11 +335,11 @@
       "sessionStatusTitle": "会话状态",
       "sessionStatusSubtitle": "已完成 / 已失败 / 可接管",
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
-      "kiloclawActivityUnavailable": "启动 KiloClaw 实例即可获取 KiloClaw 活动。",
+      "kiloclawActivityUnavailable": "启动 KiloClaw 实例以接收 KiloClaw 活动。",
       "balanceAlertsSubtitle": "组织余额不足警告",
-      "balanceAlertsUnavailable": "加入组织即可获取余额不足提醒。",
+      "balanceAlertsUnavailable": "加入组织以接收余额提醒。",
       "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒",
-      "securityFindingsUnavailable": "在范围内启用 Kilo 安全智能体即可获取安全问题。",
+      "securityFindingsUnavailable": "在某个范围启用 Kilo 安全智能体以接收安全问题。",
       "spendAlertsSubtitle": "阈值突破与每小时激增",
       "spendAlertsToggle": "支出提醒类别"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "登录尝试次数过多。请稍等片刻再试。"
   },
   "models": {
+    "auto": {
+      "frontier": "自动前沿",
+      "balanced": "自动均衡",
+      "efficient": "自动高效",
+      "small": "自动小型",
+      "free": "自动免费",
+      "organization": "组织自动"
+    },
     "dataCollected": "会收集数据",
     "free": "免费",
     "couldNotUpdateFavorites": "无法更新收藏。",

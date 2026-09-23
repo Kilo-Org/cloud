@@ -35,10 +35,6 @@ import {
   type DockerCommandExecutor,
 } from '../e2e/sandbox-control.js';
 
-// ---------------------------------------------------------------------------
-// Pure-helper tests
-// ---------------------------------------------------------------------------
-
 describe('parseDirective', () => {
   it('returns null when the prefix is absent', () => {
     expect(parseDirective('hello')).toBeNull();
@@ -301,10 +297,6 @@ describe('buildSeedFixture', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// End-to-end HTTP tests against an ephemeral server
-// ---------------------------------------------------------------------------
-
 let handle: FakeLlmServerHandle | null = null;
 
 afterEach(async () => {
@@ -522,6 +514,41 @@ describe('fake-llm-server HTTP', () => {
 
     const after = await h.adminFetch(`/test/requests`);
     await expect(after.json()).resolves.toEqual({ chatCompletions: 1, transcriptions: 0 });
+  });
+
+  it('attributes completions to a prompt scope while keeping the global total', async () => {
+    const h = await start();
+    await postChat(h.url, '__e2e_scope__:shardA\n__fake__:echo:hello');
+    await postChat(h.url, '__e2e_scope__:shardB\n__fake__:echo:hello');
+
+    const global = await h.adminFetch(`/test/requests`);
+    await expect(global.json()).resolves.toEqual({ chatCompletions: 2, transcriptions: 0 });
+
+    const a = await h.adminFetch(`/test/requests?scope=shardA`);
+    await expect(a.json()).resolves.toEqual({
+      chatCompletions: 1,
+      transcriptions: 0,
+      scope: 'shardA',
+    });
+
+    const missing = await h.adminFetch(`/test/requests?scope=shardC`);
+    await expect(missing.json()).resolves.toEqual({
+      chatCompletions: 0,
+      transcriptions: 0,
+      scope: 'shardC',
+    });
+
+    const invalid = await h.adminFetch(`/test/requests?scope=bad%20scope`);
+    expect(invalid.status).toBe(400);
+  });
+
+  it('strips the scope marker from a default echo response', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__e2e_scope__:shardD\njust a plain prompt');
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('just a plain prompt');
+    expect(text).not.toContain('__e2e_scope__');
   });
 
   it('serves the transcription catalogue when output_modalities=transcription', async () => {
@@ -2282,10 +2309,6 @@ describe('strict harness stream events', () => {
     expect(streamEventSchema.safeParse(invalid).success).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// /test/* admin guard
-// ---------------------------------------------------------------------------
 
 const CONTROL_ROUTES: Array<{ label: string; path: string; init?: RequestInit }> = [
   { label: 'POST /test/release', path: '/test/release?tag=guard', init: { method: 'POST' } },

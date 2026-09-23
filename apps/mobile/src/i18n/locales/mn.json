@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Сессийн төлөв",
       "sessionStatusSubtitle": "дууссан / амжилтгүй / удирдахад бэлэн",
       "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
-      "kiloclawActivityUnavailable": "KiloClaw-ийн үйл ажиллагаа авахын тулд KiloClaw инстанц эхлүүлнэ үү.",
+      "kiloclawActivityUnavailable": "KiloClaw үйл ажиллагаа авахын тулд KiloClaw инстанцыг эхлүүлнэ үү.",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
-      "balanceAlertsUnavailable": "Балансын анхааруулга авахын тулд байгууллагад нэгдэнэ үү.",
+      "balanceAlertsUnavailable": "Үлдэгдлийн анхааруулга авахын тулд байгууллагад элсэнэ үү.",
       "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга",
-      "securityFindingsUnavailable": "Аюулгүй байдлын илэрсэн асуудал авахын тулд Kilo Аюулгүй байдлын агентыг хүрээнд идэвхжүүлнэ үү.",
+      "securityFindingsUnavailable": "Аюулгүй байдлын эмзэг байдлын мэдээлэл авахын тулд Kilo аюулгүй байдлын агентыг хүрээнд идэвхжүүлнэ үү.",
       "spendAlertsSubtitle": "босго давсан болон цагийн огцом өсөлт",
       "spendAlertsToggle": "Зарцуулалтын анхааруулгын ангилал"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "Хэт олон удаа нэвтрэхийг оролдсон байна. Түр хүлээгээд дахин оролдоно уу."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Тэргүүлэх",
+      "balanced": "Авто Тэнцвэртэй",
+      "efficient": "Авто Үр ашигтай",
+      "small": "Авто Жижиг",
+      "free": "Авто Үнэгүй",
+      "organization": "Байгууллагын авто"
+    },
     "dataCollected": "Өгөгдөл цуглуулдаг",
     "free": "Үнэгүй",
     "couldNotUpdateFavorites": "Дуртай загваруудыг шинэчилж чадсангүй.",

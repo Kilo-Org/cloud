@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
       "kiloclawActivityUnavailable": "Ræstu KiloClaw-tilvik til að fá KiloClaw-virkni.",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
-      "balanceAlertsUnavailable": "Skráðu þig í fyrirtæki til að fá viðvaranir um lága inneign.",
+      "balanceAlertsUnavailable": "Skráðu þig í félag til að fá viðvaranir um inneign.",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
-      "securityFindingsUnavailable": "Virkjaðu Kilo öryggiserindreka á sviði til að fá öryggisniðurstöður.",
+      "securityFindingsUnavailable": "Virkjaðu Kilo-öryggiserindreka á sviði til að fá öryggisniðurstöður.",
       "spendAlertsSubtitle": "yfirferðir þröskulda og uppsveiflur á klukkustund",
       "spendAlertsToggle": "Flokkur útgjaldaviðvarana"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "Of margar innskráningartilraunir. Bíddu og reyndu aftur."
   },
   "models": {
+    "auto": {
+      "frontier": "Sjálfvirkt Fremst",
+      "balanced": "Sjálfvirkt Jafnvægis",
+      "efficient": "Sjálfvirkt Skilvirkt",
+      "small": "Sjálfvirkt Lítið",
+      "free": "Sjálfvirkt Ókeypis",
+      "organization": "Sjálfvirkt Stofnunar"
+    },
     "dataCollected": "Gögnum safnað",
     "free": "Ókeypis",
     "couldNotUpdateFavorites": "Ekki tókst að uppfæra eftirlæti.",

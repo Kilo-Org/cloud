@@ -40,6 +40,7 @@ const REMOVED_CONTAINER_CLASSES = [
   // alongside the older sandbox classes; the pinned list must gain it whenever
   // production adds a container class.
   'SandboxContainers',
+  'SandboxContainers',
 ];
 
 const KEPT_DO_CLASSES = [

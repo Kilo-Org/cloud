@@ -43,6 +43,7 @@ vi.mock('ws', () => ({
 
 import {
   createWorktreeChat,
+  fakeDirective,
   fetchFakeRequests,
   fetchFakeScenarioStatus,
   fetchFakeWaiters,
@@ -255,6 +256,37 @@ describe('fake LLM control helpers', () => {
     } finally {
       if (previous === undefined) delete process.env.FAKE_LLM_ADMIN_TOKEN;
       else process.env.FAKE_LLM_ADMIN_TOKEN = previous;
+    }
+  });
+
+  it('scopes the fake side channel and directives when E2E_FAKE_SCOPE is set', async () => {
+    const previous = process.env.E2E_FAKE_SCOPE;
+    process.env.E2E_FAKE_SCOPE = 'shardA';
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(new Response('{}', { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      expect(fakeDirective('echo:hi')).toBe('__e2e_scope__:shardA\n__fake__:echo:hi');
+      await fetchFakeRequests(config.fakeLlmUrl);
+      expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+        'http://fake.test/test/requests?scope=shardA'
+      );
+    } finally {
+      if (previous === undefined) delete process.env.E2E_FAKE_SCOPE;
+      else process.env.E2E_FAKE_SCOPE = previous;
+    }
+  });
+
+  it('rejects a malformed E2E_FAKE_SCOPE', () => {
+    const previous = process.env.E2E_FAKE_SCOPE;
+    process.env.E2E_FAKE_SCOPE = 'bad scope';
+    try {
+      expect(() => fakeDirective('echo:hi')).toThrow(/E2E_FAKE_SCOPE/);
+    } finally {
+      if (previous === undefined) delete process.env.E2E_FAKE_SCOPE;
+      else process.env.E2E_FAKE_SCOPE = previous;
     }
   });
 });

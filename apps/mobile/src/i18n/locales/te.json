@@ -839,9 +839,9 @@
       "sessionStatusTitle": "సెషన్ స్థితి",
       "sessionStatusSubtitle": "పూర్తయింది / విఫలమైంది / నియంత్రించడానికి సిద్ధం",
       "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
-      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాలను పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
+      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాన్ని పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
-      "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి ఒక సంస్థలో చేరండి.",
+      "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి సంస్థలో చేరండి.",
       "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు",
       "securityFindingsUnavailable": "భద్రతా సమస్యలను పొందడానికి ఒక పరిధిలో Kilo భద్రతా ఏజెంట్‌ను ప్రారంభించండి.",
       "spendAlertsSubtitle": "పరిమితి దాటడం మరియు గంటకు పెరుగుదల",
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "సైన్ ఇన్ చేయడానికి చాలా సార్లు ప్రయత్నించారు. కాసేపు ఆగి మళ్లీ ప్రయత్నించండి."
   },
   "models": {
+    "auto": {
+      "frontier": "ఆటో అత్యాధునికం",
+      "balanced": "ఆటో సమతుల్యం",
+      "efficient": "ఆటో సమర్థవంతమైన",
+      "small": "ఆటో చిన్న",
+      "free": "ఆటో ఉచితం",
+      "organization": "సంస్థ ఆటో"
+    },
     "dataCollected": "డేటా సేకరణ ఉంది",
     "free": "ఉచితం",
     "couldNotUpdateFavorites": "ఇష్టమైనవాటిని నవీకరించలేకపోయాము.",

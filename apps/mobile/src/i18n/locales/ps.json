@@ -839,11 +839,11 @@
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
-      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره د KiloClaw انسټانس پیل کړئ.",
+      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره یو KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
-      "balanceAlertsUnavailable": "د بیلانس خبرتیاوې ترلاسه کولو لپاره یو سازمان ته وګډون وکړئ.",
+      "balanceAlertsUnavailable": "د بیلانس خبرداریو ترلاسه کولو لپاره یو سازمان ته ورسئ.",
       "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
-      "securityFindingsUnavailable": "امنیتي موندنې ترلاسه کولو لپاره په یوه ساحه کې د Kilo امنیتي اجنټ فعال کړئ.",
+      "securityFindingsUnavailable": "د امنیتي موندنو ترلاسه کولو لپاره په یوه ساحه کې Kilo امنیتي اجنټ فعال کړئ.",
       "spendAlertsSubtitle": "د حدونو تېرېدل او ساعتي زیاتوالی",
       "spendAlertsToggle": "د لګښت خبرتیاوو کټګوري"
     },
@@ -3114,6 +3114,14 @@
     "tooManySignInAttempts": "د ننوتلو ډېرې هڅې وشوې. مهرباني وکړئ انتظار وکړئ او بیا هڅه وکړئ."
   },
   "models": {
+    "auto": {
+      "frontier": "اتومات مخکښ",
+      "balanced": "اتومات متوازن",
+      "efficient": "اتومات اغیزمن",
+      "small": "اتومات کوچنی",
+      "free": "اتومات وړیا",
+      "organization": "اتومات اداره"
+    },
     "dataCollected": "معلومات راټولېږي",
     "free": "وړیا",
     "couldNotUpdateFavorites": "د خوښې ماډلونه تازه نه شول.",

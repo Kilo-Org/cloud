@@ -337,9 +337,9 @@
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
       "kiloclawActivityUnavailable": "Запустіть екземпляр KiloClaw, щоб отримувати активність KiloClaw.",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
-      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати сповіщення про низький баланс.",
+      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати попередження про баланс.",
       "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA",
-      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми безпеки.",
+      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми.",
       "spendAlertsSubtitle": "перевищення порогів і погодинні сплески",
       "spendAlertsToggle": "Категорія «Сповіщення про витрати»"
     },
@@ -3200,6 +3200,14 @@
     "tooManySignInAttempts": "Забагато спроб входу. Зачекайте та спробуйте ще раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Передовий",
+      "balanced": "Авто Збалансований",
+      "efficient": "Авто Ефективний",
+      "small": "Авто Малий",
+      "free": "Авто Безкоштовний",
+      "organization": "Авто організації"
+    },
     "dataCollected": "Збір даних",
     "free": "Безкоштовно",
     "couldNotUpdateFavorites": "Не вдалося оновити обране.",

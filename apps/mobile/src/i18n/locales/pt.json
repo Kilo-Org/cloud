@@ -855,11 +855,11 @@
       "sessionStatusTitle": "Estado da sessão",
       "sessionStatusSubtitle": "concluída / com erro / pronta para controlo",
       "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
-      "kiloclawActivityUnavailable": "Inicia uma instância do KiloClaw para receber a atividade do KiloClaw.",
+      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber atividade do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "balanceAlertsUnavailable": "Entra numa organização para receber alertas de saldo baixo.",
+      "balanceAlertsUnavailable": "Junte-se a uma organização para receber alertas de saldo.",
       "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA",
-      "securityFindingsUnavailable": "Ativa o agente de segurança Kilo num âmbito para receber os problemas de segurança.",
+      "securityFindingsUnavailable": "Ative o Agente de segurança do Kilo num âmbito para receber ocorrências de segurança.",
       "spendAlertsSubtitle": "ultrapassagens de limites e picos horários",
       "spendAlertsToggle": "Categoria de alertas de gastos"
     },
@@ -3157,6 +3157,14 @@
     "tooManySignInAttempts": "Demasiadas tentativas de início de sessão. Aguarda um momento e tenta novamente."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avançado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Gratuito",
+      "organization": "Automático de organização"
+    },
     "dataCollected": "Dados recolhidos",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Não foi possível atualizar os favoritos.",

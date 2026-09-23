@@ -177,16 +177,28 @@ describe('readStoredValueWithRetry', () => {
     vi.resetModules();
     vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 60_000 }));
     getItemAsync.mockResolvedValue('stored-token');
+    // `resetModules` gives the reloaded helper its own error-sink registry, so
+    // the sink is re-installed on the fresh module before the read runs.
+    const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    setFreshTelemetrySink(event => {
+      events.push(event);
+    });
     const readStoredValueWithRetry = await loadHelper();
 
     const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
-      'E2E secure-store fault window is open: read of auth-token rejected'
+      'E2E secure-store fault window is open: read rejected'
     );
     await vi.advanceTimersByTimeAsync(2000);
 
     await settled;
     // The fault is the reason: the real store is never asked.
     expect(getItemAsync).not.toHaveBeenCalled();
+    // The exhausted-read report attaches the fault error, so that error must
+    // carry no key — the same invariant the real store's error keeps.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
 
     vi.doUnmock('@/lib/config');
     vi.resetModules();

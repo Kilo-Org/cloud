@@ -38,7 +38,9 @@ async function readOnce(
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
-    throw new Error(`E2E secure-store fault window is open: read of ${key} rejected`);
+    // No key in the message: the exhausted-read report attaches this error, and
+    // the report must carry no key material, like the real store's error.
+    throw new Error('E2E secure-store fault window is open: read rejected');
   }
   const value = await (firstAttempt ?? readStoredValue(key, options));
   return value;

@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
+import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
 
 type AddCreditsRowProps = Readonly<{
@@ -24,6 +25,15 @@ type AddCreditsRowProps = Readonly<{
  */
 export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  // The button keeps its natural width, so in a narrow window the description
+  // beside it collapses to a column of single letters ("A", 160 dp, e1,
+  // 2026-09-21). Stacking gives the copy the row's full width.
+  const narrow = isNarrowLayout(width);
+  // App Store review: iOS must not show an in-app CTA that opens an external
+  // purchase/billing page, so the external `url` variant stays Android-only —
+  // gate it here so no call site can surface it on iOS. An in-app `onPress`
+  // CTA is platform-agnostic and shows on both platforms.
   if (!onPress && Platform.OS === 'ios') {
     return null;
   }
@@ -37,11 +47,16 @@ export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
     }
   };
   return (
-    <View className={cn('flex-row items-center justify-between', className)}>
-      <Text className="flex-1 pr-3 text-xs text-muted-foreground">
+    <View className={cn(narrow ? 'gap-2' : 'flex-row items-center justify-between', className)}>
+      <Text className={cn(narrow ? undefined : 'flex-1 pr-3', 'text-xs text-muted-foreground')}>
         {t('addCredits.description')}
       </Text>
-      <Button size="sm" variant="outline" onPress={handlePress}>
+      <Button
+        size="sm"
+        variant="outline"
+        className={narrow ? 'w-full' : undefined}
+        onPress={handlePress}
+      >
         <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
       </Button>
     </View>

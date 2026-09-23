@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -20,9 +20,10 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
+import { cn, parseTimestamp } from '@/lib/utils';
 
 const HIDDEN_BALANCE = '*****';
 
@@ -35,6 +36,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
+  // "CREDITS" eyebrow too little room for one word and Android breaks it
+  // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
+  // row's full width.
+  const narrow = isNarrowLayout(width);
   const { t, i18n } = useTranslation();
   const { openPicker, picker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
@@ -125,13 +132,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   return (
     <View className="gap-3">
-      <View className="min-h-11 flex-row items-center justify-between gap-3">
+      <View
+        className={cn(
+          'min-h-11 gap-3',
+          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
+        )}
+      >
         <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
           {t('profile.credits')}
         </Text>
         {canPickContext && (
           <Pressable
-            className="min-h-11 min-w-0 max-w-[65%] shrink flex-row items-center justify-end gap-1 active:opacity-70"
+            className={cn(
+              'min-h-11 min-w-0 flex-row items-center gap-1 active:opacity-70',
+              narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
+            )}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}

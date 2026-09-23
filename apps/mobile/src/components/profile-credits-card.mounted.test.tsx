@@ -29,6 +29,8 @@ const currentUser = vi.hoisted(() => ({
   userId: undefined as string | undefined,
   isError: false,
 }));
+/** Window the card lays out in; a narrow one must stack the credits header. */
+const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -110,7 +112,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
+  useWindowDimensions: () => windowDims,
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
@@ -225,8 +227,17 @@ async function choose(renderer: ReactTestRenderer, label: string) {
   });
 }
 
+/** The header container's classes: the only View the card gives `min-h-11`. */
+function headerClasses(renderer: ReactTestRenderer): string[] {
+  const header = renderer.root.find(
+    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11')
+  );
+  return String(header.props.className).split(' ');
+}
+
 beforeEach(() => {
   Platform.OS = 'ios';
+  windowDims.width = 390;
   savedMetadata.clear();
   saveCompletion = undefined;
   addCreditsRowProps.latest = undefined;
@@ -546,6 +557,33 @@ describe('CreditsCard add-credits entry point', () => {
     // tree must hold no row at all for a member who cannot manage billing.
     expect(texts()).not.toContain('ADD_CREDITS_ROW');
 
+    unmount();
+  });
+});
+
+describe('CreditsCard credits header', () => {
+  const headerOrgs = [
+    { organizationId: 'org-a', organizationName, role: 'owner' },
+  ] as OrgListEntry[];
+
+  it('keeps the credits eyebrow and the account picker on one row at phone widths', async () => {
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+
+    // The 160 dp window of the e1 round squeezed the eyebrow until Android
+    // broke it mid-word ("CREDIT S"); a phone-width window must not.
+    expect(headerClasses(renderer)).toContain('flex-row');
+    unmount();
+  });
+
+  it('stacks the credits eyebrow above the account picker in a narrow window', async () => {
+    windowDims.width = 160;
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+
+    const classes = headerClasses(renderer);
+    expect(classes).toContain('flex-col');
+    expect(classes).not.toContain('flex-row');
+    // The eyebrow keeps its full copy instead of breaking mid-word.
+    expect(texts()).toContain('Credits');
     unmount();
   });
 });

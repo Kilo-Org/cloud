@@ -388,6 +388,18 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     expect(retry?.loading).toBe(true);
   });
 
+  it('restores the 12px gap between the last row and the pagination footer', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationCreditActivityScreen));
+
+    // FlashList's item separator only spans rows, so the footer carries the
+    // 12px the old content-container `gap-3` placed between it and the last row.
+    expect(renderer.root.findAll(node => node.props.className === 'pt-3')).toHaveLength(1);
+  });
+
   it('keeps Load more when a background refetch fails after pages loaded', async () => {
     pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
     pageQuery.isError = true;

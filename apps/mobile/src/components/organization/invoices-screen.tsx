@@ -35,7 +35,9 @@ import { cn, firstNonEmpty } from '@/lib/utils';
 // `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
 // positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
 // `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`.
+// separator instead of `contentContainerStyle.gap`. The old container `gap` also
+// sat between the last row and the pagination footer; FlashList's separator only
+// spans items, so that boundary carries the same 12px as `pt-3` on the footer.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
@@ -270,7 +272,9 @@ export function OrganizationInvoicesScreen() {
     );
   } else {
     const footer = (
-      <View>
+      // The former container gap also separated the last row from this footer
+      // block, which the item separator does not cover.
+      <View className="pt-3">
         {hasMore && !isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">

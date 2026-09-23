@@ -67,7 +67,10 @@ function FindingsListFooter({
 // `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
 // positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
 // `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`.
+// separator instead of `contentContainerStyle.gap`. The old container `gap` also
+// sat between the header and the first row and between the last row and the
+// footer; FlashList's separator only spans items, so those two boundaries carry
+// the same 12px as a pad on the header (`pb-3`) and on the footer (`pt-3`).
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
@@ -238,7 +241,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           ItemSeparatorComponent={FindingRowSeparator}
           extraData={rowExtraData}
           contentContainerStyle={listContentContainerStyle}
-          ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
+          ListHeaderComponent={
+            // The former container gap also separated the header from the first
+            // row, which the item separator does not cover.
+            <View className="pb-3">
+              <RefreshProgress refreshControl={refreshControl} />
+            </View>
+          }
           refreshControl={refreshControl}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {
@@ -247,14 +256,16 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            <>
+            // The former container gap also separated the last row from the
+            // footer (skeleton / error / bottom spacer).
+            <View className="pt-3">
               <FindingsListFooter
                 loading={findings.isFetchingNextPage}
                 error={findings.isFetchNextPageError}
                 onRetry={() => void findings.fetchNextPage()}
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
-            </>
+            </View>
           }
         />
       )}

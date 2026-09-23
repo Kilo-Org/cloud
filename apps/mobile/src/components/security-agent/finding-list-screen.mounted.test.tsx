@@ -200,6 +200,19 @@ describe('Security Agent list surfaces', () => {
     expect(spacer.props.className).toBe('h-3');
   });
 
+  it('restores the header and footer boundary gaps the separator cannot cover', async () => {
+    findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };
+    const root = await mount();
+    const list = root.findByType(FlashList);
+    // The old content-container `gap-3` also sat between the header and the
+    // first row and between the last row and the footer. FlashList's separator
+    // only spans items, so each boundary carries its own 12px pad.
+    const header = list.props.ListHeaderComponent as ReactElement<{ className: string }>;
+    const footer = list.props.ListFooterComponent as ReactElement<{ className: string }>;
+    expect(header.props.className).toBe('pb-3');
+    expect(footer.props.className).toBe('pt-3');
+  });
+
   it('keeps expired filter guidance outside a scroller', async () => {
     mounted = await renderWithProviders(<SecurityAgentFilterFindingsRoute />);
     expect(mounted.renderer.root.findByType(EmptyState).props.placement).not.toBe('top');

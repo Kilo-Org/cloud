@@ -144,14 +144,17 @@ describe('cloudflare containers provider create', () => {
     ['worktree containment', getWorktreeCredentialContainment(true)],
     ['kilocode requirement', { kilocode: true, github: false }],
     ['github requirement', { kilocode: false, github: true }],
-  ])('rejects %s with a capability failure', async (_label, containment) => {
+  ])('encodes %s into the provider reference', async (_label, containment) => {
     const { adapter, getContainer } = setup();
 
-    await expect(adapter.create(makeIntent({ containment }))).rejects.toMatchObject({
-      name: 'AgentSandboxUnavailableError',
-      failure: 'capability_unavailable',
-    });
+    const created = await adapter.create(makeIntent({ containment }));
+    if (!('providerRef' in created)) throw new Error('expected an allocation');
 
+    expect(decodeCloudflareProviderRef(created.providerRef)).toEqual({
+      sandboxId: ALLOCATION_A,
+      containment: true,
+      instanceId: INTENT_ID,
+    });
     expect(getContainer).not.toHaveBeenCalled();
   });
 
@@ -244,6 +247,7 @@ describe('cloudflare containers provider launch', () => {
     expect(getContainer).toHaveBeenCalledWith(LOGICAL_ID);
     expect(stub.launchWrapper).toHaveBeenCalledWith({
       allocationRef: REF_A,
+      containment: false,
       instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: {
         FOO: 'bar',
@@ -273,7 +277,7 @@ describe('cloudflare containers provider launch', () => {
     expect(stub.launchWrapper).not.toHaveBeenCalled();
   });
 
-  it('rejects a contained reference', async () => {
+  it('launches a contained reference with outbound containment', async () => {
     const { adapter, stub } = setup();
     const contained = encodeCloudflareProviderRef({
       sandboxId: ALLOCATION_A,
@@ -281,11 +285,11 @@ describe('cloudflare containers provider launch', () => {
       instanceId: INTENT_ID,
     });
 
-    await expect(adapter.launch(contained, {})).rejects.toThrow(
-      'Invalid Cloudflare containers allocation'
-    );
+    await adapter.launch(contained, {});
 
-    expect(stub.launchWrapper).not.toHaveBeenCalled();
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({ allocationRef: contained, containment: true })
+    );
   });
 
   it('propagates a DO allocation conflict', async () => {
@@ -466,18 +470,17 @@ describe('cloudflare containers provider stop', () => {
     expect(stub.stop).not.toHaveBeenCalled();
   });
 
-  it('returns retryable without a DO call for a contained reference', async () => {
-    const { adapter, stub, getContainer } = setup();
+  it('stops a contained reference through the container', async () => {
+    const { adapter, stub } = setup();
     const contained = encodeCloudflareProviderRef({
       sandboxId: ALLOCATION_A,
       containment: true,
       instanceId: INTENT_ID,
     });
 
-    await expect(adapter.stop(contained)).resolves.toBe('retryable');
+    await expect(adapter.stop(contained)).resolves.toBe('terminal');
 
-    expect(getContainer).not.toHaveBeenCalled();
-    expect(stub.stop).not.toHaveBeenCalled();
+    expect(stub.stop).toHaveBeenCalledWith(contained);
   });
 
   it('resolves a null reference through the retained intent', async () => {

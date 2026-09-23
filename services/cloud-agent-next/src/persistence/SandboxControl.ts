@@ -242,6 +242,7 @@ import {
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import {
   deriveSandboxAllocationId,
+  getManagedOutboundContainerId,
   getOutboundContainerId,
   getSandboxNamespace,
 } from '../sandbox-id.js';
@@ -1296,16 +1297,15 @@ export class SandboxControl extends DurableObject<Env> {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const resolvedProviderRef = canonicalProviderRefOf(record);
-    const outboundContainerId =
-      provider === 'cloudflare' && requiredContainment.kilocode
-        ? getOutboundContainerId(
-            this.env,
+    const outboundContainerId = requiredContainment.kilocode
+      ? getManagedOutboundContainerId(provider, this.env, {
+          logicalSandboxId: this.sandboxId,
+          physicalSandboxId:
             decodeCloudflareProviderRef(resolvedProviderRef)?.sandboxId ??
-              (record.state.kind === 'stopped' ? undefined : record.state.target?.allocationName) ??
-              this.sandboxId,
-            { managedScmContainment: requiredContainment.kilocode }
-          )
-        : undefined;
+            (record.state.kind === 'stopped' ? undefined : record.state.target?.allocationName) ??
+            this.sandboxId,
+        })
+      : undefined;
     const grants = await loadSessionCredentialGrants(this.ctx.storage);
     const scopeId = metadata.workspace?.worktreeId ?? metadata.identity.sessionId;
     const existing = grants.find(grant => grant.scopeId === scopeId);

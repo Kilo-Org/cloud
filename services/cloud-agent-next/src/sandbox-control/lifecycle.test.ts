@@ -1179,6 +1179,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     expect(h.containerStub.launchWrapper).toHaveBeenCalledWith({
       allocationRef: canonicalProviderRef(physical),
+      containment: false,
       instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: expect.objectContaining({
         PROVIDER_INSTANCE_ID: canonicalProviderRef(physical),

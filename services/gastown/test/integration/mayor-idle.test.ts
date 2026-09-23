@@ -104,6 +104,7 @@ describe('Mayor idle lifecycle', () => {
 
       // Create a convoy to get a working polecat
       const convoy = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'Test',
         tasks: [{ title: 'Task 1' }],

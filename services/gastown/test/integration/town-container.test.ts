@@ -18,39 +18,44 @@ describe('Town Container Routes', () => {
   // ── Container start agent route ─────────────────────────────────────────
 
   describe('POST /agents/start', () => {
-    it('should reject start-agent without body', async () => {
+    it('should reject an unauthenticated start-agent request before parsing the body', async () => {
       const id = townId();
       const res = await SELF.fetch(api(`/api/towns/${id}/container/agents/start`), {
         method: 'POST',
         headers: headers(),
       });
-      // Should get 400 (invalid body) rather than 401
-      expect(res.status).toBe(400);
+      // The container proxy routes live behind the /api/towns/:townId/* kilo-auth
+      // wildcard, so a request without a Kilo token is rejected before the body
+      // is looked at. It used to answer 500 — the wildcard dropped the auth
+      // middleware's response and left the request unfinalized.
+      expect(res.status).toBe(401);
     });
   });
 
   // ── Container message route ─────────────────────────────────────────────
 
   describe('POST /agents/:agentId/message', () => {
-    it('should reject message without body', async () => {
+    it('should reject an unauthenticated message request before parsing the body', async () => {
       const id = townId();
       const res = await SELF.fetch(api(`/api/towns/${id}/container/agents/some-agent/message`), {
         method: 'POST',
         headers: headers(),
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(401);
     });
   });
 });
 
 describe('Heartbeat Endpoint', () => {
+  const townId = () => `town-${crypto.randomUUID()}`;
   const rigId = () => `rig-${crypto.randomUUID()}`;
 
   it('should update agent activity via heartbeat', async () => {
-    const id = rigId();
+    const id = townId();
+    const rig = rigId();
 
     // Register an agent first
-    const createRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+    const createRes = await SELF.fetch(api(`/api/towns/${id}/rigs/${rig}/agents`), {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ role: 'polecat', name: 'test-polecat', identity: 'polecat-1' }),
@@ -64,11 +69,14 @@ describe('Heartbeat Endpoint', () => {
     await new Promise(r => setTimeout(r, 10));
 
     // Send heartbeat
-    const heartbeatRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}/heartbeat`), {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ status: 'running' }),
-    });
+    const heartbeatRes = await SELF.fetch(
+      api(`/api/towns/${id}/rigs/${rig}/agents/${agentId}/heartbeat`),
+      {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ status: 'running' }),
+      }
+    );
     expect(heartbeatRes.status).toBe(200);
     const heartbeatBody: { success: boolean; data: { heartbeat: boolean } } =
       await heartbeatRes.json();
@@ -76,7 +84,7 @@ describe('Heartbeat Endpoint', () => {
     expect(heartbeatBody.data.heartbeat).toBe(true);
 
     // Verify agent's activity was updated
-    const getRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}`), {
+    const getRes = await SELF.fetch(api(`/api/towns/${id}/rigs/${rig}/agents/${agentId}`), {
       headers: headers(),
     });
     const getBody: { data: { last_activity_at: string } } = await getRes.json();
@@ -84,12 +92,16 @@ describe('Heartbeat Endpoint', () => {
   });
 
   it('should handle heartbeat for non-existent agent gracefully', async () => {
-    const id = rigId();
-    const res = await SELF.fetch(api(`/api/rigs/${id}/agents/non-existent/heartbeat`), {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ status: 'running' }),
-    });
+    const id = townId();
+    const rig = rigId();
+    const res = await SELF.fetch(
+      api(`/api/towns/${id}/rigs/${rig}/agents/non-existent/heartbeat`),
+      {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ status: 'running' }),
+      }
+    );
     // The DO's touchAgent won't throw for non-existent agent (it's a no-op UPDATE)
     expect(res.status).toBe(200);
   });

@@ -1,4 +1,4 @@
-import { SELF } from 'cloudflare:test';
+import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
@@ -43,15 +43,16 @@ describe('HTTP API', () => {
   const townId = 'test-town-http-api';
   const rigId = () => `rig-${crypto.randomUUID()}`;
 
-  // ── Dashboard ──────────────────────────────────────────────────────────
+  // ── Service root ───────────────────────────────────────────────────────
 
-  describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+  describe('root', () => {
+    it('should serve the service status JSON at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      expect(res.headers.get('Content-Type')).toContain('application/json');
+      const body = await res.json();
+      expect(body.service).toBe('gastown');
+      expect(body.status).toBe('ok');
     });
   });
 
@@ -474,7 +475,9 @@ describe('HTTP API', () => {
       );
       const agentState = (await agentCheck.json()).data;
       expect(agentState.status).toBe('idle');
-      expect(agentState.current_hook_bead_id).toBeNull();
+      // agentDone only records an agent_done event; the alarm drains it and only
+      // then unhooks the agent and moves the source bead to in_review.
+      expect(agentState.current_hook_bead_id).toBe(bead.bead_id);
     });
   });
 
@@ -620,9 +623,15 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      // The POST returns the escalation entry (escalation_metadata joined with
+      // its bead), not the raw bead: id/severity/message instead of
+      // type/title/priority.
+      expect(body.data.id).toBeTruthy();
+      expect(body.data.severity).toBe('critical');
+      expect(body.data.message).toBe('Critical failure');
+      const bead = await env.TOWN.get(env.TOWN.idFromName(townId)).getBeadAsync(body.data.id);
+      expect(bead?.type).toBe('escalation');
+      expect(bead?.priority).toBe('critical');
     });
   });
 

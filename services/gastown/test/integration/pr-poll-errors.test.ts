@@ -38,6 +38,7 @@ describe('PR poll error discrimination (#3149)', () => {
     });
 
     const result = await town.slingConvoy({
+      staged: false,
       rigId: 'rig-1',
       convoyTitle: 'PR Poll Test',
       tasks: [{ title: 'Task 1' }],
@@ -50,8 +51,11 @@ describe('PR poll error discrimination (#3149)', () => {
     const agentId = bead!.assignee_agent_bead_id!;
     expect(agentId).toBeTruthy();
 
+    // The polecat's pr_url is what submitToReviewQueue stores on the MR bead,
+    // and poll_pr only runs for a merge_request bead that has one.
     await town.agentDone(agentId, {
       branch: 'gt/polecat/test-branch',
+      pr_url: prUrl,
       summary: 'Completed task',
     });
 

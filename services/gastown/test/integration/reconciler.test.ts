@@ -37,6 +37,7 @@ describe('Reconciler', () => {
     it('should assign an agent to an unassigned open issue bead', async () => {
       // Use slingConvoy (single task, no deps) for a bead with rig_id set
       const result = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'Single bead',
         tasks: [{ title: 'Unassigned bead' }],
@@ -57,6 +58,7 @@ describe('Reconciler', () => {
 
     it('should not assign agents to blocked beads', async () => {
       const result = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'Blocked test',
         tasks: [{ title: 'First' }, { title: 'Second', depends_on: [0] }],
@@ -75,6 +77,7 @@ describe('Reconciler', () => {
 
     it('should assign agents to newly unblocked beads after blocker closes', async () => {
       const result = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'Unblock test',
         tasks: [{ title: 'First' }, { title: 'Second', depends_on: [0] }],
@@ -202,6 +205,7 @@ describe('Reconciler', () => {
   describe('event-driven agentDone', () => {
     it('should transition source bead to in_review after alarm drains agent_done event', async () => {
       const result = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'AgentDone test',
         tasks: [{ title: 'Agent done test' }],
@@ -242,6 +246,7 @@ describe('Reconciler', () => {
   describe('reconcileReviewQueue Rule 5: refinery dispatch', () => {
     it('should create a refinery and dispatch it for an open MR bead', async () => {
       const result = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'Refinery test',
         tasks: [{ title: 'Review dispatch test' }],
@@ -288,8 +293,19 @@ describe('Reconciler', () => {
   // ── reconcileReviewQueue Rule 6: Refinery re-dispatch limits (#1342) ─
 
   describe('reconcileReviewQueue Rule 6: refinery re-dispatch limits', () => {
-    it('should fail MR bead after refinery exceeds max dispatch attempts', async () => {
+    it('should fail MR bead after it exceeds the rig dispatch cap', async () => {
+      // dispatchAgent() needs the rig *config* (storage), not just the rig row,
+      // to get past its config gate and record dispatch attempts on the bead.
+      await town.configureRig({
+        rigId: 'rig-1',
+        townId: townName,
+        gitUrl: 'https://github.com/test/repo.git',
+        defaultBranch: 'main',
+        userId: 'test-user',
+      });
+
       const result = await town.slingConvoy({
+        staged: false,
         rigId: 'rig-1',
         convoyTitle: 'Rule 6 limit test',
         tasks: [{ title: 'Dispatch limit test' }],
@@ -323,18 +339,19 @@ describe('Reconciler', () => {
       expect(refineries.length).toBeGreaterThan(0);
       const refinery = refineries[0];
 
-      // Simulate repeated idle→re-dispatch cycles by setting dispatch_attempts
-      // past the limit (MAX_DISPATCH_ATTEMPTS = 20) and backdating last_activity_at
-      // so the DISPATCH_COOLDOWN_MS check passes.
-      const pastTimestamp = new Date(Date.now() - 5 * 60_000).toISOString();
-      await town.setAgentDispatchAttempts(refinery.id, 25, pastTimestamp);
+      // Rule 6 caps refinery re-dispatches per MR bead, and reads that cap from
+      // the rig config. Lower it to the attempts the MR bead already has so the
+      // next tick is at the cap.
+      const mrAttempts = (await town.getBeadAsync(mrBead!.bead_id))?.dispatch_attempts ?? 0;
+      expect(mrAttempts).toBeGreaterThan(0);
+      await town.updateRigConfig('rig-1', { max_dispatch_attempts: mrAttempts });
 
       // Set agent to idle (simulating agentCompleted) and ensure MR is in_progress
       await town.updateAgentStatus(refinery.id, 'idle');
       const mrBefore = await town.getBeadAsync(mrBead!.bead_id);
       expect(mrBefore?.status).toBe('in_progress');
 
-      // Run alarm — Rule 6 should see dispatch_attempts >= 20 and fail the MR bead
+      // Run alarm — Rule 6 should see dispatch_attempts >= cap and fail the MR bead
       await runDurableObjectAlarm(town);
 
       const mrAfter = await town.getBeadAsync(mrBead!.bead_id);

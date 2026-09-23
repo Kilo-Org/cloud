@@ -195,8 +195,10 @@ describe('TownDO', () => {
       expect(hookedAgent?.current_hook_bead_id).toBe(bead.bead_id);
       expect(hookedAgent?.status).toBe('idle');
 
+      // hookBead assigns the agent but leaves the bead 'open': the bead only
+      // moves to in_progress when the agent's container process starts.
       const hookedBead = await town.getBeadAsync(bead.bead_id);
-      expect(hookedBead?.status).toBe('in_progress');
+      expect(hookedBead?.status).toBe('open');
       expect(hookedBead?.assignee_agent_bead_id).toBe(agent.id);
 
       const retrieved = await town.getHookedBead(agent.id);
@@ -276,11 +278,12 @@ describe('TownDO', () => {
       const beadToClose = await town.createBead({ type: 'issue', title: 'Closed bead' });
       await town.closeBead(beadToClose.bead_id, agent.id);
 
-      const openBeads = await town.listBeads({ status: 'open' });
+      // registerAgent stores the agent itself as a bead, so scope by type
+      const openBeads = await town.listBeads({ status: 'open', type: 'issue' });
       expect(openBeads).toHaveLength(1);
       expect(openBeads[0].title).toBe('Open bead');
 
-      const closedBeads = await town.listBeads({ status: 'closed' });
+      const closedBeads = await town.listBeads({ status: 'closed', type: 'issue' });
       expect(closedBeads).toHaveLength(1);
       expect(closedBeads[0].title).toBe('Closed bead');
     });
@@ -449,13 +452,16 @@ describe('TownDO', () => {
       // An escalation bead should have been created
       const escalations = await town.listBeads({ type: 'escalation' });
       expect(escalations).toHaveLength(1);
-      expect(escalations[0].title).toBe('Merge conflict: feature/conflict-test');
+      // The title carries the merge error; the branch lives in metadata below.
+      expect(escalations[0].title).toContain('Merge conflict:');
+      expect(escalations[0].title).toContain('CONFLICT (content)');
       expect(escalations[0].priority).toBe('high');
       expect(escalations[0].body).toContain('CONFLICT (content)');
       expect(escalations[0].metadata).toMatchObject({
         source_bead_id: bead.bead_id,
-        source_branch: 'feature/conflict-test',
-        agent_id: agent.id,
+        branch: 'feature/conflict-test',
+        source_agent_id: agent.id,
+        conflict: true,
       });
 
       // MR bead should be marked as failed
@@ -501,9 +507,10 @@ describe('TownDO', () => {
       expect(context.undelivered_mail[0].subject).toBe('Priority update');
       expect(context.open_beads).toHaveLength(1);
 
-      // Prime is read-only — mail should still be undelivered
+      // prime hands the undelivered mail to the agent (readAndDeliverMail), so
+      // the mailbox is empty afterwards instead of still holding the message.
       const mailbox = await town.checkMail(agent.id);
-      expect(mailbox).toHaveLength(1);
+      expect(mailbox).toHaveLength(0);
     });
 
     it('should return empty context for agent with no work', async () => {
@@ -647,13 +654,11 @@ describe('TownDO', () => {
       await town.hookBead(agent.id, bead.bead_id);
 
       const events = await town.listBeadEvents({ beadId: bead.bead_id });
-      // created + status_changed(open→in_progress) + hooked
-      expect(events).toHaveLength(3);
-      expect(events[0].event_type).toBe('created');
-      expect(events[1].event_type).toBe('status_changed');
-      expect(events[2].event_type).toBe('hooked');
-      expect(events[2].agent_id).toBe(agent.id);
-      expect(events[2].new_value).toBe(agent.id);
+      // created + hooked — hookBead no longer changes the bead status
+      expect([...events].map(e => e.event_type).sort()).toEqual(['created', 'hooked']);
+      const hookedEvent = events.find(e => e.event_type === 'hooked');
+      expect(hookedEvent?.agent_id).toBe(agent.id);
+      expect(hookedEvent?.new_value).toBe(agent.id);
     });
 
     it('should write events on unhookBead', async () => {
@@ -667,9 +672,8 @@ describe('TownDO', () => {
       await town.unhookBead(agent.id);
 
       const events = await town.listBeadEvents({ beadId: bead.bead_id });
-      // created + status_changed + hooked + unhooked
-      expect(events).toHaveLength(4);
-      expect(events[3].event_type).toBe('unhooked');
+      // created + hooked + unhooked
+      expect([...events].map(e => e.event_type).sort()).toEqual(['created', 'hooked', 'unhooked']);
     });
 
     it('should write events on updateBeadStatus', async () => {
@@ -682,11 +686,11 @@ describe('TownDO', () => {
       await town.updateBeadStatus(bead.bead_id, 'in_progress', agent.id);
 
       const events = await town.listBeadEvents({ beadId: bead.bead_id });
-      // created + status_changed
-      expect(events).toHaveLength(2);
-      expect(events[1].event_type).toBe('status_changed');
-      expect(events[1].old_value).toBe('open');
-      expect(events[1].new_value).toBe('in_progress');
+      // created + status_changed (newest first)
+      expect([...events].map(e => e.event_type).sort()).toEqual(['created', 'status_changed']);
+      const statusEvent = events.find(e => e.event_type === 'status_changed');
+      expect(statusEvent?.old_value).toBe('open');
+      expect(statusEvent?.new_value).toBe('in_progress');
     });
 
     it('should write closed event on closeBead', async () => {
@@ -699,9 +703,10 @@ describe('TownDO', () => {
       await town.closeBead(bead.bead_id, agent.id);
 
       const events = await town.listBeadEvents({ beadId: bead.bead_id });
-      // created + closed
-      expect(events).toHaveLength(2);
-      expect(events[1].event_type).toBe('closed');
+      // created + status_changed(→closed)
+      expect([...events].map(e => e.event_type).sort()).toEqual(['created', 'status_changed']);
+      const closedEvent = events.find(e => e.new_value === 'closed');
+      expect(closedEvent).toBeTruthy();
     });
 
     it('should filter events by since timestamp', async () => {

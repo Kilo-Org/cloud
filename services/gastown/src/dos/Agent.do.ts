@@ -141,6 +141,13 @@ export class AgentDO extends DurableObject<Env> {
     console.log(`${AGENT_DO_LOG} destroy: clearing all storage`);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+
+    // Storage is gone, so the cached initialization no longer describes the
+    // DO: drop it and re-create the empty event table. Later reads on the same
+    // instance then report no events instead of `no such table:
+    // rig_agent_events`.
+    this.initPromise = null;
+    await this.ensureInitialized();
   }
 
   async ping(): Promise<{ ok: true }> {

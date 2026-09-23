@@ -5892,6 +5892,15 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+
+    // Storage is gone, so the cached initialization no longer describes the
+    // DO: drop it and the town id it restored, then re-create the empty
+    // schema. The next RPC then reads an empty town instead of failing with
+    // `no such table: beads`, and because `town:id` is gone
+    // armAlarmIfNeeded() leaves the alarm disarmed.
+    this.initPromise = null;
+    this._townId = null;
+    await this.ensureInitialized();
   }
 }
 

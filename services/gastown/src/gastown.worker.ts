@@ -924,11 +924,20 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
   ) {
     return next();
   }
-  await kiloAuthMiddleware(c, async () => {
-    await adminAuditMiddleware(c, async () => {
-      await townAuthMiddleware(c, next);
+  // The three middlewares are chained by handing each a custom `next`, so their
+  // return values have to be captured by hand: a rejection (401/403/404) only
+  // reaches Hono's dispatcher through the value the outer middleware returns.
+  // Dropping it left the request unfinalized, and the `return next()`
+  // middlewares above then handed Hono a Context instead of a Response, so
+  // every unauthenticated call to a route registered after this one (container,
+  // convoy, mayor) answered 500 instead of the auth status.
+  let authResponse: unknown;
+  authResponse = await kiloAuthMiddleware(c, async () => {
+    authResponse = await adminAuditMiddleware(c, async () => {
+      authResponse = await townAuthMiddleware(c, next);
     });
   });
+  if (authResponse instanceof Response) return authResponse;
 });
 
 // ── Org Auth ────────────────────────────────────────────────────────────

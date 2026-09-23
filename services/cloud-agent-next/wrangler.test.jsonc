@@ -54,7 +54,10 @@
       "tag": "v10",
     },
   ],
-  "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
+  "kv_namespaces": [
+    { "binding": "SHARED_SANDBOX_OVERRIDES" },
+    { "binding": "WARM_BASE" },
+  ],
   "queues": {
     "producers": [
       { "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" },

@@ -11,6 +11,7 @@ import {
 import type { PreparingEventDataV2, PreparingStep } from '../../../src/shared/protocol.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import { attachBranch } from '../../../src/shared/session-branch.js';
 import {
   diagnosticDetail,
   emitControlDiagnostic,
@@ -103,8 +104,18 @@ export type ApplyAttachDeps = {
   emitPreparing?: AttachPreparingEmitter;
 };
 
-function ok(restore?: WrapperRestoreTelemetry): ControlHandlerResult {
-  return { ok: true, result: { attached: true, ...(restore ? { restore } : {}) } };
+function ok(
+  restore?: WrapperRestoreTelemetry,
+  bootstrapped = false
+): ControlHandlerResult {
+  return {
+    ok: true,
+    result: {
+      attached: true,
+      ...(restore ? { restore } : {}),
+      ...(bootstrapped ? { bootstrapped: true } : {}),
+    },
+  };
 }
 
 function fail(
@@ -363,6 +374,7 @@ async function executeSessionAttach(
   let sessionResolution: ControlDiagnosticRecord['fields']['sessionResolution'];
   let restoreTelemetry: WrapperRestoreTelemetry | undefined;
   let attachment: WorktreeKiloAttachment | undefined;
+  let bootstrapped = false;
   const diagnostic = (
     phase: 'completed' | 'failed',
     extra: Partial<ControlDiagnosticRecord['fields']> = {}
@@ -415,7 +427,8 @@ async function executeSessionAttach(
       deps.canRefreshCredentials,
       attach.runtimeIsolation,
       deps.onMutation,
-      deps.onCleanupTarget
+      deps.onCleanupTarget,
+      attach.home
     );
     const signal = AbortSignal.any([taskSignal, attachment.signal]);
     const runtime = await withTimeoutAndAbort(attachment.ready, {
@@ -484,7 +497,7 @@ async function executeSessionAttach(
                 );
               }
             }
-            const branch = attach.branch ?? `session/${attach.kilo.scopeId}`;
+            const branch = attachBranch(attach.branch, attach.kilo.scopeId);
             if (isSyntheticReviewRef(branch) && attach.branchMode !== 'working') {
               await checkoutSyntheticReviewRef({
                 runGit: (args, options) => runGit(args, options?.cwd, options?.signal, options),
@@ -591,6 +604,7 @@ async function executeSessionAttach(
           stage = 'bootstrap_marker';
           signal.throwIfAborted();
           await writeBootstrapMarker(directory);
+          bootstrapped = true;
           signal.throwIfAborted();
         }
         if (attach.kilo.containmentEnabled === false && attach.git?.token) {
@@ -728,7 +742,7 @@ async function executeSessionAttach(
       throw error;
     }
     diagnostic('completed');
-    return ok(restoreTelemetry);
+    return ok(restoreTelemetry, bootstrapped);
   } catch (error) {
     deps.onError?.(error);
     const result =

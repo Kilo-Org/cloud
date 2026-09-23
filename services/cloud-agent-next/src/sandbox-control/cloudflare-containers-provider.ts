@@ -50,6 +50,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   allocationName: string;
   instance?: ContainerInstanceSize;
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
+  warmSnapshotId?: () => string | undefined;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
   const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
@@ -123,6 +124,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       if (owned === null) {
         throw new Error('Invalid Cloudflare containers allocation');
       }
+      const warmSnapshotId = deps.warmSnapshotId?.();
       const container = deps.getContainer(deps.logicalSandboxId);
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
@@ -137,6 +139,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
           PROVIDER_INSTANCE_ID: ref,
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
+        ...(warmSnapshotId === undefined ? {} : { warmSnapshotId }),
       });
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so

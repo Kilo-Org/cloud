@@ -378,6 +378,7 @@ describe('router sessionId validation', () => {
               USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
               STREAM_TICKET_NONCE_DO: {} as TRPCContext['env']['STREAM_TICKET_NONCE_DO'],
               SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+              WARM_BASE: {} as TRPCContext['env']['WARM_BASE'],
               SESSION_INGEST: {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -831,6 +832,7 @@ describe('router sessionId validation', () => {
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             STREAM_TICKET_NONCE_DO: {} as TRPCContext['env']['STREAM_TICKET_NONCE_DO'],
             SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+            WARM_BASE: {} as TRPCContext['env']['WARM_BASE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1022,6 +1024,7 @@ describe('router sessionId validation', () => {
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             STREAM_TICKET_NONCE_DO: {} as TRPCContext['env']['STREAM_TICKET_NONCE_DO'],
             SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+            WARM_BASE: {} as TRPCContext['env']['WARM_BASE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1407,6 +1410,7 @@ describe('router sessionId validation', () => {
               USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
               STREAM_TICKET_NONCE_DO: {} as TRPCContext['env']['STREAM_TICKET_NONCE_DO'],
               SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+              WARM_BASE: {} as TRPCContext['env']['WARM_BASE'],
               SESSION_INGEST: { fetch: vi.fn() } as unknown as TRPCContext['env']['SESSION_INGEST'],
               CONTAINER_USAGE_METER: {} as TRPCContext['env']['CONTAINER_USAGE_METER'],
               R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
@@ -1527,6 +1531,7 @@ describe('router sessionId validation', () => {
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             STREAM_TICKET_NONCE_DO: {} as TRPCContext['env']['STREAM_TICKET_NONCE_DO'],
             SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+            WARM_BASE: {} as TRPCContext['env']['WARM_BASE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1837,6 +1842,7 @@ describe('router sessionId validation', () => {
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             STREAM_TICKET_NONCE_DO: {} as TRPCContext['env']['STREAM_TICKET_NONCE_DO'],
             SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
+            WARM_BASE: {} as TRPCContext['env']['WARM_BASE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],

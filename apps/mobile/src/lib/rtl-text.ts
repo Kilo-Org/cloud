@@ -57,7 +57,7 @@ function hasArabicScriptIn(nodes: readonly ReactNode[]): boolean {
 // mono family, or any `tracking-*` letter-spacing utility, optionally behind a
 // variant prefix such as `rtl:`.
 const LATIN_LABEL_TREATMENT =
-  /^(?:font-mono|font-mono-medium|font-mono-semibold|(?:[a-z-]+:)?tracking-(?:\[[^\]]+\]|tight|normal|wide|wider|widest))$/;
+  /^(?:(?:[a-z-]+:)?font-mono(?:-(?:medium|semibold))?|(?:[a-z-]+:)?tracking-(?:\[[^\]]+\]|\([^)]+\)|[a-z]+))$/;
 
 /**
  * The classes without the Latin label treatment. Letter-spacing opens the

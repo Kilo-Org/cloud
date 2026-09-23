@@ -57,4 +57,21 @@ describe('withoutLatinLabelTreatment', () => {
   it('drops a variant-prefixed tracking utility and the bare font-mono family', () => {
     expect(withoutLatinLabelTreatment('rtl:tracking-wide font-mono uppercase')).toBe('uppercase');
   });
+
+  it('drops tracking-tighter', () => {
+    expect(withoutLatinLabelTreatment('tracking-tighter text-sm')).toBe('text-sm');
+  });
+
+  it('drops a theme-variable tracking utility', () => {
+    expect(withoutLatinLabelTreatment('tracking-(--my-tracking) text-sm')).toBe('text-sm');
+  });
+
+  it('drops a variant-prefixed mono family', () => {
+    expect(withoutLatinLabelTreatment('dark:font-mono-medium text-sm')).toBe('text-sm');
+    expect(withoutLatinLabelTreatment('dark:font-mono-semibold text-sm')).toBe('text-sm');
+  });
+
+  it('keeps an unrelated token that merely starts with font-mono', () => {
+    expect(withoutLatinLabelTreatment('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
+  });
 });

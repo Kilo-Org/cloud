@@ -465,6 +465,20 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     canCopy: true,
   };
 
+  // An agent-execution delivery failure renders the assistant-failure title
+  // (message-failure-state.ts), so the status line must not state the same
+  // failure a second time in either of its two copies.
+  const executionFailure: MessageFailure = {
+    kind: 'delivery',
+    titleKey: 'agentChat.messageFailure.assistantTitle',
+    title: 'Response failed',
+    detailKey: null,
+    detail: null,
+    copyDetail: 'Message delivery failed',
+    canRetry: true,
+    canCopy: true,
+  };
+
   it('suppresses an unclassified session error the last row already states', () => {
     expect(
       statusIndicatorDuplicatesMessageFailure({
@@ -487,19 +501,22 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     // An agent-execution delivery failure renders the assistant-failure title
     // (message-failure-state.ts), so the unclassified status line would be the
     // same failure stated a second time.
-    const executionFailure: MessageFailure = {
-      kind: 'delivery',
-      titleKey: 'agentChat.messageFailure.assistantTitle',
-      title: 'Response failed',
-      detailKey: null,
-      detail: null,
-      copyDetail: 'simulated error',
-      canRetry: true,
-      canCopy: true,
-    };
     expect(
       statusIndicatorDuplicatesMessageFailure({
         indicator: { type: 'error', message: 'simulated error' },
+        failure: executionFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('suppresses the SDK delivery line the agent-execution row states as a response failure', () => {
+    // `normalizer.ts` writes `Message delivery failed` as the status indicator
+    // for an execution failure with no error text, while the row renders the
+    // assistant-failure title. The footer's "Failed to deliver" would restate
+    // the same failed run.
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Message delivery failed' },
         failure: executionFailure,
       })
     ).toBe(true);

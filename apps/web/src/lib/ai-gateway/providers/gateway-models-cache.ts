@@ -99,7 +99,6 @@ const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
   'anthropic/claude-sonnet-4-5',
   'anthropic/claude-sonnet-4-6',
   'anthropic/claude-sonnet-5-20260630',
-  'claude-opus-5',
   'claude-sonnet-4',
   'claude-sonnet-4.5',
   'claude-sonnet-5',

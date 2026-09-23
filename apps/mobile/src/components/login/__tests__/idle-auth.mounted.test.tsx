@@ -9,9 +9,13 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
-import { AppleAuthenticationButtonStyle } from 'expo-apple-authentication';
 import {
+  INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
+  INLINE_LINK_HIT_SLOP,
+  INLINE_LINK_ROW_CLASS,
+  INLINE_LINK_ROW_MARGIN_DP,
+  INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -39,10 +43,11 @@ const providers = vi.hoisted(() => ({ appleAvailable: false, googleConfigured: f
 // What the screen reads from the hook: a fixed result object plus the one piece
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
-  busy: undefined as 'otp-send' | 'passkey' | undefined,
+  busy: undefined as 'apple' | 'otp-send' | 'passkey' | undefined,
   emailError: undefined as string | undefined,
   clearEmailError: vi.fn(),
   requestEmailCode: vi.fn(),
+  signInWithApple: vi.fn(),
   signInWithPasskey: vi.fn(),
 }));
 
@@ -56,7 +61,7 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     emailError: nativeAuth.emailError,
     clearEmailError: nativeAuth.clearEmailError,
     googleConfigured: providers.googleConfigured,
-    signInWithApple: vi.fn(),
+    signInWithApple: nativeAuth.signInWithApple,
     signInWithGoogle: vi.fn(),
     signInWithPasskey: nativeAuth.signInWithPasskey,
     requestEmailCode: nativeAuth.requestEmailCode,
@@ -73,9 +78,6 @@ vi.mock('@/lib/login-draft', () => ({
 }));
 
 vi.mock('expo-apple-authentication', () => ({
-  AppleAuthenticationButton: 'AppleAuthenticationButton',
-  AppleAuthenticationButtonStyle: { WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2 },
-  AppleAuthenticationButtonType: { SIGN_IN: 0 },
   isAvailableAsync: vi.fn(async () => {
     await Promise.resolve();
     return providers.appleAvailable;
@@ -99,7 +101,11 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
+vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#14130f' }),
+}));
 
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: vi.fn(),
@@ -178,6 +184,34 @@ function findLink(root: I, label: string): I {
   return link;
 }
 
+/**
+ * The legal line's copy in render order: the prefix Text's children plus every
+ * link label, connector, and the suffix, concatenated. The sentence's own word
+ * spaces are what a reader sees, so a doubled space or a floating period shows
+ * up here without measuring pixels.
+ */
+function legalSentence(root: I): string {
+  const row = root.find(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'View' &&
+      String(n.props.className).includes('flex-wrap')
+  );
+  return row
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
+    .map(node => {
+      const children = node.props.children;
+      if (typeof children === 'string') {
+        return children;
+      }
+      if (Array.isArray(children)) {
+        return children.map(child => (typeof child === 'string' ? child : '')).join('');
+      }
+      return '';
+    })
+    .join('');
+}
+
 /** The box a control's className declares, in dp: its own height and width. */
 function boxDp(className: string): { width: number; height: number } {
   const size = (axis: 'h' | 'w'): number => {
@@ -191,18 +225,6 @@ function boxDp(className: string): { width: number; height: number } {
     throw new Error(`no ${axis} size class in "${className}"`);
   };
   return { width: size('w'), height: size('h') };
-}
-
-/** The smallest per-side reach a hitSlop expresses, in dp. */
-function slopDp(hitSlop: unknown): number {
-  if (typeof hitSlop === 'number') {
-    return hitSlop;
-  }
-  if (hitSlop && typeof hitSlop === 'object') {
-    const sides = Object.values(hitSlop as Record<string, number | undefined>);
-    return Math.min(...sides.map(side => side ?? 0));
-  }
-  return 0;
 }
 
 /** The label Text inside a provider Button, whichever icon sits beside it. */
@@ -221,9 +243,12 @@ async function compiledLabelLayout(label: I) {
     .split(' ')
     .filter(className => /^(?:flex-|text-center$)/.test(className))
     .join(' ');
-  if (!classes) {
-    return [];
-  }
+  const declarations = classes ? await compiledDeclarations(classes) : [];
+  return declarations;
+}
+
+/** The compiled declarations of an arbitrary className, through the app's pipeline. */
+async function compiledDeclarations(classes: string) {
   const { css } = await postcss([tailwindcss()]).process(
     `@reference "../../../global.css"; .target { @apply ${classes}; }`,
     { from: import.meta.filename }
@@ -234,17 +259,6 @@ async function compiledLabelLayout(label: I) {
       .s?.find(([name]) => name === 'target')?.[1]
       .flatMap(rule => rule.d ?? []) ?? []
   );
-}
-
-function findAppleButton(root: I): I {
-  const nodes = root.findAll(
-    n => typeof n.type === 'string' && (n.type as string) === 'AppleAuthenticationButton'
-  );
-  const node = nodes[0];
-  if (!node) {
-    throw new Error('Apple sign-in button not found');
-  }
-  return node;
 }
 
 /** A Button that keeps the default (brand-filled) variant is a primary action. */
@@ -262,25 +276,49 @@ beforeEach(() => {
   providers.googleConfigured = false;
 });
 
-describe('IdleAuth sign-in hierarchy', () => {
+describe('IdleAuth provider chrome parity', () => {
   beforeEach(() => {
     ssoRecovery.value = null;
     nativeAuth.busy = undefined;
+    nativeAuth.signInWithApple.mockClear();
     passkeySupport.supported = true;
     providers.appleAvailable = true;
     providers.googleConfigured = true;
   });
 
-  it('leaves the email Continue as the only filled primary action', async () => {
+  it('renders Apple, Google and the passkey with one outlined style', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    // Every provider control is a secondary: Apple wears the outlined native
-    // style, Google and the passkey are outline Buttons.
-    expect(findAppleButton(renderer.root).props.buttonStyle).toBe(
-      AppleAuthenticationButtonStyle.WHITE_OUTLINE
+    const apple = findButton(renderer.root, 'Sign in with Apple');
+    const google = findButton(renderer.root, 'Sign in with Google');
+    const passkey = findButton(renderer.root, 'Sign in with a passkey');
+
+    // One variant means one border colour and width (border-border) and one
+    // fill (bg-card); one className means one corner radius and height. The
+    // native AppleAuthenticationButton drew its own darker, thicker border, so
+    // Apple now renders the app's own outline Button like its two siblings.
+    for (const button of [apple, google, passkey]) {
+      expect(button.props.variant).toBe('outline');
+      expect(button.props.size).toBe('lg');
+      expect(String(button.props.className)).toContain('min-h-[44px]');
+      expect(String(button.props.className)).toContain('rounded-[8px]');
+    }
+    expect(apple.props.className).toBe(google.props.className);
+    expect(apple.props.className).toBe(passkey.props.className);
+
+    // One label size and weight across the three.
+    const labelClasses = [apple, google, passkey].map(button =>
+      String(labelText(button).props.className)
     );
-    expect(findButton(renderer.root, 'Sign in with Google').props.variant).toBe('outline');
-    expect(findButton(renderer.root, 'Sign in with a passkey').props.variant).toBe('outline');
+    for (const classes of labelClasses) {
+      expect(classes).toContain('text-[17px]');
+      expect(classes).toContain('font-medium');
+    }
+    expect(labelClasses[0]).toBe(labelClasses[1]);
+    expect(labelClasses[0]).toBe(labelClasses[2]);
+
+    // Apple's HIG mark replaces the native chrome, drawn inside the button.
+    expect(apple.findByType('AppleLogo')).toBeTruthy();
 
     expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
 
@@ -289,12 +327,15 @@ describe('IdleAuth sign-in hierarchy', () => {
     });
   });
 
-  it('never falls back to a solid Apple button style', async () => {
+  it('signs in with Apple through the hook handler', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    const style = findAppleButton(renderer.root).props.buttonStyle;
-    expect(style).not.toBe(AppleAuthenticationButtonStyle.BLACK);
-    expect(style).not.toBe(AppleAuthenticationButtonStyle.WHITE);
+    const apple = findButton(renderer.root, 'Sign in with Apple');
+    act(() => {
+      (apple.props.onPress as () => void)();
+    });
+
+    expect(nativeAuth.signInWithApple).toHaveBeenCalledTimes(1);
 
     act(() => {
       renderer.unmount();
@@ -305,7 +346,9 @@ describe('IdleAuth sign-in hierarchy', () => {
     providers.appleAvailable = false;
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    expect(() => findAppleButton(renderer.root)).toThrow('Apple sign-in button not found');
+    expect(() => findButton(renderer.root, 'Sign in with Apple')).toThrow(
+      'button "Sign in with Apple" not found'
+    );
     expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
 
     act(() => {
@@ -493,9 +536,18 @@ describe('IdleAuth email continue copy', () => {
       const box = boxDp(link.props.className as string);
       expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
       expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-      const slop = slopDp(link.props.hitSlop);
-      expect(box.width + 2 * slop).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-      expect(box.height + 2 * slop).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      // The 44pt design target holds in both axes: across the sentence, where
+      // no neighbour sits beside the row, and vertically through the clearance
+      // the legal row reserves (the layout-repair suite checks that clearance
+      // against the screen's gutter and the Continue button above).
+      const slop = link.props.hitSlop as {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+      };
+      expect(box.width + slop.left + slop.right).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
 
     // The sentence's copy is unchanged: both labels still render, with the
@@ -561,11 +613,12 @@ describe('IdleAuth email validation layout', () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
     const field = renderer.root.findByType('FormField');
     expect(field.props.error).toBe(nativeAuth.emailError);
-    expect(field.props.reserveErrorMessages).toEqual([
-      'Please enter your email address.',
-      nativeAuth.emailError,
-      'Unable to deliver email to this address. Please use a different email.',
-    ]);
+    // The message renders in the field's own flow: no zero-opacity reserve, so
+    // no empty hole under the input on the happy path.
+    expect(field.props.reserveErrorMessages).toBeUndefined();
+    expect(
+      renderer.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
+    ).toHaveLength(0);
     const button = findButton(renderer.root, 'Continue with email');
     expect(button.props.disabled).toBe(false);
     const siblings = field.parent?.children;
@@ -596,10 +649,10 @@ describe('IdleAuth email validation layout', () => {
     expect(remounted.props.defaultValue).toBe('user@example.com');
   });
 
-  it('keeps the reservation while loading with one indicator and disabled Continue', async () => {
+  it('keeps one indicator and a disabled Continue while loading, with no reserved hole', async () => {
     nativeAuth.busy = 'otp-send';
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
-    expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toHaveLength(3);
+    expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
     expect(findButton(renderer.root, 'Continue with email').props.disabled).toBe(true);
     expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
   });
@@ -614,5 +667,138 @@ describe('IdleAuth email validation layout', () => {
     });
     expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('');
     expect(renderer.root.findByType('FormField')).toBeTruthy();
+  });
+});
+
+describe('IdleAuth layout repairs', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailError = undefined;
+    passkeySupport.supported = true;
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+  });
+
+  it('leaves no invisible reserved error slot between the field and Continue', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // The field used to reserve its tallest error in zero-opacity copies under
+    // the input; the two-line 'Unable to deliver email...' message reserved a
+    // 35pt hole the owner measured as a 50pt input-to-Continue gap.
+    expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
+    expect(
+      renderer.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
+    ).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the field-to-Continue gutter on the shared screen gap', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const field = renderer.root.findByType('FormField');
+    const button = findButton(renderer.root, 'Continue with email');
+    // The button is the field's next sibling in the screen's `gap-3` column, so
+    // with no reserved slot the visible input-to-Continue space is exactly
+    // `gap-3` (10.5pt / 21px at 2.02 px per point).
+    expect(field.parent?.props.className).toBe('gap-3');
+    expect(field.parent).toBe(button.parent);
+    const siblings = field.parent?.children;
+    expect(siblings?.indexOf(field)).toBeLessThan(siblings?.indexOf(button) ?? 0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders the legal sentence with single word spaces and no extra link padding', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // The whole line reads as plain prose: one space between words, the period
+    // tight against "Privacy Policy". The links' own px-1 padding widened every
+    // boundary it touched.
+    expect(legalSentence(renderer.root)).toBe(
+      'By continuing you agree to our Terms and Privacy Policy.'
+    );
+    for (const link of linkPressables(renderer.root)) {
+      expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
+      expect(String(link.props.className)).toContain(INLINE_LINK_BOX_CLASS);
+      expect(link.props.hitSlop).toEqual(INLINE_LINK_HIT_SLOP);
+    }
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
+    const box = await compiledDeclarations(INLINE_LINK_BOX_CLASS);
+    const value = (property: string) => {
+      for (const declaration of box) {
+        if (!Array.isArray(declaration)) {
+          const plain = declaration as Record<string, unknown>;
+          if (property in plain) {
+            return plain[property];
+          }
+        }
+      }
+      return undefined;
+    };
+
+    // The audit floor stays on the node's own rect...
+    expect(value('minHeight')).toBe(28);
+    expect(value('minWidth')).toBe(28);
+    // ...while the vertical cancel keeps (28 - 14) / 2 out of the text-xs row,
+    // so the legal line is no taller than the surrounding prose.
+    expect(value('marginBlock')).toBe(-7);
+  });
+
+  it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // A link's 44pt vertical region reaches (28 - 14) / 2 + 8 = 15dp past the
+    // text-xs line it sits on. The screen's `gap-3` gutter to the Continue
+    // button above the row (and the ghost button below) is 10.5dp — 4.5dp
+    // short — so the legal row carries its own margin and the free space is
+    // 10.5 + 5 = 15.5dp each side. Without that clearance the region started
+    // 4.5dp inside the Continue button and a tap on the button's bottom strip
+    // opened the link instead of sending the code (the earlier mis-routed-tap
+    // finding).
+    expect(INLINE_LINK_ROW_CLASS).toBe(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
+    const overflowDp = (MIN_TAP_TARGET_DP - 14) / 2;
+    const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
+    expect(overflowDp + INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
+    expect(overflowDp).toBe(7);
+
+    const row = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className).includes('flex-wrap')
+    );
+    expect(String(row.props.className)).toContain(INLINE_LINK_ROW_CLASS);
+
+    for (const link of linkPressables(renderer.root)) {
+      const slop = link.props.hitSlop as {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+      };
+      expect(slop.top).toBe(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
+      expect(slop.bottom).toBe(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
+      expect(overflowDp + slop.top).toBeLessThanOrEqual(gutterDp);
+      expect(overflowDp + slop.bottom).toBeLessThanOrEqual(gutterDp);
+      // The region the gutter bounds is still the full design target.
+      const box = boxDp(link.props.className as string);
+      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 });

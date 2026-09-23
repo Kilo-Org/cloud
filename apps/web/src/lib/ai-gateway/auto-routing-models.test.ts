@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { addAutoRoutingModels } from './auto-routing-models';
 
 jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
@@ -67,7 +68,7 @@ describe('addAutoRoutingModels', () => {
 
   test('annotates the frontier auto model with its visible targets', async () => {
     const frontierModel = makeModel('kilo-auto/frontier');
-    const opusModel = makeModel('anthropic/claude-opus-5');
+    const opusModel = makeModel(CLAUDE_OPUS_CURRENT_MODEL_ID);
     const sonnetModel = makeModel('anthropic/claude-sonnet-5');
 
     const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
@@ -75,7 +76,7 @@ describe('addAutoRoutingModels', () => {
     expect(result).toEqual([
       {
         ...frontierModel,
-        autoRouting: { models: ['anthropic/claude-opus-5', 'anthropic/claude-sonnet-5'] },
+        autoRouting: { models: [CLAUDE_OPUS_CURRENT_MODEL_ID, 'anthropic/claude-sonnet-5'] },
       },
       sonnetModel,
       opusModel,

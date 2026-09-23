@@ -407,6 +407,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../../packages/session-ingest-contracts
       '@kilocode/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
@@ -1240,9 +1243,6 @@ importers:
       uuid:
         specifier: 11.1.1
         version: 11.1.1
-      vaul:
-        specifier: 1.1.2
-        version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1847,9 +1847,6 @@ importers:
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
-      diff:
-        specifier: '>=8.0.3'
-        version: 8.0.3
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.2(expo@57.0.21)(react-native@0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
@@ -3004,7 +3001,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.112.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/mcp-gateway:
     dependencies:
@@ -3017,9 +3014,6 @@ importers:
       '@kilocode/mcp-gateway':
         specifier: workspace:*
         version: link:../../packages/mcp-gateway
-      '@kilocode/worker-utils':
-        specifier: workspace:*
-        version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.2(expo@57.0.21)(react-native@0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
@@ -39638,6 +39632,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
+    optional: true
 
   vfile-message@4.0.3:
     dependencies:

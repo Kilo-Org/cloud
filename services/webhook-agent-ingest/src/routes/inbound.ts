@@ -6,7 +6,7 @@ import { logger } from '../util/logger';
 import { resError, resSuccess } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
 import { compareWebhookSecret, type StoredWebhookAuth } from '../util/webhook-auth';
-import { decodeUserIdFromPath } from '../util/user-id-encoding';
+import { decodeUserIdFromPath } from '@kilocode/worker-utils/user-id-encoding';
 
 type CaptureResult = { success: true; requestId: string } | { success: false; error: string };
 

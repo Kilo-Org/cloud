@@ -15,7 +15,13 @@
 // factory.
 //
 // `require`, not `import`: ESM hoisting would run `expo-router/entry` first.
-const { AppRegistry, Platform } = require('react-native');
+const { AppRegistry, LogBox, Platform } = require('react-native');
+
+// Drop expo-iap's developer copy for a failed available-purchases query before
+// the first store query can log it. The Kilo Pass screen renders its own
+// translated message for the same failure, so the library's English string must
+// not paint a LogBox banner over it.
+require('./src/lib/dev-logbox').applyDevLogBoxFilters(LogBox);
 
 if (Platform.OS === 'android') {
   const { registerWidgetTaskHandler } = require('react-native-android-widget');

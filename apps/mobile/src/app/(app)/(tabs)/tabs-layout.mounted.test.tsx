@@ -1,3 +1,14 @@
+// Named `tabs-layout`, never `_layout.*`: expo-router's route parser reads the
+// first dot-separated part of a filename, so `_layout.mounted.test.tsx` counts
+// as the layout for this directory. The typed-routes generator walks the
+// filesystem directly (not Metro's test blocklist), so that stray layout
+// swallowed the whole `(tabs)` subtree and every tab route vanished from `Href`.
+//
+// Deliberately not `_layout.mounted.test.tsx`: expo-router classifies any
+// `_layout.*` file as a layout (`getFileMeta`), so a test named `_layout.*`
+// shadows the real `_layout.tsx` and the typed-routes generator then drops
+// every route under `(tabs)` — failing `pnpm typecheck`.
+//
 // The tab bar yields the bottom band to the IME: the shared `screenOptions`
 // must carry `tabBarHideOnKeyboard: true` so the absolutely-positioned bar
 // hides while the keyboard is up (its labels and the empty-state second line

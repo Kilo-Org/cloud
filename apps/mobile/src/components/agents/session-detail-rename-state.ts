@@ -1,4 +1,4 @@
-import { displayableSessionTitle } from '@/lib/session-display-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 export type RenameState = {
   isModalOpen: boolean;
@@ -67,7 +67,7 @@ export function getSessionDetailRenameState(input: {
   // title yet" marker, not a name the user wrote. Count it as absent so the
   // header falls back to the same localized label a title-less session shows;
   // the session still exists, so renaming stays enabled.
-  const serverTitle = displayableSessionTitle(input.serverTitle);
+  const serverTitle = sessionDisplayTitle(input.serverTitle);
   const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
@@ -94,5 +94,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  return displayableSessionTitle(payload.session.title);
+  return sessionDisplayTitle(payload.session.title);
 }

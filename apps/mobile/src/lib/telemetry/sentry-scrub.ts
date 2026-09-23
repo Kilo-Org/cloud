@@ -29,17 +29,27 @@ const URL_ORIGIN_PATTERN = /\b[a-z][\da-z+.-]*:\/\/[^\s/]+/giu;
 const ABSOLUTE_PATH_PATTERN = /(?:[A-Za-z]:)?(?:\/[\w.@+-]+){2,}(?::\d+){0,2}\/?/gu;
 
 /**
- * A `host:port` run, in the plain or the Java-style `/host:port` form.
+ * A `host:port` run: an IPv4 literal, `localhost`, or the Java-style
+ * `/host:port` form a JVM connect failure prints.
+ *
+ * A bare `word:digits` run is deliberately not a host:port. It is also how a
+ * source position reads (`Bar.java:12`) and how a clock reads (`12:30`), and
+ * folding either into `<host>` erases the one value that separates two native
+ * defects, so their fallback fingerprints merge — the merge this policy exists
+ * to prevent. Only a token that can only be an address is normalized, so a bare
+ * dotted name (`example.com:443`) is left alone rather than mistaken for a
+ * `file.ext:line`.
  *
  * The leading group consumes the character before the run (or matches the start
  * of the string), so the engine only begins a host scan at a token boundary and
  * never inside a word run. The old unanchored `\/?(?:[\w-]+\.)*[\w-]+:\d` form
  * restarted a full host scan at every character of a long word run, which is
  * quadratic: a 32k-character exception message spent seconds on the JS thread
- * inside `beforeSend`. The host itself is one character class with no nested
- * quantifier, and the leading character is kept by the replacement (`$1`).
+ * inside `beforeSend`. Each host alternative is one character class with no
+ * nested quantifier, and the leading character is kept by the replacement
+ * (`$1`).
  */
-const HOST_PORT_PATTERN = /(^|[^\w.-])\/?[\w.-]+:\d{1,5}\b/gu;
+const HOST_PORT_PATTERN = /(^|[^\w.-])(?:\/[\w.-]+|localhost|(?:\d{1,3}\.){3}\d{1,3}):\d{1,5}\b/gu;
 
 /** A `?query` run: a `?` followed by non-space key/value text. */
 const QUERY_FRAGMENT_PATTERN = /\?[^\s]+/gu;

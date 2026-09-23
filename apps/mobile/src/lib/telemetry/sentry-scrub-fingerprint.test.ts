@@ -50,6 +50,34 @@ describe('scrubEvent fingerprint fallback', () => {
     ]);
   });
 
+  it('still keys a Java-style hostname address on the host placeholder', () => {
+    const event = unhandledError(
+      'Error: fetch failed: java.net.ConnectException: Failed to connect to /api.example.com:8443'
+    );
+
+    expect(scrubEvent(event).fingerprint).toEqual([
+      'Error',
+      'Error: fetch failed: java.net.ConnectException: Failed to connect to <host>',
+    ]);
+  });
+
+  it('does not rewrite a source file:line or a clock run to the host placeholder', () => {
+    const frame = scrubEvent(unhandledError('Error: native crash at com.foo.Bar.baz(Bar.java:12)'));
+    const nextFrame = scrubEvent(
+      unhandledError('Error: native crash at com.foo.Bar.baz(Bar.java:13)')
+    );
+    const clock = scrubEvent(unhandledError('Error: retry at 12:30 failed'));
+
+    // A `file:line` names the defect: folding it into `<host>` would merge two
+    // native defects that differ only in the source line.
+    expect(frame.fingerprint).toEqual([
+      'Error',
+      'Error: native crash at com.foo.Bar.baz(Bar.java:12)',
+    ]);
+    expect(nextFrame.fingerprint).not.toEqual(frame.fingerprint);
+    expect(clock.fingerprint).toEqual(['Error', 'Error: retry at 12:30 failed']);
+  });
+
   it('strips a URL origin to a placeholder', () => {
     const event = unhandledError('Upload to https://api.example.com:8443/api/attachments failed');
 
@@ -93,14 +121,16 @@ describe('scrubEvent fingerprint fallback', () => {
 
   it('bounds the work on a pathologically long message', () => {
     // `beforeSend` runs on the JS thread and an exception message is unbounded.
-    // A 200k-character word run is exactly the input that made the old
-    // unanchored host:port pattern quadratic, so the fallback must read only a
-    // bounded prefix of it.
-    const event = unhandledError('x '.repeat(100_000));
+    // One contiguous 200k-character word run is the input shape that made the
+    // old unanchored host:port pattern restart a full scan at every character,
+    // so the fallback reads only a bounded prefix of it: the fingerprint is the
+    // redacted 512-character prefix, never the whole message.
+    const event = unhandledError('x'.repeat(200_000));
 
     const [type, message] = scrubEvent(event).fingerprint ?? [];
 
     expect(type).toBe('Error');
+    expect(message).toBe('[redacted]');
     expect((message ?? '').length).toBeLessThanOrEqual(FINGERPRINT_MESSAGE_LIMIT);
   });
 

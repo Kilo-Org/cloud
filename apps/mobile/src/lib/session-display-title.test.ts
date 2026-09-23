@@ -31,6 +31,9 @@ describe('sessionDisplayTitle', () => {
     // Not the exact shape the backend writes: a different separator, no
     // milliseconds, or a name after the prefix is a title a person wrote.
     expect(sessionDisplayTitle('New session - planning')).toBe('New session - planning');
+    expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45.623Z notes')).toBe(
+      'New session - 2026-09-22T01:09:45.623Z notes'
+    );
     expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45Z')).toBe(
       'New session - 2026-09-22T01:09:45Z'
     );

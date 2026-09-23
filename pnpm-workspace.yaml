@@ -42,7 +42,7 @@ catalog:
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
-  hono: 4.12.34
+  hono: 4.13.5
   jose: 6.2.3
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
@@ -59,13 +59,14 @@ catalogs:
   # `vitest ^4.1.0` peer and imports internal Vitest APIs that vitest 5 reworked,
   # so the pool's proxy worker fails to boot under vitest 5
   # (`SyntaxError: Unexpected identifier 'file'`). Workspaces whose tests run the
-  # workerd pool stay on the pre-move vitest 4.1.6 through this catalog; the
+  # workerd pool stay on vitest 4 through this catalog; main's move from 4.1.6 to
+  # 4.1.11 is kept here (it is the newest 4.x this pool supports), while the
   # default catalog's vitest 5.0.1 covers everything else. @vitest/ui moves with
   # them so its exact `vitest` peer keeps matching. Keep these exact, and keep
   # this comment.
   vitest4:
-    '@vitest/ui': 4.1.6
-    vitest: 4.1.6
+    '@vitest/ui': 4.1.11
+    vitest: 4.1.11
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
@@ -144,7 +145,8 @@ overrides:
   storybook: 10.4.6
   next: 16.3.3
   preact: 10.28.4
-  adm-zip: 0.6.0
+  adm-zip: 0.6.1
+  baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
   decode-uri-component: 0.5.0
   glob: '>=13.0.1'
@@ -177,10 +179,10 @@ overrides:
   lodash-es: '>=4.18.1'
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.0
-  smol-toml: 1.6.1
+  smol-toml: 1.7.1
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
-  hono: 4.12.34
+  hono: 4.13.5
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
@@ -204,10 +206,10 @@ overrides:
   toml: 4.2.0
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0
-  js-yaml: 4.3.1
+  js-yaml: 4.3.2
   linkify-it: 5.0.2
   protobufjs: 7.6.5
-  sharp: '>=0.35.0'
+  sharp: 0.35.4
   tar: 7.5.21
   shell-quote: 1.10.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while

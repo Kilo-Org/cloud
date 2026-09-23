@@ -149,11 +149,19 @@ function applyHydratedTitles(raw: string): boolean {
 
 let hydrationPromise: Promise<void> | null = null;
 
+// Bumped at every account boundary so a hydration already in flight cannot
+// apply a read that started before the clear. Without it, a `getItem` that
+// resolves after `clearUserSessionTitles` would repopulate the emptied map
+// with the signed-out account's entries, and the next account's remember would
+// serialize those stale ids back to the shared KV scope.
+let hydrationEpoch = 0;
+
 // eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize hydration synchronously before any await; the awaits live inside the memoized hydration chain (same pattern as openDatabase in encrypted-kv.ts)
 async function hydrate(): Promise<void> {
   if (hydrationPromise) {
     return hydrationPromise;
   }
+  const epoch = hydrationEpoch;
   hydrationPromise = (async () => {
     const kv = await loadKv();
     if (!kv) {
@@ -161,6 +169,11 @@ async function hydrate(): Promise<void> {
     }
     try {
       const raw = await kv.getItem(USER_SESSION_TITLES_KEY, USER_SESSION_TITLES_ENTRY_KEY);
+      // The account boundary cleared the store while this read was in flight:
+      // the blob belongs to the signed-out account, so drop it.
+      if (epoch !== hydrationEpoch) {
+        return;
+      }
       if (raw !== null && applyHydratedTitles(raw)) {
         // A restored title changes what a row or header renders: notify
         // subscribers so they re-render and re-evaluate their title.
@@ -241,11 +254,16 @@ export function getUserSessionTitle(sessionId: string): string | undefined {
  * user's ids. The delete is chained through the same FIFO as the writes so a
  * queued remember cannot re-persist the blob afterwards, and hydration is
  * re-armed so the next account does not read the cleared blob through the
- * settled promise of this run.
+ * settled promise of this run. The hydration epoch is bumped first so a read
+ * already in flight cannot repopulate the map after the wipe.
  *
  * Best effort: a storage failure is swallowed so it can never abort sign-out.
  */
 export async function clearUserSessionTitles(): Promise<void> {
+  // Invalidate any hydration in flight before wiping: its KV read may resolve
+  // after this clear and would otherwise restore the signed-out account's
+  // entries into the now-empty map.
+  hydrationEpoch += 1;
   store.titles.clear();
   bumpRevision();
   lastWrite = chainSave(USER_SESSION_TITLES_KEY, async () => {
@@ -285,6 +303,8 @@ export function useUserSessionTitlesRevision(): number {
 export function __resetUserSessionTitlesForTests(): void {
   store.titles.clear();
   store.revision = 0;
+  // Invalidate any hydration left in flight by the previous case.
+  hydrationEpoch += 1;
   hydrationPromise = null;
   lastWrite = null;
 }

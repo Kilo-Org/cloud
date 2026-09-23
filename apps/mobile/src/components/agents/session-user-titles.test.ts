@@ -38,6 +38,20 @@ function storageKey(scope: string, k: string): string {
   return `${scope}\u0000${k}`;
 }
 
+/** A promise whose settlement the test controls, for holding a KV read open. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let settle: ((value: T) => void) | undefined = undefined;
+  const promise = new Promise<T>(resolve => {
+    settle = resolve;
+  });
+  return {
+    promise,
+    resolve: (value: T) => {
+      settle?.(value);
+    },
+  };
+}
+
 function storedBlobEntries(): { sessionId: string; title: string }[] {
   const raw = kvStore.get(storageKey(USER_SESSION_TITLES_KEY, TITLES_ENTRY_KEY));
   return raw ? (JSON.parse(raw) as { sessionId: string; title: string }[]) : [];
@@ -157,5 +171,27 @@ describe('session-user-titles durable record', () => {
     expect(getUserSessionTitle('ses-renamed')).toBeUndefined();
     expect(kvStore.get(storageKey(USER_SESSION_TITLES_KEY, TITLES_ENTRY_KEY))).toBeUndefined();
     expect(kvMock.clearScope).toHaveBeenCalledWith(USER_SESSION_TITLES_KEY);
+  });
+
+  it('does not repopulate the store when hydration lands after an account-boundary clear', async () => {
+    const staleBlob = JSON.stringify([{ sessionId: 'ses-old', title: PLACEHOLDER }]);
+    const pendingRead = deferred<string | null>();
+    kvMock.getItem.mockImplementationOnce(async () => pendingRead.promise);
+
+    // Hydration (module-init shape) is in flight and its KV read has not
+    // resolved yet when the account boundary clears the store.
+    const hydration = __hydrateUserSessionTitlesForTests();
+    await clearUserSessionTitles();
+
+    // The in-flight read now resolves with the signed-out account's blob.
+    pendingRead.resolve(staleBlob);
+    await hydration;
+
+    expect(getUserSessionTitle('ses-old')).toBeUndefined();
+
+    // The next account's remember must not serialize the stale id back to KV.
+    rememberUserSessionTitle('ses-new', PLACEHOLDER);
+    await __flushUserSessionTitlesWritesForTests();
+    expect(storedBlobEntries()).toEqual([{ sessionId: 'ses-new', title: PLACEHOLDER }]);
   });
 });

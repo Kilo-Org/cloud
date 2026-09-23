@@ -1793,6 +1793,20 @@
       "when": 1790087177194,
       "tag": "0255_drop_repository_customizations",
       "breakpoints": true
+    },
+    {
+      "idx": 256,
+      "version": "7",
+      "when": 1790097479765,
+      "tag": "0255_add_superseded_at_to_user_activity_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 257,
+      "version": "7",
+      "when": 1790098375222,
+      "tag": "0256_user_activity_tokens_live_ios_activity_unique",
+      "breakpoints": true
     }
   ]
 }

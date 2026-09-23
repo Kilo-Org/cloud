@@ -1421,6 +1421,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../app-shared
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../session-ingest-contracts
       jotai:
         specifier: 3.0.0
         version: 3.0.0(@types/react@19.3.0)(react@19.3.0)
@@ -1431,9 +1434,6 @@ importers:
       '@jest/globals':
         specifier: 30.3.0
         version: 30.3.0
-      '@kilocode/session-ingest-contracts':
-        specifier: workspace:*
-        version: link:../session-ingest-contracts
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))

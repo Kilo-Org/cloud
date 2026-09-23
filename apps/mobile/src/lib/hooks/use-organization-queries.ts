@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrganization } from '@/lib/organization-context';
-import { withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { INFINITE_QUERY_MAX_PAGES, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -148,6 +148,24 @@ export type CreditTransaction =
   RouterOutputs['organizations']['creditTransactionsPage']['entries'][number];
 
 /**
+ * Whether the newest-first org lists have reached their retention bound.
+ *
+ * Both lists order `created_at desc`, so page one holds the newest entries and
+ * each screen renders every retained page as one flattened list. The shared
+ * `INFINITE_QUERY_MAX_PAGES` retention bound therefore has to be reached by
+ * refusing the next page rather than by React Query's `maxPages` trim: a
+ * forward fetch runs `addToEnd(pages, page, maxPages)`, which drops index 0
+ * once the bound is exceeded, and index 0 is page one — the newest page. Left
+ * to `maxPages` alone that silently removes the newest rows from the top of
+ * the screen once a sixth page loads. Refusing the next page keeps every
+ * loaded page retained; the hooks read `hasNextPage`, so "Load more"
+ * disappears at the bound instead of paging into a silent no-op.
+ */
+function hasReachedRetentionBound(pageCount: number): boolean {
+  return pageCount >= INFINITE_QUERY_MAX_PAGES;
+}
+
+/**
  * Build the credit-transactions infinite-query options. Kept as a pure builder
  * so the retention bound and the cursor passthrough are testable without
  * mounting the hook.
@@ -161,8 +179,10 @@ export function buildOrgCreditTransactionsPageQueryOptions(
       { organizationId: organizationId ?? '' },
       {
         enabled: organizationId != null,
-        getNextPageParam: lastPage =>
-          lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+        getNextPageParam: (lastPage, pages) =>
+          lastPage.hasMore && !hasReachedRetentionBound(pages.length)
+            ? (lastPage.nextCursor ?? undefined)
+            : undefined,
       }
     )
   );
@@ -180,8 +200,9 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
 
   const pages = query.data?.pages;
   const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
-  const lastPage = pages != null && pages.length > 0 ? pages.at(-1) : undefined;
-  const hasMore = lastPage?.hasMore ?? false;
+  // `hasNextPage` folds the builder's refusal bound into the server's last-page
+  // `hasMore`, so the "Load more" control hides at the retention bound.
+  const hasMore = query.hasNextPage;
 
   return { query, entries, hasMore };
 }
@@ -202,8 +223,10 @@ export function buildOrgInvoicesPageQueryOptions(
       { organizationId: organizationId ?? '', period: 'year' },
       {
         enabled: organizationId != null,
-        getNextPageParam: lastPage =>
-          lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+        getNextPageParam: (lastPage, pages) =>
+          lastPage.hasMore && !hasReachedRetentionBound(pages.length)
+            ? (lastPage.nextCursor ?? undefined)
+            : undefined,
       }
     )
   );
@@ -221,8 +244,9 @@ export function useOrgInvoicesPage(organizationId: string | null) {
 
   const pages = query.data?.pages;
   const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
-  const lastPage = pages != null && pages.length > 0 ? pages.at(-1) : undefined;
-  const hasMore = lastPage?.hasMore ?? false;
+  // `hasNextPage` folds the builder's refusal bound into the server's last-page
+  // `hasMore`, so the "Load more" control hides at the retention bound.
+  const hasMore = query.hasNextPage;
 
   return { query, entries, hasMore };
 }

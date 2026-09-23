@@ -28,6 +28,12 @@ const VSCODE = {
   associatedPr: { number: 42, title: 'Harden live search' },
 };
 const BARE = { id: 'bare', title: '', gitUrl: null, createdOnPlatform: 'unknown' };
+const PLACEHOLDER = {
+  id: 'placeholder',
+  title: 'New session - 2026-09-21T15:44:47.176Z',
+  gitUrl: null,
+  createdOnPlatform: 'cli',
+};
 
 describe('liveSessionPlatformBucket', () => {
   it('folds platform variants into the filter bucket', () => {
@@ -143,5 +149,23 @@ describe('filterLiveSessions', () => {
     expect(
       filterLiveSessions([BARE], query({ projectFilter: ['https://github.com/kilo/cloud.git'] }))
     ).toHaveLength(0);
+  });
+
+  it('does not index the raw creation-default title', () => {
+    // The row paints the generic "Untitled session" label for this title (or
+    // whatever the platform default is), so searching for the placeholder's
+    // ISO timestamp must never surface the row.
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: '2026-09-21' }))
+    ).toHaveLength(0);
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: 'new session' }))
+    ).toHaveLength(0);
+  });
+
+  it('still indexes the resolved title of a real session alongside a placeholder row', () => {
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: 'LOGIN REDI' })).map(s => s.id)
+    ).toEqual(['cloud']);
   });
 });

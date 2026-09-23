@@ -2233,10 +2233,6 @@
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",
       "linesOf": "कुल {{total}} पङ्क्तिमध्ये {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent मा {{action}} असफल भयो ({{status}})।",
-      "failed": "Cloud Agent मा {{action}} असफल भयो।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[क्रमबद्ध रूपमा रूपान्तरण गर्न नमिल्ने इनपुट]",
       "errorPrefix": "त्रुटि: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "प्रदायकले अनुरोध अस्वीकार गर्‍यो।",
       "assistantStopped": "उत्तर दिन रोकियो।",
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
-      "assistantFailed": "उत्तर दिन सकिएन।",
-      "sendFailed": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
+      "assistantFailed": "उत्तर दिन सकिएन।"
     },
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",

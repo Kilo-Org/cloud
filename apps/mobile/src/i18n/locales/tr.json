@@ -1729,10 +1729,6 @@
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
       "linesOf": "{{start}}–{{end}}. satırlar / toplam {{total}} satır"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent işlemi başarısız oldu: {{action}} ({{status}}).",
-      "failed": "Cloud Agent işlemi başarısız oldu: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[serileştirilemeyen girdi]",
       "errorPrefix": "Hata: {{error}}"
@@ -1828,8 +1824,7 @@
       "assistantProviderRejected": "Sağlayıcı isteği reddetti.",
       "assistantStopped": "Yanıt durduruldu.",
       "assistantContextOverflow": "Konuşma model için çok uzun.",
-      "assistantFailed": "Yanıt oluşturulamadı.",
-      "sendFailed": "Mesaj gönderilemedi. Tekrar dene."
+      "assistantFailed": "Yanıt oluşturulamadı."
     },
     "filePart": {
       "loadingImage": "Görsel yükleniyor",

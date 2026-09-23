@@ -3045,6 +3045,42 @@ describe('session detail duplicate failure state', () => {
     });
   });
 
+  it('states a failed delivery once: the row keeps Retry/Copy and the footer drops the generic line', async () => {
+    const view = await mountDetails([rootUserMessage('please refactor')]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [USER_ID, { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'execution' }],
+        ])
+      );
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+
+    const text = renderedText(view.renderer.root);
+    // An agent-execution delivery failure renders the base's assistant-failure
+    // title with no second line (message-failure-state.ts); this branch's rule
+    // drops the footer's delivery-flavoured line, so the row states it once.
+    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    // The footer row that would restate the generic assistant line is gone: the
+    // delivery block is the single failed-send surface.
+    expect(indicatorNodes(view)).toHaveLength(0);
+    const labels = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toContain(i18n.t('common.retry'));
+    expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
+  });
+
   it('keeps the footer line when the transcript drops the failed row it names', async () => {
     // A failed assistant row whose parts render nothing is dropped by
     // `mergeSessionTranscript`; it owns no row, so the footer is the failure's

@@ -19,8 +19,13 @@ export function preloadHideBalancePreference(): void {
   store.preload();
 }
 
-function setHideBalance(value: boolean) {
+export function setHideBalance(value: boolean) {
   store.set(value);
+}
+
+/** The stored hide-balance value for callers with no React tree (the settings registry). */
+export function getHideBalance(): boolean {
+  return store.get();
 }
 
 export function useHideBalancePreference() {

@@ -32,6 +32,11 @@ export function applyThemePreference(pref: ThemePreference): void {
   Appearance.setColorScheme(colorSchemeForPreference(pref) ?? 'unspecified');
 }
 
+/** The stored theme preference for callers with no React tree (the settings registry). */
+export function getThemePreference(): ThemePreference {
+  return store.get();
+}
+
 export function setThemePreference(pref: ThemePreference): void {
   store.set(pref);
   // Apply synchronously so a same-render useColorScheme() read sees the new

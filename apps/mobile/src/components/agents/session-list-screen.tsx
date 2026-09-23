@@ -208,16 +208,21 @@ export function AgentSessionListScreen() {
     </View>
   );
 
+  // One handler shared by every row: with the row memoised, a poll that writes
+  // an unchanged payload leaves each row's props referentially stable and
+  // skips its render entirely.
+  const handleRowPress = useCallback(
+    (session: ActiveSession) => {
+      navigateToSession(session.id, organizationId);
+    },
+    [navigateToSession, organizationId]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
-      <RemoteSessionRow
-        session={item}
-        onPress={() => {
-          navigateToSession(item.id, organizationId);
-        }}
-      />
+      <RemoteSessionRow session={item} onPress={handleRowPress} />
     ),
-    [navigateToSession, organizationId]
+    [handleRowPress]
   );
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable

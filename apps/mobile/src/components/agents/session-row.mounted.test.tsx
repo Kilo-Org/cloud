@@ -358,7 +358,10 @@ describe('RemoteSessionRow live speech', () => {
     await i18n.changeLanguage('en');
   });
 
-  function mountRemote(overrides: Partial<ActiveSession> = {}) {
+  function mountRemote(
+    overrides: Partial<ActiveSession> = {},
+    onPress: (session: ActiveSession) => void = () => undefined
+  ) {
     return mount(
       createElement(
         QueryClientProvider,
@@ -375,7 +378,7 @@ describe('RemoteSessionRow live speech', () => {
             }),
             ...overrides,
           },
-          onPress: () => undefined,
+          onPress,
         })
       )
     );
@@ -440,5 +443,22 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
+  });
+
+  it('hands the pressed row its own session', () => {
+    // The per-row closure moved inside the memo boundary: the row calls the
+    // shared handler with its own session instead of the parent closing over
+    // each item.
+    const onPress = vi.fn<(session: ActiveSession) => void>();
+    const renderer = mountRemote({}, onPress);
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row pressable');
+    }
+    act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(onPress.mock.calls).toHaveLength(1);
+    expect(onPress.mock.calls[0]?.[0]).toMatchObject({ id: 'remote-1' });
   });
 });

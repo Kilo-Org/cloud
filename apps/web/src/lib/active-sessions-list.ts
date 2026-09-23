@@ -516,8 +516,15 @@ export async function listActiveSessions({
             livePredicate
           )
         )
-        .orderBy(desc(cli_sessions_v2.created_at))
-        .limit(50);
+        // Deliberately uncapped. The candidate set is already bounded by
+        // `livePredicate`: a row is here either because an open
+        // `cloud_agent_session_runs` row proves the agent is working, or
+        // because its idle status falls inside `CLOUD_AGENT_WARM_IDLE_CUTOFF`
+        // (15 minutes). The live socket path is uncapped too, so a LIMIT here
+        // was never a safety net — it silently dropped genuinely live agents
+        // from the tray, which is why the jank report could not measure 100
+        // agents (it saw only 50).
+        .orderBy(desc(cli_sessions_v2.created_at));
 
       const heartbeatIds = new Set(sessions.map(s => s.id));
       for (const row of cloudRows) {

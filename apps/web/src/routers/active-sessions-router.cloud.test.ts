@@ -791,6 +791,31 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions).toHaveLength(1);
     expect(result.sessions[0]?.totalCostMicrodollars).toBe(0);
   });
+
+  it('returns all 60 live cloud candidates (no 50-row cap)', async () => {
+    // The candidate set is already bounded by the liveness predicate, so the
+    // query must not drop genuinely live agents: a `.limit(50)` here hid the
+    // 51st+ agent from the tray (the jank report's 100-agent measurement).
+    const oldestSessionId = nextId('cap-oldest');
+    for (let i = 0; i < 60; i++) {
+      await seedCloudSession({
+        sessionId: i === 0 ? oldestSessionId : nextId(`cap-${i}`),
+        cloudAgentSessionId: nextId('cas'),
+        kiloUserId: regularUser.id,
+        status: 'busy',
+        statusUpdatedAt: minutesAgoIso(1),
+        createdAt: minutesAgoIso(60 - i),
+        run: { terminalAt: null },
+      });
+    }
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions).toHaveLength(60);
+    expect(result.sessions.map(s => s.id)).toContain(oldestSessionId);
+  });
 });
 
 describe('resolveCloudCandidateStatus', () => {

@@ -4,7 +4,6 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SCREEN_TRACKING_SETTLE_DEBOUNCE_MS } from '@/lib/hooks/screen-tracking-decision';
-import { SCREEN_TRACKING_GENERATION_POLL_MS } from '@/lib/hooks/use-screen-tracking';
 
 const mocks = vi.hoisted(() => {
   const state = {
@@ -15,6 +14,7 @@ const mocks = vi.hoisted(() => {
   };
   const readyListeners = new Set<() => void>();
   const navStateListeners = new Set<() => void>();
+  const generationListeners = new Set<() => void>();
   const navigationRef = {
     current: {
       getRootState: () => (state.stale === undefined ? undefined : { stale: state.stale }),
@@ -47,12 +47,27 @@ const mocks = vi.hoisted(() => {
         listener();
       }
     },
+    // The hook reads the telemetry generation through `useSyncExternalStore`
+    // (the controller notifies its subscribers), so a test changes the
+    // generation and hands the notification to the subscribed hook.
+    subscribeGeneration(listener: () => void): () => void {
+      generationListeners.add(listener);
+      return () => {
+        generationListeners.delete(listener);
+      };
+    },
+    emitGenerationChange(): void {
+      for (const listener of generationListeners) {
+        listener();
+      }
+    },
     // Renderers are never unmounted by this harness, so their subscriptions
     // persist in the listener sets across tests and would fire the shared
     // mocks (and re-capture) when a later test flips readiness or navigation.
     clearListeners(): void {
       readyListeners.clear();
       navStateListeners.clear();
+      generationListeners.clear();
     },
   };
 });
@@ -71,6 +86,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
 vi.mock('@/lib/telemetry/controller', () => ({
   allowsOptional: () => true,
   currentGeneration: () => mocks.state.generation,
+  subscribeToTelemetryGeneration: (listener: () => void) => mocks.subscribeGeneration(listener),
 }));
 
 import { useScreenTracking } from './use-screen-tracking';
@@ -224,7 +240,9 @@ describe('useScreenTracking', () => {
     // ready. `captureScreen` would silently drop the event, so the hook must
     // neither capture nor mark HOME as captured for generation 2.
     mocks.state.generation = 2;
-    advance(SCREEN_TRACKING_GENERATION_POLL_MS);
+    act(() => {
+      mocks.emitGenerationChange();
+    });
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
 
     // The consent gate discards the stale client and re-inits it under

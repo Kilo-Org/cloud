@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 
@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
+import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
@@ -284,6 +285,14 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const navigateToSession = useAgentSessionNavigator();
+  // One handler shared by every card row: with the row memoised, an unchanged
+  // payload leaves each row's props referentially stable and skips its render.
+  const handleRowPress = useCallback(
+    (session: ActiveSession) => {
+      navigateToSession(session.id);
+    },
+    [navigateToSession]
+  );
   const content = liveSessionContent(context, sessions);
 
   return (
@@ -321,9 +330,7 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
                 session={session}
                 variant="card"
                 interactive={false}
-                onPress={() => {
-                  navigateToSession(session.id);
-                }}
+                onPress={handleRowPress}
               />
             </View>
           ))}

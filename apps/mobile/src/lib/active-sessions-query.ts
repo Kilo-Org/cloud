@@ -18,7 +18,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { type UseAgentSessionsOptions } from '@/lib/hooks/use-agent-sessions';
-import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 import { useOrganization } from '@/lib/organization-context';
 import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';
@@ -36,15 +35,18 @@ export function useActiveSessions(options?: UseAgentSessionsOptions) {
     isLoaded &&
     options?.enabled !== false &&
     !isSignOutActive();
-  const wsConnected = useUserWebConnectionState();
   const input = useMemo(
     () => buildActiveSessionsTrayInput(options?.organizationId),
     [options?.organizationId]
   );
   const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
   const queryOptions = trpc.activeSessions.list.queryOptions(input, {
-    // Cloud rows need a floor poll; socket writes remain the instant CLI path.
-    refetchInterval: wsConnected ? 30_000 : 10_000,
+    // The floor poll is owned by `useActiveSessionsFloorPoll` in the live-sync
+    // mount, scoped to the routes that show live agents; socket writes remain
+    // the instant CLI path. React Query must not poll here: its fetch path
+    // notifies every mounted observer on every successful fetch, which is what
+    // re-rendered every live row on a timer.
+    refetchInterval: false,
     staleTime: 5000,
     enabled: canRead,
   });

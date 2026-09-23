@@ -1,7 +1,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -51,14 +51,14 @@ import { useUserWebConnection } from './user-web-connection-provider';
 
 type RemoteSessionRowProps = {
   session: ActiveSession;
-  onPress: () => void;
+  onPress: (session: ActiveSession) => void;
   /** Container shape: see `RowVariant`. Defaults to `'list'`. */
   variant?: RowVariant;
   /** See `StoredSessionRowProps.interactive`. Defaults to `true`. */
   interactive?: boolean;
 };
 
-export function RemoteSessionRow({
+export const RemoteSessionRow = memo(function RemoteSessionRow({
   session,
   onPress,
   variant = 'list',
@@ -91,68 +91,90 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
-  const agentLabel = remoteSessionEyebrowLabel(session);
 
   const revision = useSessionAttentionRevision();
-  const raiseId = session.status;
-  const canExit = canExitSessionFromList(session);
-  const needsInput = shouldShowNeedsInput({
-    status: session.status,
-    raiseId,
-    isAcked: isAttentionAcked(session.id, raiseId),
-  });
+  // The ack store is the one input to the row that is not `session`: an ack
+  // bumps the shared revision, so the flag re-derives when it ticks. A parent
+  // re-render with an unchanged payload and no ack reuses this result.
+  const needsInput = useMemo(
+    () =>
+      shouldShowNeedsInput({
+        status: session.status,
+        raiseId: session.status,
+        isAcked: isAttentionAcked(session.id, session.status),
+      }),
+    // eslint-disable-next-line react/exhaustive-deps -- the revision is a real input: `isAttentionAcked` reads the ack store, so the flag must re-derive when that store ticks.
+    [session, revision]
+  );
   useEffect(() => {
     reconcileSessionAttention(session.id, session.status, null);
   }, [session.id, session.status, revision]);
 
-  // Spoken meta mirrors the visible meta the row renders. When `needsInput`
-  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. Otherwise announce the same timestamp as
-  // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
-  const metaTimestamp = activeSessionMetaTimestamp(session);
-  const costSpoken = formatSpokenCost(session.totalCostMicrodollars);
-  const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
-  const spokenMeta = selectRemoteRowSpokenMeta({
-    needsInput,
-    costSpoken,
-    timeSpoken,
-  });
-
-  // Provenance subtitle: list rows show "branch · #N", card rows keep the
-  // branch-only subtitle. The spoken label mirrors this, with the PR phrase
-  // only on the list variant.
-  const subtitle =
-    variant === 'card'
-      ? (session.gitBranch ?? null)
-      : composeSessionProvenanceSubtitle({
-          branch: session.gitBranch,
-          prNumber: session.associatedPr?.number,
-        });
-  const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
+  // Every derivation below depends only on the session, the row shape and the
+  // attention flag, so an unchanged payload reuses them instead of redoing the
+  // Intl formatting per parent render. `t` changes identity with the language,
+  // which re-derives the localized strings.
+  const { title, agentLabel, canExit, statusKind, subtitle, spokenPrNumber, spokenMeta } =
+    useMemo(() => {
+      // Spoken meta mirrors the visible meta the row renders. When `needsInput`
+      // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
+      // so the label omits it. Otherwise announce the same timestamp as
+      // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
+      const metaTimestamp = activeSessionMetaTimestamp(session);
+      const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
+      return {
+        title: sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled'),
+        agentLabel: remoteSessionEyebrowLabel(session),
+        canExit: canExitSessionFromList(session),
+        statusKind: glanceableStatusKind(session.status),
+        // Provenance subtitle: list rows show "branch · #N", card rows keep the
+        // branch-only subtitle. The spoken label mirrors this, with the PR phrase
+        // only on the list variant.
+        subtitle:
+          variant === 'card'
+            ? (session.gitBranch ?? null)
+            : composeSessionProvenanceSubtitle({
+                branch: session.gitBranch,
+                prNumber: session.associatedPr?.number,
+              }),
+        spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
+        spokenMeta: selectRemoteRowSpokenMeta({
+          needsInput,
+          costSpoken: formatSpokenCost(session.totalCostMicrodollars),
+          timeSpoken,
+        }),
+      };
+    }, [session, variant, needsInput, t]);
 
   // Tray rows are always live: the eyebrow draws the status glyph from the
   // shared derivation, so the platform glyph has no slot beside it (and the
   // spoken label withholds the platform with the icon).
-  const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
-    platform: session.createdOnPlatform,
-    variant,
-    needsInput,
-    statusGlyph: true,
-    gitUrl: session.gitUrl,
-  });
-  const platformIcon =
-    platformIconKind != null ? (
-      <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
-        <SessionPlatformIcon
-          platform={session.createdOnPlatform}
-          size={12}
-          color={colors.mutedSoft}
-        />
-      </View>
-    ) : undefined;
+  const { iconKind: platformIconKind, spokenPlatform } = useMemo(
+    () =>
+      selectRowPlatformPresentation({
+        platform: session.createdOnPlatform,
+        variant,
+        needsInput,
+        statusGlyph: true,
+        gitUrl: session.gitUrl,
+      }),
+    [session, variant, needsInput]
+  );
+  const platformIcon = useMemo(
+    () =>
+      platformIconKind != null ? (
+        <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
+          <SessionPlatformIcon
+            platform={session.createdOnPlatform}
+            size={12}
+            color={colors.mutedSoft}
+          />
+        </View>
+      ) : undefined,
+    [platformIconKind, session.createdOnPlatform, colors.mutedSoft]
+  );
 
   const refreshActiveList = async () => {
     const { queryKey } = refreshScope;
@@ -217,7 +239,9 @@ export function RemoteSessionRow({
   return (
     <>
       <Pressable
-        onPress={onPress}
+        onPress={() => {
+          onPress(session);
+        }}
         onLongPress={canManage ? handleLongPress : undefined}
         accessibilityRole="button"
         accessibilityLabel={sessionRowAccessibilityLabel({
@@ -226,7 +250,7 @@ export function RemoteSessionRow({
           // Tray rows are always live: the glyph below draws the shared
           // derivation's kind, and the spoken label names the same state.
           live: true,
-          statusKind: glanceableStatusKind(session.status),
+          statusKind,
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.gitBranch ?? null,
@@ -244,7 +268,7 @@ export function RemoteSessionRow({
             remoteMeta(session)
           )}
           live
-          statusKind={glanceableStatusKind(session.status)}
+          statusKind={statusKind}
           needsInput={needsInput}
           metaWhileLive
           platformIcon={platformIcon}
@@ -272,4 +296,4 @@ export function RemoteSessionRow({
       )}
     </>
   );
-}
+});

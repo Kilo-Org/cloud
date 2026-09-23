@@ -151,7 +151,7 @@ export const SESSION_TRANSITIONS: readonly TransitionMeta[] = [
   },
 
   { from: 'bound', event: 'STOPPED', to: 'unbound', commands: [], deadline: null },
-  { from: 'queued', event: 'STOPPED', to: 'failed', commands: [], deadline: null },
+  { from: 'queued', event: 'STOPPED', to: 'queued', commands: [], deadline: 'delivery' },
   { from: 'accepted', event: 'STOPPED', to: 'failed', commands: [], deadline: null },
   { from: 'completed', event: 'STOPPED', to: 'completed', commands: [], deadline: null },
   { from: 'failed', event: 'STOPPED', to: 'failed', commands: [], deadline: null },
@@ -317,9 +317,9 @@ function deadlined(aggregate: SessionAggregate): Decision<SessionAggregate> {
 /**
  * Canonical allocation-loss terminalization without the incarnation fence: every
  * `queued`/`accepted` message becomes a coordinator `failed` carrying the loss
- * reason, and the binding clears. `decideSession`'s `STOPPED` branch fences first
- * and then applies exactly this; the stopped-seam adapter's proof-independent
- * settlement calls it directly so the row map has one owner, not two.
+ * reason, and the binding clears. The stopped-seam adapter's proof-independent
+ * settlement (`settleStopped`) owns this rule and calls it directly so the row
+ * map has one owner; the fenced `STOPPED` branch applies `failInFlightOnStop`.
  */
 export function terminalizeOnStop(
   aggregate: SessionAggregate,
@@ -335,6 +335,30 @@ export function terminalizeOnStop(
       // identity (deleting the spread's retained values), matching HEAD's
       // stop projection. The sibling cancellation marker is cleared too;
       // already-terminal messages are left untouched.
+      delete state.wrapperInstanceId;
+      delete state.preparationAttemptId;
+      const { cancellation: _cancellation, ...rest } = message;
+      return { ...rest, state };
+    }),
+  };
+}
+
+/**
+ * The fenced loss rule: fail only in-flight (`accepted`) work, preserve `queued`
+ * work with its whole delivery state so the dispatch/create path can re-drain it
+ * onto a replacement allocation. The binding clears; only the failed row loses
+ * its delivery identity and cancellation marker.
+ */
+export function failInFlightOnStop(
+  aggregate: SessionAggregate,
+  reason: string,
+  now: number
+): SessionAggregate {
+  return {
+    binding: { kind: 'unbound' },
+    messages: aggregate.messages.map(message => {
+      if (message.state.kind !== 'accepted') return message;
+      const state = terminalMessageState(message.state, 'failed', now, 'coordinator', { reason });
       delete state.wrapperInstanceId;
       delete state.preparationAttemptId;
       const { cancellation: _cancellation, ...rest } = message;
@@ -518,11 +542,8 @@ export function decideSession(
       if (event.proof.wrapper !== undefined && event.proof.wrapper !== handle.wrapper) {
         return undefined;
       }
-      return {
-        state: terminalizeOnStop(aggregate, event.reason, now),
-        commands: [],
-        deadlineAt: null,
-      };
+      const next = failInFlightOnStop(aggregate, event.reason, now);
+      return deadlined(next);
     }
     case 'DEADLINE': {
       let changed = false;

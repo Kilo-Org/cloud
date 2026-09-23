@@ -297,9 +297,12 @@ describe('sandbox control seam (live wiring)', () => {
     });
   });
 
-  it.each(['queued', 'accepted'] as const)(
-    'persists an unbound envelope and deletes the attachment for stopped %s work',
-    async kind => {
+  it.each([
+    { kind: 'accepted' as const, expected: { kind: 'failed', reason: 'idle' } },
+    { kind: 'queued' as const, expected: { kind: 'queued' } },
+  ])(
+    'persists an unbound envelope and deletes the attachment for stopped $kind work',
+    async ({ kind, expected }) => {
       const ids = makeIds();
       const messageId = `msg_seam_unbound_${kind}`;
       const session = await registerSeamSession(ids);
@@ -349,7 +352,8 @@ describe('sandbox control seam (live wiring)', () => {
         // unbound/absent after allocation loss.
         expect(stored?.v).toBe(2);
         expect(stored?.binding).toEqual({ kind: 'unbound' });
-        expect(stored?.messages?.[0]?.state).toMatchObject({ kind: 'failed', reason: 'idle' });
+        expect(stored?.messages?.[0]?.messageId).toBe(messageId);
+        expect(stored?.messages?.[0]?.state).toMatchObject(expected);
         expect(await state.storage.get(ATTACHED_SESSION_KEY)).toBeUndefined();
       });
     }

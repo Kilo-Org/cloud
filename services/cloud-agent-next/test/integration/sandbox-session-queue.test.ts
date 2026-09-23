@@ -6,7 +6,11 @@ import { waitFor } from './wait-for.js';
 import { router } from '../../src/router/auth.js';
 import { createSessionManagementHandlers } from '../../src/router/handlers/session-management.js';
 import { createSessionSendHandlers } from '../../src/router/handlers/session-send.js';
-import { type SessionMessage } from '../../src/sandbox-session/session-message-queue.js';
+import {
+  createSessionMessageRecord,
+  type SessionMessage,
+} from '../../src/sandbox-session/session-message-queue.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
 import {
   acceptedState,
   terminalState,
@@ -502,5 +506,112 @@ describe('public control queue capacity and cancellation', () => {
       state: { kind: 'cancelled', reason: 'queued_message_cancelled' },
     });
     expect((await send(sessionId, 11)).status).toBe(200);
+  });
+});
+
+describe('preserved queued work after allocation loss', () => {
+  it('arms a preserved null-deadline row and fails it at the delivery bound', async () => {
+    const sessionId = `workspace_${crypto.randomUUID()}`;
+    access.set(sessionId, ownerId);
+    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
+    const wrapperInstanceId = crypto.randomUUID();
+    const kiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const incarnation = 'incarnation-preserved-queue';
+    const messageId = id(0);
+    await session.registerSession({
+      identity: { sessionId, userId: ownerId, createdOnPlatform: 'cloud-agent-web' },
+      auth: { kiloSessionId, kilocodeToken: 'test-token' },
+      agent,
+      workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+    });
+    await runInDurableObject(session, async (_instance, state) => {
+      seed(state.storage.kv, [
+        createSessionMessageRecord({
+          turn: { type: 'prompt', messageId, prompt: 'preserved after loss' },
+          agent,
+        }),
+      ]);
+      await state.storage.put('terminal_attached_session', {
+        ownerId,
+        sessionId,
+        kiloSessionId,
+        directory: '/workspace/preserved',
+        sandboxId,
+        wrapperInstanceId,
+        allocationIncarnation: incarnation,
+      });
+      // Clear any registration alarm so the assertion below is caused by the
+      // preserved-queue arm, not an older one.
+      await state.storage.deleteAlarm();
+    });
+
+    await runInDurableObject(session, async instance => {
+      await instance.notifyStopped({
+        reason: 'idle',
+        stopProof: {
+          effect: 'destroy',
+          at: Date.now(),
+          providerRef: encodeCloudflareProviderRef({
+            sandboxId,
+            containment: true,
+            instanceId: incarnation,
+          }),
+          incarnation,
+          reason: 'idle',
+          wrapper: wrapperInstanceId,
+        },
+      });
+    });
+
+    await waitFor(async () => {
+      const armed = await runInDurableObject(session, (_instance, state) =>
+        state.storage.getAlarm()
+      );
+      expect(armed).not.toBeNull();
+    });
+    await runInDurableObject(session, async (_instance, state) => {
+      const [row] = readRawSessionMessages(state.storage.kv);
+      expect(row).toMatchObject({ state: { kind: 'queued', deadlineAt: null } });
+    });
+
+    // Acquisition never succeeds (no receipt/wrapper): the drain must park the
+    // preserved row and keep it queued rather than dropping it.
+    const stubControl = {
+      ensureReady: async () => ({
+        physical: 'creating' as const,
+        connection: 'not_ready' as const,
+      }),
+    };
+    const drain = () =>
+      runInDurableObject(session, async instance => {
+        const original = instance['env'].SANDBOX_CONTROL;
+        instance['env'].SANDBOX_CONTROL = { getByName: () => stubControl } as never;
+        try {
+          await instance.alarm();
+        } finally {
+          instance['env'].SANDBOX_CONTROL = original;
+        }
+      });
+
+    await drain();
+    const drained = await runInDurableObject(
+      session,
+      (_instance, state) => readRawSessionMessages(state.storage.kv)[0]
+    );
+    expect(drained?.state.kind).toBe('queued');
+    const deadlineAt = drained?.state.kind === 'queued' ? drained.state.deadlineAt : null;
+    expect(deadlineAt).toEqual(expect.any(Number));
+
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(deadlineAt!);
+    try {
+      await drain();
+    } finally {
+      clock.mockRestore();
+    }
+    const [failed] = await runInDurableObject(session, (_instance, state) =>
+      readRawSessionMessages(state.storage.kv)
+    );
+    expect(failed).toMatchObject({ state: { kind: 'failed', reason: 'preparation_timeout' } });
   });
 });

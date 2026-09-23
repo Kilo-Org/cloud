@@ -339,9 +339,21 @@ describe('session reducer — design §7 transitions', () => {
     expect(message?.state.intent?.turn.messageId).toBe('m1');
   });
 
-  it('STOPPED terminalizes live messages and unbinds when the proof matches', () => {
+  it('STOPPED fails in-flight work and preserves queued work for re-drain', () => {
+    const queuedRow: SessionMessage = {
+      messageId: 'm1',
+      state: {
+        kind: 'queued',
+        intent: intent('m1'),
+        deliveryStep: 'waiting',
+        deadlineAt: NOW + 30_000,
+        attachFailures: 0,
+        promptFailures: 0,
+        preparationAttemptId: 'prep-1',
+      },
+    };
     const decision = decideSession(
-      bound([queued('m1'), accepted('m2')]),
+      bound([queuedRow, accepted('m2')]),
       {
         type: 'STOPPED',
         proof: stopProof(),
@@ -350,11 +362,17 @@ describe('session reducer — design §7 transitions', () => {
       NOW
     );
     expect(decision?.state.binding.kind).toBe('unbound');
-    expect(decision?.state.messages.every(message => message.state.kind === 'failed')).toBe(true);
-    const failed = firstMessage(decision);
+    const preserved = firstMessage(decision);
+    expect(preserved?.state.kind).toBe('queued');
+    expect(preserved?.state.kind === 'queued' && preserved.state.preparationAttemptId).toBe(
+      'prep-1'
+    );
+    expect(preserved?.state.kind === 'queued' && preserved.state.deadlineAt).toBe(NOW + 30_000);
+    const failed = decision?.state.messages[1];
     expect(failed?.state.kind === 'failed' && failed.state.reason).toBe(
       'health_unhealthy_unresponsive'
     );
+    expect(decision?.deadlineAt).toBe(NOW + 30_000);
   });
 
   it('STOPPED rejects a stale incarnation or wrapper before mutating messages', () => {

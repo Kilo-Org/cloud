@@ -1938,11 +1938,14 @@ export class SandboxSession extends DurableObject<Env> {
    * the `NotifySession` command to this stub method.
    *
    * Fences on the persisted allocation incarnation: only a proof for the bound
-   * incarnation terminalizes the queued/accepted head(s) and clears the binding.
-   * A stale or duplicate proof is a no-op. A pre-C3b attachment without an
-   * incarnation is resolved against the control's canonical state first, and the
-   * resolution is revalidated inside the committing transaction so a concurrent
-   * rebind is never overwritten and the event is never dropped.
+   * incarnation fails in-flight (`accepted`) work, preserves `queued` work and
+   * clears the binding. A stale or duplicate proof is a no-op. A pre-C3b
+   * attachment without an incarnation is resolved against the control's canonical
+   * state first, and the resolution is revalidated inside the committing
+   * transaction so a concurrent rebind is never overwritten and the event is never
+   * dropped. The legacy proof-independent `settleStopped` path for an
+   * incarnation-less attachment still terminalises every queued/accepted row via
+   * `terminalizeOnStop`, so only this fenced proof path preserves `queued` work.
    */
   async notifyStopped(input: {
     stopProof: StopProof | undefined;
@@ -1966,11 +1969,11 @@ export class SandboxSession extends DurableObject<Env> {
       return { outcome: 'failed', reason: 'stop_proof_missing' };
     }
 
-    let applied: boolean;
+    let outcome: 'settled' | 'noop' | 'rejected';
     try {
-      applied = this.ctx.storage.transactionSync((): boolean => {
+      outcome = this.ctx.storage.transactionSync((): 'settled' | 'noop' | 'rejected' => {
         const current = this.terminalLifecycle.getAttachedBinding();
-        if (!current) return true;
+        if (!current) return 'noop';
         // The resolver read above is asynchronous: revalidate its outcome against
         // the attachment actually bound when this transaction commits. A
         // concurrent delete or rebind discards the stale resolver result (never the
@@ -1978,7 +1981,7 @@ export class SandboxSession extends DurableObject<Env> {
         const sameAttachment =
           current.wrapperInstanceId === initial.wrapperInstanceId &&
           current.allocationIncarnation === initial.allocationIncarnation;
-        if (!sameAttachment && current.allocationIncarnation === undefined) return true;
+        if (!sameAttachment && current.allocationIncarnation === undefined) return 'noop';
         if (sameAttachment && current.allocationIncarnation === undefined) {
           if (resolution.kind === 'settle') {
             const settled = settleStopped({
@@ -1986,11 +1989,11 @@ export class SandboxSession extends DurableObject<Env> {
               reason: input.reason,
               now: Date.now(),
             });
-            if (settled.outcome !== 'settled') return false;
+            if (settled.outcome !== 'settled') return 'rejected';
             // Admission is confirmed before any mutation, so a rejected commit
             // leaves the original attachment and envelope untouched.
             if (!this.terminalLifecycle.isCurrent(epoch) || this.deletedWorktreeId) {
-              return false;
+              return 'rejected';
             }
             this.terminalLifecycle.clearAttachmentForStop({
               wrapperInstanceId: current.wrapperInstanceId,
@@ -2001,14 +2004,14 @@ export class SandboxSession extends DurableObject<Env> {
             ) {
               throw new StopCommitRejectedError();
             }
-            return true;
+            return 'settled';
           }
-          if (resolution.kind !== 'hydrate') return true;
+          if (resolution.kind !== 'hydrate') return 'noop';
         }
         const incarnation =
           current.allocationIncarnation ??
           (sameAttachment && resolution.kind === 'hydrate' ? resolution.incarnation : undefined);
-        if (incarnation === undefined || input.stopProof === undefined) return false;
+        if (incarnation === undefined || input.stopProof === undefined) return 'rejected';
         const decision = decideStopped({
           messages: readRawSessionMessages(this.ctx.storage.kv),
           attachment: {
@@ -2018,12 +2021,15 @@ export class SandboxSession extends DurableObject<Env> {
           event: { type: 'STOPPED', proof: input.stopProof, reason: input.reason },
           now: Date.now(),
         });
-        if (decision.outcome !== 'terminalized') return true;
+        // A rejected/stale `decideStopped` is a no-op, never a settlement: arming
+        // a preserved-queue retry on a proof the transaction refused to apply
+        // would wake a retry the commit did not authorise.
+        if (decision.outcome !== 'terminalized') return 'noop';
         // Hydration writes immediately, so write admission is confirmed before
         // it: there is no "unhydrate", and the rejected path must stay
         // mutation-free.
         if (!this.terminalLifecycle.isCurrent(epoch) || this.deletedWorktreeId) {
-          return false;
+          return 'rejected';
         }
         if (current.allocationIncarnation === undefined) {
           this.terminalLifecycle.hydrateAttachmentIncarnation(incarnation);
@@ -2038,16 +2044,18 @@ export class SandboxSession extends DurableObject<Env> {
         if (!this.saveMessagesInCurrentTransaction([...decision.messages], epoch, 'coordinator')) {
           throw new StopCommitRejectedError();
         }
-        return true;
+        return 'settled';
       });
     } catch (error) {
       if (!(error instanceof StopCommitRejectedError)) throw error;
-      applied = false;
+      outcome = 'rejected';
     }
     // The transaction committed with immediate repair scheduling disabled, so
     // flush any deferred callback/report repair now (as the operation-result
     // commit path does) instead of waiting for unrelated later activity.
     this.scheduleCallbackRepairIfRequired();
+    if (outcome === 'settled') this.armPreservedQueue();
+    const applied = outcome !== 'rejected';
     return applied
       ? { outcome: 'delivered' }
       : { outcome: 'failed', reason: 'stop_commit_rejected' };
@@ -4676,6 +4684,11 @@ export class SandboxSession extends DurableObject<Env> {
       this.reportRepairRequired = false;
       this.scheduleReportRepair();
     }
+  }
+
+  private armPreservedQueue(): void {
+    if (nextQueuedMessageId(this.loadMessages()) === undefined) return;
+    this.ctx.waitUntil(this.armQueueRetry());
   }
 
   private async armQueueRetry(when = Date.now() + QUEUE_RETRY_MS): Promise<void> {

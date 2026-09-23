@@ -39,9 +39,14 @@ const hoisted = vi.hoisted(() => ({
   },
   termsGateMock: vi.fn(),
   backHandler: { current: null as null | (() => boolean) },
+  // The committed connectivity the submit gate reads; 'online' by default,
+  // flipped per test. The real module pulls in NetInfo + the probe store,
+  // which the node environment cannot resolve.
+  connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
 }));
 
-const { hookState, alertCalls, updateCommentMocks, termsGateMock, backHandler } = hoisted;
+const { hookState, alertCalls, updateCommentMocks, termsGateMock, backHandler, connectivity } =
+  hoisted;
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -150,6 +155,12 @@ vi.mock('@/components/pr-review/discussion/reply-input', () => ({
 
 vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
   useUpdatePrCommentMutation: () => hoisted.updateCommentMocks,
+}));
+
+// The submit gate reads the committed connectivity; the real module reaches
+// NetInfo, which this node-environment suite cannot resolve.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => hoisted.connectivity.value,
 }));
 
 // The sheet's own-comment write path is mocked above; the trpc module is
@@ -292,6 +303,7 @@ describe('PrCommentEditSheet', () => {
     updateCommentMocks.isPending = false;
     updateCommentMocks.error = null;
     termsGateMock.mockReset().mockResolvedValue({ kind: 'accepted' });
+    connectivity.value = 'online';
     vi.clearAllMocks();
   });
 
@@ -325,6 +337,46 @@ describe('PrCommentEditSheet', () => {
     expect((inline.props as InlineErrorProps).inlineErrorKind).toBe('bad-request');
     expect((inline.props as InlineErrorProps).inlineErrorIsLocal).toBe(true);
     expect(saveDisabled(element)).toBe(true);
+  });
+
+  it('fails a submit while CONFIRMED offline at once with the retryable copy — no request, no spinner, retry offered', async () => {
+    // The hang this gate prevents (ux1 spot check, e6-offline-hang): with the
+    // offline banner behind the full-height sheet, the tap started a write
+    // React Query paused, so the user saw an indefinite spinner with a
+    // disabled Cancel and no explanation. The gate rejects locally instead:
+    // nothing is pending, the body stays, Save stays live for the retry.
+    connectivity.value = 'offline';
+    let element = mountSheet();
+    typeBody(element, 'edited body');
+    pressButton(element, 'Save');
+
+    expect(updateCommentMocks.mutateAsync).not.toHaveBeenCalled();
+    expect(termsGateMock).not.toHaveBeenCalled();
+    expect(baseProps.onDismiss).not.toHaveBeenCalled();
+
+    element = mountSheet();
+    const inline = requireByType(element, 'ComposerInlineError');
+    expect((inline.props as InlineErrorProps).inlineError).toBe(
+      "Couldn't save your comment. Check your connection and try again."
+    );
+    expect((inline.props as InlineErrorProps).inlineErrorKind).toBe('retryable');
+    // Local rejection: announced through the inline box, not a toast.
+    expect((inline.props as InlineErrorProps).inlineErrorIsLocal).toBe(true);
+    expect(saveDisabled(element)).toBe(false);
+
+    // Back online: the same control saves the same body.
+    connectivity.value = 'online';
+    updateCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    pressButton(element, 'Save');
+    await flushMicrotasks();
+    expect(updateCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      commentId: 42,
+      kind: 'review',
+      body: 'edited body',
+    });
   });
 
   it('sends the edited body to the update mutation and dismisses on success', async () => {

@@ -29,6 +29,7 @@ import { CommentBodyField } from '@/components/pr-review/pr-review-comment-compo
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { type PrCommentKind } from '@/lib/pr-review/discussion/review-discussion-types';
 import { useUpdatePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
 
@@ -114,6 +115,19 @@ export function PrCommentEditSheet({
     setInlineError(null);
     setInlineErrorKind(null);
     setInlineErrorIsLocal(false);
+    // Confirmed offline: fail the submit at once with the retryable copy
+    // instead of starting a write React Query pauses, which leaves an
+    // indefinite spinner with a disabled Cancel and no explanation behind the
+    // full-height sheet (ux1 spot check, e6-offline-hang). The edited body
+    // stays intact, nothing is pending, and the same tap retries once the
+    // banner clears. A local rejection with no toast owner, so it announces
+    // through AccessibleStatus.
+    if (getCommittedConnectivityStatus() === 'offline') {
+      setInlineError(t('prReview.discussion.commentEditFailed'));
+      setInlineErrorKind('retryable');
+      setInlineErrorIsLocal(true);
+      return;
+    }
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
       setInlineError(t('prReview.discussion.termsOutdatedCopy'));

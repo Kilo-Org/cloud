@@ -4,7 +4,12 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Alert } from 'react-native';
 
-import { copySessionLink, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
+import {
+  buildSessionActionMenuItems,
+  copySessionLink,
+  showRenamePrompt,
+  showSessionActionMenu,
+} from './session-row-actions';
 import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 const reactNativeMock = vi.hoisted(() => ({
@@ -319,5 +324,29 @@ describe('showRenamePrompt', () => {
     showRenamePrompt('Untitled session', onRename);
     confirmWith('   ');
     expect(onRename).not.toHaveBeenCalled();
+  });
+});
+
+const noop = () => undefined;
+
+describe('buildSessionActionMenuItems', () => {
+  it('omits exit without onExit, marks delete destructive and reuses labels', () => {
+    const { items, cancelLabel } = buildSessionActionMenuItems({
+      onCopySessionId: noop,
+      onRename: noop,
+      onDelete: noop,
+    });
+
+    expect(items.map(item => item.key)).toEqual(['copyId', 'rename', 'delete']);
+    expect(items.map(item => item.label)).toEqual(['Copy session ID', 'Rename', 'Delete session']);
+    expect(items[2]?.destructive).toBe(true);
+    expect(cancelLabel).toBe('Cancel');
+  });
+
+  it('marks exit destructive only when delete is absent', () => {
+    const { items } = buildSessionActionMenuItems({ onCopySessionId: noop, onExit: noop });
+
+    expect(items.map(item => item.key)).toEqual(['copyId', 'exit']);
+    expect(items[1]?.destructive).toBe(true);
   });
 });

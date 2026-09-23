@@ -105,6 +105,68 @@ type SessionActionMenuOptions = {
   themedSheet: ThemedActionSheetOptions;
 };
 
+export type SessionActionMenuItem = {
+  key: 'copyId' | 'rename' | 'exit' | 'delete';
+  label: string;
+  destructive: boolean;
+  run: () => void;
+};
+
+export type SessionActionMenu = {
+  items: SessionActionMenuItem[];
+  cancelLabel: string;
+};
+
+/**
+ * The one session action set, in today's order: Copy session ID, optional
+ * Rename, optional Exit session, optional Delete session. Delete wins when
+ * both exist; Exit is destructive only when Delete is absent. The panel and
+ * the sheet both build from here so their order, copy and indices cannot
+ * diverge.
+ */
+export function buildSessionActionMenuItems(input: {
+  onCopySessionId: () => void;
+  onRename?: () => void;
+  onExit?: () => void;
+  onDelete?: () => void;
+}): SessionActionMenu {
+  const items: SessionActionMenuItem[] = [
+    {
+      key: 'copyId',
+      label: i18n.t('agents.sessionRow.copyId'),
+      destructive: false,
+      run: input.onCopySessionId,
+    },
+  ];
+
+  if (input.onRename) {
+    items.push({
+      key: 'rename',
+      label: i18n.t('common.rename'),
+      destructive: false,
+      run: input.onRename,
+    });
+  }
+  if (input.onExit) {
+    items.push({
+      key: 'exit',
+      label: i18n.t('agentChat.remoteSession.exitSession'),
+      destructive: input.onDelete === undefined,
+      run: input.onExit,
+    });
+  }
+  if (input.onDelete) {
+    items.push({
+      key: 'delete',
+      label: i18n.t('agents.sessionRow.deleteSession'),
+      destructive: true,
+      run: input.onDelete,
+    });
+  }
+
+  return { items, cancelLabel: i18n.t('common.cancel') };
+}
+
 /**
  * Shared session long-press menu. Builds one options list — Copy session ID,
  * optional Rename, optional Exit session, optional Delete session, Cancel —
@@ -114,44 +176,31 @@ type SessionActionMenuOptions = {
  * Android gets backdrop-tap and hardware-back dismiss from the library.
  */
 export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
-  const { showActionSheetWithOptions, onCopySessionId, onRename, onExit, onDelete, themedSheet } =
-    opts;
+  const { showActionSheetWithOptions, themedSheet } = opts;
 
-  const options = [i18n.t('agents.sessionRow.copyId')];
-  const handlers: (() => void)[] = [onCopySessionId];
+  const { items, cancelLabel } = buildSessionActionMenuItems({
+    onCopySessionId: opts.onCopySessionId,
+    onRename: opts.onRename,
+    onExit: opts.onExit,
+    onDelete: opts.onDelete,
+  });
 
-  if (onRename) {
-    options.push(i18n.t('common.rename'));
-    handlers.push(onRename);
-  }
-  if (onExit) {
-    options.push(i18n.t('agentChat.remoteSession.exitSession'));
-    handlers.push(onExit);
-  }
-  if (onDelete) {
-    options.push(i18n.t('agents.sessionRow.deleteSession'));
-    handlers.push(onDelete);
-  }
-  options.push(i18n.t('common.cancel'));
-
+  const options = [...items.map(item => item.label), cancelLabel];
   const cancelButtonIndex = options.length - 1;
-  const deleteIndex = options.indexOf(i18n.t('agents.sessionRow.deleteSession'));
-  const exitIndex = options.indexOf(i18n.t('agentChat.remoteSession.exitSession'));
-  // Delete wins when both exist; Exit is destructive only when Delete is absent.
-  const destructiveButtonIndex = [deleteIndex, exitIndex].find(index => index !== -1);
+  const destructiveButtonIndex = items.findIndex(item => item.destructive);
 
   showActionSheetWithOptions(
     {
       ...themedSheet,
       options,
       cancelButtonIndex,
-      ...(destructiveButtonIndex !== undefined && { destructiveButtonIndex }),
+      ...(destructiveButtonIndex !== -1 && { destructiveButtonIndex }),
     },
     index => {
       if (index === undefined || index === cancelButtonIndex) {
         return;
       }
-      handlers[index]?.();
+      items[index]?.run();
     }
   );
 }

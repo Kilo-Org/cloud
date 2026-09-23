@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Mic, SearchX } from '@/components/ui/icons';
+import { Mic, Search, SearchX } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { foldForSearch } from '@/i18n/fold-for-search';
@@ -266,14 +266,19 @@ export function VoiceLanguagePickerSheet() {
       }}
       scrollable={false}
       headerContent={
-        <View className="px-4 pb-2 pt-3">
+        // Same filled pill as the account language picker and the repository
+        // and share pickers: one search-field shape for the same control. The
+        // field itself is the shared single-line `Input`, so the pill owns only
+        // the chrome while the field owns the height floor, the one line box for
+        // the placeholder and the value, and the RTL content alignment.
+        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+          <Search size={18} color={colors.mutedForeground} />
           <Input
             accessibilityLabel={t('language.search')}
-            // The shared single-line box (`@/components/ui/input`) supplies the
-            // height floor, the one line box for the placeholder and the value,
-            // and the RTL content alignment, so this field keeps only its own
-            // chrome and text size.
-            className="rounded-md border border-input bg-background px-3 text-sm text-foreground"
+            // The pill supplies the horizontal inset, so the field zeroes the
+            // shared box's `px-3` — the same `flex-1 px-0` the share and model
+            // pickers give the field in this pill.
+            className="flex-1 px-0 text-base text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // Uncontrolled: iOS drops keystrokes when state drives `value`;

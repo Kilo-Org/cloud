@@ -11,7 +11,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
 import { PickerSheet } from '@/components/picker-sheet';
-import { SearchX } from '@/components/ui/icons';
+import { Search, SearchX } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
@@ -207,15 +207,22 @@ export function LanguagePickerSheet({
       disabled={busy}
       scrollable={false}
       headerContent={
-        <View className="px-4 pb-2 pt-3">
+        // Filled pill with a leading magnifier, the one search-field shape the
+        // repository and share pickers use. The outlined box this replaced made
+        // the same control look like two different controls across pickers. The
+        // field itself is the shared single-line `Input`: it owns the height
+        // floor, the one line box for the placeholder and the value, and the RTL
+        // content alignment, so the pill owns only the chrome and this field
+        // keeps only its flex share and text size.
+        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+          <Search size={18} color={colors.mutedForeground} />
           <Input
             key={searchEpoch}
             accessibilityLabel={t('language.search')}
-            // The shared single-line box (`@/components/ui/input`) supplies the
-            // height floor, the one line box for the placeholder and the value,
-            // and the RTL content alignment, so this field keeps only its own
-            // chrome and text size.
-            className="rounded-md border border-input bg-background px-3 text-sm text-foreground"
+            // The pill supplies the horizontal inset, so the field zeroes the
+            // shared box's `px-3` — the same `flex-1 px-0` the share and model
+            // pickers give the field in this pill.
+            className="flex-1 px-0 text-base text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // Uncontrolled: iOS drops keystrokes when state drives `value`. The

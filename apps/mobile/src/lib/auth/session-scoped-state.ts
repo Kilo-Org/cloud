@@ -1,6 +1,7 @@
 import { clearFilePartCache } from '@/components/agents/file-part-cache';
 import { clearMarkdownImageConfirmMemory } from '@/components/agents/markdown-image-confirm';
 import { clearSessionAutoApprove } from '@/components/agents/session-auto-approve';
+import { clearUserSessionTitles } from '@/components/agents/session-detail-rename-state';
 import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
@@ -104,6 +105,7 @@ export function clearSessionScopedState(): void {
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
+  runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;
   // dropping the engine memo keeps a completed run from repopulating it. The

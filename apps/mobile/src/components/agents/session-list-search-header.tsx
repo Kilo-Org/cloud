@@ -102,6 +102,17 @@ export function SessionListSearchHeader({
           onChangeText={onChangeText}
           defaultValue={defaultValue}
           returnKeyType="search"
+          // Android's IME, with little room left in a landscape window, swaps
+          // the app for its own full-screen extract editor: the capture that
+          // filed this defect (e9-land-ime-up.png) shows the IME's editor —
+          // the query, a SEARCH action button and the keyboard — where the
+          // screen's own no-match body belongs. `disableFullscreenUI` maps to
+          // `EditorInfo.IME_FLAG_NO_FULLSCREEN` (ReactEditText.updateImeOptions),
+          // the flag the IME's fullscreen decision reads, so the input is
+          // edited in place and the screen's own body and the tab bar stay on
+          // screen. The screen's insets then reserve the IME's occlusion (see
+          // `useAgentsBottomBands`).
+          disableFullscreenUI
           autoCapitalize="none"
           autoCorrect={false}
         />

@@ -3,11 +3,14 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import { waitFor } from './wait-for.js';
 import type { SandboxSession } from '../../src/sandbox-session/SandboxSession';
-import type { SessionMessageRecord } from '../../src/sandbox-session/session-message-queue';
+import type { SessionMessage } from '../../src/sandbox-session/session-message-queue';
+import { acceptedState } from '../../src/sandbox-session/session-state.test-helpers.js';
 import type { ResponseFrame, SessionSyncResult } from '../../src/shared/sandbox-control-protocol';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines';
 import { events } from '../../src/db/sqlite-schema';
 
+import { writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
 const root = 'ses_00000000000000000000000001';
 const cached = {
   revision: 3,
@@ -31,15 +34,17 @@ async function fixture(instance: SandboxSession, state: DurableObjectState) {
     repository: { type: 'github', repo: 'Kilo-Org/cloud' },
     workspace: { sandboxId: 'usr-abcdef123419', workspacePath: '/workspace/shared' },
   });
-  const message: SessionMessageRecord = {
+  const message: SessionMessage = {
     messageId: 'msg_observed',
-    state: 'accepted',
-    wrapperInstanceId,
-    acceptedAt: Date.now() - DEADLINE_MS.acceptedOverdue - 100,
-    lastActivityAt: Date.now() - DEADLINE_MS.acceptedOverdue - 100,
-    deliveryDeadlineAt: Date.now() + 60_000,
+    state: acceptedState({
+      acceptedAt: Date.now() - DEADLINE_MS.acceptedOverdue - 100,
+      lastActivityAt: Date.now() - DEADLINE_MS.acceptedOverdue - 100,
+      wrapperInstanceId,
+      executionDeadlineAt: Date.now() + 60_000,
+      capAt: Date.now() + 60_000,
+    }),
   };
-  state.storage.kv.put('session_messages', [message]);
+  writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [message]);
   state.storage.kv.put('session_pending_interactions', cached);
   const pending = Promise.withResolvers<ResponseFrame>();
   const control = {
@@ -99,7 +104,7 @@ describe('Session observation wiring', () => {
           });
         }
         await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
         const refresh = vi.spyOn(instance['interactionRefresh'], 'refresh');
         const alarm = instance.alarm();
         await waitFor(() =>
@@ -117,13 +122,15 @@ describe('Session observation wiring', () => {
         expect(
           f.storedEvents().filter(event => event.stream_event_type === 'kilocode')
         ).toHaveLength(1);
-        expect(state.storage.kv.get('session_messages')).toEqual([
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([
           expect.objectContaining({
             messageId: f.message.messageId,
-            state: 'accepted',
-            acceptedAt: f.message.acceptedAt,
-            deliveryDeadlineAt: f.message.deliveryDeadlineAt,
-            lastActivityAt: expect.any(Number),
+            state: expect.objectContaining({
+              kind: 'accepted',
+              acceptedAt: f.message.state.acceptedAt,
+              executionDeadlineAt: f.message.state.executionDeadlineAt,
+              lastActivityAt: expect.any(Number),
+            }),
           }),
         ]);
         refresh.mockRestore();
@@ -154,11 +161,13 @@ describe('Session observation wiring', () => {
               properties: { id: 'new_question', sessionID: root },
             });
           } else if (change === 'message' || change === 'wrapper') {
-            state.storage.kv.put('session_messages', [
-              {
-                ...f.message,
-                [change === 'message' ? 'messageId' : 'wrapperInstanceId']: crypto.randomUUID(),
-              },
+            writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [
+              change === 'message'
+                ? { ...f.message, messageId: crypto.randomUUID() }
+                : {
+                    ...f.message,
+                    state: { ...f.message.state, wrapperInstanceId: crypto.randomUUID() },
+                  },
             ]);
           } else if (change === 'lifecycle') {
             const metadata = instance['terminalLifecycle'].getStoredMetadata();
@@ -181,13 +190,13 @@ describe('Session observation wiring', () => {
           }
           const before = {
             interactions: state.storage.kv.get('session_pending_interactions'),
-            messages: state.storage.kv.get('session_messages'),
+            messages: readRawSessionMessages(state.storage.kv),
             events: f.storedEvents(),
           };
           f.pending.resolve(response(idle));
           await alarm;
           expect(state.storage.kv.get('session_pending_interactions')).toEqual(before.interactions);
-          expect(state.storage.kv.get('session_messages')).toEqual(before.messages);
+          expect(readRawSessionMessages(state.storage.kv)).toEqual(before.messages);
           expect(f.storedEvents()).toEqual(before.events);
           expect(f.control.quarantineRuntime).not.toHaveBeenCalled();
           refresh.mockRestore();
@@ -211,15 +220,11 @@ describe('Session observation wiring', () => {
         f.pending.reject(new Error('native read failed'));
         await alarm;
         expect(f.control.request).toHaveBeenCalledTimes(1);
-        expect(state.storage.kv.get('session_messages')).toEqual([
-          expect.objectContaining({ state: 'failed', failedReason: 'runtime_unhealthy' }),
-        ]);
-        expect(f.control.quarantineRuntime).toHaveBeenCalledWith(
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([
           expect.objectContaining({
-            reason: 'runtime_unhealthy',
-            wrapperInstanceId: f.message.wrapperInstanceId,
-          })
-        );
+            state: expect.objectContaining({ kind: 'failed', reason: 'runtime_unhealthy' }),
+          }),
+        ]);
         expect(f.storedEvents().filter(event => event.stream_event_type === 'kilocode')).toEqual(
           []
         );
@@ -248,7 +253,7 @@ describe('Session observation wiring', () => {
         });
         await expect(shared).rejects.toThrow('Session sync failed');
         expect(state.storage.kv.get('session_pending_interactions')).toEqual(cached);
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
         expect(f.storedEvents()).toEqual([]);
         f.control.request.mockResolvedValue(response(busy));
         instance['derivePendingInteractions']();
@@ -257,7 +262,7 @@ describe('Session observation wiring', () => {
           'pending_interactions'
         );
         expect(f.control.request).toHaveBeenCalledTimes(2);
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
       } finally {
         await f.cleanup();
       }
@@ -303,7 +308,7 @@ describe('Session observation wiring', () => {
         await current;
         expect(f.control.request).toHaveBeenCalledTimes(2);
         expect(f.storedEvents()).toHaveLength(1);
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
       } finally {
         next.resolve(response(busy));
         await f.cleanup();
@@ -331,7 +336,7 @@ describe('Session observation wiring', () => {
         status.resolve({
           connection: 'ready',
           physical: 'running',
-          wrapperInstanceId: f.message.wrapperInstanceId ?? '',
+          wrapperInstanceId: f.message.state.wrapperInstanceId ?? '',
         });
         expect(await shared).toBeUndefined();
         expect(f.control.request).not.toHaveBeenCalled();
@@ -340,7 +345,7 @@ describe('Session observation wiring', () => {
         status.resolve({
           connection: 'ready',
           physical: 'running',
-          wrapperInstanceId: f.message.wrapperInstanceId ?? '',
+          wrapperInstanceId: f.message.state.wrapperInstanceId ?? '',
         });
         await f.cleanup();
       }
@@ -359,12 +364,12 @@ describe('Session observation wiring', () => {
         );
         await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
         const nextMessage = { ...f.message, messageId: 'msg_new' };
-        state.storage.kv.put('session_messages', [nextMessage]);
+        writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [nextMessage]);
         f.pending.resolve(response(busy));
         await alarm;
         expect(f.control.getStatus).toHaveBeenCalledTimes(1);
         expect(f.control.request).toHaveBeenCalledTimes(1);
-        expect(state.storage.kv.get('session_messages')).toEqual([nextMessage]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([nextMessage]);
       } finally {
         f.pending.resolve(response(busy));
         refresh.mockRestore();

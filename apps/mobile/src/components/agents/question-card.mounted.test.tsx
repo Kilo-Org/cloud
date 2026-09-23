@@ -306,3 +306,20 @@ describe('QuestionCard custom answer selection', () => {
     expect(a11yMocks.moveA11yFocus).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('QuestionCard custom answer placeholder contrast', () => {
+  // The custom answer field swaps its fill to `bg-primary` once its radio or
+  // checkbox is active. A placeholder painted for the plain background
+  // (`mutedForeground`, near-black) is invisible on that fill, so the field's
+  // purpose cannot be read (ios session-answer-kb-up finding). The placeholder
+  // colour must follow the fill, the same way the typed text does.
+  it('paints the placeholder with the fill foreground once the custom answer is active', async () => {
+    const renderer = await renderCard(makeQuestion());
+
+    expect(customInput(renderer.root)?.props.placeholderTextColor).toBe('#6F6A61');
+
+    press(customChoice(renderer.root));
+
+    expect(customInput(renderer.root)?.props.placeholderTextColor).toBe('#ffffff');
+  });
+});

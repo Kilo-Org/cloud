@@ -12,6 +12,7 @@ import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
@@ -28,9 +29,9 @@ import { cn } from '@/lib/utils';
 
 // One fixed slot per provider row. It reserves the same width in all three
 // rows, so the flex-1 label starts from the same x, and it holds whichever of
-// the mark, the inline spinner, or nothing the row has - swapping an 18pt mark
-// for the spinner cannot move the label. The passkey row draws no mark but
-// still reserves the slot.
+// the mark or the inline spinner the row has - swapping an 18pt mark for the
+// spinner cannot move the label. All three rows draw a mark in the slot (the
+// passkey row included), so the three provider options read as one group.
 export const PROVIDER_GLYPH_SLOT_CLASS = 'h-[18px] w-[18px] items-center justify-center';
 
 export function IdleAuth({
@@ -225,19 +226,28 @@ export function IdleAuth({
       )}
 
       {showApple && (
-        // The app's own outlined Button, exactly like Google and the passkey:
-        // one border colour and width, one fill, radius, height and label
-        // weight across the three. The native AppleAuthenticationButton draws
+        // The provider row is ours, not Apple's native control: the native
+        // button titles itself in the device language, which left English
+        // "Sign in with Apple" next to the translated Google and passkey rows
+        // when the app language differed from the device language, and it draws
         // its own dark border (about twice the design system hairline) that no
-        // buttonStyle can match, so the mark is drawn here beside the label.
-        // Apple's HIG requires the mark and the exact "Sign in with Apple"
-        // wording; a custom control satisfies it, as does the Google button.
+        // buttonStyle can match. The label comes from the catalog
+        // (`login.signInWithApple`), and the mark and outline chrome match the
+        // two rows below it: one border colour and width, one fill, radius,
+        // height and label weight across the three. Apple's HIG requires the
+        // mark and the exact "Sign in with Apple" wording; a custom control
+        // satisfies it, as does the Google button.
         <Button
           variant="outline"
           size="lg"
+          // Same chrome and no-flex-wrap row as the Google and passkey rows
+          // below: the label must stay on the icon's line at the shared 44pt
+          // floor, so all three provider rows keep one height.
           className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
-          onPress={() => void signInWithApple()}
+          onPress={() => {
+            void signInWithApple();
+          }}
           accessibilityLabel={t('login.signInWithApple')}
         >
           <View className={PROVIDER_GLYPH_SLOT_CLASS}>
@@ -293,7 +303,13 @@ export function IdleAuth({
             accessibilityLabel={t('login.signInWithPasskey')}
           >
             <View className={PROVIDER_GLYPH_SLOT_CLASS}>
-              {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
+              {busy === 'passkey' ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                // Same leading-glyph slot as the Apple and Google rows, so the
+                // three provider options read as one group.
+                <KeyRound size={18} color={colors.foreground} />
+              )}
             </View>
             <Text className="flex-1 text-center text-[17px] font-medium">
               {t('login.signInWithPasskey')}
@@ -394,14 +410,19 @@ export function IdleAuth({
         <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
       </View>
       <Button
-        variant="ghost"
+        // A text action that opens the browser sign-in options. It wears the
+        // same underlined primary link treatment as the Terms and Privacy
+        // Policy links above, so it reads as tappable rather than as plain bold
+        // text with no affordance.
+        variant="link"
+        className="active:opacity-60"
         disabled={authBusy}
         onPress={() => {
           void startBrowserAuth();
         }}
         accessibilityLabel={t('login.moreSignInOptions')}
       >
-        <Text>{t('login.moreSignInOptions')}</Text>
+        <Text className="underline">{t('login.moreSignInOptions')}</Text>
       </Button>
     </View>
   );

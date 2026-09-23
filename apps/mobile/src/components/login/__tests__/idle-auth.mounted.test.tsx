@@ -22,8 +22,8 @@ import {
 } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
+import { i18n } from '@/i18n';
 import { IdleAuth, PROVIDER_GLYPH_SLOT_CLASS } from '../idle-auth';
-import '@/i18n';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -105,9 +105,7 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ foreground: '#14130f' }),
-}));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
 
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: vi.fn(),
@@ -116,6 +114,11 @@ vi.mock('expo-web-browser', () => ({
 vi.mock('@/lib/config', () => ({
   TERMS_URL: 'https://app.kilo.ai/terms-app',
   PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
+}));
+
+// The real hook pulls expo-router, which the mounted project cannot load.
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#14130f', mutedForeground: '#6f6a61' }),
 }));
 
 const { compile } = createRequire(import.meta.url)(
@@ -132,6 +135,10 @@ afterEach(() => {
       renderer.unmount();
     }
   });
+});
+
+afterEach(async () => {
+  await i18n.changeLanguage('en');
 });
 
 async function mountIdleAuth(start: StartFn): Promise<R> {
@@ -327,6 +334,13 @@ function filledPrimaryLabels(root: I): (string | undefined)[] {
     .map(b => b.props.accessibilityLabel as string | undefined);
 }
 
+/** Every provider control that carries a leading glyph before its label. */
+function providerRows(root: I): I[] {
+  return ['Sign in with Apple', 'Sign in with Google', 'Sign in with a passkey'].map(label =>
+    findButton(root, label)
+  );
+}
+
 // Provider controls are opt-in per test; the file default is the plain
 // email-only form every other suite renders.
 beforeEach(() => {
@@ -385,6 +399,43 @@ describe('IdleAuth provider chrome parity', () => {
     });
   });
 
+  it('gives every provider row a leading glyph', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // The three provider rows read as one group: each carries a leading mark in
+    // the same reserved slot (the passkey row used to be label-only text). The
+    // mark lives inside the row's slot, so the slot is what puts the label on
+    // one axis and holds the mark, the spinner, or nothing.
+    const leadingTypes = providerRows(renderer.root).map(
+      row => glyphSlot(row).children.find(child => typeof child !== 'string')?.type
+    );
+    expect(leadingTypes).toEqual(['AppleLogo', 'GoogleLogo', 'KeyRound']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('labels the Apple row from the app catalog, not the device language', async () => {
+    await i18n.changeLanguage('de');
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // Apple's native control titles itself in the device language, which left
+    // English "Sign in with Apple" beside the translated Google row. The Apple
+    // row must use the catalog like every other control on the screen.
+    expect(texts(renderer.root)).toContain('Mit Apple anmelden');
+    expect(texts(renderer.root)).not.toContain('Sign in with Apple');
+    expect(
+      renderer.root.findAll(
+        n => typeof n.type === 'string' && (n.type as string) === 'AppleAuthenticationButton'
+      )
+    ).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('signs in with Apple through the hook handler', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
@@ -408,6 +459,32 @@ describe('IdleAuth provider chrome parity', () => {
       'button "Sign in with Apple" not found'
     );
     expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth text action affordance', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = false;
+    providers.appleAvailable = false;
+    providers.googleConfigured = false;
+  });
+
+  it('draws "More sign-in options" as an underlined link, not plain text', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const more = findButton(renderer.root, 'More sign-in options');
+
+    // A tappable control with no underline, chevron or button shape read as a
+    // plain bold sentence next to the underlined Terms and Privacy Policy links.
+    expect(more.props.variant).toBe('link');
+    expect(more.props.className as string).toContain('active:opacity-60');
+    const label = more.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')[0];
+    expect(label?.props.className as string).toContain('underline');
 
     act(() => {
       renderer.unmount();
@@ -509,15 +586,20 @@ describe('IdleAuth provider label layout', () => {
     providers.googleConfigured = true;
   });
 
-  it('keeps the Google and passkey labels on one line at equal button heights', async () => {
+  it('keeps every provider label on one line at equal button heights', async () => {
+    // The Apple row is a provider row too: left on the pre-fix flex-wrap +
+    // shrink classes it would let its label wrap onto its own flex line and
+    // grow taller than the two siblings it is drawn to match.
+    providers.appleAvailable = true;
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
+    const apple = findButton(renderer.root, 'Sign in with Apple');
     const google = findButton(renderer.root, 'Sign in with Google');
     const passkey = findButton(renderer.root, 'Sign in with a passkey');
 
-    for (const button of [google, passkey]) {
+    for (const button of [apple, google, passkey]) {
       // A label must never be pushed onto its own flex line, so the icon stays
-      // on the label's line and the two stacked buttons keep one height.
+      // on the label's line and the stacked buttons keep one height.
       expect(String(button.props.className).split(/\s+/)).not.toContain('flex-wrap');
       // Keep the 44pt floor so Dynamic Type can still grow the control.
       expect(String(button.props.className)).toContain('min-h-[44px]');
@@ -531,9 +613,14 @@ describe('IdleAuth provider label layout', () => {
       expect(label.props.allowFontScaling).not.toBe(false);
     }
 
+    // The three provider controls carry one row class, so none of them can
+    // drift back to the wrapping chrome on its own.
+    expect(String(apple.props.className)).toBe(String(google.props.className));
+
     // flexBasis 0% + flexGrow 1 gives each label the whole remaining row width:
     // the remedy the resend-code label already ships (PR #6384).
     const oneLineLabel = { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' };
+    expect(await compiledLabelLayout(labelText(apple))).toEqual([oneLineLabel]);
     expect(await compiledLabelLayout(labelText(google))).toEqual([oneLineLabel]);
     expect(await compiledLabelLayout(labelText(passkey))).toEqual([oneLineLabel]);
 

@@ -117,6 +117,14 @@ export const SESSION_ATTENTION_KEY = 'session-attention';
  */
 export const TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE = 'tool-summary-translation-cache';
 /**
+ * Encrypted-KV scope for the durable record of the session titles the user set
+ * through the app's rename flow that look like the backend's unnamed-session
+ * placeholder. Holds one serialized blob of `{ sessionId, title }` entries —
+ * ids and user titles only, no secrets. Survives an app restart so a chosen
+ * title is not re-hidden as unnamed after a cold start.
+ */
+export const USER_SESSION_TITLES_KEY = 'user-session-titles';
+/**
  * Durable "Open last session" record behind the launcher shortcut and the
  * quick-settings tile. Holds `{ sessionId, userId, storedAt }`; the account id
  * scopes it so one account is never offered another account's session. Not a

@@ -48,6 +48,10 @@ afterEach(() => {
 // and the bottom tab labels.
 const TRACKED_CLASSES = ['tracking-[1.5px]', 'tracking-[0.2px]'] as const;
 
+// The Hebrew eyebrow copy from `he.json` (`home.agentSessions`). Hebrew is a
+// shipped RTL locale and not Arabic script, so the reset has to reach it too.
+const HEBREW = 'פעילים עכשיו';
+
 describe('Text tracked labels in RTL', () => {
   it.each(TRACKED_CLASSES)(
     'draws %s with no letter spacing while a tracked class stays on the element',
@@ -61,6 +65,24 @@ describe('Text tracked labels in RTL', () => {
       expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
     }
   );
+
+  it('resets a caller-tracked Hebrew label, not only Arabic', () => {
+    i18nManager.isRTL = true;
+    const root = mount(createElement(Text, { className: 'tracking-[0.2px]' }, HEBREW));
+
+    expect(hostText(root).props.className as string).toContain('tracking-[0.2px]');
+    expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
+
+  it('drops the eyebrow Latin display treatment from Hebrew copy', () => {
+    i18nManager.isRTL = true;
+    const root = mount(createElement(Text, { variant: 'eyebrow' }, HEBREW));
+
+    const className = hostText(root).props.className as string;
+    expect(className.split(' ')).not.toContain('uppercase');
+    expect(className).not.toContain('tracking');
+    expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
 
   it('leaves no non-zero letter spacing on a tracked label in any class order', () => {
     i18nManager.isRTL = true;
@@ -82,8 +104,10 @@ describe('Text tracked labels in RTL', () => {
   it('keeps the caller style after the RTL defaults', () => {
     i18nManager.isRTL = true;
     const callerStyle = { color: '#ff0000' };
+    // RTL-script copy, the copy the merged rule resets (text.rtl-labels:
+    // Latin labels keep their tracking); the caller style still lands last.
     const root = mount(
-      createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, '…')
+      createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, 'استكشف')
     );
 
     expect(hostStyle(root)).toContainEqual(callerStyle);
@@ -98,10 +122,15 @@ describe('Text tracked labels in RTL', () => {
     expect(hostText(root).props.style).toBeUndefined();
   });
 
-  it('applies the same reset to the shared Eyebrow label', () => {
+  it('drops the Eyebrow display treatment and still resets letter spacing in RTL', () => {
+    // The eyebrow's tracking class is LTR-only (text.tsx EYEBROW_LATIN_DISPLAY):
+    // an RTL eyebrow drops it and relies on the RTL letter-spacing reset.
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
+    // Arabic-script copy drops the tracked class and the mono family in an RTL
+    // interface (`withoutMonoFamily`): a zero letter spacing alone does not
+    // keep a cursive script's joins (text.rtl-labels, text.mounted).
     // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
     // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
     // display classes, so an RTL eyebrow drops them — it carries no tracked
@@ -115,6 +144,7 @@ describe('Text tracked labels in RTL', () => {
     // uppercase or tracked class is left for the shared RTL reset to neutralize
     // on this label — the reset style is its whole treatment — and the zero
     // letter-spacing reset still lands.
+    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     const className = hostText(root).props.className as string;
     const classes = className.split(' ');
     expect(classes).not.toContain('uppercase');

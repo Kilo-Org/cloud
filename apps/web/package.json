@@ -112,6 +112,7 @@
     "@types/archiver": "7.0.0",
     "@types/js-yaml": "4.0.9",
     "@types/mdx": "2.0.13",
+    "@typesafe-ai/sdk": "0.6.0",
     "@upstash/redis": "^1.38.0",
     "@vercel/firewall": "1.2.1",
     "@vercel/functions": "3.4.6",

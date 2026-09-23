@@ -21,7 +21,7 @@ jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
 jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/models', () => ({
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => ({
   kiloExclusiveModels: [
     {
       public_id: 'kilo/hidden-model',

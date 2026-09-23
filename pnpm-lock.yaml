@@ -1064,6 +1064,9 @@ importers:
       '@types/mdx':
         specifier: 2.0.13
         version: 2.0.13
+      '@typesafe-ai/sdk':
+        specifier: 0.6.0
+        version: 0.6.0
       '@upstash/redis':
         specifier: ^1.38.0
         version: 1.38.0
@@ -1416,6 +1419,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../app-shared
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../session-ingest-contracts
       jotai:
         specifier: 2.18.1
         version: 2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
@@ -1426,9 +1432,6 @@ importers:
       '@jest/globals':
         specifier: 30.3.0
         version: 30.3.0
-      '@kilocode/session-ingest-contracts':
-        specifier: workspace:*
-        version: link:../session-ingest-contracts
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
@@ -10628,6 +10631,10 @@ packages:
 
   '@types/yargs@17.0.35':
     resolution: {integrity: sha512-qUHkeCyQFxMXg79wQfTtfndEC+N9ZZg76HJftDJp+qH2tV7Gj4OJi7l+PiWwJ+pWtW8GwSmqsDj/oymhrTWXjg==}
+
+  '@typesafe-ai/sdk@0.6.0':
+    resolution: {integrity: sha512-IddX+Q0XM+VagOUZFeP7wZjaO4SHMdvnh2zEBdrZZnXedWI3BNK1lKhMx3ayrkFWvVLbVcUHJy6AVZlY+e6Jaw==}
+    engines: {node: '>=20'}
 
   '@typescript-eslint/project-service@8.67.0':
     resolution: {integrity: sha512-cvE8c7ulYeXN9fYuszhCeCsbzyVEXuhrRCybnBre7TUmqb5nRmBfQAwCj0O3WJFDeyAZt4VYv51vMCC9LHSdYw==}
@@ -28568,6 +28575,8 @@ snapshots:
   '@types/yargs@17.0.35':
     dependencies:
       '@types/yargs-parser': 21.0.3
+
+  '@typesafe-ai/sdk@0.6.0': {}
 
   '@typescript-eslint/project-service@8.67.0(typescript@5.9.3)':
     dependencies:

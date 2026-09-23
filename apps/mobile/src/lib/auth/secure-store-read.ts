@@ -1,5 +1,6 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
+import { E2eInjectedFaultError } from '@/lib/telemetry/e2e-fault';
 
 /**
  * Bounded retry for a stored credential read.
@@ -17,7 +18,8 @@ const RETRY_DELAYS_MS = [250, 500, 1000] as const;
 // lib/config: while the window is open, every read through this helper
 // rejects, which is what makes the session-restore failure states provable on
 // a live build. Env-gated, so the constant is 0 and this is inert in
-// production.
+// production. The rejection is an `E2eInjectedFaultError`, which the Sentry
+// `beforeSend` gate drops so a harness fault is never filed as a product issue.
 const moduleLoadTime = Date.now();
 
 function isFaultWindowOpen(): boolean {
@@ -37,7 +39,9 @@ async function readOnce(
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
-    throw new Error(`E2E secure-store fault window is open: read of ${key} rejected`);
+    throw new E2eInjectedFaultError(
+      `E2E secure-store fault window is open: read of ${key} rejected`
+    );
   }
   const value = await (firstAttempt ?? readStoredValue(key, options));
   return value;

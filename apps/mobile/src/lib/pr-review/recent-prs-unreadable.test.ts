@@ -85,21 +85,20 @@ describe('recent-prs with an unreadable store', () => {
     ]);
   });
 
-  it('leaves the stored recents intact when the read for a failed-mark fails', async () => {
+  it('stays total when the read for a failed-mark fails', async () => {
     await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 1, title: 'One' }));
-    // The exact bytes the successful upsert stored. `markRecentPrFailed` writes
-    // only when it finds a matching entry, so `getRecentPrs()` cannot witness
-    // this abort — it reads the same list whether or not the failed read wiped
-    // anything. The stored bytes can: a mark that treated the unreadable record
-    // as an empty one and wrote it back would replace these bytes with `[]`.
-    const storedBefore = store.get('pr-review-recents');
 
+    // `markRecentPrFailed` writes only when it finds the entry, and a failed
+    // read finds nothing, so the stored bytes cannot witness an abort here:
+    // they stay byte-identical whether the unreadable read aborts or is read as
+    // "no recents", and the mark never reaches a write. This case pins the
+    // reachable failure instead — the unreadable read must not reject into the
+    // fire-and-forget caller. The upsert and remove cases above are what pin
+    // the abort, because those mutations always write.
     vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
     await expect(
       markRecentPrFailed({ owner: 'octocat', repo: 'hello', number: 1 })
     ).resolves.toBeUndefined();
-
-    expect(store.get('pr-review-recents')).toBe(storedBefore);
   });
 });
 

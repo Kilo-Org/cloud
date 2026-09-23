@@ -407,6 +407,9 @@ async function harness(
     stop: vi.fn(async () => 'terminal'),
     ensureLeaseAtLeast: vi.fn(async () => undefined),
     readLog: vi.fn(async () => ''),
+    ensureBillingAdmission: vi.fn(async () => ({ success: true })),
+    configureBilling: vi.fn(async () => undefined),
+    isBillingBlocked: vi.fn(async () => false),
   };
   const sandboxContainers = {
     idFromName: (id: string) => ({ toString: () => `do:SANDBOX_CONTAINERS:${id}` }),

@@ -140,6 +140,7 @@ export type PreparingStep =
   | 'sandbox_boot'
   | 'kilo_server'
   | 'kilo_session'
+  | 'restore_incomplete'
   | 'ready'
   | 'failed';
 

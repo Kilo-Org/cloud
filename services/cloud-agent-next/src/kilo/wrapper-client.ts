@@ -26,6 +26,7 @@ import { KILO_AGENT_SESSION_LABEL, type DevContainerHandle } from './devcontaine
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { shellQuote, validShellEnvEntries } from './utils.js';
 import {
+  restoreIncompleteLogFields,
   type WorkspaceFailureSubtype,
   type WrapperCommandRequest,
   type WrapperPromptRequest,
@@ -1113,6 +1114,26 @@ export class WrapperClient {
         // unexpected key must not be able to overwrite the trusted fields above.
         clone: telemetry.clone,
         restore: telemetry.restore,
+      });
+    }
+    // Requirement 1: an incomplete restore must be a named, observable outcome,
+    // not a wrapper progress line the worker never reads. Read independently of
+    // the bootstrap metric above: a warm workspace restored from a backup still
+    // logs the bootstrap metric, but a genuinely warm reuse does not, and a
+    // skipped diff can only happen on a restore path. Do not retry the restore.
+    const restoreFields = restoreIncompleteLogFields(telemetry?.restore);
+    if (restoreFields) {
+      logger.warn('Cloud agent restore incomplete', {
+        metric: 'cloud_agent_restore_incomplete',
+        count: 1,
+        sessionId: request.agentSessionId,
+        platform: request.materialized.env.KILO_PLATFORM ?? '(none)',
+        // Requirement: two rebinds in one session must be attributable to the
+        // replacement that restored the worktree, so the event carries the
+        // wrapper identity alongside the kilo/agent session id.
+        wrapperRunId: request.session.wrapperRunId,
+        wrapperGeneration: request.session.wrapperGeneration,
+        ...restoreFields,
       });
     }
     return response;

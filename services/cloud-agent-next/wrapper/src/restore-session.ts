@@ -11,12 +11,27 @@ import {
   runProcess,
 } from './utils.js';
 
+export type RestoreSkipReason =
+  | 'patch_apply_failed'
+  | 'outside_workspace'
+  | 'missing_content'
+  | 'unlink_failed'
+  | 'write_failed'
+  | 'index_reset_failed';
+
+export type RestoreDiffSkip = { file: string; reason: RestoreSkipReason };
+
 export type RestoreResult =
   | {
       ok: true;
       downloaded: boolean;
       imported: true;
-      diffs: { applied: number; skipped: number; total: number };
+      diffs: {
+        applied: number;
+        skipped: number;
+        total: number;
+        skippedDiffs?: RestoreDiffSkip[];
+      };
     }
   | {
       ok: false;
@@ -49,6 +64,10 @@ const KILO_IMPORT_TIMEOUT_MS = 120_000;
 const KILO_DOWNLOAD_TIMEOUT_MS = 120_000;
 const KILO_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000;
 const MAX_SESSION_EXPORT_BYTES = 1024 * 1024 * 1024;
+// Bound the recorded skip list: a pathological snapshot with thousands of
+// skipped diffs must not blow the session-ready ingest frame budget. `skipped`
+// stays the true count; only the named record is capped.
+const MAX_RECORDED_SKIPPED_DIFFS = 100;
 const EMPTY_SESSION_INGEST_EXPORT = '{"info":{},"messages":[],"sessionDiff":[]}';
 const MAX_EMPTY_SNAPSHOT_BYTES = 1_024;
 const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
@@ -725,13 +744,17 @@ function resolveWorkspaceRelativePath(workspacePath: string, file: string): stri
   return normalizedFile;
 }
 
-function normalizePatchForWorkspace(workspacePath: string, diff: SnapshotDiff): string | null {
-  if (!diff.patch) return null;
+type NormalizedPatch =
+  | { ok: true; patch: string }
+  | { ok: false; reason: Extract<RestoreSkipReason, 'missing_content' | 'outside_workspace'> };
+
+function normalizePatchForWorkspace(workspacePath: string, diff: SnapshotDiff): NormalizedPatch {
+  if (!diff.patch) return { ok: false, reason: 'missing_content' };
 
   const relativeFile = resolveWorkspaceRelativePath(workspacePath, diff.file);
   if (!relativeFile) {
     log(`skipping patch outside workspace file=${diff.file}`);
-    return null;
+    return { ok: false, reason: 'outside_workspace' };
   }
 
   logPatchMetadata(relativeFile, 'raw', diff.patch);
@@ -750,7 +773,7 @@ function normalizePatchForWorkspace(workspacePath: string, diff: SnapshotDiff): 
     logPatchMetadata(relativeFile, 'normalized', normalizedPatch);
   }
 
-  return normalizedPatch;
+  return { ok: true, patch: normalizedPatch };
 }
 
 async function logGitPatchDiagnostics(
@@ -776,22 +799,24 @@ async function logGitPatchDiagnostics(
   }
 }
 
+type PatchApplyOutcome = { applied: true } | { applied: false; reason: RestoreSkipReason };
+
 async function applyPatch(
   workspacePath: string,
   diff: SnapshotDiff,
   signal?: AbortSignal,
   env?: NodeJS.ProcessEnv
-): Promise<boolean> {
-  const normalizedPatch = normalizePatchForWorkspace(workspacePath, diff);
-  if (!normalizedPatch) return false;
+): Promise<PatchApplyOutcome> {
+  const normalized = normalizePatchForWorkspace(workspacePath, diff);
+  if (!normalized.ok) return { applied: false, reason: normalized.reason };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
   const file = path.join(dir, 'change.patch');
   try {
     signal?.throwIfAborted();
-    fs.writeFileSync(file, normalizedPatch);
+    fs.writeFileSync(file, normalized.patch);
     const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal, env);
     signal?.throwIfAborted();
-    if (threeWay.exitCode === 0) return true;
+    if (threeWay.exitCode === 0) return { applied: true };
     log(
       `git apply --3way failed file=${diff.file} exitCode=${threeWay.exitCode}${threeWay.stderr ? ` stderr=${threeWay.stderr}` : ''}`
     );
@@ -812,7 +837,7 @@ async function applyPatch(
       log(
         `failed to clear three-way apply state file=${diff.file} exitCode=${resetExitCode}${resetStderr.trim() ? ` stderr=${resetStderr.trim()}` : ''}`
       );
-      return false;
+      return { applied: false, reason: 'index_reset_failed' };
     }
 
     await logGitPatchDiagnostics(workspacePath, file, diff.file, signal, env);
@@ -821,7 +846,7 @@ async function applyPatch(
     signal?.throwIfAborted();
     if (plain.exitCode === 0) {
       log(`git apply fallback succeeded file=${diff.file}`);
-      return true;
+      return { applied: true };
     }
     log(
       `git apply fallback failed file=${diff.file} exitCode=${plain.exitCode}${plain.stderr ? ` stderr=${plain.stderr}` : ''}`
@@ -832,18 +857,18 @@ async function applyPatch(
       const fp = path.resolve(resolvedWorkspace, diff.file);
       if (!fp.startsWith(resolvedWorkspace + '/')) {
         log(`skipping deleted-file unlink outside workspace file=${fp}`);
-        return false;
+        return { applied: false, reason: 'outside_workspace' };
       }
       try {
         fs.unlinkSync(fp);
       } catch (err: unknown) {
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
           log(`failed to unlink deleted file=${diff.file}`);
-          return false;
+          return { applied: false, reason: 'unlink_failed' };
         }
       }
       log(`unlinked deleted file after failed patch file=${diff.file}`);
-      return true;
+      return { applied: true };
     }
 
     if (diff.after !== undefined) {
@@ -851,14 +876,19 @@ async function applyPatch(
       const fp = path.resolve(resolvedWorkspace, diff.file);
       if (!fp.startsWith(resolvedWorkspace + '/')) {
         log(`skipping after-content write outside workspace file=${fp}`);
-        return false;
+        return { applied: false, reason: 'outside_workspace' };
       }
-      fs.mkdirSync(path.dirname(fp), { recursive: true });
-      fs.writeFileSync(fp, diff.after);
+      try {
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        fs.writeFileSync(fp, diff.after);
+      } catch {
+        log(`failed to write snapshot after-content file=${diff.file}`);
+        return { applied: false, reason: 'write_failed' };
+      }
       log(`wrote snapshot after-content file=${diff.file}`);
-      return true;
+      return { applied: true };
     }
-    return false;
+    return { applied: false, reason: 'patch_apply_failed' };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -1229,19 +1259,28 @@ export async function restoreSession(
     const resolvedWorkspace = path.resolve(workspacePath);
     let applied = 0;
     let skipped = 0;
+    const skippedDiffs: RestoreDiffSkip[] = [];
+    const recordSkip = (file: string, reason: RestoreSkipReason): void => {
+      if (skippedDiffs.length < MAX_RECORDED_SKIPPED_DIFFS) {
+        skippedDiffs.push({ file, reason });
+      }
+    };
 
     for (const diff of uniqueDiffs) {
       options.signal?.throwIfAborted();
       if (diff.patch) {
         try {
-          if (await applyPatch(workspacePath, diff, options.signal, env)) {
+          const outcome = await applyPatch(workspacePath, diff, options.signal, env);
+          if (outcome.applied) {
             applied++;
           } else {
+            recordSkip(diff.file, outcome.reason);
             skipped++;
           }
         } catch (err) {
           if (options.signal?.aborted) throw err;
           log(`failed to apply patch file=${diff.file}`);
+          recordSkip(diff.file, 'patch_apply_failed');
           skipped++;
         }
         continue;
@@ -1251,39 +1290,61 @@ export async function restoreSession(
 
       if (!fp.startsWith(resolvedWorkspace + '/')) {
         log(`skipping diff outside workspace file=${fp}`);
+        recordSkip(diff.file, 'outside_workspace');
         skipped++;
         continue;
       }
 
-      try {
-        if (diff.status === 'deleted') {
-          try {
-            fs.unlinkSync(fp);
-          } catch (err: unknown) {
-            if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-          }
+      if (diff.status === 'deleted') {
+        try {
+          fs.unlinkSync(fp);
           applied++;
-        } else if (diff.after !== undefined) {
+        } catch (err: unknown) {
+          if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+            applied++;
+          } else {
+            log(`failed to unlink diff file=${fp}`);
+            recordSkip(diff.file, 'unlink_failed');
+            skipped++;
+          }
+        }
+      } else if (diff.after !== undefined) {
+        try {
           fs.mkdirSync(path.dirname(fp), { recursive: true });
           fs.writeFileSync(fp, diff.after);
           applied++;
-        } else {
+        } catch {
+          log(`failed to apply diff file=${fp}`);
+          recordSkip(diff.file, 'write_failed');
           skipped++;
         }
-      } catch {
-        log(`failed to apply diff file=${fp}`);
+      } else {
+        recordSkip(diff.file, 'missing_content');
         skipped++;
       }
     }
 
     log(`diffs applied=${applied} skipped=${skipped} total=${total}`);
     if (skipped > 0) {
+      // A skipped diff does not fail the restore: the worktree keeps whatever
+      // applied, and the named reasons above are the report. Do NOT retry the
+      // whole restore — a blind re-run is the defect this replaced. A targeted
+      // retry acts on the recorded reasons and paths instead.
       log('restore incomplete; continuing with partially restored workspace');
     } else {
       log('completed successfully');
     }
 
-    return { ok: true, downloaded, imported: true, diffs: { applied, skipped, total } };
+    const diffs: {
+      applied: number;
+      skipped: number;
+      total: number;
+      skippedDiffs?: RestoreDiffSkip[];
+    } = { applied, skipped, total };
+    if (skipped > 0) {
+      diffs.skippedDiffs = skippedDiffs;
+    }
+    return { ok: true, downloaded, imported: true, diffs };
   } finally {
     if (tempDir) {
       fs.rmSync(tempDir, { recursive: true, force: true });

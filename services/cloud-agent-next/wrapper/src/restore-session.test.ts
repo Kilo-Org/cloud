@@ -2043,6 +2043,9 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       expect(result.diffs.skipped).toBe(1);
       expect(result.diffs.applied).toBe(1);
       expect(result.diffs.total).toBe(2);
+      expect(result.diffs.skippedDiffs).toEqual([
+        { file: '../escaped.txt', reason: 'outside_workspace' },
+      ]);
     }
 
     // Verify traversal target was NOT written outside the workspace
@@ -2144,7 +2147,12 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       ok: true,
       downloaded: true,
       imported: true,
-      diffs: { applied: 0, skipped: 1, total: 1 },
+      diffs: {
+        applied: 0,
+        skipped: 1,
+        total: 1,
+        skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+      },
     });
     expect(fs.existsSync(path.join(workspace, 'src/index.ts'))).toBe(false);
   });

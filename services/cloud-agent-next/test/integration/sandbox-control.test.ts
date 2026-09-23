@@ -12435,14 +12435,10 @@ describe('SandboxControl terminal runtime coordination', () => {
     let runtimeStatus: Awaited<ReturnType<ContainersBilling['getBillingRuntimeStatus']>>;
 
     await runInDurableObject(control, async instance => {
-      if ((await instance.getPhysicalRecord()).state === 'stopped') {
-        await instance.claimCreate(
-          intentId,
-          false,
-          allocationName,
-          getWorktreeCredentialContainment(false)
-        );
-      }
+      await seedCreatingAllocation(instance['ctx'].storage, intentId, {
+        allocationName,
+        containment: getWorktreeCredentialContainment(false),
+      });
       await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
     });
     await installProvider(control, providerRef, 'cloudflare-containers');
@@ -12462,7 +12458,12 @@ describe('SandboxControl terminal runtime coordination', () => {
       Object.assign(instance, { providerKind: 'cloudflare-containers' });
       await state.storage.put('provider_kind', 'cloudflare-containers');
       await instance.initializeOwner(ownerId);
-      await instance.confirmInstance(providerRef);
+      await seedCanonicalRunning(state.storage, providerRef, {
+        provider: 'cloudflare',
+        intentId,
+        allocationName,
+        containment: getWorktreeCredentialContainment(false),
+      });
       const attachment = {
         sessionId,
         kiloSessionId: ROOT_ID,

@@ -111,6 +111,31 @@ describe('planNeedsInputNotifications', () => {
     });
   });
 
+  it('falls back to the localized untitled copy for a backend default title', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'New session - 2026-09-22T18:52:16.946Z',
+          status: 'question',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.publish).toEqual([
+      {
+        sessionId: 'ses_1',
+        title: 'Untitled session',
+        kind: 'question',
+        prUrl: null,
+        organizationId: null,
+      },
+    ]);
+  });
+
   it('publishes a classified permission with the PR that can be opened', () => {
     const plan = planNeedsInputNotifications({
       previous: [],

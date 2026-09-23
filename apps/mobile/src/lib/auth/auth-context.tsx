@@ -43,6 +43,7 @@ import {
   setSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import { type AuthSignOutCause, reportAuthBranch } from '@/lib/auth/sign-out-telemetry';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
@@ -173,7 +174,7 @@ type AuthContextValue = {
    *  until the fresh reads resolve. */
   retryRestore: () => void;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
-  signOut: (ended?: boolean) => Promise<void>;
+  signOut: (ended?: boolean, cause?: AuthSignOutCause) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -407,7 +408,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     []
   );
 
-  const signOut = useCallback(async (ended = false) => {
+  const signOut = useCallback(async (ended = false, cause: AuthSignOutCause = 'user') => {
     // The ENTIRE sign-out body runs inside the FIFO auth-transition queue.
     // Dedupe inside the queued run, not at enqueue: a sign-out queued behind
     // an in-flight sign-out (or after a completed teardown) no-ops, so
@@ -455,6 +456,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // response cannot write the previous account's answer during
         // teardown.
         gateKiloClawOwned();
+        // Record the branch that fired immediately before the logout event,
+        // so exactly one row lands per actual sign-out — a deduped sign-out
+        // returned above and writes nothing — and it is attributed to the
+        // user. A server-refused refresh is the only ended-session path.
+        reportAuthBranch({
+          cause,
+          branch: cause === 'session_ended' ? 'refresh_401' : 'explicit',
+        });
         // Capture the logout event before any telemetry teardown step.
         captureEvent(LOGOUT_EVENT);
         // Remote cleanup (session revoke + push unregister + tombstone)
@@ -600,8 +609,32 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
+      // A refresh-token read that spent its budget on null while another
+      // member of the credential set is present is an unreadable credential
+      // read, not an absent session: never sign out, surface the existing
+      // retryable restore error, and record the branch. An EMPTY credential
+      // set is not an unreadable member — it is genuinely no session, and the
+      // bootstrap gate already routes to login — so it must never raise the
+      // restore error. A sign-out that owns the tree also owns this surface:
+      // its escape hatch already cleared the flag, and a deduped second
+      // sign-out (isSignedOutReference) would dead-end the overlay's Sign out.
+      if (
+        !outcome.ok &&
+        outcome.unreadable &&
+        outcome.presentKeys.length > 0 &&
+        !isSignedOutReference.current
+      ) {
+        reportAuthBranch({
+          cause: 'credentials_unreadable',
+          branch: 'refresh_token_unreadable',
+          keyNames: outcome.presentKeys,
+        });
+        setRestoreFailed(true);
+        return;
+      }
+
       if (!outcome.ok && outcome.refused && !isSignedOutReference.current) {
-        await signOut(true);
+        await signOut(true, 'session_ended');
       }
     };
 

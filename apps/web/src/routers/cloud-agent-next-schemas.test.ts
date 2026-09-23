@@ -43,6 +43,7 @@ const sandboxLifecycleCases = [
   { status: 'stopping', detailCode: 'sandbox_stopping' },
   { status: 'error', detailCode: 'sandbox_failed' },
   { status: 'unreachable', detailCode: 'connection_unavailable' },
+  { status: 'unreachable', detailCode: 'check_needed' },
   { status: 'unknown', detailCode: 'insufficient_evidence' },
   { status: 'unknown', detailCode: 'status_unavailable' },
 ] satisfies Pick<SandboxStatusSnapshot, 'status' | 'detailCode'>[];

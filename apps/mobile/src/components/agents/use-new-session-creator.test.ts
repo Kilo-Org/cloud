@@ -762,6 +762,98 @@ describe('useNewSessionCreator in-flight draft edit', () => {
     );
     expect(routerReplace).toHaveBeenCalledTimes(1);
   });
+
+  it('does not cancel a create whose trimmed body is unchanged by a whitespace-only edit', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // An IME/autocorrect composition commit that only adds trailing
+    // whitespace leaves the dispatched (trimmed) prompt identical, so it must
+    // not cancel a create whose body did not change.
+    promptRef.current = 'first draft ';
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the unsent attempt when the draft changes during the outbox load', async () => {
+    // The guard before dispatch only covers the upload; `prepareAgentSession`
+    // then awaits the outbox load and the safe-retry write while the composer
+    // stays editable. An edit in that window must abandon the still-unsent
+    // request instead of creating from the stale snapshot and clearing it.
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const setIsCreating = vi.fn(() => undefined);
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1', setIsCreating }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    // Let the immediate upload settle so the flow parks on the gated load.
+    await flushMicrotasks();
+
+    promptRef.current = 'first draft, plus detail';
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+    // The edited draft is the composer's text for the next Start.
+    expect(promptRef.current).toBe('first draft, plus detail');
+  });
+
+  it('does not abandon the unsent attempt for a whitespace-only edit during the outbox load', async () => {
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1' }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    await flushMicrotasks();
+
+    promptRef.current = 'first draft ';
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useNewSessionCreator profileId', () => {

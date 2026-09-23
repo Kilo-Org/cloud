@@ -4,7 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageSquare, SlidersHorizontal } from '@/components/ui/icons';
-import { agentColor, toneColor } from '@/lib/agent-color';
+import { agentColor, rowTint, toneColor } from '@/lib/agent-color';
 
 import { ActionTile } from './profile-action-tile';
 import { ConfigureRow } from './ui/configure-row';
@@ -22,6 +22,13 @@ const themeColors = vi.hoisted(() => {
     warn: '#warn',
     destructive: '#destructive',
     mutedForeground: '#muted-foreground',
+    secondaryForeground: '#secondary-foreground',
+    rowHoney: '#row-honey',
+    rowGold: '#row-gold',
+    rowLime: '#row-lime',
+    rowSage: '#row-sage',
+    rowMoss: '#row-moss',
+    rowFern: '#row-fern',
   };
   return colors;
 });
@@ -82,11 +89,12 @@ describe('ActionTile mounted treatment', () => {
       createElement(ActionTile, {
         icon: MessageSquare,
         label: 'Feedback',
+        hue: 'fern',
         onPress: () => undefined,
       })
     );
     const className = tileClassName(root);
-    const tint = agentColor('Feedback');
+    const tint = rowTint('fern');
     expect(className).toContain('h-[30px]');
     expect(className).toContain('w-[30px]');
     expect(className).toContain('rounded-lg');
@@ -100,12 +108,45 @@ describe('ActionTile mounted treatment', () => {
       createElement(ActionTile, {
         icon: MessageSquare,
         label: 'Feedback',
+        hue: 'fern',
         onPress: () => undefined,
       })
     );
     const icon = iconNode(root, 'MessageSquare');
     expect(icon.props.size).toBe(16);
-    expect(icon.props.color).toBe(themeColors[agentColor('Feedback').hueThemeKey]);
+    expect(icon.props.color).toBe(themeColors[rowTint('fern').hueThemeKey]);
+  });
+
+  it('renders the same tint for the same row in English and Serbian', () => {
+    const label = 'Feedback';
+    const english = render(
+      createElement(ActionTile, {
+        icon: MessageSquare,
+        label,
+        hue: 'fern',
+        onPress: () => undefined,
+      })
+    );
+    const englishClassName = tileClassName(english);
+    const englishColor = iconNode(english, 'MessageSquare').props.color as string;
+
+    const serbian = render(
+      createElement(ActionTile, {
+        icon: MessageSquare,
+        label: 'Povratne informacije',
+        hue: 'fern',
+        onPress: () => undefined,
+      })
+    );
+    const serbianClassName = tileClassName(serbian);
+    const serbianColor = iconNode(serbian, 'MessageSquare').props.color as string;
+
+    // The colour is chosen by the destination, never hashed from the label:
+    // the same row renders the same tile in every language.
+    expect(serbianClassName).toBe(englishClassName);
+    expect(serbianColor).toBe(englishColor);
+    expect(englishColor).not.toBe(themeColors.secondaryForeground);
+    expect(englishColor).not.toBe(themeColors[agentColor(label).hueThemeKey]);
   });
 
   it('tints the destructive row tile and keeps the red label', () => {
@@ -113,6 +154,7 @@ describe('ActionTile mounted treatment', () => {
       createElement(ActionTile, {
         icon: MessageSquare,
         label: 'Delete Account',
+        hue: 'fern',
         destructive: true,
         onPress: () => undefined,
       })
@@ -133,6 +175,7 @@ describe('ActionTile mounted treatment', () => {
       createElement(ActionTile, {
         icon: MessageSquare,
         label: 'Feedback',
+        hue: 'fern',
         onPress: () => undefined,
       })
     );
@@ -161,6 +204,7 @@ describe('ActionTile mounted treatment', () => {
       createElement(ActionTile, {
         icon: MessageSquare,
         label: 'Feedback',
+        hue: 'fern',
         destructive: true,
         onPress: () => undefined,
       })

@@ -652,7 +652,11 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['old-activity', 'end']]);
 
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:15.000Z'));
+    // A scheduled-only scope is startable, so the push-to-start token raises a
+    // card carrying the scheduled count and wake time instead of nothing. The
+    // refresh lands a full window after the idle delivery: a change inside the
+    // window is deferred to the trailing alarm, not delivered at once.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
     current = freshSnapshot({
       running: 0,
       idle: 0,
@@ -669,19 +673,28 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       scheduledAt: '2026-09-24T09:00:00.000Z',
     });
 
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
+    // The app wakes, adopts the pushed card, and registers its update token, so
+    // the next eligible change updates that live card in place rather than
+    // stacking a second one on the Lock Screen.
+    activityRows.set('activity-token', {
+      id: 'row-adopted',
+      kind: 'ios_activity',
+      updated_at: '2026-08-27 10:00:21+00',
+    });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:31.000Z'));
     current = freshSnapshot({ running: 1, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
       ['scope-token', 'start'],
+      ['activity-token', 'update'],
     ]);
-    expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
+    expect(JSON.parse(apns[2].aps['content-state'].props)).toMatchObject({
       running: 1,
       idle: 1,
-      needsInputSince: '2026-08-27T10:00:20.000Z',
+      needsInputSince: '2026-08-27T10:00:31.000Z',
     });
-    expect([...activityRows.keys()]).toEqual(['scope-token']);
+    expect([...activityRows.keys()]).toEqual(['scope-token', 'activity-token']);
   });
 
   it('raises one card per push-to-start token, however many refreshes find no activity', async () => {
@@ -1845,6 +1858,25 @@ describe('toGlanceableContentState', () => {
     });
   });
 
+  it('carries the scheduled count and soonest wake for a scheduled snapshot', () => {
+    const scheduledOnly: ActiveAgentsGlanceable = {
+      ...snapshot,
+      running: 0,
+      needsInput: 0,
+      needsApproval: 0,
+      idle: 0,
+      scheduled: 2,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    };
+
+    expect(JSON.parse(toGlanceableContentState(scheduledOnly).props)).toMatchObject({
+      running: 0,
+      idle: 0,
+      scheduled: 2,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+  });
+
   it('forwards the approvable count and treats an absent field as zero', () => {
     expect(
       (JSON.parse(toGlanceableContentState(snapshot).props) as Record<string, unknown>)
@@ -2000,6 +2032,46 @@ describe('deliverGlanceableSnapshot', () => {
     ];
     expect(tokens).toEqual([{ token: 'ptt-token', event: 'start' }]);
     expect(calls.expoSends).toHaveLength(0);
+  });
+
+  it('raises a push-to-start card for a scheduled-only snapshot', async () => {
+    const scheduledOnly: ActiveAgentsGlanceable = {
+      ...snapshot,
+      running: 0,
+      needsInput: 0,
+      needsApproval: 0,
+      idle: 0,
+      scheduled: 1,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    };
+    const iosTokens: IosActivityToken[] = [{ token: 'ptt-token', kind: 'ios_push_to_start' }];
+    const { deps, calls } = fakeDeps({
+      buildSnapshot: vi.fn(async () => scheduledOnly),
+      listIosActivityTokens: vi.fn(async () =>
+        iosTokens.map((token, index) => ({
+          ...token,
+          id: `row-${index}`,
+          updated_at: snapshot.updatedAt,
+        }))
+      ),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: 'org-1' }, deps);
+
+    expect(calls.iosSends).toHaveLength(1);
+    const [tokens, contentState] = calls.iosSends[0] as [
+      { token: string; event: string }[],
+      GlanceableApnsContentState,
+    ];
+    expect(tokens).toEqual([{ token: 'ptt-token', event: 'start' }]);
+    // The scheduled counts ride in the push: the app rebuilds nothing while it
+    // is not running, so a later push would otherwise blank them on the device.
+    expect(JSON.parse(contentState.props)).toMatchObject({
+      running: 0,
+      idle: 0,
+      scheduled: 1,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
   });
 
   it('skips Android when no android_ongoing activity token exists', async () => {

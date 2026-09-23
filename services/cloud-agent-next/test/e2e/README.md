@@ -464,40 +464,80 @@ derived per run from `isScenarioSupported(definition, env)`, so a declared
 capability gap is a reported skip, not a failure. The unsupported lines name the
 missing capabilities. Local expected-unsupported is exactly `auth-reject`.
 
-The `e2e-deployed` GitHub workflow (`.github/workflows/e2e-deployed.yml`) is a
-`workflow_dispatch`-only runner around this script. It maps the `worker_url`,
-`fake_llm_url` and `backend_url` inputs to `WORKER_URL`, `FAKE_LLM_URL` and
-`E2E_BACKEND_URL`, passes `E2E_USER_TOKEN` and `FAKE_LLM_ADMIN_TOKEN` only as
-environment variables, tees the log, uploads it, and writes the counts plus the
-unsupported scenarios and missing capabilities to the job summary even when the
-runner fails.
+`e2e:deployed` is the serial reference runner; use `run.ts <name> _` for a
+focused single scenario. It is not what CI runs: the `cloud-agent-e2e-tests` GitHub
+workflow (`.github/workflows/cloud-agent-e2e-tests.yml`) is `workflow_dispatch`-only and
+runs the parallel batch matrix described in the next section.
 
 ### Parallel deployed runner
 
 ```bash
+E2E_BATCH=long-question-idle pnpm --filter cloud-agent-next run e2e:parallel
 E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
 E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
 ```
 
 `smoke-parallel.ts` runs the same supported `SHARED_SCENARIOS` entries as
-`smoke-deployed.ts`, but one scenario per child process under a bounded pool.
-`E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario at
-once) and defaults to `4`. Each child gets a unique `E2E_FAKE_SCOPE`, so its
-completions are counted separately on the shared fake and its
-`fetchFakeRequests` "unchanged"/"increased" assertions stay meaningful while
-other shards dispatch. Capability-gated scenarios are filtered out up front and
-never spawned. Passes the same deployed-profile env as `e2e:deployed`. Because
-unsupported scenarios are filtered before spawn, a non-zero child exit is a
-failure: exit `1` if any scenario failed, else `0`. A child that exceeds its
-watchdog deadline (its scenario budget plus ten minutes) is killed and reported
-as a failure.
+`smoke-deployed.ts`, but one scenario per child process under a bounded pool,
+optionally restricted to one batch. `E2E_BATCH=<name>` selects a batch from
+`E2E_BATCHES` in `test/e2e/scenarios-batches.ts` (declared order preserved);
+`E2E_BATCH` unset runs every scenario, so job selection is unchanged.
+
+The batch module owns membership and each batch's default `parallel`.
+`E2E_PARALLEL` accepts a positive integer or `all` (every selected scenario at
+once) and overrides the batch default; when it is unset, a selected batch uses
+its own `parallel` and `E2E_BATCH`-unset mode defaults to `4`. Each child gets a
+unique `E2E_FAKE_SCOPE`, so its completions are counted separately on the shared
+fake and its `fetchFakeRequests` "unchanged"/"increased" assertions stay
+meaningful while other shards dispatch.
+
+Batch membership is validated unconditionally at the top of every run, in both
+modes, against `Object.keys(SHARED_SCENARIOS)`: a scenario listed by a batch
+that is not a registry key, a scenario listed by more than one batch, a registry
+scenario missing from every batch, or a `parallel` outside `[1, 4]` prints every
+error and exits `2`. **Deliberate failure mode:** a scenario added to
+`SHARED_SCENARIOS` without a batch fails `e2e:parallel` (both modes) until it is
+batched; `e2e:deployed` and `run.ts` are unaffected. An unknown `E2E_BATCH`
+prints the known names and exits `2`.
+
+Capability-gated scenarios are filtered out up front and are never spawned.
+The end-of-run output is a machine-readable contract:
+
+```
+Batch: <name> (<n> scenarios, concurrency <p>)
+unsupported: <name>
+Summary: <pass> passed, <fail> failed, <unsupported> unsupported
+Wall time: <seconds>s
+```
+
+`<name>` is `all` when `E2E_BATCH` is unset. `<n>` is the selected registry-key
+count **before** capability filtering, so `pass + fail + unsupported === n`; the
+runner asserts this and exits `2` otherwise. Because unsupported scenarios are
+filtered before spawn, a non-zero child exit is a failure: exit `1` if any
+scenario failed, else `0`. A child that exceeds its watchdog deadline (its
+scenario budget plus ten minutes) is killed and reported as a failure.
+
+The `cloud-agent-e2e-tests` GitHub workflow runs this as a matrix: a `plan` job resolves
+the batch names with `node` and no pnpm install, one `batches` matrix entry runs
+each batch (concurrency owned by the batch record; `E2E_PARALLEL` is not set)
+and uploads `e2e-batch-<name>.log`, and an `aggregate` job downloads the merged
+logs and runs `test/e2e/deploy/aggregate-batch-logs.mjs`. That consumer reports
+`ok` / `missing-log` / `no-summary` / `inconsistent` per expected batch (where
+`ok` means valid accounting, not that the tests passed), writes a combined
+`Summary:` to the job summary, and exits non-zero when any batch is not `ok` or
+when the plan or matrix result was not `success`. The workflow keeps its
+workflow-level `concurrency` only; there is no job-level `concurrency`, which
+would serialize the matrix.
 
 Cold boots contend on container provisioning, so `all` maximises the chance of a
-container cold-start timeout showing up as a false failure; the default `4`
-trades wall time for stability. The scoped counter attributes a completion only
-when its prompt carries that shard's marker; a request the harness dials without
-the scenario's prompt (for example a buggy lazy create) is not attributed and
-stays a documented limit.
+container cold-start timeout showing up as a false failure; the per-batch
+defaults trade wall time for stability. A batch's `parallel` is an experiment to
+recalibrate after an operator run, not a proven live-allocation bound: a
+finished scenario can retain its allocation until the idle stop, so peak live
+allocations can exceed the active-child count. The scoped counter attributes a
+completion only when its prompt carries that shard's marker; a request the
+harness dials without the scenario's prompt (for example a buggy lazy create) is
+not attributed and stays a documented limit.
 
 Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
 Worker names keep the stack addressable separately from production; they do
@@ -531,8 +571,8 @@ container identity. The absence of hot-turn preparation events is not proof that
 the same container served the turns; identity stays a local-only assertion.
 
 The four `sandboxFaults` scenarios' deployed statements are inference, not
-proof: the deployed matrix was not run for this change. The workflow's
-`timeout-minutes: 300` is an operational ceiling, not a certified or
+proof: the deployed matrix was not run for this change. The batch jobs'
+`timeout-minutes: 90` is a per-batch operational ceiling, not a certified or
 registry-derived bound; the scenarios mix per-turn and overall budgets, so no
 whole-matrix total is derivable. Their `sessionSandbox` capability over HTTP reports the
 persisted control-plane allocation reference, so "the same container" is
@@ -657,7 +697,7 @@ reusable catalog of planned and existing scenarios, see
 | `question-idle-resume` | Leaves a real `question:<tag>:<text>` unanswered; requires `toolResults.question=0`, the allocation to disappear inside the 15-minute idle window, the parked message to be terminal before the continuation, and a follow-up completing on a distinct non-null allocation (~30-minute budget). |
 | `external-kill` | After a completed turn, kills the identity-matched owned container via `sandboxFaults`; requires the same session to complete a follow-up on a distinct allocation reference. |
 | `kill-mid-flight` | Kills the identity-matched owned container while a parked `gate:<tag>` turn runs; requires a durable failure and a follow-up on a distinct allocation. Needs `gates` + `sandboxFaults`. |
-| `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `recovery_settled_reap` `physical_committed running→stopping` cause and stopCause, a terminal `provider_stop`, the heartbeat-expiry recovery outcome, no re-ready wrapper — plus a distinct replacement. |
+| `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `health_unhealthy_unresponsive` `allocation_transition` into `stopping.destroying`, a terminal `native_stop`, the heartbeat-expiry recovery start, no re-ready wrapper — plus a distinct replacement. |
 | `wrapper-freeze-inflight-reap` | Freezes the identity-matched control-wrapper process while a paced turn is held; requires the held message to terminalise `runtime_unhealthy`, an identity-matched `accepted_reconciliation` and still-active route, the settled-reap stop evidence, and a distinct replacement. |
 | `queue-while-busy` | Hold a bounded `slow:60:1000:16` turn, enqueue two echoes, and assert FIFO delivery through `cloud.message.*` events as the hold completes. |
 | `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |

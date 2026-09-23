@@ -204,7 +204,7 @@ semantics.
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
 | Only the `SandboxSmall` container class kept, `max_instances = 20`, `ssh.enabled = true` | The stack only runs normal `ses-` sessions; `20` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
-| The other seven container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
+| The other container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
 | Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
 | `CREDENTIAL_CONTAINMENT_ENABLED=false` | Non-contained dispatch; see plan sections 5 and 11.6. |
 | `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |
@@ -217,10 +217,10 @@ The e2e Worker provisions exactly one container class, `SandboxSmall`, with
 parallelism headroom for later parallel runs. `SandboxSmall` keeps the rendered
 `image` and `instance_type`; only `max_instances` and `ssh.enabled` change.
 
-All seven other container classes (`Sandbox`, `SandboxDIND`, `SandboxCodeReview`,
+All other container classes (`Sandbox`, `SandboxDIND`, `SandboxCodeReview`,
 `SandboxContainment`, `SandboxSmallContainment`, `SandboxCodeReviewContainment`,
-`SandboxContainers`) are removed from `containers`, `durable_objects.bindings` and
-`migrations`, so
+`SandboxContainers`)
+are removed from `containers`, `durable_objects.bindings` and `migrations`, so
 those bindings do not exist on `cloud-agent-e2e-test`. The migration list keeps
 each surviving SQLite Durable Object class on its original production tag
 (`CloudAgentSession` `v2`, `SandboxSmall` `v3`, `UserKiloFacade` `v5`,
@@ -342,8 +342,8 @@ expected set, else `0`; an expected capability gap is a reported skip, not a
 failure.
 Each scenario owns its cleanup; the runner only repeats `interruptSession` and
 `deleteSession` as a tolerant backstop. The same script runs in the
-`workflow_dispatch`-only `E2E Deployed` workflow
-(`.github/workflows/e2e-deployed.yml`). See
+`workflow_dispatch`-only `Cloud Agent E2E tests` workflow
+(`.github/workflows/cloud-agent-e2e-tests.yml`). See
 [`../README.md`](../README.md#deployed-matrix-runner) for the scenario matrix
 and the env contract.
 
@@ -351,8 +351,8 @@ Aggregate-runtime risk: the four public-surface scenarios have declared
 ceilings of 10 + 25 + 12 + 30 minutes, plus cleanup (up to about 2.5 minutes)
 and transport overhead. Their budgets mix per-turn and overall timeouts, as the
 existing scenarios do (`cold-hot` alone permits four 240 s turn waits), so no
-whole-matrix total is derivable from the registry. The workflow's
-`timeout-minutes: 300` is a reasonable operational ceiling, not a certified
+whole-matrix total is derivable from the registry. The workflow's per-batch
+`timeout-minutes: 90` is a reasonable operational ceiling, not a certified
 whole-matrix bound. None of the four public-surface scenarios uses a `gate` or
 `hang`; `worktree-multi-chat` does issue a targeted interrupt of the sibling
 chat.

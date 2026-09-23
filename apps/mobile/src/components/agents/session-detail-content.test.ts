@@ -930,6 +930,24 @@ describe('SessionDetailContent header title', () => {
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 
+  it('shows the fallback name instead of the generated placeholder title', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T02:05:22.778Z';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
+  });
+
+  it('renders a real server title unchanged', async () => {
+    sessionTitleOverride = 'Fix the session header';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe('Fix the session header');
+  });
+
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.

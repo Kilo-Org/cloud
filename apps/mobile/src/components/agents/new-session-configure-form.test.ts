@@ -813,9 +813,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: kilo remote hint ──
-  it('names both kilo remote and /remote, with no literal markdown, for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language ──
+  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
+    const cliTerms = ['kilo remote', '/remote', 'CLI session', 'local kilo process'];
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const cloud = NewSessionConfigureForm({
@@ -823,10 +826,14 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
-    // The help draws the commands as prose: the authoring markers must not
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(cloud, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    // The help draws the sentence as prose: the authoring markers must not
     // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
@@ -836,9 +843,13 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(remote, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 

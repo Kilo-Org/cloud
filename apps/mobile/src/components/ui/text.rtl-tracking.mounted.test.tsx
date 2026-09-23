@@ -43,9 +43,11 @@ afterEach(() => {
   renderer = undefined;
 });
 
-// The tracked classes the home screen labels carry: the eyebrow
-// ("الجلسات الجارية الآن", "استكشف"), the section-header action ("عرض الكل")
-// and the bottom tab labels.
+// The tracked classes a caller puts on a label: the bottom tab labels and any
+// other `className`-supplied `tracking-*`. They stay on the element in RTL and
+// the reset below zeroes their spacing. The eyebrow variant and the
+// section-header action own their Latin display treatment and drop it in RTL
+// instead (see `Text`'s eyebrow variant).
 const TRACKED_CLASSES = ['tracking-[1.5px]', 'tracking-[0.2px]'] as const;
 
 describe('Text tracked labels in RTL', () => {
@@ -98,7 +100,7 @@ describe('Text tracked labels in RTL', () => {
     expect(hostText(root).props.style).toBeUndefined();
   });
 
-  it('applies the same reset to the shared Eyebrow label', () => {
+  it('applies the same reset to the shared Eyebrow label, whose own display class is dropped in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 

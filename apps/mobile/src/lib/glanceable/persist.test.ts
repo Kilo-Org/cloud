@@ -7,10 +7,13 @@ import {
 
 import {
   _resetGlanceablePersistForTests,
+  _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
+  isGlanceableRestoreSettled,
+  isGlanceableRestoreUnavailable,
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from './persist';
@@ -137,6 +140,46 @@ describe('restorePersistedGlanceable', () => {
 
     expect(getLastGlanceableSnapshot()).toEqual(stored);
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+
+  it('flags an unreadable mirror so a caller can tell it from an absent record', async () => {
+    // A locked keychain (expo-secure-store's default WHEN_UNLOCKED access): the
+    // record may exist but cannot be read.
+    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('does not report a restore settled until the first read finishes', async () => {
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+
+    const restore = restorePersistedGlanceable();
+
+    // A caller that reads a null snapshot must not treat it as "nothing
+    // persisted" until the read that could fill it has settled.
+    expect(isGlanceableRestoreSettled()).toBe(false);
+
+    gate.resolve();
+    await restore;
+
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('clears the unreadable flag after a read that succeeds', async () => {
+    _setGlanceableRestoreUnavailableForTests(true);
+
+    await restorePersistedGlanceable();
+
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
   });
 
   // The mirror written by the previous release at schema version 1 carries no

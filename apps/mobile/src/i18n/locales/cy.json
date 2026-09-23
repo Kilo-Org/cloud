@@ -214,7 +214,6 @@
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
     "bonusCreditsExpiring": "Mae {{amount}} o gredydau bonws yn dod i ben ar {{date}}.",
-    "creditBalanceEmpty": "Nid oes credydau ar ôl yn eich balans. Rheolir credydau'r cyfrif hwn y tu allan i'r ap iOS.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -3406,5 +3405,17 @@
     "multiplierError": "Nodwch luosydd o 1 neu fwy",
     "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
     "pushOffByCategory": "I ffwrdd yn Hysbysiadau"
+  },
+  "credits": {
+    "title": "Prynu credydau",
+    "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
+    "packLabel": "Ychwanegu {{amount}} o gredydau",
+    "priceUnavailable": "Pris ddim ar gael",
+    "purchased": "Ychwanegwyd credydau at eich balans.",
+    "empty": "Nid yw pecynnau credydau ar gael ar hyn o bryd.",
+    "noMatchingProducts": "Ni ddychwelodd yr App Store unrhyw becynnau credydau cyfatebol.",
+    "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
+    "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
+    "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
   }
 }

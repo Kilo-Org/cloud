@@ -214,7 +214,6 @@
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
     "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
-    "creditBalanceEmpty": "M'għad fadal l-ebda kreditu fil-bilanċ tiegħek. Għal dan il-kont, il-krediti jiġu mmaniġġjati barra mill-applikazzjoni tal-iOS.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -3363,5 +3362,17 @@
     "multiplierError": "Daħħal multiplikatur ta' 1 jew aktar",
     "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
     "pushOffByCategory": "Mitfi fin-Notifiki"
+  },
+  "credits": {
+    "title": "Ixtri krediti",
+    "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
+    "packLabel": "Żid {{amount}} f'krediti",
+    "priceUnavailable": "Prezz mhux disponibbli",
+    "purchased": "Il-krediti ġew miżjuda mal-bilanċ tiegħek.",
+    "empty": "Il-pakketti tal-krediti mhumiex disponibbli bħalissa.",
+    "noMatchingProducts": "L-App Store ma rritornax pakketti tal-krediti li jaqblu.",
+    "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
+    "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
+    "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   }
 }

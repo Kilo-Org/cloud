@@ -214,7 +214,6 @@
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
     "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
-    "creditBalanceEmpty": "יתרת הקרדיטים שלך היא אפס. בחשבון הזה, הקרדיטים מנוהלים מחוץ לאפליקציית iOS.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",
@@ -3277,5 +3276,17 @@
     "multiplierError": "הזן מכפיל של 1 או יותר",
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
     "pushOffByCategory": "כבוי בהתראות"
+  },
+  "credits": {
+    "title": "קניית קרדיטים",
+    "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
+    "packLabel": "הוספת {{amount}} בקרדיטים",
+    "priceUnavailable": "המחיר אינו זמין",
+    "purchased": "הקרדיטים נוספו ליתרה שלך.",
+    "empty": "חבילות קרדיטים אינן זמינות כעת.",
+    "noMatchingProducts": "App Store לא החזיר חבילות קרדיטים תואמות.",
+    "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
+    "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
+    "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   }
 }

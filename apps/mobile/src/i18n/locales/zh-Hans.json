@@ -214,7 +214,6 @@
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
     "bonusCreditsExpiring": "{{amount}} 的奖励额度将于 {{date}} 到期。",
-    "creditBalanceEmpty": "你的可用额度已用完。此账户的额度需在 iOS 应用之外管理。",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -3234,5 +3233,17 @@
     "multiplierError": "请输入 1 或更大的倍数",
     "permissionDenied": "你没有管理支出提醒的权限。",
     "pushOffByCategory": "已在通知中关闭"
+  },
+  "credits": {
+    "title": "购买额度",
+    "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
+    "packLabel": "添加 {{amount}} 额度",
+    "priceUnavailable": "价格不可用",
+    "purchased": "额度已添加到你的余额。",
+    "empty": "目前无法获取额度包。",
+    "noMatchingProducts": "App Store 未返回匹配的额度包。",
+    "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
+    "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
+    "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
   }
 }

@@ -214,7 +214,6 @@
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
     "bonusCreditsExpiring": "{{amount}} tutarındaki bonus kredinin süresi {{date}} tarihinde dolacak.",
-    "creditBalanceEmpty": "Kredi bakiyen tükendi. Bu hesabın kredileri iOS uygulamasının dışında yönetilir.",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -3234,5 +3233,17 @@
     "multiplierError": "1 veya daha büyük bir çarpan gir",
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
     "pushOffByCategory": "Bildirimler'de kapalı"
+  },
+  "credits": {
+    "title": "Kredi satın al",
+    "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
+    "packLabel": "{{amount}} değerinde kredi ekle",
+    "priceUnavailable": "Fiyat kullanılamıyor",
+    "purchased": "Krediler bakiyenize eklendi.",
+    "empty": "Kredi paketleri şu anda kullanılamıyor.",
+    "noMatchingProducts": "App Store eşleşen kredi paketi döndürmedi.",
+    "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
   }
 }

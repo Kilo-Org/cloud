@@ -214,7 +214,6 @@
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
     "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna bónais in éag {{date}}.",
-    "creditBalanceEmpty": "Níl aon chreidmheas fágtha agat. Déantar creidmheasanna an chuntais seo a bhainistiú lasmuigh den aip iOS.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -3363,5 +3362,17 @@
     "multiplierError": "Iontráil iolraitheoir 1 nó níos mó",
     "permissionDenied": "Níl cead agat foláirimh chaiteachais a bhainistiú.",
     "pushOffByCategory": "As i bhFógraí"
+  },
+  "credits": {
+    "title": "Ceannaigh creidmheasanna",
+    "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
+    "packLabel": "Cuir {{amount}} i gcreidmheasanna leis",
+    "priceUnavailable": "Praghas gan fáil",
+    "purchased": "Cuireadh creidmheasanna le do chothromas.",
+    "empty": "Níl pacáistí creidmheasa ar fáil faoi láthair.",
+    "noMatchingProducts": "Níor thug an App Store aon phacáistí creidmheasa comhoiriúnacha ar ais.",
+    "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
+    "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
+    "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
   }
 }

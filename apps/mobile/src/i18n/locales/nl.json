@@ -214,7 +214,6 @@
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
     "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
-    "creditBalanceEmpty": "Je hebt geen tegoed meer. Het tegoed voor dit account wordt buiten de iOS-app beheerd.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -3234,5 +3233,17 @@
     "multiplierError": "Voer een vermenigvuldiger van 1 of meer in",
     "permissionDenied": "Je hebt geen toestemming om bestedingswaarschuwingen te beheren.",
     "pushOffByCategory": "Uit in Meldingen"
+  },
+  "credits": {
+    "title": "Credits kopen",
+    "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "packLabel": "{{amount}} aan credits toevoegen",
+    "priceUnavailable": "Prijs niet beschikbaar",
+    "purchased": "Er zijn credits aan je saldo toegevoegd.",
+    "empty": "Creditpakketten zijn momenteel niet beschikbaar.",
+    "noMatchingProducts": "De App Store heeft geen overeenkomende creditpakketten geretourneerd.",
+    "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
+    "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
+    "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."
   }
 }

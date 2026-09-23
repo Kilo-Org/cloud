@@ -214,7 +214,6 @@
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
     "bonusCreditsExpiring": "{{amount}} nan kredi bonis ap ekspire {{date}}.",
-    "creditBalanceEmpty": "Ou pa gen kredi ki rete. Pou kont sa a, ou jere kredi yo deyò aplikasyon iOS la.",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -3234,5 +3233,17 @@
     "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
     "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
     "pushOffByCategory": "Fèmen nan Notifikasyon"
+  },
+  "credits": {
+    "title": "Achte kredi",
+    "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
+    "packLabel": "Ajoute {{amount}} an kredi",
+    "priceUnavailable": "Pri pa disponib",
+    "purchased": "Kredi yo ajoute nan balans ou.",
+    "empty": "Pake kredi yo pa disponib kounye a.",
+    "noMatchingProducts": "App Store pa t retounen okenn pake kredi ki matche.",
+    "noMatchingProductsPlay": "Google Play pa t retounen okenn pake kredi ki matche.",
+    "purchaseOwnedByAnotherAccount": "Kredi ki sou Apple Account sa a fè pati yon lòt kont Kilo. Konekte nan kont Kilo sa a pou itilize yo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredi ki sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou itilize yo."
   }
 }

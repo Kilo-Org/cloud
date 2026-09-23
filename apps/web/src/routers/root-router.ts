@@ -32,6 +32,7 @@ import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
 import { personalAutoFixRouter } from '@/routers/personal-auto-fix-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
+import { creditsRouter } from '@/routers/credits-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
@@ -86,6 +87,7 @@ export const rootRouter = createTRPCRouter({
   personalAutoFix: personalAutoFixRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
+  credits: creditsRouter,
   agentProfiles: agentProfilesRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,

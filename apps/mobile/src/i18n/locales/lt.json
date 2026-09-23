@@ -214,7 +214,6 @@
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
     "bonusCreditsExpiring": "Papildomi kreditai ({{amount}}) galioja iki {{date}}.",
-    "creditBalanceEmpty": "Jūsų kreditų likutis lygus nuliui. Šios paskyros kreditai valdomi ne iOS programėlėje.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -3320,5 +3319,17 @@
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
     "pushOffByCategory": "Išjungta pranešimuose"
+  },
+  "credits": {
+    "title": "Pirkti kreditus",
+    "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
+    "packLabel": "Pridėti {{amount}} kreditų",
+    "priceUnavailable": "Kaina neprieinama",
+    "purchased": "Kreditai pridėti prie jūsų balanso.",
+    "empty": "Kreditų paketai šiuo metu neprieinami.",
+    "noMatchingProducts": "App Store negrąžino jokių atitinkančių kreditų paketų.",
+    "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
+    "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
+    "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
   }
 }

@@ -51,6 +51,8 @@ export default defineProject({
       'src/lib/hooks/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.tsx',
+      'src/lib/credits/**/*.test.ts',
+      'src/lib/credits/**/*.test.tsx',
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',

@@ -18,10 +18,19 @@ const mockSubscriptionsV2Revoke = jest
 
 const mockOrdersGet = jest.fn().mockImplementation(() => ({ data: { orderId: 'paid-order' } }));
 
+const mockProductsGet = jest
+  .fn()
+  .mockImplementation(() => ({ data: { productId: 'credits_usd10', purchaseState: 0 } }));
+
+const mockProductsConsume = jest
+  .fn<(request: unknown) => Promise<void>>()
+  .mockResolvedValue(undefined);
+
 const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) => ({
   args,
   orders: { get: mockOrdersGet },
   purchases: {
+    products: { get: mockProductsGet, consume: mockProductsConsume },
     subscriptions: { acknowledge: mockAcknowledge },
     subscriptionsv2: {
       get: mockSubscriptionsV2Get,
@@ -174,6 +183,47 @@ describe('google-play-sdk', () => {
     await expect(revokeGooglePlaySubscriptionPurchase('test-token')).rejects.toThrow(
       'provider unavailable'
     );
+  });
+
+  it('calls purchases.products.get with the package name, product id and token', async () => {
+    const { getGooglePlayProductPurchase } = loadGooglePlaySdk();
+
+    const data = await getGooglePlayProductPurchase('credits_usd10', 'purchase-token');
+
+    expect(mockProductsGet).toHaveBeenCalledWith({
+      packageName: 'com.kilocode.kiloapp',
+      productId: 'credits_usd10',
+      token: 'purchase-token',
+    });
+    expect(data).toEqual({ productId: 'credits_usd10', purchaseState: 0 });
+  });
+
+  it('consumes a one-time product and tolerates an already-consumed purchase', async () => {
+    const { consumeGooglePlayProductPurchase } = loadGooglePlaySdk();
+
+    await consumeGooglePlayProductPurchase('credits_usd10', 'purchase-token');
+    expect(mockProductsConsume).toHaveBeenCalledWith({
+      packageName: 'com.kilocode.kiloapp',
+      productId: 'credits_usd10',
+      token: 'purchase-token',
+    });
+
+    // The app can consume concurrently, or the response can be lost.
+    mockProductsConsume.mockRejectedValueOnce(new Error('already consumed'));
+    mockProductsGet.mockReturnValueOnce({ data: { consumptionState: 1 } });
+    await expect(
+      consumeGooglePlayProductPurchase('credits_usd10', 'purchase-token')
+    ).resolves.toBeUndefined();
+  });
+
+  it('propagates a consume failure unless the purchase is consumed', async () => {
+    const { consumeGooglePlayProductPurchase } = loadGooglePlaySdk();
+
+    mockProductsConsume.mockRejectedValueOnce(new Error('provider unavailable'));
+    mockProductsGet.mockReturnValueOnce({ data: { consumptionState: 0 } });
+    await expect(
+      consumeGooglePlayProductPurchase('credits_usd10', 'purchase-token')
+    ).rejects.toThrow('provider unavailable');
   });
 
   it('throws when the service account JSON is not set', () => {

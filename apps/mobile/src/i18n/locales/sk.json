@@ -214,7 +214,6 @@
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
     "bonusCreditsExpiring": "Platnosť bonusových kreditov v hodnote {{amount}} sa skončí {{date}}.",
-    "creditBalanceEmpty": "Nemáš žiadne kredity. Pre tento účet sa kredity spravujú mimo aplikácie pre iOS.",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -3320,5 +3319,17 @@
     "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
     "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
     "pushOffByCategory": "Vypnuté v Upozorneniach"
+  },
+  "credits": {
+    "title": "Kúpiť kredity",
+    "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
+    "packLabel": "Pridať {{amount}} v kreditoch",
+    "priceUnavailable": "Cena nie je k dispozícii",
+    "purchased": "Kredity boli pridané do vášho zostatku.",
+    "empty": "Balíky kreditov teraz nie sú k dispozícii.",
+    "noMatchingProducts": "App Store nevrátil žiadne zodpovedajúce balíky kreditov.",
+    "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
+    "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   }
 }

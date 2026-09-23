@@ -214,7 +214,6 @@
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
     "bonusCreditsExpiring": "{{amount}} em créditos de bônus expiram em {{date}}.",
-    "creditBalanceEmpty": "Seu saldo de créditos está zerado. Nesta conta, os créditos são gerenciados fora do app para iOS.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -3277,5 +3276,17 @@
     "multiplierError": "Insira um multiplicador de 1 ou mais",
     "permissionDenied": "Você não tem permissão para gerenciar os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações"
+  },
+  "credits": {
+    "title": "Comprar créditos",
+    "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
+    "packLabel": "Adicionar {{amount}} em créditos",
+    "priceUnavailable": "Preço indisponível",
+    "purchased": "Créditos adicionados ao seu saldo.",
+    "empty": "Os pacotes de créditos estão indisponíveis no momento.",
+    "noMatchingProducts": "A App Store não retornou nenhum pacote de créditos correspondente.",
+    "noMatchingProductsPlay": "O Google Play não retornou nenhum pacote de créditos correspondente.",
+    "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
+    "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."
   }
 }

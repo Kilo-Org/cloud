@@ -370,7 +370,7 @@ beforeEach(() => {
   mockedIap.connected = false;
   mockedIap.fetchProducts.mockResolvedValue([]);
   mockedIap.finishTransaction.mockResolvedValue(undefined);
-  mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
+  mockedIap.getAvailablePurchases.mockResolvedValue([]);
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
@@ -1377,7 +1377,8 @@ describe('KiloPassNativeIapOwner', () => {
   });
 
   it('recovers purchases using server-backed product IDs when the store fetch is empty', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
@@ -1385,17 +1386,24 @@ describe('KiloPassNativeIapOwner', () => {
 
     owner.render();
     await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
+    owner.render();
+    await flushPromises();
 
     expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
   });
 
   it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
     owner.render();
     await flushPromises();
 

@@ -6,6 +6,8 @@ import {
   remoteCommandCatalogV1Schema,
   sessionEventPayloadSchema,
   sessionEventV2RowSchema,
+  sessionStatusDataSchema,
+  sessionStatusUpdatedPayloadSchema,
 } from './schemas';
 
 describe('cloudWorktreeChangesReadyDataSchema', () => {
@@ -134,6 +136,82 @@ describe('session worktree event schemas', () => {
   );
 });
 
+describe('scheduled session status', () => {
+  const scheduledAt = '2026-09-24T09:00:00.000Z';
+
+  it('parses a scheduled session.status payload with its wake time', () => {
+    const parsed = sessionStatusDataSchema.parse({
+      sessionID: 'ses_12345678901234567890123456',
+      status: { type: 'scheduled', scheduledAt },
+    });
+
+    expect(parsed.status).toEqual({ type: 'scheduled', scheduledAt });
+  });
+
+  it('carries the wake time through the v2 row and both status-updated payload shapes', () => {
+    const row = {
+      source: 'v2' as const,
+      sessionId: 'ses_12345678901234567890123456',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:01.000Z',
+      title: 'Test',
+      createdOnPlatform: 'cloud-agent-web',
+      organizationId: null,
+      gitUrl: null,
+      gitBranch: null,
+      parentSessionId: null,
+      status: 'scheduled',
+      statusUpdatedAt: null,
+      scheduledAt,
+    };
+
+    expect(sessionEventV2RowSchema.parse(row).scheduledAt).toBe(scheduledAt);
+
+    const fullRow = sessionStatusUpdatedPayloadSchema.parse({
+      source: 'v2',
+      session: row,
+      previousStatus: 'idle',
+      status: 'scheduled',
+      statusUpdatedAt: null,
+      scheduledAt,
+      changedAt: row.updatedAt,
+    });
+    expect(fullRow.scheduledAt).toBe(scheduledAt);
+
+    const lightweight = sessionStatusUpdatedPayloadSchema.parse({
+      source: 'v2',
+      sessionId: row.sessionId,
+      previousStatus: 'idle',
+      status: 'scheduled',
+      statusUpdatedAt: null,
+      scheduledAt,
+      changedAt: row.updatedAt,
+    });
+    expect(lightweight.scheduledAt).toBe(scheduledAt);
+  });
+
+  it('parses an unknown status string and preserves it verbatim', () => {
+    const unknownStatus = 'hibernating';
+    const parsed = sessionEventV2RowSchema.parse({
+      source: 'v2',
+      sessionId: 'ses_12345678901234567890123456',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:01.000Z',
+      title: 'Test',
+      createdOnPlatform: 'cloud-agent-web',
+      organizationId: null,
+      gitUrl: null,
+      gitBranch: null,
+      parentSessionId: null,
+      status: unknownStatus,
+      statusUpdatedAt: null,
+    });
+
+    expect(parsed.status).toBe(unknownStatus);
+    expect(parsed.status).not.toBe('idle');
+  });
+});
+
 describe('activeSessionSchema capabilities', () => {
   it('parses a session whose `capabilities` is absent', () => {
     const parsed = activeSessionSchema.parse({
@@ -187,6 +265,29 @@ describe('activeSessionSchema capabilities', () => {
       capabilities: { attachments: 'yes' },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('activeSessionSchema scheduledAt', () => {
+  it('exposes the wake time for a scheduled session', () => {
+    const parsed = activeSessionSchema.parse({
+      id: 'ses_remote_scheduled',
+      status: 'scheduled',
+      title: 'Test',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+
+    expect(parsed.scheduledAt).toBe('2026-09-24T09:00:00.000Z');
+  });
+
+  it('leaves the wake time absent when the CLI reports none', () => {
+    const parsed = activeSessionSchema.parse({
+      id: 'ses_remote_scheduled',
+      status: 'scheduled',
+      title: 'Test',
+    });
+
+    expect(parsed.scheduledAt).toBeUndefined();
   });
 });
 

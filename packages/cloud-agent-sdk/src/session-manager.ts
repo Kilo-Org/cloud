@@ -812,6 +812,9 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
     };
   if (s.type === 'interrupted')
     return { type: 'info', message: 'Session stopped', timestamp: now, code: 'session-stopped' };
+  // A scheduled session renders no bottom-bar indicator: the session-detail
+  // connection row owns that reading.
+  if (s.type === 'scheduled') return null;
   return null;
 }
 
@@ -1566,7 +1569,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
     const sKey = (s: AgentStatus) =>
-      s.type === 'autocommit' ? `${s.type}:${s.step}:${s.commitHash ?? ''}` : s.type;
+      s.type === 'autocommit'
+        ? `${s.type}:${s.step}:${s.commitHash ?? ''}`
+        : s.type === 'scheduled'
+          ? `${s.type}:${s.scheduledAt ?? ''}`
+          : s.type;
     const csKey = (cs: CloudStatus | null) =>
       cs === null
         ? ''

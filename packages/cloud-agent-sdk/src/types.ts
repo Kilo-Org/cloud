@@ -147,7 +147,9 @@ export type AgentStatus =
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
   | { type: 'disconnected' }
-  | { type: 'interrupted' };
+  | { type: 'interrupted' }
+  /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
+  | { type: 'scheduled'; scheduledAt?: string };
 
 /** Cloud infrastructure status — independent from agent activity. */
 export type CloudStatus =

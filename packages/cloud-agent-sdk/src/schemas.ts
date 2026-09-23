@@ -47,6 +47,10 @@ export const sessionStatusSchema = z.discriminatedUnion('type', [
     message: z.string(),
     next: z.number(),
   }),
+  // A session that is scheduled to wake later and does nothing now. The wake
+  // time is optional: a CLI may report `scheduled` without one, and the reading
+  // then stays "scheduled" with no time.
+  z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional() }),
 ]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 
@@ -460,6 +464,13 @@ export const activeSessionSchema = z
     gitBranch: z.string().optional(),
     parentSessionId: z.string().optional(),
     /**
+     * ISO-8601 wake time for a `scheduled` session, as advertised by the
+     * owning CLI in its `sessions.list` / `sessions.heartbeat` payload. Absent
+     * when the CLI reports `scheduled` without a wake time. Declared here so
+     * typed consumers (the mobile session list) can read it without a cast.
+     */
+    scheduledAt: z.string().optional(),
+    /**
      * Per-session capabilities advertised by the owning CLI in its
      * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
      * gates the remote-CLI attachment path; absent / false means the CLI
@@ -555,7 +566,16 @@ export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
 // V2 session system events
 // ---------------------------------------------------------------------------
 
-export const sessionStatusValueSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
+/**
+ * Permissive status value for v2 session rows and status-updated payloads.
+ *
+ * Deliberately `z.string()` rather than a closed enum: a newer CLI may report a
+ * status this SDK does not know yet, and that value must still parse so the
+ * event/row is never dropped and the value is never re-labelled. Known values
+ * (`idle`, `busy`, `question`, `permission`, `retry`, `scheduled`) keep working
+ * unchanged.
+ */
+export const sessionStatusValueSchema = z.string();
 
 export const sessionEventV2RowSchema = z.object({
   source: z.literal('v2'),
@@ -571,6 +591,7 @@ export const sessionEventV2RowSchema = z.object({
   worktreeId: z.string().nullable().optional(),
   status: sessionStatusValueSchema.nullable(),
   statusUpdatedAt: z.string().nullable(),
+  scheduledAt: z.string().nullable().optional(),
 });
 export type SessionEventV2Row = z.infer<typeof sessionEventV2RowSchema>;
 
@@ -588,6 +609,7 @@ export const sessionStatusUpdatedPayloadSchema = z.union([
     previousStatus: sessionStatusValueSchema.nullable(),
     status: sessionStatusValueSchema.nullable(),
     statusUpdatedAt: z.string().nullable(),
+    scheduledAt: z.string().nullable().optional(),
     changedAt: z.string(),
   }),
   z.object({
@@ -596,6 +618,7 @@ export const sessionStatusUpdatedPayloadSchema = z.union([
     previousStatus: sessionStatusValueSchema.nullable(),
     status: sessionStatusValueSchema.nullable(),
     statusUpdatedAt: z.string().nullable(),
+    scheduledAt: z.string().nullable().optional(),
     updatedAt: z.string().optional(),
     changedAt: z.string(),
   }),

@@ -551,15 +551,21 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     // Heartbeats carry the CLI's current per-session status. Forwarding it
     // re-derives activity after a reconnect: a terminal `session.status: idle`
     // fired while the socket was dead is never replayed, which otherwise
-    // leaves the UI stuck on a busy indicator forever.
-    function forwardHeartbeatStatus(status: string): void {
-      if (status !== 'idle' && status !== 'busy') return;
-      if (status === lastForwardedHeartbeatStatus) return;
-      lastForwardedHeartbeatStatus = status;
+    // leaves the UI stuck on a busy indicator forever. A `scheduled` status
+    // carries the wake time, which is part of the dedupe key so a changed wake
+    // re-derives instead of being swallowed as a repeat.
+    function forwardHeartbeatStatus(status: string, scheduledAt?: string): void {
+      if (status !== 'idle' && status !== 'busy' && status !== 'scheduled') return;
+      const key = status === 'scheduled' ? `scheduled:${scheduledAt ?? ''}` : status;
+      if (key === lastForwardedHeartbeatStatus) return;
+      lastForwardedHeartbeatStatus = key;
       sink.onServiceEvent({
         type: 'session.status',
         sessionId: config.kiloSessionId,
-        status: { type: status },
+        status:
+          status === 'scheduled'
+            ? { type: 'scheduled', ...(scheduledAt ? { scheduledAt } : {}) }
+            : { type: status },
       });
     }
 
@@ -581,7 +587,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (session) {
           setOwnerConnectionId(session.connectionId);
           sessionStopped = false;
-          forwardHeartbeatStatus(session.status);
+          forwardHeartbeatStatus(session.status, session.scheduledAt);
           publishCapabilities(session.capabilities);
           return;
         }
@@ -599,7 +605,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (session) {
           setOwnerConnectionId(parsed.data.connectionId);
           sessionStopped = false;
-          forwardHeartbeatStatus(session.status);
+          forwardHeartbeatStatus(session.status, session.scheduledAt);
           publishCapabilities(session.capabilities);
           return;
         }

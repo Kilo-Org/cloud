@@ -1,6 +1,14 @@
+const mockSweepLog = jest.fn();
+jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSweepLog) }));
+
 import { describe, expect, it } from '@jest/globals';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
+  MAX_SCOPE_DECISIONS_PER_RUN,
+  SCOPE_BATCH_SIZE,
   LOOKBACK_HOURS,
+  createSpendAlertSweepStore,
   evaluateScope,
   runSpendAlertSweep,
   sweepHourlyBuckets,
@@ -17,6 +25,8 @@ const ANOMALY_RULE_ID = 'rule-anomaly';
 const NOW = new Date('2026-09-16T16:32:00.000Z');
 /** The hour bucket `NOW` falls in; the dedupe key is anchored to it. */
 const NOW_HOUR = '2026-09-16T16:00:00.000Z';
+
+const HOUR_MS = 60 * 60 * 1000;
 
 function thresholdRule(overrides: Partial<SpendAlertRuleSnapshot> = {}): SpendAlertRuleSnapshot {
   return {
@@ -64,8 +74,12 @@ function snapshot(overrides: Partial<SpendAlertScopeSnapshot> = {}): SpendAlertS
   };
 }
 
+/** A store that answers one fixed snapshot for every scope it is asked about. */
 function stubStore(value: SpendAlertScopeSnapshot | null): SpendAlertSweepStore {
-  return { loadScopeSnapshot: async () => value };
+  return {
+    loadScopeSnapshots: async scopeKeys =>
+      value === null ? new Map() : new Map(scopeKeys.map(scopeKey => [scopeKey, value])),
+  };
 }
 
 /** A store whose snapshot follows the rule state a sweep would have written. */
@@ -81,18 +95,24 @@ function lifecycleStore(options: {
   const value = { windowMicrodollars: options.windowMicrodollars };
 
   const store: SpendAlertSweepStore = {
-    loadScopeSnapshot: async () =>
-      snapshot({
-        rules: [
-          {
-            ...options.rule,
-            firing: state.firing,
-            conditionStartedAt: state.conditionStartedAt,
-            lastValueMicrodollars: state.lastValueMicrodollars,
-          },
-        ],
-        windowMicrodollars: value.windowMicrodollars,
-      }),
+    loadScopeSnapshots: async scopeKeys =>
+      new Map(
+        scopeKeys.map(scopeKey => [
+          scopeKey,
+          snapshot({
+            scopeKey,
+            rules: [
+              {
+                ...options.rule,
+                firing: state.firing,
+                conditionStartedAt: state.conditionStartedAt,
+                lastValueMicrodollars: state.lastValueMicrodollars,
+              },
+            ],
+            windowMicrodollars: value.windowMicrodollars,
+          }),
+        ])
+      ),
   };
 
   return {
@@ -420,22 +440,38 @@ describe('one alert per crossing', () => {
   });
 });
 
-describe('runSpendAlertSweep re-arm walk', () => {
+describe('runSpendAlertSweep candidate set and batching', () => {
+  type SweepDb = Parameters<typeof runSpendAlertSweep>[0];
+  type FiringRuleRow = { ruleId: string; scopeKey: string };
+  type RollupRow = { scope_key: string; changed: boolean };
+
+  /** A store that records the batch of keys each decision read asked for. */
+  function recordingStore(): { store: SpendAlertSweepStore; requestedBatches: string[][] } {
+    const requestedBatches: string[][] = [];
+    const store: SpendAlertSweepStore = {
+      loadScopeSnapshots: async scopeKeys => {
+        requestedBatches.push([...scopeKeys]);
+        return new Map();
+      },
+    };
+    return { store, requestedBatches };
+  }
+
+  /** The keys a store's batches asked to decide, in order. */
+  function decidedKeys(requestedBatches: string[][]): string[] {
+    return requestedBatches.flat();
+  }
+
   /**
-   * A database whose only reads are the empty rollup and the firing-scope pages.
-   * `makePage` builds each page from the limit the walk actually asked for, so
-   * the test does not hard-code the walk's page size.
+   * A database whose reads are the rollup (`rollupRows`), the firing-rule pages
+   * and nothing else. `makePage` builds each page from the limit the walk
+   * actually asked for, so the test does not hard-code the walk's page size.
    */
   function pagedFiringDatabase(
-    makePage: (size: number, call: number) => string[],
-    delta: string[] = []
-  ): {
-    database: Parameters<typeof runSpendAlertSweep>[0];
-    requestedLimits: number[];
-    pages: string[][];
-  } {
+    makePage: (size: number, call: number) => FiringRuleRow[],
+    rollupRows: RollupRow[] = []
+  ): { database: SweepDb; requestedLimits: number[] } {
     const requestedLimits: number[] = [];
-    const pages: string[][] = [];
     const chain = {
       from: () => chain,
       innerJoin: () => chain,
@@ -444,70 +480,306 @@ describe('runSpendAlertSweep re-arm walk', () => {
       limit: (size: number) => {
         const call = requestedLimits.length;
         requestedLimits.push(size);
-        const page = makePage(size, call);
-        pages.push(page);
-        return Promise.resolve(page.map(scopeKey => ({ scopeKey })));
+        return Promise.resolve(makePage(size, call));
       },
     };
     const database = {
-      execute: async () => ({ rows: delta.map(scope_key => ({ scope_key })) }),
-      selectDistinct: () => chain,
-    } as unknown as Parameters<typeof runSpendAlertSweep>[0];
-    return { database, requestedLimits, pages };
+      execute: async () => ({ rows: rollupRows }),
+      select: () => chain,
+    } as unknown as SweepDb;
+    return { database, requestedLimits };
+  }
+
+  function scopeKeys(count: number, prefix: string): string[] {
+    return Array.from(
+      { length: count },
+      (_, index) => `${prefix}-${String(index).padStart(5, '0')}`
+    );
+  }
+
+  /**
+   * The rollup's rows for a set of scopes: every one of them re-derived, and —
+   * unless `rewritten` says otherwise — every one of them rewritten by the
+   * guarded upsert.
+   */
+  function rollupRows(
+    keys: string[],
+    rewritten: (key: string) => boolean = () => true
+  ): RollupRow[] {
+    return keys.map(scope_key => ({ scope_key, changed: rewritten(scope_key) }));
   }
 
   it('re-arms every firing scope across keyset pages, not only the first page', async () => {
-    const evaluated: string[] = [];
-    const store: SpendAlertSweepStore = {
-      loadScopeSnapshot: async scopeKey => {
-        evaluated.push(scopeKey);
-        return null;
-      },
-    };
-    const tail = ['user:zzz-1', 'user:zzz-2'];
-    const { database, pages } = pagedFiringDatabase((size, call) =>
-      call === 0
-        ? Array.from({ length: size }, (_, i) => `user:p1-${String(i).padStart(4, '0')}`)
-        : call === 1
-          ? tail
-          : []
-    );
+    let firstPage: FiringRuleRow[] = [];
+    const tail: FiringRuleRow[] = [
+      { ruleId: 'rule-z1', scopeKey: 'user:zzz-1' },
+      { ruleId: 'rule-z2', scopeKey: 'user:zzz-2' },
+    ];
+    const { database, requestedLimits } = pagedFiringDatabase((size, call) => {
+      if (call === 0) {
+        firstPage = Array.from({ length: size }, (_, index) => ({
+          ruleId: `rule-p1-${String(index).padStart(4, '0')}`,
+          scopeKey: `user:p1-${String(index).padStart(4, '0')}`,
+        }));
+        return firstPage;
+      }
+      if (call === 1) return tail;
+      return [];
+    });
+    const { store, requestedBatches } = recordingStore();
 
     const result = await runSpendAlertSweep(database, { store }, { now: NOW });
 
     // The first page is full at the walk's own size, so a fixed single-page read
     // would stop here; the tail proves the walk continued past it.
-    expect(pages[0].length).toBeGreaterThan(0);
-    expect(pages[1]).toEqual(tail);
-    expect(evaluated).toEqual([...pages[0], ...tail]);
-    expect(result.candidateScopes).toBe(pages[0].length + tail.length);
+    expect(requestedLimits.length).toBeGreaterThan(1);
+    expect(firstPage.length).toBe(requestedLimits[0]);
+    const decided = decidedKeys(requestedBatches);
+    expect(decided).toHaveLength(firstPage.length + tail.length);
+    expect(new Set(decided)).toEqual(
+      new Set([...firstPage.map(rule => rule.scopeKey), ...tail.map(rule => rule.scopeKey)])
+    );
+    expect(result.candidateScopes).toBe(firstPage.length + tail.length);
   });
 
-  it('decides a scope only once when the rollup delta and the firing set overlap', async () => {
-    const evaluated: string[] = [];
-    const store: SpendAlertSweepStore = {
-      loadScopeSnapshot: async scopeKey => {
-        evaluated.push(scopeKey);
-        return null;
-      },
-    };
-    // The same scope arrives once through the rollup delta and again through the
-    // firing read; it must be decided once, not twice.
+  it("collapses a scope's two firing rules and the rollup delta into one decision", async () => {
+    // The same scope arrives once through the rollup delta and again twice
+    // through the firing read; it must be decided once, not three times.
+    const sameScope: FiringRuleRow[] = [
+      { ruleId: 'rule-a', scopeKey: 'user:owner-1' },
+      { ruleId: 'rule-b', scopeKey: 'user:owner-1' },
+    ];
     const { database } = pagedFiringDatabase(
-      (_size, call) => (call === 0 ? ['user:owner-1'] : []),
-      ['user:owner-1']
+      (_size, call) => (call === 0 ? sameScope : []),
+      rollupRows(['user:owner-1'])
     );
+    const { store, requestedBatches } = recordingStore();
 
     const result = await runSpendAlertSweep(database, { store }, { now: NOW });
 
-    expect(evaluated).toEqual(['user:owner-1']);
+    expect(decidedKeys(requestedBatches)).toEqual(['user:owner-1']);
     expect(result.candidateScopes).toBe(1);
+  });
+
+  it('decides a batch per chunk of scope keys, not a round trip per scope', async () => {
+    const deltaCount = SCOPE_BATCH_SIZE * 2 + 17;
+    const delta = scopeKeys(deltaCount, 'user:batch');
+    const { database } = pagedFiringDatabase(() => [], rollupRows(delta));
+    const { store, requestedBatches } = recordingStore();
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    expect(result.candidateScopes).toBe(deltaCount);
+    expect(requestedBatches).toHaveLength(3);
+    expect(requestedBatches.map(batch => batch.length)).toEqual([
+      SCOPE_BATCH_SIZE,
+      SCOPE_BATCH_SIZE,
+      17,
+    ]);
+    // Ranges are disjoint: no scope is decided twice.
+    expect(new Set(decidedKeys(requestedBatches)).size).toBe(deltaCount);
+  });
+
+  it('caps the run, reports the deferred remainder and keeps the delta first', async () => {
+    const delta = scopeKeys(MAX_SCOPE_DECISIONS_PER_RUN + 25, 'user:cap');
+    const { database } = pagedFiringDatabase(() => [], rollupRows(delta));
+    const { store, requestedBatches } = recordingStore();
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    expect(result.candidateScopes).toBe(MAX_SCOPE_DECISIONS_PER_RUN);
+    expect(result.timings?.deferredScopes).toBe(25);
+    expect(requestedBatches).toHaveLength(MAX_SCOPE_DECISIONS_PER_RUN / SCOPE_BATCH_SIZE);
+    const decided = decidedKeys(requestedBatches);
+    const deltaSet = new Set(delta);
+    // Every decided scope is one whose bucket moved, decided once: the cap may
+    // not spend a slot on a re-derived scope while a delta scope is waiting, and
+    // the rotation must not repeat a scope inside one tick.
+    expect(decided).toHaveLength(MAX_SCOPE_DECISIONS_PER_RUN);
+    expect(new Set(decided).size).toBe(MAX_SCOPE_DECISIONS_PER_RUN);
+    expect(decided.every(key => deltaSet.has(key))).toBe(true);
+  });
+
+  it('decides every rewritten scope before it defers a re-derived one', async () => {
+    // The rollup re-derived 6,000 scopes but rewrote only the last 3,820 of them
+    // — the delta is deliberately behind the re-derived set in scope-key order.
+    mockSweepLog.mockClear();
+    const all = scopeKeys(6000, 'user:mix');
+    const rewritten = new Set(all.slice(-3820));
+    const { database } = pagedFiringDatabase(
+      () => [],
+      rollupRows(all, key => rewritten.has(key))
+    );
+    const { store, requestedBatches } = recordingStore();
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    const decided = decidedKeys(requestedBatches);
+    expect(decided).toHaveLength(MAX_SCOPE_DECISIONS_PER_RUN);
+    // Every scope whose bucket moved has something new to decide, so the cap
+    // must not be what defers one of them.
+    expect(decided.filter(key => rewritten.has(key))).toHaveLength(rewritten.size);
+    // What the cap deferred is only re-derived scopes with nothing new to decide.
+    expect(result.timings?.deferredScopes).toBe(all.length - decided.length);
+    expect(result.sweptScopes).toBe(rewritten.size);
+    expect(mockSweepLog).toHaveBeenCalledWith(
+      'Spend alert sweep phases completed',
+      expect.objectContaining({ rederivedScopes: all.length })
+    );
+  });
+
+  it('still decides the delta when the re-derived remainder would consume the cap', async () => {
+    // ceil(89_983 / 18) = 5000, the whole cap. Without a remainder-floor bound
+    // the 100 scopes whose buckets moved would get zero slots every tick.
+    const remainder = scopeKeys(89_983, 'user:rest');
+    const delta = scopeKeys(100, 'user:delta');
+    const all = [...remainder, ...delta];
+    const rewritten = new Set(delta);
+    const { database } = pagedFiringDatabase(
+      () => [],
+      rollupRows(all, key => rewritten.has(key))
+    );
+    const { store, requestedBatches } = recordingStore();
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    const decided = decidedKeys(requestedBatches);
+    expect(decided.filter(key => rewritten.has(key))).toEqual(delta);
+    expect(result.candidateScopes).toBe(MAX_SCOPE_DECISIONS_PER_RUN);
+    expect(result.sweptScopes).toBe(delta.length);
+    expect(result.timings?.deferredScopes).toBe(all.length - MAX_SCOPE_DECISIONS_PER_RUN);
+  });
+
+  it('still re-arms a firing scope when the re-derived remainder would consume the cap', async () => {
+    const remainder = scopeKeys(89_983, 'user:rest');
+    const firing: FiringRuleRow[] = [{ ruleId: 'rule-fire', scopeKey: 'user:firing' }];
+    const { database } = pagedFiringDatabase(
+      (_size, call) => (call === 0 ? firing : []),
+      rollupRows(remainder, () => false)
+    );
+    const { store, requestedBatches } = recordingStore();
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    const decided = decidedKeys(requestedBatches);
+    expect(decided[0]).toBe('user:firing');
+    expect(result.candidateScopes).toBe(MAX_SCOPE_DECISIONS_PER_RUN);
+  });
+
+  it('re-decides the scopes the cap deferred without their bucket changing again', async () => {
+    // Tick one rewrites every one of 5,025 scopes: the cap defers 25 of them.
+    const all = scopeKeys(MAX_SCOPE_DECISIONS_PER_RUN + 25, 'user:defer');
+    const { store, requestedBatches } = recordingStore();
+
+    const first = pagedFiringDatabase(() => [], rollupRows(all));
+    await runSpendAlertSweep(first.database, { store }, { now: NOW });
+
+    const decided = new Set(decidedKeys(requestedBatches));
+    expect(decided.size).toBe(MAX_SCOPE_DECISIONS_PER_RUN);
+    const deferred = all.filter(key => !decided.has(key));
+    expect(deferred).toHaveLength(25);
+
+    // Those buckets were rewritten, so no later tick names them as the delta
+    // again — the rollup only re-derives them. They must still be decided, or a
+    // scope that stops spending is silently dropped.
+    for (const minutes of [5, 10, 15]) {
+      const next = pagedFiringDatabase(
+        () => [],
+        rollupRows(all, () => false)
+      );
+      await runSpendAlertSweep(
+        next.database,
+        { store },
+        {
+          now: new Date(NOW.getTime() + minutes * 60 * 1000),
+        }
+      );
+      for (const key of decidedKeys(requestedBatches)) decided.add(key);
+    }
+
+    for (const key of deferred) expect(decided.has(key)).toBe(true);
+    expect(decided.size).toBe(all.length);
+  });
+
+  it('reaches every re-derived scope within a bounded number of ticks when the delta fills the cap', async () => {
+    // The delta alone is at the cap, so the run can spend only the rotation slots
+    // it reserves on the rest of the re-derived set. That reserved window has to
+    // advance every tick, or a scope the cap deferred from the delta would starve
+    // while its usage stays inside the rollup window.
+    const all = scopeKeys(MAX_SCOPE_DECISIONS_PER_RUN * 2, 'user:rotate');
+    const changed = new Set(all.slice(0, MAX_SCOPE_DECISIONS_PER_RUN));
+    const { store, requestedBatches } = recordingStore();
+    const decided = new Set<string>();
+
+    for (let tick = 0; tick < 40; tick += 1) {
+      const { database } = pagedFiringDatabase(
+        () => [],
+        rollupRows(all, key => changed.has(key))
+      );
+      await runSpendAlertSweep(
+        database,
+        { store },
+        {
+          now: new Date(NOW.getTime() + tick * 5 * 60 * 1000),
+        }
+      );
+      for (const key of decidedKeys(requestedBatches)) decided.add(key);
+      requestedBatches.length = 0;
+    }
+
+    expect(decided.size).toBe(all.length);
+  });
+
+  it('rotates the required set so a scope whose bucket keeps changing is not starved', async () => {
+    // An actively spending scope's current-hour bucket grows on every rollup, so
+    // it is in the delta on every tick. A run that always decided the head of the
+    // delta would never reach its tail while the delta outgrows the cap.
+    const all = scopeKeys(MAX_SCOPE_DECISIONS_PER_RUN + 400, 'user:busy');
+    const { store, requestedBatches } = recordingStore();
+    const decided = new Set<string>();
+
+    for (let tick = 0; tick < 40; tick += 1) {
+      const { database } = pagedFiringDatabase(() => [], rollupRows(all));
+      await runSpendAlertSweep(
+        database,
+        { store },
+        {
+          now: new Date(NOW.getTime() + tick * 5 * 60 * 1000),
+        }
+      );
+      for (const key of decidedKeys(requestedBatches)) decided.add(key);
+      requestedBatches.length = 0;
+    }
+
+    expect(decided.size).toBe(all.length);
+  });
+
+  it('reports phase timings and logs them from inside the sweep', async () => {
+    mockSweepLog.mockClear();
+    const { database } = pagedFiringDatabase(() => []);
+    const { store } = recordingStore();
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    expect(result.timings).toEqual({
+      rollupMs: expect.any(Number),
+      decisionMs: expect.any(Number),
+      rearmMs: expect.any(Number),
+      deferredScopes: 0,
+    });
+    expect(mockSweepLog).toHaveBeenCalledWith(
+      'Spend alert sweep phases completed',
+      expect.objectContaining({
+        sweptScopes: 0,
+        rederivedScopes: 0,
+        candidateScopes: 0,
+        timings: expect.objectContaining({ deferredScopes: 0 }),
+      })
+    );
   });
 });
 
 describe('sweepHourlyBuckets window', () => {
-  const HOUR_MS = 60 * 60 * 1000;
-
   type SweepDb = Parameters<typeof sweepHourlyBuckets>[0];
 
   /** Captures the one statement the rollup executes, so its window can be asserted without a database. */
@@ -520,6 +792,11 @@ describe('sweepHourlyBuckets window', () => {
       },
     } as unknown as SweepDb;
     return { database, statements };
+  }
+
+  /** The SQL text and ordered parameters drizzle would send for a captured statement. */
+  function rendered(statement: unknown): { sql: string; params: unknown[] } {
+    return new PgDialect().sqlToQuery(statement as SQL);
   }
 
   /** Every `Date` interpolated into a drizzle statement, in chunk order. */
@@ -620,5 +897,233 @@ describe('sweepHourlyBuckets window', () => {
     expect(rawInstant.toISOString()).toBe('2026-09-16T13:32:00.000Z');
     expect(from.toISOString()).not.toBe(rawInstant.toISOString());
     expect(from.toISOString()).toBe('2026-09-16T13:00:00.000Z');
+  });
+
+  it('stops the scan at now and rewrites only a bucket whose sum changed', async () => {
+    const now = new Date('2026-09-16T16:32:00.000Z');
+    const { database, statements } = captureRollup();
+
+    await sweepHourlyBuckets(database, { now });
+
+    const { sql: text, params } = rendered(statements[0]);
+    // A sender-supplied `created_at` can sit ahead of our clock; a future-dated
+    // row must not create a bucket for an hour that has not started. The scan is
+    // bounded above by the run's own `now`, the last bound parameter.
+    expect(text).toContain('"microdollar_usage"."created_at" <= $2');
+    expect(params.at(-1)).toBe(now);
+
+    // The guard keeps a bucket whose sum did not move from being rewritten. It
+    // narrows the write only: the re-derived set the run decides from comes from
+    // the aggregate, so a scope the guard skipped is still a candidate.
+    expect(text).toContain('IS DISTINCT FROM EXCLUDED.cost_microdollars');
+  });
+
+  it('returns every re-derived scope, with whether its bucket was rewritten', async () => {
+    const rows = [
+      { scope_key: 'user:changed', changed: true },
+      { scope_key: 'user:unchanged', changed: false },
+    ];
+    const database = {
+      execute: async () => ({ rows }),
+    } as unknown as SweepDb;
+
+    const rollup = await sweepHourlyBuckets(database, {
+      now: new Date('2026-09-16T16:32:00.000Z'),
+    });
+
+    // The unchanged scope stays in the candidate reservoir — that is what lets
+    // the run defer it and still decide it on a later tick.
+    expect(rollup.scopeKeys).toEqual(['user:changed', 'user:unchanged']);
+    expect(rollup.changedScopeKeys).toEqual(['user:changed']);
+  });
+});
+
+describe('createSpendAlertSweepStore batched reads', () => {
+  type StoreDb = Parameters<typeof createSpendAlertSweepStore>[0];
+
+  /** The shape the settings+rules+state select maps one rule row from. */
+  function ruleRow(scopeKey: string, overrides: Record<string, unknown> = {}) {
+    return {
+      scopeKey,
+      enabled: true,
+      ruleId: `${scopeKey}-threshold`,
+      kind: 'threshold',
+      ruleEnabled: true,
+      thresholdMicrodollars: 1_000_000,
+      windowHours: 24,
+      multiplierBasisPoints: null,
+      emailEnabled: true,
+      pushEnabled: false,
+      firing: false,
+      conditionStartedAt: null,
+      lastValueMicrodollars: null,
+      ...overrides,
+    };
+  }
+
+  /** The shape the batched aggregate returns one row per scope from. */
+  function totalsRow(scopeKey: string, overrides: Record<string, unknown> = {}) {
+    return {
+      scope_key: scopeKey,
+      current_hour: 0,
+      baseline_buckets: 0,
+      baseline: null,
+      window_24: 0,
+      window_168: 0,
+      window_720: 0,
+      ...overrides,
+    };
+  }
+
+  /**
+   * A database whose only reads are the settings+rules+state select (answered
+   * with `settingsRows`) and the aggregate `execute` (answered with
+   * `totalsRows`). Both are recorded, so the test can assert the batch's read
+   * count and the statements themselves.
+   */
+  function storeDatabase(
+    settingsRows: Record<string, unknown>[],
+    totalsRows: Record<string, unknown>[]
+  ) {
+    const statements: unknown[] = [];
+    let selectCalls = 0;
+    const chain = {
+      from: () => chain,
+      leftJoin: () => chain,
+      where: () => Promise.resolve(settingsRows),
+    };
+    const database = {
+      select: () => {
+        selectCalls += 1;
+        return chain;
+      },
+      execute: async (statement: unknown) => {
+        statements.push(statement);
+        return { rows: totalsRows };
+      },
+    } as unknown as StoreDb;
+    return { database, statements, selectCalls: () => selectCalls };
+  }
+
+  it('serves a whole batch with two statements and picks the configured window', async () => {
+    const database = storeDatabase(
+      [
+        ruleRow('user:a', { windowHours: 168 }),
+        // A later rule row for the same scope shares the snapshot.
+        ruleRow('user:a', {
+          ruleId: 'user:a-state',
+          windowHours: null,
+          thresholdMicrodollars: null,
+        }),
+      ],
+      [totalsRow('user:a', { window_24: 11, window_168: 42, window_720: 99 })]
+    );
+    const store = createSpendAlertSweepStore(database.database);
+
+    const snapshots = await store.loadScopeSnapshots(['user:a', 'user:b', 'team:ignored'], NOW);
+
+    expect(database.selectCalls()).toBe(1);
+    expect(database.statements).toHaveLength(1);
+
+    // A key with no settings row is absent; a key that names no scope is dropped
+    // before it reaches the database.
+    expect([...snapshots.keys()]).toEqual(['user:a']);
+    const scope = snapshots.get('user:a');
+    expect(scope?.windowMicrodollars).toEqual({ 168: 42 });
+    expect(scope?.rules).toHaveLength(2);
+
+    const { sql: text, params } = new PgDialect().sqlToQuery(database.statements[0] as SQL);
+    // `scope_key` predicate, the precomputed per-window sums, and a lower bound
+    // that is the longest window (720 h). The WHERE clause is rendered last, so
+    // its `scope_key` array and `hour_start` bound are the last two parameters.
+    expect(text).toContain('GROUP BY');
+    expect(text).toContain('= ANY(');
+    const lowerBound = params.at(-1);
+    expect(params.at(-2)).toEqual(['user:a']);
+    expect(lowerBound).toBeInstanceOf(Date);
+    expect(NOW.getTime() - (lowerBound as Date).getTime()).toBe(720 * HOUR_MS);
+    expect(text).toContain('"spend_alert_hourly"."hour_start" >= $');
+  });
+
+  it('issues no aggregate for a batch where no scope has settings', async () => {
+    const database = storeDatabase([], []);
+    const store = createSpendAlertSweepStore(database.database);
+
+    const snapshots = await store.loadScopeSnapshots(['user:a', 'user:b'], NOW);
+
+    expect(snapshots.size).toBe(0);
+    expect(database.statements).toHaveLength(0);
+  });
+
+  it('does not read at all for a batch whose keys name no scope', async () => {
+    const database = storeDatabase([ruleRow('user:a')], []);
+    const store = createSpendAlertSweepStore(database.database);
+
+    const snapshots = await store.loadScopeSnapshots(['team:1', 'nonsense'], NOW);
+
+    expect(snapshots.size).toBe(0);
+    expect(database.selectCalls()).toBe(0);
+    expect(database.statements).toHaveLength(0);
+  });
+
+  it('trusts the p95 baseline only at the bucket floor and rounds it', async () => {
+    const database = storeDatabase(
+      [
+        ruleRow('user:anomaly', {
+          ruleId: 'user:anomaly-anomaly',
+          kind: 'anomaly',
+          windowHours: null,
+          thresholdMicrodollars: null,
+          multiplierBasisPoints: 300,
+        }),
+      ],
+      [totalsRow('user:anomaly', { baseline_buckets: 30, baseline: '1234.6', current_hour: '17' })]
+    );
+    const store = createSpendAlertSweepStore(database.database);
+
+    const snapshots = await store.loadScopeSnapshots(['user:anomaly'], NOW);
+    const scope = snapshots.get('user:anomaly');
+
+    expect(scope?.baselineHourlyMicrodollars).toBe(1235);
+    expect(scope?.currentHourMicrodollars).toBe(17);
+    // An anomaly rule configures no rolling window.
+    expect(scope?.windowMicrodollars).toEqual({});
+  });
+
+  it('keeps the baseline null below the bucket floor', async () => {
+    const database = storeDatabase(
+      [
+        ruleRow('user:anomaly', {
+          ruleId: 'user:anomaly-anomaly',
+          kind: 'anomaly',
+          windowHours: null,
+          thresholdMicrodollars: null,
+          multiplierBasisPoints: 300,
+        }),
+      ],
+      [totalsRow('user:anomaly', { baseline_buckets: 23, baseline: '1234.6' })]
+    );
+    const store = createSpendAlertSweepStore(database.database);
+
+    const snapshots = await store.loadScopeSnapshots(['user:anomaly'], NOW);
+
+    expect(snapshots.get('user:anomaly')?.baselineHourlyMicrodollars).toBeNull();
+  });
+
+  it('decides a settings row that has no rules instead of skipping it', async () => {
+    const database = storeDatabase(
+      [ruleRow('user:empty', { ruleId: null, kind: null })],
+      [totalsRow('user:empty', { current_hour: 5 })]
+    );
+    const store = createSpendAlertSweepStore(database.database);
+
+    const snapshots = await store.loadScopeSnapshots(['user:empty'], NOW);
+
+    expect(snapshots.get('user:empty')).toMatchObject({
+      scopeKey: 'user:empty',
+      enabled: true,
+      rules: [],
+      currentHourMicrodollars: 5,
+    });
   });
 });

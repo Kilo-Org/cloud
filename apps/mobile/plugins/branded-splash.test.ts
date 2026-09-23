@@ -185,10 +185,16 @@ describe('shared branded splash', () => {
     // `resources` when the file is absent, so the project's own gitignored
     // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
     // worktree that prebuilt) cannot add its icon, notification or app-background
-    // entries to the array. Pin the splash color this plugin owns.
-    expect(evaluated._internal?.modResults?.android?.colors).toEqual({
+    // entries to the array. Assert the splash color this plugin owns is present
+    // among them rather than the only one, by containment, the same way the
+    // styles assertion below pins its theme: not the whole array and not its
+    // exact length, so a prebuild's other colors (iconBackground, colorPrimary,
+    // …) surviving here cannot fail the case.
+    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
-        color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }],
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

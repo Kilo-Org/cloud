@@ -251,8 +251,12 @@ export function createSessionFixture(
     updateNetworkPolicy: vi.fn(async () => undefined),
     request,
   } satisfies Control;
+  const containers = {
+    clearSessionSnapshot: vi.fn(async (): Promise<void> => {}),
+  };
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
+    SANDBOX_CONTAINERS: { getByName: () => containers },
     WORKER_URL: 'https://worker.example.test',
     NEXTAUTH_SECRET: 'test-secret',
     CALLBACK_QUEUE: callbackQueue,
@@ -267,6 +271,7 @@ export function createSessionFixture(
       return session;
     },
     control,
+    containers,
     env,
     settleBackground: () => Promise.all(background),
     metadata,

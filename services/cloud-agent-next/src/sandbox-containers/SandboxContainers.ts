@@ -12,6 +12,7 @@ import {
   CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import { selectStartSnapshot } from '../sandbox-control/warm-base.js';
 import {
   ContainersBilling,
@@ -62,6 +63,7 @@ type ContainersRecord = {
   allocationRef: string | null;
   stopOpId: string | null;
   lastSnapshot: { id: string; sourceAllocation: string } | null;
+  snapshotOutcome?: 'ready' | 'failed';
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
@@ -372,6 +374,14 @@ export class SandboxContainers extends DurableObject<Env> {
         'container snapshot timed out'
       );
       return { id: snapshot.id };
+    });
+  }
+
+  async clearSessionSnapshot(): Promise<void> {
+    return this.runExclusive(async () => {
+      const record = await this.readRecord();
+      if (record.lastSnapshot === null) return;
+      await this.writeRecord({ ...record, lastSnapshot: null });
     });
   }
 
@@ -758,6 +768,7 @@ export class SandboxContainers extends DurableObject<Env> {
       allocationRef: null,
       stopOpId: null,
       lastSnapshot: record.lastSnapshot,
+      ...(record.snapshotOutcome !== undefined ? { snapshotOutcome: record.snapshotOutcome } : {}),
       ...(record.instance !== undefined ? { instance: record.instance } : {}),
       ...(record.billingConfigured ? { billingConfigured: true } : {}),
     };
@@ -797,28 +808,44 @@ export class SandboxContainers extends DurableObject<Env> {
     ref: string,
     stopOpId: string
   ): Promise<void> {
-    const attempt = container.snapshotContainer({});
+    const snapshotId = await this.captureSessionSnapshot(container);
+    const { result, persisted } = await this.recordSnapshotOutcome(snapshotId, ref, stopOpId);
+    logControlDiagnostic('session_snapshot', { result, stopOpId }, persisted ? 'info' : 'warn');
+  }
+
+  private async captureSessionSnapshot(container: Container): Promise<string | null> {
     try {
       const snapshot = await withTimeout(
-        attempt,
+        container.snapshotContainer({}),
         SNAPSHOT_TIMEOUT_MS,
         'container snapshot timed out'
       );
-      await this.publishSnapshot(snapshot.id, ref, stopOpId);
+      return snapshot.id;
     } catch {
-      void attempt.then(
-        snapshot => this.runExclusive(() => this.publishSnapshot(snapshot.id, ref, stopOpId)),
-        () => undefined
-      );
+      return null;
     }
   }
 
-  private async publishSnapshot(id: string, ref: string, stopOpId: string): Promise<void> {
-    const record = await this.readRecord();
-    if (record.state !== 'stopping') return;
-    if (record.allocationRef !== ref) return;
-    if (record.stopOpId !== stopOpId) return;
-    await this.writeRecord({ ...record, lastSnapshot: { id, sourceAllocation: ref } });
+  private async recordSnapshotOutcome(
+    snapshotId: string | null,
+    ref: string,
+    stopOpId: string
+  ): Promise<{ result: 'ready' | 'failed'; persisted: boolean }> {
+    const result = snapshotId === null ? 'failed' : 'ready';
+    try {
+      const record = await this.readRecord();
+      if (record.state !== 'stopping') return { result, persisted: false };
+      if (record.allocationRef !== ref) return { result, persisted: false };
+      if (record.stopOpId !== stopOpId) return { result, persisted: false };
+      await this.writeRecord({
+        ...record,
+        ...(snapshotId === null ? {} : { lastSnapshot: { id: snapshotId, sourceAllocation: ref } }),
+        snapshotOutcome: result,
+      });
+      return { result, persisted: true };
+    } catch {
+      return { result, persisted: false };
+    }
   }
 
   private billingScheduler(): ContainersBillingScheduler {

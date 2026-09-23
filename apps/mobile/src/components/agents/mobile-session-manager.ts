@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- fetchSession NOT_FOUND retry helpers stay with the manager (M1). */
-import { toast } from 'sonner-native';
 import {
   type CloudAgentSessionId,
   createSessionManager,
@@ -13,10 +12,7 @@ import {
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
-import {
-  formatSafeCloudAgentFailureDiagnostic,
-  withCloudAgentDiagnostics,
-} from '@/components/agents/mobile-session-diagnostics';
+import { withCloudAgentDiagnostics } from '@/components/agents/mobile-session-diagnostics';
 import { RequestDeadlineError } from '@kilocode/event-service';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
@@ -38,7 +34,6 @@ import {
   readResolvedDeliveryFailures,
 } from '@/lib/persist/resolved-delivery-failures';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { i18n } from '@/i18n';
 
 export { StreamTicketResponseSchema };
 
@@ -443,13 +438,17 @@ export function createMobileAgentSessionManager({
         );
       });
     },
-    onSendFailed: (_messageText, displayMessage, error) => {
-      toast.error(
-        formatSafeCloudAgentFailureDiagnostic('send', error, organizationId) ??
-          displayMessage ??
-          i18n.t('agentChat.messageFailure.sendFailed')
-      );
-    },
+    // The SDK states a failed send itself: `send` calls this hook and then
+    // sets an error status indicator (packages/cloud-agent-sdk/src/
+    // session-manager.ts:2606-2623) that mobile renders translated above the
+    // composer. That indicator is written for every failure except a
+    // connection-level one while the agent is already disconnected, where the
+    // preserved "Agent connection lost" line is the failure — so no failed send
+    // is left without a surface. A toast here would restate the failure as raw
+    // developer text (HTTP status plus the server message), so the hook stays
+    // silent — the SDK's indicator is the single failed-send surface.
+    // oxlint-disable-next-line no-empty-function -- the SDK's status indicator owns the failed-send surface
+    onSendFailed: () => {},
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
       // The route mounted before its metadata read could settle (offline or

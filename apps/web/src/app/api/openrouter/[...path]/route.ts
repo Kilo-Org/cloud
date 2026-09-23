@@ -26,7 +26,7 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,

@@ -35,8 +35,8 @@ import {
   checkPromotionLimit,
   logFreeModelRequest,
 } from '@/lib/free-model-rate-limiter';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 jest.mock('next/server', () => {

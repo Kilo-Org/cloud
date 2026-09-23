@@ -9,6 +9,7 @@ import {
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { PreparingEventDataV2, PreparingStep } from '../../../src/shared/protocol.js';
+import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
   diagnosticDetail,
@@ -42,7 +43,7 @@ import { withKiloRequestDeadline } from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
-import { formatGitFailure, formatGitResultFailure } from '../git-errors.js';
+import { formatGitFailure, formatGitResultFailure, gitOperationError } from '../git-errors.js';
 import {
   WorktreeKiloRuntimeError,
   type WorktreeKiloRuntime,
@@ -106,9 +107,13 @@ function ok(): ControlHandlerResult {
 function fail(
   code: ControlErrorCode,
   message: string,
-  retryable: boolean
+  retryable: boolean,
+  subtype?: WorkspaceFailureSubtype
 ): Extract<ControlHandlerResult, { ok: false }> {
-  return { ok: false, error: { code, message, retryable } };
+  return {
+    ok: false,
+    error: { code, message, retryable, ...(subtype === undefined ? {} : { subtype }) },
+  };
 }
 
 function diagnosticErrorCode(
@@ -467,7 +472,12 @@ async function executeSessionAttach(
               if (cloned.exitCode !== 0) {
                 const message = formatGitResultFailure(cloned, 'git clone failed', redact);
                 progress.fail('cloning', cloneStepId, message);
-                return fail('not_ready', message, true);
+                return fail(
+                  'not_ready',
+                  message,
+                  true,
+                  gitOperationError(cloned, 'clone', redact).subtype
+                );
               }
             }
             const branch = attach.branch ?? `session/${attach.kilo.scopeId}`;
@@ -528,7 +538,12 @@ async function executeSessionAttach(
               if (checked.exitCode !== 0) {
                 const message = formatGitResultFailure(checked, 'git checkout failed', redact);
                 progress.fail('cloning', cloneStepId, message);
-                return fail('not_ready', message, true);
+                return fail(
+                  'not_ready',
+                  message,
+                  true,
+                  gitOperationError(checked, 'checkout', redact).subtype
+                );
               }
             }
             progress.complete('cloning', cloneStepId);
@@ -597,7 +612,7 @@ async function executeSessionAttach(
         }
       } catch (error) {
         if (error instanceof WrapperBootstrapError) {
-          const result = fail('not_ready', formatGitFailure(error), error.retryable);
+          const result = fail('not_ready', formatGitFailure(error), error.retryable, error.subtype);
           progress.fail('cloning', 'phase:cloning', result.error.message);
           return result;
         }

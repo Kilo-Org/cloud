@@ -1,15 +1,13 @@
 import { describe, test, expect } from '@jest/globals';
+import { autoFreeModels, preferredModels, selectAutoFreeCandidate } from './models';
 import {
-  autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
-  preferredModels,
-  selectAutoFreeCandidate,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
-} from './models';
+} from './kilo-exclusive-models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -17,8 +15,8 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-} from './providers/anthropic.constants';
-import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+} from './kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 

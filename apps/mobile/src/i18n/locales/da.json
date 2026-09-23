@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter.",
     "biometricUnlock": "Lås op med biometri",
     "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter.",
-    "featureFlags": "Funktionsflag",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Fjern · ≥ {{min}}",
-    "featureFlagSkipped": "Standard · < {{min}}",
-    "featureFlagNotLoaded": "Standard · ikke indlæst",
     "gatewayTranscription": "Transskription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transskribér stemmeinput med en Kilo Gateway-model i stedet for enhedens stemmegenkendelse. Din optagelse sendes til Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
       "linesOf": "linje {{start}}–{{end}} af {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Handlingen {{action}} i Cloud Agent mislykkedes ({{status}}).",
-      "failed": "Handlingen {{action}} i Cloud Agent mislykkedes."
-    },
     "collectCopyableText": {
       "unserializableInput": "[inddata kan ikke serialiseres]",
       "errorPrefix": "Fejl: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Udbyderen afviste anmodningen.",
       "assistantStopped": "Genereringen af svaret blev stoppet.",
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
-      "assistantFailed": "Svaret kunne ikke genereres.",
-      "sendFailed": "Kunne ikke sende beskeden. Prøv igen."
+      "assistantFailed": "Svaret kunne ikke genereres."
     },
     "filePart": {
       "loadingImage": "Indlæser billede",

@@ -1,5 +1,8 @@
 import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isKiloExclusiveFreeModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import {
+  isKiloExclusiveFreeModel,
+  kiloExclusiveModels,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,

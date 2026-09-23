@@ -4,7 +4,7 @@
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { type RefObject, useMemo } from 'react';
+import { type ReactNode, type RefObject, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +57,14 @@ type PrReviewDiscussionListProps = {
    * (useReplyFocusScroll). Optional; absent = no viewport reporting.
    */
   readonly onViewportLayout?: (height: number) => void;
+  /**
+   * The tab's empty state, rendered instead of the rows when the blocked /
+   * muted filter removes every loaded row. The tab decides "empty" from the
+   * unfiltered page, so without this the body would render nothing at all.
+   * The copy stays the tab's: it is the same surface, and a distinct message
+   * needs a catalog key the translation slice owns.
+   */
+  readonly emptyState?: ReactNode;
 };
 
 export function PrReviewDiscussionList({
@@ -76,6 +84,7 @@ export function PrReviewDiscussionList({
   onRetryLoadMore,
   onReplyInputFocus,
   onViewportLayout,
+  emptyState,
 }: Readonly<PrReviewDiscussionListProps>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
@@ -138,6 +147,26 @@ export function PrReviewDiscussionList({
     () => ({ paddingTop: 12, paddingLeft: insets.left, paddingRight: insets.right }),
     [insets.left, insets.right]
   );
+
+  // Every loaded row belongs to a blocked or muted author. An empty FlashList
+  // draws nothing, so the body would read as blank with no explanation. The
+  // tab hands down the empty state it already owns for this surface; the
+  // footer stays mounted so later pages (whose rows may be visible) and a
+  // later-page retry stay reachable from the filtered body.
+  if (visibleItems.length === 0 && emptyState) {
+    return (
+      <View className="flex-1">
+        {emptyState}
+        <ListFooter
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          laterPageError={laterPageError}
+          onLoadMore={onLoadMore}
+          onRetryLoadMore={onRetryLoadMore}
+        />
+      </View>
+    );
+  }
 
   return (
     <FlashList

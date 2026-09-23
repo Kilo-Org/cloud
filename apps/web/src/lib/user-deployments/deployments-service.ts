@@ -373,6 +373,7 @@ async function getGithubTokenFromIntegrationId(
     .where(
       and(
         eq(platform_integrations.id, platformIntegrationId),
+        eq(platform_integrations.github_connection_role, 'workflow'),
         eq(platform_integrations.integration_status, 'active')
       )
     )
@@ -384,7 +385,9 @@ async function getGithubTokenFromIntegrationId(
     integration[0].platform_installation_id
   ) {
     const tokenData = await generateGitHubInstallationToken(
-      integration[0].platform_installation_id
+      integration[0].platform_installation_id,
+      integration[0].github_app_type ?? 'standard',
+      integration[0].id
     );
     return tokenData.token;
   }
@@ -521,7 +524,14 @@ async function resolveGitHubSource(
   const [platformIntegration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(eq(platform_integrations.id, platformIntegrationId), ownershipCondition))
+    .where(
+      and(
+        eq(platform_integrations.id, platformIntegrationId),
+        ownershipCondition,
+        eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.github_connection_role, 'workflow')
+      )
+    )
     .limit(1);
 
   if (!platformIntegration) {
@@ -553,7 +563,9 @@ async function resolveGitHubSource(
 
   // Generate GitHub installation token
   const tokenData = await generateGitHubInstallationToken(
-    platformIntegration.platform_installation_id
+    platformIntegration.platform_installation_id,
+    platformIntegration.github_app_type ?? 'standard',
+    platformIntegration.id
   );
 
   return {

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "เมื่อปิด ปุ่มขึ้นบรรทัดใหม่จะแทรกบรรทัดใหม่ในช่องป้อนข้อความของเอเจนต์",
     "biometricUnlock": "ปลดล็อกด้วยข้อมูลชีวมิติ",
     "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที",
-    "featureFlags": "แฟล็กฟีเจอร์",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ระยะไกล · ≥ {{min}}",
-    "featureFlagSkipped": "ค่าเริ่มต้น · < {{min}}",
-    "featureFlagNotLoaded": "ค่าเริ่มต้น · ยังไม่ได้โหลด",
     "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
       "linesOf": "บรรทัด {{start}}–{{end}} จากทั้งหมด {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} ของ Cloud Agent ไม่สำเร็จ ({{status}})",
-      "failed": "{{action}} ของ Cloud Agent ไม่สำเร็จ"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ข้อมูลขาเข้าที่แปลงเป็นข้อความไม่ได้]",
       "errorPrefix": "ข้อผิดพลาด: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "ผู้ให้บริการปฏิเสธคำขอ",
       "assistantStopped": "หยุดสร้างคำตอบแล้ว",
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
-      "assistantFailed": "สร้างคำตอบไม่สำเร็จ",
-      "sendFailed": "ส่งข้อความไม่สำเร็จ กรุณาลองอีกครั้ง"
+      "assistantFailed": "สร้างคำตอบไม่สำเร็จ"
     },
     "filePart": {
       "loadingImage": "กำลังโหลดรูปภาพ",

@@ -8,7 +8,7 @@ import {
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   getDirectByokModelsForOrganization,
   getDirectByokModelsForUser,

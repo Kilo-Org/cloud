@@ -3,26 +3,16 @@
  */
 
 import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import {
-  claude_opus_4_8_stealth_model,
-  claude_opus_4_7_stealth_model,
-  claude_sonnet_4_6_stealth_model,
-  claude_opus_4_6_stealth_model,
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
-import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
@@ -100,67 +90,4 @@ export function isPdfSupportingModel(model: string): boolean {
     isGeminiModel(model) ||
     isMuseModel(model)
   );
-}
-
-export function isKiloExclusiveFreeModel(model: string): boolean {
-  return kiloExclusiveModels.some(
-    m => m.public_id === model && m.status !== 'disabled' && !m.pricing
-  );
-}
-
-export function isKiloExclusiveModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.status !== 'disabled');
-}
-
-export function isKiloExclusiveRateLimitedModel(model: string): boolean {
-  return kiloExclusiveModels.some(
-    m => m.public_id === model && m.status !== 'disabled' && m.flags.includes('rate-limited')
-  );
-}
-
-export const kiloExclusiveModels = [
-  gemma_4_26b_a4b_it_free_model,
-  qwen36_plus_stealth_model,
-  claude_opus_4_8_stealth_model,
-  claude_opus_4_7_stealth_model,
-  claude_sonnet_4_6_stealth_model,
-  claude_opus_4_6_stealth_model,
-  stepfun_37_flash_free_model,
-] as KiloExclusiveModel[];
-
-export function isKiloStealthModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
-}
-
-export function shouldRedactModelNameInMicrodollarUsage(
-  provider: ProviderId,
-  model: string
-): boolean {
-  return provider === 'custom' || isKiloStealthModel(model);
-}
-
-export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return isKiloStealthModel(model);
-}
-
-export function isDisabledKiloExclusiveModel(model: string): boolean {
-  return !!kiloExclusiveModels.find(m => m.public_id === model && m.status === 'disabled');
-}
-
-export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
-  return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
-}
-
-/**
- * Routing allow-list for a live exclusive model. `undefined` means the model is
- * not a restricted exclusive and catalog provider metadata should be used.
- */
-export function getKiloExclusiveInferenceProviderRestriction(
-  modelId: string
-): ReadonlySet<string> | undefined {
-  const exclusive = findKiloExclusiveModel(modelId);
-  if (!exclusive || exclusive.inference_provider_restriction.length === 0) {
-    return undefined;
-  }
-  return new Set(exclusive.inference_provider_restriction);
 }

@@ -218,17 +218,19 @@ export async function fetchGitHubRepositoriesForOrganization(
 
 export async function fetchAllGitHubRepositoriesForOrganization(
   organizationId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<GitHubRepositoriesResult> {
   const integrations = (
-    await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
+    await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB, purpose)
   ).filter(isPlatformIntegrationHealthy);
-  return fetchRepositoriesForIntegrations(integrations, forceRefresh);
+  return fetchRepositoriesForIntegrations(integrations, forceRefresh, purpose);
 }
 
 async function fetchRepositoriesForIntegrations(
   integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
-  forceRefresh: boolean
+  forceRefresh: boolean,
+  purpose: 'workflow' | 'agent'
 ): Promise<GitHubRepositoriesResult> {
   if (integrations.length === 0) {
     return missingIntegrationResponse('No GitHub integration found for this organization');
@@ -243,7 +245,8 @@ async function fetchRepositoriesForIntegrations(
           const repositories = await fetchGitHubRepositories(
             integration.platform_installation_id,
             integration.github_app_type || 'standard',
-            integration.id
+            integration.id,
+            purpose
           );
           await updateRepositoriesForIntegration(integration.id, repositories);
           return {

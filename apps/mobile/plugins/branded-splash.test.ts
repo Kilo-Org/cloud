@@ -5,7 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compileModsAsync, type ConfigPlugin, type ExportedConfig } from 'expo/config-plugins';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Each case runs expo-splash-screen's image pipeline through `compileModsAsync`,
+// and the idempotence case compiles twice. On a loaded machine (the full gate
+// saturates every core) that real filesystem work can stretch past the project's
+// 15 s budget and fail a healthy test. The file-wide timeout leaves that
+// headroom; a genuinely hung compile still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
 
 const require = createRequire(import.meta.url);
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -129,7 +136,8 @@ describe('shared branded splash', () => {
     // resources already on disk, so compiling against this package's root would
     // fold a developer's generated, gitignored `android/` tree into the result —
     // its `colors.xml` is absent in CI — and merge colors this test does not own
-    // into the mod results, making the exact assertion below machine-dependent.
+    // into the mod results, so the run would no longer describe only this
+    // plugin's output.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
@@ -175,11 +183,20 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // Assert by containment, not by the array's exact contents: introspection
-    // merges the splash color into the project's own Android resources, so the
-    // array also carries colors this plugin does not own. The plugin's contract
-    // is that its own color is present among them — the same `toMatchObject`
-    // containment shape the styles assertion below uses.
+    // The compile root is the throwaway project `createAndroidProject()`
+    // returns, whose `res/values` holds no `colors.xml`, and `withBrandedSplash`
+    // reads and writes `config.modRequest.platformProjectRoot` under that same
+    // root; a worktree's prebuilt `android/` tree never reaches these
+    // modResults, so the splash color below is the only entry the run produces.
+    // The base `colors` mod resolves its file under `modRequest.projectRoot` —
+    // that throwaway root again — and introspection falls back to empty
+    // `resources` when the file is absent, so the project's own gitignored
+    // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
+    // worktree that prebuilt) cannot add its icon, notification or app-background
+    // entries to the array. Assert the splash color this plugin owns is present
+    // by containment, not by pinning the whole array or its exact length, the
+    // same way the styles assertion below pins its theme: this case speaks only
+    // for the entry this plugin writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

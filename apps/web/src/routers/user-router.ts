@@ -533,6 +533,21 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
+  // Whether the caller has any Kilo gateway usage. Any `microdollar_usage` row
+  // for the user counts (org-scoped and zero-cost free-model rows included), so
+  // this reads the primary DB rather than a replica that may lag the first
+  // request. The lookup is an indexed `LIMIT 1` on
+  // `idx_kilo_user_id_created_at2`, so a cold-boot call is cheap.
+  hasGatewayUsage: baseProcedure
+    .output(z.object({ hasUsage: z.boolean() }))
+    .query(async ({ ctx }) => {
+      const row = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.kilo_user_id, ctx.user.id),
+        columns: { id: true },
+      });
+      return { hasUsage: row !== undefined };
+    }),
+
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {
     const providers = await getUserAuthProviders(ctx.user.id);
 

@@ -62,6 +62,15 @@ vi.mock('@/lib/utils', () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
 }));
 
+// The trailing icons of a row, in render order. The favorite star must be the
+// last one so every row's star shares one right-alignment column, and the
+// selected check sits in the reserved column to its left.
+function trailingIconTypes(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => (node.type as string) === 'Check' || (node.type as string) === 'Star')
+    .map(node => node.type as string);
+}
+
 describe('ModelPickerOptionRow BYOK badge', () => {
   it('renders the BYOK badge for a CLI-catalog option with user BYOK available', () => {
     const renderer = renderRow(cliCatalogOption({ hasUserByokAvailable: true }));
@@ -113,35 +122,54 @@ describe('ModelPickerOptionRow trailing accessory slot', () => {
     const selectedChildren = selectedRow.children.filter(isInstance);
     const unselectedChildren = unselectedRow.children.filter(isInstance);
 
-    // content, star, trailing slot — in both rows.
+    // content, reserved check column, star — in both rows.
     expect(selectedChildren).toHaveLength(3);
     expect(unselectedChildren).toHaveLength(3);
 
-    const selectedSlot = selectedChildren[2];
-    const unselectedSlot = unselectedChildren[2];
+    const selectedSlot = selectedChildren[1];
+    const unselectedSlot = unselectedChildren[1];
 
-    // The trailing slot is the same element with the same fixed width in both
-    // rows, so the favorite star holds one column down the list.
+    // The reserved column is the same element with the same fixed width in
+    // both rows, so selecting a row never moves the content or the star.
     expect(selectedSlot?.type).toBe('View');
     expect(unselectedSlot?.type).toBe('View');
     expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
     expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+
+    // Only the contents differ: the check marks the selected row.
+    expect(selectedSlot?.findAllByType('Check')).toHaveLength(1);
+    expect(unselectedSlot?.findAllByType('Check')).toHaveLength(0);
+
+    // The star stays the row's last child, so it holds one right-alignment
+    // column whichever row is selected.
+    expect(selectedChildren[2]?.type).toBe('Pressable');
+    expect(unselectedChildren[2]?.type).toBe('Pressable');
   });
 
-  it('keeps the star then the reserved check in one order on every row', () => {
+  it('keeps the check then the star in one order on every row', () => {
     const option = cliCatalogOption();
-    expect(trailingSlots(renderRow(option, { selected: false }))).toEqual(['Star:20', 'Check:18']);
-    expect(trailingSlots(renderRow(option, { selected: true }))).toEqual(['Star:20', 'Check:18']);
+    // The check only renders when the row is selected; the star is the last
+    // trailing slot either way, so every row's star holds one column.
+    expect(trailingSlots(renderRow(option, { selected: false }))).toEqual(['Star:20']);
+    expect(trailingSlots(renderRow(option, { selected: true }))).toEqual(['Check:18', 'Star:20']);
   });
 
   it('hides the reserved check on unselected rows and shows it on selected rows', () => {
     const option = cliCatalogOption();
-    expect(checkAccessories(renderRow(option, { selected: false }))).toEqual([
-      { color: 'transparent', size: 18 },
-    ]);
+    expect(checkAccessories(renderRow(option, { selected: false }))).toEqual([]);
     expect(checkAccessories(renderRow(option, { selected: true }))).toEqual([
       { color: '#4F5A10', size: 18 },
     ]);
+  });
+});
+
+describe('ModelPickerOptionRow trailing alignment', () => {
+  it('keeps the favorite star rightmost so every row star shares one column', () => {
+    const selectedRow = renderRow(cliCatalogOption(), { selected: true });
+    expect(trailingIconTypes(selectedRow.root)).toEqual(['Check', 'Star']);
+
+    const plainRow = renderRow(cliCatalogOption());
+    expect(trailingIconTypes(plainRow.root)).toEqual(['Star']);
   });
 });
 

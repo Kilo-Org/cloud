@@ -26,6 +26,12 @@ function mount(element: ReactElement) {
   return renderer.root;
 }
 
+// Both assertions are kept: `hostText` reaches the host node to read its inline
+// style, `hostClasses` reads the resolved class list.
+function hostText(root: TestRenderer.ReactTestInstance) {
+  return root.find(node => Object.is(node.type, 'Text'));
+}
+
 function hostClasses(root: TestRenderer.ReactTestInstance): string[] {
   const node = root.find(candidate => Object.is(candidate.type, 'Text'));
   return String(node.props.className).split(' ');
@@ -38,6 +44,64 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+});
+
+describe('Text mounted letter spacing', () => {
+  // The reset belongs to the RTL interface: RTL-script copy takes it there,
+  // while a joined script in an LTR screen keeps the tracking its class asks
+  // for (`text.rtl-labels` pins that LTR case).
+  it.each([false, true])(
+    'resets the tracking for Arabic children in RTL only (isRTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+      const text = hostText(
+        mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+      );
+
+      if (isRTL) {
+        expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+      } else {
+        expect(text.props.style).toBeUndefined();
+      }
+    }
+  );
+
+  it('leaves Latin children untouched and keeps LTR style undefined', () => {
+    const text = hostText(
+      mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+    );
+
+    expect(text.props.style).toBeUndefined();
+  });
+
+  it('resets the eyebrow variant tracking for Arabic children in RTL', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(mount(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
+
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  it('resets the tab label tracking for Arabic children in RTL', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mount(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
+    );
+
+    expect(text.props.className as string).toContain('tracking-[0.2px]');
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  // An RTL interface keeps the paragraph direction for a Latin run and leaves
+  // its tracking alone: the reset is for RTL-script copy (`text.rtl-labels`).
+  it('keeps the RTL paragraph direction and no reset for Latin children', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+    );
+
+    expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
+    expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
+  });
 });
 
 describe('Text eyebrow letterspacing', () => {

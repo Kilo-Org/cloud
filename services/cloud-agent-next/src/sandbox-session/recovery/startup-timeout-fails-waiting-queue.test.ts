@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { createSessionFixture, RUNTIME_ID } from '../session-fixture.test-helpers.js';
-import type { SessionMessageRecord } from '../session-message-queue.js';
-
+import type { SessionEnvelope } from '../../sandbox-state/model/session.js';
+import { readSessionValueSync, writeSessionMessages } from '../../sandbox-state/persist/access.js';
+import { readRawSessionMessages } from '../../sandbox-state/persist/load.js';
 const orchestrationMocks = vi.hoisted(() => ({
   eventQueries: vi.fn(),
   signedAttachments: vi.fn(),
@@ -84,19 +85,24 @@ describe('startup timeout', () => {
     await fixture.flush();
 
     const deadlineAt = Date.now() + 20_000;
-    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
-    fixture.storage.kv.put(
-      'session_messages',
+    const envelope = readSessionValueSync<SessionEnvelope>(fixture.storage.kv);
+    if (!envelope) throw new Error('missing session envelope');
+    const stored = readRawSessionMessages(fixture.storage.kv);
+    writeSessionMessages(
+      fixture.storage.kv,
+      envelope.binding,
       stored.map(message =>
-        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: deadlineAt } : message
+        message.messageId === 'a' && message.state.kind === 'queued'
+          ? { ...message, state: { ...message.state, deadlineAt } }
+          : message
       )
     );
 
     // Before the deadline the unavailable environment parks the head: the real
-    // `deliveryDeadlineAt` path must not terminalize yet.
+    // `deadlineAt` path must not terminalize yet.
     await fixture.fireAlarm();
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.record('a')?.state.kind).toBe('queued');
     expect(fixture.alarmAt()).not.toBeNull();
 
     // At the head deadline the real drain check fails the head with the
@@ -105,9 +111,7 @@ describe('startup timeout', () => {
     await fixture.fireAlarm();
     await fixture.flush();
     expect(fixture.record('a')).toMatchObject({
-      state: 'failed',
-      failedReason: 'preparation_timeout',
-      terminalAt: deadlineAt,
+      state: { kind: 'failed', reason: 'preparation_timeout', at: deadlineAt },
     });
   });
 });

@@ -30,6 +30,28 @@ const cases: ReadonlyArray<
   ['runtime_unhealthy', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
   ['runtime_unhealthy', 'pre_dispatch', 'failed', 'pre_dispatch', 'wrapper_start_failed'],
   [
+    'health_unhealthy_absent',
+    'accepted',
+    'failed',
+    'post_dispatch_no_activity',
+    'wrapper_disconnected',
+  ],
+  ['health_unhealthy_absent', 'pre_dispatch', 'failed', 'pre_dispatch', 'wrapper_start_failed'],
+  [
+    'health_unhealthy_unresponsive',
+    'accepted',
+    'failed',
+    'post_dispatch_no_activity',
+    'wrapper_disconnected',
+  ],
+  [
+    'health_unhealthy_unresponsive',
+    'pre_dispatch',
+    'failed',
+    'pre_dispatch',
+    'wrapper_start_failed',
+  ],
+  [
     'environment_stopped',
     'accepted',
     'failed',

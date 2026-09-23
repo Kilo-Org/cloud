@@ -108,6 +108,28 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  // The letter-spacing reset belongs to an RTL interface: in this LTR screen
+  // the eyebrow label and the action keep `tracking-[1.5px]`, and no inline
+  // style overrides the class (the RTL case below pins the reset).
+  it('keeps the tracked letter-spacing on the Arabic label and action in LTR', () => {
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const actionText = action.find(node => Object.is(node.type, 'Text'));
+
+    expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
+    expect(label.props.style).toBeUndefined();
+    expect(actionText.props.style).toBeUndefined();
+  });
+
   it('renders Arabic labels without the mono family or letter spacing in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(

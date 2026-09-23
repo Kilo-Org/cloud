@@ -49,14 +49,17 @@ import { notifyUserSessionEvent } from '../session-events';
 import {
   applyMetadataChanges,
   CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+  CLI_DISCONNECT_STALE_BUSY_WINDOW_MS,
   computeSessionMetadataUpdates,
   resetAttentionStatusOnCliDisconnect,
 } from './metadata';
 
-type StatusRow = { status: string | null };
+type StatusRow = { status: string | null; statusUpdatedAt: string | null };
 
 function createTransactionDb(options: {
   initialStatus: string | null;
+  /** Stored status_updated_at before the call. Defaults to null (no status write). */
+  initialStatusUpdatedAt?: string | null;
   cloudAgentWorktreeId?: string | null;
   /** After the conditional update, status read-back (simulates concurrent overwrite). */
   persistedStatus?: string | null;
@@ -73,13 +76,23 @@ function createTransactionDb(options: {
     selectCall += 1;
     if (options.rowMissing) return [];
     if (selectCall === 1) {
-      return [{ status: options.initialStatus } satisfies StatusRow];
+      return [
+        {
+          status: options.initialStatus,
+          statusUpdatedAt: options.initialStatusUpdatedAt ?? null,
+        } satisfies StatusRow,
+      ];
     }
     const status =
       options.persistedStatus !== undefined
         ? options.persistedStatus
         : options.initialStatus !== null &&
-            (options.initialStatus === 'question' || options.initialStatus === 'permission')
+            (options.initialStatus === 'question' ||
+              options.initialStatus === 'permission' ||
+              (options.initialStatus === 'busy' &&
+                options.initialStatusUpdatedAt != null &&
+                new Date(options.initialStatusUpdatedAt).getTime() <=
+                  Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS))
           ? CLI_DISCONNECT_ATTENTION_RESET_STATUS
           : options.initialStatus;
     return [
@@ -458,7 +471,69 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     expect(refreshParams).toEqual([]);
   });
 
-  it.each(['busy', 'idle', 'retry', null] as const)(
+  it('clears a busy row whose owning CLI is gone and emits session.status.updated', async () => {
+    const db = createTransactionDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: new Date(
+        Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS - 1_000
+      ).toISOString(),
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    expect(db.applyUpdate).toHaveBeenCalled();
+    expect(db.updateSet).toHaveBeenCalledWith({
+      status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+      status_updated_at: expect.any(String),
+    });
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.status.updated',
+        data: expect.objectContaining({
+          previousStatus: 'busy',
+          status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        }),
+      }),
+      undefined
+    );
+  });
+
+  it('leaves a live busy row untouched when its status write is recent', async () => {
+    const db = createTransactionDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await resetAttentionStatusOnCliDisconnect(
+      { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never,
+      'usr_1',
+      'ses_1'
+    );
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('leaves a busy row untouched when status_updated_at is missing', async () => {
+    const db = createTransactionDb({ initialStatus: 'busy', initialStatusUpdatedAt: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await resetAttentionStatusOnCliDisconnect(
+      { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never,
+      'usr_1',
+      'ses_1'
+    );
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(['idle', 'retry', null] as const)(
     'no-ops without write or notify when stored status is %s',
     async status => {
       const db = createTransactionDb({ initialStatus: status });

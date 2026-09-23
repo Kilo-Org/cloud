@@ -108,6 +108,21 @@ const config: ExpoConfig = {
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
+  // iOS and Android only (apps/mobile/AGENTS.md): there is no web target, and
+  // the dev server's web page is not a product surface. Left undeclared, Expo
+  // *detects* the set (getSupportedPlatforms): `react-native` resolving adds
+  // ios and android, and `react-dom` resolving adds web. The dev server that
+  // produced dev/logs/mobile.log had web in its manifest platforms, so it
+  // answered a browser request with the web index.html, and that page requests
+  // a web bundle of this entry: babel-preset-expo rewrites `react-native` to
+  // `react-native-web` (not installed), and Metro logged
+  // `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the
+  // app console — a JavaScript error the app never caused. Naming the two
+  // platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+  // browser request falls through to the manifest response instead of the web
+  // page whether or not the workspace resolves `react-dom`.
+  // Asserted in scripts/assert-expo-config.mjs.
+  platforms: ['ios', 'android'],
   // Per-locale native strings. Expo's built-in `withLocales` writes a
   // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
   // usage-description keys (the plugin options below stay as the base Info.plist

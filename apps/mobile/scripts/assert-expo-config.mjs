@@ -133,6 +133,26 @@ check(
   'ios.requireFullScreen must be true (iPad Split View/Slide Over stays out of scope)'
 );
 
+// Platforms contract: the app is iOS and Android only (apps/mobile/AGENTS.md).
+// Expo detects the platform set when the config does not declare one
+// (getSupportedPlatforms): `react-native` resolving adds ios and android, and
+// `react-dom` resolving adds web. The dev server recorded in
+// dev/logs/mobile.log had web in its manifest platforms, so it answered a
+// browser request with the web index.html; that page requests a web bundle of
+// apps/mobile/index.js, where babel-preset-expo rewrites `react-native` to
+// `react-native-web` (not installed), and Metro logs
+// `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the app
+// console — a JavaScript error the app never causes. Declaring the two
+// platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+// browser request falls through to the manifest response instead.
+const PLATFORMS = ['ios', 'android'];
+check(
+  Array.isArray(config.platforms) &&
+    config.platforms.length === PLATFORMS.length &&
+    PLATFORMS.every(platform => config.platforms.includes(platform)),
+  `platforms must be exactly [${PLATFORMS.join(', ')}] (web is not a product target; it bundles an unsupported platform and logs a Metro resolve error into the app console)`
+);
+
 const associatedDomains = config.ios?.associatedDomains ?? [];
 check(
   associatedDomains.includes(ASSOCIATED_DOMAIN),

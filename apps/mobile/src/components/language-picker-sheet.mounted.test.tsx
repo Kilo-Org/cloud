@@ -90,7 +90,7 @@ vi.mock('@/components/picker-sheet', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
-vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6b7280' }),
@@ -505,6 +505,46 @@ describe('LanguagePickerSheet row alignment', () => {
         expect(className).not.toContain('text-left');
       }
     }
+
+    renderer.unmount();
+  });
+});
+
+describe('LanguagePickerSheet search field', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  // The language and repository pickers render the same "search a list"
+  // control. The repository picker's field is a filled rounded pill with a
+  // leading magnifier; the language field used to be a thin outlined box with
+  // no icon, so the same control read as two different controls.
+  it('uses the shared filled search pill with a leading magnifier', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+    const field = input.parent;
+    if (!field) {
+      throw new Error('language search field container not found');
+    }
+
+    expect((field.props.className as string).split(/\s+/)).toEqual(
+      expect.arrayContaining([
+        'flex-row',
+        'items-center',
+        'gap-2',
+        'rounded-full',
+        'bg-secondary',
+        'px-3',
+        'py-2',
+      ])
+    );
+    expect(field.props.className as string).not.toContain('border-input');
+    expect(findByType(renderer.root, 'Search')).toHaveLength(1);
+    expect(input.props.className as string).not.toContain('border');
+    expect(input.props.className as string).toContain('flex-1');
 
     renderer.unmount();
   });

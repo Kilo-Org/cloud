@@ -24,6 +24,30 @@ vi.mock('expo-blur', () => ({
   BlurView: 'BlurView',
 }));
 
+const glassMock = vi.hoisted(() => ({
+  isLiquidGlassAvailable: vi.fn<() => boolean>(() => false),
+  isGlassEffectAPIAvailable: vi.fn<() => boolean>(() => true),
+}));
+
+const motionMock = vi.hoisted(() => ({ reducedMotion: false }));
+
+vi.mock('expo-glass-effect', () => ({
+  GlassView: 'GlassView',
+  isLiquidGlassAvailable: glassMock.isLiquidGlassAvailable,
+  isGlassEffectAPIAvailable: glassMock.isGlassEffectAPIAvailable,
+}));
+
+vi.mock('nativewind', () => ({
+  styled: (component: unknown) => component,
+}));
+
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motionMock.reducedMotion,
+    scrollAnimated: !motionMock.reducedMotion,
+  }),
+}));
+
 type Renderer = TestRenderer.ReactTestRenderer;
 
 let childMounts = 0;
@@ -94,6 +118,9 @@ beforeEach(() => {
   platformMock.OS = 'ios';
   useColorSchemeMock.mockReturnValue('dark');
   accessibilityMock.addEventListener.mockReturnValue({ remove: vi.fn() });
+  glassMock.isLiquidGlassAvailable.mockReturnValue(false);
+  glassMock.isGlassEffectAPIAvailable.mockReturnValue(true);
+  motionMock.reducedMotion = false;
   childMounts = 0;
   __resetBlurBarForTests();
 });
@@ -255,6 +282,105 @@ describe('BlurBar Reduce Transparency', () => {
     expect(hosts(renderer, 'BlurView')).toHaveLength(0);
     expect(accessibilityMock.isReduceTransparencyEnabled).not.toHaveBeenCalled();
     expect(accessibilityMock.addEventListener).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('BlurBar Liquid Glass selection', () => {
+  it('renders GlassView when Liquid Glass is available and Reduce Transparency is off', async () => {
+    glassMock.isLiquidGlassAvailable.mockReturnValue(true);
+    const pending = deferred<boolean>();
+    accessibilityMock.isReduceTransparencyEnabled.mockReturnValue(pending.promise);
+    const renderer = await render(createElement('Text', null, 'content'));
+
+    pending.resolve(false);
+    await settle();
+
+    expect(hosts(renderer, 'BlurView')).toHaveLength(0);
+    const glasses = hosts(renderer, 'GlassView');
+    expect(glasses).toHaveLength(1);
+    expect(glasses[0]?.props.glassEffectStyle).toEqual({ style: 'regular', animate: true });
+    expect(glasses[0]?.props.colorScheme).toBe('dark');
+    expect(glasses[0]?.props.className).toBe('absolute inset-0');
+    expect(hosts(renderer, 'Text')[0]?.props.children).toBe('content');
+
+    renderer.unmount();
+  });
+
+  it('does not animate the glass material under Reduce Motion', async () => {
+    glassMock.isLiquidGlassAvailable.mockReturnValue(true);
+    motionMock.reducedMotion = true;
+    const pending = deferred<boolean>();
+    accessibilityMock.isReduceTransparencyEnabled.mockReturnValue(pending.promise);
+    const renderer = await render(createElement('Text', null, 'content'));
+
+    pending.resolve(false);
+    await settle();
+
+    const glasses = hosts(renderer, 'GlassView');
+    expect(glasses).toHaveLength(1);
+    expect(glasses[0]?.props.glassEffectStyle).toEqual({ style: 'regular', animate: false });
+
+    renderer.unmount();
+  });
+
+  it('keeps BlurView when the Liquid Glass API is unavailable on iOS 26 betas', async () => {
+    glassMock.isLiquidGlassAvailable.mockReturnValue(true);
+    glassMock.isGlassEffectAPIAvailable.mockReturnValue(false);
+    const pending = deferred<boolean>();
+    accessibilityMock.isReduceTransparencyEnabled.mockReturnValue(pending.promise);
+    const renderer = await render(createElement('Text', null, 'content'));
+
+    pending.resolve(false);
+    await settle();
+
+    expect(hosts(renderer, 'GlassView')).toHaveLength(0);
+    expect(hosts(renderer, 'BlurView')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps BlurView when Liquid Glass is not available', async () => {
+    const pending = deferred<boolean>();
+    accessibilityMock.isReduceTransparencyEnabled.mockReturnValue(pending.promise);
+    const renderer = await render(createElement('Text', null, 'content'));
+
+    pending.resolve(false);
+    await settle();
+
+    expect(hosts(renderer, 'GlassView')).toHaveLength(0);
+    expect(hosts(renderer, 'BlurView')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('prefers the solid surface over GlassView when Reduce Transparency is on', async () => {
+    glassMock.isLiquidGlassAvailable.mockReturnValue(true);
+    const pending = deferred<boolean>();
+    accessibilityMock.isReduceTransparencyEnabled.mockReturnValue(pending.promise);
+    const renderer = await render(createElement('Text', null, 'content'));
+
+    pending.resolve(true);
+    await settle();
+
+    expect(outerView(renderer)?.props.className).toContain('bg-background');
+    expect(hosts(renderer, 'BlurView')).toHaveLength(0);
+    expect(hosts(renderer, 'GlassView')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('never queries the glass availability on Android', async () => {
+    platformMock.OS = 'android';
+    accessibilityMock.isReduceTransparencyEnabled.mockResolvedValue(false);
+    const renderer = await render(createElement('Text', null, 'content'));
+
+    expect(outerView(renderer)?.props.className).toContain('bg-background');
+    expect(hosts(renderer, 'BlurView')).toHaveLength(0);
+    expect(hosts(renderer, 'GlassView')).toHaveLength(0);
+    expect(glassMock.isLiquidGlassAvailable).not.toHaveBeenCalled();
+    expect(glassMock.isGlassEffectAPIAvailable).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

@@ -73,6 +73,32 @@ describe('session documents', () => {
     expect(storedSessionSearchDocument({ session_id: 'c', title: null })).toBeNull();
   });
 
+  it('indexes a title with surrounding whitespace trimmed', () => {
+    // The indexed title and its fingerprint must stay byte-identical to the
+    // pre-fallback behaviour: a padded title is normalized, not stored raw.
+    const document = sessionDocument('sess-trim', '  Fix login  ');
+    expect(document.title).toBe('Fix login');
+    expect(document.fingerprint).toContain('"title":"Fix login"');
+  });
+
+  it('skips the backend default title instead of indexing a raw timestamp', () => {
+    // Explorer session-question: `New session - <ISO>` is machine output, so a
+    // Spotlight result must not carry it as the session's name.
+    expect(
+      storedSessionSearchDocument({
+        session_id: 'd',
+        title: 'New session - 2026-09-20T08:10:35.172Z',
+      })
+    ).toBeNull();
+    expect(
+      activeSessionSearchDocument({
+        id: 'live-5',
+        title: 'Child session - 2026-09-20T08:10:35.172Z',
+        organizationId: null,
+      })
+    ).toBeNull();
+  });
+
   it('skips a session that still carries the backend placeholder', () => {
     // Indexing the placeholder would put one identical machine string per
     // fresh session into the system search.

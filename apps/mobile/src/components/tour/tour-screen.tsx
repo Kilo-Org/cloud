@@ -182,9 +182,11 @@ export function TourScreen() {
       {/* The tour is presented `modal` (apps/mobile/src/app/(app)/_layout.tsx),
           so the header takes the modal clearance instead of re-adding the
           status-bar inset the native sheet already owns — no dead band above
-          the eyebrow. The eyebrow stays top-left and the fork has no back
-          control to return to. */}
-      <ScreenHeader eyebrow={t('tour.eyebrow')} modal centerTitle={false} showBackButton={false} />
+          the eyebrow. The eyebrow is centred (`centerTitle`): the fork body,
+          which is the only other content, is a centred column, so a top-left
+          eyebrow read as a stranded label beside it (home-quick-tour finding).
+          The fork has no back control to return to. */}
+      <ScreenHeader eyebrow={t('tour.eyebrow')} modal centerTitle showBackButton={false} />
 
       <View className="flex-1">
         <ForkStep onChoose={choosePath} />

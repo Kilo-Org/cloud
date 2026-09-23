@@ -17,13 +17,13 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatMeta,
   formatSessionTotalCost,
-  sessionDisplayTitle,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
@@ -108,7 +108,7 @@ export function StoredSessionRow({
   const { showActionSheetWithOptions } = useActionSheet();
   // One derivation for the visible label, the spoken label and the rename
   // prompt: a creation placeholder title reads as "Untitled session".
-  const title = sessionDisplayTitle(session.title, t('agents.sessionRow.untitled'));
+  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);

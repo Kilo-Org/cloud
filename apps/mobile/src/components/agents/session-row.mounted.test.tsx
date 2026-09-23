@@ -181,6 +181,16 @@ describe('StoredSessionRow live speech', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('paints the untitled label for a session that still carries the backend placeholder', () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the row
+    // shows its own label instead of the machine string.
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session - 2026-09-22T01:09:45.623Z' } })
+    );
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain('New session - 2026-09-22T01:09:45.623Z');
+  });
+
   it('updates the dot and speech in place while retaining metadata and provenance', () => {
     const props = { session: { ...session, associatedPr: { number: 42 } }, metaWhileLive: true };
     const renderer = mount(row(props));

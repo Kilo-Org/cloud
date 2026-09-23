@@ -25,6 +25,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -37,7 +38,6 @@ import {
   remoteMeta,
   remoteSessionEyebrowLabel,
   selectRemoteRowSpokenMeta,
-  sessionDisplayTitle,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
@@ -93,7 +93,7 @@ export function RemoteSessionRow({
   const exitingRef = useRef(false);
   // One derivation for the visible label, the spoken label and the rename
   // prompt: a creation placeholder title reads as "Untitled session".
-  const title = sessionDisplayTitle(session.title, t('agents.sessionRow.untitled'));
+  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

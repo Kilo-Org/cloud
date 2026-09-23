@@ -175,6 +175,16 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // `compileModsAsync` with `introspect: true` runs the Android colors mod
+    // against `projectRoot`, so on a worktree with a generated or prebuilt
+    // `android/` tree the introspected list also carries that project's other
+    // colors — notification and dialog colors from the app's other plugins
+    // (adaptive-icon, notification, app background), and whatever a local
+    // prebuild already wrote. Assert the splash color this plugin owns is
+    // present among them, by containment, rather than that it is the only entry
+    // or that the array has an exact length, the same way the styles assertion
+    // below tolerates extra prebuilt styles (and not the whole array, so a
+    // prebuild's iconBackground, colorPrimary, … cannot fail the case).
     // arrayContaining, not an exact array: introspection seeds android.colors
     // from the checked-out prebuild, which also carries the app's other colors
     // (colorPrimary, app_background, notification_icon_color). Asserting the

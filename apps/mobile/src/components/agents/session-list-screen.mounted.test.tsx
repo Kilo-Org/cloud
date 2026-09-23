@@ -11,6 +11,7 @@ import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -334,11 +335,25 @@ type HeaderElement = {
     children: { type: string };
   };
 };
-function headerActions() {
-  const context = header().props.context as {
-    props: { children: (HeaderElement | null)[] };
+/** The header's `context` row, whose children are its section label and controls. */
+function headerRow() {
+  return header().props.context as {
+    props: { className: string; children: (HeaderElement | null)[] };
   };
-  return context.props.children.filter((child): child is HeaderElement => child !== null);
+}
+/** The row's controls, in order: the section label leads the row and is not one. */
+function headerActions() {
+  return headerRow().props.children.filter(
+    (child): child is HeaderElement => child !== null && typeof child.props.testID === 'string'
+  );
+}
+/** The section label that owns the row start (see `headerActions`). */
+function headerRowLabel() {
+  const label = headerRow().props.children[0];
+  if (!label) {
+    throw new Error('Missing header row label');
+  }
+  return label as unknown as { props: { className: string; children: string } };
 }
 function headerAction(testID = 'agents-view-history') {
   const button = headerActions().find(child => child.props.testID === testID);
@@ -1068,7 +1083,9 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(nodes(type)).toHaveLength(0);
     }
     expect(headerAction().type).toBe('Pressable');
-    expect(headerAction().props.children.type).toBe('Text');
+    // The trailing See-all label is an eyebrow-scale label, the same element the
+    // row's section label uses.
+    expect(headerAction().props.children.type).toBe(Eyebrow);
   });
 });
 
@@ -1378,6 +1395,19 @@ describe('AgentSessionListScreen live filtering', () => {
     const list = requireNode('FlatList');
     expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a2']);
     expect(header().props.eyebrow).toBe('2 LIVE');
+  });
+
+  it('leads the controls row with the section label so section headers share one alignment', async () => {
+    await renderScreen();
+
+    const label = headerRowLabel();
+    // The label owns the row start and grows, so the controls keep the row end —
+    // the Home live-sessions header's shape. A row holding only the trailing
+    // 'See all' read as a section header whose label was missing (e2, agents).
+    expect(headerRow().props.className).toContain('justify-end');
+    expect(label.props.className).toContain('grow');
+    expect(label.props.children).toBe(i18n.t('home.agentSessions'));
+    expect(headerActions().map(control => control.props.testID)).toEqual(['agents-view-history']);
   });
 
   it('keeps the header right to See-all alone while nothing is filterable', async () => {

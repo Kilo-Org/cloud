@@ -14,7 +14,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
-const ACTION_BOX_CLASSES = ['grow', 'max-w-full', 'flex-row', 'justify-end'];
+const ACTION_BOX_CLASSES = ['shrink-0', 'max-w-full', 'flex-row'];
 const ACTION_TEXT_CLASSES = ['shrink', 'font-mono-medium', 'text-[11px]', 'text-primary'];
 const PHYSICAL_ALIGNMENT_CLASSES = new Set([
   'text-left',
@@ -87,17 +87,24 @@ describe('SectionHeader mounted layout', () => {
       expect(text.props.style).toBeUndefined();
     }
 
-    expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
-      'flex-wrap'
-    );
-    // The action copy must sit at the row's end in both directions, so the box
-    // is a row that places its content at the main-axis end, and the layout is
-    // direction-relative and identical under RTL. The row's outer edge comes
-    // from the action box's flex direction, never from a physical text
-    // alignment.
-    expect((action.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining(ACTION_BOX_CLASSES)
-    );
+    // The action copy must sit at the row's end in both directions: the row
+    // packs every flex line to its end (`justify-end`) and only the label grows,
+    // so a lone action box on a wrapped line still lands on the row's outer edge
+    // instead of the line start that `justify-between` gives it. The box must
+    // not grow too — when both children grew the row split in half and the
+    // action sat at the inner edge of its half (the screen centre in Arabic)
+    // instead of the margin the tab bar, cards and rows below share
+    // (home-arabic-rtl, home). The layout is direction-relative and identical
+    // under RTL, and the row's outer edge comes from the row's own main-axis
+    // placement, never from a physical text alignment.
+    const rowClasses = ((action.parent?.props.className as string | undefined) ?? '').split(' ');
+    expect(rowClasses).toContain('flex-wrap');
+    expect(rowClasses).toContain('justify-end');
+    expect(rowClasses).not.toContain('justify-between');
+    const actionBoxClasses = (action.props.className as string).split(' ');
+    expect(actionBoxClasses).toEqual(expect.arrayContaining(ACTION_BOX_CLASSES));
+    expect(actionBoxClasses).not.toContain('grow');
+    expect(actionBoxClasses).not.toContain('justify-end');
     const actionTextClasses = (text.props.className as string).split(' ');
     expect(actionTextClasses).toEqual(expect.arrayContaining(ACTION_TEXT_CLASSES));
     expect(actionTextClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);

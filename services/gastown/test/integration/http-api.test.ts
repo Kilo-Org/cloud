@@ -1,4 +1,4 @@
-import { SELF } from 'cloudflare:test';
+import { SELF, env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
@@ -46,12 +46,14 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+    it('should serve service info at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      // The worker exposes a service descriptor; the dashboard UI itself lives
+      // in the web app.
+      expect(res.headers.get('Content-Type')).toContain('application/json');
+      const body = await res.json();
+      expect(body).toMatchObject({ service: 'gastown', status: 'ok' });
     });
   });
 
@@ -430,6 +432,10 @@ describe('HTTP API', () => {
   describe('agent done', () => {
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
+      // The alarm loop only arms for an initialized town (armAlarmIfNeeded
+      // bails when `town:id` is absent).
+      const townStub = env.TOWN.get(env.TOWN.idFromName(townId));
+      await townStub.setTownId(townId);
       const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
@@ -464,6 +470,10 @@ describe('HTTP API', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.done).toBe(true);
+
+      // gt_done only records an event; the alarm drains it, which closes out
+      // the polecat's work and unhooks it.
+      expect(await runDurableObjectAlarm(townStub)).toBe(true);
 
       // Verify agent is idle
       const agentCheck = await SELF.fetch(
@@ -619,10 +629,19 @@ describe('HTTP API', () => {
         }),
       });
       expect(res.status).toBe(201);
+      // The route returns an EscalationEntry built from the escalation bead.
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      expect(body.data.id).toBeTruthy();
+      expect(body.data.severity).toBe('critical');
+      expect(body.data.message).toBe('Critical failure');
+
+      const beads = await env.TOWN.get(env.TOWN.idFromName(townId)).listBeads({
+        type: 'escalation',
+        rig_id: id,
+      });
+      expect(beads).toHaveLength(1);
+      expect(beads[0].title).toBe('Escalation: Critical failure');
+      expect(beads[0].priority).toBe('critical');
     });
   });
 

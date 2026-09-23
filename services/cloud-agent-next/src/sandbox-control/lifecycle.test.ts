@@ -1903,39 +1903,29 @@ describe('SandboxControl lifecycle boundaries', () => {
 
     const replacement = { ...first, connectionId: crypto.randomUUID() };
 
-    // The fence changes during the frame's first storage read, so the forward bails
-    // at its stale-before-enqueue guard without ever attempting the session-DO RPC.
-    const storage = h.storage as unknown as { get: (key: string) => Promise<unknown> };
-    const originalGet = storage.get.bind(storage);
-    let fenced = false;
-    storage.get = async (key: string) => {
-      if (!fenced) {
-        fenced = true;
-        h.replaceConnection(replacement);
-      }
-      return originalGet(key);
-    };
-    try {
-      await h.hooks.onSessionEventBatch?.({ items }, first);
-      await h.flush();
+    // The fence changes after the frame is admitted but before its queued run
+    // dispatches, so the forward bails at its stale-before-enqueue guard without
+    // ever attempting the session-DO RPC. The batch hot path resolves eligibility
+    // synchronously, so this needs no awaited storage read to interleave with.
+    const pending = h.hooks.onSessionEventBatch?.({ items }, first);
+    h.replaceConnection(replacement);
+    await pending;
+    await h.flush();
 
-      // The forward never reached the destination, so the fence rejection retained
-      // the frame instead of treating it as already applied.
-      expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
+    // The forward never reached the destination, so the fence rejection retained
+    // the frame instead of treating it as already applied.
+    expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
 
-      // The retained frame is replayed for the connection that is current when the
-      // handshake settles instead of being silently lost, and it keeps the frame's
-      // original wrapper instance so the session DO's runtime gate stays in charge.
-      await h.hooks.onHandshakeComplete?.(replacement);
-      await h.hooks.onReady?.(replacement);
-      await h.flush();
-      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
-        items,
-        wrapperInstanceId: first.wrapperInstanceId,
-      });
-    } finally {
-      storage.get = originalGet;
-    }
+    // The retained frame is replayed for the connection that is current when the
+    // handshake settles instead of being silently lost, and it keeps the frame's
+    // original wrapper instance so the session DO's runtime gate stays in charge.
+    await h.hooks.onHandshakeComplete?.(replacement);
+    await h.hooks.onReady?.(replacement);
+    await h.flush();
+    expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+      items,
+      wrapperInstanceId: first.wrapperInstanceId,
+    });
   });
 
   it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {

@@ -770,23 +770,7 @@ export class TownDO extends DurableObject<Env> {
     this._containerRunPolicy =
       (await this.ctx.storage.get<ContainerRunPolicy>('container:runPolicy')) ?? 'automatic';
 
-    beadOps.initBeadTables(this.sql);
-
-    // These are no-ops now but kept for clarity
-    agents.initAgentTables(this.sql);
-    mail.initMailTables(this.sql);
-    reviewQueue.initReviewQueueTables(this.sql);
-
-    rigs.initRigTables(this.sql);
-
-    query(this.sql, createTableAgentNudges(), []);
-    for (const idx of getIndexesAgentNudges()) {
-      query(this.sql, idx, []);
-    }
-
-    wasteland.initWastelandTables(this.sql);
-
-    events.initTownEventsTable(this.sql);
+    this.createSchema();
 
     // One-shot cleanup: older versions of this DO stored a separate
     // `mayor:ready_reported_for:<startedAt>` key per container instance,
@@ -806,6 +790,32 @@ export class TownDO extends DurableObject<Env> {
     // unconditionally so pending work (idle agents with hooks, open MR beads,
     // stale reviews) gets processed.
     await this.armAlarmIfNeeded();
+  }
+
+  /**
+   * Create the town's SQLite schema. Every statement is
+   * `CREATE TABLE/INDEX IF NOT EXISTS`, so this is safe to run repeatedly —
+   * including right after `destroy()` wiped the storage, where the DO instance
+   * keeps serving RPCs and must not fail with "no such table".
+   */
+  private createSchema(): void {
+    beadOps.initBeadTables(this.sql);
+
+    // These are no-ops now but kept for clarity
+    agents.initAgentTables(this.sql);
+    mail.initMailTables(this.sql);
+    reviewQueue.initReviewQueueTables(this.sql);
+
+    rigs.initRigTables(this.sql);
+
+    query(this.sql, createTableAgentNudges(), []);
+    for (const idx of getIndexesAgentNudges()) {
+      query(this.sql, idx, []);
+    }
+
+    wasteland.initWastelandTables(this.sql);
+
+    events.initTownEventsTable(this.sql);
   }
 
   private _townId: string | null = null;
@@ -5892,6 +5902,14 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+
+    // deleteAll() wipes the DO's SQLite tables along with its key-value
+    // storage, but this instance keeps serving RPCs (in-flight container
+    // callbacks, stale stubs). Re-create the empty schema so those calls read
+    // empty tables instead of failing with "no such table". The alarm is
+    // deliberately left disarmed: `town:id` is gone, which is exactly how
+    // armAlarmIfNeeded detects a deleted town.
+    this.createSchema();
   }
 }
 

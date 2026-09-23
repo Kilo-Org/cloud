@@ -10,9 +10,13 @@ describe('Town DO Alarm', () => {
   let townName: string;
   let town: ReturnType<typeof getTownStub>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     townName = `town-alarm-${crypto.randomUUID()}`;
     town = getTownStub(townName);
+    // The alarm loop only arms for an initialized town: armAlarmIfNeeded()
+    // bails when the durable `town:id` key is absent (it is how a destroyed
+    // town is detected), so a fresh town must record its id first.
+    await town.setTownId(townName);
   });
 
   // ── Rig config management ─────────────────────────────────────────────
@@ -50,7 +54,7 @@ describe('Town DO Alarm', () => {
       });
       const bead = await town.createBead({ type: 'issue', title: 'Test bead' });
 
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       // The alarm should fire without error
       const ran = await runDurableObjectAlarm(town);
@@ -64,7 +68,7 @@ describe('Town DO Alarm', () => {
         identity: `alarm-done-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Done bead' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       // Run the initial alarm from hookBead
       await runDurableObjectAlarm(town);
@@ -115,7 +119,7 @@ describe('Town DO Alarm', () => {
         identity: `rearm-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Active work' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       // First alarm from hookBead
       await runDurableObjectAlarm(town);
@@ -149,7 +153,7 @@ describe('Town DO Alarm', () => {
 
       await town.submitToReviewQueue({
         agent_id: agent.id,
-        bead_id: bead.id,
+        bead_id: bead.bead_id,
         rig_id: 'test-rig',
         branch: 'feature/review',
       });
@@ -175,14 +179,19 @@ describe('Town DO Alarm', () => {
         identity: `no-town-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Pending bead' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
-      // Run alarm — no rig config, so scheduling should be skipped
+      // Run alarm — no rig config, so the container is never started.
       await runDurableObjectAlarm(town);
 
-      // Agent should still be idle (not dispatched)
+      // The dispatch action marks the agent working and the bead in_progress
+      // synchronously before the best-effort container start; the container is
+      // unavailable in tests, so the agent stays working for patrol to recover
+      // (#1358).
       const updatedAgent = await town.getAgentAsync(agent.id);
-      expect(updatedAgent?.status).toBe('idle');
+      expect(updatedAgent?.status).toBe('working');
+      const beadAfter = await town.getBeadAsync(bead.bead_id);
+      expect(beadAfter?.status).toBe('in_progress');
     });
 
     it('should attempt to dispatch idle agents with hooked beads', async () => {
@@ -194,15 +203,16 @@ describe('Town DO Alarm', () => {
         identity: `dispatch-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Dispatch bead' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       // Run alarm — container not available in tests, so startAgentInContainer
-      // will fail, but the attempt should be made
+      // will fail, but the attempt should be made.
       await runDurableObjectAlarm(town);
 
-      // Agent stays idle because container start failed
+      // The dispatch action leaves the agent working when the container start
+      // fails, so patrol can recover it (#1358).
       const updatedAgent = await town.getAgentAsync(agent.id);
-      expect(updatedAgent?.status).toBe('idle');
+      expect(updatedAgent?.status).toBe('working');
     });
   });
 
@@ -215,8 +225,13 @@ describe('Town DO Alarm', () => {
         name: 'DeadAgent',
         identity: `alarm-dead-${townName}`,
       });
-      await town.updateAgentStatus(agent.id, 'dead');
       await town.configureRig(testRigConfig());
+
+      // Heartbeat first: a freshly registered agent has no last_activity_at,
+      // and reconcileGC treats a missing activity timestamp as stale, so an
+      // agent that was alive recently is the realistic shape here.
+      await town.touchAgentHeartbeat(agent.id);
+      await town.updateAgentStatus(agent.id, 'dead');
 
       // Run alarm — witnessPatrol runs internally
       await runDurableObjectAlarm(town);
@@ -233,7 +248,7 @@ describe('Town DO Alarm', () => {
         identity: `alarm-orphan-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Orphan bead' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       // Kill the agent — bead is now orphaned (hooked to dead agent)
       await town.updateAgentStatus(agent.id, 'dead');
@@ -242,7 +257,7 @@ describe('Town DO Alarm', () => {
       await runDurableObjectAlarm(town);
 
       // Bead should still exist and be in_progress (patrol doesn't auto-reassign yet)
-      const beadAfter = await town.getBeadAsync(bead.id);
+      const beadAfter = await town.getBeadAsync(bead.bead_id);
       expect(beadAfter).not.toBeNull();
     });
   });
@@ -266,7 +281,7 @@ describe('Town DO Alarm', () => {
         title: 'E2E test bead',
         priority: 'high',
       });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       // hookBead arms alarm — run it (container unavailable in tests,
       // so agent stays idle since dispatch fails)
@@ -274,8 +289,8 @@ describe('Town DO Alarm', () => {
       expect(alarmRan).toBe(true);
 
       const agentAfterAlarm = await town.getAgentAsync(agent.id);
-      expect(agentAfterAlarm?.status).toBe('idle');
-      expect(agentAfterAlarm?.current_hook_bead_id).toBe(bead.id);
+      expect(agentAfterAlarm?.status).toBe('working');
+      expect(agentAfterAlarm?.current_hook_bead_id).toBe(bead.bead_id);
 
       // Simulate agent completing work (in production the container
       // would have started the agent and it would call agentDone)
@@ -285,14 +300,20 @@ describe('Town DO Alarm', () => {
         summary: 'E2E work complete',
       });
 
-      // Agent should be idle now
+      // gt_done only records an event: the alarm drains it, which moves the
+      // source bead to in_review, opens the MR bead and unhooks the polecat.
+      await runDurableObjectAlarm(town);
+
       const agentAfterDone = await town.getAgentAsync(agent.id);
-      expect(agentAfterDone?.status).toBe('idle');
       expect(agentAfterDone?.current_hook_bead_id).toBeNull();
 
-      // Run alarm — should process the review queue entry
-      // (will fail at container level but that's expected in tests)
+      // The container reports the process exit separately; that completion is
+      // what returns the polecat to idle.
+      await town.agentCompleted(agent.id, { status: 'completed' });
       await runDurableObjectAlarm(town);
+
+      const agentAfterCompleted = await town.getAgentAsync(agent.id);
+      expect(agentAfterCompleted?.status).toBe('idle');
 
       // MR bead should have been picked up and processed (failed in test env)
       const mrBeads = await town.listBeads({ type: 'merge_request' });

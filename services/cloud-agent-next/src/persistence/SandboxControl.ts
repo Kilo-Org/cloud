@@ -464,6 +464,28 @@ type BatchForwardMember = {
   queuedAt: number;
 };
 
+// Batches admitted on the same connection, route and runtime coalesce into one
+// RPC while they wait behind an in-flight run. A merged run still returns one
+// result per constituent, and a retained member keeps its own replay entry, so
+// coalescing does not make one replay entry stand for two frames.
+function batchCoalescingIdentity(
+  identity: SessionEventIdentity,
+  connection: SandboxControlConnectionIdentity,
+  admission: { sessionId: string; nativeRuntimeId?: string }
+): string {
+  return JSON.stringify([
+    identity.directory,
+    identity.kiloSessionId ?? null,
+    identity.rootKiloSessionId ?? null,
+    identity.nativeRuntimeId ?? null,
+    connection.connectionId,
+    connection.wrapperInstanceId ?? null,
+    connection.providerInstanceId,
+    admission.sessionId,
+    admission.nativeRuntimeId ?? null,
+  ]);
+}
+
 type ForwardOperation =
   | 'receiveSandboxControlEvent'
   | 'receiveSandboxControlPreparing'
@@ -4648,10 +4670,10 @@ export class SandboxControl extends DurableObject<Env> {
     const member: BatchForwardMember = { payload, fields, queuedAt };
     const next = this.sessionForwarding.enqueue<BatchForwardMember, SandboxEventBatchResult>({
       sessionId: admission.sessionId,
-      // Each batch is forwarded as its own frame so a retained batch keeps a
-      // per-frame replay entry with its original wrapper instance; merging two
-      // batches would make one replay entry stand for two frames.
-      identity: null,
+      // Compatible waiting batches coalesce into one RPC. Each constituent keeps
+      // its own payload, fields and replay entry, so a merged run is still
+      // retained and replayed frame by frame.
+      identity: batchCoalescingIdentity(identity, connection, admission),
       bytes: frameBytes,
       items: payload.items.length,
       item: member,
@@ -4671,10 +4693,11 @@ export class SandboxControl extends DurableObject<Env> {
     identity: SessionEventIdentity,
     admission: { sessionId: string; nativeRuntimeId?: string }
   ): Promise<SandboxEventBatchResult[]> {
-    // An async read before the eligibility check lets a hand-off that lands during
-    // the read surface as stale, so the batch is retained for replay instead of
-    // being sent over a connection that is already gone.
-    await loadRouteTable(this.ctx.storage);
+    // No awaited storage read here: the batch hot path resolves eligibility from
+    // the in-memory route table so a real batch forward never blocks on storage.
+    // `deliverBatchRun` still re-checks the connection before its send, so a
+    // hand-off that landed before the run is observed as stale and the batch is
+    // retained for replay below instead of being sent over a gone connection.
     const results = await this.deliverBatchRun(members, connection, identity, admission);
     // A batch whose frame never reached the session DO is retained for replay once
     // its fence moved, so a queued part delta is not lost with the retired runtime.

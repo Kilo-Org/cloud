@@ -291,7 +291,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   });
 
   it.each([
-    { stored: null, checked: 'Personal' },
+    // An absent stored choice is 'not chosen yet': the provider's login default
+    // resolves to the first organization, so the picker must mark that row. A
+    // stored organization missing from the list marks no row at all.
+    { stored: null, checked: name },
     { stored: 'org-missing', checked: undefined },
   ])(
     'marks the account the user is actually on when the stored one is missing (stored=$stored)',

@@ -65,7 +65,7 @@ export type DemandEvent = {
   type: 'DEMAND';
   requestId: string;
   target: AllocationTarget;
-  createIntent: AllocationCreateIntent;
+  createIntent: AllocationCreateIntent | null;
 };
 
 /** Session → allocation seam. One request binds to one allocation. */
@@ -73,7 +73,7 @@ export type AcquireEvent = {
   type: 'ACQUIRE';
   requestId: string;
   target: AllocationTarget;
-  createIntent: AllocationCreateIntent;
+  createIntent: AllocationCreateIntent | null;
   deliveryDeadlineAt: number;
 };
 

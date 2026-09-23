@@ -46,6 +46,7 @@ import { AppState, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
+import { SessionPreviewOverlay } from '@/components/agents/session-preview-overlay';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
@@ -1109,6 +1110,10 @@ function RootLayout() {
                 </StateSurface>
               </AppContentReveal>
               <AnimatedSplashOverlay />
+              {/* The long-press session preview. It renders nothing until the
+                  preview store opens, and draws itself through the app-root
+                  Portal so the dim covers the tab bar too. */}
+              <SessionPreviewOverlay />
             </AppRootProviders>
           </OfflineBannerSpaceGate>
         </ThemeProvider>

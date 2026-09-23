@@ -189,7 +189,7 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
-import { normalizeSessionTitle } from '@/lib/session-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -1588,7 +1588,7 @@ export function SessionDetailContent({
   // (`New session - <ISO>`); it is a storage key, not a name, so treat it as
   // absent and let the fallback name (or a live rename) show instead.
   const serverTitle = isSessionLoaded
-    ? normalizeSessionTitle(fetchedData.title ?? undefined)
+    ? sessionDisplayTitle(fetchedData.title ?? undefined)
     : undefined;
   const rename = useSessionDetailRename({
     sessionId,
@@ -1598,7 +1598,7 @@ export function SessionDetailContent({
     // title it opened with instead of blinking back to "Session". A
     // generated placeholder title is not a name: fall back to the
     // localized label rather than the raw ISO string.
-    fallbackTitle: normalizeSessionTitle(cachedTitle) ?? t('agentChat.session.title'),
+    fallbackTitle: sessionDisplayTitle(cachedTitle) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

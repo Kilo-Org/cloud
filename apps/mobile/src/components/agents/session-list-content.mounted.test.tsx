@@ -289,7 +289,7 @@ describe('AgentSessionListContent liveness', () => {
     }
   );
 
-  it('parks pagination after a programmatic page-one reset until the user drags', () => {
+  it('parks pagination after a programmatic page-one reset and replays the end-reach on the user drag', () => {
     const onEndReached = vi.fn<() => void>();
     const retained = Array.from({ length: 12 }, (_, index) => session(`row-${index}`));
     const pageOne = retained.slice(0, 4);
@@ -315,22 +315,26 @@ describe('AgentSessionListContent liveness', () => {
       (shrunk.props as ListProps).onEndReached();
     });
     expect(onEndReached).not.toHaveBeenCalled();
-    // The next end-reach the user's own drag produces resumes pagination.
+    // FlashList reports the end once per data change, so the drag the user makes
+    // to browse both lifts the park and replays the end-reach the park dropped.
     act(() => {
       (shrunk.props as ListProps).onScrollBeginDrag();
     });
+    expect(onEndReached).toHaveBeenCalledTimes(1);
+    // The parked report is replayed once; later reports pass straight through.
     act(() => {
       (shrunk.props as ListProps).onEndReached();
     });
-    expect(onEndReached).toHaveBeenCalledTimes(1);
+    expect(onEndReached).toHaveBeenCalledTimes(2);
   });
 
-  it('releases the pagination park on touch move when the list fits the viewport', () => {
+  it('releases the pagination park on touch move and replays the dropped end-reach when the list fits the viewport', () => {
     const onEndReached = vi.fn<() => void>();
     const retained = Array.from({ length: 12 }, (_, index) => session(`row-${index}`));
     // The shrink leaves fewer rows than fill the viewport, so FlashList never
-    // emits `onScrollBeginDrag` (there is nothing to scroll) and only the
-    // finger's own `onTouchMove` opens the park.
+    // emits `onScrollBeginDrag` (there is nothing to scroll) and reports the end
+    // once per data change: only the finger's own `onTouchMove` can both open
+    // the park and replay the end-reach it dropped.
     const pageOne = retained.slice(0, 4);
     const props = contentProps({
       sections: [{ title: 'Today', data: retained }],
@@ -353,10 +357,17 @@ describe('AgentSessionListContent liveness', () => {
     act(() => {
       (shrunk.props as ListProps).onTouchMove();
     });
+    expect(onEndReached).toHaveBeenCalledTimes(1);
+    // A further touch move replays nothing: the parked report was consumed.
+    act(() => {
+      (shrunk.props as ListProps).onTouchMove();
+    });
+    expect(onEndReached).toHaveBeenCalledTimes(1);
+    // The park is gone, so a later end-reach passes straight through.
     act(() => {
       (shrunk.props as ListProps).onEndReached();
     });
-    expect(onEndReached).toHaveBeenCalledTimes(1);
+    expect(onEndReached).toHaveBeenCalledTimes(2);
   });
 
   it.each([false, true])('preserves retry recovery for searching=%s', isSearching => {

@@ -131,14 +131,28 @@ export function buildReviewFirstPageQueryOptions(
 ) {
   return {
     queryKey: [...buildReviewListQueryKey(trpc, scope), REVIEW_FIRST_PAGE_KEY],
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    queryFn: (): Promise<ReviewListPage> => fetchReviewListPage(scope, 0),
+    queryFn: async (): Promise<ReviewListPage> => {
+      const page = await fetchReviewListPage(scope, 0);
+      // Same contract as the list builder: the endpoints resolve handler errors
+      // as `{ success: false, error }`, and a resolved failure must not become
+      // this query's `data`. Throwing keeps the last successful page (React
+      // Query keeps `data` across a failed refetch), so the interval below still
+      // sees the running review it is polling for.
+      if (!page.success) {
+        throw new Error(page.error);
+      }
+      return page;
+    },
     staleTime: 0,
     enabled,
     refetchInterval: (query: { state: { data?: ReviewListPage } }) => {
+      // Poll until a successful page one with no running review arrives: the
+      // interval must survive a transient failure (no page delivered yet, or
+      // the last successful page still held after a failed refetch) instead of
+      // clearing on it, or one blip stops the poll for the rest of the review.
       const page = query.state.data;
       if (!page?.success) {
-        return false;
+        return REVIEW_POLL_INTERVAL_MS;
       }
       return hasInFlightReview(page.reviews) ? REVIEW_POLL_INTERVAL_MS : false;
     },
@@ -220,8 +234,10 @@ export function useReviewList(scope: string) {
   const queryClient = useQueryClient();
   const list = useInfiniteQuery(buildReviewListQueryOptions(trpc, scope));
 
-  // The list's own first page is what the screen renders, so it decides whether
-  // a review is still in flight and a page-one probe is worth running at all.
+  // A running review is created newest-first, so it lands on page one; that
+  // page decides whether a page-one probe is worth running at all. The screen
+  // renders every retained page, but only page one is polled so one tick is one
+  // request instead of one per retained page.
   const firstPage = list.data?.pages[0];
   const probing = firstPage?.success === true && hasInFlightReview(firstPage.reviews);
   const probe = useQuery(buildReviewFirstPageQueryOptions(trpc, scope, probing));

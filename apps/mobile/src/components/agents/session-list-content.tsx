@@ -250,8 +250,15 @@ export function AgentSessionListContent({
     }
     previousRowCountRef.current = rows.length;
   }, [rows.length]);
+  // FlashList reports the end once per data change, so the end-reach the shrink
+  // produces is not followed by another one on its own. Hold it while parked and
+  // replay it when the user's movement lifts the park: a list whose rows fit the
+  // viewport never reaches the end again, so without the replay it would stay
+  // parked for good and never load older sessions.
+  const parkedEndReachRef = useRef(false);
   const handleEndReached = useCallback(() => {
     if (paginationParkedRef.current) {
+      parkedEndReachRef.current = true;
       return;
     }
     onEndReached();
@@ -264,8 +271,15 @@ export function AgentSessionListContent({
   // movement, which a viewport-fitting list still reports; the PR-review diff
   // file list wires the same two events for the same reason.
   const releasePaginationPark = useCallback(() => {
+    if (!paginationParkedRef.current) {
+      return;
+    }
     paginationParkedRef.current = false;
-  }, []);
+    if (parkedEndReachRef.current) {
+      parkedEndReachRef.current = false;
+      onEndReached();
+    }
+  }, [onEndReached]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {

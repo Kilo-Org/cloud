@@ -579,11 +579,30 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
     const refetchInterval = readProbeRefetchInterval(options);
 
     expect(refetchInterval({ state: { data: makePage(50, true, 'running') } })).toBe(5000);
+    // A settled page with no running review is the one state that stops it.
     expect(refetchInterval({ state: { data: makePage(50, false) } })).toBe(false);
+  });
+
+  it('keeps polling through a transient failure instead of clearing the interval', () => {
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', true);
+    const refetchInterval = readProbeRefetchInterval(options);
+
+    // No page delivered yet (the first probe fetch failed): the review may still
+    // be running, so the interval must not clear on that one blip.
+    expect(refetchInterval({ state: {} })).toBe(5000);
+    // The last successful page is still held after a failed refetch (React Query
+    // keeps `data` on error), and a defensive failure payload keeps it polling.
     expect(
       refetchInterval({ state: { data: { success: false, reviews: [], error: 'boom' } } })
-    ).toBe(false);
-    expect(refetchInterval({ state: {} })).toBe(false);
+    ).toBe(5000);
+    expect(refetchInterval({ state: { data: makePage(50, true, 'running') } })).toBe(5000);
+  });
+
+  it('rejects a resolved failure page like the list builder so a handler error never becomes probe data', async () => {
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', true);
+    listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
+
+    await expect(options.queryFn()).rejects.toThrow('boom');
   });
 });
 

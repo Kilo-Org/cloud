@@ -23,7 +23,9 @@ export const RTL_WRITING_DIRECTION: TextStyle = { writingDirection: 'rtl' };
  * 2026-09-22). Naming the alignment keeps every field on the interface's side,
  * which is what the language search fields already do.
  *
- * Applied to a `TextInput` through `withRtlInputAlignment`; `Text` keeps
+ * Applied to a `TextInput` through `withRtlInputAlignment`; the shared
+ * single-line field, `@/components/ui/input`, applies it to every single-line
+ * input, so a call site does not repeat it. `Text` keeps
  * `RTL_WRITING_DIRECTION` above, which leaves an explicit `text-center` alone.
  * It reaches the input as an inline style, not a class: NativeWind maps
  * `textAlign` to a native prop for `TextInput` and crashes on it in this

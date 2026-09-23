@@ -175,6 +175,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the project root's real `colors.xml`, so the array
+    // also carries the colors every other Android plugin contributes. This
+    // suite owns only the splash color: assert it is present, as the styles
+    // assertion below does, rather than pinning the whole file.
     // The shared app config carries the other `colors.xml` entries (icon and
     // notification colors, the app background) through the same mod chain, so
     // assert this plugin's surface is present rather than the array length.

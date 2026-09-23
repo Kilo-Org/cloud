@@ -82,6 +82,32 @@ function subscribeToCacheEvents(): { events: unknown[]; unsubscribe: () => void 
   return { events, unsubscribe };
 }
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+  const resolvers: ((value: T) => void)[] = [];
+  const promise = new Promise<T>(resolve => {
+    resolvers.push(resolve);
+  });
+  return {
+    promise,
+    resolve: value => {
+      resolvers[0]?.(value);
+    },
+  };
+}
+
+/** Flushes the microtasks a resolved poll fetch schedules. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.appState = 'active';
@@ -199,5 +225,79 @@ describe('useActiveSessionsFloorPoll', () => {
     expect(events).toHaveLength(0);
     expect(client.getQueryData(QUERY_KEY)).toEqual(payload('a', 'running'));
     unsubscribe();
+  });
+
+  it('never overwrites a payload a writer landed while the poll was in flight', async () => {
+    // The poll bypasses React Query's fetch path, so it is not covered by the
+    // live-sync writer's `cancelQueries`. A socket write / pull-to-refresh that
+    // resolves first owns the cache; the poll's older snapshot must yield.
+    const initial = payload('a', 'running');
+    client.setQueryData(QUERY_KEY, initial);
+    const pending = deferred<CachedActiveSessionsData>();
+    const queryFn = vi.fn<QueryFn>().mockReturnValue(pending.promise);
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    await advanceBy(30_000);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    const newer = payload('a', 'question');
+    client.setQueryData(QUERY_KEY, newer);
+    // React Query's structural sharing stores its own object, so compare
+    // against the reference the cache actually holds after the write.
+    const written = client.getQueryData(QUERY_KEY);
+    const { events, unsubscribe } = subscribeToCacheEvents();
+
+    // The poll's response arrives last, carrying the older snapshot.
+    pending.resolve(payload('a', 'idle'));
+    await settle();
+
+    expect(client.getQueryData(QUERY_KEY)).toBe(written);
+    expect(events).toHaveLength(0);
+    unsubscribe();
+  });
+
+  it('aborts the in-flight request when the surface is left, and the stale tick writes nothing', async () => {
+    const initial = payload('a', 'running');
+    client.setQueryData(QUERY_KEY, initial);
+    const pending = deferred<CachedActiveSessionsData>();
+    const signals: (AbortSignal | undefined)[] = [];
+    const queryFn = (async (context: { signal?: AbortSignal }) => {
+      signals.push(context.signal);
+      const snapshot = await pending.promise;
+      return snapshot;
+    }) as unknown as QueryFn;
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    await advanceBy(30_000);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+
+    await render({ enabled: true, visible: false, connected: true, queryFn });
+    expect(signals[0]?.aborted).toBe(true);
+
+    const { events, unsubscribe } = subscribeToCacheEvents();
+    pending.resolve(payload('a', 'idle'));
+    await settle();
+
+    expect(client.getQueryData(QUERY_KEY)).toBe(initial);
+    expect(events).toHaveLength(0);
+    unsubscribe();
+  });
+
+  it('re-arms cleanly after an aborted in-flight tick', async () => {
+    // The aborted tick must not leave the in-flight flag set, or the interval
+    // the next effect arms would skip its ticks until the stale request
+    // settled.
+    const initial = payload('a', 'running');
+    client.setQueryData(QUERY_KEY, initial);
+    const pending = deferred<CachedActiveSessionsData>();
+    const queryFn = vi.fn<QueryFn>().mockReturnValue(pending.promise);
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    await advanceBy(30_000);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    await render({ enabled: true, visible: false, connected: true, queryFn });
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    await advanceBy(30_000);
+
+    expect(queryFn).toHaveBeenCalledTimes(2);
   });
 });

@@ -42,10 +42,12 @@ export function useActiveSessions(options?: UseAgentSessionsOptions) {
   const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
   const queryOptions = trpc.activeSessions.list.queryOptions(input, {
     // The floor poll is owned by `useActiveSessionsFloorPoll` in the live-sync
-    // mount, scoped to the routes that show live agents; socket writes remain
-    // the instant CLI path. React Query must not poll here: its fetch path
-    // notifies every mounted observer on every successful fetch, which is what
-    // re-rendered every live row on a timer.
+    // mount, scoped to the routes whose UI reads the cache: every tab (the tab
+    // layout renders the Agents needs-input badge from it on all of them) plus
+    // the share sheet. Socket writes remain the instant CLI path. React Query
+    // must not poll here: its fetch path notifies every mounted observer on
+    // every successful fetch, which is what re-rendered every live row on a
+    // timer.
     refetchInterval: false,
     staleTime: 5000,
     enabled: canRead,

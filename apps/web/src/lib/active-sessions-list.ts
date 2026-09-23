@@ -94,6 +94,22 @@ export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
  */
 const CLOUD_AGENT_WARM_IDLE_CUTOFF = sql`now() - interval '15 minutes'`;
 
+/**
+ * Hard ceiling on the cloud-candidate rows the tray returns. The product
+ * target is 100 live agents, so this is 5x the largest set the app is expected
+ * to render: it cannot drop a live agent the tray would actually show.
+ *
+ * A ceiling is still needed because only one branch of `livePredicate` is
+ * time-bounded: the warm-idle branch by `CLOUD_AGENT_WARM_IDLE_CUTOFF`, but the
+ * open-run branch (`cloud_agent_session_runs.terminal_at IS NULL`) by nothing —
+ * an orphaned run keeps its session a candidate until the 90-day session
+ * cascade. Newest-first order below is what makes the ceiling safe: the tail it
+ * drops is the oldest candidates, i.e. exactly the orphaned-run accumulation.
+ * The former `LIMIT 50` was not safe, because 50 is below the live set a user
+ * can have.
+ */
+export const CLOUD_AGENT_CANDIDATE_LIMIT = 500;
+
 type EnrichmentRow = {
   session_id: string;
   created_on_platform: string | null;
@@ -516,15 +532,16 @@ export async function listActiveSessions({
             livePredicate
           )
         )
-        // Deliberately uncapped. The candidate set is already bounded by
-        // `livePredicate`: a row is here either because an open
-        // `cloud_agent_session_runs` row proves the agent is working, or
-        // because its idle status falls inside `CLOUD_AGENT_WARM_IDLE_CUTOFF`
-        // (15 minutes). The live socket path is uncapped too, so a LIMIT here
-        // was never a safety net — it silently dropped genuinely live agents
-        // from the tray, which is why the jank report could not measure 100
-        // agents (it saw only 50).
-        .orderBy(desc(cli_sessions_v2.created_at));
+        // Newest-first, then capped at a ceiling far above the 100-agent
+        // target (`CLOUD_AGENT_CANDIDATE_LIMIT`). The order is what makes the
+        // cap safe: the warm-idle branch is time-bounded, but an open
+        // `cloud_agent_session_runs` row with no `terminal_at` keeps its
+        // session a candidate until the 90-day session cascade, so the tail
+        // this drops is the stale one. The `(kilo_user_id, created_at)` index
+        // backs both the filter and this order, so the cap also stops the scan
+        // once it has 500 matches instead of walking every orphaned candidate.
+        .orderBy(desc(cli_sessions_v2.created_at))
+        .limit(CLOUD_AGENT_CANDIDATE_LIMIT);
 
       const heartbeatIds = new Set(sessions.map(s => s.id));
       for (const row of cloudRows) {

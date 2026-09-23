@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SCREEN_TRACKING_SETTLE_DEBOUNCE_MS } from '@/lib/hooks/screen-tracking-decision';
+import type * as ScreenTrackingDecisionTypes from '@/lib/hooks/screen-tracking-decision';
 
 const mocks = vi.hoisted(() => {
   const state = {
@@ -30,6 +31,9 @@ const mocks = vi.hoisted(() => {
     state,
     navigationRef,
     captureScreen: vi.fn<(name: string) => void>(),
+    // The real decision still runs; the spy only records each evaluation, so a
+    // test can prove the generation subscription re-ran it.
+    decide: vi.fn<(input: { accountGeneration: number }) => void>(),
     setPostHogReady(ready: boolean): void {
       state.postHogReady = ready;
       for (const listener of readyListeners) {
@@ -89,6 +93,17 @@ vi.mock('@/lib/telemetry/controller', () => ({
   subscribeToTelemetryGeneration: (listener: () => void) => mocks.subscribeGeneration(listener),
 }));
 
+vi.mock('@/lib/hooks/screen-tracking-decision', async importOriginal => {
+  const actual = await importOriginal<typeof ScreenTrackingDecisionTypes>();
+  return {
+    ...actual,
+    decideScreenTracking: (input: Parameters<typeof actual.decideScreenTracking>[0]) => {
+      mocks.decide(input);
+      return actual.decideScreenTracking(input);
+    },
+  };
+});
+
 import { useScreenTracking } from './use-screen-tracking';
 
 const HOME = '(app)/(tabs)/(0_home)';
@@ -139,6 +154,7 @@ describe('useScreenTracking', () => {
     mocks.state.postHogReady = true;
     mocks.state.generation = 1;
     mocks.captureScreen.mockReset();
+    mocks.decide.mockReset();
   });
 
   afterEach(() => {
@@ -235,6 +251,7 @@ describe('useScreenTracking', () => {
     mount();
     advanceSettleWindow();
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
+    const evaluationsBefore = mocks.decide.mock.calls.length;
 
     // The account switch bumps the generation while the old client is still
     // ready. `captureScreen` would silently drop the event, so the hook must
@@ -243,6 +260,11 @@ describe('useScreenTracking', () => {
     act(() => {
       mocks.emitGenerationChange();
     });
+    // The subscription itself, not a later rerender, must re-run the decision:
+    // with a no-op subscription the flag below would carry the assertions on
+    // the readiness flip alone.
+    expect(mocks.decide.mock.calls.length).toBeGreaterThan(evaluationsBefore);
+    expect(mocks.decide.mock.calls.at(-1)?.[0].accountGeneration).toBe(2);
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
 
     // The consent gate discards the stale client and re-inits it under

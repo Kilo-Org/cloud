@@ -57,7 +57,7 @@ function payload(sessions: Session[]): CachedActiveSessionsData {
 }
 
 describe('isLiveAgentsSurfaceSegments', () => {
-  it.each(['(0_home)', '(2_agents)', 'share-gate'])(
+  it.each(['(0_home)', '(1_kiloclaw)', '(2_agents)', '(3_profile)', '(4_chat)', 'share-gate'])(
     'is true for the live-agents segment %s',
     segment => {
       expect(isLiveAgentsSurfaceSegments(['(app)', '(tabs)', segment])).toBe(true);
@@ -68,9 +68,15 @@ describe('isLiveAgentsSurfaceSegments', () => {
     expect(isLiveAgentsSurfaceSegments(['(app)', '(tabs)', '(2_agents)', 'history'])).toBe(true);
   });
 
+  it('is true for a nested route under a tab whose badge renders the count', () => {
+    expect(isLiveAgentsSurfaceSegments(['(app)', '(tabs)', '(3_profile)', 'organization'])).toBe(
+      true
+    );
+  });
+
   const nonLiveSurfaceCases: [string, string[]][] = [
-    ['kiloclaw tab', ['(app)', '(tabs)', '(1_kiloclaw)']],
-    ['profile tab', ['(app)', '(tabs)', '(3_profile)']],
+    ['a session opened over the tabs', ['(app)', 'agent-chat', '[session-id]']],
+    ['the pr-review stack', ['(app)', 'pr-review', '[owner]', '[repo]', '[number]']],
     ['empty segments', []],
   ];
   it.each(nonLiveSurfaceCases)('is false for %s', (_label, segments) => {
@@ -78,7 +84,14 @@ describe('isLiveAgentsSurfaceSegments', () => {
   });
 
   it('lists exactly the surfaces documented as live consumers', () => {
-    expect([...LIVE_AGENTS_SURFACE_SEGMENTS]).toEqual(['(0_home)', '(2_agents)', 'share-gate']);
+    expect([...LIVE_AGENTS_SURFACE_SEGMENTS]).toEqual([
+      '(0_home)',
+      '(1_kiloclaw)',
+      '(2_agents)',
+      '(3_profile)',
+      '(4_chat)',
+      'share-gate',
+    ]);
   });
 });
 

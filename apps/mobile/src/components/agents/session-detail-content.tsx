@@ -132,7 +132,10 @@ import {
   type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
-import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+} from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -1609,13 +1612,14 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  // The CLI lists an unrenamed session under a generated placeholder title
-  // (`New session - <ISO>`); it is a storage key, not a name, so treat it as
-  // absent and let the fallback name (or a live rename) show instead. The
-  // judgement lives in `namedSessionTitle` rather than here so it can also
-  // consult the record of titles the app's own rename wrote: a user-chosen
-  // title that happens to match the placeholder shape is kept, and a genuine
-  // placeholder still reaches `getSessionDetailRenameState` as absent.
+  // A generated placeholder title (`New session - <ISO>` / `Child session -
+  // <ISO>`) is a storage key, not a name: showing it truncates the header to
+  // "New session - 2026-…". Treat it as absent and let the fallback name (or a
+  // live rename) show instead. The judgement lives in `namedSessionTitle`
+  // rather than here so it can also consult the record of titles the app's own
+  // rename wrote: a user-chosen title that happens to match the placeholder
+  // shape is kept, and a genuine placeholder still reaches
+  // `getSessionDetailRenameState` as absent.
   const serverTitle = isSessionLoaded
     ? namedSessionTitle(fetchedData.title ?? undefined, sessionId)
     : undefined;
@@ -2017,9 +2021,14 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
+            // The loaded header, the route's loading header and its error state
+            // all share one cap (`SESSION_HEADER_TITLE_LINES`), and
+            // `reserveTitleSpace` holds exactly that many lines, so a long title
+            // wraps at a word boundary instead of being cut to one tail-ellipsized
+            // line ("Moving-average empty windo…").
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-            backFallback="/(app)/(tabs)/(2_agents)"
+            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
             className="pb-1"
             {...(rename.isTitleInteractive
@@ -2161,6 +2170,10 @@ export function SessionDetailContent({
               title={t('agentChat.session.renameSession')}
               placeholder={t('agentChat.session.renamePlaceholder')}
               initialValue={rename.modalInitialValue}
+              // The server accepts a title this long; the modal's 50-character
+              // default would cut a longer title mid-word and the header would
+              // then show the fragment.
+              maxLength={SESSION_TITLE_MAX_LENGTH}
               onSave={handleRenameSave}
               onClose={handleRenameClose}
             />

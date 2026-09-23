@@ -23,6 +23,7 @@ import {
 } from '@kilocode/app-shared/organizations';
 import { cn } from '@/lib/utils';
 import {
+  SPEND_ALERTS_CTA_SLOT_CLASS,
   SPEND_ALERTS_OFF_COPY,
   SPEND_ALERTS_PANEL_SLOT_CLASS,
   SPEND_ALERTS_SAVED,
@@ -64,7 +65,9 @@ import {
  * and a narrow one on the organization view. The loading skeleton (717px of
  * blocks at its tallest), the ready form, and the load-error and forbidden
  * states all render into this same slot, so every phase is the floor's height
- * and nothing below moves as the settings arrive, fail or are refused.
+ * and nothing below moves as the settings arrive, fail or are refused. The
+ * ready form's own two call-to-action branches also share a reserved height, so
+ * a save that fails rather than succeeds cannot move the dashboard either.
  */
 const PANEL_SLOT_CLASS = SPEND_ALERTS_PANEL_SLOT_CLASS;
 
@@ -281,27 +284,32 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
           {/* One call to action at a time: a failed save retries the same draft,
               otherwise Save posts it. The never-configured empty state has
               nothing to post, so both buttons are absent there and its only
-              action is the switch above. */}
-          {controlsVisible &&
-            (saveMutation.isError ? (
-              <div className="border-destructive/40 bg-destructive/10 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-                <p className="type-body text-destructive">{view.save.error}</p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={save}
-                  disabled={saveMutation.isPending}
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <div className="flex justify-end">
-                <Button onClick={save} disabled={!validation.ok || saveMutation.isPending}>
-                  Save
-                </Button>
-              </div>
-            ))}
+              action is the switch above. Both branches sit in one wrapper whose
+              reserved height is the taller save-error row, so a failed save
+              cannot grow the panel and move the dashboard below. */}
+          {controlsVisible && (
+            <div className={SPEND_ALERTS_CTA_SLOT_CLASS}>
+              {saveMutation.isError ? (
+                <div className="border-destructive/40 bg-destructive/10 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                  <p className="type-body text-destructive">{view.save.error}</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={save}
+                    disabled={saveMutation.isPending}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex justify-end">
+                  <Button onClick={save} disabled={!validation.ok || saveMutation.isPending}>
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </PanelSlot>

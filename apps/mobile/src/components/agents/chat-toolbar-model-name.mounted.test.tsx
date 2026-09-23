@@ -3,8 +3,12 @@ import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { formatShortModelDisplayName } from '@/lib/model-display-name';
+import type * as AvailableModels from '@/lib/hooks/use-available-models';
+import { toModelOptions } from '@/lib/hooks/use-available-models';
+import {
+  buildSessionModelOptions,
+  type SessionModelOption,
+} from '@/lib/hooks/use-session-model-options';
 
 import { ChatToolbar } from './chat-toolbar';
 
@@ -15,6 +19,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+// The real `use-available-models` (used below to run the reported catalogue
+// name through `toModelOptions`) reaches `expo-secure-store` through the auth
+// token owner; stub it as the pure `use-available-models.test.ts` does.
+vi.mock('expo-secure-store', () => ({}));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: vi.fn() }),
@@ -35,9 +43,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/hooks/use-available-models', () => ({
-  thinkingEffortLabel: (variant: string) => variant,
-}));
+vi.mock('@/lib/hooks/use-available-models', async importOriginal => {
+  const actual = await importOriginal<typeof AvailableModels>();
+  return { ...actual, thinkingEffortLabel: (variant: string) => variant };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#111827',
@@ -60,7 +69,7 @@ vi.mock('@/lib/utils', () => ({
 const CATALOGUE_MODEL_NAME = 'DeepSeek: DeepSeek V4.1 Flash';
 // The 19-character label the chip must render in full: wider than the space one
 // nowrap row leaves after the shrink-0 mode chip and the effort badge.
-const LONG_MODEL_NAME = formatShortModelDisplayName(CATALOGUE_MODEL_NAME);
+const LONG_MODEL_NAME = 'DeepSeek V4.1 Flash';
 
 const MODEL_OPTIONS: SessionModelOption[] = [
   {
@@ -72,6 +81,34 @@ const MODEL_OPTIONS: SessionModelOption[] = [
     showGatewayMetadata: true,
   },
 ];
+
+/**
+ * Builds the chip's option the way the app does: the raw gateway catalogue
+ * name goes through `toModelOptions`, which strips `<Vendor>: `, and then
+ * `buildSessionModelOptions`, which projects the `ModelOption` onto the
+ * `SessionModelOption` the chip reads. This test never strips the prefix
+ * itself, so deleting the strip from `toModelOptions` fails the assertion
+ * below.
+ */
+function reportedModelOptions(): SessionModelOption[] {
+  const gatewayModels = toModelOptions({
+    data: [
+      {
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: CATALOGUE_MODEL_NAME,
+        opencode: { variants: { low: {}, medium: {} } },
+      },
+    ],
+  });
+  return buildSessionModelOptions({
+    activeSessionType: null,
+    remoteModelState: { ownerConnectionId: null, protocol: 'unknown', refresh: 'idle' },
+    observedModel: null,
+    remoteModelOverride: null,
+    gatewayModels,
+    gatewayModelsLoading: false,
+  }).options;
+}
 
 function renderToolbar(
   modelOptions: SessionModelOption[] = MODEL_OPTIONS
@@ -127,20 +164,14 @@ describe('ChatToolbar long model name', () => {
   });
 
   it('renders the reported catalogue name whole beside the low effort badge', () => {
-    // Pins the exact reported input end to end: the gateway's
-    // `DeepSeek: DeepSeek V4.1 Flash` becomes the option name the chip shows.
-    expect(CATALOGUE_MODEL_NAME).toBe('DeepSeek: DeepSeek V4.1 Flash');
-    expect(formatShortModelDisplayName(CATALOGUE_MODEL_NAME)).toBe('DeepSeek V4.1 Flash');
-    const reportedOptions: SessionModelOption[] = [
-      {
-        id: 'deepseek/deepseek-v4.1-flash',
-        name: formatShortModelDisplayName(CATALOGUE_MODEL_NAME),
-        displayId: 'deepseek/deepseek-v4.1-flash',
-        variants: ['low', 'medium'],
-        isPreferred: false,
-        showGatewayMetadata: true,
-      },
-    ];
+    // Pins the exact reported input end to end: the gateway catalogue's
+    // `DeepSeek: DeepSeek V4.1 Flash` goes through the real option builders
+    // (`toModelOptions` then `buildSessionModelOptions`) and the resulting
+    // option reaches the chip. This test never strips the prefix itself, so
+    // deleting the strip from `toModelOptions` fails here.
+    const reportedOptions = reportedModelOptions();
+    expect(reportedOptions[0]?.name).toBe(LONG_MODEL_NAME);
+
     const renderer = renderToolbar(reportedOptions);
 
     // The whole name, not `DeepSeek V4.1 F...`, and clipped to one line.

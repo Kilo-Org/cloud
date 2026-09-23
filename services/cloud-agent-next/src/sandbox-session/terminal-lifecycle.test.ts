@@ -615,3 +615,74 @@ describe('SandboxSession terminal lifecycle', () => {
     });
   });
 });
+
+describe('SandboxSession terminal lifecycle stop binding', () => {
+  it('records an optional allocation incarnation and preserves it across a phase rewrite', () => {
+    const fixture = createFixture({ attached: false });
+    const epoch = fixture.lifecycle.captureEpoch() ?? -1;
+    expect(
+      fixture.lifecycle.recordAttachment({
+        metadata: fixture.metadata,
+        sandboxId: SANDBOX_ID,
+        wrapperInstanceId: WRAPPER_INSTANCE_ID,
+        allocationIncarnation: 'incarnation_1',
+        prepared: false,
+        epoch,
+      })
+    ).toBe(true);
+    expect(fixture.lifecycle.getAttachedBinding()).toEqual({
+      allocationIncarnation: 'incarnation_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    // A pending (prepared:false) binding admits no terminal and does not count as attached.
+    expect(fixture.lifecycle.getAttachedWrapperInstanceId()).toBeUndefined();
+    // The confirmation rewrite omits the incarnation and must preserve the bound value.
+    expect(
+      fixture.lifecycle.recordAttachment({
+        metadata: fixture.metadata,
+        sandboxId: SANDBOX_ID,
+        wrapperInstanceId: WRAPPER_INSTANCE_ID,
+        epoch,
+      })
+    ).toBe(true);
+    expect(fixture.lifecycle.getAttachedWrapperInstanceId()).toBe(WRAPPER_INSTANCE_ID);
+    expect(fixture.lifecycle.getAttachedBinding()).toEqual({
+      allocationIncarnation: 'incarnation_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+  });
+
+  it('reports an absent incarnation for a legacy attachment and hydrates it once', () => {
+    const fixture = createFixture();
+    expect(fixture.lifecycle.getAttachedBinding()).toEqual({
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    expect(fixture.lifecycle.hydrateAttachmentIncarnation('incarnation_2')).toBe(true);
+    expect(fixture.lifecycle.getAttachedBinding()).toEqual({
+      allocationIncarnation: 'incarnation_2',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    expect(fixture.lifecycle.hydrateAttachmentIncarnation('incarnation_3')).toBe(false);
+    expect(fixture.lifecycle.getAttachedBinding()?.allocationIncarnation).toBe('incarnation_2');
+  });
+
+  it('clears the binding only for a matching filter', () => {
+    const fixture = createFixture({ attached: false });
+    const epoch = fixture.lifecycle.captureEpoch() ?? -1;
+    fixture.lifecycle.recordAttachment({
+      metadata: fixture.metadata,
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      allocationIncarnation: 'incarnation_4',
+      epoch,
+    });
+    expect(
+      fixture.lifecycle.clearAttachmentForStop({ allocationIncarnation: 'incarnation_other' })
+    ).toBe(false);
+    expect(fixture.lifecycle.getAttachedBinding()).not.toBeUndefined();
+    expect(
+      fixture.lifecycle.clearAttachmentForStop({ allocationIncarnation: 'incarnation_4' })
+    ).toBe(true);
+    expect(fixture.lifecycle.getAttachedBinding()).toBeUndefined();
+  });
+});

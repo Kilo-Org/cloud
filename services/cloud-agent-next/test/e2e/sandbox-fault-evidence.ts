@@ -7,12 +7,13 @@
  * The record stream is first narrowed to the durable logical `sandboxId` the
  * caller read from `getSession`, then anchored on the reaped allocation's own
  * `allocationId`/`wrapperInstanceId` as reported by its settled
- * `physical_committed running -> stopping` record. The durable sandbox id is
+ * `allocation_transition` into `stopping.destroying`. The durable sandbox id is
  * stable across a replacement, so it alone cannot exclude the replacement; the
- * allocation anchor is what does. The accepted-reconciliation diagnostic carries
- * no `sandboxId`, so it is matched by its accepted message id instead. A missing
- * cause stays `null` and the assertion fails; the scenarios never infer a reap
- * from a null allocation observation alone.
+ * allocation anchor is what does. `native_stop` carries no durable sandbox id,
+ * so the caller passes the derived allocation name. The accepted-reconciliation
+ * diagnostic carries no `sandboxId`, so it is matched by its accepted message
+ * id instead. A missing cause stays `null` and the assertion fails; the
+ * scenarios never infer a reap from a null allocation observation alone.
  */
 
 import type { LogRecord } from './idle-stop-evidence.js';
@@ -20,16 +21,16 @@ import type { LogRecord } from './idle-stop-evidence.js';
 export type SandboxFaultReapEvidence = {
   /** The allocation reference the caller observed being reaped, echoed back. */
   reapedAllocationRef: string;
-  /** Identity-matched `physical_committed running -> stopping` cause. */
+  /** Identity-matched `allocated.* -> stopping.destroying` reason. */
   physicalStopCause: string | null;
   physicalStopStopCause: string | null;
   physicalStopFromState: string | null;
   physicalStopToState: string | null;
-  /** True when an identity-matched terminal `provider_stop` was observed. */
+  /** True when an identity-matched terminal `native_stop` was observed. */
   providerStopObserved: boolean;
-  /** True when an identity-matched `deadline_fired deadlineId=heartbeatExpiry` was observed. */
+  /** True when recovery started `allocated.healthy -> allocated.recovering` with `event=deadline`. */
   heartbeatExpiryDeadline: boolean;
-  /** First identity-matched started `recovery_outcome` cause/outcome. */
+  /** First identity-matched recovery-start cause/outcome. */
   recoveryCause: string | null;
   recoveryOutcome: string | null;
   /** True when an identity-matched `wrapper_ready` followed the fault (a veto). */
@@ -62,14 +63,34 @@ function stringField(record: LogRecord, key: string): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+function isSettledStop(record: LogRecord, sandboxId: string): boolean {
+  return (
+    record.diagnosticEvent === 'allocation_transition' &&
+    record.aggregate === 'allocation' &&
+    record.sandboxId === sandboxId &&
+    typeof record.from === 'string' &&
+    record.from.startsWith('allocated.') &&
+    record.to === 'stopping.destroying'
+  );
+}
+
 export function collectReapEvidence(
   records: Iterable<LogRecord>,
-  input: { reapedAllocationRef: string; sandboxId: string; messageId?: string }
+  input: {
+    reapedAllocationRef: string;
+    sandboxId: string;
+    messageId?: string;
+    allocationName?: string;
+  }
 ): SandboxFaultReapEvidence {
   const evidence = emptyReapEvidence(input.reapedAllocationRef);
   const matched = [...records].filter(
     record =>
       record.sandboxId === input.sandboxId ||
+      // `native_stop` carries the provider allocation name, not the durable sandbox id.
+      (record.diagnosticEvent === 'native_stop' &&
+        input.allocationName !== undefined &&
+        record.allocationName === input.allocationName) ||
       // The accepted-reconciliation diagnostic carries no `sandboxId`; its
       // identity is the accepted message id.
       (record.diagnosticEvent === 'accepted_reconciliation' &&
@@ -85,17 +106,14 @@ export function collectReapEvidence(
   let stopAllocationId: string | null = null;
   let stopWrapperInstanceId: string | null = null;
   for (const record of matched) {
-    if (
-      record.diagnosticEvent === 'physical_committed' &&
-      record.fromState === 'running' &&
-      record.toState === 'stopping'
-    ) {
+    if (isSettledStop(record, input.sandboxId)) {
       stopAllocationId = stringField(record, 'allocationId');
       stopWrapperInstanceId = stringField(record, 'wrapperInstanceId');
-      evidence.physicalStopCause = stringField(record, 'cause');
-      evidence.physicalStopStopCause = stringField(record, 'stopCause');
-      evidence.physicalStopFromState = stringField(record, 'fromState');
-      evidence.physicalStopToState = stringField(record, 'toState');
+      const reason = stringField(record, 'reason');
+      evidence.physicalStopCause = reason;
+      evidence.physicalStopStopCause = reason;
+      evidence.physicalStopFromState = stringField(record, 'from');
+      evidence.physicalStopToState = stringField(record, 'to');
       break;
     }
   }
@@ -129,16 +147,26 @@ export function collectReapEvidence(
   for (const record of matched) {
     if (!belongsToStop(record)) continue;
     const diagnosticEvent = record.diagnosticEvent;
-    if (diagnosticEvent === 'provider_stop') {
-      if (record.result === 'terminal') evidence.providerStopObserved = true;
-    } else if (diagnosticEvent === 'deadline_fired') {
-      if (record.deadlineId === 'heartbeatExpiry') evidence.heartbeatExpiryDeadline = true;
-    } else if (diagnosticEvent === 'recovery_outcome') {
-      const outcome = stringField(record, 'outcome');
-      if (evidence.recoveryOutcome === null || outcome === 'started') {
-        evidence.recoveryCause = stringField(record, 'cause');
-        evidence.recoveryOutcome = outcome;
-      }
+    if (
+      evidence.physicalStopCause !== null &&
+      diagnosticEvent === 'native_stop' &&
+      record.result === 'terminal' &&
+      input.allocationName !== undefined &&
+      record.allocationName === input.allocationName
+    ) {
+      evidence.providerStopObserved = true;
+    } else if (
+      diagnosticEvent === 'allocation_transition' &&
+      record.aggregate === 'allocation' &&
+      record.to === 'allocated.recovering' &&
+      record.from !== 'allocated.recovering' &&
+      evidence.recoveryOutcome === null
+    ) {
+      const event = stringField(record, 'event');
+      evidence.heartbeatExpiryDeadline =
+        record.from === 'allocated.healthy' && event === 'deadline';
+      evidence.recoveryCause = evidence.heartbeatExpiryDeadline ? 'heartbeat_expired' : event;
+      evidence.recoveryOutcome = 'started';
     } else if (diagnosticEvent === 'wrapper_ready') {
       evidence.wrapperReadyAfterFault = true;
     } else if (diagnosticEvent === 'heartbeat') {
@@ -161,11 +189,11 @@ export function collectReapEvidence(
 /**
  * Require the identity-correlated pass rule for a settled reap. A distinct
  * replacement is necessary but not sufficient: the evidence must name the
- * settled-reap cause on the physical stop, a terminal provider stop, the
- * heartbeat-expiry recovery, no re-ready wrapper, and (inflight only) the
- * `runtime_unhealthy` reconciliation plus a still-active route. Rejecting a
- * null cause is the point: a run that merely lost the allocation and got a
- * replacement must not pass.
+ * settled-reap reason on `allocated.* -> stopping.destroying`, a terminal
+ * `native_stop`, the heartbeat-expiry recovery start, no re-ready wrapper, and
+ * (inflight only) the `runtime_unhealthy` reconciliation plus a still-active
+ * route. Rejecting a null cause is the point: a run that merely lost the
+ * allocation and got a replacement must not pass.
  */
 export function assertReapOutcome(input: {
   evidence: SandboxFaultReapEvidence;
@@ -185,24 +213,26 @@ export function assertReapOutcome(input: {
       `no distinct replacement: the same allocation ${input.reapedAllocationRef} still serves the session`
     );
   }
-  if (evidence.physicalStopFromState !== 'running' || evidence.physicalStopToState !== 'stopping') {
-    throw new Error(
-      `no identity-matched running -> stopping physical commit (from=${evidence.physicalStopFromState ?? 'none'}; to=${evidence.physicalStopToState ?? 'none'})`
-    );
-  }
   if (
-    evidence.physicalStopCause !== input.settledReapReason ||
-    evidence.physicalStopStopCause !== input.settledReapReason
+    evidence.physicalStopFromState?.startsWith('allocated.') !== true ||
+    evidence.physicalStopToState !== 'stopping.destroying'
   ) {
     throw new Error(
-      `physical stop cause=${evidence.physicalStopCause ?? 'none'}/stopCause=${evidence.physicalStopStopCause ?? 'none'}; expected ${input.settledReapReason}`
+      `no identity-matched allocated.* -> stopping.destroying transition (from=${evidence.physicalStopFromState ?? 'none'}; to=${evidence.physicalStopToState ?? 'none'})`
+    );
+  }
+  if (evidence.physicalStopCause !== input.settledReapReason) {
+    throw new Error(
+      `stop reason=${evidence.physicalStopCause ?? 'none'}; expected ${input.settledReapReason}`
     );
   }
   if (!evidence.providerStopObserved) {
-    throw new Error('no identity-matched terminal provider_stop was observed');
+    throw new Error('no identity-matched terminal native_stop was observed');
   }
   if (!evidence.heartbeatExpiryDeadline) {
-    throw new Error('no identity-matched deadline_fired deadlineId=heartbeatExpiry was observed');
+    throw new Error(
+      'no identity-matched allocation_transition allocated.healthy -> allocated.recovering event=deadline was observed'
+    );
   }
   if (evidence.recoveryCause !== 'heartbeat_expired' || evidence.recoveryOutcome !== 'started') {
     throw new Error(

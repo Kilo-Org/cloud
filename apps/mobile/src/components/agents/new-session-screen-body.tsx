@@ -44,6 +44,7 @@ import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import {
   resolveContinueStartDisabled,
@@ -67,6 +68,7 @@ import {
 } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
@@ -95,6 +97,7 @@ function AndroidPendingPickerRecovery({
 export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const searchParams = useLocalSearchParams<{
     organizationId?: string;
@@ -574,13 +577,17 @@ export function NewSessionScreenBody() {
 
   const handleAddAttachment = useCallback(async () => {
     void addCandidates(
-      await pickAgentAttachments(showActionSheetWithOptions, {
-        userId,
-        surface: 'agent-new',
-        sessionId: null,
-      })
+      await pickAgentAttachments(
+        showActionSheetWithOptions,
+        {
+          userId,
+          surface: 'agent-new',
+          sessionId: null,
+        },
+        themedSheet
+      )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId]);
+  }, [addCandidates, showActionSheetWithOptions, userId, themedSheet]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
@@ -714,7 +721,7 @@ export function NewSessionScreenBody() {
         <View className="px-4 pt-4">
           <Text className="text-sm text-muted-foreground">
             {t('agentChat.newSession.continueFrom', {
-              title: cloneSourceTitle || t('agentChat.session.title'),
+              title: sessionDisplayTitle(cloneSourceTitle) ?? t('agentChat.session.title'),
             })}
           </Text>
         </View>

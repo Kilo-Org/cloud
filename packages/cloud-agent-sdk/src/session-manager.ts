@@ -344,6 +344,17 @@ type SessionManagerConfig = {
    * is unchanged.
    */
   isStalledTransportError?: (err: unknown) => boolean;
+  /**
+   * The consumer's send path can deliver remote-CLI attachment parts: it
+   * materializes the presigned GET parts and passes them as `attachmentParts`.
+   * The `supportsAttachments` gate reports a `remote` session supported only
+   * when this is set — a consumer that knows only the cloud-only `attachments`
+   * field (web) would otherwise render an attachment control whose send the
+   * session manager rejects with `Only Cloud Agent sessions support
+   * attachments`. The mobile adapter is the canonical provider; web passes
+   * nothing, so its remote sessions stay unsupported.
+   */
+  supportsRemoteAttachmentParts?: boolean;
   websocketBaseUrl?: string;
   userWebConnection: UserWebConnection;
   api: CloudAgentApi;
@@ -412,7 +423,12 @@ type SessionManagerAtoms = {
   isRefreshingCachedTranscript: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
-  /** Active resolved transport can deliver canonical Cloud Agent attachments. */
+  /**
+   * The active resolved transport can deliver attachments for this session
+   * through a path its consumer supports: the cloud-only `attachments` field
+   * for `cloud-agent`, or remote-CLI `attachmentParts` for a `remote` session
+   * when the consumer declared `supportsRemoteAttachmentParts`.
+   */
   supportsAttachments: W<boolean>;
   activeSessionType: W<ActiveSessionType | null>;
   remoteModelState: W<RemoteModelState>;
@@ -882,7 +898,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // False while no session is active; once a session resolves the gate is
   // computed optimistically (see `recomputeSupportsAttachments`), so a remote
   // session whose CLI has not advertised `capabilities.attachments` still
-  // reports supported.
+  // reports supported — for a consumer that declared it can deliver remote
+  // attachment parts (`supportsRemoteAttachmentParts`). A consumer without
+  // that path (web) keeps remote sessions unsupported.
   const supportsAttachmentsAtom = atom(false);
   const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
   const remoteModelStateAtom = atom<RemoteModelState>(EMPTY_REMOTE_MODEL_STATE);
@@ -1485,10 +1503,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    *  - `cloud-agent`: always supports attachments (S3a is a no-op for
    *    cloud-agent sessions, but cloud-agent attachments flow through
    *    the existing `attachments` field, not the new `attachmentParts`).
-   *  - `remote`: optimistic. While the CLI has not advertised the capability
-   *    the gate reports supported; only an explicit
-   *    `capabilities.attachments === false` in its most recent heartbeat or
-   *    `sessions.list` downgrades it.
+   *  - `remote`: optimistic for a consumer that declared it can deliver
+   *    remote attachment parts (`supportsRemoteAttachmentParts`). While the
+   *    CLI has not advertised the capability the gate reports supported; only
+   *    an explicit `capabilities.attachments === false` in its most recent
+   *    heartbeat or `sessions.list` downgrades it. A consumer without that
+   *    path (web) never reports a remote session supported: it knows only the
+   *    cloud-only `attachments` field, whose send this manager rejects.
    *  - `read-only`: never supports attachments.
    */
   function recomputeSupportsAttachments(sessionType: ActiveSessionType | null): void {
@@ -1496,7 +1517,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (sessionType === 'cloud-agent') {
       supports = true;
     } else if (sessionType === 'remote') {
-      supports = cliCapabilitySupported(currentCapabilities?.attachments);
+      supports =
+        config.supportsRemoteAttachmentParts === true &&
+        cliCapabilitySupported(currentCapabilities?.attachments);
     } else {
       supports = false;
     }

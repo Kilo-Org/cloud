@@ -314,6 +314,11 @@ const remoteCatalog = {
 function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): SessionManagerConfig {
   return {
     store: createStore(),
+    // The canonical remote-attachment consumer: it can materialize presigned
+    // GET parts and send them as `attachmentParts`, so the
+    // `supportsAttachments` gate is optimistic for remote sessions. Tests that
+    // model a consumer without that path (web) override it to `false`.
+    supportsRemoteAttachmentParts: true,
     userWebConnection: { marker: 'test-user-web-connection' } as never,
     resolveSession: jest.fn().mockResolvedValue({
       type: 'cloud-agent',
@@ -8284,6 +8289,33 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
 
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+    });
+
+    it('a consumer without the remote attachment-parts path keeps remote unsupported', async () => {
+      // Web's CloudChatPage knows only the cloud-only `attachments` field, so
+      // an optimistic remote gate would show a paperclip whose send the
+      // session manager rejects. The consumer declares the missing path by
+      // omitting `supportsRemoteAttachmentParts`.
+      const config = createMockConfig({ supportsRemoteAttachmentParts: false });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+
+      // No capability value makes it supported for that consumer.
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+
+      // cloud-agent still flows through the cloud-only field it does know.
+      mockSessionCallbacks.onResolved?.({
+        type: 'cloud-agent',
+        kiloSessionId: kiloId('ses-1'),
+        cloudAgentSessionId: cloudAgentId('agent-1'),
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
   });
 

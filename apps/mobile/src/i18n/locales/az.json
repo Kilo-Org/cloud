@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "OpenAI Codex sessiya transkriptini idxal et",
       "reviewDescription": "dəyişiklikləri nəzərdən keçir [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} əmrindən istifadə et",
-      "useSkillCommand": "/{{command}} bacarığından istifadə et",
-      "skillBadge": "Bacarıq",
       "insert": "Daxil et",
       "upgradeRequiredFallback": "Bu əmrdən istifadə etmək üçün CLI-ni yenilə.",
       "exitCapabilityUnavailable": "Sessiyadan çıxmaq üçün CLI-ni yenilə.",

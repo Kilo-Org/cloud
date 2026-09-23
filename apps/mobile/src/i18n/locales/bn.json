@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "OpenAI Codex সেশনের ট্রান্সক্রিপ্ট আমদানি করুন",
       "reviewDescription": "পরিবর্তনগুলি পর্যালোচনা করুন [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ব্যবহার করুন",
-      "useSkillCommand": "স্কিল /{{command}} ব্যবহার করুন",
-      "skillBadge": "স্কিল",
       "insert": "যোগ করুন",
       "upgradeRequiredFallback": "এই কমান্ডটি ব্যবহার করতে আপনার CLI আপগ্রেড করুন।",
       "exitCapabilityUnavailable": "সেশন শেষ করতে আপনার CLI আপডেট করুন।",

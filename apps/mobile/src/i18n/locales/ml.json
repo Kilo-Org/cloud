@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "OpenAI Codex സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് ഇറക്കുമതി ചെയ്യുക",
       "reviewDescription": "മാറ്റങ്ങൾ അവലോകനം ചെയ്യുക [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ഉപയോഗിക്കുക",
-      "useSkillCommand": "സ്കിൽ /{{command}} ഉപയോഗിക്കുക",
-      "skillBadge": "സ്കിൽ",
       "insert": "ചേർക്കുക",
       "upgradeRequiredFallback": "ഈ കമാൻഡ് ഉപയോഗിക്കാൻ നിങ്ങളുടെ CLI അപ്ഗ്രേഡ് ചെയ്യുക.",
       "exitCapabilityUnavailable": "സെഷനിൽ നിന്ന് പുറത്തുകടക്കാൻ നിങ്ങളുടെ CLI അപ്ഡേറ്റ് ചെയ്യുക.",

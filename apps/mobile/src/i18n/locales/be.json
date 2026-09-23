@@ -2648,8 +2648,6 @@
       "resumeCodexDescription": "імпартаваць транскрыпт сеансу OpenAI Codex",
       "reviewDescription": "прагледзець змены [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Выкарыстаць /{{command}}",
-      "useSkillCommand": "Выкарыстаць навык /{{command}}",
-      "skillBadge": "Навык",
       "insert": "Уставіць",
       "upgradeRequiredFallback": "Абнавіце CLI, каб выкарыстоўваць гэтую каманду.",
       "exitCapabilityUnavailable": "Абнавіце CLI, каб выйсці з сеанса.",

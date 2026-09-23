@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "OpenAI Codex seansi transkriptini import qilish",
       "reviewDescription": "o'zgarishlarni ko'rib chiqish [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} buyrug'idan foydalanish",
-      "useSkillCommand": "/{{command}} ko'nikmasidan foydalanish",
-      "skillBadge": "Ko'nikma",
       "insert": "Qo'yish",
       "upgradeRequiredFallback": "Bu buyruqdan foydalanish uchun CLI dasturini yangilang.",
       "exitCapabilityUnavailable": "Sessiyadan chiqish uchun CLI dasturini yangilang.",

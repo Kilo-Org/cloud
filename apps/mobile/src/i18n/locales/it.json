@@ -2059,8 +2059,6 @@
       "resumeCodexDescription": "importa la trascrizione di una sessione OpenAI Codex",
       "reviewDescription": "rivedi le modifiche [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usa /{{command}}",
-      "useSkillCommand": "Usa competenza /{{command}}",
-      "skillBadge": "Competenza",
       "insert": "Inserisci",
       "upgradeRequiredFallback": "Aggiorna la tua CLI per usare questo comando.",
       "exitCapabilityUnavailable": "Aggiorna la tua CLI per uscire dalla sessione.",

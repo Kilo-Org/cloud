@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "import transkrip sesi OpenAI Codex",
       "reviewDescription": "semak perubahan [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gunakan /{{command}}",
-      "useSkillCommand": "Gunakan kemahiran /{{command}}",
-      "skillBadge": "Kemahiran",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Sila naik taraf CLI anda untuk menggunakan arahan ini.",
       "exitCapabilityUnavailable": "Kemas kini CLI anda untuk keluar daripada sesi.",

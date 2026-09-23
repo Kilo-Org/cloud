@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "εισήγαγε απομαγνητοφώνηση συνεδρίας OpenAI Codex",
       "reviewDescription": "έλεγξε τις αλλαγές [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Χρήση /{{command}}",
-      "useSkillCommand": "Χρήση δεξιότητας /{{command}}",
-      "skillBadge": "Δεξιότητα",
       "insert": "Εισαγωγή",
       "upgradeRequiredFallback": "Αναβάθμισε το CLI σου για να χρησιμοποιήσεις αυτή την εντολή.",
       "exitCapabilityUnavailable": "Ενημέρωσε το CLI σου για να τερματίσεις τη συνεδρία.",

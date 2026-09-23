@@ -2090,8 +2090,6 @@
       "resumeCodexDescription": "ייבא תמלול של סשן OpenAI Codex",
       "reviewDescription": "סקור את השינויים [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "שימוש בפקודה /{{command}}",
-      "useSkillCommand": "שימוש במיומנות /{{command}}",
-      "skillBadge": "מיומנות",
       "insert": "הוספה",
       "upgradeRequiredFallback": "עדכן את ה-CLI שלך כדי להשתמש בפקודה זו.",
       "exitCapabilityUnavailable": "עדכן את ה-CLI שלך כדי לצאת מהסשן.",

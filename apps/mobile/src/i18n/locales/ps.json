@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "د OpenAI Codex سیشن رونوشت وارد کړه",
       "reviewDescription": "بدلونونه وګوره [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} وکاروئ",
-      "useSkillCommand": "مهارت /{{command}} وکاروئ",
-      "skillBadge": "مهارت",
       "insert": "دننه کړئ",
       "upgradeRequiredFallback": "د دې کمانډ کارولو لپاره مهرباني وکړئ خپل CLI تازه کړئ.",
       "exitCapabilityUnavailable": "له ناستې د وتلو لپاره خپل CLI تازه کړئ.",

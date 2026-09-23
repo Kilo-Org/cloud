@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "voer 'n OpenAI Codex-sessietranskripsie in",
       "reviewDescription": "hersien veranderinge [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gebruik /{{command}}",
-      "useSkillCommand": "Gebruik vaardigheid /{{command}}",
-      "skillBadge": "Vaardigheid",
       "insert": "Voeg in",
       "upgradeRequiredFallback": "Werk asseblief jou CLI by om hierdie opdrag te gebruik.",
       "exitCapabilityUnavailable": "Werk jou CLI by om die sessie te sluit.",

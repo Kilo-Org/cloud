@@ -2068,8 +2068,6 @@
       "resumeCodexDescription": "een OpenAI Codex-sessietranscript importeren",
       "reviewDescription": "wijzigingen bekijken [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} gebruiken",
-      "useSkillCommand": "/{{command}} vaardigheid gebruiken",
-      "skillBadge": "Vaardigheid",
       "insert": "Invoegen",
       "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
       "exitCapabilityUnavailable": "Werk je CLI bij om de sessie af te sluiten.",

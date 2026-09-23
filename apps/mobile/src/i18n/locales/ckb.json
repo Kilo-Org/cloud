@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "دەقی دانیشتنی OpenAI Codex هاوردە بکە",
       "reviewDescription": "گۆڕانکارییەکان بپشکنە [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "بەکارهێنانی /{{command}}",
-      "useSkillCommand": "بەکارهێنانی لێهاتوویی /{{command}}",
-      "skillBadge": "لێهاتوویی",
       "insert": "تێخستن",
       "upgradeRequiredFallback": "تکایە CLIـی خۆت نوێ بکەرەوە بۆ بەکارهێنانی ئەم فەرمانە.",
       "exitCapabilityUnavailable": "بۆ دەرچوون لە سێشنەکە، CLI ـی خۆت نوێ بکەرەوە.",

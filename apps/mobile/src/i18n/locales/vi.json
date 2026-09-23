@@ -2068,8 +2068,6 @@
       "resumeCodexDescription": "nhập bản ghi phiên OpenAI Codex",
       "reviewDescription": "xem lại các thay đổi [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Dùng /{{command}}",
-      "useSkillCommand": "Dùng kỹ năng /{{command}}",
-      "skillBadge": "Kỹ năng",
       "insert": "Chèn",
       "upgradeRequiredFallback": "Vui lòng nâng cấp CLI của bạn để sử dụng lệnh này.",
       "exitCapabilityUnavailable": "Cập nhật CLI của bạn để thoát phiên.",

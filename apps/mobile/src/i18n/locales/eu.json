@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "inportatu OpenAI Codex saio baten transkripzioa",
       "reviewDescription": "berrikusi aldaketak [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Erabili /{{command}}",
-      "useSkillCommand": "Erabili trebetasuna /{{command}}",
-      "skillBadge": "Trebetasuna",
       "insert": "Txertatu",
       "upgradeRequiredFallback": "Eguneratu zure CLI komando hau erabiltzeko.",
       "exitCapabilityUnavailable": "Eguneratu zure CLI saiotik irteteko.",

@@ -2724,8 +2724,6 @@
       "resumeCodexDescription": "mewnforio trawsgrifiad sesiwn OpenAI Codex",
       "reviewDescription": "adolyga'r newidiadau [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Defnyddio /{{command}}",
-      "useSkillCommand": "Defnyddio sgil /{{command}}",
-      "skillBadge": "Sgil",
       "insert": "Mewnosod",
       "upgradeRequiredFallback": "Uwchraddiwch eich CLI i ddefnyddio'r gorchymyn hwn.",
       "exitCapabilityUnavailable": "Diweddarwch eich CLI i adael y sesiwn.",

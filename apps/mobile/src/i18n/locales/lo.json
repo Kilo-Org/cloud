@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "ນຳເຂົ້າບົດບັນທຶກເຊສຊັນ OpenAI Codex",
       "reviewDescription": "ກວດສອບການປ່ຽນແປງ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ໃຊ້ /{{command}}",
-      "useSkillCommand": "ໃຊ້ທັກສະ /{{command}}",
-      "skillBadge": "ທັກສະ",
       "insert": "ແຊກ",
       "upgradeRequiredFallback": "ອັບເກຣດ CLI ເພື່ອໃຊ້ຄຳສັ່ງນີ້.",
       "exitCapabilityUnavailable": "ອັບເດດ CLI ເພື່ອອອກຈາກເຊສຊັນ.",

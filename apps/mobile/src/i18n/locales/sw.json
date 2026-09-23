@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "ingiza nakala ya kikao cha OpenAI Codex",
       "reviewDescription": "kagua mabadiliko [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Tumia /{{command}}",
-      "useSkillCommand": "Tumia ujuzi /{{command}}",
-      "skillBadge": "Ujuzi",
       "insert": "Ingiza",
       "upgradeRequiredFallback": "Tafadhali sasisha CLI yako ili utumie amri hii.",
       "exitCapabilityUnavailable": "Sasisha CLI yako ili utoke kwenye kikao.",

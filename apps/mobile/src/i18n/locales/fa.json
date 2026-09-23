@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "رونوشت نشست OpenAI Codex را درونریزی کن",
       "reviewDescription": "تغییرات را بازبینی کن [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "استفاده از /{{command}}",
-      "useSkillCommand": "استفاده از مهارت /{{command}}",
-      "skillBadge": "مهارت",
       "insert": "درج",
       "upgradeRequiredFallback": "برای استفاده از این دستور، CLI خود را ارتقا دهید.",
       "exitCapabilityUnavailable": "برای خروج از نشست، CLI خود را به‌روزرسانی کنید.",

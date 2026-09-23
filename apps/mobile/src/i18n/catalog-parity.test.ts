@@ -27,11 +27,15 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons and the `/` suggestion
- * list's skill rows (`slash-command-suggestions.tsx`) landed in all 86
- * catalogs, so no copy is pending translation today.
+ * The notifications.category.*Unavailable reasons landed in all 86 catalogs.
+ * The `/` suggestion list's skill rows (`slash-command-suggestions.tsx`) added
+ * `agentChat.slashCommands.skillBadge` and `agentChat.slashCommands.useSkillCommand`
+ * to `en.json`, so those two are still pending translation today.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>([
+  'agentChat.slashCommands.skillBadge',
+  'agentChat.slashCommands.useSkillCommand',
+]);
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

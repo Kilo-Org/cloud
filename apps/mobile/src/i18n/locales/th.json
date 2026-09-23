@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "นำเข้าบันทึกเซสชัน OpenAI Codex",
       "reviewDescription": "ตรวจสอบการเปลี่ยนแปลง [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ใช้ /{{command}}",
-      "useSkillCommand": "ใช้ทักษะ /{{command}}",
-      "skillBadge": "ทักษะ",
       "insert": "แทรก",
       "upgradeRequiredFallback": "กรุณาอัปเดต CLI เพื่อใช้คำสั่งนี้",
       "exitCapabilityUnavailable": "อัปเดต CLI ของคุณเพื่อออกจากเซสชัน",

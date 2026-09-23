@@ -2610,8 +2610,6 @@
       "resumeCodexDescription": "importă transcrierea unei sesiuni OpenAI Codex",
       "reviewDescription": "revizuiește modificările [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Folosește /{{command}}",
-      "useSkillCommand": "Folosește competența /{{command}}",
-      "skillBadge": "Competență",
       "insert": "Inserează",
       "upgradeRequiredFallback": "Actualizează CLI-ul pentru a folosi această comandă.",
       "exitCapabilityUnavailable": "Actualizează CLI-ul pentru a închide sesiunea.",

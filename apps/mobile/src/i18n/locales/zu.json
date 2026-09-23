@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "ngenisa umbhalo weseshini ye-OpenAI Codex",
       "reviewDescription": "buyekeza izinguquko [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Sebenzisa /{{command}}",
-      "useSkillCommand": "Sebenzisa ikhono /{{command}}",
-      "skillBadge": "Ikhono",
       "insert": "Faka",
       "upgradeRequiredFallback": "Sicela ubuyekeze i-CLI yakho ukuze usebenzise lo myalo.",
       "exitCapabilityUnavailable": "Buyekeza i-CLI yakho ukuze uphume eseshini.",

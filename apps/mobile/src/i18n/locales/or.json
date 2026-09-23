@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "OpenAI Codex ସେସନ୍‌ର ଟ୍ରାନ୍ସକ୍ରିପ୍ଟ ଆମଦାନି କରନ୍ତୁ",
       "reviewDescription": "ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ସମୀକ୍ଷା କରନ୍ତୁ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ବ୍ୟବହାର କରନ୍ତୁ",
-      "useSkillCommand": "ସ୍କିଲ୍ /{{command}} ବ୍ୟବହାର କରନ୍ତୁ",
-      "skillBadge": "ସ୍କିଲ୍",
       "insert": "ଯୋଡ଼ନ୍ତୁ",
       "upgradeRequiredFallback": "ଏହି କମାଣ୍ଡ ବ୍ୟବହାର କରିବାକୁ ଆପଣଙ୍କ CLI ଅପଗ୍ରେଡ୍ କରନ୍ତୁ।",
       "exitCapabilityUnavailable": "ସେସନରୁ ବାହାରିବାକୁ ଆପଣଙ୍କ CLI ଅଦ୍ୟତନ କରନ୍ତୁ।",

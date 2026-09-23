@@ -1994,8 +1994,6 @@
       "resumeCodexDescription": "importer la transcription d'une session OpenAI Codex",
       "reviewDescription": "examiner les modifications [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Utiliser /{{command}}",
-      "useSkillCommand": "Utiliser la compétence /{{command}}",
-      "skillBadge": "Compétence",
       "insert": "Insérer",
       "upgradeRequiredFallback": "Mettez à jour votre CLI pour utiliser cette commande.",
       "exitCapabilityUnavailable": "Mettez à jour votre CLI pour quitter la session.",

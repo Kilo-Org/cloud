@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "tuo OpenAI Codex -istunnon litterointi",
       "reviewDescription": "tarkista muutokset [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Käytä /{{command}}",
-      "useSkillCommand": "Käytä taitoa /{{command}}",
-      "skillBadge": "Taito",
       "insert": "Lisää",
       "upgradeRequiredFallback": "Päivitä CLI, jotta voit käyttää tätä komentoa.",
       "exitCapabilityUnavailable": "Päivitä CLI, jotta voit poistua istunnosta.",

@@ -2572,8 +2572,6 @@
       "resumeCodexDescription": "OpenAI Codex сессийн транскриптийг импортол",
       "reviewDescription": "өөрчлөлтүүдийг хяна [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ашиглах",
-      "useSkillCommand": "/{{command}} чадвар ашиглах",
-      "skillBadge": "Чадвар",
       "insert": "Оруулах",
       "upgradeRequiredFallback": "Энэ командыг ашиглахын тулд CLI-ээ шинэчилнэ үү.",
       "exitCapabilityUnavailable": "Сессээс гарахын тулд CLI-ээ шинэчилнэ үү.",

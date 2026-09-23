@@ -2068,8 +2068,6 @@
       "resumeCodexDescription": "bir OpenAI Codex oturum dökümünü içe aktar",
       "reviewDescription": "değişiklikleri incele [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} komutunu kullan",
-      "useSkillCommand": "/{{command}} becerisini kullan",
-      "skillBadge": "Beceri",
       "insert": "Ekle",
       "upgradeRequiredFallback": "Bu komutu kullanmak için CLI'yı güncelle.",
       "exitCapabilityUnavailable": "Oturumdan çıkmak için CLI'yı güncelle.",

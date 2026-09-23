@@ -113,7 +113,7 @@ describe('ChatToolbar', () => {
     expect(props.disabled).toBe(false);
   });
 
-  it('lets the control row reflow so a long model chip keeps its own width', () => {
+  it('keeps the control row on one line so it never wraps the model chip', () => {
     const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
@@ -125,9 +125,9 @@ describe('ChatToolbar', () => {
         ? element.props.className
         : '';
     expect(className).toContain('flex-row');
-    // The mode chip is shrink-0, so a nowrap row would squeeze the model name
-    // down to a few characters. Wrapping gives the model chip its own line.
-    expect(className).toContain('flex-wrap');
+    // The row must never wrap: the mode chip is shrink-0, so the model chip
+    // takes the remaining width and truncates its own label.
+    expect(className).not.toContain('flex-wrap');
 
     const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
     expect(pasteButtonProps.className).toContain('shrink-0');
@@ -151,7 +151,9 @@ describe('ChatToolbar', () => {
     expect(pasteButtonProps.className).toContain('shrink-0');
   });
 
-  it('wraps the chips for the narrow new-session viewport', () => {
+  it('keeps the chips on one row even when a caller passes the superseded wrap flag', () => {
+    // `wrap` opted into #6349's second row. The toolbar never wraps now, and the
+    // new-session and clone callers still pass the flag, so it must stay inert.
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({ ...defaultProps(), wrap: true }) as Node;
 
@@ -162,7 +164,7 @@ describe('ChatToolbar', () => {
         ? element.props.className
         : '';
     expect(className).toContain('flex-row');
-    expect(className).toContain('flex-wrap');
+    expect(className).not.toContain('flex-wrap');
   });
 
   it('forwards onLayout to the row', () => {
@@ -173,22 +175,24 @@ describe('ChatToolbar', () => {
     expect(element).toMatchObject({ props: { onLayout } });
   });
 
-  it('packs the paste button with the model chip so it never wraps to a line of its own', () => {
+  it('packs the paste button with the model chip so it never leaves the chip line', () => {
     const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
 
-    // A paste button that is a sibling of the chips overflows the first line on
-    // its own and wraps to an empty row below the model chip. One inner row
-    // holding both makes the outer wrap move them together.
+    // The paste button and the chip share one inner row, so the button cannot
+    // break away from the chip onto a line of its own.
     const packRow = findRowHolding(element, ['ModelSelector', 'ComposerPasteButton']);
     expect(packRow).not.toBeNull();
     const packClassName = typeof packRow?.className === 'string' ? packRow.className : '';
     expect(packClassName).toContain('flex-row');
     expect(packClassName).not.toContain('flex-wrap');
+    // Without `shrink` the nowrap row overflows instead of truncating (React
+    // Native defaults `flexShrink` to 0), pushing the paste button off the row.
+    expect(packClassName).toContain('shrink');
+    expect(packClassName).toContain('min-w-0');
 
-    // On the chip's line the button still keeps the trailing edge, as it did
-    // when every item fit on the first line.
+    // The button still keeps the trailing edge of the chip's line.
     const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
     expect(pasteButtonProps.className).toContain('ml-auto');
   });

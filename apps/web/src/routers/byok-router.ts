@@ -36,7 +36,7 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/pr
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,

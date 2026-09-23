@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "ሲጠፋ፣ የመመለሻ ቁልፍ በወኪል መልእክት ማስገቢያዎች ውስጥ አዲስ መስመር ያስገባል።",
     "biometricUnlock": "በባዮሜትሪክስ መክፈት",
     "biometricUnlockSubtitle": "መተግበሪያው ሲጀመር እና ከበስተጀርባ ለአምስት ደቂቃዎች ከቆየ በኋላ መክፈት ያስፈልጋል።",
-    "featureFlags": "የተግባር ባንዲራዎች",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "የርቀት · ≥ {{min}}",
-    "featureFlagSkipped": "ነባሪ · < {{min}}",
-    "featureFlagNotLoaded": "ነባሪ · አልተጫነም",
     "gatewayTranscription": "በKilo Gateway ድምጽን ወደ ጽሑፍ መቀየር",
     "gatewayTranscriptionSubtitle": "የድምፅ ግብዓትን በመሣሪያው የንግግር ማውቂያ ምትክ በKilo Gateway ሞዴል ወደ ጽሑፍ ቀይሩ። ቀረጻዎ ወደ Kilo Gateway ይላካል።",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",
       "linesOf": "ከ{{total}} መስመሮች {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "የCloud Agent {{action}} አልተሳካም ({{status}})።",
-      "failed": "የCloud Agent {{action}} አልተሳካም።"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ወደ ተከታታይ ውሂብ ሊቀየር የማይችል ግብዓት]",
       "errorPrefix": "ስህተት: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "አቅራቢው ጥያቄውን ውድቅ አድርጓል።",
       "assistantStopped": "ምላሹ ቆሟል።",
       "assistantContextOverflow": "ውይይቱ ለሞዴሉ በጣም ረጅም ነው።",
-      "assistantFailed": "ምላሹ አልተሳካም።",
-      "sendFailed": "መልእክቱን መላክ አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+      "assistantFailed": "ምላሹ አልተሳካም።"
     },
     "filePart": {
       "loadingImage": "ምስሉን በመጫን ላይ",

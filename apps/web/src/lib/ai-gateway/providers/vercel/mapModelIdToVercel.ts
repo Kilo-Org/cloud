@@ -1,4 +1,4 @@
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { resolveOpenRouterModelAlias } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 

@@ -327,7 +327,8 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     const legacyRows = await db
       .insert(platform_integrations)
       .values(
-        [legacyOwner.id, otherLegacyOwner.id].map(organizationId => ({
+        [legacyOwner.id, otherLegacyOwner.id].map((organizationId, index) => ({
+          github_connection_role: index === 0 ? ('workflow' as const) : null,
           owned_by_organization_id: organizationId,
           platform: 'github',
           integration_type: 'app',
@@ -402,6 +403,7 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
         },
         {
           owned_by_organization_id: connectedOwner.id,
+          github_connection_role: 'workflow',
           platform: 'github',
           integration_type: 'app',
           platform_installation_id: installationId,
@@ -443,6 +445,7 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
         platform: 'github',
         integration_type: 'app',
         platform_installation_id: installationId,
+        github_connection_role: 'workflow',
         github_app_type: 'standard',
         platform_account_id: String(ACCOUNT_ID),
         platform_account_login: ACCOUNT_LOGIN,

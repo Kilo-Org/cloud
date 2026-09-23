@@ -74,6 +74,15 @@ export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
   return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
 }
 
+/**
+ * Deferral budget for a head whose preparation deadline lands while the control
+ * plane reports a runtime replacement in flight. Each deferral grants a fresh
+ * delivery window, so the budget caps the wait inside one replacement cycle and
+ * leaves the existing terminal path to run when a replacement never completes.
+ * Binding the replacement runtime ends the cycle and starts the next budget.
+ */
+export const RUNTIME_REPLACEMENT_WAIT_LIMIT = 6;
+
 // ---------------------------------------------------------------------------
 // Canonical field access. The wire model nests per-state fields under `state`;
 // these helpers keep the one mapping in one place.
@@ -470,7 +479,10 @@ export function releaseUnadmittedWaitingMessages(
       ]);
       // Preserve intent and deadline: the head keeps its original preparation
       // bound. A released attach proof is retained for late results.
-      const proofs = releaseAttach && attach ? { retiredAttach: attach } : undefined;
+      const proofs =
+        releaseAttach && attach
+          ? { retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach) }
+          : undefined;
       return withProofs({ ...message, state: cleared }, proofs);
     }),
     releasedIds,
@@ -553,7 +565,10 @@ export function releaseCompletedRetryableAttach(
   return messages.map(message => {
     const attach = message.messageId === messageId ? message.proofs?.attach : undefined;
     if (!attach?.dispatched || attach.result?.ok !== false) return message;
-    const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+    const proofs: MessageProofs = {
+      ...message.proofs,
+      retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+    };
     delete proofs.attach;
     return withProofs(
       {
@@ -567,6 +582,24 @@ export function releaseCompletedRetryableAttach(
       Object.keys(proofs).length > 0 ? proofs : undefined
     );
   });
+}
+
+/**
+ * Retire an attach proof into the single `retiredAttach` slot without letting
+ * the slot's attach epoch drop. A dispatched attach carries no `attachmentEpoch`
+ * until its result arrives, and every other retired proof's epoch was already
+ * counted by `nextAttachmentEpoch`. Replacing the slot with an epoch-less proof
+ * would drop the pool to the epochs of the proofs that remain, so the next attach
+ * is minted at or below the epoch the native-runtime fence holds and looks like a
+ * stale result — refusing the in-place rebind the head is waiting for. Carry the
+ * highest epoch either proof has carried so the pool never falls below the fence.
+ */
+export function retireAttachProof(
+  attach: SessionOperationProof,
+  previous: SessionOperationProof | undefined
+): SessionOperationProof {
+  const attachmentEpoch = Math.max(attach.attachmentEpoch ?? 0, previous?.attachmentEpoch ?? 0);
+  return { ...attach, ...(attachmentEpoch > 0 ? { attachmentEpoch } : {}) };
 }
 
 /**
@@ -588,7 +621,10 @@ export function releaseUnconfirmedAttach(
     !sameSessionOperation(attach.authorization, authorization)
   )
     return undefined;
-  const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+  const proofs: MessageProofs = {
+    ...message.proofs,
+    retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+  };
   delete proofs.attach;
   return messages.map(item =>
     item.messageId !== message.messageId
@@ -876,6 +912,24 @@ export function streamCloudStatus(
   return messages.length > 0 ? { type: 'ready' } : null;
 }
 
+/**
+ * Mint the next attach epoch. A retired proof keeps its epoch in the pool: the
+ * native-runtime fence rejects an in-place rebind recorded at an epoch it
+ * already holds, and the retired proof's epoch is the one that fence carries, so
+ * re-minting it would make the replacement attach look like a stale result.
+ */
+function nextAttachmentEpoch(messages: readonly SessionMessage[]): number {
+  return (
+    Math.max(
+      0,
+      ...messages.flatMap(message => [
+        message.proofs?.attach?.attachmentEpoch ?? 0,
+        message.proofs?.retiredAttach?.attachmentEpoch ?? 0,
+      ])
+    ) + 1
+  );
+}
+
 export function applySessionOperationResult(
   aggregate: SessionAggregate,
   delivery: SessionOperationDelivery,
@@ -960,10 +1014,7 @@ export function applySessionOperationResult(
         : delivery.completedAt,
   };
   const attachmentEpoch =
-    kind === 'attach'
-      ? (proof.attachmentEpoch ??
-        Math.max(0, ...messages.map(item => item.proofs?.attach?.attachmentEpoch ?? 0)) + 1)
-      : undefined;
+    kind === 'attach' ? (proof.attachmentEpoch ?? nextAttachmentEpoch(messages)) : undefined;
   return {
     messages: applied.map(item =>
       item.messageId === message.messageId
@@ -1113,9 +1164,7 @@ export function completeSessionOperationAttachment(
     nextQueuedMessageId(messages) !== message.messageId
   )
     return undefined;
-  const attachmentEpoch =
-    proof.attachmentEpoch ??
-    Math.max(0, ...messages.map(item => item.proofs?.attach?.attachmentEpoch ?? 0)) + 1;
+  const attachmentEpoch = proof.attachmentEpoch ?? nextAttachmentEpoch(messages);
   return messages.map(item =>
     item.messageId === message.messageId
       ? {

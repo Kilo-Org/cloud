@@ -1,11 +1,11 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ContextPickerSheet } from '@/components/context-picker-sheet';
 import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -17,47 +17,68 @@ import { useTRPC } from '@/lib/trpc';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
-/** The caller supplies its cached memberships; the picker does not fetch data. */
+/**
+ * The caller supplies its cached memberships; the picker does not fetch data.
+ * Returns the opener for its control plus the sheet element the caller renders,
+ * so the sheet lives in the caller's tree (a portal-free `Modal`) instead of a
+ * process-wide action-sheet provider.
+ */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
-  const { showActionSheetWithOptions } = useActionSheet();
-  const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { setOrganizationId } = useOrganization();
+  const { setOrganizationId, organizationId } = useOrganization();
+  const [open, setOpen] = useState(false);
 
-  return () => {
-    if (!orgs) {
+  const labels = [
+    t('common.personal'),
+    ...(orgs ?? []).map(org => org.organizationName),
+    t('common.cancel'),
+  ];
+  const cancelButtonIndex = labels.length - 1;
+  // Personal is index 0 and the memberships follow in list order. A persisted
+  // membership that is no longer listed checks nothing, so the mark never names
+  // an account the user is not on.
+  const memberIndex = orgs?.findIndex(org => org.organizationId === organizationId) ?? -1;
+  let currentIndex = -1;
+  if (organizationId === null) {
+    currentIndex = 0;
+  } else if (memberIndex >= 0) {
+    currentIndex = memberIndex + 1;
+  }
+
+  const select = (index: number) => {
+    setOpen(false);
+    if (index === cancelButtonIndex) {
       return;
     }
-    const options = [
-      t('common.personal'),
-      ...orgs.map(org => org.organizationName),
-      t('common.cancel'),
-    ];
-    const cancelButtonIndex = options.length - 1;
-    showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex,
-        title: t('profile.selectAccount'),
-        containerStyle: { paddingBottom: bottom, backgroundColor: colors.card },
-        textStyle: { color: colors.foreground },
-        titleTextStyle: { color: colors.mutedForeground },
-      },
-      index => {
-        if (index === undefined || index === cancelButtonIndex) {
-          return;
-        }
-        if (index === 0) {
-          setOrganizationId(null);
-        } else {
-          const org = orgs[index - 1];
-          if (org) {
-            setOrganizationId(org.organizationId);
-          }
-        }
+    if (index === 0) {
+      setOrganizationId(null);
+      return;
+    }
+    const org = orgs?.[index - 1];
+    if (org) {
+      setOrganizationId(org.organizationId);
+    }
+  };
+
+  return {
+    openPicker: () => {
+      if (orgs) {
+        setOpen(true);
       }
-    );
+    },
+    picker: orgs ? (
+      <ContextPickerSheet
+        visible={open}
+        title={t('profile.selectAccount')}
+        options={labels}
+        cancelButtonIndex={cancelButtonIndex}
+        currentIndex={currentIndex}
+        onSelect={select}
+        onClose={() => {
+          setOpen(false);
+        }}
+      />
+    ) : null,
   };
 }
 
@@ -76,7 +97,7 @@ export function ContextControl({
     enabled: token != null,
   });
   const orgs = organizations.data;
-  const openPicker = useContextPicker(orgs);
+  const { openPicker, picker } = useContextPicker(orgs);
   const organizationId = scope ? scope.organizationId : context.organizationId;
   const isResolved = scope ? scope.isResolved : context.isLoaded;
   const providerError = scope ? null : context.error;
@@ -157,6 +178,7 @@ export function ContextControl({
         </Pressable>
       )}
       <AccessibleStatus message={errorMessage} className="text-sm" />
+      {picker}
       {retry && errorMessage ? (
         <Pressable
           accessibilityRole="button"

@@ -17223,7 +17223,6 @@ packages:
 
   react-native-render-html@6.3.4:
     resolution: {integrity: sha512-H2jSMzZjidE+Wo3qCWPUMU1nm98Vs2SGCvQCz/i6xf0P3Y9uVtG/b0sDbG/cYFir2mSYBYCIlS1Dv0WC1LjYig==}
-    deprecated: This package has been replaced with @native-html/render
     peerDependencies:
       react: '*'
       react-native: '*'

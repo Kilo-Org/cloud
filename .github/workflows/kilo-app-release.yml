@@ -16,6 +16,11 @@ on:
       - 'packages/notifications/**'
       - 'packages/cloud-agent-sdk/**'
   workflow_dispatch:
+  # A held release must run later even when main goes quiet: no push means no
+  # run, and the held submission would wait for ever. A held or no-change run
+  # costs only the check-changes job.
+  schedule:
+    - cron: '41 * * * *'
 
 # cancel-in-progress: false lets a running release finish. GitHub keeps one run
 # pending per group and cancels the previously pending run, so a burst of merges
@@ -35,6 +40,9 @@ jobs:
       contents: read # read the release tags
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
+      allowed: ${{ steps.cap.outputs.allowed }}
+      version: ${{ steps.check.outputs.version }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -43,15 +51,22 @@ jobs:
       - name: Check for changes since last release
         id: check
         run: |
+          # Find the latest kilo-app release tag. Read before the manual override:
+          # the changelog step needs the range even for a dispatch.
+          LAST_TAG=$(git tag --list 'kilo-app-release/*' --sort=-creatordate | head -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> "$GITHUB_ENV"
+
+          # The version this run submits: the changelog heading and the store
+          # identity assertion both read it.
+          VERSION=$(sed -n "s/^  version: '\([0-9][0-9.]*\)',$/\1/p" apps/mobile/app.config.ts)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
           # A manual run is the override: build and submit whatever main holds.
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Manual run — building regardless of changes"
             echo "should_build=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          # Find the latest kilo-app release tag
-          LAST_TAG=$(git tag --list 'kilo-app-release/*' --sort=-creatordate | head -n 1)
 
           if [ -z "$LAST_TAG" ]; then
             echo "No previous release tag found — first build"
@@ -61,8 +76,20 @@ jobs:
 
           echo "Last release tag: $LAST_TAG"
 
-          # Check for changes in kilo-app or its direct workspace:* inputs since that tag
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ pnpm-lock.yaml)
+          # Check for changes in kilo-app or its direct workspace:* inputs since that tag.
+          # This list must mirror the push `paths` filter above: the hourly
+          # schedule has no paths filter, so anything extra here (a lockfile
+          # bump outside the app paths, say) releases on the next scheduled run
+          # what a push would have ignored. pnpm-lock.yaml is deliberately
+          # absent, for the same reason the push trigger excludes it: an
+          # unrelated dependency bump elsewhere in the monorepo must not submit
+          # a build. A bump of an app dependency also edits
+          # apps/mobile/package.json, which is inside apps/mobile/ here.
+          # CHANGELOG.md is excluded: the changelog commit this workflow pushes onto
+          # the version-bump branch re-triggers this workflow, and the tag marks the
+          # pre-changelog commit, so without the exclusion every release starts the
+          # next one. The same exclusion retires the bump-PR merge from the range.
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
 
           # The bump-version job edits the version line after every submission. Its
           # merged PR must not release the same code again, or every release starts
@@ -85,12 +112,52 @@ jobs:
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Notes for the changelog
+        id: notes
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          if [ -n "$LAST_TAG" ]; then
+            NOTES=$(node scripts/kilo-app-release-notes.mjs body --from "$LAST_TAG" --to HEAD)
+          else
+            NOTES=$(node scripts/kilo-app-release-notes.mjs body)
+          fi
+          printf '%s\n' "$NOTES"
+          {
+            echo 'notes<<NOTES_EOF'
+            printf '%s\n' "$NOTES"
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # The cost gate: the last thing before any build. Apple refuses a
+      # submission over its rolling upload limit, and the failure is the whole
+      # point of the gate — never build an artifact the throttle will refuse.
+      # The count is the App Store Connect uploads themselves (the
+      # kilo-app-upload/ markers Submit iOS pushes), never the release tags: a
+      # run that uploads the IPA and then fails at Submit Android writes no
+      # release tag, and with the hourly schedule it would re-upload iOS for
+      # ever while the tag count still read low.
+      # A hold is not a failure: the run stays green and the next push or the
+      # hourly run resumes the same unreleased change.
+      - name: Gate on the App Store Connect upload limit
+        id: cap
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          CAP_OUT=$(node scripts/kilo-app-release-upload-cap.mjs --cap 10 --prefix kilo-app-upload/)
+          printf '%s\n' "$CAP_OUT"
+          ALLOWED=$(printf '%s\n' "$CAP_OUT" | sed -n 's/^allowed=//p')
+          echo "allowed=$ALLOWED" >> "$GITHUB_OUTPUT"
+          if [ "$ALLOWED" != "true" ]; then
+            echo "::notice::App Store Connect upload limit reached — no artifact is built; the next push or the hourly run picks this release up."
+          fi
+
   validate:
+    needs: [check-changes]
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true'
     uses: ./.github/workflows/kilo-app-ci.yml
 
   preflight:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -155,9 +222,12 @@ jobs:
 
   build-and-submit:
     needs: [check-changes, validate, preflight]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
+    outputs:
+      ios_build: ${{ steps.identity.outputs.ios_build }}
+      android_build: ${{ steps.identity.outputs.android_build }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -217,11 +287,39 @@ jobs:
         working-directory: apps/mobile
         run: node ../../scripts/inspect-mobile-artifacts.mjs artifacts/app.ipa artifacts/app.aab build.json
 
+      # Read the identity the stores will receive from the built artifact. This
+      # fails the run before the upload when the IPA does not carry the version
+      # in app.config.ts, so a mismatched artifact never reaches the stores.
+      - name: Read the store build identity
+        id: identity
+        working-directory: apps/mobile
+        run: |
+          IDENTITY=$(node ../../scripts/kilo-app-release-notes.mjs identity --config app.config.ts --ipa artifacts/app.ipa --build-json build.json)
+          printf '%s\n' "$IDENTITY"
+          printf '%s\n' "$IDENTITY" | sed -n 's/^\(ios_build\|android_build\)=/\1=/p' >> "$GITHUB_OUTPUT"
+
       - name: Submit iOS
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: pnpx eas-cli@21.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
+
+      # An iOS submission is a real App Store Connect upload even when the
+      # Android submit after it fails, so record it the moment it succeeds: the
+      # upload cap counts this marker prefix, and the release tag below stays
+      # release detection only. The marker is annotated, so its creatordate is
+      # the upload moment — a release held and resumed hours later still counts
+      # at the upload time, not the commit's. The run id and attempt keep the
+      # name unique, so an hourly retry of the same commit pushes a second,
+      # distinct marker instead of failing on a name that already exists.
+      # An annotated tag needs a tagger identity; the runner has none.
+      - name: Mark the iOS upload
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          MARKER="kilo-app-upload/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git tag -a "$MARKER" -m "$MARKER"
+          git push origin "$MARKER"
 
       - name: Submit Android
         working-directory: apps/mobile
@@ -229,6 +327,8 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: pnpx eas-cli@21.8.0 submit --profile production --platform android --non-interactive --path artifacts/app.aab
 
+      # Release detection only: the next run reads this to find the last release.
+      # The upload cap never counts it (a partial run writes no release tag).
       - name: Tag release
         run: |
           TAG="kilo-app-release/$(date -u +%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
@@ -239,31 +339,51 @@ jobs:
   # marketing version is patch-bumped for the next one. This runs beside
   # build-and-submit, not after it: the submission is never blocked on the bump.
   # The build number is not bumped here; EAS auto-increments it remotely.
+  # The bump branch is pushed here, but its PR is opened by the changelog job,
+  # only once the changelog section is on the branch. A PR opened during the
+  # 60-minute build window can be merged (and its branch auto-deleted) before
+  # the section lands, which loses the build's changelog line for ever.
   bump-version:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: write # push the bump branch
-      pull-requests: write # open the PR, request the reviewer
-      issues: write # PR assignees are an Issues API operation; pull-requests: write alone does not cover --assignee
+      pull-requests: read # look for an open bump PR to reuse its branch
+    outputs:
+      branch: ${{ steps.pending.outputs.branch || steps.bump.outputs.branch }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
       # An open bump PR already carries the next version. A second one would
       # bump to the same number and conflict with it.
+      # Only a PR from this repository counts: `gh pr list` also returns PRs
+      # opened from forks, and a fork PR whose head branch happens to be named
+      # `kilo-app-version-bump-x.y.z` would make this job skip the bump and
+      # publish a branch the changelog job cannot fetch from origin. The
+      # version would never be bumped while that PR stayed open.
       - name: Look for an open bump PR
         id: pending
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          OPEN=$(gh pr list --state open --limit 100 --json headRefName \
-            --jq '[.[] | select(.headRefName | startswith("kilo-app-version-bump-"))] | length')
+          BRANCHES=$(gh pr list --state open --limit 100 --json headRefName,isCrossRepository \
+            --jq '[.[] | select((.headRefName | startswith("kilo-app-version-bump-")) and (.isCrossRepository | not))] | .[].headRefName')
+          OPEN=$(printf '%s\n' "$BRANCHES" | grep -c . || true)
           if [ "$OPEN" != "0" ]; then
             echo "A kilo-app version bump PR is already open — nothing to open."
           fi
+          # A PR head ref is a name a stranger can choose. It is consumed by the
+          # changelog job's shell, so accept only the exact name this pipeline
+          # creates and fail loudly on anything else.
+          BRANCH=$(printf '%s\n' "$BRANCHES" | head -n 1)
+          if [ -n "$BRANCH" ] && ! printf '%s' "$BRANCH" | grep -qE '^kilo-app-version-bump-[0-9.]+$'; then
+            echo "::error::Refusing a version-bump branch this pipeline did not create: $BRANCH"
+            exit 1
+          fi
           echo "open=$OPEN" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Bump patch version
         id: bump
@@ -280,6 +400,7 @@ jobs:
           echo "Bumped $OLD -> $NEW"
           echo "old=$OLD" >> "$GITHUB_OUTPUT"
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "branch=kilo-app-version-bump-$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Push bump branch
         if: steps.pending.outputs.open == '0'
@@ -293,34 +414,103 @@ jobs:
           # Force: a re-run rewrites the same single line onto the same branch.
           git push -fu origin "kilo-app-version-bump-$NEW"
 
-      - name: Open bump PR
-        if: steps.pending.outputs.open == '0'
+  # The changelog section rides the version-bump branch, not main. Main is
+  # protected by the `main-reviews` ruleset (pull_request, 1 approval,
+  # non_fast_forward, `bypass_actors: null`, ruleset 12440134) and the
+  # `main-tests` ruleset (8 required status checks, 12440145), so a GITHUB_TOKEN
+  # push to main is refused (`git log origin/main --author=github-actions` shows
+  # every bot commit on main arrived through a PR). The version-bump PR is the
+  # pipeline's own path to main, a human merges it exactly as today, and no human
+  # writes or edits a changelog line. It needs build-and-submit so a section is
+  # written only for a build that reached the stores.
+  #
+  # The section lands on the branch first and the PR is opened or refreshed
+  # after, so the version line and the section are on the branch together before
+  # any human can merge them. A land whose branch is already gone is not a
+  # failed build: the section is carried to the pending branch and the next
+  # build writes it above its own section.
+  changelog:
+    needs: [check-changes, bump-version, build-and-submit]
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: write # push the section onto the version-bump branch
+      pull-requests: write # open or refresh the version-bump PR
+      issues: write # PR assignees are an Issues API operation; pull-requests: write alone does not cover --assignee
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Land the changelog section on the version-bump branch
+        id: land
+        env:
+          NOTES: ${{ needs.check-changes.outputs.notes }}
+          BRANCH: ${{ needs.bump-version.outputs.branch }}
+          PENDING: kilo-app-changelog-pending
+        run: |
+          # The branch is a PR head ref, so a stranger can name it. It reaches
+          # this shell as an environment value, never as an interpolated ${{ }},
+          # and only the exact name this pipeline creates is accepted.
+          if ! printf '%s' "$BRANCH" | grep -qE '^kilo-app-version-bump-[0-9.]+$'; then
+            echo "::error::Refusing to land the changelog on an unexpected branch: $BRANCH"
+            exit 1
+          fi
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/kilo-app-notes.md"
+          OUT=$(node scripts/kilo-app-release-notes.mjs write \
+            --version "${{ needs.check-changes.outputs.version }}" \
+            --ios-build "${{ needs.build-and-submit.outputs.ios_build }}" \
+            --android-build "${{ needs.build-and-submit.outputs.android_build }}" \
+            --body-file "$RUNNER_TEMP/kilo-app-notes.md" \
+            --land "origin:$BRANCH" \
+            --pending "$PENDING")
+          printf '%s\n' "$OUT"
+          if printf '%s\n' "$OUT" | grep -q '^changelog: landed '; then
+            echo "landed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "landed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The version-bump branch was already merged — this build's changelog section waits on $PENDING for the next build's section. The submission itself succeeded."
+          fi
+
+      # Only a branch that now carries the section gets a PR: a human who merges
+      # it takes the version line and the changelog line to main in one merge.
+      - name: Open or refresh the version-bump PR
+        if: steps.land.outputs.landed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ needs.bump-version.outputs.branch }}
+          OLD: ${{ needs.check-changes.outputs.version }}
         run: |
-          NEW="${{ steps.bump.outputs.new }}"
-          OLD="${{ steps.bump.outputs.old }}"
+          NEW="${BRANCH#kilo-app-version-bump-}"
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          cat > /tmp/bump-pr-body.md <<EOF
+          cat > "$RUNNER_TEMP/kilo-app-bump-pr.md" <<EOF
           ## What
 
-          Bumps apps/mobile (kilo-app) version $OLD -> $NEW.
+          Bumps apps/mobile (kilo-app) version $OLD -> $NEW, and carries this
+          build's changelog section.
 
           ## Why
 
-          The kilo-app Release workflow is submitting version $OLD to the App Store and
-          to Google Play (run: $RUN_URL). A store release needs a version string that
-          was not released before, so main moves to the next one.
+          The kilo-app Release workflow submitted version $OLD to the App Store and
+          to Google Play (run: $RUN_URL). A store release needs a version string
+          that was not released before, so main moves to the next one, and the
+          build's changelog section reaches main in the same merge.
 
           ## What to do
 
           1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
              do not trigger workflow runs. Close and reopen this PR (or push an empty
              commit) to start CI.
-          2. Review and merge. Only the version line changed; no product code.
+          2. Review and merge. Only the version line and the changelog section
+             changed; no product code.
           EOF
-          gh pr create --base main \
-            --title "chore(kilo-app): bump version to $NEW" \
-            --body-file /tmp/bump-pr-body.md \
-            --assignee iscekic \
-            --reviewer iscekic
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md"
+            echo "Refreshed the version-bump PR #$PR for $BRANCH"
+          else
+            gh pr create --base main \
+              --title "chore(kilo-app): bump version to $NEW" \
+              --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md" \
+              --assignee iscekic \
+              --reviewer iscekic
+          fi

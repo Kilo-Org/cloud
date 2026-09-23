@@ -42,6 +42,14 @@ export function startDeviceAuthPoll(params: {
   let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
   let inFlight = false;
   let lastTickStartedAt = 0;
+  // The server's own throttle deadline, in `Date.now()` milliseconds. A
+  // foreground poll (`pollNow`) must not send a request before it: resuming
+  // the app is not the server's permission to poll again. Only a retry that
+  // named a `Retry-After` records a deadline; our own backoff stays
+  // bypassable so a resume still polls promptly while the server is merely
+  // pending. Always at or before the retry timer it was scheduled with, so
+  // it is never stale while a timer is pending.
+  let throttledUntil = 0;
 
   const scheduleNext = (delay: number) => {
     timeoutId = setTimeout(() => {
@@ -147,7 +155,12 @@ export function startDeviceAuthPoll(params: {
           // remaining time times out on that tick instead of polling again.
           const wait = Math.max(retryDelay, outcome.retryAfterMs ?? 0);
           const remaining = POLL_OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
-          scheduleNext(Math.min(wait, Math.max(0, remaining)));
+          const delay = Math.min(wait, Math.max(0, remaining));
+          // Record the server's deadline for a foreground poll. Capped by the
+          // scheduled delay, so a Retry-After longer than the remaining budget
+          // never pushes the deadline past the tick that times the poll out.
+          throttledUntil = Date.now() + Math.min(outcome.retryAfterMs ?? 0, delay);
+          scheduleNext(delay);
           return;
         }
         case 'error': {
@@ -176,6 +189,12 @@ export function startDeviceAuthPoll(params: {
     // At most one extra poll per foreground transition: skip when a tick is
     // already in flight or the last tick started under 1 second ago.
     if (inFlight || Date.now() - lastTickStartedAt < 1000) {
+      return;
+    }
+    // A foreground transition is not the server's permission to poll again.
+    // While a Retry-After throttle is in force, leave the retry timer it was
+    // scheduled with in place instead of ticking: the server asked us to wait.
+    if (Date.now() < throttledUntil) {
       return;
     }
     if (timeoutId) {

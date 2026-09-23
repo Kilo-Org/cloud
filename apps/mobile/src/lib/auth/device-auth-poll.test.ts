@@ -80,6 +80,27 @@ describe('startDeviceAuthPoll', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('does not poll early when foregrounded during a Retry-After cooldown', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json(
+        { error: 'TOO_MANY_ATTEMPTS' },
+        { status: 429, headers: { 'retry-after': '90' } }
+      )
+    );
+    const { poll } = makePoll();
+    // First scheduled tick at 3s is throttled with a 90s Retry-After.
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Foreground well after the 1s guard but before the cooldown expires: the
+    // server asked us to wait, so no poll may be sent early.
+    await vi.advanceTimersByTimeAsync(10_000);
+    poll.pollNow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The cooldown still ends on the server's schedule, not later.
+    await vi.advanceTimersByTimeAsync(80_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('times out immediately when startedAt is already past the overall timeout', async () => {
     const { setState, cleanup } = makePoll({
       startedAt: Date.now() - 5 * 60 * 1000 - 1000,

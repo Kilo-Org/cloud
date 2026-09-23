@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
 import { createElement, type ElementType, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -62,6 +63,10 @@ vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown', Check: 'Ch
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => theme.colors,
 }));
+
+// The `react-native` mock above exposes `Platform` as a plain object, so a test
+// can switch the platform the picker reads without re-mocking the module.
+const platform = Platform as unknown as { OS: 'android' | 'ios' };
 
 const Text = 'Text' as ElementType;
 const Skeleton = 'Skeleton' as ElementType;
@@ -146,6 +151,7 @@ beforeEach(() => {
   auth.token = 'token';
   persisted = null;
   rerender = undefined;
+  platform.OS = 'android';
   theme.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
@@ -241,6 +247,23 @@ describe('ContextControl', () => {
         current === 1 ? DARK_COLORS.foreground : 'transparent',
         null,
       ]);
+    }
+  );
+
+  it.each([
+    { stored: null, expected: ['✓ Personal', name, 'Cancel'] },
+    { stored: 'org-a', expected: ['Personal', `✓ ${name}`, 'Cancel'] },
+    { stored: 'org-missing', expected: ['Personal', name, 'Cancel'] },
+  ])(
+    'marks the current account in the iOS option label (stored=$stored)',
+    async ({ stored, expected }) => {
+      // The native iOS sheet drops `icons`, so iOS must carry the mark in the label.
+      platform.OS = 'ios';
+      storage.read.mockResolvedValue(stored);
+      const ui = await mount();
+      await waitFor(() => !picker(ui).props.disabled);
+      await press(picker(ui));
+      expect(nativePicker().options.options).toEqual(expected);
     }
   );
 

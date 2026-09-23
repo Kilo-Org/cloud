@@ -1,6 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +17,11 @@ import { useTRPC } from '@/lib/trpc';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
+// `ActionSheetIOS` renders option strings and has no icon API, so the native iOS
+// sheet drops the Android `icons` check. iOS carries the current-account mark in
+// the option label instead; U+2713, the text-presentation check iOS uses in menus.
+const IOS_CHECK_MARK = '\u2713';
+
 /** The caller supplies its cached memberships; the picker does not fetch data. */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
   const { showActionSheetWithOptions } = useActionSheet();
@@ -29,17 +34,25 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
     if (!orgs) {
       return;
     }
-    const options = [
+    const labels = [
       t('common.personal'),
       ...orgs.map(org => org.organizationName),
       t('common.cancel'),
     ];
-    const cancelButtonIndex = options.length - 1;
+    const cancelButtonIndex = labels.length - 1;
     // Personal is index 0 and the memberships follow in list order. A persisted
     // membership that is no longer listed checks nothing, so the mark never names
     // an account the user is not on.
     const isCurrent = (index: number) =>
       index === 0 ? organizationId === null : orgs[index - 1]?.organizationId === organizationId;
+    // The native iOS sheet ignores the Android-only `icons`, so iOS would show no
+    // current-account mark at all; a marked label is the platform's own way to
+    // show the selected item. Android keeps the icon and paints the mark there.
+    const options = labels.map((label, index) =>
+      Platform.OS === 'ios' && index !== cancelButtonIndex && isCurrent(index)
+        ? `${IOS_CHECK_MARK} ${label}`
+        : label
+    );
     showActionSheetWithOptions(
       {
         options,

@@ -132,6 +132,7 @@ import {
   type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -170,6 +171,7 @@ import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -189,7 +191,6 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -392,11 +393,12 @@ export function SessionDetailContent({
     setFollowTailNonce(count => count + 1);
   }, []);
 
-  const { bottom } = useSafeAreaInsets();
   // The strip below the keyboard container reserves the device safe area so the
   // composer's tail clears the navigation bar / home indicator. The container
   // above does not add it again (`containerReservesBottomInset`), so the space
   // is resolved once per screen instead of twice.
+  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -1586,19 +1588,23 @@ export function SessionDetailContent({
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
   // The CLI lists an unrenamed session under a generated placeholder title
   // (`New session - <ISO>`); it is a storage key, not a name, so treat it as
-  // absent and let the fallback name (or a live rename) show instead.
+  // absent and let the fallback name (or a live rename) show instead. The
+  // judgement lives in `namedSessionTitle` rather than here so it can also
+  // consult the record of titles the app's own rename wrote: a user-chosen
+  // title that happens to match the placeholder shape is kept, and a genuine
+  // placeholder still reaches `getSessionDetailRenameState` as absent.
   const serverTitle = isSessionLoaded
-    ? sessionDisplayTitle(fetchedData.title ?? undefined)
+    ? namedSessionTitle(fetchedData.title ?? undefined, sessionId)
     : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session". A
-    // generated placeholder title is not a name: fall back to the
-    // localized label rather than the raw ISO string.
-    fallbackTitle: sessionDisplayTitle(cachedTitle) ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". The route's
+    // cached metadata can hold the backend's ISO placeholder, which must not
+    // paint either, while a title the user's own rename wrote is kept.
+    fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
@@ -1793,11 +1799,11 @@ export function SessionDetailContent({
     const removeIndex = actions.indexOf('remove');
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: t('agentChat.goal.title'),
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         const action = index === undefined ? undefined : actions[index];
@@ -1828,7 +1834,7 @@ export function SessionDetailContent({
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {

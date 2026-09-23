@@ -14,15 +14,19 @@ import {
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
-import type { CreateIntent, ObserveResult } from './physical-lifecycle.js';
-import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
+import type {
+  ObserveResult,
+  ProviderAdapter,
+  ProviderAllocationIntent,
+  ProviderCreateIntent,
+} from './provider.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
 function mapObservation(
   observation: ContainersObservation,
   providerRef: string,
-  intent: CreateIntent | null | undefined
+  intent: ProviderAllocationIntent | null | undefined
 ): ObserveResult {
   if (observation.state === 'idle') {
     if (observation.running) return 'unknown';
@@ -43,15 +47,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
-  const encodeIntentProviderRef = (intent: CreateIntent): string =>
+  const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
     encodeCloudflareProviderRef({
       sandboxId: intent.allocationName ?? deps.logicalSandboxId,
       containment: false,
       instanceId: intent.intentId,
     });
 
-  const resolveProviderRef = (ref: string | null, intent?: CreateIntent | null): string | null =>
-    ref ?? (intent ? encodeIntentProviderRef(intent) : null);
+  const resolveProviderRef = (
+    ref: string | null,
+    intent?: ProviderAllocationIntent | null
+  ): string | null => ref ?? (intent ? encodeIntentProviderRef(intent) : null);
 
   const decodeOwnedProviderRef = (ref: string | null): CloudflareProviderRef | null => {
     const decoded = decodeCloudflareProviderRef(ref);
@@ -73,6 +79,8 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     resumable: false,
+    persistentWorkspace: false,
+    destroysOnStop: true,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
       if (intent.containment && (intent.containment.kilocode || intent.containment.github)) {

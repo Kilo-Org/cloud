@@ -50,6 +50,22 @@ describe('stripInlineCodeMarkers', () => {
 });
 
 describe('run-location help copy', () => {
+  it('keeps the English new-session hint in plain mobile language', () => {
+    const value = valueAt(CATALOG_LOADERS.en(), ['agentChat', 'newSession', 'remoteHint']);
+    expect(typeof value).toBe('string');
+
+    // The phone user reads one actionable sentence telling them to start Kilo
+    // on their computer; no CLI-only entry point, no internal vocabulary.
+    expect(value).toBe('To run on your computer, start Kilo there and leave it running.');
+    expect(value as string).not.toContain('/remote');
+    expect(value as string).not.toContain('CLI session');
+    expect(value as string).not.toContain('local kilo process');
+    expect(value as string).not.toContain('`');
+  });
+
+  // The translated catalogs still carry the reviewed wording — the translation
+  // pipeline owns them, so this PR only changed `en.json`. Whatever markers a
+  // catalog holds, the renderer strips them before the reader sees the text.
   it.each(SUPPORTED_LANGUAGES)('%s never renders an authoring marker', tag => {
     const catalog = CATALOG_LOADERS[tag]();
 

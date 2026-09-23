@@ -236,6 +236,9 @@ export function ModelPickerContent() {
               : t('agentChat.modelPicker.noModelsDescription')
           }
           action={
+            // The in-field X is one way back; the no-matches body offers the
+            // same recovery the Agents search empty state does, so the only
+            // exit from "No matches" is not backspacing the query away.
             deferredSearch.trim() ? (
               <Button variant="outline" onPress={handleClearSearch}>
                 <Text>{t('common.clearSearch')}</Text>
@@ -250,7 +253,12 @@ export function ModelPickerContent() {
           keyExtractor={item => item.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingBottom: bottom }}
+          // The bottom inset rides on the list's frame, not its content: a
+          // content inset only cleared the end of the list, so a row at the
+          // viewport bottom (the picker's last row) was drawn under the opaque
+          // Android navigation bar. Ending the viewport above the bar is the
+          // same frame inset `session-list-screen` uses for its FAB band.
+          style={{ marginBottom: bottom }}
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (

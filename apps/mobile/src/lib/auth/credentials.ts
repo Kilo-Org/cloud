@@ -7,6 +7,7 @@ import {
   readStoredValueRetryingNull,
   readStoredValueWithRetry,
 } from '@/lib/auth/secure-store-read';
+import { deleteStoredValue, writeStoredValue } from '@/lib/auth/secure-store-value';
 import { getActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
@@ -101,9 +102,9 @@ export async function persistSignInCredentialsAtEpoch(
   // a newer sign-in or sign-out: their own credential write is queued
   // strictly behind this one.
   const clearPartialCredentials = async (): Promise<void> => {
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await deleteStoredValue(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await deleteStoredValue(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
   };
 
   // Fence one credential operation: skip it when the epoch moved before the
@@ -112,9 +113,12 @@ export async function persistSignInCredentialsAtEpoch(
     if (!isCurrentAuthEpoch(epoch)) {
       return false;
     }
+    // A keychain write/delete that rejects is reported at warning level with
+    // the stable operation fingerprint and then propagates, so sign-in lands
+    // on its persist-error state instead of publishing a half-written pair.
     await (value === undefined
-      ? SecureStore.deleteItemAsync(key, IOS_BEARER_SECURE_STORE_OPTIONS)
-      : SecureStore.setItemAsync(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
+      ? deleteStoredValue(key, IOS_BEARER_SECURE_STORE_OPTIONS)
+      : writeStoredValue(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
     if (!isCurrentAuthEpoch(epoch)) {
       await clearPartialCredentials();
       return false;

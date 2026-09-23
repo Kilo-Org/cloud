@@ -220,6 +220,10 @@ describe('isShortViewport', () => {
   it('reads a tablet in landscape as tall, so the state keeps its full stack', () => {
     // Wide but not short: the band there is taller than the whole stack.
     expect(isShortViewport(1024, 768)).toBe(false);
+    // A 600dp-short-edge tablet is Android's smallest (the `sw600dp`
+    // qualifier, the 1024x600 emulator). It is wide but still a tablet: its
+    // band is ~384dp against the ~167dp stack, so it keeps the full stack too.
+    expect(isShortViewport(1024, 600)).toBe(false);
   });
 
   it('reads a square window as tall, so the state keeps its full stack', () => {

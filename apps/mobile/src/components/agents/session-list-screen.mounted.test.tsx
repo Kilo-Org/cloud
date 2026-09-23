@@ -594,6 +594,20 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
   });
 
+  it('still reserves the FAB strip on a 600dp-short-edge tablet held sideways', async () => {
+    // Android's smallest tablet (the `sw600dp` qualifier, the 1024x600
+    // emulator) is wide and short-edged, but its band is taller than the whole
+    // state, so the FAB keeps its own strip there too.
+    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
+    state.windowWidth = 1024;
+    state.windowHeight = 600;
+
+    await renderScreen();
+
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
+  });
+
   it('renders the empty-state New session action as the tab’s primary affordance', async () => {
     await renderScreen();
     const createAction = action('New session');

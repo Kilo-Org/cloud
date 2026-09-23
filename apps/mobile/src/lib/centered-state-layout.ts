@@ -32,12 +32,14 @@ export function getStateSurfaceInsets({
 }
 
 /**
- * The tallest window that is still a phone held sideways. A phone's short edge
- * tops out around 480dp and a tablet's is at least 768dp, so this sits in the
- * empty gap between them: above it the band between the page header and the tab
- * bar is taller than any centered state's full stack and nothing needs to give.
+ * The smallest short edge a tablet can have: Android's `sw600dp` qualifier. A
+ * phone's short edge tops out around 480dp, so this sits above every phone; a
+ * landscape window at or above it is a tablet, whose band between the page
+ * header and the fixed tab bar is taller than any centered state's full stack
+ * and nothing needs to give. The boundary is exclusive — a 600dp-short-edge
+ * tablet (the 1024x600 emulator) is a tablet, not a phone held sideways.
  */
-const SHORT_WINDOW_MAX_HEIGHT = 600;
+const TABLET_SHORT_EDGE_MIN = 600;
 
 /**
  * Whether the window is a short one — a phone held sideways.
@@ -54,7 +56,9 @@ const SHORT_WINDOW_MAX_HEIGHT = 600;
  *
  * Both halves matter: a portrait window is tall even when the keyboard shortens
  * it, and a tablet in landscape is wide but tall enough to keep the full stack.
- * An unavailable dimension (a partial platform mock) is never a short window.
+ * A landscape window whose short edge reaches the tablet qualifier is a tablet,
+ * not a short phone window. An unavailable dimension (a partial platform mock)
+ * is never a short window.
  *
  * `CenteredState` owns the band, so it is the one that asks this and publishes
  * the answer as the short-centered-band flag; a state that can drop decoration
@@ -66,7 +70,7 @@ export function isShortViewport(width: number, height: number): boolean {
     Number.isFinite(width) &&
     Number.isFinite(height) &&
     width > height &&
-    height <= SHORT_WINDOW_MAX_HEIGHT
+    height < TABLET_SHORT_EDGE_MIN
   );
 }
 

@@ -2508,10 +2508,20 @@ export class SandboxSession extends DurableObject<Env> {
       // known coordinator cause.
       const coordinatorOriginated =
         terminalSource === undefined || terminalSource === 'coordinator';
+      // A confirmed attach rejection that carries a git subtype is a workspace
+      // setup failure: the runtime started and the clone/checkout failed. The
+      // live proof is authoritative; only fall back to the retired slot when no
+      // live proof remains, so a current subtype-less rejection never inherits
+      // an older attempt's git subtype.
+      const workspaceSubtype =
+        coordinatorOriginated && failedReason === 'attach_exhausted'
+          ? (message.proofs?.attach ?? message.proofs?.retiredAttach)?.rejectionSubtype
+          : undefined;
       const classification = classifyControlPlaneRunFailure({
         reason: coordinatorOriginated ? failedReason : undefined,
         dispatchState,
         status,
+        ...(workspaceSubtype === undefined ? {} : { workspaceSubtype }),
         ...(assistantReason === undefined ? {} : { assistantReason }),
         ...(providerOwnership === undefined ? {} : { providerOwnership }),
         ...(message.state.intent?.agent.model === undefined
@@ -4559,14 +4569,23 @@ export class SandboxSession extends DurableObject<Env> {
     }
     const busy = retryableRejection && error.code === 'session_busy';
     const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
-    const released = retryableCompletedAttach
-      ? releaseCompletedRetryableAttach(this.loadMessages(), messageId, retryNotBefore)
-      : this.loadMessages();
+    const current = this.loadMessages();
+    // Mark the live proof before a retryable completed attach retires it, so the
+    // git subtype survives on the retained proof for the final report. Only the
+    // attach phase may mark an attach proof; a prompt rejection must not stamp a
+    // successfully completed attach proof, which would suppress the attach
+    // failure counter on a later attempt.
     const marked =
-      countAttachRejection && attachProof
-        ? markSessionOperationRejection(released, attachProof.authorization)
-        : released;
-    const nextMessages = marked ?? released;
+      rejection && phase === 'attach' && attachProof
+        ? markSessionOperationRejection(
+            current,
+            attachProof.authorization,
+            error instanceof ControlRequestError ? error.subtype : undefined
+          )
+        : undefined;
+    const nextMessages = retryableCompletedAttach
+      ? releaseCompletedRetryableAttach(marked ?? current, messageId, retryNotBefore)
+      : (marked ?? current);
     const updated =
       busy || (phase !== 'prompt' && !countAttachRejection)
         ? undefined

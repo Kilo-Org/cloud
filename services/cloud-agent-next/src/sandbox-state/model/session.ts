@@ -13,6 +13,7 @@ import { z } from 'zod';
 import {
   CloudAgentAssistantFailureReasonSchema,
   CloudAgentProviderOwnershipSchema,
+  WorkspaceFailureSubtypeSchema,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export { CloudAgentAssistantFailureReasonSchema, CloudAgentProviderOwnershipSchema };
@@ -150,6 +151,8 @@ export const controlErrorSchema = z
     retryable: z.boolean(),
     /** Frozen from `shared/sandbox-control-protocol.ts`; preserved end to end. */
     admission: z.literal('not-admitted').optional(),
+    /** Git workspace failure subtype carried on a control rejection; optional/additive. */
+    subtype: WorkspaceFailureSubtypeSchema.optional().catch(undefined),
   })
   .strict();
 
@@ -179,6 +182,8 @@ export const sessionOperationProofSchema = z
     attachmentEpoch: timestamp.optional(),
     decision: sessionOperationDecisionSchema.optional(),
     rejectionReceived: z.literal(true).optional(),
+    /** Git workspace failure subtype recorded from a confirmed attach rejection. */
+    rejectionSubtype: WorkspaceFailureSubtypeSchema.optional(),
   })
   .strict();
 

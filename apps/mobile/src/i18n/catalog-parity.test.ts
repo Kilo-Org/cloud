@@ -32,32 +32,6 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 
-/**
- * The source and relation copy of the feature-flag status line
- * (`components/feature-flags-section.tsx`, `<value> · <source> · <relation>`).
- * The value word and the section header were translated when the debug surface
- * landed; the translation slice has since landed these three keys in every
- * catalog, so the check below holds each one to a value that differs from
- * English.
- */
-const FEATURE_FLAG_STATUS_KEYS = [
-  'preferences.featureFlagApplied',
-  'preferences.featureFlagSkipped',
-  'preferences.featureFlagNotLoaded',
-] as const;
-
-/** The value `key` addresses in a loaded catalog, or `undefined`. */
-function nestedValue(catalog: unknown, key: string): unknown {
-  let node: unknown = catalog;
-  for (const part of key.split('.')) {
-    if (!node || typeof node !== 'object') {
-      return undefined;
-    }
-    node = (node as Record<string, unknown>)[part];
-  }
-  return node;
-}
-
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -72,8 +46,6 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
 
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
-const NON_ENGLISH_LANGUAGES = SUPPORTED_LANGUAGES.filter(tag => tag !== 'en');
-
 describe('catalog keys', () => {
   it('names only pending keys en.json defines', () => {
     for (const key of PENDING_TRANSLATION_KEYS) {
@@ -87,28 +59,20 @@ describe('catalog keys', () => {
     }
   });
 
-  it.each(NON_ENGLISH_LANGUAGES)('%s defines exactly the English key families', tag => {
-    const families = keyFamilies(CATALOG_LOADERS[tag]());
-    expect(
-      [...families].filter(key => !ENGLISH_FAMILIES.has(key)),
-      `${tag} defines keys en.json does not`
-    ).toEqual([]);
-    expect(
-      [...ENGLISH_FAMILIES].filter(key => !families.has(key) && !PENDING_TRANSLATION_KEYS.has(key)),
-      `${tag} is missing keys en.json defines`
-    ).toEqual([]);
-  });
-
-  it('translates every feature-flag status key the translation slice has landed', () => {
-    const landed = FEATURE_FLAG_STATUS_KEYS;
-    for (const key of landed) {
-      const english = nestedValue(CATALOG_LOADERS.en(), key);
-      for (const tag of NON_ENGLISH_LANGUAGES) {
-        expect(
-          nestedValue(CATALOG_LOADERS[tag](), key),
-          `${tag}.${key} still reads English`
-        ).not.toBe(english);
-      }
+  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
+    '%s defines exactly the English key families',
+    tag => {
+      const families = keyFamilies(CATALOG_LOADERS[tag]());
+      expect(
+        [...families].filter(key => !ENGLISH_FAMILIES.has(key)),
+        `${tag} defines keys en.json does not`
+      ).toEqual([]);
+      expect(
+        [...ENGLISH_FAMILIES].filter(
+          key => !families.has(key) && !PENDING_TRANSLATION_KEYS.has(key)
+        ),
+        `${tag} is missing keys en.json defines`
+      ).toEqual([]);
     }
-  });
+  );
 });

@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "serverdan · ≥ {{min}}",
     "featureFlagSkipped": "standart · < {{min}}",
-    "featureFlagNotLoaded": "standart · yuklanmagan",
+    "featureFlagNotLoaded": "Standart · Yuklanmagan",
     "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
     "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
     "transcriptionModel": "$t(transcriptionModel.title)",

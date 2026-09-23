@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "vom Server · ≥ {{min}}",
     "featureFlagSkipped": "Standard · < {{min}}",
-    "featureFlagNotLoaded": "Standard · nicht geladen",
+    "featureFlagNotLoaded": "Standard · Nicht geladen",
     "gatewayTranscription": "Gateway-Transkription",
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
     "transcriptionModel": "$t(transcriptionModel.title)",

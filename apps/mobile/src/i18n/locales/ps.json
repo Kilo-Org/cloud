@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "له سرور څخه · ≥ {{min}}",
     "featureFlagSkipped": "ډیفالټ · < {{min}}",
-    "featureFlagNotLoaded": "ډیفالټ · بار نه شو",
+    "featureFlagNotLoaded": "ډیفالټ · نه بار شوی",
     "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
     "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
     "transcriptionModel": "$t(transcriptionModel.title)",

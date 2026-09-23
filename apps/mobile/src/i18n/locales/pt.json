@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remoto · ≥ {{min}}",
     "featureFlagSkipped": "predefinido · < {{min}}",
-    "featureFlagNotLoaded": "predefinido · não carregado",
+    "featureFlagNotLoaded": "Predefinido · Não carregado",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva o ditado com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. A sua gravação é enviada para o Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

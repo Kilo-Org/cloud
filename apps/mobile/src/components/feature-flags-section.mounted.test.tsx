@@ -159,7 +159,7 @@ describe('FeatureFlagsSection', () => {
     expect(lines).toContain('أعلام الميزات');
     expect(lines).toContain('مفعّل · من الخادم · ≥ 1.0.4');
     expect(lines).toContain('معطّل · افتراضي · < 1.0.6');
-    expect(lines).toContain('مفعّل · افتراضي · لم يتم التحميل');
+    expect(lines).toContain('مفعّل · افتراضي · غير محمّل');
     for (const line of lines.filter(text => text.includes(' · '))) {
       expect(line, `untranslated row copy: ${line}`).not.toMatch(/[A-Za-z]/);
     }

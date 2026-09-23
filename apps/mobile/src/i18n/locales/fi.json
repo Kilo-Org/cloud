@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "palvelimelta · ≥ {{min}}",
     "featureFlagSkipped": "oletus · < {{min}}",
-    "featureFlagNotLoaded": "oletus · ei ladattu",
+    "featureFlagNotLoaded": "Oletus · Ei ladattu",
     "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
     "transcriptionModel": "$t(transcriptionModel.title)",

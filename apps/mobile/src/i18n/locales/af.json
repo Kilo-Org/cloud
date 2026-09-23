@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "afgeleë · ≥ {{min}}",
     "featureFlagSkipped": "verstek · < {{min}}",
-    "featureFlagNotLoaded": "verstek · nie gelaai nie",
+    "featureFlagNotLoaded": "Verstek · Nie gelaai",
     "gatewayTranscription": "Gateway-transkripsie",
     "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
     "transcriptionModel": "$t(transcriptionModel.title)",

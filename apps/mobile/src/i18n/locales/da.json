@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "fjern · ≥ {{min}}",
     "featureFlagSkipped": "standard · < {{min}}",
-    "featureFlagNotLoaded": "standard · ikke indlæst",
+    "featureFlagNotLoaded": "Standard · Ikke indlæst",
     "gatewayTranscription": "Transskription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transskribér stemmeinput med en Kilo Gateway-model i stedet for enhedens stemmegenkendelse. Din optagelse sendes til Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

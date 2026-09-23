@@ -16,7 +16,9 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  * from PostHog or the flag's default, and the gate that decided. Every word
  * comes from the catalog — the value, the source and the state; only the flag
  * key, the `{{min}}`/`v{{version}}` versions and the `≥`/`<` operators are
- * notation.
+ * notation. `preferences.featureFlagApplied`, `preferences.featureFlagSkipped`
+ * and `preferences.featureFlagNotLoaded` carry the source and relation words,
+ * and every non-English catalog translates those three keys.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();

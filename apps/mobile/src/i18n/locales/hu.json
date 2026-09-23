@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "távoli · ≥ {{min}}",
     "featureFlagSkipped": "alapértelmezett · < {{min}}",
-    "featureFlagNotLoaded": "alapértelmezett · nincs betöltve",
+    "featureFlagNotLoaded": "Alapértelmezett · Nincs betöltve",
     "gatewayTranscription": "Átírás Kilo Gateway-n keresztül",
     "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
     "transcriptionModel": "$t(transcriptionModel.title)",

@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "zerbitzaritik · ≥ {{min}}",
     "featureFlagSkipped": "lehenetsia · < {{min}}",
-    "featureFlagNotLoaded": "lehenetsia · kargatu gabe",
+    "featureFlagNotLoaded": "Lehenetsia · Kargatu gabe",
     "gatewayTranscription": "Kilo Gateway bidezko transkripzioa",
     "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
     "transcriptionModel": "$t(transcriptionModel.title)",

@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "serverdən · ≥ {{min}}",
     "featureFlagSkipped": "standart · < {{min}}",
-    "featureFlagNotLoaded": "standart · yüklənməyib",
+    "featureFlagNotLoaded": "Defolt · Yüklənməyib",
     "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
     "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",

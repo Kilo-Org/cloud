@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "із сервера · ≥ {{min}}",
     "featureFlagSkipped": "типово · < {{min}}",
-    "featureFlagNotLoaded": "типово · не завантажено",
+    "featureFlagNotLoaded": "Типова · Не завантажено",
     "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

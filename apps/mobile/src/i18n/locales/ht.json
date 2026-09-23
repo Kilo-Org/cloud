@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "soti nan sèvè · ≥ {{min}}",
     "featureFlagSkipped": "pa defo · < {{min}}",
-    "featureFlagNotLoaded": "pa defo · pa chaje",
+    "featureFlagNotLoaded": "Pa defo · Pa chaje",
     "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

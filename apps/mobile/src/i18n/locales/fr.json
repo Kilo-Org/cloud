@@ -2114,7 +2114,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "distant · ≥ {{min}}",
     "featureFlagSkipped": "par défaut · < {{min}}",
-    "featureFlagNotLoaded": "par défaut · non chargé",
+    "featureFlagNotLoaded": "Par défaut · Non chargé",
     "gatewayTranscription": "Transcription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrivez la saisie vocale avec un modèle Kilo Gateway au lieu de la reconnaissance vocale de l'appareil. Votre enregistrement est envoyé à Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

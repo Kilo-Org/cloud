@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "серверээс · ≥ {{min}}",
     "featureFlagSkipped": "анхдагч · < {{min}}",
-    "featureFlagNotLoaded": "анхдагч · ачаалагдаагүй",
+    "featureFlagNotLoaded": "Өгөгдмөл · Ачаалагдаагүй",
     "gatewayTranscription": "Kilo Gateway-р яриаг бичвэр болгох",
     "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
     "transcriptionModel": "$t(transcriptionModel.title)",

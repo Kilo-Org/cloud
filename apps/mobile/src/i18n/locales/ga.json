@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "ón bhfreastalaí · ≥ {{min}}",
     "featureFlagSkipped": "réamhshocrú · < {{min}}",
-    "featureFlagNotLoaded": "réamhshocrú · gan lódáil",
+    "featureFlagNotLoaded": "Réamhshocraithe · Gan lódáil",
     "gatewayTranscription": "Tras-scríobh tríd an Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

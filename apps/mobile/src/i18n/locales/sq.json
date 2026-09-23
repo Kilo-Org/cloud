@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "nga serveri · ≥ {{min}}",
     "featureFlagSkipped": "parazgjedhur · < {{min}}",
-    "featureFlagNotLoaded": "parazgjedhur · nuk u ngarkua",
+    "featureFlagNotLoaded": "Parazgjedhje · Nuk është ngarkuar",
     "gatewayTranscription": "Transkriptim me Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

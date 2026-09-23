@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است.",
     "featureFlags": "پرچم‌های ویژگی",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "از سرور · ≥ {{min}}",
+    "featureFlagApplied": "از راه دور · ≥ {{min}}",
     "featureFlagSkipped": "پیش‌فرض · < {{min}}",
     "featureFlagNotLoaded": "پیش‌فرض · بارگذاری نشده",
     "gatewayTranscription": "تبدیل گفتار به متن با Kilo Gateway",

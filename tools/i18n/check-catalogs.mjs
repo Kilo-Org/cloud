@@ -80,7 +80,7 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerApple',
   'profile.providerDiscord',
   // Feature-flag debug surface (Preferences): the `≥`/`<` operators, the
-  // `{{min}}` placeholder and the `v{{version}}` build line are notation and
+  // `{{min}}` placeholder and the `v{{version}}` build tag are notation and
   // stay identical to English. The value word and the reason copy are prose —
   // the source ("remote", "default") and state ("not loaded") words included —
   // so every catalog translates them and they are not allowlisted here.

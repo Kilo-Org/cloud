@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "uzaktan · ≥ {{min}}",
     "featureFlagSkipped": "varsayılan · < {{min}}",
-    "featureFlagNotLoaded": "varsayılan · yüklenmedi",
+    "featureFlagNotLoaded": "Varsayılan · Yüklenmedi",
     "gatewayTranscription": "Kilo Gateway ile sesi metne dönüştürme",
     "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",

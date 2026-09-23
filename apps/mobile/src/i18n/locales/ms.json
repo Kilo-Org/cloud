@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "dari pelayan · ≥ {{min}}",
     "featureFlagSkipped": "lalai · < {{min}}",
-    "featureFlagNotLoaded": "lalai · belum dimuat",
+    "featureFlagNotLoaded": "Lalai · Belum dimuat",
     "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripsikan input suara dengan model Kilo Gateway dan bukan pengecaman pertuturan peranti. Rakaman anda dihantar ke Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

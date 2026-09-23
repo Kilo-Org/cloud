@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { displayableSessionTitle, sessionDisplayTitle } from './session-display-title';
+import { sessionDisplayTitle } from './session-display-title';
 
 describe('sessionDisplayTitle', () => {
   it('returns a real title unchanged', () => {
@@ -39,17 +39,6 @@ describe('sessionDisplayTitle', () => {
     );
     expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45Z')).toBe(
       'New session - 2026-09-22T01:09:45Z'
-    );
-  });
-
-  it('applies the same rules through the displayableSessionTitle alias', () => {
-    expect(displayableSessionTitle('New session - 2026-09-22T16:37:00.000Z')).toBeUndefined();
-    expect(displayableSessionTitle('Child session - 2026-09-22T16:37:00.000Z')).toBeUndefined();
-    expect(displayableSessionTitle(null)).toBeUndefined();
-    expect(displayableSessionTitle('   ')).toBeUndefined();
-    expect(displayableSessionTitle('  Implementation plan  ')).toBe('Implementation plan');
-    expect(displayableSessionTitle('New session - implementation plan')).toBe(
-      'New session - implementation plan'
     );
   });
 });

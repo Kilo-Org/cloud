@@ -14,6 +14,9 @@ import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
  * message's real title over it. A session that still carries the placeholder
  * has no name yet, so every surface treats it exactly like a title-less one
  * and never paints the machine string.
+ *
+ * The session-detail header and its live `session.updated` handler call these
+ * same rules, so every surface shares this one name.
  */
 export function sessionDisplayTitle(title: string | null | undefined): string | undefined {
   const trimmed = title?.trim();
@@ -22,9 +25,3 @@ export function sessionDisplayTitle(title: string | null | undefined): string | 
   }
   return trimmed;
 }
-
-/**
- * The session-detail header and its live `session.updated` handler call the
- * same rules under this name; keep it an alias so the two names cannot drift.
- */
-export const displayableSessionTitle = sessionDisplayTitle;

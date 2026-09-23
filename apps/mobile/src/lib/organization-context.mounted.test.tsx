@@ -145,11 +145,24 @@ describe('OrganizationProvider default organization', () => {
     expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
   });
 
+  it('writes the default organization to the key non-React scope readers use', async () => {
+    list.mockResolvedValue([orgA, orgB]);
+    await mount();
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'org-a');
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
+    await waitFor(() => !scope().isSaving);
+  });
+
   it('resolves an empty list to Personal', async () => {
     list.mockResolvedValue([]);
     await mount();
     await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    // Personal from an empty list is not an explicit choice: neither key is
+    // written, so a later list with organizations still resolves its default.
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
   });
 
   it('keeps Personal and reports a list failure without spinning', async () => {
@@ -177,6 +190,9 @@ describe('OrganizationProvider default organization', () => {
     const first = await mount();
     await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    // An explicit Personal choice is not overridden by the default, so the
+    // organization key stays absent for every other scope reader too.
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
     unmount(first);
     await mount();
     await waitFor(() => scope().isLoaded);

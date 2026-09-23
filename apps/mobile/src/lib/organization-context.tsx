@@ -111,6 +111,30 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     }
   }, [token]);
 
+  const persist = useCallback(async (id: string | null) => {
+    generation.current += 1;
+    const operation = generation.current;
+    const epoch = currentAuthEpoch();
+    setState(current => ({ ...current, isSaving: true }));
+    let error: 'save' | null = null;
+    try {
+      // An organization writes the organization key and clears the Personal
+      // marker; Personal deletes the organization key every other reader relies
+      // on and writes the marker in its place.
+      await (id
+        ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
+        : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
+      await (id
+        ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
+        : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
+    } catch {
+      error = 'save';
+    }
+    if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
+      setState(current => ({ ...current, error, isSaving: false }));
+    }
+  }, []);
+
   // Publish the default organization once the shared list has settled. Fenced
   // by the generation and auth epoch captured in `restore()`, so a sign-out or
   // a newer sign-in during the fetch publishes nothing stale.
@@ -138,6 +162,15 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     const defaultId = organizations?.[0]?.organizationId ?? null;
     activeId.current = defaultId;
     setState({ token, organizationId: defaultId, isLoaded: true, isSaving: false, error: null });
+    // The default must land in storage, not only in React context: every other
+    // reader of the organization key (glanceable scope, widget actions, voice
+    // input, tool-summary translation) resolves the selection from SecureStore,
+    // so publishing this id only here would leave them on Personal while the
+    // app shows the organization. Personal (no organizations) writes nothing:
+    // an absent key with no marker is still 'not chosen yet'.
+    if (defaultId) {
+      void persist(defaultId);
+    }
   }, [
     state,
     organizations,
@@ -145,31 +178,8 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     organizationsFetching,
     organizationsError,
     token,
+    persist,
   ]);
-
-  const persist = useCallback(async (id: string | null) => {
-    generation.current += 1;
-    const operation = generation.current;
-    const epoch = currentAuthEpoch();
-    setState(current => ({ ...current, isSaving: true }));
-    let error: 'save' | null = null;
-    try {
-      // An organization writes the organization key and clears the Personal
-      // marker; Personal deletes the organization key every other reader relies
-      // on and writes the marker in its place.
-      await (id
-        ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
-        : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
-      await (id
-        ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
-        : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
-    } catch {
-      error = 'save';
-    }
-    if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
-      setState(current => ({ ...current, error, isSaving: false }));
-    }
-  }, []);
 
   // This provider stays mounted above the auth gate. Reset on sign-out and
   // invalidate obsolete reads/saves on token changes and unmount.

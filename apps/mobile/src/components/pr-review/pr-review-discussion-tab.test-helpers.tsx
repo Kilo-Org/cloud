@@ -23,6 +23,13 @@ const hoisted = vi.hoisted(() => ({
     buttons: { text?: string; onPress?: () => void }[];
   }[],
   deleteMutate: vi.fn(),
+  // The delete confirmation's submit gate reads the committed connectivity
+  // (ux2): 'online' by default, flipped per test. The real module pulls in
+  // NetInfo + the probe store, which the node environment cannot resolve.
+  connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
+  // The delete gate's visible failure feedback (ux2). The real adapter wraps
+  // sonner-native, which the node environment cannot resolve.
+  toastError: vi.fn(),
   // The tab's screen focus drives the CTA bar's keyboard lift (a foreign
   // surface's keyboard must not lift the bar behind it — uxs3, e4-confirm-
   // discard). Flippable so the suite can mount the tab unfocused.
@@ -53,6 +60,8 @@ export const insetsState = hoisted.insetsState;
 export const pushMock = hoisted.pushMock;
 export const alertCalls = hoisted.alertCalls;
 export const deleteMutate = hoisted.deleteMutate;
+export const connectivity = hoisted.connectivity;
+export const toastError = hoisted.toastError;
 export const focusState = hoisted.focusState;
 export const replyScrollFns = hoisted.replyScrollFns;
 export const discussionState = hoisted.discussionState;
@@ -111,6 +120,18 @@ vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
 // suite, so here it is a captured `mutate`.
 vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
   useDeletePrCommentMutation: () => ({ mutate: hoisted.deleteMutate }),
+}));
+// ux2: the delete confirmation's offline gate. The real modules reach NetInfo /
+// sonner-native, neither of which this node-environment suite can resolve.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => hoisted.connectivity.value,
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    success: vi.fn(),
+    error: hoisted.toastError,
+    warning: vi.fn(),
+  },
 }));
 
 export const BASE_PROPS = {
@@ -172,6 +193,7 @@ export function resetState(): void {
   discussionState.conversation = [];
   discussionState.firstPageErrorState = null;
   discussionState.laterPageError = false;
+  hoisted.connectivity.value = 'online';
 }
 
 export function expectCtaPresence(

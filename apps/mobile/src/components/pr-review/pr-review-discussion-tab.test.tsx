@@ -6,6 +6,7 @@ import {
   alertCalls,
   BASE_PROPS,
   bottomPaddedViews,
+  connectivity,
   deleteMutate,
   discussionState,
   expectCtaPresence,
@@ -16,6 +17,7 @@ import {
   replyScrollFns,
   rerenderTab,
   resetState,
+  toastError,
 } from './pr-review-discussion-tab.test-helpers';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -463,6 +465,30 @@ describe('PrReviewDiscussionTab own-comment actions (s4)', () => {
       commentId: 42,
       kind: 'review',
     });
+
+    renderer.unmount();
+  });
+
+  it('does not start the delete while CONFIRMED offline — the row stays and the retryable failure is shown', () => {
+    // ux2 spot check: with the offline banner up, confirming Delete used to
+    // start a write React Query pauses — the row was optimistically removed
+    // (a false success, lost if the app was killed before reconnect) with no
+    // failure feedback. The gate rejects locally instead: the mutation never
+    // runs, so the row is never removed, and the same retryable copy the
+    // server-failure path uses is shown.
+    connectivity.value = 'offline';
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(alertCalls).toHaveLength(1);
+    const deleteButton = alertCalls[0]?.buttons.find(button => button.text === 'Delete');
+    deleteButton?.onPress?.();
+
+    expect(deleteMutate).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(
+      "Couldn't delete your comment. Check your connection and try again."
+    );
 
     renderer.unmount();
   });

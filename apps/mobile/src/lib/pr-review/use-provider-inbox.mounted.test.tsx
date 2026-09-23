@@ -1,5 +1,5 @@
-import './use-provider-inbox.test-helpers';
-import { act, createElement } from 'react';
+import { parseTimestampSpy } from './use-provider-inbox.test-helpers';
+import { act, createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
@@ -78,7 +78,12 @@ beforeEach(() => {
 
 async function mountInbox(enabled = true) {
   let inbox: ReturnType<typeof useProviderInbox> | undefined = undefined;
+  let bump: (() => void) | undefined = undefined;
   function Harness() {
+    const [, setTick] = useState(0);
+    bump = () => {
+      setTick(tick => tick + 1);
+    };
     inbox = useProviderInbox(enabled);
     return null;
   }
@@ -91,6 +96,13 @@ async function mountInbox(enabled = true) {
         throw new Error('Inbox did not mount');
       }
       return inbox;
+    },
+    // Harness-local state bump: re-renders the hook with unchanged query data.
+    bump: () => {
+      if (!bump) {
+        throw new Error('Inbox did not mount');
+      }
+      bump();
     },
   };
 }
@@ -284,4 +296,23 @@ describe('revoked GitHub inbox recovery', () => {
       expect(mocks.providerPage).not.toHaveBeenCalled();
     }
   );
+});
+
+it('reuses the merged items array across a re-render with unchanged query data', async () => {
+  mocks.authorization.mockResolvedValue({ connected: true });
+  const mounted = await mountInbox();
+  await waitFor(() => mounted.inbox().items.length === 2);
+  // Before the fix the merge ran in the render body, so each render produced a
+  // fresh array and re-parsed every row. The memo must reuse both.
+  const itemsBefore = mounted.inbox().items;
+  const parsesBefore = parseTimestampSpy.mock.calls.length;
+  act(() => {
+    mounted.bump();
+  });
+  // eslint-disable-next-line no-console -- the PR proof quotes this measured parse count
+  console.log(
+    `[inbox] parses load=${parsesBefore} rerender=${parseTimestampSpy.mock.calls.length}`
+  );
+  expect(mounted.inbox().items).toBe(itemsBefore);
+  expect(parseTimestampSpy.mock.calls.length).toBe(parsesBefore);
 });

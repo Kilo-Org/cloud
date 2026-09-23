@@ -17,6 +17,7 @@ const accountLabels: Record<SandboxDestination['provider']['account'], string> =
 
 const providerLabels: Record<SandboxDestination['provider']['id'], string> = {
   cloudflare: 'Cloudflare',
+  'cloudflare-containers': 'Cloudflare Containers',
   vercel: 'Vercel',
 };
 
@@ -31,6 +32,8 @@ const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
   single: 'Single',
   shared: 'Shared',
   'isolated-standard': 'Dedicated Standard',
+  'standard-3': '2 vCPU / 8 GiB',
+  'standard-4': '4 vCPU / 12 GiB',
   devcontainer: 'Dev container',
   small: '2 vCPU / 4 GiB',
   large: '4 vCPU / 8 GiB',

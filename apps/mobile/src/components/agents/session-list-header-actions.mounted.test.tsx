@@ -8,7 +8,6 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
-import { COMPACT_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
 
 import { SessionListHeaderActions } from './session-list-header-actions';
 import '@/i18n';
@@ -54,27 +53,32 @@ function boxDp(className: string): { width: number; height: number } {
   return { width: size('w'), height: size('h') };
 }
 
-/** The smallest per-side reach a hitSlop expresses, in dp. */
-function slopDp(hitSlop: unknown): number {
+/** The per-side reach a `hitSlop` prop expresses; a bare number covers every side. */
+function slopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
-    return hitSlop;
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    const sides = Object.values(hitSlop as Record<string, number | undefined>);
-    return Math.min(...sides.map(side => side ?? 0));
+    const sides = hitSlop as Partial<Insets>;
+    return {
+      top: sides.top ?? 0,
+      right: sides.right ?? 0,
+      bottom: sides.bottom ?? 0,
+      left: sides.left ?? 0,
+    };
   }
-  return 0;
+  return { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+/** The smallest per-side reach a hitSlop expresses, in dp. */
+function slopDp(hitSlop: unknown): number {
+  const sides = slopInsets(hitSlop);
+  return Math.min(sides.top, sides.right, sides.bottom, sides.left);
 }
 
 /** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
 function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
-  if (typeof hitSlop === 'number') {
-    return hitSlop;
-  }
-  if (hitSlop && typeof hitSlop === 'object') {
-    return (hitSlop as Partial<Insets>)[side] ?? 0;
-  }
-  return 0;
+  return hitSlopInsets(hitSlop)[side];
 }
 
 function pressesWithLabel(root: I, label: string): I[] {
@@ -149,10 +153,11 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 type Insets = { top: number; right: number; bottom: number; left: number };
 
 /**
- * A control's hitSlop as per-side insets. Controls here use either shape: the
- * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
- * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
- * side.
+ * A control's hitSlop as per-side insets. Both controls in this header pass
+ * per-side insets: the shared `IconButton` takes a per-side object, and
+ * `SessionFilterButton` spells out four equal sides (`FILTER_HIT_SLOP`). The
+ * scalar branch mirrors React Native's own `number | Rect` hitSlop type, where
+ * one number applies to every side.
  */
 function hitSlopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
@@ -251,31 +256,31 @@ describe('SessionListHeaderActions new-session control', () => {
       // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
       expect(gapDp).toBe(14);
 
-      // `hitSlopInsets` validates and normalizes either shape; `slopSideDp` then
-      // reads the facing side, because the filter expresses its slop as one dp
-      // value for every side while the new-session control caps its right side.
+      // `hitSlopInsets` validates and normalizes either shape; `slopSideDp`
+      // then reads the facing side: the header caps the filter's two horizontal
+      // sides, while the new-session control keeps the shared symmetric slop.
       const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
       const filterSlop = hitSlopInsets(filter.props.hitSlop);
       // The gap has to fit the pair's two facing slops in either direction;
       // more than the gap means the two touch regions overlap, and the later
       // sibling (the filter) claims the taps inside the overlap. Either control
-      // may express hitSlop as one number or as per-side insets: the filter
-      // writes its slop as one number for every side, the new-session control
-      // as a per-side object.
+      // may express hitSlop as one number or as per-side insets: `IconButton`
+      // and this control both pass a per-side object today.
       const facingDp = isRTL
         ? slopSideDp(newSessionSlop, 'left') + slopSideDp(filterSlop, 'right')
         : slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left');
       expect(facingDp).toBeLessThanOrEqual(gapDp);
       // Capping the facing sides must not drop either control below the design
       // target: the compact new-session box plus its symmetric slop, and the
-      // filter's `h-11` frame plus the capped slop.
+      // filter's own 36pt box plus the capped slop.
       const box = boxDp(newSession.props.className as string);
       expect(
         box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
       ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-      expect(String(filter.props.className)).toContain('h-11 w-11');
+      const filterBox = boxDp(filter.props.className as string);
+      expect(filterBox.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
       expect(
-        COMPACT_CONTROL_FRAME_DP + slopSideDp(filterSlop, 'left') + slopSideDp(filterSlop, 'right')
+        filterBox.width + slopSideDp(filterSlop, 'left') + slopSideDp(filterSlop, 'right')
       ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
       act(() => {

@@ -16,7 +16,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 // (14 - 8 = 6). Whichever way the row mirrors, the facing pair sums to exactly
 // the 14pt gap, so the two touch regions meet at its boundary instead of one
 // claiming the later sibling's taps inside an overlap.
-// 38.5 + 6 + 6 = 50.5pt still clears `DESIGN.md:364`'s 44pt.
+// 36 + 6 + 6 = 48pt still clears `DESIGN.md:364`'s 44pt.
 const FILTER_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,
   bottom: COMPACT_CONTROL_HIT_SLOP_DP,

@@ -761,6 +761,101 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.provider).toBe('cloudflare');
     expect(selection.sandboxId).toMatch(/^dind-/);
   });
+
+  it('keeps isolated control-plane sessions on Cloudflare when the containers gate is unset', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('selects containers for personal isolated control-plane sessions when the gate is wildcarded', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: '*', CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare-containers');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('selects containers only for enrolled isolated control-plane organizations', async () => {
+    const enrolled = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+    const outside = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(enrolled.provider).toBe('cloudflare-containers');
+    expect(outside.provider).toBe('cloudflare');
+  });
+
+  it('keeps enrolled isolated legacy sessions on Cloudflare', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: legacySessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('keeps enrolled devcontainer sessions on Cloudflare DIND allocation', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+      devcontainer: true,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^dind-/);
+  });
+
+  it('keeps enrolled shared control-plane sessions on Cloudflare', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^org-/);
+  });
+
+  it('keeps Vercel precedence when both enrollments are enabled', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+      },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('vercel');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
 });
 
 describe('getSandboxNamespace', () => {

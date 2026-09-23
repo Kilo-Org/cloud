@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { RTL_NO_LETTER_SPACING } from '@/lib/rtl-text';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 // `Text` reads the native direction at render time, so the mutable flag drives
@@ -26,9 +27,17 @@ function mount(element: ReactElement) {
   return renderer.root;
 }
 
+function hostText(root: TestRenderer.ReactTestInstance) {
+  return root.find(candidate => Object.is(candidate.type, 'Text'));
+}
+
 function hostClasses(root: TestRenderer.ReactTestInstance): string[] {
-  const node = root.find(candidate => Object.is(candidate.type, 'Text'));
-  return String(node.props.className).split(' ');
+  return String(hostText(root).props.className).split(' ');
+}
+
+function hostStyle(root: TestRenderer.ReactTestInstance): unknown[] {
+  const style = (hostText(root).props.style ?? []) as unknown[];
+  return style.filter(entry => entry !== undefined);
 }
 
 beforeEach(() => {
@@ -42,18 +51,26 @@ afterEach(() => {
 
 describe('Text eyebrow letterspacing', () => {
   // Finding home-ar-loading: an Arabic section label carried the Latin
-  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت').
-  it.each([false, true])('keeps the eyebrow display treatment in LTR only (RTL=%s)', isRTL => {
+  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The
+  // tracked class stays on the element in either direction; the RTL style
+  // array resets the letter-spacing, so the Arabic label keeps its joins
+  // (see lib/rtl-text.ts).
+  it.each([false, true])('keeps the eyebrow display treatment unspaced in RTL (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
-    const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));
-    expect(classes).toEqual(
-      expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'text-muted-foreground'])
+    const root = mount(createElement(Text, { variant: 'eyebrow' }, 'Live now'));
+    expect(hostClasses(root)).toEqual(
+      expect.arrayContaining([
+        'font-mono-medium',
+        'text-[10px]',
+        'text-muted-foreground',
+        'uppercase',
+        'tracking-[1.5px]',
+      ])
     );
     if (isRTL) {
-      expect(classes).not.toContain('uppercase');
-      expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+      expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
     } else {
-      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      expect(hostText(root).props.style).toBeUndefined();
     }
   });
 
@@ -66,15 +83,14 @@ describe('Text eyebrow letterspacing', () => {
 
   it.each([false, true])('applies the same rule to the Eyebrow component (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
-    const classes = hostClasses(
-      mount(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
+    const root = mount(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'));
+    expect(hostClasses(root)).toEqual(
+      expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'uppercase', 'tracking-[1.5px]'])
     );
-    expect(classes).toEqual(expect.arrayContaining(['font-mono-medium', 'text-[10px]']));
     if (isRTL) {
-      expect(classes).not.toContain('uppercase');
-      expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+      expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
     } else {
-      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      expect(hostText(root).props.style).toBeUndefined();
     }
   });
 });

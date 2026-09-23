@@ -9,9 +9,10 @@ type EyebrowProps = Omit<ComponentProps<typeof Text>, 'variant'>;
  * Eyebrow label: mono, 10px. Defaults to muted color; pass a `className` with
  * a `text-*` token to override (e.g. agent hue).
  *
- * The uppercase, letterspaced display treatment is LTR-only: `letter-spacing`
- * breaks a cursive script's joins, so an RTL eyebrow renders the same copy
- * without it (see `Text`'s eyebrow variant).
+ * The uppercase, letterspaced display treatment is the Latin one: `Text`
+ * keeps its class in both directions and resets the letter-spacing in RTL, so
+ * an Arabic eyebrow renders the same copy unspaced (see `Text`'s eyebrow
+ * variant and `@/lib/rtl-text`).
  */
 export function Eyebrow({ className, ...props }: EyebrowProps) {
   return <Text variant="eyebrow" className={cn(className)} {...props} />;

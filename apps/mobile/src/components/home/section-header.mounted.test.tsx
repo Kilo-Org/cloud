@@ -134,38 +134,39 @@ describe('SectionHeader mounted layout', () => {
 
   // Finding home-ar-loading: the Arabic section labels carried the Latin
   // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
-  // ('ال جلسا ت'). The display treatment is LTR-only.
-  it.each([
-    { isRTL: false, tracked: true },
-    { isRTL: true, tracked: false },
-  ])('letterspaces the section labels only outside RTL (RTL=$isRTL)', ({ isRTL, tracked }) => {
-    i18nManager.isRTL = isRTL;
-    const root = mount(
-      createElement(SectionHeader, {
-        label: 'الجلسات الجارية الآن',
-        actionLabel: 'عرض الكل',
-        onActionPress: () => undefined,
-      })
-    );
-    const action = root.findByProps({ accessibilityRole: 'button' });
-    const text = action.find(node => Object.is(node.type, 'Text'));
-    const label = root.find(
-      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
-    );
+  // ('ال جلسا ت'). Both labels keep the tracked class and `Text` resets the
+  // letter-spacing in RTL, so the copy keeps its joins (see lib/rtl-text.ts).
+  it.each([{ isRTL: false }, { isRTL: true }])(
+    'keeps the section labels tracked, unspaced in RTL (RTL=$isRTL)',
+    ({ isRTL }) => {
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'الجلسات الجارية الآن',
+          actionLabel: 'عرض الكل',
+          onActionPress: () => undefined,
+        })
+      );
+      const action = root.findByProps({ accessibilityRole: 'button' });
+      const text = action.find(node => Object.is(node.type, 'Text'));
+      const label = root.find(
+        node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+      );
 
-    for (const node of [label, text]) {
-      const classes = (node.props.className as string).split(' ');
-      if (tracked) {
+      for (const node of [label, text]) {
+        const classes = (node.props.className as string).split(' ');
         expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
-      } else {
-        expect(classes).not.toContain('uppercase');
-        expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+        if (isRTL) {
+          expect(node.props.style).toContainEqual({ letterSpacing: 0 });
+        } else {
+          expect(node.props.style).toBeUndefined();
+        }
       }
     }
-  });
+  );
 
-  // The action's display treatment intentionally branches on direction (the
-  // LTR-only letterspacing); the layout must not.
+  // The action's display treatment is the same in either direction (the RTL
+  // reset lives in the `Text` style); the layout must not branch at all.
   it('does not branch the action layout on direction', () => {
     function actionLayout(isRTL: boolean) {
       i18nManager.isRTL = isRTL;

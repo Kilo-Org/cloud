@@ -109,8 +109,9 @@ export function StoredSessionRow({
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see, so the row falls back to the localized unnamed name the same
-  // way the session header does. A title the user's own rename wrote is
-  // excluded from that fallback by `namedSessionTitle`; the subscription
+  // way the session header does. `namedSessionTitle` makes that judgement
+  // through the shared `sessionDisplayTitle` helper and additionally excludes a
+  // placeholder-shaped title the user's own rename wrote; the subscription
   // repaints the row once the durable record hydrates after a cold start.
   useUserSessionTitlesRevision();
   const title =

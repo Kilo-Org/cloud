@@ -3,10 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   getSessionDetailRenameState,
   initialRenameState,
-  namedSessionTitle,
   type RenameState,
   renameStateReducer,
-  titleFromSessionUpdatedEvent,
 } from './session-detail-rename-state';
 
 describe('getSessionDetailRenameState', () => {
@@ -119,6 +117,35 @@ describe('getSessionDetailRenameState', () => {
         serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
         renameState: { ...initialRenameState(), isModalOpen: true },
       }).modalInitialValue
+    ).toBe(fallbackTitle);
+  });
+
+  it('shows the fallback label when the loaded record still carries the backend placeholder', () => {
+    // A fresh session is seeded with `New session - ${ISO}`; the app must
+    // paint its own label, never the machine string.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T01:09:45.623Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the fallback label when the loaded record carries a blank title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '   ',
+        renameState: initialRenameState(),
+      }).title
     ).toBe(fallbackTitle);
   });
 
@@ -260,70 +287,5 @@ describe('renameStateReducer', () => {
     const changed = renameStateReducer(submitted, { type: 'sessionChanged' });
     expect(changed.isModalOpen).toBe(false);
     expect(changed.optimisticTitle).toBeNull();
-  });
-});
-
-function sessionUpdatedPayload(
-  over: { sessionId?: string; title?: string | null; source?: string } = {}
-) {
-  return {
-    source: over.source ?? 'v2',
-    session: {
-      sessionId: over.sessionId ?? 'ses-1',
-      title: over.title === undefined ? 'Auto Title' : over.title,
-    },
-  };
-}
-
-describe('titleFromSessionUpdatedEvent', () => {
-  it('returns the title for this session', () => {
-    expect(titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload())).toBe('Auto Title');
-  });
-
-  it('ignores another session', () => {
-    expect(
-      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ sessionId: 'ses-2' }))
-    ).toBeUndefined();
-  });
-
-  it('ignores a blank or null title', () => {
-    expect(
-      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: null }))
-    ).toBeUndefined();
-    expect(
-      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
-    ).toBeUndefined();
-  });
-
-  it('ignores the backend placeholder title', () => {
-    expect(
-      titleFromSessionUpdatedEvent(
-        'ses-1',
-        sessionUpdatedPayload({ title: 'New session - 2026-09-22T02:05:22.778Z' })
-      )
-    ).toBeUndefined();
-    expect(
-      titleFromSessionUpdatedEvent(
-        'ses-1',
-        sessionUpdatedPayload({ title: 'Child session - 2026-09-22T02:05:22.778Z' })
-      )
-    ).toBeUndefined();
-  });
-});
-
-describe('namedSessionTitle', () => {
-  it('returns undefined for a missing, null or blank title', () => {
-    expect(namedSessionTitle(undefined)).toBeUndefined();
-    expect(namedSessionTitle(null)).toBeUndefined();
-    expect(namedSessionTitle('   ')).toBeUndefined();
-  });
-
-  it('returns undefined for the backend placeholder titles', () => {
-    expect(namedSessionTitle('New session - 2026-09-22T02:05:22.778Z')).toBeUndefined();
-    expect(namedSessionTitle('Child session - 2026-09-22T02:05:22.778Z')).toBeUndefined();
-  });
-
-  it('returns the trimmed title for a real name', () => {
-    expect(namedSessionTitle('  Fix login  ')).toBe('Fix login');
   });
 });

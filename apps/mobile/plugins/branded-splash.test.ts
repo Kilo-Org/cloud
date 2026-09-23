@@ -179,6 +179,15 @@ describe('shared branded splash', () => {
     // prebuilt `android/` tree contributes its own colors alongside the ones
     // Expo generates. Assert the splash background this plugin owns is
     // present, not that it is the only color.
+    // Introspection runs against the real project root, so `withAndroidColors`
+    // also reads whatever the project's own prebuild has already written to
+    // `android/app/src/main/res/values/colors.xml` (that directory is
+    // gitignored, so CI sees only the splash color while a worktree with a
+    // prebuild sees the app's colors too). The plugin's contract is that its
+    // own color is present, not that it is the only one.
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
     // compileModsAsync introspects the project's existing android resources, so
     // the colors array also carries the project's other theme colors. Assert the
     // splash color this plugin owns instead of the array's exact contents.

@@ -1,3 +1,5 @@
+import { sessionDisplayTitle } from '@/lib/session-display-title';
+
 import {
   clearUserSessionTitles as clearStoredUserSessionTitles,
   getUserSessionTitle,
@@ -61,36 +63,24 @@ type SessionDetailRenameState = {
 };
 
 /**
- * The backend's "unnamed" session title is a raw ISO placeholder such as
- * `New session - 2026-09-22T02:05:22.778Z`; web nulls it before display.
- * Mirrors `isDefaultSessionTitle` in
- * `packages/session-ingest-contracts/src/index.ts` and must stay in step with
- * it. The pattern is mirrored rather than imported because mobile does not
- * depend on that package (only `apps/web` consumes it) and
- * `apps/mobile/AGENTS.md` requires `npx expo install` for dependencies, which
- * cannot resolve a private workspace package.
- */
-const PLACEHOLDER_SESSION_TITLE_PATTERN =
-  /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-
-/**
  * Titles the user set through the app's rename flow, keyed by session id.
  *
- * The placeholder pattern can only prove a title *looks* like the backend's
- * unnamed placeholder; it cannot prove who wrote it, and the rename API accepts
- * any nonblank title, so a user may choose one that matches the pattern. Stored
- * text alone cannot separate the two, so the app records the titles its own
- * rename flow wrote and never hides those as unnamed. The record is durable
- * (hydrated from the encrypted KV at startup), so a chosen title survives a
- * cold relaunch; `clearSessionScopedState` drops it at an account boundary.
+ * `sessionDisplayTitle` judges the stored text alone: it can prove only that a
+ * title *looks* like the backend's unnamed placeholder, not who wrote it, and
+ * the rename API accepts any nonblank title, so a user may choose one that
+ * matches. Stored text alone cannot separate the two, so the app records the
+ * titles its own rename flow wrote and never hides those as unnamed. The
+ * record is durable (hydrated from the encrypted KV at startup), so a chosen
+ * title survives a cold relaunch; `clearSessionScopedState` drops it at an
+ * account boundary.
  *
- * Only a title that the placeholder pattern would hide needs recording: every
- * other title is already returned as-is by `namedSessionTitle`, so the caller
- * filters before writing and the record stays tiny.
+ * Only a title `sessionDisplayTitle` would hide needs recording: every other
+ * title is already returned as-is by `namedSessionTitle`, so the caller filters
+ * before writing and the record stays tiny.
  */
 export function rememberUserSessionTitle(sessionId: string, title: string): void {
   const trimmed = title.trim();
-  if (trimmed.length === 0 || !PLACEHOLDER_SESSION_TITLE_PATTERN.test(trimmed)) {
+  if (trimmed.length === 0 || sessionDisplayTitle(trimmed) !== undefined) {
     return;
   }
   rememberStoredUserSessionTitle(sessionId, trimmed);
@@ -107,28 +97,32 @@ export function clearUserSessionTitles(): void {
 
 /**
  * A title a user should actually see, or undefined when the session has no
- * name: null, blank, or the backend's ISO placeholder. A title the app's own
- * rename flow wrote for `sessionId` is never treated as the placeholder.
+ * name: null, blank, or the backend's ISO placeholder — the judgement
+ * `sessionDisplayTitle` makes on the stored text. A title the app's own rename
+ * flow wrote for `sessionId` is never treated as the placeholder.
  * Callers fall back to the localized unnamed-session name.
  */
 export function namedSessionTitle(
   title: string | null | undefined,
   sessionId?: string
 ): string | undefined {
-  if (title == null) {
-    return undefined;
+  const display = sessionDisplayTitle(title);
+  if (display !== undefined) {
+    return display;
   }
-  const trimmed = title.trim();
-  if (trimmed.length === 0) {
-    return undefined;
-  }
+  // `sessionDisplayTitle` sees only the text, so it cannot tell a placeholder
+  // the backend seeded from a title the user chose that happens to match it.
+  // The recorded title proves the app's own rename flow wrote it.
+  const trimmed = title?.trim();
   if (
-    PLACEHOLDER_SESSION_TITLE_PATTERN.test(trimmed) &&
-    !(sessionId !== undefined && getUserSessionTitle(sessionId) === trimmed)
+    trimmed !== undefined &&
+    trimmed.length > 0 &&
+    sessionId !== undefined &&
+    getUserSessionTitle(sessionId) === trimmed
   ) {
-    return undefined;
+    return trimmed;
   }
-  return trimmed;
+  return undefined;
 }
 
 /**

@@ -175,24 +175,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // Assert the color this plugin generates with containment, not by pinning
-    // the full `resources.color` array. `compileModsAsync` introspects the
-    // project's existing android resources and merges them into the colors
-    // modResults, so the array also carries the shared app config's other
-    // `colors.xml` entries (icon and notification colors, the app background)
-    // that reach it through the same mod chain, and a worktree with a prebuilt
-    // `android/` directory carries that file's extra entries (iconBackground,
-    // colorPrimary, …) as well. Assert the splash color the plugin owns is
-    // present among them rather than the only one, the same way the styles
-    // assertion below pins its theme: containment matches the generated
-    // `splashscreen_background` entry regardless of what other entries the
-    // generated project contains — not the whole array and not its exact length,
-    // so a prebuild's other colors surviving here cannot fail the case.
-    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
+    // The compile root is the throwaway project `createAndroidProject()`
+    // returns, whose `res/values` holds no `colors.xml`, and `withBrandedSplash`
+    // reads and writes `config.modRequest.platformProjectRoot` under that same
+    // root; a worktree's prebuilt `android/` tree never reaches these
+    // modResults, so the splash color below is the only entry the run produces.
+    expect(evaluated._internal?.modResults?.android?.colors).toEqual({
       resources: {
-        color: expect.arrayContaining([
-          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
-        ]),
+        color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }],
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

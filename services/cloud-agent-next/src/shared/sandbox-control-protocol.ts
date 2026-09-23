@@ -249,15 +249,14 @@ export const sandboxHelloPayloadSchema = z.object({
   capabilities: z
     .object({
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
 });
@@ -269,14 +268,12 @@ export const sandboxHelloResultSchema = z.object({
     .object({
       kiloVersionHeartbeat: z.boolean().optional(),
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
+      kiloLocalPhase: z.literal(true).optional(),
     })
     .optional(),
 });
@@ -1070,13 +1067,12 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   capabilities: z
     .object({
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

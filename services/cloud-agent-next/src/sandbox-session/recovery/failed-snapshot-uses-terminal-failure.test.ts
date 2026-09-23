@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { failWaitingMessages, streamQueuedSnapshots } from '../session-message-queue.js';
+import { acceptedMessage, queuedMessage } from '../session-state.test-helpers.js';
+
+function promptIntent(prompt: string) {
+  return {
+    turn: { type: 'prompt' as const, messageId: 'intent', prompt },
+    agent: { mode: 'code' as const },
+  };
+}
 
 describe('failed snapshot', () => {
-  it('projects failed rows with terminalFailure instead of as queued', () => {
+  it('projects failed messages with terminalFailure instead of as queued', () => {
     const { messages } = failWaitingMessages(
       [
-        { messageId: 'a', state: 'queued', prompt: 'hello' },
-        { messageId: 'b', state: 'accepted', prompt: 'world', acceptedAt: 20 },
+        queuedMessage('a', { intent: promptIntent('hello') }),
+        acceptedMessage('b', { intent: promptIntent('world'), acceptedAt: 20 }),
       ],
       'environment_failed'
     );

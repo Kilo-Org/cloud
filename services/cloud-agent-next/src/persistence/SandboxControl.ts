@@ -568,19 +568,18 @@ export class SandboxControl extends DurableObject<Env> {
   // that arrives during a pass folded into one follow-up pass.
   private replayRunning = false;
   private replayRequested = false;
+  // Sessions whose retained frames the running pass has shifted out of the replay
+  // queue and not finished with. A live frame for such a session is held behind
+  // them instead of being forwarded, so a frame the pass restores is never
+  // re-driven behind a live frame admitted while the pass was in flight.
+  private readonly replayingSessions = new Set<string>();
+  // The counters the forwarding diagnostics actually maintain. `settled`,
+  // `recovered`, `maxQueueWaitMs` and `maxTotalForwardMs` are assigned on every
+  // forward; queue depth lives in `sessionForwarding.stats()` on the heartbeat.
   private readonly forwarding = {
-    enqueued: 0,
     settled: 0,
-    waiting: 0,
-    inFlight: 0,
-    highWater: 0,
-    dropped: 0,
     recovered: 0,
-    notApplied: 0,
-    failed: 0,
-    bufferedBytes: 0,
     maxQueueWaitMs: 0,
-    maxRpcWaitMs: 0,
     maxTotalForwardMs: 0,
   };
   private forwardSequence = 0;
@@ -4233,6 +4232,25 @@ export class SandboxControl extends DurableObject<Env> {
       frameItems,
       queuedAt,
     };
+    // A live frame must not overtake its session's retained prefix. While a frame
+    // retained for this session is still in flight in a pass or queued for replay,
+    // hold the live frame behind it in the same FIFO queue: the replay path then
+    // delivers both in order, so a frame the pass restores is never re-driven
+    // after a newer live frame admitted while the pass was in flight.
+    if (!replay && this.sessionReplayPending(admission.sessionId)) {
+      this.retainSessionFrame({
+        sessionId: admission.sessionId,
+        bytes: frameBytes,
+        identity,
+        eventType,
+        operation,
+        frame,
+        wrapperInstanceId,
+        forward,
+        fields,
+      });
+      return { applied: false, retryable: true };
+    }
     const next = this.sessionForwarding.enqueueFenced<ForwardedSessionFrame>({
       sessionId: admission.sessionId,
       bytes: frameBytes,
@@ -4274,7 +4292,11 @@ export class SandboxControl extends DurableObject<Env> {
             this.recordForwardDrop('stale_before_enqueue', fields);
             return { applied: false, attempted: false };
           }
-          const eligibility = this.resolveForwardEligibility(identity, forwardConnection, admission);
+          const eligibility = this.resolveForwardEligibility(
+            identity,
+            forwardConnection,
+            admission
+          );
           if (!eligibility.ok) {
             this.recordForwardDrop(eligibility.reason, { ...fields, ...eligibility.fields });
             this.logSkippedForwardRun({
@@ -4328,16 +4350,18 @@ export class SandboxControl extends DurableObject<Env> {
           // `session.event` path, which carries no receipt for the session DO to
           // deduplicate. A forward that bailed before its send is not delivered, so
           // its frame stays retained for the next handshake instead of being lost.
-          if (!replay && !error.forwarded) {
-            const retained = this.sessionEventReplay.push({
+          if (!replay && !error.forwarded)
+            this.retainSessionFrame({
               sessionId: admission.sessionId,
               bytes: frameBytes,
-              expiresAt: Date.now() + SESSION_EVENT_REPLAY_TTL_MS,
-              value: { identity, eventType, operation, frame, wrapperInstanceId, forward },
+              identity,
+              eventType,
+              operation,
+              frame,
+              wrapperInstanceId,
+              forward,
+              fields,
             });
-            if (retained === 'overflow') this.recordForwardDrop('replay_overflow', fields);
-            else this.scheduleSessionEventReplay(this.socketHandler.getConnectionIdentity());
-          }
           return;
         }
         this.recordForwardDrop('forwarding_capacity_exhausted', fields);
@@ -4367,6 +4391,46 @@ export class SandboxControl extends DurableObject<Env> {
   private currentReplayConnection(): SandboxControlConnectionIdentity | null {
     const current = this.socketHandler.getConnectionIdentity();
     return current !== null && this.isCurrentConnection(current) ? current : null;
+  }
+
+  // True while this session has retained frames that have not been re-driven yet:
+  // either queued for replay or shifted into the pass that is still running. A
+  // live frame for such a session is held behind them, so the replayed prefix
+  // stays ahead of newer live frames even when a pass restores a frame it could
+  // not deliver.
+  private sessionReplayPending(sessionId: string): boolean {
+    return this.replayingSessions.has(sessionId) || this.sessionEventReplay.has(sessionId);
+  }
+
+  // Retains one session frame behind its session's older entries. A frame the
+  // forward never reached the destination with is delivered in FIFO order by the
+  // next replay pass instead of being lost with the retired runtime.
+  private retainSessionFrame(input: {
+    sessionId: string;
+    bytes: number;
+    identity: SessionEventIdentity;
+    eventType: string;
+    operation: ForwardOperation;
+    frame: unknown;
+    wrapperInstanceId: string | undefined;
+    forward: PendingSessionReplay['forward'];
+    fields: ControlDiagnosticFields;
+  }): void {
+    const retained = this.sessionEventReplay.push({
+      sessionId: input.sessionId,
+      bytes: input.bytes,
+      expiresAt: Date.now() + SESSION_EVENT_REPLAY_TTL_MS,
+      value: {
+        identity: input.identity,
+        eventType: input.eventType,
+        operation: input.operation,
+        frame: input.frame,
+        wrapperInstanceId: input.wrapperInstanceId,
+        forward: input.forward,
+      },
+    });
+    if (retained === 'overflow') this.recordForwardDrop('replay_overflow', input.fields);
+    else this.scheduleSessionEventReplay(this.socketHandler.getConnectionIdentity());
   }
 
   // Coalesces replay triggers: at most one pass drains the retained queue at a
@@ -4492,35 +4556,47 @@ export class SandboxControl extends DurableObject<Env> {
         }),
       };
     });
-    for (const { sessionId, replays } of passes) {
-      const unapplied: Array<SessionEventReplayEntry<PendingSessionReplay>> = [];
-      for (const { entry, reached, result } of replays) {
-        const outcome = await result;
-        if (outcome.applied !== true) {
-          if (!reached.current) unapplied.push(entry);
-          continue;
-        }
-        this.forwarding.recovered += isSessionEventReplayFrame(entry.value.frame)
-          ? entry.value.frame.items.length
-          : 1;
-        this.logDiagnostic('forward_recovered', {
-          ...diagnosticConnection(connection),
-          eventType: entry.value.eventType,
-          sessionId,
-          ...this.forwarding,
-        });
-      }
-      if (unapplied.length === 0) continue;
-      // Restore newest first so the front of the queue keeps FIFO order.
-      for (let index = unapplied.length - 1; index >= 0; index -= 1) {
-        const entry = unapplied[index];
-        const retained = this.sessionEventReplay.restore(sessionId, entry);
-        if (retained === 'overflow')
-          this.recordForwardDrop('replay_overflow', {
+    // Mark every session whose retained prefix this pass owns. A live frame for
+    // such a session is held behind the prefix instead of being forwarded, so it
+    // cannot be delivered before a frame the pass has to restore.
+    for (const { sessionId } of passes) this.replayingSessions.add(sessionId);
+    try {
+      for (const { sessionId, replays } of passes) {
+        const unapplied: Array<SessionEventReplayEntry<PendingSessionReplay>> = [];
+        for (const { entry, reached, result } of replays) {
+          const outcome = await result;
+          if (outcome.applied !== true) {
+            if (!reached.current) unapplied.push(entry);
+            continue;
+          }
+          this.forwarding.recovered += isSessionEventReplayFrame(entry.value.frame)
+            ? entry.value.frame.items.length
+            : 1;
+          this.logDiagnostic('forward_recovered', {
             ...diagnosticConnection(connection),
             eventType: entry.value.eventType,
+            sessionId,
+            ...this.forwarding,
           });
+        }
+        if (unapplied.length > 0) {
+          // Restore newest first so the front of the queue keeps FIFO order.
+          for (let index = unapplied.length - 1; index >= 0; index -= 1) {
+            const entry = unapplied[index];
+            const retained = this.sessionEventReplay.restore(sessionId, entry);
+            if (retained === 'overflow')
+              this.recordForwardDrop('replay_overflow', {
+                ...diagnosticConnection(connection),
+                eventType: entry.value.eventType,
+              });
+          }
+        }
+        // This session's frames have all resolved, so a live frame for it may be
+        // forwarded again; anything restored above is covered by the queue check.
+        this.replayingSessions.delete(sessionId);
       }
+    } finally {
+      for (const { sessionId } of passes) this.replayingSessions.delete(sessionId);
     }
     return this.isCurrentConnection(connection);
   }
@@ -4556,6 +4632,19 @@ export class SandboxControl extends DurableObject<Env> {
       frameItems: payload.items.length,
       queuedAt,
     };
+    // A live batch must not overtake its session's retained prefix: see
+    // `sessionReplayPending`.
+    if (this.sessionReplayPending(admission.sessionId)) {
+      this.retainSessionBatch(
+        payload,
+        frameBytes,
+        admission.sessionId,
+        identity,
+        connection.wrapperInstanceId,
+        fields
+      );
+      return batchOutcomes(payload, 'unattempted', true);
+    }
     const member: BatchForwardMember = { payload, fields, queuedAt };
     const next = this.sessionForwarding.enqueue<BatchForwardMember, SandboxEventBatchResult>({
       sessionId: admission.sessionId,
@@ -4596,29 +4685,37 @@ export class SandboxControl extends DurableObject<Env> {
       results.every(result => result.outcomes.every(outcome => outcome.status === 'unattempted'))
     )
       for (const member of members)
-        this.retainSessionBatch(member, admission.sessionId, identity, connection);
+        this.retainSessionBatch(
+          member.item.payload,
+          member.bytes,
+          admission.sessionId,
+          identity,
+          connection.wrapperInstanceId,
+          member.item.fields
+        );
     return results;
   }
 
   // Retains one batch frame for replay with its original wrapper instance, so the
   // session DO's runtime gate stays authoritative when the replay runs.
   private retainSessionBatch(
-    member: SessionForwardRunMember<BatchForwardMember>,
+    payload: SandboxEventBatchPayload,
+    bytes: number,
     sessionId: string,
     identity: SessionEventIdentity,
-    connection: SandboxControlConnectionIdentity
+    wrapperInstanceId: string | undefined,
+    fields: ControlDiagnosticFields
   ): void {
-    const payload = member.item.payload;
     const retained = this.sessionEventReplay.push({
       sessionId,
-      bytes: member.bytes,
+      bytes,
       expiresAt: Date.now() + SESSION_EVENT_REPLAY_TTL_MS,
       value: {
         identity,
         eventType: 'session.event.batch',
         operation: 'receiveSandboxControlEventBatch',
         frame: { items: payload.items },
-        wrapperInstanceId: connection.wrapperInstanceId,
+        wrapperInstanceId,
         forward: (
           route,
           fields,
@@ -4644,7 +4741,7 @@ export class SandboxControl extends DurableObject<Env> {
           ),
       },
     });
-    if (retained === 'overflow') this.recordForwardDrop('replay_overflow', member.item.fields);
+    if (retained === 'overflow') this.recordForwardDrop('replay_overflow', fields);
     else this.scheduleSessionEventReplay(this.socketHandler.getConnectionIdentity());
   }
 

@@ -1546,6 +1546,178 @@ describe('SandboxControl lifecycle boundaries', () => {
       ).toHaveLength(1);
   });
 
+  it('keeps a frame restored mid-replay ahead of a live frame admitted before the follow-up pass', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    // A second session on the same runtime, so one session's replay can hold the pass
+    // in flight while another session's frame is restored.
+    const [firstRoute] = await h.control.listRoutes();
+    if (!firstRoute) throw new Error('Missing route');
+    const secondRoute = {
+      ...firstRoute,
+      sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+      directory: '/workspace/b',
+    };
+    h.records.set('session_routes', [firstRoute, secondRoute]);
+
+    const firstIdentity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    const secondIdentity = {
+      directory: secondRoute.directory,
+      kiloSessionId: secondRoute.kiloSessionId,
+    };
+    const payload = (sequence: number) => ({
+      type: 'session.message.outcome' as const,
+      properties: { messageId: `msg_${sequence}`, status: 'completed' as const },
+    });
+    const firstHead = payload(1);
+    const firstRetained = payload(2);
+    const secondHeld = payload(3);
+    const secondRestored = payload(4);
+    const secondLive = payload(5);
+
+    const firstHeadGate = deferred<{ applied: boolean }>();
+    const firstReplayGate = deferred<{ applied: boolean }>();
+    const secondHeldGate = deferred<{ applied: boolean }>();
+    h.session.receiveSandboxControlEvent.mockImplementation(
+      async ({ payload: forwarded }: { payload: unknown }) => {
+        if (forwarded === firstHead) return firstHeadGate.promise;
+        if (forwarded === firstRetained) return firstReplayGate.promise;
+        if (forwarded === secondHeld) return secondHeldGate.promise;
+        return { applied: true };
+      }
+    );
+
+    // The first session's frame is queued while the connection is current, then the
+    // fence changes before its turn, so it is retained.
+    const firstPending = [firstHead, firstRetained].map(event =>
+      h.hooks.onSessionEvent?.(firstIdentity, event, first)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+    firstHeadGate.resolve({ applied: true });
+    await Promise.all(firstPending);
+    await h.flush();
+
+    // A handshake replays the retained frame; its RPC is held so the pass stays in
+    // flight while the other session's frames move.
+    const replayConnection = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replayConnection);
+    await h.hooks.onHandshakeComplete?.(replayConnection);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // A live frame for the second session is held in flight, so the frame queued
+    // behind it keeps its place when the fence changes.
+    const heldPending = h.hooks.onSessionEvent?.(secondIdentity, secondHeld, replayConnection);
+    await vi.advanceTimersByTimeAsync(0);
+    const restoredPending = h.hooks.onSessionEvent?.(
+      secondIdentity,
+      secondRestored,
+      replayConnection
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+    secondHeldGate.resolve({ applied: true });
+    await Promise.all([heldPending, restoredPending]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The fence is back while the first session's replay is still in flight, and a
+    // newer live frame for the second session arrives before the follow-up pass
+    // re-drives the restored frame.
+    const liveConnection = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(liveConnection);
+    await h.hooks.onHandshakeComplete?.(liveConnection);
+    const livePending = h.hooks.onSessionEvent?.(secondIdentity, secondLive, liveConnection);
+    await vi.advanceTimersByTimeAsync(0);
+
+    firstReplayGate.resolve({ applied: true });
+    await livePending;
+    await h.flush();
+
+    const deliveredSecond = () =>
+      h.session.receiveSandboxControlEvent.mock.calls
+        .map(
+          ([request]) =>
+            (request.payload as { properties: { messageId: string } }).properties.messageId
+        )
+        .filter(
+          messageId => messageId === 'msg_3' || messageId === 'msg_4' || messageId === 'msg_5'
+        );
+    expect(deliveredSecond()).toEqual(['msg_3', 'msg_4', 'msg_5']);
+    for (const event of [secondHeld, secondRestored, secondLive])
+      expect(
+        h.session.receiveSandboxControlEvent.mock.calls.filter(
+          ([request]) => request.payload === event
+        )
+      ).toHaveLength(1);
+  });
+
+  it('reports only the forwarding counters it maintains', async () => {
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const identity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    const payload = {
+      type: 'session.message.outcome' as const,
+      properties: { messageId: 'msg_1', status: 'completed' as const },
+    };
+    h.session.receiveSandboxControlEvent.mockResolvedValue({ applied: true });
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await h.hooks.onSessionEvent?.(identity, payload, connection);
+      await h.flush();
+
+      const settled = withFields.mock.calls
+        .map(([fields]) => fields as Record<string, unknown>)
+        .filter(fields => fields.diagnosticEvent === 'forward_settled');
+      expect(settled.at(-1)).toMatchObject({
+        settled: 1,
+        recovered: 0,
+        maxQueueWaitMs: expect.any(Number),
+        maxTotalForwardMs: expect.any(Number),
+      });
+      // Every counter that has no source is dropped rather than logged as 0.
+      for (const unsourced of [
+        'enqueued',
+        'waiting',
+        'inFlight',
+        'highWater',
+        'dropped',
+        'notApplied',
+        'failed',
+        'bufferedBytes',
+        'maxRpcWaitMs',
+      ])
+        expect(settled.at(-1)).not.toHaveProperty(unsourced);
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
   it('keeps a replayed session event that already reached the session DO from being replayed again', async () => {
     const h = await harness();
     h.session.getControlState.mockResolvedValue({

@@ -30,6 +30,7 @@ export type SessionEventReplayQueue<T> = {
   push: (entry: SessionEventReplayPush<T>) => 'queued' | 'overflow';
   shift: (sessionId: string, now: number) => SessionEventReplayEntry<T> | undefined;
   restore: (sessionId: string, entry: SessionEventReplayEntry<T>) => 'queued' | 'overflow';
+  has: (sessionId: string) => boolean;
   sessions: () => string[];
   expire: (now: number) => T[];
   stats: () => SessionEventReplayStats;
@@ -95,6 +96,9 @@ export function createSessionEventReplayQueue<T>(): SessionEventReplayQueue<T> {
       events += 1;
       bytes += entry.bytes;
       return 'queued';
+    },
+    has(sessionId) {
+      return queues.has(sessionId);
     },
     sessions() {
       return [...queues.keys()];

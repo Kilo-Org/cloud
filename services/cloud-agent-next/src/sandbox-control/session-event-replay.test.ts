@@ -45,6 +45,18 @@ describe('createSessionEventReplayQueue', () => {
     expect(queue.sessions()).toEqual([]);
   });
 
+  it('reports whether a session still has retained entries', () => {
+    const queue = createSessionEventReplayQueue<string>();
+    expect(queue.has('workspace_a')).toBe(false);
+    push(queue, 'workspace_a', 'a1');
+
+    expect(queue.has('workspace_a')).toBe(true);
+    expect(queue.has('workspace_b')).toBe(false);
+
+    queue.shift('workspace_a', NOW);
+    expect(queue.has('workspace_a')).toBe(false);
+  });
+
   it('rejects the newest entry at the event cap and preserves the retained prefix', () => {
     const queue = createSessionEventReplayQueue<number>();
     for (let index = 0; index < MAX_SESSION_EVENT_REPLAY_EVENTS; index++) {

@@ -275,9 +275,8 @@ describe('showRenamePrompt', () => {
   });
 
   it('does not rename when the prefilled title is confirmed unchanged', () => {
-    // The rows seed the prompt with the app's untitled copy for a session the
-    // backend has not named. Confirming without editing must be a no-op, not a
-    // rename to that localized string.
+    // Confirming the seeded value without editing must be a no-op, not a
+    // rename to that value.
     const onRename = vi.fn<(newTitle: string) => void>();
     showRenamePrompt('Untitled session', onRename);
     confirmWith('Untitled session');

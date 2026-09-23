@@ -92,11 +92,10 @@ export function RemoteSessionRow({
   }, [refreshScope]);
   const exitingRef = useRef(false);
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
-  // The rename field seeds the session's own title, never the display fallback:
-  // `showRenamePrompt` saves whatever the field holds, so prefilling the
-  // untitled copy would persist that localized string as a real title on a
-  // no-edit tap (the raw backend default is a harmless no-op).
-  const renameInitialValue = session.title;
+  // Same seeding as the stored row: a session the backend has not named yet
+  // opens an empty rename field instead of the `New session - <ISO>` machine
+  // string, and the save paths reject an unchanged or blank value.
+  const renameInitialValue = sessionDisplayTitle(session.title) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

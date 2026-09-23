@@ -107,11 +107,13 @@ export function StoredSessionRow({
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
-  // The rename field seeds the session's own title, never the display fallback:
-  // `showRenamePrompt` saves whatever the field holds, so prefilling the
-  // untitled copy would persist that localized string as a real title on a
-  // no-edit tap (the raw backend default is a harmless no-op).
-  const renameInitialValue = session.title ?? '';
+  // The rename field seeds the name a person wrote, never the backend default
+  // or the display fallback: a session still carrying `New session - <ISO>`
+  // opens an empty field (the "Session name" placeholder prompts for a name)
+  // instead of the machine string the row hides. Both save paths already
+  // refuse an unchanged or blank value, so a no-edit confirm cannot persist
+  // the empty seed.
+  const renameInitialValue = sessionDisplayTitle(session.title) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);

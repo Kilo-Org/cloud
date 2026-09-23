@@ -279,9 +279,16 @@ describe('row exit refresh caller', () => {
 });
 
 describe('RemoteSessionRow rename prefill', () => {
-  it('seeds the rename prompt with the raw backend title, not the untitled fallback', async () => {
-    const rawTitle = 'New session - 2026-09-20T08:10:35.172Z';
-    await render(makeCached({ id: 'remote-rename', createdOnPlatform: 'cli', title: rawTitle }));
+  it('seeds the rename prompt empty for a session the backend has not named', async () => {
+    // The row hides `New session - ${ISO}` on screen; the rename prompt must
+    // not reopen that machine string, so an unnamed session opens blank.
+    await render(
+      makeCached({
+        id: 'remote-rename',
+        createdOnPlatform: 'cli',
+        title: 'New session - 2026-09-20T08:10:35.172Z',
+      })
+    );
     act(() => {
       if (!renderer) {
         throw new Error('Missing row');
@@ -292,6 +299,6 @@ describe('RemoteSessionRow rename prefill', () => {
     act(() => {
       state.rename?.();
     });
-    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith(rawTitle, expect.any(Function));
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
   });
 });

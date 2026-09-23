@@ -449,8 +449,9 @@ jobs:
           PENDING: kilo-app-changelog-pending
         run: |
           # The branch is a PR head ref, so a stranger can name it. It reaches
-          # this shell as an environment value, never as an interpolated ${{ }},
-          # and only the exact name this pipeline creates is accepted.
+          # this shell as an environment value, never as an interpolated
+          # expression, and only the exact name this pipeline creates is
+          # accepted.
           if ! printf '%s' "$BRANCH" | grep -qE '^kilo-app-version-bump-[0-9.]+$'; then
             echo "::error::Refusing to land the changelog on an unexpected branch: $BRANCH"
             exit 1

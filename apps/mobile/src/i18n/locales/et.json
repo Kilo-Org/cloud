@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
     "featureFlags": "Funktsioonilipud",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Kaug · ≥ {{min}}",
+    "featureFlagSkipped": "Vaikimisi · < {{min}}",
+    "featureFlagNotLoaded": "Vaikimisi · pole laaditud",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
-      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClaw tegevust.",
+      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClawi tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
-      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada madala saldo hoiatusi.",
+      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada saldo hoiatusi.",
       "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
-      "securityFindingsUnavailable": "Lülita Kilo turvaagent kindlas ulatuses sisse, et saada turvaleide.",
+      "securityFindingsUnavailable": "Luba Kilo turvaagent ühes ulatuses, et saada turvalisuse leide.",
       "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
       "spendAlertsToggle": "Kulutushoiatuste kategooria"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaatne Tipptasemel",
+      "balanced": "Automaatne Tasakaalustatud",
+      "efficient": "Automaatne Tõhus",
+      "small": "Automaatne Väike",
+      "free": "Automaatne Tasuta",
+      "organization": "Organisatsiooni automaatne"
+    },
     "dataCollected": "Andmeid kogutakse",
     "free": "Tasuta",
     "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus.",

@@ -2,7 +2,6 @@ export const CLAUDE_FABLE_LATEST_MODEL_ALIAS = '~anthropic/claude-fable-latest';
 export const CLAUDE_OPUS_LATEST_MODEL_ALIAS = '~anthropic/claude-opus-latest';
 export const CLAUDE_SONNET_LATEST_MODEL_ALIAS = '~anthropic/claude-sonnet-latest';
 export const CLAUDE_HAIKU_LATEST_MODEL_ALIAS = '~anthropic/claude-haiku-latest';
-export const GPT_LATEST_MODEL_ALIAS = '~openai/gpt-latest';
 export const GPT_MINI_LATEST_MODEL_ALIAS = '~openai/gpt-mini-latest';
 export const GPT_ASTRA_LATEST_MODEL_ALIAS = '~openai/gpt-astra-latest';
 export const GPT_LUNA_LATEST_MODEL_ALIAS = '~openai/gpt-luna-latest';
@@ -23,7 +22,6 @@ export const LATEST_MODEL_ALIASES = [
   CLAUDE_OPUS_LATEST_MODEL_ALIAS,
   CLAUDE_SONNET_LATEST_MODEL_ALIAS,
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
-  GPT_LATEST_MODEL_ALIAS,
   GPT_MINI_LATEST_MODEL_ALIAS,
   GPT_ASTRA_LATEST_MODEL_ALIAS,
   GPT_LUNA_LATEST_MODEL_ALIAS,

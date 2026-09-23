@@ -442,7 +442,18 @@ const NOTIFICATION_CATEGORY_KEYS = [
   'securityFindings',
 ] as const;
 
-type NotificationCapability = { available: boolean; unavailableReason: string | null };
+/** Machine-readable reason a gated category is unavailable. The client owns the
+ *  wording: it maps each code to a catalog key, so the row reads in the reader's
+ *  language. A server sentence rendered in English on every locale. */
+type NotificationCapabilityReason =
+  | 'organizationRequired'
+  | 'securityAgentRequired'
+  | 'kiloclawInstanceRequired';
+
+type NotificationCapability = {
+  available: boolean;
+  unavailableReasonCode: NotificationCapabilityReason | null;
+};
 type NotificationCapabilities = Record<
   (typeof NOTIFICATION_CATEGORY_KEYS)[number],
   NotificationCapability
@@ -450,11 +461,11 @@ type NotificationCapabilities = Record<
 
 const ALWAYS_AVAILABLE_CAPABILITY: NotificationCapability = {
   available: true,
-  unavailableReason: null,
+  unavailableReasonCode: null,
 };
 
-function unavailableCapability(reason: string): NotificationCapability {
-  return { available: false, unavailableReason: reason };
+function unavailableCapability(reason: NotificationCapabilityReason): NotificationCapability {
+  return { available: false, unavailableReasonCode: reason };
 }
 
 /**
@@ -499,16 +510,16 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
     sessionStatus: ALWAYS_AVAILABLE_CAPABILITY,
     balanceAlerts: hasOrganization
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Join an organization to get balance alerts.'),
+      : unavailableCapability('organizationRequired'),
     // Every signed-in account has a personal scope, so spend alerts are always
     // available; the spend view offers the same switch for that scope.
     spendAlerts: ALWAYS_AVAILABLE_CAPABILITY,
     securityFindings: hasSecurityConfig
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Enable Kilo Security Agent on a scope to get security findings.'),
+      : unavailableCapability('securityAgentRequired'),
     kiloclawActivity: hasKiloclawInstance
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Start a KiloClaw instance to get KiloClaw activity.'),
+      : unavailableCapability('kiloclawInstanceRequired'),
   };
 }
 
@@ -521,6 +532,21 @@ export const userRouter = createTRPCRouter({
       isAdmin: ctx.user.is_admin,
     });
   }),
+
+  // Whether the caller has any Kilo gateway usage. Any `microdollar_usage` row
+  // for the user counts (org-scoped and zero-cost free-model rows included), so
+  // this reads the primary DB rather than a replica that may lag the first
+  // request. The lookup is an indexed `LIMIT 1` on
+  // `idx_kilo_user_id_created_at2`, so a cold-boot call is cheap.
+  hasGatewayUsage: baseProcedure
+    .output(z.object({ hasUsage: z.boolean() }))
+    .query(async ({ ctx }) => {
+      const row = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.kilo_user_id, ctx.user.id),
+        columns: { id: true },
+      });
+      return { hasUsage: row !== undefined };
+    }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {
     const providers = await getUserAuthProviders(ctx.user.id);

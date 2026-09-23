@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur.",
     "featureFlags": "Funksiya bayroqları",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Uzaq · ≥ {{min}}",
+    "featureFlagSkipped": "Defolt · < {{min}}",
+    "featureFlagNotLoaded": "Defolt · yüklənməyib",
     "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
     "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
       "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
-      "kiloclawActivityUnavailable": "KiloClaw fəaliyyətini almaq üçün KiloClaw nüsxəsini başladın.",
+      "kiloclawActivityUnavailable": "KiloClaw fəaliyyəti üçün KiloClaw nüsxəsini işə salın.",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
-      "balanceAlertsUnavailable": "Balans xəbərdarlıqlarını almaq üçün təşkilata qoşulun.",
+      "balanceAlertsUnavailable": "Balans xəbərdarlıqları üçün təşkilata qoşulun.",
       "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları",
-      "securityFindingsUnavailable": "Təhlükəsizlik problemlərini almaq üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin.",
+      "securityFindingsUnavailable": "Təhlükəsizlik aşkarlamaları üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin.",
       "spendAlertsSubtitle": "hədd aşmaları və saatlıq sıçrayışlar",
       "spendAlertsToggle": "Xərc bildirişləri kateqoriyası"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Həddindən çox giriş cəhdi edilib. Bir az gözlə və yenidən cəhd et."
   },
   "models": {
+    "auto": {
+      "frontier": "Avtomatik Qabaqcıl",
+      "balanced": "Avtomatik Balanslı",
+      "efficient": "Avtomatik Səmərəli",
+      "small": "Avtomatik Kiçik",
+      "free": "Avtomatik Pulsuz",
+      "organization": "Təşkilat Avtomatik"
+    },
     "dataCollected": "Məlumat toplanır",
     "free": "Pulsuz",
     "couldNotUpdateFavorites": "Sevimliləri yeniləmək mümkün olmadı.",

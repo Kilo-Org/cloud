@@ -427,7 +427,7 @@ export function buildDeployedConfig(
     bearerToken: auth.token,
     fetchStreamTicket: sessionId =>
       fetchStreamTicket({ backendUrl: env.backendUrl, token: auth.token, sessionId }),
-    skipBalanceCheck: false,
+    skipBalanceCheck: true,
     workerUrl: env.workerUrl,
     internalApiSecret: env.e2eInternalApiSecret,
     fakeLlmUrl: env.fakeLlmUrl,

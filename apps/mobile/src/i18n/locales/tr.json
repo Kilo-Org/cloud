@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir.",
     "featureFlags": "Özellik bayrakları",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Uzak · ≥ {{min}}",
+    "featureFlagSkipped": "Varsayılan · < {{min}}",
+    "featureFlagNotLoaded": "Varsayılan · yüklenmedi",
     "gatewayTranscription": "Kilo Gateway ile sesi metne dönüştürme",
     "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -337,7 +337,7 @@
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
       "kiloclawActivityUnavailable": "KiloClaw etkinliği almak için bir KiloClaw örneği başlat.",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
-      "balanceAlertsUnavailable": "Düşük bakiye uyarıları almak için bir kuruluşa katıl.",
+      "balanceAlertsUnavailable": "Bakiye uyarıları almak için bir kuruluşa katıl.",
       "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları",
       "securityFindingsUnavailable": "Güvenlik bulguları almak için bir kapsamda Kilo Güvenlik ajanını etkinleştir.",
       "spendAlertsSubtitle": "eşik aşımları ve saatlik artışlar",
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Çok fazla oturum açma denemesi yapıldı. Lütfen biraz bekle ve tekrar dene."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatik Öncü",
+      "balanced": "Otomatik Dengeli",
+      "efficient": "Otomatik Verimli",
+      "small": "Otomatik Küçük",
+      "free": "Otomatik Ücretsiz",
+      "organization": "Kuruluş Otomatik"
+    },
     "dataCollected": "Veri toplanıyor",
     "free": "Ücretsiz",
     "couldNotUpdateFavorites": "Favoriler güncellenemedi.",

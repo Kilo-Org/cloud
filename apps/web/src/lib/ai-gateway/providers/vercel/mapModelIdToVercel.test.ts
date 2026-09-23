@@ -42,7 +42,6 @@ describe('mapModelIdToVercel', () => {
       ['anthropic/claude-sonnet-4-5', 'anthropic/claude-sonnet-4.5'],
       ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
       ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
-      ['claude-opus-5', 'anthropic/claude-opus-5'],
       ['claude-sonnet-4', 'anthropic/claude-sonnet-4'],
       ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
       ['claude-sonnet-5', 'anthropic/claude-sonnet-5'],
@@ -101,8 +100,10 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
-    it('rewrites x-ai/ to xai/', async () => {
-      await expect(mapModelIdToVercel('x-ai/some-new-grok')).resolves.toBe('xai/some-new-grok');
+    it('rewrites x-ai/ to spacexai/', async () => {
+      await expect(mapModelIdToVercel('x-ai/some-new-grok')).resolves.toBe(
+        'spacexai/some-new-grok'
+      );
     });
 
     it('rewrites z-ai/ to zai/', async () => {

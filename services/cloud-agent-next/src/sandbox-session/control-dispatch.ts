@@ -1,5 +1,5 @@
 import { withTimeout } from '@kilocode/worker-utils';
-import type { ConnectionState, PhysicalState } from '../sandbox-control/status-projection.js';
+import type { ConnectionState, PhysicalState } from '../shared/sandbox-status.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,

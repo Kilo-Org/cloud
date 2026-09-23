@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق.",
     "featureFlags": "أعلام الميزات",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "عن بُعد · ≥ {{min}}",
+    "featureFlagSkipped": "افتراضي · < {{min}}",
+    "featureFlagNotLoaded": "افتراضي · لم يتم التحميل",
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -339,7 +339,7 @@
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "balanceAlertsUnavailable": "انضم إلى مؤسسة للحصول على تنبيهات الرصيد.",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA",
-      "securityFindingsUnavailable": "فعّل وكيل أمان Kilo على نطاق للحصول على ملاحظات الأمان.",
+      "securityFindingsUnavailable": "فعِّل وكيل الأمان من Kilo على نطاق للحصول على النتائج الأمنية.",
       "spendAlertsSubtitle": "تجاوزات الحدود والارتفاعات الساعية",
       "spendAlertsToggle": "فئة تنبيهات الإنفاق"
     },
@@ -3291,6 +3291,14 @@
     "tooManySignInAttempts": "تجاوزت الحد المسموح لمحاولات تسجيل الدخول. انتظر قليلًا وحاول مرة أخرى."
   },
   "models": {
+    "auto": {
+      "frontier": "تلقائي متقدم",
+      "balanced": "تلقائي متوازن",
+      "efficient": "تلقائي فعّال",
+      "small": "تلقائي صغير",
+      "free": "تلقائي مجاني",
+      "organization": "تلقائي المؤسسة"
+    },
     "dataCollected": "يجمع البيانات",
     "free": "مجاني",
     "couldNotUpdateFavorites": "تعذّر تحديث المفضلة.",

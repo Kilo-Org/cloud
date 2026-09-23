@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Desblokeatu aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren.",
     "featureFlags": "Funtzio-bandera",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Urruneko · ≥ {{min}}",
+    "featureFlagSkipped": "Lehenetsia · < {{min}}",
+    "featureFlagNotLoaded": "Lehenetsia · ez da kargatu",
     "gatewayTranscription": "Kilo Gateway bidezko transkripzioa",
     "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
       "kiloclawActivityUnavailable": "Abiarazi KiloClaw instantzia bat KiloClaw jarduera jasotzeko.",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
-      "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo baxuko abisuak jasotzeko.",
+      "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo-abisuak jasotzeko.",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
-      "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-arazoak jasotzeko.",
+      "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-aurkikuntzak jasotzeko.",
       "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
       "spendAlertsToggle": "Gastu-alerten kategoria"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Saioa hasteko saiakera gehiegi egin dira. Itxaron eta saiatu berriro."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatiko Puntakoa",
+      "balanced": "Automatiko Orekatua",
+      "efficient": "Automatiko Eraginkorra",
+      "small": "Automatiko Txikia",
+      "free": "Automatiko Doan",
+      "organization": "Erakunde-automatikoa"
+    },
     "dataCollected": "Datuak biltzen dira",
     "free": "Doan",
     "couldNotUpdateFavorites": "Ezin izan dira gogokoak eguneratu.",

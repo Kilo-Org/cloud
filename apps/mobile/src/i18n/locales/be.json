@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Разблакіроўка патрабуецца пры запуску праграмы і пасля пяці хвілін у фонавым рэжыме.",
     "featureFlags": "Сцягі функцый",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Аддалена · ≥ {{min}}",
+    "featureFlagSkipped": "Прадвызначана · < {{min}}",
+    "featureFlagNotLoaded": "Прадвызначана · не загружана",
     "gatewayTranscription": "Распазнаванне маўлення праз Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Пераўтварайце галасавы ўвод у тэкст з дапамогай мадэлі Kilo Gateway замест распазнавання маўлення на самой прыладзе. Ваш запіс адпраўляецца ў Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -873,9 +873,9 @@
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
       "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
-      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб нізкім балансе.",
+      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб балансе.",
       "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
-      "securityFindingsUnavailable": "Уключыце агента бяспекі Kilo у пэўным абсягу, каб атрымліваць выяўленыя праблемы бяспекі.",
+      "securityFindingsUnavailable": "Уключыце Агента бяспекі Kilo у пэўным абсягу, каб атрымліваць праблемы бяспекі.",
       "spendAlertsSubtitle": "перасячэнні парогаў і гадзінныя ўсплёскі",
       "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках"
     },
@@ -3205,6 +3205,14 @@
     "tooManySignInAttempts": "Занадта шмат спроб уваходу. Пачакай і паспрабуй яшчэ раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Аўта Перадавы",
+      "balanced": "Аўта Збалансаваны",
+      "efficient": "Аўта Эфектыўны",
+      "small": "Аўта Малы",
+      "free": "Аўта Бясплатны",
+      "organization": "Аўта арганізацыі"
+    },
     "dataCollected": "Збор даных",
     "free": "Бясплатна",
     "couldNotUpdateFavorites": "Не ўдалося абнавіць абранае.",

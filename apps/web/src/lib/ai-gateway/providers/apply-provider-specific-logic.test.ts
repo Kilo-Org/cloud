@@ -15,11 +15,30 @@ import {
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import {
-  gpt_5_6_sol_discounted_model,
-  gpt_6_astra_flex_model,
-} from '@/lib/ai-gateway/providers/openai-exclusive';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+
+const nonFlexExclusiveModel: KiloExclusiveModel = {
+  public_id: 'test/non-flex-exclusive',
+  internal_id: 'test/non-flex',
+  display_name: 'Non-Flex test model',
+  description: 'Test model',
+  status: 'public',
+  context_length: 8_192,
+  max_completion_tokens: 4_096,
+  gateway: 'openrouter',
+  flags: [],
+  pricing: null,
+  inference_provider_restriction: [],
+};
+
+const flexExclusiveModel: KiloExclusiveModel = {
+  ...nonFlexExclusiveModel,
+  public_id: 'test/flex-exclusive',
+  internal_id: 'test/flex',
+  display_name: 'Flex test model',
+  flags: ['flex'],
+};
 
 function makeRequest(
   model: string,
@@ -40,6 +59,7 @@ function makeProvider(responseTransforms: Provider['responseTransforms']): Provi
     id: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
+    disableUrlSuffix: false,
     apiKey: 'test-key',
     apiKeyHeader: null,
     supportedChatApis: ['chat_completions'],
@@ -113,8 +133,8 @@ describe('removeUnsupportedRequestServiceTier', () => {
       reason: 'non-fallback custom pricing',
     },
     {
-      model: gpt_5_6_sol_discounted_model.public_id,
-      kiloExclusiveModel: gpt_5_6_sol_discounted_model,
+      model: nonFlexExclusiveModel.public_id,
+      kiloExclusiveModel: nonFlexExclusiveModel,
       reason: 'non-Flex Kilo-exclusive model',
     },
   ])(
@@ -142,7 +162,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
 
   it.each([
     ['moonshotai/kimi-k3', null],
-    [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
+    [flexExclusiveModel.public_id, flexExclusiveModel],
     ['vendor/standard-model', null],
   ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
     const request = makeRequest(model);

@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type AgentMode, ModeSelector } from '@/components/agents/mode-selector';
@@ -32,6 +32,16 @@ type ChatToolbarProps = {
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
   className?: string;
+  /**
+   * Lets the chips wrap onto a second row when their combined intrinsic width
+   * exceeds the row (narrow viewports), instead of ellipsizing the selected
+   * model name (#6349). On by default; `wrap={false}` pins the chips to one
+   * row. The host owns the extra height: the new-session form scrolls and its
+   * input floor reserves the measured toolbar height.
+   */
+  wrap?: boolean;
+  /** Forwards the row's layout, e.g. to measure the wrapped height. */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 export function ChatToolbar({
@@ -50,6 +60,8 @@ export function ChatToolbar({
   modelLocked = false,
   modelLockLabel,
   className,
+  wrap = true,
+  onLayout,
 }: Readonly<ChatToolbarProps>) {
   const modeSelector = (
     <ModeSelector
@@ -100,8 +112,10 @@ export function ChatToolbar({
     // to the effort badge. Wrapping moves the model chip to its own line, where
     // it has the full row width to show the selected model.
     <View
+      onLayout={onLayout}
       className={cn(
-        'flex-row flex-wrap items-center gap-2 px-3 py-2.5',
+        'flex-row items-center gap-2 px-3 py-2.5',
+        wrap && 'flex-wrap',
         disabled && 'opacity-50',
         className
       )}

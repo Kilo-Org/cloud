@@ -273,9 +273,9 @@
       "kiloclawActivitySubtitle": "istanza pronta o in errore, azioni pianificate",
       "kiloclawActivityUnavailable": "Avvia un'istanza KiloClaw per ricevere l'attività di KiloClaw.",
       "balanceAlertsSubtitle": "avvisi di saldo basso dell'organizzazione",
-      "balanceAlertsUnavailable": "Unisciti a un'organizzazione per ricevere avvisi di saldo basso.",
+      "balanceAlertsUnavailable": "Unisciti a un'organizzazione per ricevere avvisi sul saldo.",
       "securityFindingsSubtitle": "nuovi problemi di sicurezza e promemoria SLA",
-      "securityFindingsUnavailable": "Attiva l'agente di sicurezza Kilo su un ambito per ricevere problemi di sicurezza.",
+      "securityFindingsUnavailable": "Attiva l'Agente di sicurezza Kilo su un ambito per ricevere segnalazioni di sicurezza.",
       "spendAlertsSubtitle": "superamenti di soglia e picchi orari",
       "spendAlertsToggle": "Categoria avvisi di spesa"
     },
@@ -2177,9 +2177,9 @@
     "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano.",
     "featureFlags": "Flag di funzionalità",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "Remoto · ≥ {{min}}",
+    "featureFlagSkipped": "Predefinito · < {{min}}",
+    "featureFlagNotLoaded": "Predefinito · non caricato",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -3162,6 +3162,14 @@
     "tooManySignInAttempts": "Troppi tentativi di accesso. Attendi e riprova."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanzato",
+      "balanced": "Auto Bilanciato",
+      "efficient": "Auto Efficiente",
+      "small": "Auto Piccolo",
+      "free": "Auto Gratuito",
+      "organization": "Auto Organizzazione"
+    },
     "dataCollected": "Dati raccolti",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Impossibile aggiornare i preferiti.",

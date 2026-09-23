@@ -107,6 +107,12 @@ export async function persistSignInCredentialsAtEpoch(
     await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
   };
 
+  // Whether any credential key of this attempt reached the keychain. A later
+  // rejection then knows the store may hold a partial set and wipes it; a
+  // failure on the very first operation leaves the previous session untouched,
+  // so a transient keychain failure stays retryable instead of signing out.
+  let committedAny = false;
+
   // Fence one credential operation: skip it when the epoch moved before the
   // op, and clear the partial pair when it moved during the op.
   const commitWrite = async (key: string, value?: string): Promise<boolean> => {
@@ -119,6 +125,7 @@ export async function persistSignInCredentialsAtEpoch(
     await (value === undefined
       ? deleteStoredValue(key, IOS_BEARER_SECURE_STORE_OPTIONS)
       : writeStoredValue(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
+    committedAny = true;
     if (!isCurrentAuthEpoch(epoch)) {
       await clearPartialCredentials();
       return false;
@@ -128,14 +135,30 @@ export async function persistSignInCredentialsAtEpoch(
 
   let published = false;
   await writeCredentials(async () => {
-    if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
-      return;
-    }
-    if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
-      return;
-    }
-    if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
-      return;
+    try {
+      if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
+        return;
+      }
+      if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
+        return;
+      }
+      if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
+        return;
+      }
+    } catch (error) {
+      // A later keychain operation rejected after an earlier one committed:
+      // the store now holds a partial credential set. Wipe it best-effort in
+      // the same serialized slot — so it cannot touch a newer sign-in's keys —
+      // then rethrow the original failure. A cleanup failure is swallowed so
+      // it cannot mask the write failure the caller owns.
+      if (committedAny) {
+        try {
+          await clearPartialCredentials();
+        } catch {
+          // Best effort: the caller must still see the original failure.
+        }
+      }
+      throw error;
     }
     // Every fenced operation passed its post-check and nothing awaited since
     // the last one, so the epoch is still current: publish to the owner.

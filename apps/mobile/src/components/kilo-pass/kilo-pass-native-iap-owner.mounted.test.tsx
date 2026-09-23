@@ -102,6 +102,9 @@ vi.mock('@/lib/analytics/posthog', () => ({
 }));
 
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-products', () => ({
+  // The owner reads the backend catalog through this shared query-options
+  // helper; the mock must expose it or every render throws "No export".
+  backendStoreKiloPassProductsQueryOptions: () => ({ queryKey: ['kp-products'] }),
   useStoreKiloPassProducts: () => ({
     products: [],
     isLoading: mockedQuery.storeProductsIsLoading,

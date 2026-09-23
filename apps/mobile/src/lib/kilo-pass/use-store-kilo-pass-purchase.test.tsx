@@ -1447,9 +1447,16 @@ describe('KiloPassNativeIapOwner', () => {
       purchaseToken: 'tier49-token',
       transactionId: 'tier49-order',
     });
-    mockedIap.availablePurchases = [unresolvedTierPurchase];
+    // Recovery reads the owner's own store lookup (`getAvailableIapPurchases`),
+    // not the hook's reactive list, so the store must be connected and answer
+    // with the charged purchase.
+    mockedIap.getAvailablePurchases.mockResolvedValue([unresolvedTierPurchase]);
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
     owner.render();
     await flushPromises();
 

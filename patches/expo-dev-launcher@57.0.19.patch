@@ -82,7 +82,7 @@ diff --git a/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTa
 index 232bdcf..f5b77e8 100644
 --- a/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTabButton.kt
 +++ b/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTabButton.kt
-@@ -6,16 +6,28 @@ import androidx.compose.foundation.layout.Arrangement
+@@ -6,16 +6,36 @@
  import androidx.compose.foundation.layout.Column
  import androidx.compose.foundation.layout.padding
  import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,6 +97,7 @@ index 232bdcf..f5b77e8 100644
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.graphics.Color
 +import androidx.compose.ui.layout.onSizeChanged
++import androidx.compose.ui.platform.LocalDensity
 +import androidx.compose.ui.text.AnnotatedString
  import androidx.compose.ui.text.font.FontWeight
 +import androidx.compose.ui.text.rememberTextMeasurer
@@ -106,13 +107,20 @@ index 232bdcf..f5b77e8 100644
  import expo.modules.devmenu.compose.newtheme.NewAppTheme
 -import expo.modules.devmenu.compose.primitives.NewText
 +
-+/** Floor for a label's shrink-to-fit: 8 sp (the sm style is 12 sp), the scale
-+ * where the widest stock label, 'Updates', still fits the 32 dp tab. */
-+private const val LABEL_MIN_FONT_SCALE = 0.667f
++/** Floor for a label's shrink-to-fit: 7.2 sp (the sm style is 12 sp), the
++ * scale where the widest stock label, 'Updates', still fits the tab once
++ * `LABEL_HORIZONTAL_INSET` is taken off each side. */
++private const val LABEL_MIN_FONT_SCALE = 0.6f
++
++/** Horizontal breathing room a shrunk label keeps inside its tab. Shrinking
++ * to the tab's full width put the widest label ('Updates') exactly on the
++ * tab's edge, where sub-pixel rounding tail-ellipsized it mid-word, and left
++ * every label touching the selected tab's pill. */
++private val LABEL_HORIZONTAL_INSET = 2.dp
  
  @Composable
  fun BottomTabButton(
-@@ -25,10 +37,17 @@ fun BottomTabButton(
+@@ -25,10 +45,17 @@
    modifier: Modifier = Modifier,
    onClick: () -> Unit
  ) {
@@ -130,7 +138,7 @@ index 232bdcf..f5b77e8 100644
        .clip(
          RoundedCornerShape(NewAppTheme.borderRadius.md)
        )
-@@ -53,16 +72,40 @@ fun BottomTabButton(
+@@ -53,16 +80,45 @@
        }
      )
  
@@ -138,7 +146,7 @@ index 232bdcf..f5b77e8 100644
 +    // Keep the tab label to one line: in a narrow window the tab is too small
 +    // for the label at its normal size, and Compose then broke it mid-word
 +    // into a second line the pill clipped ("Upda tes", "Settin gs"). Shrink
-+    // the label to fit instead, and ellipsize only below the 8 sp floor.
++    // the label to fit instead, and ellipsize only below the 7.2 sp floor.
 +    val labelColor = if (isSelected) {
 +      NewAppTheme.colors.icon.info
 +    } else {
@@ -155,10 +163,15 @@ index 232bdcf..f5b77e8 100644
 +    val measuredWidthPx = remember(label, labelStyle) {
 +      textMeasurer.measure(AnnotatedString(label), labelStyle, maxLines = 1).size.width
 +    }
-+    val factor = if (tabWidthPx > 0 && measuredWidthPx > tabWidthPx) {
++    // Shrink to the tab minus the inset, never to the tab's exact edge: a
++    // label that lands on the edge is tail-ellipsized by a sub-pixel overflow
++    // ("Updat…") and sits flush against the selected tab's pill.
++    val labelInsetPx = with(LocalDensity.current) { LABEL_HORIZONTAL_INSET.roundToPx() }
++    val labelWidthPx = (tabWidthPx - 2 * labelInsetPx).coerceAtLeast(0)
++    val factor = if (labelWidthPx > 0 && measuredWidthPx > labelWidthPx) {
 +      maxOf(
 +        LABEL_MIN_FONT_SCALE,
-+        tabWidthPx.toFloat() / measuredWidthPx.toFloat()
++        labelWidthPx.toFloat() / measuredWidthPx.toFloat()
 +      )
 +    } else {
 +      1f

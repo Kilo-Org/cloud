@@ -174,7 +174,7 @@ export class MeteredBillingLifecycle {
         try {
           await this.heartbeat.recordStop(
             { reason: 'runtime_signal' },
-            active.stoppedObservedAtMs ?? Date.now()
+            stoppedAtFromState(await this.host.getState())
           );
           await this.host.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {

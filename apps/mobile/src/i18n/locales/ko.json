@@ -214,7 +214,6 @@
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
     "bonusCreditsExpiring": "{{date}}에 만료되는 보너스 크레딧은 {{amount}}입니다.",
-    "creditBalanceEmpty": "남은 크레딧이 없습니다. 이 계정의 크레딧은 iOS 앱 외부에서 관리됩니다.",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "deleteAccountTitle": "계정을 삭제할까요?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "1 이상의 배수를 입력하세요",
     "permissionDenied": "지출 알림을 관리할 권한이 없습니다.",
     "pushOffByCategory": "알림에서 꺼짐"
+  },
+  "credits": {
+    "title": "크레딧 구매",
+    "description": "크레딧은 Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 추가되는 일회성 구매입니다. 스토어가 계정에 요금을 청구하고 스토어가 결제를 확인한 후 크레딧이 추가됩니다.",
+    "packLabel": "{{amount}} 상당의 크레딧 추가",
+    "priceUnavailable": "가격을 사용할 수 없음",
+    "purchased": "크레딧이 잔액에 추가되었습니다.",
+    "empty": "현재 크레딧 팩을 사용할 수 없습니다.",
+    "noMatchingProducts": "App Store에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
+    "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
+    "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
+    "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   }
 }

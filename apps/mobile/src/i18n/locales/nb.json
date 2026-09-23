@@ -214,7 +214,6 @@
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter utløper {{date}}.",
-    "creditBalanceEmpty": "Du har ingen kreditter igjen. For denne kontoen administreres kreditter utenfor iOS-appen.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "Angi en multiplikator på 1 eller mer",
     "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
     "pushOffByCategory": "Av i Varsler"
+  },
+  "credits": {
+    "title": "Kjøp kreditter",
+    "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
+    "packLabel": "Legg til {{amount}} i kreditter",
+    "priceUnavailable": "Prisen er ikke tilgjengelig",
+    "purchased": "Kreditter er lagt til saldoen din.",
+    "empty": "Kredittpakker er ikke tilgjengelige akkurat nå.",
+    "noMatchingProducts": "App Store returnerte ingen samsvarende kredittpakker.",
+    "noMatchingProductsPlay": "Google Play returnerte ingen samsvarende kredittpakker.",
+    "purchaseOwnedByAnotherAccount": "Kredittene på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredittene på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem."
   }
 }

@@ -214,7 +214,6 @@
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
     "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
-    "creditBalanceEmpty": "Þú átt enga inneign. Inneign þessa reiknings er stjórnað utan iOS-forritsins.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
     "pushOffByCategory": "Af í Tilkynningum"
+  },
+  "credits": {
+    "title": "Kaupa inneign",
+    "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
+    "packLabel": "Bæta við {{amount}} í inneign",
+    "priceUnavailable": "Verð ekki tiltækt",
+    "purchased": "Inneign hefur verið bætt við stöðuna þína.",
+    "empty": "Inneignarpakkar eru ekki tiltækir núna.",
+    "noMatchingProducts": "App Store skilaði engum samsvarandi inneignarpökkum.",
+    "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
+    "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
+    "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   }
 }

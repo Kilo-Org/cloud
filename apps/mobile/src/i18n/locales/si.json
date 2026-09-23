@@ -214,7 +214,6 @@
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
     "bonusCreditsExpiring": "{{amount}} ක ප්‍රසාද ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
-    "creditBalanceEmpty": "ඔබේ ක්‍රෙඩිට් ශේෂය හිස්ය. මෙම ගිණුමේ ක්‍රෙඩිට් කළමනාකරණය කරන්නේ iOS යෙදුමෙන් පිටතදීය.",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "1 හෝ ඊට වැඩි ගුණකයක් ඇතුළත් කරන්න",
     "permissionDenied": "වියදම් දැනුම්දීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
     "pushOffByCategory": "දැනුම්දීම් තුළ ක්‍රියා විරහිතයි"
+  },
+  "credits": {
+    "title": "ක්‍රෙඩිට් මිලදී ගන්න",
+    "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
+    "packLabel": "{{amount}} ක් වටිනා ක්‍රෙඩිට් එක් කරන්න",
+    "priceUnavailable": "මිල නොමැත",
+    "purchased": "ඔබේ ශේෂයට ක්‍රෙඩිට් එක් කර ඇත.",
+    "empty": "ක්‍රෙඩිට් පැකේජ දැනට නොමැත.",
+    "noMatchingProducts": "App Store ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
+    "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
+    "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
+    "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   }
 }

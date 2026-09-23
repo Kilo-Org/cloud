@@ -214,7 +214,6 @@
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
     "bonusCreditsExpiring": "{{amount}} የጉርሻ ክሬዲት በ{{date}} ጊዜው ያበቃል።",
-    "creditBalanceEmpty": "የክሬዲት ቀሪ ሂሳብዎ ባዶ ነው። ለዚህ መለያ ክሬዲት የሚተዳደረው ከiOS መተግበሪያው ውጭ ነው።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "ከ1 ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
     "permissionDenied": "የወጪ ማስጠንቀቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
     "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል"
+  },
+  "credits": {
+    "title": "ክሬዲት ይግዙ",
+    "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
+    "packLabel": "የ{{amount}} ክሬዲት ያክሉ",
+    "priceUnavailable": "ዋጋ አይገኝም",
+    "purchased": "ክሬዲት ወደ ቀሪ ሂሳብዎ ተጨምሯል።",
+    "empty": "የክሬዲት ጥቅሎች አሁን አይገኙም።",
+    "noMatchingProducts": "ከApp Store ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
+    "noMatchingProductsPlay": "ከGoogle Play ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
+    "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
+    "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
   }
 }

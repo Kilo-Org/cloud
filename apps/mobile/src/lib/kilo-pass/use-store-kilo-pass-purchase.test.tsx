@@ -383,7 +383,7 @@ beforeEach(() => {
   mockedIap.connected = false;
   mockedIap.fetchProducts.mockResolvedValue([]);
   mockedIap.finishTransaction.mockResolvedValue(undefined);
-  mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
+  mockedIap.getAvailablePurchases.mockResolvedValue([]);
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
@@ -1412,12 +1412,17 @@ describe('KiloPassNativeIapOwner', () => {
   });
 
   it('recovers purchases using server-backed product IDs when the store fetch is empty', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
     owner.render();
     await flushPromises();
 
@@ -1442,9 +1447,16 @@ describe('KiloPassNativeIapOwner', () => {
       purchaseToken: 'tier49-token',
       transactionId: 'tier49-order',
     });
-    mockedIap.availablePurchases = [unresolvedTierPurchase];
+    // Recovery reads the owner's own store lookup (`getAvailableIapPurchases`),
+    // not the hook's reactive list, so the store must be connected and answer
+    // with the charged purchase.
+    mockedIap.getAvailablePurchases.mockResolvedValue([unresolvedTierPurchase]);
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
     owner.render();
     await flushPromises();
 
@@ -1466,7 +1478,11 @@ describe('KiloPassNativeIapOwner', () => {
   // must stay silent rather than pop a bare toast behind a screen with no
   // purchase UI.
   it('keeps a recovery failure silent while no inline error surface is mounted', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    // Recovery reads the owner's own store lookup (`getAvailableIapPurchases`),
+    // not the hook's reactive list, so the store must be connected and answer
+    // with the charged purchase.
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
@@ -1475,6 +1491,10 @@ describe('KiloPassNativeIapOwner', () => {
     });
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
     owner.render();
     await flushPromises();
 
@@ -1514,12 +1534,15 @@ describe('KiloPassNativeIapOwner', () => {
   });
 
   it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
     owner.render();
     await flushPromises();
 

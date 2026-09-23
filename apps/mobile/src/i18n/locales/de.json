@@ -214,7 +214,6 @@
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
     "bonusCreditsExpiring": "Dein Bonusguthaben von {{amount}} verfällt am {{date}}.",
-    "creditBalanceEmpty": "Dein Guthaben ist aufgebraucht. Für dieses Konto wird das Guthaben außerhalb der iOS-App verwaltet.",
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
     "deleteAccountTitle": "Konto löschen?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
     "pushOffByCategory": "In Benachrichtigungen aus"
+  },
+  "credits": {
+    "title": "Guthaben kaufen",
+    "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
+    "packLabel": "{{amount}} Guthaben hinzufügen",
+    "priceUnavailable": "Preis nicht verfügbar",
+    "purchased": "Guthaben wurde deinem Kontostand hinzugefügt.",
+    "empty": "Guthaben-Pakete sind derzeit nicht verfügbar.",
+    "noMatchingProducts": "Der App Store hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
+    "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   }
 }

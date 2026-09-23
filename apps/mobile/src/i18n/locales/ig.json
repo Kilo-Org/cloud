@@ -214,7 +214,6 @@
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
     "bonusCreditsExpiring": "Ego ojiji mgbakwunye {{amount}} ga-agwụ na {{date}}.",
-    "creditBalanceEmpty": "Ego ojiji gị agwụla. A na-ejikwa ego ojiji maka akaụntụ a na mpụga ngwa iOS.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "Tinye ọnụọgụ mmụba nke 1 ma ọ bụ karịa",
     "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
     "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa"
+  },
+  "credits": {
+    "title": "Zụta ego ojiji",
+    "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
+    "packLabel": "Tinye ego ojiji ruru {{amount}}",
+    "priceUnavailable": "Ọnụ ahịa adịghị",
+    "purchased": "E tinyela ego ojiji na nguzozi gị.",
+    "empty": "Ngwugwu ego ojiji adịghị ugbu a.",
+    "noMatchingProducts": "App Store eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "noMatchingProductsPlay": "Google Play eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "purchaseOwnedByAnotherAccount": "Ego ojiji dị na Apple Account a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya.",
+    "purchaseOwnedByAnotherAccountPlay": "Ego ojiji dị na akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya."
   }
 }

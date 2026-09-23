@@ -214,7 +214,6 @@
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
     "bonusCreditsExpiring": "ເຄຣດິດໂບນັດ {{amount}} ຈະໝົດອາຍຸ {{date}}.",
-    "creditBalanceEmpty": "ທ່ານບໍ່ມີເຄຣດິດຄົງເຫຼືອ. ການຈັດການເຄຣດິດສຳລັບບັນຊີນີ້ຕ້ອງເຮັດນອກແອັບ iOS.",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",
@@ -3229,5 +3228,17 @@
     "multiplierError": "ໃສ່ຕົວຄູນ 1 ຫຼື ຫຼາຍກວ່າ",
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ.",
     "pushOffByCategory": "ປິດໃນການແຈ້ງເຕືອນ"
+  },
+  "credits": {
+    "title": "ຊື້ເຄຣດິດ",
+    "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
+    "packLabel": "ເພີ່ມເຄຣດິດມູນຄ່າ {{amount}}",
+    "priceUnavailable": "ບໍ່ມີລາຄາ",
+    "purchased": "ເພີ່ມເຄຣດິດໃສ່ຍອດຂອງທ່ານແລ້ວ.",
+    "empty": "ແພັກເຄຣດິດບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້.",
+    "noMatchingProducts": "App Store ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
+    "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
+    "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
+    "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
   }
 }

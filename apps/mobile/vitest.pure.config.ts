@@ -53,6 +53,8 @@ export default defineProject({
       // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
       // this directory holds both kinds, and a file in both projects runs twice.
       'src/lib/kilo-pass/**/!(*.mounted).test.tsx',
+      'src/lib/credits/**/*.test.ts',
+      'src/lib/credits/**/*.test.tsx',
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',

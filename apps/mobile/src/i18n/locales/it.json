@@ -214,7 +214,6 @@
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
     "bonusCreditsExpiring": "{{amount}} di crediti bonus scadono il {{date}}.",
-    "creditBalanceEmpty": "Hai esaurito i crediti. Per questo account, i crediti si gestiscono al di fuori dell'app iOS.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -3272,5 +3271,17 @@
     "multiplierError": "Inserisci un moltiplicatore di 1 o più",
     "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
     "pushOffByCategory": "Disattivato in Notifiche"
+  },
+  "credits": {
+    "title": "Acquista crediti",
+    "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "packLabel": "Aggiungi {{amount}} in crediti",
+    "priceUnavailable": "Prezzo non disponibile",
+    "purchased": "I crediti sono stati aggiunti al tuo saldo.",
+    "empty": "I pacchetti di crediti non sono disponibili al momento.",
+    "noMatchingProducts": "L'App Store non ha restituito pacchetti di crediti corrispondenti.",
+    "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
+    "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
+    "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   }
 }

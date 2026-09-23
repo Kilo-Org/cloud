@@ -214,7 +214,6 @@
     "showBalance": "بیلانس ښکاره کړه",
     "balanceHidden": "بیلانس پټ دی",
     "bonusCreditsExpiring": "د {{amount}} انعامي کریډیټ موده په {{date}} پای ته رسېږي.",
-    "creditBalanceEmpty": "ستاسو کریډیټ خلاص شوی دی. د دې حساب کریډیټ د iOS اپلیکیشن څخه بهر اداره کېږي.",
     "signOutTitle": "له حسابه ووځم؟",
     "signOutMessage": "خپل کاري ځای ته د لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
     "deleteAccountTitle": "حساب ړنګ کړم؟",
@@ -3229,5 +3228,17 @@
     "multiplierError": "د 1 یا ډېر ضریب ولیکه",
     "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
     "pushOffByCategory": "په خبرتیاوو کې بند"
+  },
+  "credits": {
+    "title": "کریډیټ وپېرئ",
+    "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته د Kilo App کې د AI کوډ کولو غونډو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
+    "packLabel": "د {{amount}} په ارزښت کریډیټونه زیات کړئ",
+    "priceUnavailable": "بیه شتون نلري",
+    "purchased": "کریډیټونه ستاسو توازن ته زیات شول.",
+    "empty": "د کریډیټ بنډلونه اوس شتون نلري.",
+    "noMatchingProducts": "App Store د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
+    "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
+    "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
+    "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
   }
 }

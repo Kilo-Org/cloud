@@ -214,7 +214,6 @@
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
     "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
-    "creditBalanceEmpty": "Nie masz środków na koncie. Środkami na tym koncie zarządza się poza aplikacją na iOS.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -3315,5 +3314,17 @@
     "multiplierError": "Podaj mnożnik równy 1 lub większy",
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
     "pushOffByCategory": "Wyłączone w Powiadomieniach"
+  },
+  "credits": {
+    "title": "Kup kredyty",
+    "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
+    "packLabel": "Dodaj {{amount}} w kredytach",
+    "priceUnavailable": "Cena niedostępna",
+    "purchased": "Kredyty zostały dodane do Twojego salda.",
+    "empty": "Pakiety kredytów są obecnie niedostępne.",
+    "noMatchingProducts": "App Store nie zwrócił pasujących pakietów kredytów.",
+    "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
+    "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   }
 }

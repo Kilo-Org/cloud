@@ -214,7 +214,6 @@
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
     "bonusCreditsExpiring": "{{amount}} de crédits bonus expirent le {{date}}.",
-    "creditBalanceEmpty": "Vous n'avez plus de crédits. Pour ce compte, les crédits se gèrent en dehors de l'application iOS.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -3272,5 +3271,17 @@
     "multiplierError": "Saisissez un multiplicateur de 1 ou plus",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
     "pushOffByCategory": "Désactivé dans les notifications"
+  },
+  "credits": {
+    "title": "Acheter des crédits",
+    "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
+    "packLabel": "Ajouter {{amount}} en crédits",
+    "priceUnavailable": "Prix indisponible",
+    "purchased": "Des crédits ont été ajoutés à votre solde.",
+    "empty": "Les packs de crédits sont indisponibles pour le moment.",
+    "noMatchingProducts": "L'App Store n'a renvoyé aucun pack de crédits correspondant.",
+    "noMatchingProductsPlay": "Google Play n'a renvoyé aucun pack de crédits correspondant.",
+    "purchaseOwnedByAnotherAccount": "Les crédits associés à ce compte Apple Account appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
+    "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."
   }
 }

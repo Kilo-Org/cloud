@@ -12,7 +12,8 @@ import { SETTINGS_TOOLS_ENABLED_KEY } from '@/lib/storage-keys';
  * default, matching the Kilo-tools default — the user turns it off, and a
  * missing value is on rather than off.
  *
- * Sign-out drops it: `clearSettingsToolsEnabled` resets memory and deletes the
+ * The account boundary drops it: `clearSessionScopedState`, which both the
+ * sign-out body and a direct account switch call, resets memory and deletes the
  * persisted value, so the next account starts from the default.
  */
 const store = createSecureStorePreference<boolean>({

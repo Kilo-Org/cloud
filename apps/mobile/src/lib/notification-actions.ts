@@ -258,7 +258,9 @@ async function dispatchNeedsInputResponse(
       }
       // An unparseable PR URL falls back to the session route: the user still
       // lands on the raise instead of nowhere.
-      setPendingDeepLink(prPathForData(data) ?? notificationPathForData(data), 'notification');
+      setPendingDeepLink(prPathForData(data) ?? notificationPathForData(data), 'notification', {
+        organizationId: organizationIdForData(data),
+      });
       return true;
     }
     case NEEDS_INPUT_ACTION_IDS.openSession: {
@@ -266,7 +268,9 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
-      setPendingDeepLink(notificationPathForData(data), 'notification');
+      setPendingDeepLink(notificationPathForData(data), 'notification', {
+        organizationId: organizationIdForData(data),
+      });
       return true;
     }
     default: {
@@ -283,7 +287,9 @@ async function dispatchNeedsInputResponse(
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(notificationPathForData(data), 'notification');
+  setPendingDeepLink(notificationPathForData(data), 'notification', {
+    organizationId: organizationIdForData(data),
+  });
   return false;
 }
 
@@ -331,6 +337,17 @@ function parseNotificationPayload(data: unknown): PushData | null {
 
 function isRaiseData(data: PushData | null): data is NeedsInputRaiseData {
   return data?.type === 'cloud_agent_session';
+}
+
+/**
+ * The organization the tapped notification's session belongs to, or null when
+ * it carries none (a Personal session, or any other push type). Rides into the
+ * pending deep link so the gated consumer switches before it navigates. Shared
+ * so the cold-start body tap (notifications.ts) stashes the same organization
+ * as the warm tap paths here.
+ */
+export function organizationIdForData(data: PushData): string | null {
+  return data.type === 'cloud_agent_session' ? (data.organizationId ?? null) : null;
 }
 
 async function dismissResponseNotification(

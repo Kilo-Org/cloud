@@ -7,6 +7,7 @@ import '@/i18n';
 import { ContextControl, type ContextDisplayScope } from '@/components/context-control';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
+import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const list = vi.hoisted(() => vi.fn());
@@ -148,12 +149,18 @@ beforeEach(() => {
   appearance.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
-  storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
-    persisted = value;
+  storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
+    // Only the organization key is the selection under test here: an explicit
+    // Personal choice also writes the marker key beside it.
+    if (key === ORGANIZATION_STORAGE_KEY) {
+      persisted = value;
+    }
     await Promise.resolve();
   });
-  storage.remove.mockReset().mockImplementation(async () => {
-    persisted = null;
+  storage.remove.mockReset().mockImplementation(async (key: string) => {
+    if (key === ORGANIZATION_STORAGE_KEY) {
+      persisted = null;
+    }
     await Promise.resolve();
   });
   showPicker.mockReset();
@@ -178,8 +185,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     const names = Promise.withResolvers<typeof orgs>();
     list.mockReturnValue(names.promise);
     const ui = await mount();
-    expect(texts(ui).includes('Personal')).toBe(id === null);
-    expect(ui.renderer.root.findAllByType(Skeleton)).toHaveLength(id === null ? 0 : 1);
+    // An absent stored choice now waits for the organization list to settle
+    // before it publishes Personal, so the label is still resolving here.
+    expect(texts(ui)).not.toContain(label);
+    expect(ui.renderer.root.findAllByType(Skeleton)).toHaveLength(1);
     expect(picker(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
     await act(() => {
@@ -396,6 +405,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   });
 
   it('announces a save failure, keeps the selection, and retries persistence', async () => {
+    // A stored organization keeps the default from preselecting the first org,
+    // so the picker choice below is a real change that exercises the save path.
+    storage.read.mockResolvedValue('org-b');
     storage.write.mockRejectedValueOnce(new Error('write failed'));
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);

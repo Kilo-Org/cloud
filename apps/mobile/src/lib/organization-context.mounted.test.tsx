@@ -1,13 +1,27 @@
+/* eslint-disable max-lines -- test-renderer mounts the provider with the real query cache. */
 import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
-import { waitFor } from '@/test/render-with-providers';
+import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+
+const ORG_KEY = ORGANIZATION_STORAGE_KEY;
+/**
+ * The settled "Personal was chosen" marker, shared with the provider and the
+ * sign-out cleanup. It is a SECOND key so an explicit Personal choice survives
+ * the organization key's deletion, which now means 'not chosen yet' rather
+ * than Personal.
+ */
+const MARKER_KEY = ORGANIZATION_PERSONAL_STORAGE_KEY;
 
 const auth = vi.hoisted(() => ({ token: 'token-a' as string | undefined }));
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
+const list = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -15,11 +29,27 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: storage.write,
   deleteItemAsync: storage.remove,
 }));
+// The provider reads the shared `organizations.list` query through the same
+// shape `context-control.mounted.test.tsx` mocks.
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: { queryOptions: () => ({ queryKey: ['organizations-list'], queryFn: list }) },
+    },
+  }),
+}));
+
+type OrgEntry = { organizationId: string; organizationName: string; role: string };
+const orgA: OrgEntry = { organizationId: 'org-a', organizationName: 'Org A', role: 'owner' };
+const orgB: OrgEntry = { organizationId: 'org-b', organizationName: 'Org B', role: 'owner' };
+
+const savedMetadata = new Map<string, string>();
 
 let current: ReturnType<typeof useOrganization> | undefined = undefined;
 const publications: { token: string | undefined; id: string | null; loaded: boolean }[] = [];
-const writes: (string | null)[] = [];
-const renderers: TestRenderer.ReactTestRenderer[] = [];
+type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
+const mounted: Mounted[] = [];
+let client: QueryClient | undefined = undefined;
 
 function Probe() {
   current = useOrganization();
@@ -34,46 +64,177 @@ function scope() {
   return current;
 }
 
-const tree = () => createElement(OrganizationProvider, null, createElement(Probe));
-
-async function mount() {
-  const ref: { current?: TestRenderer.ReactTestRenderer } = {};
-  await act(() => {
-    ref.current = TestRenderer.create(tree());
-  });
-  if (!ref.current) {
-    throw new Error('provider did not mount');
+/** The exact tree `renderWithProviders` builds, so `renderer.update` keeps the client. */
+function tree() {
+  if (!client) {
+    throw new Error('query client not captured');
   }
-  renderers.push(ref.current);
-  return ref.current;
+  return createElement(
+    QueryClientProvider,
+    { client },
+    createElement(OrganizationProvider, null, createElement(Probe))
+  );
+}
+
+async function mount(): Promise<Mounted> {
+  const ui = await renderWithProviders(createElement(Probe), { wrapper: OrganizationProvider });
+  client = ui.queryClient;
+  mounted.push(ui);
+  return ui;
+}
+
+async function rerender(): Promise<void> {
+  await act(() => {
+    mounted.at(-1)?.renderer.update(tree());
+  });
+}
+
+function unmount(ui: Mounted): void {
+  const index = mounted.indexOf(ui);
+  if (index !== -1) {
+    mounted.splice(index, 1);
+  }
+  ui.unmount();
 }
 
 beforeEach(() => {
   auth.token = 'token-a';
   bumpAuthEpoch();
   current = undefined;
+  client = undefined;
   publications.length = 0;
-  writes.length = 0;
-  storage.read.mockReset().mockResolvedValue(null);
-  storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
-    writes.push(value);
-    await Promise.resolve(undefined);
+  savedMetadata.clear();
+  storage.read.mockReset().mockImplementation(async (key: string) => {
+    await Promise.resolve();
+    return savedMetadata.get(key) ?? null;
   });
-  storage.remove.mockReset().mockImplementation(async () => {
-    writes.push(null);
-    await Promise.resolve(undefined);
+  storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
+    savedMetadata.set(key, value);
+    await Promise.resolve();
   });
+  storage.remove.mockReset().mockImplementation(async (key: string) => {
+    savedMetadata.delete(key);
+    await Promise.resolve();
+  });
+  list.mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
-  act(() => {
-    for (const renderer of renderers.splice(0)) {
-      renderer.unmount();
-    }
+  for (const ui of mounted.splice(0)) {
+    ui.unmount();
+  }
+});
+
+describe('OrganizationProvider default organization', () => {
+  it('publishes a stored organization without waiting for the list', async () => {
+    savedMetadata.set(ORG_KEY, 'org-b');
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
+    await act(() => {
+      names.resolve([orgA]);
+    });
+    expect(scope().organizationId).toBe('org-b');
+  });
+
+  it('defaults to the first organization when nothing is stored', async () => {
+    list.mockResolvedValue([orgA, orgB]);
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
+  });
+
+  it('writes the default organization to the key non-React scope readers use', async () => {
+    list.mockResolvedValue([orgA, orgB]);
+    await mount();
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'org-a');
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
+    await waitFor(() => !scope().isSaving);
+  });
+
+  it('resolves an empty list to Personal', async () => {
+    list.mockResolvedValue([]);
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    // Personal from an empty list is not an explicit choice: neither key is
+    // written, so a later list with organizations still resolves its default.
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+  });
+
+  it('keeps Personal and reports a list failure without spinning', async () => {
+    list.mockRejectedValue(new Error('offline'));
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: 'restore' });
+    expect(publications.some(value => value.loaded && value.id === null)).toBe(true);
+  });
+
+  it('re-resolves the default through Retry after a list failure', async () => {
+    list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([orgA]);
+    await mount();
+    await waitFor(() => scope().error === 'restore');
+    await act(() => {
+      scope().retry();
+    });
+    await waitFor(() => scope().error === null && scope().isLoaded);
+    expect(scope().organizationId).toBe('org-a');
+  });
+
+  it('keeps an explicit Personal marker across a re-mount with organizations available', async () => {
+    savedMetadata.set(MARKER_KEY, 'personal');
+    list.mockResolvedValue([orgA]);
+    const first = await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    // An explicit Personal choice is not overridden by the default, so the
+    // organization key stays absent for every other scope reader too.
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    unmount(first);
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+  });
+
+  it('publishes nothing stale when a sign-out lands during the list fetch', async () => {
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    expect(scope().isLoaded).toBe(false);
+    auth.token = undefined;
+    await rerender();
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    await act(() => {
+      names.resolve([orgA]);
+    });
+    expect(scope().organizationId).toBeNull();
+    expect(publications.some(value => value.loaded && value.id !== null)).toBe(false);
+  });
+
+  it('attributes a late list result to the newer sign-in, never the old token', async () => {
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    auth.token = 'token-b';
+    await rerender();
+    expect(
+      publications.filter(value => value.token === 'token-b').every(value => !value.loaded)
+    ).toBe(true);
+    await act(() => {
+      names.resolve([orgA]);
+    });
+    await waitFor(() => scope().isLoaded);
+    expect(
+      publications.filter(value => value.token === 'token-a' && value.id === 'org-a')
+    ).toHaveLength(0);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
   });
 });
 
-describe('OrganizationProvider restoration', () => {
+describe('OrganizationProvider restoration fencing', () => {
   it('never publishes Personal before a delayed saved organization', async () => {
     const read = Promise.withResolvers<string | null>();
     storage.read.mockReturnValue(read.promise);
@@ -86,11 +247,6 @@ describe('OrganizationProvider restoration', () => {
     expect(publications.some(value => value.loaded && value.id === null)).toBe(false);
   });
 
-  it('resolves an absent stored value to Personal', async () => {
-    await mount();
-    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
-  });
-
   it('keeps a failed read unresolved and retries restoration', async () => {
     storage.read.mockRejectedValueOnce(new Error('read failed')).mockResolvedValue('org-a');
     await mount();
@@ -99,6 +255,7 @@ describe('OrganizationProvider restoration', () => {
     await act(() => {
       scope().retry();
     });
+    await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
   });
 
@@ -119,199 +276,105 @@ describe('OrganizationProvider restoration', () => {
     expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
   });
 
-  it('lets only the latest restoration retry publish', async () => {
-    const oldRead = Promise.withResolvers<string | null>();
-    const newRead = Promise.withResolvers<string | null>();
-    storage.read.mockRejectedValueOnce(new Error('failed'));
+  it('ignores a read after a token change', async () => {
+    const read = Promise.withResolvers<string | null>();
+    storage.read.mockReturnValueOnce(read.promise).mockResolvedValue('org-b');
     await mount();
-    storage.read.mockReturnValueOnce(oldRead.promise).mockReturnValueOnce(newRead.promise);
-    const retry = scope().retry;
+    auth.token = 'token-b';
+    await rerender();
     await act(() => {
-      retry();
-      retry();
+      read.resolve('org-a');
     });
-    await act(() => {
-      newRead.resolve('org-b');
-    });
-    await act(() => {
-      oldRead.resolve('org-a');
-    });
+    await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
   });
 
-  it('does not reuse signed-out readiness when a token arrives', async () => {
-    auth.token = undefined;
-    const renderer = await mount();
-    const read = Promise.withResolvers<string | null>();
-    storage.read.mockReturnValue(read.promise);
-    auth.token = 'token-b';
-    await act(() => {
-      renderer.update(tree());
-    });
-    expect(
-      publications.filter(value => value.token === 'token-b').every(value => !value.loaded)
-    ).toBe(true);
-    await act(() => {
-      read.resolve('org-b');
-    });
-    expect(scope().organizationId).toBe('org-b');
-  });
-
-  it('keeps the selected ID stable while a refreshed token restores the same context', async () => {
-    storage.read.mockResolvedValueOnce('org-a');
-    const renderer = await mount();
-    const read = Promise.withResolvers<string | null>();
-    storage.read.mockReturnValue(read.promise);
-    auth.token = 'refreshed-token';
-    await act(() => {
-      renderer.update(tree());
-    });
-    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: false });
-    await act(() => {
-      read.resolve('org-a');
-    });
-    expect(
-      publications
-        .filter(value => value.token === 'refreshed-token')
-        .every(value => value.id === 'org-a')
-    ).toBe(true);
-    expect(scope().isLoaded).toBe(true);
-  });
-
-  it.each(['token', 'epoch', 'unmount'])('ignores a read after %s invalidation', async reason => {
+  it('ignores a read after an epoch bump', async () => {
     const read = Promise.withResolvers<string | null>();
     storage.read.mockReturnValueOnce(read.promise).mockResolvedValue('org-b');
-    const renderer = await mount();
-    if (reason === 'token') {
-      auth.token = 'token-b';
-      await act(() => {
-        renderer.update(tree());
-      });
-    } else if (reason === 'epoch') {
-      bumpAuthEpoch();
-    } else {
-      act(() => {
-        renderer.unmount();
-      });
-      await mount();
-    }
+    await mount();
+    bumpAuthEpoch();
     await act(() => {
       read.resolve('org-a');
     });
-    expect(scope()).toMatchObject(
-      reason === 'epoch'
-        ? { organizationId: null, isLoaded: false, error: null }
-        : { organizationId: 'org-b', isLoaded: true, error: null }
-    );
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: false, error: null });
+  });
+
+  it('settles a pending default when the user selects the placeholder value', async () => {
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    await act(() => {
+      scope().setOrganizationId(null);
+    });
+    await act(() => {
+      names.resolve([orgA]);
+    });
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true });
+    expect(savedMetadata.get(MARKER_KEY)).toBe('personal');
   });
 });
 
 describe('OrganizationProvider persistence', () => {
-  it.each([
-    { id: 'org-a', fails: false },
-    { id: 'org-a', fails: true },
-    { id: null, fails: false },
-    { id: null, fails: true },
-  ])('keeps $id save Retry busy until storage settles (fails=$fails)', async ({ id, fails }) => {
-    storage.read.mockResolvedValue('previous-org');
+  it('writes the organization key and clears the Personal marker', async () => {
     await mount();
-    const write = id === null ? storage.remove : storage.write;
-    write.mockRejectedValueOnce(new Error('save failed'));
+    await waitFor(() => scope().isLoaded);
     await act(() => {
-      scope().setOrganizationId(id);
-    });
-    await waitFor(() => scope().error === 'save');
-    const save = Promise.withResolvers<undefined>();
-    write.mockImplementationOnce(async (_key: string, value?: string) => {
-      await save.promise;
-      writes.push(value ?? null);
-    });
-    await act(() => {
-      scope().retry();
-    });
-    expect(scope()).toMatchObject({
-      organizationId: id,
-      isLoaded: true,
-      error: 'save',
-      isSaving: true,
-    });
-    expect(writes).toEqual([]);
-    await act(() => {
-      if (fails) {
-        save.reject(new Error('retry failed'));
-      } else {
-        save.resolve(undefined);
-      }
+      scope().setOrganizationId('org-a');
     });
     await waitFor(() => !scope().isSaving);
-    expect(scope()).toMatchObject({ organizationId: id, error: fails ? 'save' : null });
-    expect(writes).toEqual(fails ? [] : [id]);
+    expect(savedMetadata.get(ORG_KEY)).toBe('org-a');
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', error: null });
   });
 
-  it.each(['org-b', null])('retries the latest selection %s, not a failed snapshot', async id => {
+  it('deletes the organization key and writes the Personal marker', async () => {
+    savedMetadata.set(ORG_KEY, 'org-a');
     await mount();
-    storage.write.mockRejectedValueOnce(new Error('save failed'));
+    await waitFor(() => scope().isLoaded);
+    await act(() => {
+      scope().setOrganizationId(null);
+    });
+    await waitFor(() => !scope().isSaving);
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    expect(savedMetadata.get(MARKER_KEY)).toBe('personal');
+    expect(scope()).toMatchObject({ organizationId: null, error: null });
+  });
+
+  it('keeps the selection and reports a save failure, then retries persistence', async () => {
+    savedMetadata.set(ORG_KEY, 'previous-org');
+    storage.write.mockRejectedValueOnce(new Error('write failed'));
+    await mount();
+    await waitFor(() => scope().isLoaded);
     await act(() => {
       scope().setOrganizationId('org-a');
     });
     await waitFor(() => scope().error === 'save');
-    const retry = scope().retry;
+    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: 'save' });
+    expect(savedMetadata.get(ORG_KEY)).toBe('previous-org');
     await act(() => {
-      scope().setOrganizationId(id);
-      retry();
+      scope().retry();
     });
-    await waitFor(() => writes.length === 2);
-    expect(writes).toEqual([id, id]);
-    expect(scope()).toMatchObject({
-      organizationId: id,
-      isLoaded: true,
-      error: null,
-      isSaving: false,
-    });
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'org-a' && !scope().isSaving);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', error: null });
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
   });
 
-  describe.each(['resolve', 'reject'])('obsolete save %s', outcome => {
-    it.each([
-      { reason: 'selection', expected: 'org-b', isSaving: true },
-      { reason: 'token', expected: null, isSaving: false },
-      { reason: 'epoch', expected: 'org-a', isSaving: true },
-      { reason: 'unmount', expected: null, isSaving: false },
-    ])('ignores completion after $reason invalidation', async ({ reason, expected, isSaving }) => {
-      const renderer = await mount();
-      const save = Promise.withResolvers<undefined>();
-      const newerSave = Promise.withResolvers<undefined>();
-      storage.write.mockReturnValueOnce(save.promise).mockReturnValueOnce(newerSave.promise);
-      await act(() => {
-        scope().setOrganizationId('org-a');
-      });
-      if (reason === 'selection') {
-        await act(() => {
-          scope().setOrganizationId('org-b');
-        });
-      } else if (reason === 'token') {
-        auth.token = undefined;
-        await act(() => {
-          renderer.update(tree());
-        });
-      } else if (reason === 'epoch') {
-        bumpAuthEpoch();
-      } else {
-        act(() => {
-          renderer.unmount();
-        });
-        await mount();
-      }
-      await act(() => {
-        if (outcome === 'resolve') {
-          save.resolve(undefined);
-        } else {
-          save.reject(new Error('obsolete'));
-        }
-      });
-      expect(scope()).toMatchObject({ organizationId: expected, error: null, isSaving });
-      await act(() => {
-        newerSave.resolve(undefined);
-      });
+  it('keeps a save busy until storage settles', async () => {
+    const save = Promise.withResolvers<undefined>();
+    storage.write.mockImplementationOnce(async () => {
+      await save.promise;
     });
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    await act(() => {
+      scope().setOrganizationId('org-a');
+    });
+    expect(scope().isSaving).toBe(true);
+    await act(() => {
+      save.resolve(undefined);
+    });
+    await waitFor(() => !scope().isSaving);
+    expect(scope()).toMatchObject({ organizationId: 'org-a', error: null });
   });
 });

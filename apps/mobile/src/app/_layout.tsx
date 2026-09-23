@@ -92,12 +92,13 @@ import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission
 import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
-  getPendingDeepLink,
+  consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
+import { useOrganization } from '@/lib/organization-context';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -212,6 +213,9 @@ function RootLayoutNav({
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  // The gated pending-deep-link consumer below switches to the tapped
+  // notification's organization through this provider before it navigates.
+  const { setOrganizationId } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
@@ -788,11 +792,23 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady) {
       return;
     }
-    const navigation = resolvePendingNavigation(getPendingDeepLink());
+    const pending = consumePendingDeepLink();
+    if (!pending) {
+      return;
+    }
+    // Switch to the destination's organization before navigating, in the same
+    // effect body with nothing awaited between: the route reads the new
+    // organization on its first render instead of fetching the old scope and
+    // showing an empty list. A destination with no organization (Personal)
+    // leaves the selection unchanged.
+    if (pending.organizationId !== null) {
+      setOrganizationId(pending.organizationId);
+    }
+    const navigation = resolvePendingNavigation(pending.href);
     if (navigation) {
       router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, router]);
+  }, [pendingDeepLink, isShellReady, router, setOrganizationId]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady) {

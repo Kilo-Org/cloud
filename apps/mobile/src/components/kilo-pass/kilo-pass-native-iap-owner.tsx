@@ -101,6 +101,20 @@ async function fetchAppStoreSubscriptions(productSkus: string[]): Promise<StoreK
   return storeProducts;
 }
 
+/**
+ * Every product identifier recovery, restore, and ownership may act on: the ones
+ * the backend advertises unioned with the ones the store resolved. A store that
+ * cannot query one tier must not drop it from this set — an owned but
+ * uncompleted transaction for that tier would be released instead of completed,
+ * costing the user a purchase they paid for.
+ */
+function getEnabledProductIds(
+  backendProductIds: readonly string[],
+  storeProductIds: readonly string[]
+): string[] {
+  return [...new Set([...backendProductIds, ...storeProductIds])];
+}
+
 export type KiloPassNativeIapContextValue = {
   products: readonly AppStoreKiloPassProduct[];
   productsIsLoading: boolean;
@@ -243,26 +257,30 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
 
-  // Server-backed fallback for the recovery SKU list: when the store fetch
-  // fails or returns no products, recovery still needs the enabled product IDs
-  // so charged-but-uncompleted transactions are completed instead of released.
+  // The backend's product identifiers. The enabled-id set below unions them
+  // with the store-resolved ones, so a tier the store cannot query still has
+  // its charged-but-uncompleted transactions completed instead of released.
   const serverProductsQuery = useQuery(trpc.kiloPass.getMobileStoreProducts.queryOptions());
   const productsQuery = useStoreKiloPassProducts({
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
   });
-  const enabledAppleProductIds = useMemo(() => {
-    if (productsQuery.products.length > 0) {
-      return productsQuery.products.map(product => product.appleProductId);
-    }
-    return serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [];
-  }, [productsQuery.products, serverProductsQuery.data]);
-  const enabledGoogleProductIds = useMemo(() => {
-    if (productsQuery.products.length > 0) {
-      return productsQuery.products.map(product => product.googleProductId);
-    }
-    return serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [];
-  }, [productsQuery.products, serverProductsQuery.data]);
+  const enabledAppleProductIds = useMemo(
+    () =>
+      getEnabledProductIds(
+        serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
+        productsQuery.products.map(product => product.appleProductId)
+      ),
+    [productsQuery.products, serverProductsQuery.data]
+  );
+  const enabledGoogleProductIds = useMemo(
+    () =>
+      getEnabledProductIds(
+        serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [],
+        productsQuery.products.map(product => product.googleProductId)
+      ),
+    [productsQuery.products, serverProductsQuery.data]
+  );
 
   const ownedPurchase = useMemo(() => {
     if (!isIapPlatform) {
@@ -318,13 +336,19 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
           const result = await queryClient.fetchQuery(
             trpc.kiloPass.getMobileStoreProducts.queryOptions()
           );
-          return result.products.map(product => product.appleProductId);
+          return getEnabledProductIds(
+            result.products.map(product => product.appleProductId),
+            enabledAppleProductIds
+          );
         },
         loadEnabledGoogleProductIds: async () => {
           const result = await queryClient.fetchQuery(
             trpc.kiloPass.getMobileStoreProducts.queryOptions()
           );
-          return result.products.map(product => product.googleProductId);
+          return getEnabledProductIds(
+            result.products.map(product => product.googleProductId),
+            enabledGoogleProductIds
+          );
         },
         finishTransaction,
         invalidateAfterCompletion,

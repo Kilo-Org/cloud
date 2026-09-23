@@ -84,7 +84,24 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  // The two floors below keep the scroll CONTENT reachable; they do not keep
+  // The form is edge-to-edge and the window never resizes for the IME on
+  // either platform, so the screen needs two floors. The first is the
+  // navigation-bar inset, which the screen root keeps as paddingBottom, so the
+  // pinned footer can never render inside the bar: the Start action sits in a
+  // footer below the scroll body, and without the inset the footer would render
+  // in the navigation bar's region (a formSheet over this screen no longer
+  // leaves that region exposed below itself: the sheet is fixed at its shared
+  // options, `sheetShouldOverflowTopInset`). The second is the keyboard height,
+  // because the composer auto-focuses on open and without the keyboard floor
+  // the Start control stays half-hidden behind the keyboard strip; the
+  // keyboard-lift view below adds the reported IME height above that inset.
+  // That lift view is the app's cross-platform IME primitive
+  // (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide on iOS), one
+  // implementation for both platforms; the footer is its second child, so the
+  // IME lifts the action too and no scroll position can carry the Start action
+  // under the bar or the keyboard.
+  //
+  // The composer reveal keeps the scroll CONTENT reachable; it does not keep
   // the composer card's own bottom row (the mode/model pills) above the IME —
   // the card is the first child, so it is drawn under the keyboard. This
   // reveal scrolls the card's bottom edge to the viewport's bottom, changing
@@ -95,18 +112,6 @@ export function NewSessionConfigureForm({
   // edge (rounded corner, top padding, the prompt's first line) comes back
   // clipped under the header.
   const composerReveal = useComposerRevealScroll();
-  // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the screen needs two floors: the navigation-bar inset
-  // — the Start action sits in a footer below the scroll body, and without the
-  // inset the footer would render in the navigation bar's region (a formSheet
-  // over this screen no longer leaves that region exposed below itself: the
-  // sheet is fixed at its shared options, `sheetShouldOverflowTopInset`) — and
-  // the keyboard height, because the composer auto-focuses on open and without
-  // the keyboard floor the Start control stays half-hidden behind the keyboard
-  // strip. The keyboard-lift view is the app's cross-platform IME primitive
-  // (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide on iOS), so
-  // the same implementation runs on both platforms; the footer is its second
-  // child, so the IME lifts the action too.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the IME, so the two never stack into a double lift.
@@ -280,11 +285,11 @@ export function NewSessionConfigureForm({
             Persistent failure feedback for the cloud create, in the reserved
             spot above Start. A retryable rejection carries the retry control;
             a terminal one says what the server reported instead. It rides with
-            the action it answers, so the feedback is on screen wherever the
-            body is scrolled. The form owns this feedback, so the creator hook
-            stays silent for it. Cloud-only: the route also clears the failure
-            when the target changes, and this gate keeps a stale one off a
-            remote target no matter which path selected it.
+            the action it answers, so no scroll position can carry it away. The
+            form owns this feedback, so the creator hook stays silent for it.
+            Cloud-only: the route also clears the failure when the target
+            changes, and this gate keeps a stale one off a remote target no
+            matter which path selected it.
           */}
           {cloudCreateError && !isRemote ? (
             <NewSessionCloudCreateError

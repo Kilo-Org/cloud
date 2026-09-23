@@ -184,15 +184,17 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
-function findElement(node: Node, typeName: string): Record<string, unknown> | null {
+type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
+
+/** The first node of `typeName`, so a test can inspect its position in the tree. */
+function findElement(node: Node, typeName: string): ElementNode {
   if (node === null || typeof node !== 'object') {
     return null;
   }
-  const props = node.props ?? {};
-  const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type === typeName) {
-    return node;
+  const typed = node as { type?: unknown; props?: Record<string, unknown> };
+  const children = typed.props?.children;
+  if (typed.type === typeName) {
+    return typed;
   }
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findElement(child as Node, typeName);
@@ -211,13 +213,13 @@ function findOnLayoutHandler(
     return null;
   }
   const props = node.props ?? {};
+  const children = props.children;
   const type = (node as { type?: unknown }).type;
   if (type !== 'ScrollView' && typeof props.onLayout === 'function') {
     return props.onLayout as (event: {
       nativeEvent: { layout: { y: number; height: number } };
     }) => void;
   }
-  const children = props.children;
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findOnLayoutHandler(child as Node);
     if (found) {
@@ -333,7 +335,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   it.each(['android', 'ios'] as const)(
-    'clears the navigation bar at the screen root and lifts the body above the IME on %s',
+    'floors the root at the safe-area bottom and lifts the pinned footer above the IME on %s',
     async os => {
       platformState.OS = os;
       insetsState.bottom = 42;
@@ -375,20 +377,18 @@ describe('NewSessionConfigureForm', () => {
 
       // It renders in the footer instead: a sibling of the body inside the
       // keyboard-lift view, so it is always on screen and the IME lifts it.
-      const liftView = findElement(element, 'AppAwareKeyboardPaddingView');
-      expect(liftView).not.toBeNull();
-      expect(findElementByType(liftView, 'ScrollView')).not.toBeNull();
-      expect(findElementByType(liftView, 'NewSessionStartButton')).not.toBeNull();
+      const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+      expect(lift).not.toBeNull();
+      expect(findElement(lift, 'ScrollView')).not.toBeNull();
+      expect(findElement(lift, 'NewSessionStartButton')).not.toBeNull();
 
       // Below the body, not above it: the pinned bottom bar.
-      const liftChildren = (liftView?.props as { children?: Node[] } | undefined)?.children ?? [];
-      const bodyIndex = liftChildren.findIndex(
-        child => (child as { type?: unknown } | undefined)?.type === 'ScrollView'
-      );
+      const liftChildren = (lift?.props?.children ?? []) as Node[];
+      const bodyIndex = liftChildren.findIndex(child => findElement(child, 'ScrollView') !== null);
       const footerIndex = liftChildren.findIndex(
-        child => findElementByType(child, 'NewSessionStartButton') !== null
+        child => findElement(child, 'NewSessionStartButton') !== null
       );
-      expect(bodyIndex).toBeGreaterThanOrEqual(0);
+      expect(bodyIndex).toBe(0);
       expect(footerIndex).toBeGreaterThan(bodyIndex);
     } finally {
       insetsState.bottom = 0;
@@ -397,19 +397,32 @@ describe('NewSessionConfigureForm', () => {
 
   it('keeps the cloud-create failure with the Start action it answers', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),
-      cloudCreateError: { retryable: true, message: 'prepare failed' },
+      runOnInstance: null,
+      cloudCreateError,
     }) as Node;
 
+    // A failure the user answers at the pinned Start must not end up scrolled
+    // off screen above it: it lives in the pinned footer, not the scroll body.
     const scrollBody = findElement(element, 'ScrollView');
     expect(scrollBody).not.toBeNull();
-    // A failure the user answers at the pinned Start must not end up scrolled
-    // off screen above it.
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
+    const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+    expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -842,7 +855,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
-  // ── Case 14: reorder wiring lock ──
+  // ── Case 13: reorder wiring lock ──
   it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 

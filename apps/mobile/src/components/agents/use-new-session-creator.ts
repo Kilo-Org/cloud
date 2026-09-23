@@ -100,7 +100,8 @@ export function useNewSessionCreator({
     // call prepareSession with an empty prompt. The voice controller has
     // already presented its own feedback, so a no-op here preserves the
     // user's draft and screen state without toasting.
-    const prompt = resolveNewSessionPromptForCreate(promptRef.current);
+    const draft = promptRef.current;
+    const prompt = resolveNewSessionPromptForCreate(draft);
     if (prompt === null) {
       return;
     }
@@ -116,6 +117,17 @@ export function useNewSessionCreator({
     // inside `uploadPending`; `{ ok: false }` is truthy, so test `ok`.
     const uploaded = await attachments.uploadPending();
     if (!uploaded.ok) {
+      setIsCreating(false);
+      return;
+    }
+
+    // The keyboard stays up while a create is in flight (making a focused
+    // Android input non-editable drops the IME and collapses the pinned
+    // footer), so the composer keeps taking edits. This attempt holds the
+    // snapshot above: a draft the user changed mid-flight is a request for
+    // different text, so cancel before the create is dispatched instead of
+    // discarding the edit. Their edited draft stays for the next Start.
+    if (promptRef.current !== draft) {
       setIsCreating(false);
       return;
     }

@@ -335,11 +335,12 @@ export function NewSessionPrompt({
       await onPrefillAttachments([file]);
     },
     addText: text => {
-      // The hook calls the latest render's callback, so this sees a create or
-      // a voice session that started during the clipboard read. Neither may
-      // take a draft mutation. `NewSessionPrompt` holds no submit lock, so the
-      // button's own disabled rule is the authority.
-      if (!control.inputEditable) {
+      // The hook calls the latest render's callback, so this sees a create
+      // that started during the clipboard read. A create already holds its own
+      // snapshot, so a late paste must not land in the draft behind it.
+      // `NewSessionPrompt` holds no submit lock, so the button's own disabled
+      // rule is the authority.
+      if (control.draftMutationLocked) {
         return;
       }
       promptSelectionRef.current = pasteTextIntoComposer(text, {
@@ -378,7 +379,7 @@ export function NewSessionPrompt({
   }
 
   function handleInsertNewline() {
-    if (!control.inputEditable) {
+    if (control.draftMutationLocked) {
       return;
     }
     promptSelectionRef.current = pasteTextIntoComposer('\n', {
@@ -457,10 +458,13 @@ export function NewSessionPrompt({
           placeholderTextColor={colors.mutedForeground}
           multiline
           defaultValue={initialPrompt}
-          className={cn(
-            'w-full px-2 py-2 text-base leading-6 text-foreground',
-            isCreating && 'opacity-50'
-          )}
+          // No dimming while a create is in flight: the field stays editable
+          // (an in-flight create must not steal the IME from the pinned
+          // footer), so it must not read as disabled. The busy affordance is
+          // the Start button's own spinner. An edit made mid-flight is not
+          // discarded: the creator cancels the attempt before it dispatches
+          // and keeps this draft (see `createSessionFromDraft`).
+          className="w-full px-2 py-2 text-base leading-6 text-foreground"
           style={[
             promptInputStyle,
             { height: promptMeasure.height },
@@ -472,9 +476,7 @@ export function NewSessionPrompt({
           onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
           scrollEnabled={promptMeasure.height >= promptMaxHeight}
-          editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
-          accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           returnKeyType={returnSendsMessage ? 'send' : 'default'}
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
           onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
@@ -506,15 +508,15 @@ export function NewSessionPrompt({
             <View className="ml-1">
               <Pressable
                 onPress={handleInsertNewline}
-                disabled={!control.inputEditable}
+                disabled={control.draftMutationLocked}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityRole="button"
                 accessibilityLabel={t('agentChat.composer.insertNewline')}
-                accessibilityState={{ disabled: !control.inputEditable }}
+                accessibilityState={{ disabled: control.draftMutationLocked }}
                 style={{ minHeight: PROMPT_HIT_TARGET, minWidth: PROMPT_HIT_TARGET }}
                 className={cn(
                   'items-center justify-center rounded-full active:opacity-70',
-                  !control.inputEditable && 'opacity-50'
+                  control.draftMutationLocked && 'opacity-50'
                 )}
               >
                 <CornerDownLeft size={18} color={colors.mutedForeground} />

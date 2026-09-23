@@ -10,6 +10,7 @@
     "./slack-credential": "./src/slack-credential.ts",
     "./internal-service-token-audiences": "./src/internal-service-token-audiences.ts",
     "./instance-id": "./src/instance-id.ts",
+    "./base64url": "./src/base64url.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
@@ -46,7 +47,8 @@
     "./code-review-council": "./src/code-review-council.ts",
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
     "./r2-client": "./src/r2-client.ts",
-    "./direct-byok-model": "./src/direct-byok-model.ts"
+    "./direct-byok-model": "./src/direct-byok-model.ts",
+    "./user-id-encoding": "./src/user-id-encoding.ts"
   },
   "scripts": {
     "test": "vitest run",

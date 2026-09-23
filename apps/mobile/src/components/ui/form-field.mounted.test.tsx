@@ -8,10 +8,16 @@ import { i18n } from '@/i18n';
 import ar from '@/i18n/locales/ar.json';
 import en from '@/i18n/locales/en.json';
 
+const rtl = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
   TextInput: 'TextInput',
+  I18nManager: {
+    get isRTL() {
+      return rtl.isRTL;
+    },
+  },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -22,6 +28,7 @@ vi.mock('@/lib/a11y/status-announcement', () => ({ useStatusAnnouncement: vi.fn(
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 afterEach(() => {
+  rtl.isRTL = false;
   act(() => {
     renderer?.unmount();
   });
@@ -103,5 +110,41 @@ describe('FormField reserved validation space', () => {
     expect(renderer?.root.findByType(AccessibleStatus).props.message).toBe(
       i18n.t('login.pleaseEnterEmail')
     );
+  });
+});
+
+describe('FormField direction-aware content alignment', () => {
+  function mountInput(style?: { textAlign: 'center' }) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, { label: i18n.t('login.emailAddress'), style })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer.root.findByType('TextInput');
+  }
+
+  it('right-aligns the field content in a right-to-left interface', () => {
+    // The label mirrors to the right edge with the rest of the RTL layout, so
+    // the value must sit on the same side even when it is Latin (an email
+    // address, whose own strong direction would otherwise stay left).
+    rtl.isRTL = true;
+
+    expect(mountInput().props.style).toEqual([{ textAlign: 'right' }, undefined]);
+  });
+
+  it('leaves the field style to the caller in a left-to-right interface', () => {
+    rtl.isRTL = false;
+
+    expect(mountInput().props.style).toBeUndefined();
+  });
+
+  it('keeps an explicit caller alignment after the RTL default', () => {
+    rtl.isRTL = true;
+    const centered = { textAlign: 'center' } as const;
+
+    expect(mountInput(centered).props.style).toEqual([{ textAlign: 'right' }, centered]);
   });
 });

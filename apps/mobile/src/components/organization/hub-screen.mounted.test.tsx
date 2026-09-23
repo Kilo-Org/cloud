@@ -10,6 +10,7 @@ import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
+import { compiledDimensions } from '@/test/native-dimensions';
 
 import '@/i18n';
 import { OrganizationHubScreen } from './hub-screen';
@@ -201,6 +202,31 @@ describe('OrganizationHubScreen rename control', () => {
     expect(width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
 
     expect(control.props.accessibilityRole).toBe('button');
+    unmount();
+  });
+
+  it('compiles the rename control box to at least 28dp with a 44pt reach', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const control = findRenameControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    // The audit reads the control's laid-out node and `hitSlop` never widens
+    // it, so assert the box the installed Tailwind and react-native-css
+    // compilers emit for the class, not a hand-written utility map.
+    const declarations = (await compiledDimensions(control.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    const slop = hitSlopPerSide(control.props.hitSlop);
+
+    expect(box.height).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(box.height + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
+    expect(box.width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
     unmount();
   });
 

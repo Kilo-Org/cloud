@@ -17,6 +17,7 @@ export function resolveKeyboardPaddingEventsForPlatform(
   platform: string
 ): KeyboardPaddingPlatformEvents | null {
   if (platform === 'android') {
+    // Android does not provide keyboardWillShow/keyboardWillHide events.
     return { show: 'keyboardDidShow', hide: 'keyboardDidHide' };
   }
   if (platform === 'ios') {

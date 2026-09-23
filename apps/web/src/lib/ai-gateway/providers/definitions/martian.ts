@@ -5,6 +5,7 @@ export const MARTIAN = {
   id: 'martian',
   apiUrl: 'https://api.withmartian.com/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('MARTIAN_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'responses', 'messages'],

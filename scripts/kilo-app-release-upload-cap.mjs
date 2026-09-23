@@ -125,8 +125,14 @@ function main() {
       windowHours = Number(argv[(index += 1)]);
     } else if (arg === '--now') {
       now = argv[(index += 1)];
+      if (now === undefined) {
+        return usage('--now requires an ISO8601 timestamp');
+      }
     } else if (arg === '--prefix') {
       prefix = argv[(index += 1)];
+      if (prefix === undefined) {
+        return usage('--prefix requires a value');
+      }
     } else {
       return usage(`unknown argument: ${arg}`);
     }

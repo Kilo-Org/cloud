@@ -20,7 +20,9 @@
  * A `--land` whose branch is gone or cannot be pushed is not a failed build:
  * the composed section is carried to the `--pending` branch and the next build
  * writes it above its own section. The store submission already succeeded, so
- * the run stays green and the changelog line is not lost.
+ * the run stays green and the changelog line is not lost. A `--pending` branch
+ * that exists but cannot be read is never overwritten: the carry is refused
+ * instead, so a transient read failure cannot drop the sections it holds.
  *
  * Exit codes:
  *   0 - the section was composed, written, landed, was already present, or was
@@ -65,10 +67,10 @@ const CHANGELOG_EXCLUDE = ':(exclude)apps/mobile/CHANGELOG.md';
 // version line and the changelog together.
 const VERSION_BUMP_FILES = new Set(['apps/mobile/app.config.ts', 'apps/mobile/CHANGELOG.md']);
 
-const VERSION_RE = /^  version: '([0-9][0-9.]*)',$/m;
+const VERSION_RE = /^ {2}version: '([0-9][0-9.]*)',$/m;
 const PR_SUBJECT_RE = /\(#\d+\)$/;
 const DIFF_CHANGE_RE = /^[+-][^+-]/;
-const DIFF_VERSION_RE = /^[+-]  version: '/;
+const DIFF_VERSION_RE = /^[+-] {2}version: '/;
 
 const INITIAL_MARKER = '- Initial release: no earlier build to compare against.';
 const NO_CHANGES_MARKER = '- No user-visible changes since the previous build.';
@@ -475,20 +477,39 @@ function commitOn(parent, path, content, message) {
   }
 }
 
-/** The sections carried by the pending branch, newest first; [] when none. */
+/** True when a fetch failed because the ref does not exist on the remote. */
+function isMissingRef(error) {
+  const stderr = error && error.stderr ? String(error.stderr) : '';
+  return /couldn't find remote ref/i.test(stderr);
+}
+
+/**
+ * The sections carried by the pending branch, newest first. `{ sections: [] }`
+ * when the branch holds none, and a branch that does not exist yet is not an
+ * error. Any other read failure is `{ sections: [], error }`: it is not the
+ * same as "no carried sections", and the carry path force-pushes, so writing
+ * over content that could not be read would drop those sections for ever.
+ */
 function readPending(remote, branch) {
   if (!branch) {
-    return [];
+    return { sections: [] };
   }
   try {
     git(['fetch', '--depth=1', remote, branch], { stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch {
-    return [];
+  } catch (error) {
+    if (isMissingRef(error)) {
+      return { sections: [] };
+    }
+    return { sections: [], error: reasonOf(error) };
   }
   try {
-    return splitSections(git(['show', `FETCH_HEAD:${PENDING_FILE}`]));
-  } catch {
-    return [];
+    return { sections: splitSections(git(['show', `FETCH_HEAD:${PENDING_FILE}`])) };
+  } catch (error) {
+    const stderr = error && error.stderr ? String(error.stderr) : '';
+    if (/does not exist in/i.test(stderr)) {
+      return { sections: [] };
+    }
+    return { sections: [], error: reasonOf(error) };
   }
 }
 
@@ -546,7 +567,11 @@ function landSection(options, heading, section) {
 
   // Sections an earlier build could not land ride along above their own, so a
   // branch that was merged during that build never loses its changelog line.
-  const pending = readPending(remote, options.pending);
+  // A pending branch that exists but cannot be read is not an empty one: the
+  // carry path below force-pushes, and overwriting content that could not be
+  // read would drop the sections an earlier build carried there.
+  const pendingRead = readPending(remote, options.pending);
+  const pending = pendingRead.sections;
 
   for (let attempt = 1; attempt <= MAX_LAND_RETRIES + 1; attempt += 1) {
     try {
@@ -588,6 +613,11 @@ function landSection(options, heading, section) {
   // The branch was merged and deleted while the build ran. The submission
   // already succeeded, so the run stays green: the section waits for the next
   // build's section instead of being lost.
+  if (pendingRead.error) {
+    return fail(
+      `could not land ${heading} on ${branch}, and ${options.pending} could not be read (${pendingRead.error}); refusing to overwrite the sections it carries`
+    );
+  }
   try {
     writePending(remote, options.pending, [
       section,

@@ -77,11 +77,19 @@ jobs:
           echo "Last release tag: $LAST_TAG"
 
           # Check for changes in kilo-app or its direct workspace:* inputs since that tag.
+          # This list must mirror the push `paths` filter above: the hourly
+          # schedule has no paths filter, so anything extra here (a lockfile
+          # bump outside the app paths, say) releases on the next scheduled run
+          # what a push would have ignored. pnpm-lock.yaml is deliberately
+          # absent, for the same reason the push trigger excludes it: an
+          # unrelated dependency bump elsewhere in the monorepo must not submit
+          # a build. A bump of an app dependency also edits
+          # apps/mobile/package.json, which is inside apps/mobile/ here.
           # CHANGELOG.md is excluded: the changelog commit this workflow pushes onto
           # the version-bump branch re-triggers this workflow, and the tag marks the
           # pre-changelog commit, so without the exclusion every release starts the
           # next one. The same exclusion retires the bump-PR merge from the range.
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ pnpm-lock.yaml ':(exclude)apps/mobile/CHANGELOG.md')
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
 
           # The bump-version job edits the version line after every submission. Its
           # merged PR must not release the same code again, or every release starts
@@ -350,13 +358,18 @@ jobs:
 
       # An open bump PR already carries the next version. A second one would
       # bump to the same number and conflict with it.
+      # Only a PR from this repository counts: `gh pr list` also returns PRs
+      # opened from forks, and a fork PR whose head branch happens to be named
+      # `kilo-app-version-bump-x.y.z` would make this job skip the bump and
+      # publish a branch the changelog job cannot fetch from origin. The
+      # version would never be bumped while that PR stayed open.
       - name: Look for an open bump PR
         id: pending
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCHES=$(gh pr list --state open --limit 100 --json headRefName \
-            --jq '[.[] | select(.headRefName | startswith("kilo-app-version-bump-"))] | .[].headRefName')
+          BRANCHES=$(gh pr list --state open --limit 100 --json headRefName,isCrossRepository \
+            --jq '[.[] | select((.headRefName | startswith("kilo-app-version-bump-")) and (.isCrossRepository | not))] | .[].headRefName')
           OPEN=$(printf '%s\n' "$BRANCHES" | grep -c . || true)
           if [ "$OPEN" != "0" ]; then
             echo "A kilo-app version bump PR is already open — nothing to open."

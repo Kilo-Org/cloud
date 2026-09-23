@@ -278,6 +278,13 @@ export function SessionDetailContent({
   }, []);
 
   const messages = useAtomValue(manager.atoms.messagesList);
+  // The live list behind a stable identity for the callbacks the transcript
+  // hands to its memoized rows. `renderItem` and `handleRetryMessage` read the
+  // current list through this ref instead of capturing `messages`, so neither
+  // changes identity on a streaming publish. Assigned during render, the same
+  // way `liveModelPickerSelectionScopeRef` below is.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -301,6 +308,18 @@ export function SessionDetailContent({
     totalCost
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  // The accessor handed to the transcript's rows must keep one identity across
+  // streaming publishes: the SDK re-emits `childMessages` on every
+  // `partsRevision` bump, and a changing prop would defeat `MessageBubble`'s
+  // shallow memo for every visible row. The in-transcript subagent card
+  // subscribes to the atom itself (`LiveChildSessionSection`), so it stays live
+  // without this identity changing.
+  const getChildMessagesRef = useRef(getChildMessages);
+  getChildMessagesRef.current = getChildMessages;
+  const getChildMessagesForRows = useCallback(
+    (childSessionId: string) => getChildMessagesRef.current(childSessionId),
+    []
+  );
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -1180,7 +1199,7 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
-      const prompt = resolveRetryPrompt(message, messages);
+      const prompt = resolveRetryPrompt(message, messagesRef.current);
       if (prompt === null) {
         return;
       }
@@ -1207,7 +1226,7 @@ export function SessionDetailContent({
         },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(
@@ -1369,7 +1388,9 @@ export function SessionDetailContent({
           ? pendingMessages.get(item.message.info.id)
           : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
-      const retryPrompt = resolveRetryPrompt(item.message, messages);
+      // Read the live list through the ref: capturing `messages` here would
+      // change this callback's identity on every streaming publish.
+      const retryPrompt = resolveRetryPrompt(item.message, messagesRef.current);
       const bubble = (
         <MessageBubble
           message={item.message}
@@ -1381,7 +1402,10 @@ export function SessionDetailContent({
           // so feeding it the stripped list would turn a reasoning stream into a
           // stale activity or "Waiting for activity" instead of "Thinking".
           // The card renders no child rows, so nothing thinking-related leaks.
-          getChildMessages={getChildMessages}
+          // `getChildMessagesForRows` is the ref-backed accessor: a stable
+          // identity here is what lets an unchanged row bail out of the memo.
+          // The card itself subscribes to the atom, so it stays live.
+          getChildMessages={getChildMessagesForRows}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
@@ -1415,13 +1439,12 @@ export function SessionDetailContent({
     [
       lastAssistantMessageId,
       isStreaming,
-      getChildMessages,
+      getChildMessagesForRows,
       modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
-      messages,
       handleRetryMessage,
       handleCopyToComposer,
       handleOpenDetails,

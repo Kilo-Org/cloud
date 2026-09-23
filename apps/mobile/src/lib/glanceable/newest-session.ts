@@ -45,9 +45,10 @@ function titleOf(row: NewestSessionRow | null): string | null {
   if (row === null) {
     return null;
   }
-  // A blank title would draw an empty newest line; a session still carrying
-  // the backend's `New session - ${ISO}` placeholder has no name a person
-  // wrote, and the surface shows nothing rather than the machine string.
+  // A backend default title (`New session - <ISO>`) is machine output, and a
+  // blank title would draw an empty newest line; a session with no name a
+  // person wrote shows nothing rather than a label with no name (or the
+  // machine string) after it.
   return sessionDisplayTitle(row.title) ?? null;
 }
 

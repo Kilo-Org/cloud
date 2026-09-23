@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Kada je isključeno, tipka za novi red umeće novi red u polja za unos poruke agentima.",
     "biometricUnlock": "Otključavanje biometrijom",
     "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta provedenih u pozadini.",
-    "featureFlags": "Zastavice funkcija",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "udaljeno · ≥ {{min}}",
-    "featureFlagSkipped": "zadano · < {{min}}",
-    "featureFlagNotLoaded": "zadano · nije učitano",
     "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2265,10 +2260,6 @@
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
       "linesOf": "redovi {{start}}–{{end}} od {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Radnja {{action}} u usluzi Cloud Agent nije uspjela ({{status}}).",
-      "failed": "Radnja {{action}} u usluzi Cloud Agent nije uspjela."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ulazni podaci koji se ne mogu serijalizirati]",
       "errorPrefix": "Greška: {{error}}"
@@ -2364,8 +2355,7 @@
       "assistantProviderRejected": "Pružalac usluge je odbio zahtjev.",
       "assistantStopped": "Generisanje odgovora je zaustavljeno.",
       "assistantContextOverflow": "Razgovor je predug za model.",
-      "assistantFailed": "Generisanje odgovora nije uspjelo.",
-      "sendFailed": "Slanje poruke nije uspjelo. Pokušaj ponovo."
+      "assistantFailed": "Generisanje odgovora nije uspjelo."
     },
     "filePart": {
       "loadingImage": "Učitavanje slike",

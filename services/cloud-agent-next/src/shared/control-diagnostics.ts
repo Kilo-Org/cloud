@@ -275,6 +275,41 @@ export const controlDiagnosticFieldsSchema = z
     statusQueryPending: z.boolean().optional(),
     questionQueryPending: z.boolean().optional(),
     permissionQueryPending: z.boolean().optional(),
+    workloadPhase: z
+      .enum(['probe', 'applied', 'migration', 'oom', 'stats', 'rollback', 'failed'])
+      .optional(),
+    workloadFailure: z
+      .enum([
+        'flag_off',
+        'no_finite_limit',
+        'below_minimum',
+        'not_delegated',
+        'occupied',
+        'controller_unavailable',
+        'readback_mismatch',
+        'write_failed',
+        'unavailable',
+        'pid_changed',
+        'membership_unconfirmed',
+      ])
+      .optional(),
+    containerLimitBytes: count.optional(),
+    aggregateMaxBytes: count.optional(),
+    reserveBytes: count.optional(),
+    appliedMaxBytes: count.optional(),
+    readbackMaxBytes: count.optional(),
+    currentBytes: count.optional(),
+    peakBytes: count.optional(),
+    oomKills: count.optional(),
+    oomGroupKills: count.optional(),
+    migratedCount: count.optional(),
+    toolCount: count.optional(),
+    serverCount: count.optional(),
+    pressureSomeTotal: count.optional(),
+    pressureFullTotal: count.optional(),
+    cpuController: z.boolean().optional(),
+    siblingProtection: z.boolean().optional(),
+    workloadLimitSource: z.enum(['cgroup', 'explicit', 'meminfo']).optional(),
   })
   .strict();
 
@@ -291,6 +326,7 @@ export const controlDiagnosticRecordSchema = z
       'control.request',
       'control.event',
       'control.upload',
+      'control.workload',
     ]),
     fields: controlDiagnosticFieldsSchema,
   })

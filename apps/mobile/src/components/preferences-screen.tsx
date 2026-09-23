@@ -3,7 +3,6 @@ import { Bell, Globe, Mic, SlidersHorizontal, Wallet, WandSparkles } from '@/com
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -79,8 +78,6 @@ export function PreferencesScreen() {
             onChange={setThemePreference}
           />
         </View>
-
-        {__DEV__ ? <FeatureFlagsSection /> : null}
 
         <ConfigureRow
           icon={Globe}

@@ -6,6 +6,7 @@ import {
   type CloudAgentFailureResponsibility,
   type CloudAgentFailureStage,
   type CloudAgentProviderOwnership,
+  type WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   assistantTerminalCode,
@@ -57,7 +58,8 @@ const UNKNOWN: ControlPlaneFailureClassification = {
 export function classifyControlPlaneFailure(
   reason: string | undefined,
   dispatchState: ControlPlaneDispatchState,
-  status: 'failed' | 'interrupted'
+  status: 'failed' | 'interrupted',
+  workspaceSubtype?: WorkspaceFailureSubtype
 ): ControlPlaneFailureClassification {
   if (status === 'interrupted') {
     // An interrupted lifecycle is a cancellation, never a platform failure,
@@ -65,6 +67,11 @@ export function classifyControlPlaneFailure(
     return reason === 'queued_message_cancelled' || reason === 'interruption_unconfirmed'
       ? INTERRUPTION_USER
       : INTERRUPTION_SYSTEM;
+  }
+  if (workspaceSubtype !== undefined) {
+    // The runtime started; a clone/checkout failure is workspace setup, not a
+    // wrapper that failed to start.
+    return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
   }
   switch (reason) {
     case 'missing_metadata':
@@ -130,14 +137,21 @@ export function classifyControlPlaneRunFailure(input: {
   assistantReason?: CloudAgentAssistantFailureReason;
   providerOwnership?: CloudAgentProviderOwnership;
   admittedModel?: string;
+  workspaceSubtype?: WorkspaceFailureSubtype;
 }): ControlPlaneRunFailure {
-  const base = classifyControlPlaneFailure(input.reason, input.dispatchState, input.status);
+  const base = classifyControlPlaneFailure(
+    input.reason,
+    input.dispatchState,
+    input.status,
+    input.workspaceSubtype
+  );
   if (input.status !== 'failed') return base;
   if (input.assistantReason === undefined) {
     const mapped = classifyCloudAgentFailure({
       source: 'run',
       stage: base.stage,
       code: base.code,
+      ...(input.workspaceSubtype === undefined ? {} : { workspaceSubtype: input.workspaceSubtype }),
     });
     return { ...base, responsibility: mapped.responsibility, failureReason: mapped.reason };
   }

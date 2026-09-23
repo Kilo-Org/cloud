@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "关闭后，按回车键会在智能体的消息输入框中换行。",
     "biometricUnlock": "使用生物识别解锁",
     "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。",
-    "featureFlags": "功能标志",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "来自服务器 · ≥ {{min}}",
-    "featureFlagSkipped": "默认 · < {{min}}",
-    "featureFlagNotLoaded": "默认 · 未加载",
     "gatewayTranscription": "使用 Kilo Gateway 转写",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1729,10 +1724,6 @@
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
       "linesOf": "第 {{start}}–{{end}} 行，共 {{total}} 行"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}}失败（{{status}}）。",
-      "failed": "Cloud Agent {{action}}失败。"
-    },
     "collectCopyableText": {
       "unserializableInput": "[无法序列化的输入]",
       "errorPrefix": "错误：{{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "提供商拒绝了该请求。",
       "assistantStopped": "已停止生成回复。",
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
-      "assistantFailed": "生成回复失败。",
-      "sendFailed": "发送消息失败。请重试。"
+      "assistantFailed": "生成回复失败。"
     },
     "filePart": {
       "loadingImage": "正在加载图片",

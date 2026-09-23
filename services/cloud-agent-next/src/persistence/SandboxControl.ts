@@ -240,9 +240,10 @@ import {
   type SandboxBillingInput,
 } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
+import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
 import {
   deriveSandboxAllocationId,
-  getOutboundContainerId,
+  getManagedOutboundContainerId,
   getSandboxNamespace,
 } from '../sandbox-id.js';
 import {
@@ -1297,16 +1298,15 @@ export class SandboxControl extends DurableObject<Env> {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const resolvedProviderRef = canonicalProviderRefOf(record);
-    const outboundContainerId =
-      provider === 'cloudflare' && requiredContainment.kilocode
-        ? getOutboundContainerId(
-            this.env,
+    const outboundContainerId = requiredContainment.kilocode
+      ? getManagedOutboundContainerId(provider, this.env, {
+          logicalSandboxId: this.sandboxId,
+          physicalSandboxId:
             decodeCloudflareProviderRef(resolvedProviderRef)?.sandboxId ??
-              (record.state.kind === 'stopped' ? undefined : record.state.target?.allocationName) ??
-              this.sandboxId,
-            { managedScmContainment: requiredContainment.kilocode }
-          )
-        : undefined;
+            (record.state.kind === 'stopped' ? undefined : record.state.target?.allocationName) ??
+            this.sandboxId,
+        })
+      : undefined;
     const grants = await loadSessionCredentialGrants(this.ctx.storage);
     const scopeId = metadata.workspace?.worktreeId ?? metadata.identity.sessionId;
     const existing = grants.find(grant => grant.scopeId === scopeId);
@@ -1397,11 +1397,14 @@ export class SandboxControl extends DurableObject<Env> {
         const native = decodeCloudflareProviderRef(providerRef);
         if (
           alias?.sandboxId !== this.sandboxId ||
-          this.providerKind !== 'cloudflare' ||
+          !providerUsesOutboundCredentialProxy(this.providerKind) ||
           allocation.state.kind !== 'allocated' ||
           !native ||
           input.outboundContainerId !==
-            getOutboundContainerId(this.env, native.sandboxId, { managedScmContainment: true })
+            getManagedOutboundContainerId(this.providerKind, this.env, {
+              logicalSandboxId: this.sandboxId,
+              physicalSandboxId: native.sandboxId,
+            })
         ) {
           return null;
         }
@@ -3359,11 +3362,14 @@ export class SandboxControl extends DurableObject<Env> {
       1_000,
       'Diagnostic signing secret lookup timed out'
     ).catch(() => null);
+    const workloadCgroup = (this.env as { CONTROL_WORKLOAD_CGROUP?: unknown })
+      .CONTROL_WORKLOAD_CGROUP;
     const launchEnv = buildControlWrapperLaunchEnv({
       workerUrl: this.env.WORKER_URL,
       sandboxId: this.sandboxId,
       credential,
       diagnostics: { allocationId, signingSecret },
+      ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
     });
     this.logDiagnostic('wrapper_log_upload', {
       allocationId,

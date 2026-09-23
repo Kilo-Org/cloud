@@ -6,6 +6,7 @@ import {
   type SandboxAllocation,
   type SandboxDestination,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { providerUsesOutboundCredentialProxy } from './agent-sandbox/capabilities.js';
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import {
   sessionPlaneForNewOwner,
@@ -181,6 +182,18 @@ export function getSandboxNamespace(
     return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
   }
   return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
+}
+
+export function getManagedOutboundContainerId(
+  provider: AgentSandboxProvider,
+  env: SandboxNamespaceEnv & Pick<Env, 'SANDBOX_CONTAINERS'>,
+  ids: { logicalSandboxId: string; physicalSandboxId: string }
+): string | undefined {
+  if (!providerUsesOutboundCredentialProxy(provider)) return undefined;
+  if (provider === 'cloudflare-containers') {
+    return env.SANDBOX_CONTAINERS.idFromName(ids.logicalSandboxId).toString();
+  }
+  return getOutboundContainerId(env, ids.physicalSandboxId, { managedScmContainment: true });
 }
 
 export function getOutboundContainerId(

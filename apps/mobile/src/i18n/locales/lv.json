@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Ja šī opcija ir izslēgta, ievades taustiņš aģenta ziņojuma ievades laukā ievieto jaunu rindu.",
     "biometricUnlock": "Biometriskā atbloķēšana",
     "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm.",
-    "featureFlags": "Funkciju karodziņi",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "attālināts · ≥ {{min}}",
-    "featureFlagSkipped": "noklusējums · < {{min}}",
-    "featureFlagNotLoaded": "noklusējums · nav ielādēts",
     "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2265,10 +2260,6 @@
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
       "linesOf": "rindas {{start}}–{{end}} no {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Neizdevās veikt Cloud Agent darbību „{{action}}” ({{status}}).",
-      "failed": "Neizdevās veikt Cloud Agent darbību „{{action}}”."
-    },
     "collectCopyableText": {
       "unserializableInput": "[neserializējama ievade]",
       "errorPrefix": "Kļūda: {{error}}"
@@ -2364,8 +2355,7 @@
       "assistantProviderRejected": "Pakalpojumu sniedzējs noraidīja pieprasījumu.",
       "assistantStopped": "Atbildes sagatavošana tika apturēta.",
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
-      "assistantFailed": "Neizdevās sagatavot atbildi.",
-      "sendFailed": "Neizdevās nosūtīt ziņojumu. Lūdzu, mēģini vēlreiz."
+      "assistantFailed": "Neizdevās sagatavot atbildi."
     },
     "filePart": {
       "loadingImage": "Ielādē attēlu",

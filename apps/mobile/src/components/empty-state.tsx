@@ -29,6 +29,11 @@ type EmptyStateProps = {
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
+  /** Renders the short presentation (no icon bubble, tighter block gaps) for a
+   *  caller whose clear region cannot hold the full height; the title, the
+   *  description and the action all stay. When omitted, the centered form
+   *  measures the band it is given and compacts on its own. */
+  compact?: boolean;
 };
 
 type EmptyStateContentProps = EmptyStateProps & {
@@ -150,11 +155,28 @@ function CenteredEmptyStateContent(props: Readonly<EmptyStateProps>) {
   );
 }
 
+/**
+ * Renders the empty state centered inside a measured `CenteredState` by
+ * default, choosing between the full and the compact form from the band that
+ * state offers. A caller that measures its own clear region (`compact` passed)
+ * owns that decision instead, so the form it renders cannot disagree with the
+ * reserve it set on its `StateSurfaceInsets`.
+ */
 export function EmptyState({
   refreshControl,
   placement = 'center',
+  compact,
   ...props
 }: Readonly<EmptyStateProps>) {
+  if (compact !== undefined) {
+    return placement === 'center' ? (
+      <CenteredState refreshControl={refreshControl}>
+        <EmptyStateContent {...props} compact={compact} />
+      </CenteredState>
+    ) : (
+      <EmptyStateContent {...props} placement={placement} compact={compact} />
+    );
+  }
   return placement === 'center' ? (
     <CenteredState refreshControl={refreshControl}>
       <CenteredEmptyStateContent {...props} />

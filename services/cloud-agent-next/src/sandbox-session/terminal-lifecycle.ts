@@ -48,7 +48,23 @@ const terminalRecordSchema = z
   })
   .strict();
 
-const attachedSessionSchema = terminalRecordSchema.omit({ ptyId: true, state: true }).strict();
+const attachedSessionSchema = terminalRecordSchema
+  .omit({ ptyId: true, state: true })
+  .extend({
+    /**
+     * Canonical allocation incarnation the binding is fenced to. Optional so a
+     * pre-C3b record still parses; absent is resolved authoritatively, not
+     * treated as a mismatch. Never `allocationIdentity(...).id`.
+     */
+    allocationIncarnation: z.string().min(1).optional(),
+    /**
+     * Absent means prepared. `false` is the pending phase written before the
+     * control route exists on a `needsPreparation` attach; it admits no terminal
+     * and does not skip re-preparation.
+     */
+    prepared: z.boolean().optional(),
+  })
+  .strict();
 
 const lifecycleFenceSchema = z
   .object({
@@ -216,7 +232,10 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
   function getAttachedWrapperInstanceId(): string | undefined {
     const current = snapshot();
     const attached = readAttachedSession();
-    return current && attached && matchesMetadata(attached, current.metadata)
+    return current &&
+      attached &&
+      attached.prepared !== false &&
+      matchesMetadata(attached, current.metadata)
       ? attached.wrapperInstanceId
       : undefined;
   }
@@ -305,6 +324,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     if (!attached || !sameAttachment(makeAttachment(context), attached)) {
       return terminalError(TERMINAL_UNAVAILABLE);
     }
+    if (attached.prepared === false) return terminalError(TERMINAL_UNAVAILABLE);
     if (!options.validateAccess) return { success: true, data: { context } };
 
     let access: Awaited<ReturnType<TerminalControl['validateTerminalAccess']>>;
@@ -327,7 +347,11 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
       return denied(access.reason ?? 'runtime access or billing could not be verified');
     }
     const latestAttachment = readAttachedSession();
-    if (!latestAttachment || !sameAttachment(makeAttachment(context), latestAttachment)) {
+    if (
+      !latestAttachment ||
+      latestAttachment.prepared === false ||
+      !sameAttachment(makeAttachment(context), latestAttachment)
+    ) {
       return terminalError(TERMINAL_UNAVAILABLE);
     }
     return { success: true, data: { context } };
@@ -695,6 +719,8 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     metadata: SessionMetadata;
     sandboxId: string;
     wrapperInstanceId?: string;
+    allocationIncarnation?: string;
+    prepared?: boolean;
     epoch: number;
   }): boolean {
     if (!isCurrent(input.epoch)) return false;
@@ -703,6 +729,15 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
       storage.kv.delete(ATTACHED_SESSION_KEY);
       return false;
     }
+    const existing = readAttachedSession();
+    const preservedIncarnation =
+      existing &&
+      matchesMetadata(existing, input.metadata) &&
+      existing.sandboxId === input.sandboxId &&
+      existing.wrapperInstanceId === wrapperInstance.data
+        ? existing.allocationIncarnation
+        : undefined;
+    const allocationIncarnation = input.allocationIncarnation ?? preservedIncarnation;
     const attachment: AttachedSession = {
       ownerId: input.metadata.identity.userId,
       sessionId: input.metadata.identity.sessionId,
@@ -711,6 +746,8 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
       sandboxId: input.sandboxId,
       wrapperInstanceId: wrapperInstance.data,
       ...(input.metadata.identity.orgId ? { organizationId: input.metadata.identity.orgId } : {}),
+      ...(allocationIncarnation === undefined ? {} : { allocationIncarnation }),
+      ...(input.prepared === false ? { prepared: false } : {}),
     };
     storage.kv.put(ATTACHED_SESSION_KEY, attachment);
     return true;
@@ -834,6 +871,61 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     return true;
   }
 
+  /**
+   * The persisted binding for the allocation→session `STOPPED` seam. Returns the
+   * raw record (including a missing incarnation, which the seam resolves before
+   * fencing) and never synthesizes a value.
+   */
+  function getAttachedBinding():
+    | { allocationIncarnation?: string; wrapperInstanceId: string }
+    | undefined {
+    const attached = readAttachedSession();
+    if (!attached) return undefined;
+    return {
+      ...(attached.allocationIncarnation === undefined
+        ? {}
+        : { allocationIncarnation: attached.allocationIncarnation }),
+      wrapperInstanceId: attached.wrapperInstanceId,
+    };
+  }
+
+  /**
+   * Persist the incarnation resolved for a pre-C3b attachment. Only fills a
+   * missing field; a record that already carries one is left untouched.
+   */
+  function hydrateAttachmentIncarnation(incarnation: string): boolean {
+    const attached = readAttachedSession();
+    if (!attached || attached.allocationIncarnation !== undefined) return false;
+    storage.kv.put(ATTACHED_SESSION_KEY, { ...attached, allocationIncarnation: incarnation });
+    return true;
+  }
+
+  /**
+   * Remove the binding for a terminalized stop. With no filter it clears
+   * unconditionally (authoritative settlement); with a filter it clears only a
+   * matching record, so a concurrent rebind is never cleared by a stale stop.
+   */
+  function clearAttachmentForStop(
+    filter: { allocationIncarnation?: string; wrapperInstanceId?: string } = {}
+  ): boolean {
+    const attached = readAttachedSession();
+    if (!attached) return false;
+    if (
+      filter.allocationIncarnation !== undefined &&
+      attached.allocationIncarnation !== filter.allocationIncarnation
+    ) {
+      return false;
+    }
+    if (
+      filter.wrapperInstanceId !== undefined &&
+      attached.wrapperInstanceId !== filter.wrapperInstanceId
+    ) {
+      return false;
+    }
+    storage.kv.delete(ATTACHED_SESSION_KEY);
+    return true;
+  }
+
   function purgeDeletedState(): void {
     if (readFence()?.state !== 'deleted') return;
     const keys = Array.from(storage.kv.list<unknown>(), ([key]) => key);
@@ -852,14 +944,17 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
   return {
     beginDeletion,
     beginRevocation,
+    clearAttachmentForStop,
     clearAttachedWrapperAfterRecovery,
     captureEpoch: () => snapshot()?.epoch ?? null,
     cleanupSession,
     closeTerminal,
     createTerminal,
+    getAttachedBinding,
     getAttachedWrapperInstanceId,
     getStoredMetadata,
     getTerminal,
+    hydrateAttachmentIncarnation,
     invalidateRuntime,
     isBlocked: () => readFence() !== undefined,
     isCurrent,

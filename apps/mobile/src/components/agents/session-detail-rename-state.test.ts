@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- the header title-state suite and the v2 session.updated title suite share one module. */
 import { describe, expect, it } from 'vitest';
 
 import {
+  displaySessionTitle,
   getSessionDetailRenameState,
   initialRenameState,
   type RenameState,
@@ -57,6 +59,85 @@ describe('getSessionDetailRenameState', () => {
       modalInitialValue: null,
       isModalOpen: false,
     });
+  });
+
+  it('hides a backend default title behind the fallback copy', () => {
+    // `New session - <ISO>` is machine output, not a user-facing title.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-20T08:10:35.172Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the localized fallback instead of the backend placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the localized fallback for a child-session placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Child session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('shows the localized fallback for a blank server title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '   ',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('keeps a real server title unchanged', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Fix login',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('Fix login');
+  });
+
+  it('seeds the rename modal with the localized fallback for a placeholder title', () => {
+    // The placeholder must not be editable as-is: the header shows "Session",
+    // so the modal must open on "Session" too.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: { ...initialRenameState(), isModalOpen: true },
+      }).modalInitialValue
+    ).toBe(fallbackTitle);
   });
 
   it('shows the fallback label when the loaded record still carries the backend placeholder', () => {
@@ -137,6 +218,42 @@ describe('getSessionDetailRenameState', () => {
         renameState: { ...initialRenameState(), isModalOpen: true, optimisticTitle: 'Pending' },
       }).modalInitialValue
     ).toBe('Pending');
+  });
+
+  it('falls back to the untitled copy for a loaded session whose server title normalized away', () => {
+    // A `New session - <ISO>` placeholder is normalized to undefined by
+    // displaySessionTitle at the data boundary; the header then shows the
+    // short fallback in full instead of an ellipsized timestamp.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: undefined,
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+});
+
+describe('displaySessionTitle', () => {
+  it('hides the auto-title placeholder so the header shows its fallback', () => {
+    expect(displaySessionTitle('New session - 2026-01-01T00:00:00.000Z')).toBeUndefined();
+    expect(displaySessionTitle('Child session - 2026-01-01T00:00:00.000Z')).toBeUndefined();
+  });
+
+  it('keeps a real title untouched', () => {
+    expect(displaySessionTitle('Mobile layout refinement')).toBe('Mobile layout refinement');
+  });
+
+  it('treats null, undefined and blank titles as untitled', () => {
+    expect(displaySessionTitle(null)).toBeUndefined();
+    expect(displaySessionTitle(undefined)).toBeUndefined();
+    expect(displaySessionTitle('   ')).toBeUndefined();
   });
 });
 
@@ -258,6 +375,15 @@ describe('titleFromSessionUpdatedEvent', () => {
     ).toBeUndefined();
     expect(
       titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
+    ).toBeUndefined();
+  });
+
+  it('ignores a placeholder title echoed for this session', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - 2026-01-01T00:00:00.000Z' })
+      )
     ).toBeUndefined();
   });
 

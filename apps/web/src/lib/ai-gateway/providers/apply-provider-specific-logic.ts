@@ -151,7 +151,10 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isKimiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
+      OpenRouterInferenceProviderIdSchema.enum.alibaba,
+    ];
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];

@@ -102,6 +102,24 @@ describe('mutationErrorDisplay', () => {
     });
   });
 
+  it('uses the edit-comment bad-request copy for the own-comment edit surface', () => {
+    // The own-comment edit sheet rejects a body the server will no longer
+    // accept with the "can't be edited" copy, not the composer's post copy.
+    const classification = classifyPrReviewMutationError(
+      makeError('BAD_REQUEST', 'Comment is too long')
+    );
+    expect(mutationErrorDisplay('edit-comment', classification)).toEqual({
+      kind: 'bad-request',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+    expect(
+      mutationErrorDisplayFromError('edit-comment', makeError('BAD_REQUEST', 'Comment is too long'))
+    ).toEqual({
+      kind: 'bad-request',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+  });
+
   it('words the submit bad-request copy after the connected provider when a term rides', () => {
     // s6f: a rejected review submit on a GitLab merge request must never read
     // "pull request". The provider arm passes the translated noun as `term`;

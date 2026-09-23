@@ -1,6 +1,7 @@
 // Pure selection of the inline mutation-error copy shown in the
-// comment-composer and review-submit formSheets. Classification lives in
-// `classifyPrReviewMutationError`; this helper maps kind → display message.
+// comment-composer, review-submit and own-comment edit formSheets.
+// Classification lives in `classifyPrReviewMutationError`; this helper maps
+// kind → display message.
 //
 // FORBIDDEN always passes the server-provided classification.message
 // through verbatim (the server already sanitizes it to actionable copy).
@@ -16,7 +17,7 @@ import {
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
-type MutationErrorDisplaySurface = 'composer' | 'submit';
+export type MutationErrorDisplaySurface = 'composer' | 'submit' | 'edit-comment';
 
 type MutationErrorDisplayKind = 'retryable' | 'bad-request' | 'forbidden' | 'reconnect';
 
@@ -28,7 +29,7 @@ type MutationErrorDisplay = {
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
 type MutationErrorDisplayOptions = {
-  /** The raw thrown error, used for the retryable composer copy. */
+  /** The raw thrown error, used for the retryable composer / edit-comment copy. */
   readonly rawError?: unknown;
   /**
    * The connected provider's noun, already translated (s6f): on the submit
@@ -41,9 +42,13 @@ type MutationErrorDisplayOptions = {
 
 /**
  * The bad-request inline copy per surface. The submit surface words the
- * rejection after the connected provider when a term rides (s6f).
+ * rejection after the connected provider when a term rides (s6f); the
+ * edit-comment surface says the posted comment can no longer be edited.
  */
 function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string): string {
+  if (surface === 'edit-comment') {
+    return i18n.t('prReview.discussion.commentEditUnavailable');
+  }
   if (surface === 'composer') {
     return i18n.t('prReview.mutationError.commentNotPosted');
   }

@@ -85,10 +85,9 @@ export function WorktreeReviewDialog({
           <WorktreeReviewList
             comments={draft.comments}
             compact
-            freshness={review.freshness}
-            showFreshness
+            unappliedCommentIds={review.unappliedCommentIds}
             renderActions={comment =>
-              review.freshness.get(comment.id) === 'current' ? null : (
+              review.unappliedCommentIds.has(comment.id) ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -100,7 +99,7 @@ export function WorktreeReviewDialog({
                 >
                   Discard
                 </Button>
-              )
+              ) : null
             }
             editor={draft.editor}
             editorError={draft.error}

@@ -32,7 +32,10 @@ import {
   type StoreKiloPassProduct,
 } from '@/lib/kilo-pass/store-products';
 import { getAppStoreKiloPassOwnershipPreflight } from '@/lib/kilo-pass/subscription-card-state';
-import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
+import {
+  backendStoreKiloPassProductsQueryOptions,
+  useStoreKiloPassProducts,
+} from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import {
   createAppStoreKiloPassPurchaseActions,
   getKiloPassPurchaseErrorMessage,
@@ -50,6 +53,16 @@ const isAndroid = Platform.OS === 'android';
 const STORE_CONNECTION_ERROR_MESSAGE_KEY = isAndroid
   ? 'kiloPass.couldNotConnectToPlay'
   : 'kiloPass.couldNotConnectToAppStore';
+
+/**
+ * The screen shows one store-failure surface. The store-connection message is
+ * the same failure the products-unavailable card states, so the screen must
+ * recognize it without comparing translated copy: the app language can change
+ * while the message is on screen, and a copy comparison then fails and brings
+ * the duplicate line back. The flag travels with the message so they can never
+ * drift apart.
+ */
+type KiloPassIapError = { message: string; storeConnection: boolean };
 
 function getSubscriptionOfferToken(product: ProductSubscription): string | undefined {
   if (product.platform !== 'android') {
@@ -105,6 +118,8 @@ export type KiloPassNativeIapContextValue = {
   isPending: boolean;
   isRestoringPurchases: boolean;
   errorMessage: string | null;
+  /** True when `errorMessage` is the store-connection message, not a purchase or restore failure. */
+  storeConnectionError: boolean;
   clearError: () => void;
   /** True when the store account already owns a pass on another Kilo account. */
   ownedByAnotherAccount: boolean;
@@ -136,9 +151,12 @@ export function useKiloPassNativeIap(): KiloPassNativeIapContextValue {
 }
 
 /**
- * The single `useIAP` call site. Mounted only when the purchase presentation is
- * `native_iap` on iOS or Android, so there is never more than one IAP owner on
- * the Kilo Pass route.
+ * The single `useIAP` call site. Mounted once at the Kilo Pass route entry on
+ * iOS and Android — before the presentation query resolves — so the native
+ * store connection and the store-product query overlap that request instead of
+ * queuing behind it. It wraps every presentation variant (loading, error,
+ * non-native, and native-IAP) so it never unmounts and remounts as the query
+ * settles; only the purchasable content is gated on `native_iap`.
  */
 export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
@@ -146,9 +164,9 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const { authEpoch } = useAuth();
   const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);
   const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [iapError, setIapError] = useState<KiloPassIapError | null>(null);
   const clearError = useCallback(() => {
-    setErrorMessage(null);
+    setIapError(null);
   }, []);
   const [ownershipChecked, setOwnershipChecked] = useState(false);
   const [ownershipCheckFailed, setOwnershipCheckFailed] = useState(false);
@@ -186,7 +204,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       if (message) {
         captureEvent(KILO_PASS_PURCHASE_FAILED_EVENT);
         showDedupedPurchaseError(message);
-        setErrorMessage(message);
+        setIapError({ message, storeConnection: false });
       }
     },
     onPurchaseSuccess: purchase => {
@@ -234,7 +252,9 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   // Server-backed fallback for the recovery SKU list: when the store fetch
   // fails or returns no products, recovery still needs the enabled product IDs
   // so charged-but-uncompleted transactions are completed instead of released.
-  const serverProductsQuery = useQuery(trpc.kiloPass.getMobileStoreProducts.queryOptions());
+  // Shares the store-product cache lifetime, so a re-entered route reads the
+  // catalog instead of paying the request again.
+  const serverProductsQuery = useQuery(backendStoreKiloPassProductsQueryOptions(trpc));
   const productsQuery = useStoreKiloPassProducts({
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
@@ -304,13 +324,13 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         enabledGoogleProductIds,
         loadEnabledAppleProductIds: async () => {
           const result = await queryClient.fetchQuery(
-            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+            backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return result.products.map(product => product.appleProductId);
         },
         loadEnabledGoogleProductIds: async () => {
           const result = await queryClient.fetchQuery(
-            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+            backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return result.products.map(product => product.googleProductId);
         },
@@ -319,7 +339,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         onPurchaseCompleted: () => {
           // Completed is emitted server-side by the completion mutation — do not
           // re-add a client capture (double counting).
-          setErrorMessage(null);
+          setIapError(null);
           const onCompleted = pendingPurchaseCompletedCallbackRef.current;
           pendingPurchaseCompletedCallbackRef.current = null;
           onCompleted?.();
@@ -329,7 +349,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         },
         showError: message => {
           showDedupedPurchaseError(message);
-          setErrorMessage(message);
+          setIapError({ message, storeConnection: false });
         },
       }),
     [
@@ -361,7 +381,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         replacedSku: options.googleReplacement?.productId,
       };
       setIsRequestingPurchase(true);
-      setErrorMessage(null);
+      setIapError(null);
       captureEvent(KILO_PASS_PURCHASE_STARTED_EVENT);
       try {
         const requestStarted = await actions.purchase(product, options);
@@ -392,9 +412,19 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     }
 
     setIsRestoringPurchases(true);
-    setErrorMessage(null);
+    setIapError(null);
     try {
-      return await actions.restorePurchases();
+      const result = await actions.restorePurchases();
+      if (result !== 'failed') {
+        // A restore that answered proves the store is reachable, so the
+        // ownership lookup is no longer in doubt. Clear the failure or the
+        // screen keeps claiming the store is unreachable over its own
+        // "restored"/"no purchases" feedback and offers a retry that cannot
+        // fix anything.
+        setOwnershipChecked(true);
+        setOwnershipCheckFailed(false);
+      }
+      return result;
     } finally {
       setIsRestoringPurchases(false);
     }
@@ -405,9 +435,22 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     isRestoringPurchases,
   ]);
 
+  // Drop the store-product caches only when the signed-in account actually
+  // changes. Running this on the owner's first mount deleted the 5-minute entry
+  // `useStoreKiloPassProducts` deliberately keeps, so every re-entry re-ran the
+  // native `fetchProducts` plus `getMobileStoreProducts` and repainted the tier
+  // skeletons for products the app already had. The backend catalog carries the
+  // account's `appAccountToken` and now lives for the same window, so it is
+  // dropped with the entry it feeds instead of leaking the previous account's.
+  const previousAuthEpochRef = useRef(authEpoch);
   useEffect(() => {
+    if (previousAuthEpochRef.current === authEpoch) {
+      return;
+    }
+    previousAuthEpochRef.current = authEpoch;
+    queryClient.removeQueries(trpc.kiloPass.getMobileStoreProducts.pathFilter());
     queryClient.removeQueries({ queryKey: ['kilo-pass', 'app-store-products'] });
-  }, [authEpoch, queryClient]);
+  }, [authEpoch, queryClient, trpc]);
 
   useEffect(() => {
     if (!isIapPlatform) {
@@ -425,11 +468,16 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         // must not start a purchase: a device subscription owned by another Kilo
         // account would otherwise charge the user before any check can see it.
         setOwnershipChecked(true);
+        setOwnershipCheckFailed(false);
+        // The lookup that failed before has now answered, so the store-connection
+        // message it raised no longer describes this screen. Any other failure
+        // (a purchase or a restore message) is still true and stays.
+        setIapError(current => (current?.storeConnection ? null : current));
       } catch {
         // A failed lookup answers nothing, so purchasing stays blocked and the
         // screen offers a retry instead of charging the user blind.
         setOwnershipCheckFailed(true);
-        setErrorMessage(i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY));
+        setIapError({ message: i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY), storeConnection: true });
       }
     })();
   }, [connected, ownershipAttempt, refreshAvailablePurchases]);
@@ -487,7 +535,8 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         completePlayPurchase.isPending ||
         isRestoringPurchases,
       isRestoringPurchases,
-      errorMessage,
+      errorMessage: iapError?.message ?? null,
+      storeConnectionError: iapError?.storeConnection ?? false,
       clearError,
       ownedByAnotherAccount,
       ownedAppleProductId,
@@ -502,7 +551,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       clearError,
       completeAppStorePurchase.isPending,
       completePlayPurchase.isPending,
-      errorMessage,
+      iapError,
       isRequestingPurchase,
       isRestoringPurchases,
       ownedAppleProductId,

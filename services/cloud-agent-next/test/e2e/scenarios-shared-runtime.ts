@@ -50,6 +50,13 @@ const DURABLE_BUDGET_MS = 15_000;
  */
 const ALLOCATION_WAIT_SLACK_MS = 1_000;
 
+/**
+ * Attempt cap for recovering an observed post-open stream drop while booting.
+ * The boot budget is the other bound; the cap keeps a session whose socket
+ * drops repeatedly from reconnecting without limit.
+ */
+const MAX_BOOT_RECONNECTS = 5;
+
 export type ScenarioDeadline = {
   /** Absolute epoch milliseconds at which the scenario budget expires. */
   deadlineAt: number;
@@ -555,6 +562,84 @@ export async function bootToCompletion(
     stream.close();
     throw error;
   }
+}
+
+/**
+ * Recover a boot turn from an observed post-open stream drop.
+ *
+ * `waitForTerminal` resolves `null` both on a genuine timeout and when the
+ * socket finalizes, so the caller cannot otherwise tell a dropped transport from
+ * a slow turn. This helper waits for the terminal within one absolute boot
+ * budget, and when the socket has actually finalized (`isOpen === false`) it
+ * reconnects with replay, bounded by that same budget and
+ * `MAX_BOOT_RECONNECTS`; any observed close on a finalized socket triggers that
+ * path, and the close code/reason is attached when one was observed. A healthy
+ * socket that reaches the timeout is reported as a missing terminal and is never
+ * reconnected. Only a failure to establish a replacement stream aborts recovery:
+ * the error is rethrown with the accumulated close evidence attached, never
+ * retried and never swallowed.
+ */
+export async function waitForBootTerminal(input: {
+  deadline: ScenarioDeadline;
+  config: DriverConfig;
+  sessionId: string;
+  messageId: string;
+  stream: StreamConnection;
+  budgetMs: number;
+  label: string;
+}): Promise<{ terminal: StreamEvent | null; stream: StreamConnection; transport: string }> {
+  const { deadline, config, sessionId, messageId, budgetMs, label } = input;
+  const bootDeadlineAt = Date.now() + Math.max(1, Math.min(budgetMs, deadline.remaining(label)));
+  let stream = input.stream;
+  let attempts = 0;
+  let transport = '';
+
+  while (Date.now() < bootDeadlineAt) {
+    const terminal = await stream.waitForTerminal(bootDeadlineAt - Date.now(), messageId);
+    if (terminal !== null) return { terminal, stream, transport };
+    if (stream.isOpen) {
+      // A live socket that reached the budget is a genuine missing terminal, not
+      // a transport loss: report it without reconnecting.
+      return { terminal: null, stream, transport };
+    }
+    transport = appendClose(transport, stream.closeInfo);
+    if (Date.now() >= bootDeadlineAt || attempts >= MAX_BOOT_RECONNECTS) break;
+    const remaining = bootDeadlineAt - Date.now();
+    if (remaining <= 0) break;
+    attempts += 1;
+    try {
+      stream = await deadline.within(
+        `${label} reconnect`,
+        signal => openConnectedStream(config, sessionId, true, undefined, signal),
+        remaining
+      );
+    } catch (error) {
+      throw attachTransport(error, transport);
+    }
+  }
+  return { terminal: null, stream, transport };
+}
+
+/** Append one observed close to the accumulated transport evidence. */
+function appendClose(transport: string, closeInfo: StreamConnection['closeInfo']): string {
+  const described =
+    closeInfo === null
+      ? 'stream closed without a close frame'
+      : `stream closed code=${closeInfo.code} reason=${closeInfo.reason || 'none'}`;
+  return transport === '' ? described : `${transport}; ${described}`;
+}
+
+/**
+ * Attach the accumulated close evidence to a reconnect failure and return it for
+ * immediate rethrow. The original error object is kept so its identity and
+ * message survive; the failure is not classified and no retry follows.
+ */
+function attachTransport(error: unknown, transport: string): unknown {
+  if (error instanceof Error) {
+    error.message = `${error.message}; transport: ${transport}`;
+    return error;
+  }
+  return new Error(`${String(error)}; transport: ${transport}`);
 }
 
 /**

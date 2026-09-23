@@ -32,9 +32,6 @@ function sandboxAllocationUnavailableReason(
   if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
     return 'Cloudflare containers are not enabled for this account';
   }
-  if (isCloudAgentContainerBillingEnabled(env, owner)) {
-    return 'Cloudflare containers do not support enforced compute billing';
-  }
   return undefined;
 }
 

@@ -179,6 +179,7 @@ export class SessionOperation {
   private deadlineCleanup?: Promise<boolean>;
   private publicationScoped?: PublicationScope;
   private publicationScopeNotified = false;
+  private abortedByMessageScope = false;
 
   constructor(
     session: SessionRequestIdentity,
@@ -316,6 +317,14 @@ export class SessionOperation {
     return this.publicationScoped;
   }
 
+  markMessageScopedAbort(): void {
+    this.abortedByMessageScope = true;
+  }
+
+  get messageScopedAbort(): boolean {
+    return this.abortedByMessageScope;
+  }
+
   waitForPublicationScope(): Promise<PublicationScope> {
     return this.publicationScoped
       ? Promise.resolve(this.publicationScoped)
@@ -408,7 +417,12 @@ export class SessionOperation {
   }
 
   requestRetirement(reason: string, deadlineAt: number): void {
-    if (this.publicationScoped || this.cleanupOwner.cleanupState === 'confirmed') return;
+    if (
+      this.abortedByMessageScope ||
+      this.publicationScoped ||
+      this.cleanupOwner.cleanupState === 'confirmed'
+    )
+      return;
     this.deps.retireRuntime(reason, this.captureCleanupDeadline(deadlineAt), this.nativeTarget());
   }
 

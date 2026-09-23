@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
+import { ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
 
 // Every test re-imports the auth module graph after vi.resetModules() and the
 // failure-matrix tests wait out real 250/500/1000 ms retry backoffs. On a
@@ -390,6 +391,7 @@ vi.mock('@/lib/storage-keys', () => ({
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
@@ -656,6 +658,12 @@ describe('sign-out teardown ordering', () => {
       expect.anything()
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    // The Personal-choice marker is account-scoped selection state too: if it
+    // outlived the account, the next account on this device would inherit the
+    // signed-out account's explicit Personal choice and skip its own default.
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      ORGANIZATION_PERSONAL_STORAGE_KEY
+    );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('live-session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
@@ -701,6 +709,22 @@ describe('sign-out teardown ordering', () => {
     // run on a plain sign-in.
     expect(logoutCleanupMock.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(1);
     expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('clears the prior account Personal-choice marker on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // A direct account switch must resolve the new account's own organization
+    // default; the prior account's explicit Personal choice must not leak.
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      ORGANIZATION_PERSONAL_STORAGE_KEY
+    );
 
     unmount();
   });

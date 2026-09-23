@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive credential suite: the bearer writes, the refresh rotation, and the unreadable-credential cases share the SecureStore mock and the serialized-write seam */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -284,6 +285,111 @@ describe('refresh rotation', () => {
         expect.any(String),
         expectedOptions
       );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // The defect this slice removes: a null refresh-token read used to be read
+  // as "no session" and refused, which signed a healthy person out. It is a
+  // failed read of one member, not an absent credential set.
+  it('returns unreadable, not refused, when the refresh token is absent but the token is present', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toEqual({
+        ok: false,
+        refused: false,
+        unreadable: true,
+        presentKeys: [AUTH_TOKEN_KEY],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      // The stored token is untouched: nothing was deleted or published.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('stored-token');
+      expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns unreadable with no present keys for an empty credential set', async () => {
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      // A null member never refuses: even an empty set is an unreadable read,
+      // not a signed-out session.
+      expect(outcome).toEqual({
+        ok: false,
+        refused: false,
+        unreadable: true,
+        presentKeys: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rotates when a null refresh-token read is followed by a stored value', async () => {
+    let refreshReads = 0;
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === REFRESH_TOKEN_KEY) {
+        refreshReads += 1;
+        return refreshReads === 1 ? null : 'stored-refresh';
+      }
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome.ok).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        REFRESH_TOKEN_KEY,
+        'r2',
+        expectedOptions
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('still refuses when the server answers 401 for a stored refresh token', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ error: 'invalid' }, { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toEqual({ ok: false, refused: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       vi.unstubAllGlobals();
     }

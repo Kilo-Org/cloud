@@ -186,8 +186,9 @@ describe('shared branded splash', () => {
     // compile root carries, so a root that does hold one (a worktree that ran a
     // prebuild, or a shared config whose other plugins add icon, notification and
     // app-background entries down the same mod chain) contributes its entries
-    // beside the splash color this plugin owns. This case speaks only for that
-    // entry, the same way the styles assertion below pins its theme.
+    // beside the splash color this plugin owns. Keep the exact `#FAF74F` value
+    // too, the same way the styles assertion below pins its theme: this case
+    // speaks only for that entry.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

@@ -29,14 +29,21 @@ type EmptyStateProps = {
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
+  /** Renders the short presentation (no icon bubble, tighter block gaps) for a
+   *  caller whose clear region cannot hold the full height; the title, the
+   *  description and the action all stay. When omitted, the centered form
+   *  reads the band the `CenteredState` around it publishes and compacts on its
+   *  own, so the form cannot disagree with the reserve the caller set. */
+  compact?: boolean;
 };
 
 export function EmptyState({
   placement = 'center',
   refreshControl,
+  compact,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = <EmptyStateBody {...props} placement={placement} />;
+  const body = <EmptyStateBody {...props} placement={placement} compact={compact} />;
   return placement === 'center' ? (
     <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
   ) : (
@@ -51,6 +58,7 @@ function EmptyStateBody({
   className,
   action,
   placement,
+  compact: compactOverride,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
   iconSize = 24,
   iconStrokeWidth = 1.5,
@@ -67,8 +75,12 @@ function EmptyStateBody({
   // and halves the gaps, which keeps the copy and the action inside the band
   // with no scroll. `placement="top"` and `placement="static"` states are laid
   // out by their own caller and keep the full stack.
+  //
+  // A caller that measured its own clear region passes `compact` and owns the
+  // decision (the Agents screen does); otherwise the centered form reads the
+  // band the scroller publishes.
   const shortBand = useShortCenteredBand();
-  const compact = placement === 'center' && shortBand;
+  const compact = compactOverride ?? (placement === 'center' && shortBand);
 
   const content = (
     <View

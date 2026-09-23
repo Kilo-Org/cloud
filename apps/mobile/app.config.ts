@@ -108,6 +108,21 @@ const config: ExpoConfig = {
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
+  // iOS and Android only (apps/mobile/AGENTS.md): there is no web target, and
+  // the dev server's web page is not a product surface. Left undeclared, Expo
+  // *detects* the set (getSupportedPlatforms): `react-native` resolving adds
+  // ios and android, and `react-dom` resolving adds web. The dev server that
+  // produced dev/logs/mobile.log had web in its manifest platforms, so it
+  // answered a browser request with the web index.html, and that page requests
+  // a web bundle of this entry: babel-preset-expo rewrites `react-native` to
+  // `react-native-web` (not installed), and Metro logged
+  // `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the
+  // app console — a JavaScript error the app never caused. Naming the two
+  // platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+  // browser request falls through to the manifest response instead of the web
+  // page whether or not the workspace resolves `react-dom`.
+  // Asserted in scripts/assert-expo-config.mjs.
+  platforms: ['ios', 'android'],
   // Per-locale native strings. Expo's built-in `withLocales` writes a
   // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
   // usage-description keys (the plugin options below stay as the base Info.plist
@@ -368,6 +383,14 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // One implementation for iOS and Android: the discard confirm is the same
+    // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
+    // already draws that copy as given (it exposes no casing transform to
+    // override). Android is the one platform that lacks the capability —
+    // AppCompat's stock button-bar text appearance forces ALL-CAPS — so the
+    // plugin's single platform piece is the AppTheme override it writes, and it
+    // is registered once here for both prebuilds.
+    './plugins/withAndroidAlertDialogButtonCase',
     // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
     // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
     // by capability — iOS's UIAlertController already follows the system

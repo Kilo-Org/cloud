@@ -1,8 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- Jest node-environment mocks must be registered before loading the component. */
 import { jest } from '@jest/globals';
-import { createElement } from 'react';
+import React, { createElement } from 'react';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+
+// @swc/jest compiles JSX with the classic runtime, and the nested
+// SsoAccountMismatchNotice imports no React default, so its
+// `React.createElement` calls need React on the global.
+Object.assign(globalThis, { React });
 
 jest.mock('@/components/auth/sign-in/AuthProviderButtons', () => ({
   AuthProviderButtons: () => null,
@@ -95,6 +100,7 @@ const { SignInForm } = require('./SignInForm') as {
     emailOnly?: boolean;
     title?: string;
     searchParams: Record<string, string>;
+    accountMismatch?: { expectedEmail: string; signedInEmail: string };
   }) => ReactElement;
 };
 
@@ -161,6 +167,22 @@ describe('SignInForm Enterprise SSO navigation', () => {
     expect(html).toContain('Continue to Single Sign-On');
     expect(html).not.toContain('Security Verification');
     expect(html.match(/Install Kilo Code/g)).toHaveLength(1);
+  });
+
+  it('renders the account mismatch notice instead of any sign-in affordance', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, {
+        ssoMode: true,
+        searchParams: { sso: 'true', email: 'a@example.com' },
+        accountMismatch: { expectedEmail: 'a@example.com', signedInEmail: 'b@example.com' },
+      })
+    );
+
+    expect(html).toContain('Wrong account signed in');
+    expect(html).toContain('b@example.com');
+    expect(html).toContain('a@example.com');
+    expect(html).toContain('Sign out and continue as a@example.com');
+    expect(html).not.toContain('Continue with Email');
   });
 
   it('renders callback errors globally when the empty email is invalid', () => {

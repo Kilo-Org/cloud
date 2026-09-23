@@ -4,8 +4,7 @@ import { type ReactNode } from 'react';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
-  ChildSessionSection,
-  getTaskToolSessionId,
+  LiveChildSessionSection,
   type OpenChildSession,
   type RenderPartFn,
 } from './child-session-section';
@@ -46,13 +45,13 @@ export function ToolPartRenderer({
   }
 
   if (part.tool === 'task' && getChildMessages && renderPart && onOpenChildSession) {
-    const sessionId = getTaskToolSessionId(part);
-    const childMessages = sessionId ? getChildMessages(sessionId) : [];
-
+    // `LiveChildSessionSection` subscribes to the child transcript itself, so
+    // the memoized `MessageBubble` above can keep one prop identity across
+    // streaming publishes while the card's activity label still updates.
     return (
-      <ChildSessionSection
+      <LiveChildSessionSection
         part={part}
-        childMessages={childMessages}
+        getChildMessages={getChildMessages}
         onOpenChildSession={onOpenChildSession}
         modelOptions={modelOptions}
       />

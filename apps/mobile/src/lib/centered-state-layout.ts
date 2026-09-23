@@ -102,6 +102,23 @@ export function getCenteredStateBand({
   return { top, bottom, band: Math.max(0, bottom - top) };
 }
 
+/**
+ * The bottom reserve a nested surface resolves: the larger of the inherited
+ * reserve and the inset the nested surface asks for, so a nested reservation
+ * can never shrink a surface's clearance. The tabs layout reserves the tab bar
+ * alone (its 16dp content gap is content-only), so the Agents screen's centered
+ * states resolve exactly the bar plus the FAB band they ask for.
+ */
+export function getBottomReservation({
+  inherited,
+  bottomInset,
+}: {
+  inherited: number;
+  bottomInset: number;
+}) {
+  return Math.max(inherited, bottomInset);
+}
+
 export function getCenteredStateLayout({
   surface,
   viewport,

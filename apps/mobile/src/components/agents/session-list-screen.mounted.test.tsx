@@ -10,9 +10,11 @@ import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
+import { LiveSessionListEmptyState } from './live-session-list-empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
+import { getEmptyStateFullHeight, SESSION_ROW_PITCH } from '@/lib/agents-bottom-chrome';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
@@ -20,11 +22,6 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
-  // Mutable so a case can put the tree in a short landscape window: the
-  // reserved band the centered bodies clear is the tab bar's alone there (the
-  // FAB's strip would leave a no-match state less room than one line of copy).
-  windowWidth: 390,
-  windowHeight: 844,
   // Mutable so a case can put the tree on Android: the platform decides
   // whether the floating pull-to-refresh indicator is safe (device defect
   // uxs1) or the reserved band carries the in-flight state instead.
@@ -108,11 +105,7 @@ vi.mock('react-native', () => ({
       return { remove: vi.fn() };
     },
   },
-  useWindowDimensions: () => ({
-    fontScale: state.fontScale,
-    height: state.windowHeight,
-    width: state.windowWidth,
-  }),
+  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -320,6 +313,17 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+/** Fire the body wrapper's layout with the height the list can use. */
+function layoutBody(height: number) {
+  const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+  if (!wrapper) {
+    throw new Error('Missing body wrapper');
+  }
+  const onLayout = wrapper.props.onLayout as (event: {
+    nativeEvent: { layout: { height: number } };
+  }) => void;
+  onLayout({ nativeEvent: { layout: { height } } });
+}
 function showKeyboard(height: number) {
   const listener = keyboardSubscribers.show;
   if (!listener) {
@@ -399,8 +403,6 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
-  state.windowWidth = 390;
-  state.windowHeight = 844;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
   state.topInset = 0;
@@ -508,13 +510,17 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    // The FAB's own strip is reserved for a centered body only while the window
-    // can spare it: a short landscape window reserves the tab bar's band alone,
-    // so the body still clears the bar instead of shrinking below the state's
-    // height (the FAB is a corner overlay there and the column never reaches it).
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
-      state.tabBarHeight + (test.empty ? 0 : 64)
-    );
+    // The tab bar is the hard surface reserve; while the FAB shows its band
+    // (the mocked 48dp button + its 16dp margin) joins it, because a centered
+    // state's full-width action (the load failure's Retry, the boundary's
+    // back-to-profile) must not reach into the corner overlay (see
+    // `useAgentsListChrome`). The tabs layout reserves the bar alone (its 16dp
+    // content gap is content-only), so the raised reserve is the bar plus the
+    // FAB band. The no-match body owns the whole band and hides the FAB instead
+    // (`showFab`), so its reserve is the bar alone.
+    const surface = root().findByType(StateSurfaceInsets);
+    const expectedInset = test.empty ? state.tabBarHeight : state.tabBarHeight + 64;
+    expect(surface.props.bottomInset).toBe(expectedInset);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -562,50 +568,6 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
-  });
-
-  it('reserves the tab-bar band alone for a centered body in a short landscape window', async () => {
-    // Device defect e4: in a 411dp-tall landscape window the FAB's own strip is
-    // taller than the band the centered body gets, so reserving it as well left
-    // the no-match state less room than one line of copy — its copy and
-    // Clear-search action sat under the bar, whose overlay swallowed the taps,
-    // and only a scroll brought them back. The FAB is a corner overlay there and
-    // the centered column never reaches it, so the band is the tab bar's alone.
-    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
-    state.windowWidth = 914;
-    state.windowHeight = 411;
-
-    await renderScreen();
-
-    expect(nodes('CenteredState')).toHaveLength(1);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
-  });
-
-  it('still reserves the FAB strip on a tablet held sideways', async () => {
-    // Wide but not short: the band there is taller than the whole state, so
-    // the FAB keeps its own strip and the state centers above it.
-    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
-    state.windowWidth = 1024;
-    state.windowHeight = 768;
-
-    await renderScreen();
-
-    expect(nodes('CenteredState')).toHaveLength(1);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
-  });
-
-  it('still reserves the FAB strip on a 600dp-short-edge tablet held sideways', async () => {
-    // Android's smallest tablet (the `sw600dp` qualifier, the 1024x600
-    // emulator) is wide and short-edged, but its band is taller than the whole
-    // state, so the FAB keeps its own strip there too.
-    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
-    state.windowWidth = 1024;
-    state.windowHeight = 600;
-
-    await renderScreen();
-
-    expect(nodes('CenteredState')).toHaveLength(1);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
   });
 
   it('renders the empty-state New session action as the tab’s primary affordance', async () => {
@@ -1111,6 +1073,35 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
   });
 
+  it('clamps the live list frame to one row pitch in a short window and scrolls the rest under the FAB', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const contentContainerStyle = () =>
+      nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
+    const fullBand = state.tabBarHeight + 64;
+
+    // Short landscape window: the body keeps less than the full FAB band, so
+    // the frame yields the soft band down to one row pitch — the branch line
+    // is never clipped at rest — and the yielded part rides on the content so
+    // the last row can still be scrolled clear of the button.
+    const shortHeight = 180;
+    act(() => {
+      layoutBody(shortHeight);
+    });
+    const clampedFrame = shortHeight - SESSION_ROW_PITCH;
+    expect(clampedFrame).toBeLessThan(fullBand);
+    expect(listStyle()).toEqual({ marginBottom: clampedFrame });
+    expect(contentContainerStyle().paddingBottom).toBe(fullBand - clampedFrame);
+
+    // A tall window keeps the whole band and puts nothing on the content.
+    act(() => {
+      layoutBody(900);
+    });
+    expect(listStyle()).toEqual({ marginBottom: fullBand });
+    expect(contentContainerStyle().paddingBottom).toBe(0);
+  });
+
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
@@ -1380,31 +1371,13 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
-  it('clears the tab bar for the no-match body through the surface reservation alone', async () => {
+  it('lifts the no-match body above the keyboard inside the platform container', async () => {
     state.live.activeSessions = [row];
-    const renderer = await renderScreen();
+    await renderScreen();
     const searchHeader = requireNode('SessionListSearchHeader');
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
-    expect(nodes('CenteredState')).toHaveLength(1);
-    expect(nodes('FlatList')).toHaveLength(0);
-    // The fixed tab bar is reserved once, by the surface inset this screen sets
-    // (the tab bar's band alone here: the no-match body owns the band, so the
-    // FAB yields and its strip never joins the reservation) and which
-    // CenteredState's pending-layout fallback pads by. Letting the no-match
-    // body shrink its own frame by the same band cleared the band a second time
-    // and pushed the centered copy about half the band above the centre of the
-    // area above the bar, so the body must not carry a clearance of its own.
-    const body = nodes('CenteredState')[0];
-    // Assert the reservation the screen actually sets, then that the body adds
-    // none of its own: `EmptyState` hands `CenteredState` only `refreshControl`
-    // and children, so a `style` here would be a duplicate clearance.
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
-    expect(body?.props.style).toBeUndefined();
-    expect(renderer.root.findByType(EmptyState).props.description).toBe(
-      'Try a different search term.'
-    );
 
     // iOS: the native container owns the lift, so the centered no-match body is
     // inside it and re-measures against the viewport it shrinks.
@@ -1537,9 +1510,19 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
+        // The keyboard container is the third child; the feedback band and the
+        // body (the rows list inside its measuring wrapper) share it.
         tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
       ).toEqual(['View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
-      expect(descendantsOf(requireNode('KeyboardAvoidingView'), 'FlatList')).toHaveLength(1);
+      const rows = descendantsOf(requireNode('KeyboardAvoidingView'), 'FlatList');
+      expect(rows).toHaveLength(1);
+      // The body wrapper that measures the list's available height is the
+      // `onLayout` view the rows list hangs from (see `useAgentsListChrome`).
+      const wrapper = descendantsOf(requireNode('KeyboardAvoidingView'), 'View').find(
+        node =>
+          typeof node.props.onLayout === 'function' && descendantsOf(node, 'FlatList').length === 1
+      );
+      expect(wrapper).toBeDefined();
     }
   });
 
@@ -1662,6 +1645,138 @@ describe('AgentSessionListScreen live filtering', () => {
     // survives in the native content description after the badge unmounts.
     expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions');
     expect(nodes('ScrollView')).toHaveLength(0);
+  });
+
+  it('renders the no-match state compact while the clear region is short and full when it grows', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const compact = () => root().findByType(EmptyState).props.compact as boolean;
+
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    // The first, unmeasured frame keeps the full presentation.
+    expect(compact()).toBe(false);
+
+    // The 420dp-tall landscape capture: the body keeps ~180dp; the 81dp bar
+    // leaves ~99dp, short of the full state. Compact drops the icon bubble and
+    // tightens the gaps so the hint and the action stay above the bar.
+    act(() => {
+      layoutBody(180);
+    });
+    expect(compact()).toBe(true);
+    // The no-match body owns the band the tab bar leaves, so the creation FAB
+    // yields instead of floating over the state's description and Clear action.
+    expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
+      false
+    );
+    const surface = root().findByType(StateSurfaceInsets);
+    expect(surface.props.bottomInset).toBe(state.tabBarHeight);
+    // The tabs layout reserves the bar alone (its 16dp content gap is
+    // content-only), so the state's clear region is the body minus the bar its
+    // own full-width action must clear.
+
+    // A body that exactly clears the bar holds the whole full state; one dp less
+    // is compact.
+    const fullStateBody = getEmptyStateFullHeight() + state.tabBarHeight;
+    act(() => {
+      layoutBody(fullStateBody - 1);
+    });
+    expect(compact()).toBe(true);
+
+    act(() => {
+      layoutBody(fullStateBody);
+    });
+    expect(compact()).toBe(false);
+
+    act(() => {
+      layoutBody(900);
+    });
+    expect(compact()).toBe(false);
+  });
+
+  it('compacts the no-match state for a body that only holds it at the base font scale', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const compact = () => root().findByType(EmptyState).props.compact as boolean;
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    // The body that holds the whole state with the base-size text...
+    const baseScaleBody = getEmptyStateFullHeight({ fontScale: 1 }) + state.tabBarHeight;
+    act(() => {
+      layoutBody(baseScaleBody);
+    });
+    expect(compact()).toBe(false);
+
+    // ...no longer holds it once Dynamic Type grows the title, the hint and the
+    // action, so the state must drop the icon bubble and tighten the gaps.
+    state.fontScale = 2;
+    await renderScreen();
+    const grownHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (grownHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    act(() => {
+      layoutBody(baseScaleBody);
+    });
+    expect(compact()).toBe(true);
+
+    act(() => {
+      layoutBody(getEmptyStateFullHeight({ fontScale: 2 }) + state.tabBarHeight);
+    });
+    expect(compact()).toBe(false);
+  });
+
+  it('renders the live empty state compact in a short window and full in a tall one', async () => {
+    await renderScreen();
+    const compact = () => root().findByType(LiveSessionListEmptyState).props.compact as boolean;
+    expect(compact()).toBe(false);
+
+    act(() => {
+      layoutBody(180);
+    });
+    expect(compact()).toBe(true);
+    expect(root().findByType(EmptyState).props.compact).toBe(true);
+
+    act(() => {
+      layoutBody(900);
+    });
+    expect(compact()).toBe(false);
+    expect(root().findByType(EmptyState).props.compact).toBe(false);
+  });
+
+  it('compacts the no-match state for the reserve reduced motion adds to the band', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const compact = () => root().findByType(EmptyState).props.compact as boolean;
+    const search = () => {
+      (requireNode('SessionListSearchHeader').props.onChangeText as (text: string) => void)(
+        'nothing matches this'
+      );
+    };
+    act(search);
+
+    // A body that holds the whole full state while no reserve sits above it...
+    const holdsFullState = getEmptyStateFullHeight() + state.tabBarHeight;
+    act(() => {
+      layoutBody(holdsFullState);
+    });
+    expect(compact()).toBe(false);
+
+    // ...no longer holds it once reduced motion reserves RefreshProgress's h-9
+    // box (31.5dp) inside the band, so the state must go compact instead of
+    // running its hint and Clear action under the bar.
+    state.reducedMotion = true;
+    await renderScreen();
+    act(search);
+    act(() => {
+      layoutBody(holdsFullState);
+    });
+    expect(compact()).toBe(true);
   });
 });
 

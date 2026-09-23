@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getBottomReservation,
   getCenteredStateBand,
   getCenteredStateLayout,
   getStateSurfaceInsets,
@@ -306,6 +307,13 @@ describe('getStateSurfaceInsets', () => {
         bottom: 40,
       })
     ).toEqual({ topInset: 0, bottomInset: 0 });
+  });
+});
+
+describe('getBottomReservation', () => {
+  it('raises an inherited reserve with the passed inset, never shrinking it', () => {
+    expect(getBottomReservation({ inherited: 97, bottomInset: 81 })).toBe(97);
+    expect(getBottomReservation({ inherited: 60, bottomInset: 81 })).toBe(81);
   });
 });
 

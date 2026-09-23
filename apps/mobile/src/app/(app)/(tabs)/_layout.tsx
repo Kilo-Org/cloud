@@ -163,6 +163,12 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           freezeOnBlur: true,
+          // The row palette colours a destination inside a screen; a tab tint
+          // says which tab is selected — a state, not a destination. One accent
+          // per tab would put six accents on the bar and fight the rows below
+          // it, and an icon-only recolour would disagree with `TabBarLabel`,
+          // which draws its label from its own `text-foreground` /
+          // `text-muted-foreground` classes and ignores the navigator tint.
           tabBarActiveTintColor: colors.foreground,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarBackground: TabBarBackground,

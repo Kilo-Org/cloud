@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -138,7 +139,7 @@ export function AgentSessionListScreen() {
     }, [runForegroundRefresh])
   );
 
-  const listRef = useRef<FlatList<ActiveSession>>(null);
+  const listRef = useRef<FlashListRef<ActiveSession>>(null);
   useScrollToTop(listRef);
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -308,16 +309,21 @@ export function AgentSessionListScreen() {
     // viewport ends above the button's band and no row can scroll into it on
     // either platform.
     body = (
-      <FlatList
+      // FlashList v2 recycles rows and keeps scroll position; the rows are
+      // homogeneous, so one item type is enough. `style` stays the frame object
+      // (FlashList's own root already carries `flex: 1`), where a `className`
+      // would be ignored.
+      <FlashList
         ref={listRef}
         data={visibleSessions}
         renderItem={renderItem}
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
+        getItemType={() => 'session'}
         style={listInsets.frame}
         contentContainerStyle={listInsets.content}
         refreshControl={rowsControl}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
+        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
       />
     );
   }

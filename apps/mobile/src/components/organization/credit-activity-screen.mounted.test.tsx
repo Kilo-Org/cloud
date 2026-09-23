@@ -152,7 +152,10 @@ vi.mock('react-native-reanimated', () => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
-  FlatList: (props: {
+}));
+
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
     data?: unknown[];
     renderItem?: (info: { item: unknown; index: number }) => ReactElement;
     ListEmptyComponent?: ReactElement;
@@ -160,10 +163,10 @@ vi.mock('react-native', () => ({
   }) => {
     const data = props.data ?? [];
     if (data.length === 0) {
-      return createElement('FlatList', null, props.ListEmptyComponent, props.ListFooterComponent);
+      return createElement('FlashList', null, props.ListEmptyComponent, props.ListFooterComponent);
     }
     return createElement(
-      'View',
+      'FlashList',
       null,
       data.map((item, index) =>
         createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
@@ -280,7 +283,7 @@ describe('OrganizationCreditActivityScreen empty', () => {
     );
 
     expect(collectText(renderer.toJSON())).toContain('EMPTY_STATE:No credit activity');
-    expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     expect(
       (
         renderer.root.find(node => String(node.type) === 'EmptyState').props as {
@@ -294,6 +297,18 @@ describe('OrganizationCreditActivityScreen empty', () => {
 });
 
 describe('OrganizationCreditActivityScreen pagination', () => {
+  it('renders the loaded rows through the FlashList mock', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationCreditActivityScreen));
+
+    const lists = renderer.root.findAll(node => String(node.type) === 'FlashList');
+    expect(lists).toHaveLength(1);
+    expect(collectText(renderer.toJSON())).toContain('Top-up');
+  });
+
   it('keeps pagination available when a loaded page has no visible entries', async () => {
     pageQuery.data = { pages: [{ entries: [], nextCursor: 1, hasMore: true }] };
     pageHook.hasMore = true;

@@ -43,7 +43,7 @@ const mockedReactQuery = vi.hoisted(() => ({
   backendProductsStaleTime: undefined as number | undefined,
   completeAppStorePurchase: vi.fn(),
   completeAppStorePurchaseIsPending: false,
-  fetchQuery: vi.fn(),
+  query: vi.fn(),
   invalidateQueries: vi.fn(),
   lastQueryKey: null as unknown[] | null,
   mobileStoreProductsData: undefined as
@@ -120,7 +120,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => {
     mockedReactQuery.useQueryClient();
     return {
-      fetchQuery: mockedReactQuery.fetchQuery,
+      query: mockedReactQuery.query,
       invalidateQueries: mockedReactQuery.invalidateQueries,
       removeQueries: mockedReactQuery.removeQueries,
     };
@@ -390,7 +390,7 @@ beforeEach(() => {
   mockedReactQuery.backendProductsStaleTime = undefined;
   mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedReactQuery.completeAppStorePurchaseIsPending = false;
-  mockedReactQuery.fetchQuery.mockResolvedValue({
+  mockedReactQuery.query.mockResolvedValue({
     appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
     products: [{ appleProductId: product.appleProductId }],
   });

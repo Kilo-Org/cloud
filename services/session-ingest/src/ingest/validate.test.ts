@@ -142,6 +142,9 @@ describe('validateAndParseIngestPayload', () => {
     });
   });
 
+  // The item has to exceed MAX_SINGLE_ITEM_BYTES (50 MB) for the tokenizer to
+  // skip it as oversized, so this case serializes, encodes and scans ~50 MB.
+  // The default 5 s timeout is too tight for that on slower machines.
   it('reports parser-skipped oversized items as ineligible', () => {
     const result = validate({
       data: [
@@ -155,7 +158,7 @@ describe('validateAndParseIngestPayload', () => {
       skippedItemCount: 1,
       maxValidItemBytes: MAX_SINGLE_ITEM_BYTES + 1,
     });
-  });
+  }, 15_000);
 
   it.each([
     ['at', INGEST_CHUNK_MAX_BYTES],

@@ -24,18 +24,20 @@ catalog:
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
   # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
-  '@sentry/cli': 3.6.2
-  '@tanstack/query-async-storage-persister': 5.100.10
-  '@tanstack/react-query': 5.100.10
-  '@tanstack/react-query-persist-client': 5.100.10
-  '@trpc/client': 11.17.0
-  '@trpc/server': 11.17.0
-  '@trpc/tanstack-react-query': 11.17.0
+  '@sentry/cli': 3.8.0
+  '@tanstack/query-async-storage-persister': 5.103.1
+  '@tanstack/react-query': 5.103.1
+  '@tanstack/react-query-persist-client': 5.103.1
+  '@trpc/client': 11.18.0
+  # @trpc/client@11.18.0 declares this exact peer:
+  #   @trpc/server: 11.18.0
+  '@trpc/server': 11.18.0
+  '@trpc/tanstack-react-query': 11.18.0
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
-  '@typescript/native-preview': 7.0.0-dev.20260514.1
-  '@vitest/coverage-v8': 4.1.11
-  '@vitest/ui': 4.1.11
+  '@typescript/native-preview': 7.0.0-dev.20260707.2
+  '@vitest/coverage-v8': 5.0.1
+  '@vitest/ui': 5.0.1
   '@workos-inc/node': 8.13.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
@@ -48,10 +50,23 @@ catalog:
   tsx: 4.21.0
   typescript: 5.9.3
   ulid: 3.0.2
-  vitest: 4.1.11
+  vitest: 5.0.1
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
-  zod: 4.4.3
+  zod: 4.6.5
+catalogs:
+  # Every published @cloudflare/vitest-pool-workers (through 0.22.0) declares a
+  # `vitest ^4.1.0` peer and imports internal Vitest APIs that vitest 5 reworked,
+  # so the pool's proxy worker fails to boot under vitest 5
+  # (`SyntaxError: Unexpected identifier 'file'`). Workspaces whose tests run the
+  # workerd pool stay on vitest 4 through this catalog; main's move from 4.1.6 to
+  # 4.1.11 is kept here (it is the newest 4.x this pool supports), while the
+  # default catalog's vitest 5.0.1 covers everything else. @vitest/ui moves with
+  # them so its exact `vitest` peer keeps matching. Keep these exact, and keep
+  # this comment.
+  vitest4:
+    '@vitest/ui': 4.1.11
+    vitest: 4.1.11
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
@@ -70,27 +85,37 @@ minimumReleaseAgeExclude:
   - '@cloudflare/workerd-linux-64@1.20260918.1'
   - '@cloudflare/workerd-linux-arm64@1.20260918.1'
   - '@cloudflare/workerd-windows-64@1.20260918.1'
-  # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
+  # Expo SDK 57 alignment: the 2026-09-18 patch releases `expo install --check`
   # expects, plus the exact transitive versions that aligned graph resolves to.
   # Each entry exempts exactly the listed package@version required by that
   # alignment; any other or future version of these packages stays age-gated.
-  - expo@57.0.21
-  - '@expo/ui@57.0.17'
-  - expo-router@57.0.20
-  - expo-widgets@57.0.18
-  - babel-preset-expo@57.0.11
-  - expo-modules-core@57.0.17
+  - expo@57.0.24
+  - '@expo/ui@57.0.19'
+  - expo-router@57.0.22
+  - expo-widgets@57.0.20
+  - expo-asset@57.0.18
+  - expo-build-properties@57.0.21
+  - expo-constants@57.0.19
+  - expo-image-manipulator@57.0.19
+  - expo-image-picker@57.0.19
+  - expo-location@57.0.19
+  - expo-notifications@57.0.20
+  - expo-sharing@57.0.21
+  - expo-task-manager@57.0.19
+  - babel-preset-expo@57.0.12
+  - expo-modules-core@57.0.18
   - expo-modules-jsi@57.1.0
-  - '@expo/cli@57.0.23'
+  - '@expo/cli@57.0.26'
+  - '@expo/metro-runtime@57.0.16'
   - '@expo/metro-file-map@57.0.3'
   - expo-glass-effect@57.0.3
+  - expo-manifests@57.0.2
+  - expo-updates-interface@57.0.2
+  - '@expo/schema-utils@57.0.2'
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
   - expo-dev-menu-interface
-  - expo-manifests
-  - expo-updates-interface
-  - '@expo/schema-utils'
   - '@typescript/native-preview'
   - '@typescript/native-preview-darwin-arm64'
   - '@typescript/native-preview-darwin-x64'
@@ -193,9 +218,20 @@ overrides:
   # and constructs its own WebClient, so the versions must agree. 7.x is the
   # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
-  # Direct `@expo/ui@57.0.17` (expo-widgets peer) and expo-router's `^57.0.9`
+  # Direct `@expo/ui@57.0.19` (expo-widgets peer) and expo-router's `^57.0.19`
   # otherwise resolve to two native-module copies. Force one version.
-  '@expo/ui': 57.0.17
+  '@expo/ui': 57.0.19
+  # Every workspace app pins the same @types/react on purpose; a second copy
+  # breaks the root `prepare` type build (apps/web's JSX intrinsic props then
+  # resolve against two React type identities). The Expo SDK 57 alignment moves
+  # kilo-app to 19.3.0, so hold the whole tree on it.
+  '@types/react': 19.3.0
+  # kilo-app moved to jotai 3.0.0. The shared cloud-agent-sdk atoms it reads
+  # only type-check when both sides resolve the same module identity, so the
+  # SDK's jotai moves with it; apps/web and apps/extension keep their own
+  # jotai 2.18.1 (jotai-minidb 0.0.8 imports `atomFamily` from
+  # `jotai/vanilla/utils`, which jotai 3 no longer exports).
+  '@kilocode/cloud-agent-sdk>jotai': 3.0.0
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
@@ -219,13 +255,13 @@ patchedDependencies:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
-  expo-router@57.0.20: patches/expo-router@57.0.20.patch
+  expo-router@57.0.22: patches/expo-router@57.0.22.patch
   expo-server-sdk: patches/expo-server-sdk.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
-  expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
+  expo-task-manager@57.0.19: patches/expo-task-manager@57.0.19.patch
+  expo-widgets@57.0.20: patches/expo-widgets@57.0.20.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
   # Fabric mounting race: RCTComponentViewFactory registers component views from
   # the JS thread without the class-map mutex, so a mounting transaction can

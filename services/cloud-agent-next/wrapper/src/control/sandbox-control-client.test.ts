@@ -2947,7 +2947,9 @@ describe('sandbox control event batching', () => {
       timers.mockRestore();
       cleared.mockRestore();
     }
-  });
+    // Filling the 2048-entry outbox costs one macrotask per event (~2.5ms each),
+    // which sits right at Bun's 5s default and times out under CI load.
+  }, 30_000);
 });
 
 async function handshake(

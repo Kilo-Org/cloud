@@ -82,8 +82,10 @@ describe('Text tracked labels in RTL', () => {
   it('keeps the caller style after the RTL defaults', () => {
     i18nManager.isRTL = true;
     const callerStyle = { color: '#ff0000' };
+    // Arabic-script copy, the only copy the merged rule resets (text.rtl-labels:
+    // Latin labels keep their tracking); the caller style still lands last.
     const root = mount(
-      createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, '…')
+      createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, 'استكشف')
     );
 
     expect(hostStyle(root)).toContainEqual(callerStyle);
@@ -102,6 +104,9 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
+    // Arabic-script copy drops the tracked class and the mono family in an RTL
+    // interface (`withoutMonoFamily`): a zero letter spacing alone does not
+    // keep a cursive script's joins (text.rtl-labels, text.mounted).
     // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
     // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
     // display classes, so an RTL eyebrow drops them — it carries no tracked

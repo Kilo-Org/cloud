@@ -46,6 +46,10 @@ import {
 
 describe('mapModelIdToVercel', () => {
   describe('tilde-prefixed latest aliases', () => {
+    it('keeps the generic GPT latest alias on the existing Vercel model', () => {
+      expect(mapModelIdToVercel(GPT_LATEST_MODEL_ALIAS)).toBe('openai/gpt-5.6-sol');
+    });
+
     it.each([
       [CLAUDE_FABLE_LATEST_MODEL_ALIAS, CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],
       [CLAUDE_OPUS_LATEST_MODEL_ALIAS, CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID],

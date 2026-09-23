@@ -20,7 +20,7 @@ import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -89,7 +89,7 @@ export const preferredModels = [
   ...autoFreeModels.map(({ model }) => model),
 
   CLAUDE_OPUS_CURRENT_MODEL_ID,
-  'openai/gpt-6-sol',
+  GPT_SOL_CURRENT_MODEL_ID,
   ...(gpt_5_6_sol_discounted_model.status === 'public'
     ? [gpt_5_6_sol_discounted_model.public_id]
     : []),

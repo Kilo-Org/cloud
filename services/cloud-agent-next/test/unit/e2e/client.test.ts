@@ -889,7 +889,9 @@ describe('create helper session tracking', () => {
   it('reports the returned id after prepareBrowserSession resolves', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_1' }))
+      vi
+        .fn()
+        .mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_1' }))
     );
     const onSessionCreated = vi.fn();
 
@@ -916,7 +918,9 @@ describe('create helper session tracking', () => {
   it('reports the returned id after createWorktreeChat resolves', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_2' }))
+      vi
+        .fn()
+        .mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_2' }))
     );
     const onSessionCreated = vi.fn();
 

@@ -338,7 +338,7 @@
       "balanceAlertsSubtitle": "संगठन का बैलेंस कम होने की चेतावनियाँ",
       "balanceAlertsUnavailable": "बैलेंस अलर्ट पाने के लिए किसी संगठन से जुड़ें।",
       "securityFindingsSubtitle": "नई सुरक्षा समस्याएँ और SLA के रिमाइंडर",
-      "securityFindingsUnavailable": "सुरक्षा समस्याएँ पाने के लिए किसी दायरे में Kilo सुरक्षा एजेंट चालू करें।",
+      "securityFindingsUnavailable": "सुरक्षा समस्याएँ पाने के लिए किसी स्कोप पर Kilo सुरक्षा एजेंट चालू करें।",
       "spendAlertsSubtitle": "सीमा पार होना और हर घंटे की बढ़त",
       "spendAlertsToggle": "खर्च की चेतावनी श्रेणी"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "साइन इन करने की बहुत बार कोशिश की गई है। कृपया थोड़ा इंतज़ार करें और फिर से कोशिश करें।"
   },
   "models": {
+    "auto": {
+      "frontier": "स्वचालित अत्याधुनिक",
+      "balanced": "स्वचालित संतुलित",
+      "efficient": "स्वचालित कुशल",
+      "small": "स्वचालित छोटा",
+      "free": "स्वचालित निःशुल्क",
+      "organization": "संस्था स्वचालित"
+    },
     "dataCollected": "डेटा संग्रह चालू",
     "free": "निःशुल्क",
     "couldNotUpdateFavorites": "पसंदीदा अपडेट नहीं हो सके।",

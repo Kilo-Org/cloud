@@ -840,7 +840,7 @@
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
       "kiloclawActivityUnavailable": "برای دریافت فعالیت KiloClaw، یک نمونه KiloClaw راه‌اندازی کنید.",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
-      "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی کم، به یک سازمان بپیوندید.",
+      "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی، به یک سازمان بپیوندید.",
       "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA",
       "securityFindingsUnavailable": "برای دریافت یافته‌های امنیتی، عامل امنیتی Kilo را در یک محدوده فعال کنید.",
       "spendAlertsSubtitle": "عبور از آستانه‌ها و جهش‌های ساعتی",
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید و دوباره تلاش کنید."
   },
   "models": {
+    "auto": {
+      "frontier": "خودکار پیشرفته",
+      "balanced": "خودکار متعادل",
+      "efficient": "خودکار کارآمد",
+      "small": "خودکار کوچک",
+      "free": "خودکار رایگان",
+      "organization": "خودکار سازمان"
+    },
     "dataCollected": "جمع‌آوری داده",
     "free": "رایگان",
     "couldNotUpdateFavorites": "به‌روزرسانی موارد دلخواه ممکن نشد.",

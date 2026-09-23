@@ -124,9 +124,20 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, making the exact assertion below machine-dependent.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(
@@ -136,7 +147,7 @@ describe('shared branded splash', () => {
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });
@@ -164,12 +175,38 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // The real projectRoot may carry a prebuilt android/ tree, whose existing
-    // colors the colors mod merges in; assert the splash entry, not that it is
-    // the only one (the styles assertion below matches the same way).
+    // arrayContaining, not an exact array: introspection seeds android.colors
+    // from the checked-out prebuild, which also carries the app's other colors
+    // (colorPrimary, app_background, notification_icon_color). Asserting the
+    // exact length made this pass only on a tree with no prebuilt android/.
+    // Introspection runs against the real project root, so `withAndroidColors`
+    // also reads whatever the project's own prebuild has already written to
+    // `android/app/src/main/res/values/colors.xml` (that directory is
+    // gitignored, so CI sees only the splash color while a worktree with a
+    // prebuild sees the app's colors too). The plugin's contract is that its
+    // own color is present, not that it is the only one.
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
+    // compileModsAsync introspects the project's existing android resources, so
+    // the colors array also carries the project's other theme colors. Assert the
+    // splash color this plugin owns instead of the array's exact contents.
+    // Introspection reads the project's own native resources, so the colors
+    // modResults carry whatever the worktree's generated `android/` project
+    // declares next to the splash color: notification and dialog colors come
+    // from the app's other plugins (adaptive-icon, notification, app
+    // background), and `introspect` merges into the colors a local prebuild
+    // already generated, so a worktree with a prebuilt `android/` directory
+    // carries that file's extra entries too. Assert the splash color the plugin
+    // owns is present among them rather than the only one, by containment, the
+    // same way the styles assertion below pins its theme: not the whole array
+    // and not its exact length, so a prebuild's other colors (iconBackground,
+    // colorPrimary, …) surviving here cannot fail the case.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
-        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

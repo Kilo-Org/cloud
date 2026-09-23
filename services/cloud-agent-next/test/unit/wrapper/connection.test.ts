@@ -10,10 +10,6 @@ import {
   isSessionIdleEvent,
 } from '../../../wrapper/src/connection.js';
 
-// ---------------------------------------------------------------------------
-// Ingest connection diagnostics
-// ---------------------------------------------------------------------------
-
 describe('buildIngestConnectionFailureMessage', () => {
   it('explains websocket errors without assuming a network or DO cause', () => {
     const message = buildIngestConnectionFailureMessage({
@@ -49,10 +45,6 @@ describe('buildIngestConnectionFailureMessage', () => {
     expect(message).toContain('sandbox can reach the local cloud-agent Worker');
   });
 });
-
-// ---------------------------------------------------------------------------
-// isSessionIdleEvent
-// ---------------------------------------------------------------------------
 
 describe('isSessionIdleEvent', () => {
   it('returns true for a valid session.idle event with sessionID', () => {

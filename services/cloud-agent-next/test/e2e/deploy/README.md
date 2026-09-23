@@ -204,7 +204,7 @@ semantics.
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
 | Only the `SandboxSmall` container class kept, `max_instances = 20`, `ssh.enabled = true` | The stack only runs normal `ses-` sessions; `20` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
-| The other six container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
+| The other seven container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
 | Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
 | `CREDENTIAL_CONTAINMENT_ENABLED=false` | Non-contained dispatch; see plan sections 5 and 11.6. |
 | `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |
@@ -217,14 +217,15 @@ The e2e Worker provisions exactly one container class, `SandboxSmall`, with
 parallelism headroom for later parallel runs. `SandboxSmall` keeps the rendered
 `image` and `instance_type`; only `max_instances` and `ssh.enabled` change.
 
-All six other container classes (`Sandbox`, `SandboxDIND`, `SandboxCodeReview`,
-`SandboxContainment`, `SandboxSmallContainment`, `SandboxCodeReviewContainment`)
-are removed from `containers`, `durable_objects.bindings` and `migrations`, so
+All seven other container classes (`Sandbox`, `SandboxDIND`, `SandboxCodeReview`,
+`SandboxContainment`, `SandboxSmallContainment`, `SandboxCodeReviewContainment`,
+`SandboxContainers`) are removed from `containers`, `durable_objects.bindings` and
+`migrations`, so
 those bindings do not exist on `cloud-agent-e2e-test`. The migration list keeps
 each surviving SQLite Durable Object class on its original production tag
 (`CloudAgentSession` `v2`, `SandboxSmall` `v3`, `UserKiloFacade` `v5`,
 `StreamTicketNonceDO` `v8`, `SandboxControl` `v9`, `SandboxSession` `v10`);
-entries whose classes are all removed (`v1`, `v4`, `v6`, `v7`) are dropped, and
+entries whose classes are all removed (`v1`, `v4`, `v6`, `v7`, `v11`) are dropped, and
 no surviving tag is renumbered or reordered. The e2e Worker's Durable Object
 migration history is **append-only**: once a Worker has been deployed, existing
 tags are part of its creation history and cannot be renumbered. To change the

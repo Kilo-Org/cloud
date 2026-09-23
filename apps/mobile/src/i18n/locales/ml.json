@@ -840,7 +840,7 @@
       "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാറാകൽ/പരാജയപ്പെടൽ, മുൻകൂട്ടി നിശ്ചയിച്ച പ്രവർത്തനങ്ങൾ",
       "kiloclawActivityUnavailable": "KiloClaw പ്രവർത്തനം ലഭിക്കാൻ ഒരു KiloClaw ഇൻസ്റ്റൻസ് ആരംഭിക്കുക.",
       "balanceAlertsSubtitle": "ഓർഗനൈസേഷന്റെ ബാലൻസ് കുറയുമ്പോഴുള്ള മുന്നറിയിപ്പുകൾ",
-      "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു സ്ഥാപനത്തിൽ ചേരുക.",
+      "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു ഓർഗനൈസേഷനിൽ ചേരുക.",
       "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും",
       "securityFindingsUnavailable": "സുരക്ഷാ കണ്ടെത്തലുകൾ ലഭിക്കാൻ ഒരു പരിധിയിൽ Kilo സുരക്ഷാ ഏജന്റ് പ്രവർത്തനക്ഷമമാക്കുക.",
       "spendAlertsSubtitle": "പരിധി ലംഘനങ്ങളും മണിക്കൂർ തോറുമുള്ള വർധനകളും",
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "വളരെയധികം തവണ സൈൻ ഇൻ ചെയ്യാൻ ശ്രമിച്ചു. അൽപ്പം കാത്തിരുന്ന് വീണ്ടും ശ്രമിക്കുക."
   },
   "models": {
+    "auto": {
+      "frontier": "ഓട്ടോ ഫ്രന്റിയർ",
+      "balanced": "ഓട്ടോ സമതുലിതം",
+      "efficient": "ഓട്ടോ കാര്യക്ഷമം",
+      "small": "ഓട്ടോ ചെറുത്",
+      "free": "ഓട്ടോ സൗജന്യം",
+      "organization": "സംഘടന ഓട്ടോ"
+    },
     "dataCollected": "ഡാറ്റ ശേഖരിക്കുന്നു",
     "free": "സൗജന്യം",
     "couldNotUpdateFavorites": "പ്രിയപ്പെട്ടവ പുതുക്കാൻ കഴിഞ്ഞില്ല.",

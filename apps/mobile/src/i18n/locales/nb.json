@@ -838,11 +838,11 @@
       "sessionStatusTitle": "Øktstatus",
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
-      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for å få KiloClaw-aktivitet.",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-forekomst for å få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
-      "balanceAlertsUnavailable": "Bli med i en organisasjon for å få varsler om lav saldo.",
+      "balanceAlertsUnavailable": "Bli med i en organisasjon for å få saldovarsler.",
       "securityFindingsSubtitle": "nye funn og SLA-påminnelser",
-      "securityFindingsUnavailable": "Aktiver Kilo-sikkerhetsagenten i et omfang for å få sikkerhetsfunn.",
+      "securityFindingsUnavailable": "Aktiver Kilo-sikkerhetsagenten på et omfang for å få sikkerhetsfunn.",
       "spendAlertsSubtitle": "grenseoverskridelser og topper per time",
       "spendAlertsToggle": "Kategorien forbruksvarsler"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "For mange påloggingsforsøk. Vent og prøv igjen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisk Avansert",
+      "balanced": "Automatisk Balansert",
+      "efficient": "Automatisk Effektiv",
+      "small": "Automatisk Liten",
+      "free": "Automatisk Gratis",
+      "organization": "Organisasjons-Auto"
+    },
     "dataCollected": "Data samles inn",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Kunne ikke oppdatere favorittene.",

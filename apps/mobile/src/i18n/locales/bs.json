@@ -854,11 +854,11 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspjelo / spremno za upravljanje",
       "kiloclawActivitySubtitle": "instance spremne/neuspjele, zakazane radnje",
-      "kiloclawActivityUnavailable": "Pokreni instancu KiloClaw da bi dobio aktivnost KiloClaw.",
+      "kiloclawActivityUnavailable": "Pokrenite KiloClaw instancu da biste dobili KiloClaw aktivnost.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "balanceAlertsUnavailable": "Pridruži se organizaciji da bi dobio upozorenja o niskom saldu.",
+      "balanceAlertsUnavailable": "Pridružite se organizaciji da biste dobili upozorenja o saldu.",
       "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici",
-      "securityFindingsUnavailable": "Uključi Kilo sigurnosnog agenta na opsegu da bi dobio sigurnosne nalaze.",
+      "securityFindingsUnavailable": "Omogućite Kilo sigurnosnog agenta na opsegu da biste dobili sigurnosne nalaze.",
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi na sat",
       "spendAlertsToggle": "Kategorija upozorenja o potrošnji"
     },
@@ -3173,6 +3173,14 @@
     "tooManySignInAttempts": "Previše pokušaja prijave. Sačekaj pa pokušaj ponovo."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatski Napredni",
+      "balanced": "Automatski Uravnotežen",
+      "efficient": "Automatski Efikasni",
+      "small": "Automatski Mali",
+      "free": "Automatski Besplatni",
+      "organization": "Automatski organizacije"
+    },
     "dataCollected": "Prikuplja podatke",
     "free": "Besplatno",
     "couldNotUpdateFavorites": "Nije moguće ažurirati omiljene modele.",

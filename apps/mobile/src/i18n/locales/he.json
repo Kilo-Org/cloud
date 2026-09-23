@@ -334,9 +334,9 @@
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
-      "kiloclawActivityUnavailable": "הפעל מופע של KiloClaw כדי לקבל פעילות KiloClaw.",
+      "kiloclawActivityUnavailable": "הפעל מופע KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
-      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות על יתרה נמוכה.",
+      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות יתרה.",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
       "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה.",
       "spendAlertsSubtitle": "חציית ספים וזינוקים שעתיים",
@@ -3173,6 +3173,14 @@
     "tooManySignInAttempts": "יותר מדי ניסיונות התחברות. המתן ונסה שוב."
   },
   "models": {
+    "auto": {
+      "frontier": "אוטומטי מתקדם",
+      "balanced": "אוטומטי מאוזן",
+      "efficient": "אוטומטי יעיל",
+      "small": "אוטומטי קטן",
+      "free": "אוטומטי חינם",
+      "organization": "אוטומטי של הארגון"
+    },
     "dataCollected": "אוסף נתונים",
     "free": "חינם",
     "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים.",

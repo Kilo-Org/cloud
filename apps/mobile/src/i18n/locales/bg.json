@@ -838,11 +838,11 @@
       "sessionStatusTitle": "Статус на сесията",
       "sessionStatusSubtitle": "завършена / неуспешна / готова за управление",
       "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
-      "kiloclawActivityUnavailable": "Стартирай инстанция на KiloClaw, за да получаваш активност от KiloClaw.",
+      "kiloclawActivityUnavailable": "Стартирайте инстанция KiloClaw, за да получавате активност на KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
-      "balanceAlertsUnavailable": "Присъедини се към организация, за да получаваш предупреждения за нисък баланс.",
+      "balanceAlertsUnavailable": "Присъединете се към организация, за да получавате предупреждения за баланса.",
       "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA",
-      "securityFindingsUnavailable": "Активирай агента по сигурността на Kilo за даден обхват, за да получаваш проблеми със сигурността.",
+      "securityFindingsUnavailable": "Активирайте Агента по сигурността на Kilo в обхват, за да получавате открити проблеми със сигурността.",
       "spendAlertsSubtitle": "преминаване на прагове и часови скокове",
       "spendAlertsToggle": "Категория известия за разходи"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "Твърде много опити за влизане. Изчакай и опитай отново."
   },
   "models": {
+    "auto": {
+      "frontier": "Автоматичен Водещ",
+      "balanced": "Автоматичен Балансиран",
+      "efficient": "Автоматичен Ефективен",
+      "small": "Автоматичен Малък",
+      "free": "Автоматичен Безплатен",
+      "organization": "Автоматичен на организацията"
+    },
     "dataCollected": "Събира данни",
     "free": "Безплатно",
     "couldNotUpdateFavorites": "Не успяхме да актуализираме любимите модели.",

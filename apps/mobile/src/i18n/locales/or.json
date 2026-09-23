@@ -842,7 +842,7 @@
       "balanceAlertsSubtitle": "ସଂଗଠନର କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
       "balanceAlertsUnavailable": "ବ୍ୟାଲାନ୍ସ ସତର୍କତା ପାଇବାକୁ ଏକ ସଂଗଠନରେ ଯୋଗ ଦିଅନ୍ତୁ।",
       "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ",
-      "securityFindingsUnavailable": "ସୁରକ୍ଷା ସମସ୍ୟା ପାଇବାକୁ ଏକ ପରିସରରେ Kilo ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରନ୍ତୁ।",
+      "securityFindingsUnavailable": "ସୁରକ୍ଷା ସମସ୍ୟା ପାଇବାକୁ ଏକ ପରିସରରେ Kilo ସୁରକ୍ଷା ଏଜେଣ୍ଟ ସକ୍ଷମ କରନ୍ତୁ।",
       "spendAlertsSubtitle": "ସୀମା ଅତିକ୍ରମ ଏବଂ ଘଣ୍ଟାପ୍ରତି ବୃଦ୍ଧି",
       "spendAlertsToggle": "ଖର୍ଚ୍ଚ ସତର୍କତା ବର୍ଗ"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "ଅତ୍ୟଧିକ ଥର ସାଇନ୍ ଇନ୍ ଚେଷ୍ଟା କରିଛନ୍ତି। କିଛି ସମୟ ଅପେକ୍ଷା କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   },
   "models": {
+    "auto": {
+      "frontier": "ସ୍ୱୟଂଚାଳିତ ଅତ୍ୟାଧୁନିକ",
+      "balanced": "ସ୍ୱୟଂଚାଳିତ ସନ୍ତୁଳିତ",
+      "efficient": "ସ୍ୱୟଂଚାଳିତ କାର୍ଯ୍ୟକ୍ଷମ",
+      "small": "ସ୍ୱୟଂଚାଳିତ ଛୋଟ",
+      "free": "ସ୍ୱୟଂଚାଳିତ ମାଗଣା",
+      "organization": "ସଂସ୍ଥା ସ୍ୱୟଂଚାଳିତ"
+    },
     "dataCollected": "ତଥ୍ୟ ସଂଗ୍ରହ ହୁଏ",
     "free": "ମାଗଣା",
     "couldNotUpdateFavorites": "ପସନ୍ଦର ମଡେଲ୍ ତାଲିକା ଅଦ୍ୟତନ ହୋଇପାରିଲା ନାହିଁ।",

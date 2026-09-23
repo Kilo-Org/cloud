@@ -336,9 +336,9 @@
       "kiloclawActivitySubtitle": "готовность и ошибки экземпляра, запланированные действия",
       "kiloclawActivityUnavailable": "Запустите экземпляр KiloClaw, чтобы получать активность KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения о низком балансе организации",
-      "balanceAlertsUnavailable": "Присоединитесь к организации, чтобы получать оповещения о низком балансе.",
+      "balanceAlertsUnavailable": "Присоединитесь к организации, чтобы получать оповещения о балансе.",
       "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA",
-      "securityFindingsUnavailable": "Включите Агент безопасности Kilo в области, чтобы получать замечания по безопасности.",
+      "securityFindingsUnavailable": "Включите Агента безопасности Kilo в области, чтобы получать уязвимости.",
       "spendAlertsSubtitle": "превышения порогов и почасовые всплески",
       "spendAlertsToggle": "Категория «Оповещения о расходах»"
     },
@@ -3216,6 +3216,14 @@
     "tooManySignInAttempts": "Слишком много попыток входа. Подождите и попробуйте снова."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Передовой",
+      "balanced": "Авто Сбалансированный",
+      "efficient": "Авто Эффективный",
+      "small": "Авто Малый",
+      "free": "Авто Бесплатный",
+      "organization": "Авто организации"
+    },
     "dataCollected": "Сбор данных",
     "free": "Бесплатно",
     "couldNotUpdateFavorites": "Не удалось обновить избранное.",

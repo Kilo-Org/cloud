@@ -840,9 +840,9 @@
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
       "kiloclawActivityUnavailable": "KiloClaw ක්‍රියාකාරකම් ලබා ගැනීමට KiloClaw පිටපතක් අරඹන්න.",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
-      "balanceAlertsUnavailable": "ශේෂය අඩු වීමේ දැනුම්දීම් ලබා ගැනීමට සංවිධානයකට සම්බන්ධ වන්න.",
+      "balanceAlertsUnavailable": "ශේෂ අනතුරු ඇඟවීම් ලබා ගැනීමට සංවිධානයකට සම්බන්ධ වන්න.",
       "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්",
-      "securityFindingsUnavailable": "ආරක්ෂක ගැටලු ලබා ගැනීමට විෂය පථයක Kilo ආරක්ෂක නියෝජිතයා සක්‍රීය කරන්න.",
+      "securityFindingsUnavailable": "ආරක්ෂක සොයාගැනීම් ලබා ගැනීමට විෂය පථයක Kilo ආරක්ෂක නියෝජිතයා සක්‍රීය කරන්න.",
       "spendAlertsSubtitle": "සීමා ඉක්මවීම් සහ පැයකට ඇති උච්චතා",
       "spendAlertsToggle": "වියදම් දැනුම්දීම් ප්‍රවර්ගය"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "පිවිසීමට උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර මොහොතක් රැඳී සිට නැවත උත්සාහ කරන්න."
   },
   "models": {
+    "auto": {
+      "frontier": "ස්වයංක්‍රීය අතිනවීන",
+      "balanced": "ස්වයංක්‍රීය සමතුලිත",
+      "efficient": "ස්වයංක්‍රීය කාර්යක්ෂම",
+      "small": "ස්වයංක්‍රීය කුඩා",
+      "free": "ස්වයංක්‍රීය නොමිලේ",
+      "organization": "සංවිධානයේ ස්වයංක්‍රීය"
+    },
     "dataCollected": "දත්ත රැස් කරයි",
     "free": "නොමිලේ",
     "couldNotUpdateFavorites": "ප්‍රියතමයන් යාවත්කාලීන කළ නොහැකි විය.",

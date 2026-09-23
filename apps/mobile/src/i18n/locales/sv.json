@@ -840,9 +840,9 @@
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
       "kiloclawActivityUnavailable": "Starta en KiloClaw-instans för att få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "balanceAlertsUnavailable": "Gå med i en organisation för att få varningar om lågt saldo.",
+      "balanceAlertsUnavailable": "Gå med i en organisation för att få saldovarningar.",
       "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
-      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsanmärkningar.",
+      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd.",
       "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
       "spendAlertsToggle": "Kategorin utgiftsvarningar"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "För många inloggningsförsök. Vänta ett tag och försök igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisk Avancerad",
+      "balanced": "Automatisk Balanserad",
+      "efficient": "Automatisk Effektiv",
+      "small": "Automatisk Liten",
+      "free": "Automatisk Gratis",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Data samlas in",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Det gick inte att uppdatera favoriterna.",

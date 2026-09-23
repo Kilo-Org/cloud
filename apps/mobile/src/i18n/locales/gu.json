@@ -842,7 +842,7 @@
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
       "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
-      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો.",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે એક અવકાશમાં Kilo સુરક્ષા એજન્ટ સક્ષમ કરો.",
       "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
       "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "સાઇન ઇન કરવાના ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને થોડી રાહ જુઓ અને ફરી પ્રયત્ન કરો."
   },
   "models": {
+    "auto": {
+      "frontier": "આપમેળે અગ્રણી",
+      "balanced": "આપમેળે સંતુલિત",
+      "efficient": "આપમેળે કાર્યક્ષમ",
+      "small": "આપમેળે નાનું",
+      "free": "આપમેળે મફત",
+      "organization": "સંસ્થા આપમેળે"
+    },
     "dataCollected": "ડેટા એકત્ર થાય છે",
     "free": "મફત",
     "couldNotUpdateFavorites": "મનપસંદની યાદી અપડેટ કરી શકાઈ નહીં.",

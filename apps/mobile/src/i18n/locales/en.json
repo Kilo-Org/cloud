@@ -3146,6 +3146,14 @@
     "tooManySignInAttempts": "Too many sign-in attempts. Please wait and try again."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Frontier",
+      "balanced": "Auto Balanced",
+      "efficient": "Auto Efficient",
+      "small": "Auto Small",
+      "free": "Auto Free",
+      "organization": "Organization Auto"
+    },
     "dataCollected": "Data collected",
     "free": "Free",
     "couldNotUpdateFavorites": "Could not update favorites",

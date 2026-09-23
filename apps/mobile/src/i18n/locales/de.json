@@ -334,11 +334,11 @@
       "sessionStatusTitle": "Sitzungsstatus",
       "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
-      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivitäten zu erhalten.",
+      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivität zu erhalten.",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
-      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Warnungen bei niedrigem Guthaben zu erhalten.",
+      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Guthabenwarnungen zu erhalten.",
       "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
-      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten für einen Bereich, um Sicherheitsbefunde zu erhalten.",
+      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten in einem Bereich, um Sicherheitsbefunde zu erhalten.",
       "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
       "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
     },
@@ -3130,6 +3130,14 @@
     "tooManySignInAttempts": "Du hast zu viele Anmeldeversuche unternommen. Bitte warte einen Moment und versuche es erneut."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Spitzenmodell",
+      "balanced": "Auto Ausgewogen",
+      "efficient": "Auto Effizient",
+      "small": "Auto Klein",
+      "free": "Auto Kostenlos",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Daten werden erfasst",
     "free": "Kostenlos",
     "couldNotUpdateFavorites": "Die Favoriten konnten nicht aktualisiert werden.",

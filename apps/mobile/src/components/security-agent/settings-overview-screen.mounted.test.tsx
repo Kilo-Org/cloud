@@ -14,7 +14,9 @@ import { securityConfigFixture } from './security-config.test-fixture';
 const committedConnectivity = vi.hoisted(() => ({
   status: 'online' as 'online' | 'offline' | 'unknown',
 }));
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+);
 const failures = new Set<string>();
 const gates = new Map<string, Promise<undefined>>();
 let configData: Record<string, unknown> = {};

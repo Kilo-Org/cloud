@@ -47,7 +47,7 @@ export function useGitHubReposRefresh({
     async (isReturnTriggered: boolean) => {
       setIsRefreshingRepos(true);
       try {
-        const fresh = await queryClient.fetchQuery({
+        const fresh = await queryClient.query({
           ...(organizationId
             ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
                 organizationId,

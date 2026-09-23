@@ -646,10 +646,12 @@ describe('ConversationMessages', () => {
   );
 
   it('keeps live questions, suggestion actions, and child-session controls visible', () => {
-    const atoms: Pick<
-      SessionManager['atoms'],
-      'activeQuestion' | 'isStreaming' | 'activeSuggestion'
-    > = {
+    // `@kilocode/cloud-agent-sdk` resolves jotai 3 (kilo-app's graph) while
+    // apps/web stays on jotai 2 (jotai-minidb 0.0.8 imports `atomFamily` from
+    // `jotai/vanilla/utils`, which jotai 3 dropped). The two majors' stores and
+    // atoms interoperate at runtime; only their atom types differ, so the fake
+    // manager's atoms need a bridge cast.
+    const atoms = {
       activeQuestion: atom<StandaloneQuestion | null>(null),
       isStreaming: atom(true),
       activeSuggestion: atom<StandaloneSuggestion | null>({
@@ -658,7 +660,10 @@ describe('ConversationMessages', () => {
         text: 'Run the focused checks next?',
         actions: [{ label: 'Run checks', prompt: 'Run the focused verification' }],
       }),
-    };
+    } as unknown as Pick<
+      SessionManager['atoms'],
+      'activeQuestion' | 'isStreaming' | 'activeSuggestion'
+    >;
     jest.mocked(useOptionalManager).mockReturnValue({ atoms } as SessionManager);
     const childSessionId = `ses_${'a'.repeat(26)}`;
     const childMessages = [

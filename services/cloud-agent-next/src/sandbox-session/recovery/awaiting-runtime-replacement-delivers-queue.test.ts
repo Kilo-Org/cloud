@@ -435,4 +435,106 @@ describe('awaiting a runtime replacement', () => {
       state: { kind: 'queued', wrapperInstanceId: RUNTIME_ID, replacementWaits: undefined },
     });
   });
+
+  it('keeps the attach-epoch pool across a second deferral so the rebind still binds', async () => {
+    const fixture = createSessionFixture(fixtureDeps);
+    const retiredNativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementNativeRuntimeId = '44444444-4444-4444-8444-444444444444';
+
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'connected',
+      wrapperInstanceId: RUNTIME_ID,
+      allocationIncarnation: 'incarnation_1',
+      runtimeReplacementInFlight: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+
+    // The head binds a native runtime at attach epoch 1 before the retirement, so
+    // the fence holds 1 and the in-place rebind must advance past it.
+    const boundAuthorization: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: '11111111-1111-4111-8111-111111111111',
+      messageId: 'a',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    rewriteHead(fixture, 'a', message => ({
+      ...message,
+      proofs: {
+        attach: {
+          authorization: boundAuthorization,
+          dispatched: true,
+          completedAt: Date.now(),
+          attachmentEpoch: 1,
+        },
+      },
+    }));
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: retiredNativeRuntimeId,
+      authorization: boundAuthorization,
+    });
+    expect(fixture.values.get('native_runtime_fence')).toMatchObject({ attachmentEpoch: 1 });
+
+    // Deferral one retires the completed attach, whose epoch the fence holds.
+    const firstDeadline = Date.now() + 20_000;
+    setDeliveryDeadline(fixture, 'a', firstDeadline);
+    vi.setSystemTime(firstDeadline);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')?.proofs?.retiredAttach).toMatchObject({ attachmentEpoch: 1 });
+
+    // The redelivery dispatches a fresh attach, and its result has not arrived
+    // when the next deadline lands: the second deferral retires an epoch-less
+    // proof over the completed one.
+    const pendingAuthorization: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: '22222222-2222-4222-8222-222222222222',
+      messageId: 'a',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    rewriteHead(fixture, 'a', message => ({
+      ...message,
+      proofs: {
+        ...message.proofs,
+        attach: { authorization: pendingAuthorization, dispatched: true },
+      },
+    }));
+    const secondDeadline = Date.now() + 20_000;
+    setDeliveryDeadline(fixture, 'a', secondDeadline);
+    vi.setSystemTime(secondDeadline);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(queuedStateOf(fixture, 'a')?.replacementWaits).toBe(2);
+    // Dropping the epoch here makes the next attach mint at or below the fence's
+    // epoch, so the replacement looks like a stale result and never binds.
+    expect(fixture.record('a')?.proofs?.retiredAttach).toMatchObject({ attachmentEpoch: 1 });
+
+    // The replacement binds in place: the attach result carries the replacement
+    // native runtime identity, and the fence must advance to it.
+    delegateRequest(fixture, 'session.attach', async () =>
+      controlResponse({ attached: true, nativeRuntimeId: replacementNativeRuntimeId })
+    );
+    delegateRequest(fixture, 'session.prompt', async () => controlFailure(true, 'not_ready'));
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      allocationIncarnation: 'incarnation_1',
+      operationResults: true,
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.values.get('native_runtime_fence')).toMatchObject({
+      nativeRuntimeId: replacementNativeRuntimeId,
+    });
+  });
 });

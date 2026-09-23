@@ -464,7 +464,10 @@ export function releaseUnadmittedWaitingMessages(
       ]);
       // Preserve intent and deadline: the head keeps its original preparation
       // bound. A released attach proof is retained for late results.
-      const proofs = releaseAttach && attach ? { retiredAttach: attach } : undefined;
+      const proofs =
+        releaseAttach && attach
+          ? { retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach) }
+          : undefined;
       return withProofs({ ...message, state: cleared }, proofs);
     }),
     releasedIds,
@@ -501,7 +504,10 @@ export function releaseCompletedRetryableAttach(
   return messages.map(message => {
     const attach = message.messageId === messageId ? message.proofs?.attach : undefined;
     if (!attach?.dispatched || attach.result?.ok !== false) return message;
-    const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+    const proofs: MessageProofs = {
+      ...message.proofs,
+      retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+    };
     delete proofs.attach;
     return withProofs(
       {
@@ -515,6 +521,24 @@ export function releaseCompletedRetryableAttach(
       Object.keys(proofs).length > 0 ? proofs : undefined
     );
   });
+}
+
+/**
+ * Retire an attach proof into the single `retiredAttach` slot without letting
+ * the slot's attach epoch drop. A dispatched attach carries no `attachmentEpoch`
+ * until its result arrives, and every other retired proof's epoch was already
+ * counted by `nextAttachmentEpoch`. Replacing the slot with an epoch-less proof
+ * would drop the pool to the epochs of the proofs that remain, so the next attach
+ * is minted at or below the epoch the native-runtime fence holds and looks like a
+ * stale result — refusing the in-place rebind the head is waiting for. Carry the
+ * highest epoch either proof has carried so the pool never falls below the fence.
+ */
+export function retireAttachProof(
+  attach: SessionOperationProof,
+  previous: SessionOperationProof | undefined
+): SessionOperationProof {
+  const attachmentEpoch = Math.max(attach.attachmentEpoch ?? 0, previous?.attachmentEpoch ?? 0);
+  return { ...attach, ...(attachmentEpoch > 0 ? { attachmentEpoch } : {}) };
 }
 
 /**
@@ -536,7 +560,10 @@ export function releaseUnconfirmedAttach(
     !sameSessionOperation(attach.authorization, authorization)
   )
     return undefined;
-  const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+  const proofs: MessageProofs = {
+    ...message.proofs,
+    retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+  };
   delete proofs.attach;
   return messages.map(item =>
     item.messageId !== message.messageId

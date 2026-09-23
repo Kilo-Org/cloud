@@ -244,6 +244,7 @@ import {
   replacePreparationAttemptId,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
+  retireAttachProof,
   RUNTIME_REPLACEMENT_WAIT_LIMIT,
   streamCloudStatus,
   streamQueuedSnapshots,
@@ -4595,7 +4596,7 @@ export class SandboxSession extends DurableObject<Env> {
           return message;
         const proofs = message.proofs ? { ...message.proofs } : undefined;
         if (proofs?.attach) {
-          proofs.retiredAttach = proofs.attach;
+          proofs.retiredAttach = retireAttachProof(proofs.attach, proofs.retiredAttach);
           delete proofs.attach;
         }
         return {

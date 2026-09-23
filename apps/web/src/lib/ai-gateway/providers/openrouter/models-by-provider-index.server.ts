@@ -30,7 +30,7 @@ export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterRe
 
 type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
-  fetchStoredModels: () => Promise<StoredModelMap>;
+  fetchOpenRouterModels: () => Promise<StoredModelMap>;
   fetchVercelModels: () => Promise<StoredModelMap>;
   ttlMs: number;
   nowMs: () => number;
@@ -146,7 +146,7 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
     if (!snapshotProviderSlugs) return new Set();
     const [storedModels, vercelModels] = await Promise.all([
-      options.fetchStoredModels(),
+      options.fetchOpenRouterModels(),
       options.fetchVercelModels(),
     ]);
     const openRouterProviderSlugs = narrowProviderSlugsToVariant(
@@ -190,7 +190,7 @@ const DEFAULT_TTL_MS = 30_000;
 
 const defaultLoader = createModelsByProviderIndexLoader({
   fetchSnapshot: fetchLatestModelsByProviderSnapshotFromDb,
-  fetchStoredModels: getOpenRouterModelsMetadataFromDatabase,
+  fetchOpenRouterModels: getOpenRouterModelsMetadataFromDatabase,
   fetchVercelModels: getVercelModelsMetadataFromDatabase,
   ttlMs: DEFAULT_TTL_MS,
   nowMs: () => Date.now(),

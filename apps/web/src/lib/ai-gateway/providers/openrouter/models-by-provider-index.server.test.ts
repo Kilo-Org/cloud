@@ -118,7 +118,7 @@ describe('createModelsByProviderIndexLoader', () => {
   ) {
     return createModelsByProviderIndexLoader({
       fetchSnapshot: async () => snapshot,
-      fetchStoredModels: async () => models,
+      fetchOpenRouterModels: async () => models,
       fetchVercelModels: async () => vercelModels,
       ttlMs: 60_000,
       nowMs: () => 0,

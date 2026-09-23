@@ -373,6 +373,56 @@ describe('CloudAgentWorkspaceTabs', () => {
     }
   });
 
+  it('reports activation from a bubbling click on the active tab but not from its close button', () => {
+    const dom = installTabsTestDom();
+    let root: Root | undefined;
+    const onActivateTab = jest.fn();
+
+    try {
+      root = createRoot(dom.container);
+      act(() => {
+        root?.render(
+          createElement(
+            Tabs,
+            { value: 'chat:ses_first' },
+            createElement(CloudAgentWorkspaceTabs, {
+              activeTabId: CHAT_TAB_ID,
+              chatSessions: [makeSession('ses_first', 'First worktree chat')],
+              currentSessionId: 'ses_first',
+              files: [],
+              onCloseFile: () => undefined,
+              onSelectChat: () => undefined,
+              onCloseChat: () => undefined,
+              onRenameChat: async () => undefined,
+              terminals: [],
+              terminalStatuses: {},
+              canCreateTerminal: false,
+              onSelectTab: () => undefined,
+              onCreateTerminal: () => undefined,
+              onCloseTerminal: () => undefined,
+              onActivateTab,
+            })
+          )
+        );
+      });
+
+      const activeTab = dom.container.querySelector<HTMLButtonElement>('[role="tab"]');
+      if (!activeTab) throw new Error('Missing active chat tab');
+      void act(() => activeTab.dispatchEvent(new window.Event('click', { bubbles: true })));
+      expect(onActivateTab).toHaveBeenCalledTimes(1);
+
+      const closeButton = dom.container.querySelector<HTMLButtonElement>(
+        '[aria-label="Close First worktree chat"]'
+      );
+      if (!closeButton) throw new Error('Missing chat close button');
+      void act(() => closeButton.dispatchEvent(new window.Event('click', { bubbles: true })));
+      expect(onActivateTab).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root?.unmount());
+      dom.cleanup();
+    }
+  });
+
   it('keeps the split chat action busy and disables only chat creation while pending', () => {
     const html = renderWorkspaceTabs({ isCreatingChat: true, canCreateTerminal: true }, true);
     const action = findButtonMarkup(html, 'aria-label="New chat"');
@@ -813,5 +863,34 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(html).not.toContain('Session actions for');
     expect(html).toContain('New chat');
     expect(html).toContain('New terminal');
+  });
+
+  it('suppresses selected chrome and reports every tab unselected while selection is suppressed', () => {
+    const html = renderWorkspaceTabs({
+      selectionSuppressed: true,
+      terminals: [{ id: 'pty', title: 'Terminal 1', cloudAgentSessionId: 'workspace-one' }],
+      files: [{ path: 'src/file.ts' }],
+    });
+
+    expect(html).not.toContain('border-foreground/30');
+    for (const label of ['First worktree chat', 'Terminal 1', 'file.ts']) {
+      const tab = findButtonMarkup(html, label);
+      expect(tab).toContain('role="tab"');
+      expect(tab).toContain('aria-selected="false"');
+      expect(tab).toContain('data-state="inactive"');
+    }
+  });
+
+  it('leaves selected chrome and state to Radix when selection is not suppressed', () => {
+    const html = renderWorkspaceTabs({
+      terminals: [{ id: 'pty', title: 'Terminal 1', cloudAgentSessionId: 'workspace-one' }],
+      files: [{ path: 'src/file.ts' }],
+    });
+
+    expect(html).toContain('border-foreground/30');
+    const chatTab = findButtonMarkup(html, 'First worktree chat');
+    expect(chatTab).toContain('aria-selected="true"');
+    expect(chatTab).toContain('data-state="active"');
+    expect(chatTab).not.toContain('data-state="inactive"');
   });
 });

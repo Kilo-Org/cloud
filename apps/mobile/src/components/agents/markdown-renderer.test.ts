@@ -3,7 +3,7 @@
 import Module from 'node:module';
 import { createElement, type ReactElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 
@@ -918,5 +918,57 @@ describe('MarkdownRenderer nested table fallback', () => {
       await Promise.resolve();
       mounted.unmount();
     });
+  });
+});
+
+/**
+ * Proof for the explorer's `session-tools-ar` finding: in the Arabic interface
+ * the assistant body and its bullet list read as centre-aligned, with the
+ * marker detached at the right edge (`session-tools-ar.png`). React Native only
+ * centres a paragraph through `textAlign`, so the renderer's contract is that
+ * the RTL path names the base direction (`writingDirection: 'rtl'`, from
+ * `lib/rtl-text.ts`) and no paragraph or marker style carries a `textAlign` at
+ * all. The marker box is the library's own; the renderer never gives it one.
+ */
+describe('MarkdownRenderer RTL paragraph direction (explorer session-tools-ar)', () => {
+  afterEach(() => {
+    rnStub.I18nManager.isRTL = false;
+  });
+
+  function elementStyle(element: ReactElement): Record<string, unknown> {
+    return flattenStyle((element.props as { style?: unknown }).style);
+  }
+
+  it('names the paragraph base direction without centring it', async () => {
+    rnStub.I18nManager.isRTL = true;
+    const renderer = await createRenderer();
+    const heading = renderer.heading('Why fork PRs can fail', { fontSize: 20 }) as ReactElement;
+    const body = renderer.escape('Secrets are withheld.', { fontSize: 16 }) as ReactElement;
+    const link = renderer.link('catalog.json', 'https://example.com', {
+      fontSize: 16,
+    }) as ReactElement;
+    for (const element of [heading, body, link]) {
+      const style = elementStyle(element);
+      expect(style.writingDirection).toBe('rtl');
+      expect(style.textAlign).toBeUndefined();
+    }
+  });
+
+  it('leaves the LTR path without a writing direction or alignment', async () => {
+    const renderer = await createRenderer();
+    const body = renderer.escape('Secrets are withheld.', { fontSize: 16 }) as ReactElement;
+    const style = elementStyle(body);
+    expect(style.writingDirection).toBeUndefined();
+    expect(style.textAlign).toBeUndefined();
+  });
+
+  it('has no centring style on the paragraph or list marker box', async () => {
+    const { getMarkdownStyles } = await import('./markdown-palette');
+    const styles = getMarkdownStyles(palette);
+    for (const key of ['text', 'paragraph', 'list', 'li'] as const) {
+      const style = flattenStyle(styles[key]);
+      expect(style.textAlign).toBeUndefined();
+      expect(style.alignItems).toBeUndefined();
+    }
   });
 });

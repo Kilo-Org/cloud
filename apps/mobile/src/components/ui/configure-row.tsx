@@ -5,7 +5,7 @@ import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
+import { type RowHue, rowTint, type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +53,12 @@ type ConfigureRowProps = {
    * accent instead of a hue hashed from its title.
    */
   tone?: ToneKey;
+  /**
+   * Curated destination hue (see `RowHue`). A row identifies a destination, so
+   * its colour is chosen once in the table and passed explicitly here; it is
+   * never derived from the title. A semantic tone outranks it.
+   */
+  hue?: RowHue;
   onPress?: () => void;
   disabled?: boolean;
   trailing?: ReactNode;
@@ -68,6 +74,7 @@ export function ConfigureRow({
   subtitle,
   subtitleNumberOfLines,
   tone,
+  hue,
   onPress,
   disabled,
   trailing,
@@ -77,9 +84,15 @@ export function ConfigureRow({
   const colors = useThemeColors();
   const { fontScale } = useWindowDimensions();
   const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE;
-  // A semantic tone overrides the shared neutral tile; a title never hashes
-  // into an agent hue here.
-  const tint: Tint = tone ? toneColor(tone) : NEUTRAL_TINT;
+  // A semantic tone outranks the curated destination hue, and a row carrying
+  // neither keeps the neutral tile that the settings surfaces outside the
+  // Profile screen still render (preferences-screen, account-settings-screen).
+  let tint: Tint = NEUTRAL_TINT;
+  if (tone) {
+    tint = toneColor(tone);
+  } else if (hue) {
+    tint = rowTint(hue);
+  }
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = Boolean(onPress) && !disabled;

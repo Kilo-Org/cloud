@@ -27,10 +27,16 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * The profile-editor validation copy below (the duplicate-key refusal and the
+ * MCP bound messages) is written in `en.json` by the review-fix slice and waits
+ * for the translation slice, so it is listed here until it lands everywhere.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>([
+  'profiles.keyDuplicate',
+  'profiles.mcp.commandTooLong',
+  'profiles.mcp.urlTooLong',
+  'profiles.mcp.jsonTooLarge',
+]);
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

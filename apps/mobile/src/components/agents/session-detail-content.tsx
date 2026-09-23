@@ -115,6 +115,11 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
+import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
@@ -468,6 +473,35 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  // The session's active-profile chip: the profile this session runs on. The
+  // session row stores no profile id, so the same resolution the session start
+  // used — the context's effective default — names it, matching the web
+  // indicator's layers. Tapping opens that profile's editor.
+  const {
+    profile: sessionProfile,
+    isLoading: isSessionProfileLoading,
+    isError: isSessionProfileError,
+  } = useEffectiveAgentProfile(organizationId);
+  const sessionProfileIndicatorState = buildActiveProfileIndicatorState({
+    selectedProfileName: sessionProfile?.name ?? null,
+    repoBoundProfileName: null,
+    hasManualEnvVars: false,
+    hasManualSetupCommands: false,
+    hasSelectedProfileId: sessionProfile !== null,
+    isProfilesLoading: isSessionProfileLoading,
+    hasProfileError: isSessionProfileError,
+  });
+  const openSessionProfileEditor = () => {
+    if (sessionProfile) {
+      router.push(
+        getProfileOverviewPath(
+          sessionProfile.id,
+          profileOrganizationId(organizationId, sessionProfile)
+        )
+      );
+    }
+  };
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
     sessionId,
@@ -1994,6 +2028,19 @@ export function SessionDetailContent({
                 }
               : {})}
           />
+          {sessionProfileIndicatorState ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+              className="px-4 pb-1"
+            >
+              <ActiveProfileIndicator
+                state={sessionProfileIndicatorState}
+                onPress={openSessionProfileEditor}
+              />
+            </Animated.View>
+          ) : null}
           {sessionGoal ? (
             <Animated.View
               entering={FadeIn.duration(200)}

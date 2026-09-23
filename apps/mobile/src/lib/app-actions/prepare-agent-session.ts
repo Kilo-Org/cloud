@@ -42,6 +42,10 @@ export type PrepareAgentSessionInput =
       model: string;
       variant?: string;
       profileId?: string | null;
+      /** Manual env vars layered over the profile; omitted from the body when empty. */
+      envVars?: Record<string, string>;
+      /** Manual setup commands layered over the profile; omitted from the body when empty. */
+      setupCommands?: string[];
       /** Commit and push the agent's changes (true) or leave them uncommitted. */
       autoCommit?: boolean;
       attachments?: AgentAttachmentWire;
@@ -216,6 +220,8 @@ type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
   operationKey: string;
   upstreamBranch?: string;
   profileId?: string;
+  envVars?: Record<string, string>;
+  setupCommands?: string[];
   attachments?: AgentAttachmentWire;
 };
 
@@ -267,6 +273,17 @@ function newIntentFingerprint(
   input: Extract<PrepareAgentSessionInput, { kind: 'new' }>,
   repo: ReturnType<typeof resolveRepoFingerprint> | string
 ): string {
+  // The inline overrides are part of the intent only when present, so a session
+  // with no manual config keeps the exact fingerprint the deployed app stored
+  // (a relaunch reuses its safe-retry key instead of minting a duplicate).
+  const inlineOverrides =
+    input.envVars !== undefined && Object.keys(input.envVars).length > 0
+      ? { envVars: input.envVars }
+      : {};
+  const setupCommands =
+    input.setupCommands !== undefined && input.setupCommands.length > 0
+      ? { setupCommands: input.setupCommands }
+      : {};
   return JSON.stringify({
     prompt: input.prompt,
     mode: input.mode,
@@ -277,6 +294,8 @@ function newIntentFingerprint(
     organizationId: input.organizationId ?? null,
     profileId: input.profileId ?? null,
     attachments: input.attachments ?? null,
+    ...inlineOverrides,
+    ...setupCommands,
   });
 }
 
@@ -327,6 +346,15 @@ function prepareSessionBody(
   }
   if (input.profileId) {
     body.profileId = input.profileId;
+  }
+  // Inline overrides the server layers over the resolved profile. Omitted when
+  // empty so the body is byte-identical to what the deployed app sent before
+  // the advanced config carried manual values.
+  if (input.envVars !== undefined && Object.keys(input.envVars).length > 0) {
+    body.envVars = input.envVars;
+  }
+  if (input.setupCommands !== undefined && input.setupCommands.length > 0) {
+    body.setupCommands = input.setupCommands;
   }
   if (input.attachments) {
     body.attachments = input.attachments;

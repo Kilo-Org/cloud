@@ -518,13 +518,15 @@ type SessionManager = {
     attachments?: CloudAgentAttachments;
     images?: Images;
     /**
-     * Ready file parts to forward to a CAPABLE remote CLI session (the CLI
-     * advertised `capabilities.attachments: true` in its most recent
-     * heartbeat). Distinct from the cloud-only `attachments` field: cloud
-     * sessions use `attachments`, remote sessions use `attachmentParts`.
-     * Session-manager enforces the gate — a non-null payload for a
-     * non-capable session is rejected with a typed error before it can
-     * reach the transport.
+     * Ready file parts to forward to a remote CLI session. Distinct from the
+     * cloud-only `attachments` field: cloud sessions use `attachments`, remote
+     * sessions use `attachmentParts`. The gate is optimistic: a remote session
+     * accepts parts while the CLI has not advertised the capability, and only
+     * an explicit `capabilities.attachments: false` in its most recent
+     * heartbeat rejects them. Session-manager enforces the gate — a non-null
+     * payload for a session the CLI reported incapable (or for a non-remote
+     * session) is rejected with a typed error before it can reach the
+     * transport.
      */
     attachmentParts?: RemoteAttachmentPart[];
     /**
@@ -877,6 +879,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const isRefreshingCachedTranscriptAtom = atom(false);
   const isReadOnlyAtom = atom(false);
+  // False while no session is active; once a session resolves the gate is
+  // computed optimistically (see `recomputeSupportsAttachments`), so a remote
+  // session whose CLI has not advertised `capabilities.attachments` still
+  // reports supported.
   const supportsAttachmentsAtom = atom(false);
   const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
   const remoteModelStateAtom = atom<RemoteModelState>(EMPTY_REMOTE_MODEL_STATE);
@@ -1030,7 +1036,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * capability change (upgrade, downgrade, reconnect, absent) — not only at
    * the initial `onResolved` moment. `undefined` means the CLI has not
    * reported any (older CLIs, mid-reconnect, or a session that the active
-   * CLI no longer claims).
+   * CLI no longer claims); the gate treats that as supported.
    */
   let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
   let observedModelSource: ObservedModelSource | null = null;
@@ -1456,20 +1462,33 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Optimistic CLI-capability gate. A capability the CLI has not reported yet
+   * (`undefined` — older CLI, mid-reconnect, or a `sessions.list` row without
+   * the field) reports supported, so a feature gated on CLI support does not
+   * disappear until the CLI explicitly denies it. Only an explicit `false`
+   * from the most recent `sessions.heartbeat` / `sessions.list` payload
+   * downgrades the gate. Read-only sessions never reach this helper: the
+   * caller keeps them unsupported.
+   */
+  function cliCapabilitySupported(value: boolean | undefined): boolean {
+    return value !== false;
+  }
+
+  /**
    * Recompute the `supportsAttachments` gate for the active session. Called
    * on every `onResolved` (initial resolution) AND every
    * `onTransportCapabilitiesChange` (heartbeat upgrade/downgrade/reconnect/
-   * absent) so the UI gate tracks the CLI's most recent advertisement.
+   * absent) so the UI gate tracks the CLI's most recent advertisement — the
+   * downgrade lands as soon as an explicit negative is reported.
    *
    * Rules:
    *  - `cloud-agent`: always supports attachments (S3a is a no-op for
    *    cloud-agent sessions, but cloud-agent attachments flow through
    *    the existing `attachments` field, not the new `attachmentParts`).
-   *  - `remote`: supports attachments only when the live CLI reported
-   *    `capabilities.attachments === true` in its most recent heartbeat
-   *    or `sessions.list`. Any other state (absent, false, mid-reconnect)
-   *    → `false`, matching today's "no paperclip" parity for non-capable
-   *    remote sessions.
+   *  - `remote`: optimistic. While the CLI has not advertised the capability
+   *    the gate reports supported; only an explicit
+   *    `capabilities.attachments === false` in its most recent heartbeat or
+   *    `sessions.list` downgrades it.
    *  - `read-only`: never supports attachments.
    */
   function recomputeSupportsAttachments(sessionType: ActiveSessionType | null): void {
@@ -1477,7 +1496,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (sessionType === 'cloud-agent') {
       supports = true;
     } else if (sessionType === 'remote') {
-      supports = currentCapabilities?.attachments === true;
+      supports = cliCapabilitySupported(currentCapabilities?.attachments);
     } else {
       supports = false;
     }
@@ -2216,8 +2235,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // Seed capabilities from the resolved session so the initial gate
         // reflects whatever the mobile-side `resolveSession` adapter had
         // to work with (e.g. the current `activeSessions.list` snapshot).
-        // Subsequent heartbeat changes arrive via `onTransportCapabilitiesChange`
-        // and overwrite this.
+        // An absent snapshot still reports supported (optimistic); subsequent
+        // heartbeat changes arrive via `onTransportCapabilitiesChange` and
+        // overwrite this, including an explicit downgrade.
         currentCapabilities = resolved.type === 'remote' ? resolved.capabilities : undefined;
         recomputeSupportsAttachments(resolved.type);
         updateCapabilityAtoms(session);
@@ -2559,12 +2579,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         throw new Error('Only Cloud Agent sessions support attachments');
       }
       if (input.attachmentParts && input.attachmentParts.length > 0) {
-        if (sessionType !== 'remote' || currentCapabilities?.attachments !== true) {
-          // A non-null `attachmentParts` for a non-capable session is a
-          // UI-bug: the paperclip is supposed to be hidden whenever this
-          // gate fails, so we should never see payload here. Refuse to
-          // forward rather than silently drop — same policy as the
-          // cloud-only branch above.
+        if (sessionType !== 'remote' || !cliCapabilitySupported(currentCapabilities?.attachments)) {
+          // A non-null `attachmentParts` for a session whose CLI explicitly
+          // reported `attachments: false` (or for a non-remote session) is a
+          // UI-bug: the paperclip is supposed to be hidden whenever this gate
+          // fails, so we should never see payload here. Refuse to forward
+          // rather than silently drop — same policy as the cloud-only branch
+          // above.
           throw new Error('Only capable remote CLI sessions support attachments');
         }
       }

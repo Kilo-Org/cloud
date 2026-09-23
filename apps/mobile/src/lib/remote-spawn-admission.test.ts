@@ -35,10 +35,9 @@ describe('resolveRemoteSpawnAdmission', () => {
     ).toEqual({ allowed: false, toast: remoteSpawnFilesNotSupportedToast() });
   });
 
-  it('rejects files when capability is absent', () => {
+  it('admits files when the capability is unknown (optimistic default)', () => {
     expect(resolveRemoteSpawnAdmission({ instance, payload: filesPayload })).toEqual({
-      allowed: false,
-      toast: remoteSpawnFilesNotSupportedToast(),
+      allowed: true,
     });
   });
 

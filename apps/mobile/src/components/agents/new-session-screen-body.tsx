@@ -604,10 +604,15 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null;
-  const instanceHasSessionClone = runOnInstance?.capabilities?.sessionClone === true;
-  // Clone entry: an incapable CLI shows the inline "cannot continue" reason
-  // immediately; a delivered clone/import failure overrides it after a Start
-  // attempt. Both clear when Run-on changes (see handleRunOnChange).
+  // Optimistic CLI-capability gate: an instance that has not advertised
+  // `sessionClone` is treated as capable; only an explicit
+  // `sessionClone: false` marks it incapable.
+  const instanceHasSessionClone =
+    runOnInstance !== null && runOnInstance.capabilities?.sessionClone !== false;
+  // Clone entry: a CLI the picker reported as incapable shows the inline
+  // "cannot continue" reason immediately; a delivered clone/import failure
+  // overrides it after a Start attempt. Both clear when Run-on changes (see
+  // handleRunOnChange).
   const incapableCliSelected = isCloneEntry && runOnInstance !== null && !instanceHasSessionClone;
   let runOnInlineNote: string | null = null;
   if (incapableCliSelected) {
@@ -661,8 +666,9 @@ export function NewSessionScreenBody() {
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
-        // Live CLI import: the dispatch carries the clone source id only when
-        // the instance advertises `sessionClone` (fail-closed otherwise).
+        // Live CLI import: the dispatch carries the clone source id unless the
+        // instance explicitly reported `sessionClone: false` (unknown is
+        // treated as capable).
         remoteSpawn.onStart();
         return;
       }

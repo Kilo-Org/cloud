@@ -2170,7 +2170,7 @@ describe('createSessionManager', () => {
       await switching;
     });
 
-    it('allows attachments only for a resolved Cloud Agent session', async () => {
+    it('reports attachments for Cloud Agent and optimistic remote, denies read-only', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -2179,7 +2179,12 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
+      // Remote with no advertised capabilities: optimistic -> supported.
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      // Only an explicit negative downgrades.
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
@@ -8175,13 +8180,54 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
   // -------------------------------------------------------------------------
 
   describe('supportsAttachments gate', () => {
-    it('heartbeat absent -> true upgrade flips supportsAttachments true', async () => {
+    it('remote with unknown capabilities reports supported (optimistic default)', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      // An absent heartbeat / sessions.list capability stays supported.
+      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+    });
+
+    it('resolved row with an explicit negative downgrades supportsAttachments', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({
+        type: 'remote',
+        kiloSessionId: kiloId('ses-1'),
+        capabilities: { attachments: false },
+      });
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+    });
+
+    it('explicit attachments: false downgrades supportsAttachments', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+    });
+
+    it('explicit false -> true upgrade flips supportsAttachments true', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
@@ -8202,7 +8248,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
 
-    it('true -> absent flips supportsAttachments false', async () => {
+    it('true -> absent stays true (optimistic default)', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -8213,6 +8259,30 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
       mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+    });
+
+    it('cloud-agent reports supported', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({
+        type: 'cloud-agent',
+        kiloSessionId: kiloId('ses-1'),
+        cloudAgentSessionId: cloudAgentId('agent-1'),
+      });
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+    });
+
+    it('read-only reports unsupported even with an unknown capability', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
   });
@@ -8285,13 +8355,49 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       ).toBeUndefined();
     });
 
-    it('non-capable remote + non-empty attachmentParts rejects before transport send', async () => {
+    it('remote with explicit attachments:false + attachmentParts rejects before transport send', async () => {
       const onSendFailed = jest.fn();
       const config = createMockConfig({ onSendFailed });
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const attachmentParts: RemoteAttachmentPart[] = [
+        {
+          type: 'file',
+          mime: 'text/plain',
+          filename: 'file.txt',
+          url: 'https://example.com/file.txt',
+        },
+      ];
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachmentParts,
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        expect.any(String),
+        expect.objectContaining({
+          message: 'Only capable remote CLI sessions support attachments',
+        })
+      );
+    });
+
+    it('read-only + attachmentParts rejects before transport send', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [
@@ -8347,6 +8453,41 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
           message: 'Only Cloud Agent sessions support attachments',
         })
       );
+    });
+
+    it('remote with unknown capability + attachmentParts forwards to session.send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const attachmentParts: RemoteAttachmentPart[] = [
+        {
+          type: 'file',
+          mime: 'text/plain',
+          filename: 'file.txt',
+          url: 'https://example.com/file.txt',
+        },
+      ];
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachmentParts,
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+        },
+        images: undefined,
+        attachmentParts,
+      });
     });
 
     it('capable remote + attachmentParts forwards to session.send', async () => {

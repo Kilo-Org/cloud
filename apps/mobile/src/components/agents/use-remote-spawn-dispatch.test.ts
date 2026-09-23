@@ -470,11 +470,12 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(onSpawnAdmitted).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call the admitted callback when admission denies files', () => {
+  it('does not call the admitted callback when the instance reported attachments false', () => {
     const onSpawnAdmitted = vi.fn();
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       getSubmitPayload: () => filesPayload,
+      runOnInstance: { ...INSTANCE, capabilities: { attachments: false } },
       onSpawnAdmitted: () => {
         onSpawnAdmitted();
       },
@@ -484,6 +485,21 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
+  });
+
+  it('admits files when the instance capability is unknown (optimistic default)', async () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => filesPayload,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    await captureSpawnCall(onStart);
+    expect(onSpawnAdmitted).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
   it('does not call the admitted callback without a target instance', () => {
@@ -522,13 +538,13 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     ]);
   });
 
-  it('does not spawn when a clone source is set but the instance lacks sessionClone', () => {
+  it('does not spawn when a clone source is set but the instance reported sessionClone false', () => {
     const onCloneImportFailure = vi.fn();
     const onSpawnAdmitted = vi.fn();
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       cloneFromKiloSessionId: 'ses_source',
-      runOnInstance: INSTANCE,
+      runOnInstance: { ...INSTANCE, capabilities: { sessionClone: false } },
       onSpawnAdmitted: () => {
         onSpawnAdmitted();
       },
@@ -541,6 +557,27 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotContinue');
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it('spawns a clone when the instance capability is unknown (optimistic default)', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'code',
+      selection: { model: { providerID: 'anthropic', modelID: 'claude-x' } },
+      cloneFromKiloSessionId: 'ses_source',
+      runOnInstance: INSTANCE,
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      {
+        agent: 'code',
+        model: { providerID: 'anthropic', modelID: 'claude-x' },
+        orgId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+      },
+      { operationKey: expect.any(String) },
+    ]);
   });
 
   it('a clone entry navigates with no shareId (payload is null)', async () => {

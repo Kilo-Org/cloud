@@ -261,11 +261,12 @@ export function useRemoteSpawnDispatch({
       toast.error(admission.toast);
       return;
     }
-    // Clone entry: the selected instance must advertise `sessionClone` before
-    // we send the source id. Fail before spawn (and before admitting the
-    // attempt) when the flag is missing, so the route shows the inline
-    // "cannot continue" note instead of firing a spawn that the CLI rejects.
-    if (fields.cloneFromKiloSessionId && runOnInstance.capabilities?.sessionClone !== true) {
+    // Clone entry: only an instance the picker reported as explicitly
+    // incapable (`sessionClone: false`) is refused before we send the source
+    // id; an unknown capability is optimistic. Fail before spawn (and before
+    // admitting the attempt) so the route shows the inline "cannot continue"
+    // note instead of firing a spawn the CLI rejects.
+    if (fields.cloneFromKiloSessionId && runOnInstance.capabilities?.sessionClone === false) {
       onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
       return;
     }

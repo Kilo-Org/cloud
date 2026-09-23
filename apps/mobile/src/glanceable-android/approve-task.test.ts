@@ -453,6 +453,12 @@ function evaluateEntry(platform: string): {
           },
         };
       }
+      case './src/lib/dev-logbox': {
+        // The entry drops expo-iap's developer copy for a failed
+        // available-purchases query before the router entry loads; the stub
+        // answers with the one call it makes.
+        return { applyDevLogBoxFilters: (): void => undefined };
+      }
       case 'react-native-android-widget': {
         return { registerWidgetTaskHandler: (): void => undefined };
       }

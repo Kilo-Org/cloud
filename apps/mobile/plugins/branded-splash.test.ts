@@ -124,9 +124,20 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, making the exact assertion below machine-dependent.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(
@@ -136,7 +147,7 @@ describe('shared branded splash', () => {
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });
@@ -165,13 +176,20 @@ describe('shared branded splash', () => {
       },
     });
     // `compileModsAsync` with `introspect: true` runs the Android colors mod
-    // against `projectRoot`, so on a worktree with a generated `android/` tree
-    // the introspected list also carries the app's other colors. Assert the
-    // splash surface is present rather than that it is the only entry, the same
-    // way the styles assertion below tolerates extra prebuilt styles.
+    // against `projectRoot`, so on a worktree with a generated or prebuilt
+    // `android/` tree the introspected list also carries that project's other
+    // colors — notification and dialog colors from the app's other plugins
+    // (adaptive-icon, notification, app background), and whatever a local
+    // prebuild already wrote. Assert the splash color this plugin owns is
+    // present among them, by containment, rather than that it is the only entry
+    // or that the array has an exact length, the same way the styles assertion
+    // below tolerates extra prebuilt styles (and not the whole array, so a
+    // prebuild's iconBackground, colorPrimary, … cannot fail the case).
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
-        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

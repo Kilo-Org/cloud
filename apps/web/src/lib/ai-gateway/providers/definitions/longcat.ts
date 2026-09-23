@@ -6,6 +6,7 @@ export const LONGCAT = {
   id: 'longcat',
   apiUrl: 'https://api.longcat.ai/openai/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('LONGCAT_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions'],

@@ -53,16 +53,27 @@ function boxDp(className: string): { width: number; height: number } {
   return { width: size('w'), height: size('h') };
 }
 
-/** The smallest per-side reach a hitSlop expresses, in dp. */
-function slopDp(hitSlop: unknown): number {
+/** The per-side reach a `hitSlop` prop expresses; a bare number covers every side. */
+function slopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
-    return hitSlop;
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    const sides = Object.values(hitSlop as Record<string, number | undefined>);
-    return Math.min(...sides.map(side => side ?? 0));
+    const sides = hitSlop as Partial<Insets>;
+    return {
+      top: sides.top ?? 0,
+      right: sides.right ?? 0,
+      bottom: sides.bottom ?? 0,
+      left: sides.left ?? 0,
+    };
   }
-  return 0;
+  return { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+/** The smallest per-side reach a hitSlop expresses, in dp. */
+function slopDp(hitSlop: unknown): number {
+  const sides = slopInsets(hitSlop);
+  return Math.min(sides.top, sides.right, sides.bottom, sides.left);
 }
 
 /** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
@@ -142,10 +153,11 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 type Insets = { top: number; right: number; bottom: number; left: number };
 
 /**
- * A control's hitSlop as per-side insets. Controls here use either shape: the
- * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
- * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
- * side.
+ * A control's hitSlop as per-side insets. Both controls in this header pass
+ * per-side insets: the shared `IconButton` takes a per-side object, and
+ * `SessionFilterButton` spells out four equal sides (`FILTER_HIT_SLOP`). The
+ * scalar branch mirrors React Native's own `number | Rect` hitSlop type, where
+ * one number applies to every side.
  */
 function hitSlopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
@@ -238,13 +250,13 @@ describe('SessionListHeaderActions new-session control', () => {
     expect(gapDp).toBe(14);
 
     // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
-    // shape, because the filter expresses its slop as one dp value for every
-    // side while the new-session control caps its right side.
-    // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap. Either
-    // control may express hitSlop as one number or as per-side insets: the
-    // filter writes its slop as one number for every side, the new-session
-    // control as a per-side object.
+    // shape of React Native's `number | Rect` hitSlop: a control may express one
+    // dp value for every side or spell out per-side insets. Both header controls
+    // spell out insets today — the filter writes four equal sides, while the
+    // new-session control caps its facing (right) side — so the helper has to
+    // accept either shape rather than assume one. The new-session control sits
+    // left of the filter, so the gap has to fit both facing slops; more than the
+    // gap means the two regions overlap.
     expect(
       slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);

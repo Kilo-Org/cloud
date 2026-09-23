@@ -1,5 +1,14 @@
+/* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import {
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +23,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
@@ -24,9 +34,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { isShortViewport } from '@/lib/centered-state-layout';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
@@ -37,13 +48,17 @@ export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { bottom, left, right } = useSafeAreaInsets();
-  const { fontScale, height: windowHeight, width: windowWidth } = useWindowDimensions();
-
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
-  );
+  const { left, right } = useSafeAreaInsets();
+  // The tabs layout's width-aware label decision rides along, so this screen's
+  // clearance (list frame, FAB and state-surface insets) tracks the bar height.
+  const tabBarHeight = useEffectiveTabBarHeight();
+  // Android runs edge-to-edge and never resizes the window for the IME, so the
+  // native KeyboardAvoidingView is inert there; the app-aware container follows
+  // the keyboard events instead (the repo's one platform fork for this).
+  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
+  // The window decides the short-landscape case below: the FAB's own strip is
+  // only worth reserving while the window can spare it.
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -51,7 +66,6 @@ export function AgentSessionListScreen() {
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
-  const showFab = context.isReady && content !== 'empty';
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -60,6 +74,17 @@ export function AgentSessionListScreen() {
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
+  // The no-match body is the state the tab bar's band was reopened for, and its
+  // compact form fills that band down to the corner the FAB floats in. Since
+  // reserving the FAB's band here is what parked the state's second line and
+  // action behind the tab bar in a short landscape window (landscape spot
+  // defect e8), a state that fills the band owns it and the FAB yields: it
+  // must not sit over the description or the Clear action at a large text
+  // scale. The list bodies keep it — they clear it with their own frame inset —
+  // and so does the load-failure body, whose FAB is the only creation
+  // affordance while the list is failing.
+  const noMatchBody = hasLiveRows && visibleSessions.length === 0;
+  const showFab = context.isReady && content !== 'empty' && !noMatchBody;
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);
@@ -326,6 +351,37 @@ export function AgentSessionListScreen() {
     tabBarHeight +
     (showFab && !isShortViewport(windowWidth, windowHeight) ? FAB_SIZE + FAB_MARGIN : 0);
 
+  // The feedback band and the body share one keyboard container so every
+  // centered state (no-match, live-empty, skeletons, load failure) re-measures
+  // against the viewport the keyboard leaves, not the full window. The header
+  // and search field stay outside it and never move.
+  const region = (
+    <>
+      <View
+        className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
+        style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+      >
+        <LiveSessionFeedback
+          context={context}
+          sessions={sessions}
+          failureLabel={t('agents.sessionList.couldNotLoadActive')}
+          centered={query.hasLoaded && content === 'error'}
+          refresh={{
+            busy: pull.refreshing || pull.busy,
+            failed: pull.failed || retryableRowsFailure,
+            onRetry: handleRefreshRetry,
+            // The pull's progress belongs to the centered no-match body (the
+            // same state that mounts it), so the band does not draw a second
+            // spinner while that body shows one.
+            progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
+          }}
+          refreshControl={refreshControl}
+        />
+      </View>
+      {body}
+    </>
+  );
+
   return (
     <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
@@ -357,29 +413,14 @@ export function AgentSessionListScreen() {
             onClearSearch={query.handleClearSearch}
           />
         ) : null}
-        <View
-          className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
-          style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
-        >
-          <LiveSessionFeedback
-            context={context}
-            sessions={sessions}
-            failureLabel={t('agents.sessionList.couldNotLoadActive')}
-            centered={query.hasLoaded && content === 'error'}
-            refresh={{
-              busy: pull.refreshing || pull.busy,
-              failed: pull.failed || retryableRowsFailure,
-              onRetry: handleRefreshRetry,
-              // The pull's progress belongs to the centered no-match body (the
-              // same state that mounts it), so the band does not draw a second
-              // spinner while that body shows one.
-              progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
-            }}
-            refreshControl={refreshControl}
-          />
-        </View>
-        {body}
-        {/* Empty content owns its creation action; other admitted states keep the FAB. */}
+        {keyboardContainerKind === 'app-aware-padding' ? (
+          <AppAwareKeyboardPaddingView className="flex-1">{region}</AppAwareKeyboardPaddingView>
+        ) : (
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {region}
+          </KeyboardAvoidingView>
+        )}
+        {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         {showFilterModal && (
           <SessionFilterModal

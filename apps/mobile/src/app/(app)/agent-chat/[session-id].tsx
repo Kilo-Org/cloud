@@ -30,6 +30,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -206,7 +207,7 @@ export default function SessionDetailScreen() {
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
-            <View className="flex-row items-center gap-2">
+            <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
                 info={undefined}
                 totalCostMicrodollars={null}
@@ -338,7 +339,7 @@ export default function SessionDetailScreen() {
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
-        cachedTitle={sessionQuery.data?.title ?? undefined}
+        cachedTitle={sessionDisplayTitle(sessionQuery.data?.title)}
         displayScope={displayScope}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}

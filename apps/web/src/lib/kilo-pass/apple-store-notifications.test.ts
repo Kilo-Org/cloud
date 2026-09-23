@@ -30,6 +30,7 @@ import {
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
+import type * as StoreRefund from '@/lib/credits/store-refund';
 import { toMicrodollars } from '@/lib/utils';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 
@@ -50,6 +51,23 @@ type PosthogTrackingMock = {
 function getPosthogTrackingMock(): PosthogTrackingMock {
   return jest.requireMock('@/lib/kilo-pass/posthog-tracking') as PosthogTrackingMock;
 }
+
+// The real reversal runs against the test database by default; one test makes a
+// single call fail to prove a failed credit-pack clawback is not swallowed.
+jest.mock('@/lib/credits/store-refund', () => {
+  const actual = jest.requireActual<typeof StoreRefund>('@/lib/credits/store-refund');
+  return {
+    __esModule: true,
+    ...actual,
+    reverseStoreCreditPurchase: jest.fn(actual.reverseStoreCreditPurchase),
+  };
+});
+
+function getStoreRefundMock(): typeof StoreRefund {
+  return jest.requireMock<typeof StoreRefund>('@/lib/credits/store-refund');
+}
+
+const mockReverseStoreCreditPurchase = jest.mocked(getStoreRefundMock().reverseStoreCreditPurchase);
 
 let processAppStoreKiloPassNotification: typeof AppleStoreNotifications.processAppStoreKiloPassNotification;
 
@@ -131,6 +149,7 @@ describe('processAppStoreKiloPassNotification', () => {
 
   beforeEach(() => {
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockClear();
+    mockReverseStoreCreditPurchase.mockClear();
   });
 
   describe('kilo_pass_purchase_completed tracking', () => {
@@ -1473,6 +1492,62 @@ describe('processAppStoreKiloPassNotification', () => {
       providerTransactionId: transactionId,
       storeCreditReversal: { reversed: true, amountMicrodollars },
     });
+  });
+
+  it('leaves a credit-pack refund unprocessed when the clawback fails', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const transactionId = `tx-${crypto.randomUUID()}`;
+    const amountMicrodollars = toMicrodollars(10);
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: amountMicrodollars,
+      is_free: false,
+      description: 'Credit purchase via App Store',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.AppStore, transactionId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: amountMicrodollars })
+      .where(eq(kilocode_users.id, user.id));
+
+    mockReverseStoreCreditPurchase.mockRejectedValueOnce(new Error('credit reversal unavailable'));
+
+    await expect(
+      processAppStoreKiloPassNotification({
+        signedPayload: 'credit-pack-refund-fail',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: 'credit-pack-refund-fail',
+            notificationType: NotificationTypeV2.REFUND,
+            signedTransactionInfo: 'credit-pack-refund-fail-transaction',
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            transactionId,
+            productId: 'credits.usd10.v1',
+            appAccountToken: user.app_store_account_token,
+            revocationDate: Date.parse('2026-05-16T00:00:00.000Z'),
+          }),
+      })
+    ).rejects.toThrow('credit reversal unavailable');
+
+    // The event must stay unprocessed so the App Store redelivers it and the
+    // idempotent reversal claws the pack back exactly once; marking it processed
+    // would record a successful refund with the credits still granted.
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, 'credit-pack-refund-fail'),
+    });
+    expect(event?.processed_at).toBeNull();
+
+    // The transaction rolled back: no balance change and no success audit entry.
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after?.total_microdollars_acquired).toBe(amountMicrodollars);
+    const audit = await db.query.kilo_pass_audit_log.findFirst({
+      where: sql`${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'credit-pack-refund-fail'`,
+    });
+    expect(audit).toBeUndefined();
   });
 
   it('scopes App Store refund reversals to the refunded transaction after a same-month upgrade', async () => {

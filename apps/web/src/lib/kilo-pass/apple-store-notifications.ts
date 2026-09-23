@@ -841,24 +841,18 @@ export async function processAppStoreKiloPassNotification(params: {
         });
       }
       // A refunded credit pack is not a Kilo Pass purchase, so it is reversed
-      // separately, keyed by its store transaction id.
+      // separately, keyed by its store transaction id. A failure here must
+      // propagate: swallowing it would mark the event processed with the
+      // credits still granted, and the App Store never redelivers a processed
+      // event, so the clawback would be lost permanently. The reversal is
+      // idempotent, so a redelivery retries it safely — the same contract as
+      // the Google Play one-time refund branch.
       let storeCreditReversal: StoreCreditReversalResult | null = null;
       if (getStoreCreditProductByAppleProductId(transaction.productId)) {
-        try {
-          storeCreditReversal = await reverseStoreCreditPurchase(tx, {
-            paymentProvider: KiloPassPaymentProvider.AppStore,
-            providerTransactionId: transaction.transactionId,
-          });
-        } catch (error) {
-          captureException(error, {
-            tags: { area: 'kilo-pass', operation: 'reverse-app-store-credit-pack-refund' },
-            extra: {
-              notificationUuid: notification.notificationUUID,
-              transactionId: transaction.transactionId,
-              productId: transaction.productId,
-            },
-          });
-        }
+        storeCreditReversal = await reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId: transaction.transactionId,
+        });
       }
       await endStoreSubscription(tx, transaction);
       await appendKiloPassAuditLog(tx, {

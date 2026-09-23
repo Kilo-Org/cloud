@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -79,20 +79,6 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const storeConnectionTimeoutKey =
     storefront === 'play' ? PLAY_CONNECTION_TIMEOUT_KEY : APP_STORE_CONNECTION_TIMEOUT_KEY;
 
-  // Bounded wait for the store connection — without this, a stuck
-  // connection leaves the screen showing loading skeletons forever.
-  useEffect(() => {
-    if (options.connected) {
-      return undefined;
-    }
-    const timer = setTimeout(() => {
-      setStoreErrorMessage(current => current ?? storeConnectionTimeoutKey);
-    }, STORE_CONNECTION_TIMEOUT_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [options.connected, connectionAttempt, storeConnectionTimeoutKey]);
-
   const productsQuery = useQuery({
     queryKey: ['credits', 'store-products', userId],
     queryFn: async () => {
@@ -111,6 +97,28 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     enabled: options.connected && userId != null,
     staleTime: STORE_CREDIT_PRODUCTS_STALE_TIME_MS,
   });
+
+  // Bounded wait for the store connection — without this, a stuck connection
+  // leaves the screen showing loading skeletons forever. A retry re-arms the
+  // timer, so the handle is kept in a ref: a fetch that answers the bound
+  // cancels it in the effect below, or it would re-raise the banner over the
+  // packs the store had just priced.
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (options.connected) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setStoreErrorMessage(current => current ?? storeConnectionTimeoutKey);
+    }, STORE_CONNECTION_TIMEOUT_MS);
+    connectionTimeoutRef.current = timer;
+    return () => {
+      clearTimeout(timer);
+      if (connectionTimeoutRef.current === timer) {
+        connectionTimeoutRef.current = null;
+      }
+    };
+  }, [options.connected, connectionAttempt, storeConnectionTimeoutKey]);
 
   // The backend catalog on its own, so a store that failed to answer still has
   // the pack amounts to render. The loader reads the same query through the
@@ -131,13 +139,24 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
 
   const queryErrorMessage = getAuthoredProductsErrorMessageKey(productsQuery.error);
 
+  // The store-connection bound is a claim about the connection, so a connected
+  // store clears it. Keying only on `isSuccess` never cleared it: React Query
+  // keeps `status: success` across a refetch and while the query is disabled
+  // with cached data, so after the 8s timeout fired the banner outlived the
+  // disconnection until the screen remounted. A completed fetch answers the
+  // bound too, so a successful refetch clears the banner and cancels the timer
+  // that refetch re-armed; otherwise the timer re-raised the banner over packs
+  // the store had just priced. A cached success is not an answer —
+  // `dataUpdatedAt` moves only when a fetch completes — so a store that drops
+  // with fresh prices still gets its banner.
+  const observedDataUpdatedAtRef = useRef(productsQuery.dataUpdatedAt);
   useEffect(() => {
-    // The store-connection bound is a claim about the connection, so a
-    // connected store clears it. Keying only on `isSuccess` never cleared it:
-    // React Query keeps `status: success` across a refetch and while the query
-    // is disabled with cached data, so after the 8s timeout fired the banner
-    // outlived the disconnection until the screen remounted. A completed fetch
-    // answers the bound too, so a successful refetch clears it.
+    const storeAnswered = productsQuery.dataUpdatedAt !== observedDataUpdatedAtRef.current;
+    observedDataUpdatedAtRef.current = productsQuery.dataUpdatedAt;
+    if (storeAnswered && connectionTimeoutRef.current !== null) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
     if (options.connected || productsQuery.isSuccess) {
       setStoreErrorMessage(null);
     }

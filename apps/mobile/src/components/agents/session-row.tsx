@@ -110,6 +110,8 @@ export function StoredSessionRow({
   const { t } = useTranslation();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
+  // One derivation for the visible label, the spoken label and the rename
+  // prompt: a creation placeholder title reads as "Untitled session".
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see, so the row falls back to the localized unnamed name the same

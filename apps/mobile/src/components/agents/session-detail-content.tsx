@@ -1623,9 +1623,10 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session". The route's
-    // cached metadata can hold the backend's ISO placeholder, which must not
-    // paint either.
+    // title it opened with instead of blinking back to "Session". A creation
+    // placeholder cached in the list is not a title: fall back to "Session".
+    // The route's cached metadata can hold the backend's ISO placeholder,
+    // which must not paint either.
     fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;

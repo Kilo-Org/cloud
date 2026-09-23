@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react';
 import {
   expandPlatformFilter,
   formatGitUrlProject,
+  normalisePlatformSelection,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
@@ -22,10 +23,14 @@ export function useAgentSessionListData(options: {
 }) {
   const { organizationId, platformFilter, projectFilter, ready, searchQuery } = options;
   const sortBy = SESSION_LIST_SORT;
-  const createdOnPlatform = useMemo(
-    () => (platformFilter.length > 0 ? expandPlatformFilter(platformFilter) : undefined),
-    [platformFilter]
-  );
+  const createdOnPlatform = useMemo(() => {
+    if (platformFilter.length === 0) {
+      return undefined;
+    }
+    // Collapse a persisted variant into its bucket first, so the history query
+    // covers the raw platforms of the single row the sheet checks.
+    return expandPlatformFilter(normalisePlatformSelection(platformFilter));
+  }, [platformFilter]);
   const gitUrl = useMemo(
     () => (projectFilter.length > 0 ? projectFilter : undefined),
     [projectFilter]

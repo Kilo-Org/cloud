@@ -249,6 +249,19 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(repoRows(renderer)).toHaveLength(0);
   });
 
+  it('keeps the EmptyState out while the repository query has no data yet', async () => {
+    // TanStack Query reports this shape while an enabled query is paused (the
+    // device is offline on first load): not loading, not errored, and `data`
+    // is still undefined. That must not read as zero repositories.
+    repositories.data = undefined;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    const { renderer } = await mount();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(repoRows(renderer)).toHaveLength(0);
+  });
+
   it('shows the selectAtLeastOne validation only with an empty selection', async () => {
     const { renderer } = await mount();
     const validation = i18n.t('securityAgent.repositories.selectAtLeastOne');

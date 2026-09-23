@@ -160,6 +160,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const showRepositoryStates = mode === 'selected';
   const hasRepositories = (repositories.data?.length ?? 0) > 0;
+  // A loading, failed, or not-yet-fetched repository query must not read as
+  // zero repositories. While an enabled query is paused (offline first load)
+  // it is neither loading nor errored and `data` is still undefined, which is
+  // not the settled "No repositories" state the Manage access CTA is for.
+  const repositoriesEmpty = repositories.data?.length === 0;
 
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
@@ -208,7 +213,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               isRetrying={repositories.isFetching}
             />
           )}
-          {!repositories.isLoading && !repositories.isError && !hasRepositories ? (
+          {!repositories.isLoading && !repositories.isError && repositoriesEmpty ? (
             <EmptyState
               placement="top"
               icon={FolderGit2}

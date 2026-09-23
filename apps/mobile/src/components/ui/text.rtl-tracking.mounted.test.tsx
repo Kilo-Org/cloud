@@ -115,6 +115,7 @@ describe('Text tracked labels in RTL', () => {
     // uppercase or tracked class is left for the shared RTL reset to neutralize
     // on this label — the reset style is its whole treatment — and the zero
     // letter-spacing reset still lands.
+    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     const className = hostText(root).props.className as string;
     const classes = className.split(' ');
     expect(classes).not.toContain('uppercase');

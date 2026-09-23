@@ -145,6 +145,8 @@ export function NewSessionConfigureForm({
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
       onLayout={event => {
+        // The one layout feeds both consumers: the form frame height sets the
+        // prompt's input floor, and the hook's viewport height drives the reveal.
         handleScrollFrameLayout(event);
         composerReveal.onViewportLayout(event.nativeEvent.layout.height);
       }}

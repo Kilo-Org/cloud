@@ -40,6 +40,7 @@ function makeProvider(responseTransforms: Provider['responseTransforms']): Provi
     id: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
+    disableUrlSuffix: false,
     apiKey: 'test-key',
     apiKeyHeader: null,
     supportedChatApis: ['chat_completions'],

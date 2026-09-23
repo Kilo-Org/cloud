@@ -18,7 +18,6 @@ export class GitCloneService {
     const fs = new MemFS();
 
     try {
-      // If no commits yet, create empty repo
       if (gitObjects.length === 0) {
         await git.init({ fs, dir: '/', defaultBranch: 'main' });
         return fs;
@@ -26,7 +25,6 @@ export class GitCloneService {
 
       await git.init({ fs, dir: '/', defaultBranch: 'main' });
 
-      // Import all git objects
       for (const obj of gitObjects) {
         await fs.writeFile(obj.path, obj.data);
       }
@@ -59,7 +57,6 @@ export class GitCloneService {
         branches = [];
       }
 
-      // Determine symref target for HEAD
       const symrefTarget = await resolveHeadSymref(fs, branches);
 
       // Git HTTP protocol: info/refs response format
@@ -76,7 +73,6 @@ export class GitCloneService {
       const headLine = `${head} HEAD\0${capabilities}\n`;
       response += formatPacketLine(headLine);
 
-      // Branch refs
       for (const branch of branches) {
         try {
           const oid = await git.resolveRef({
@@ -90,7 +86,6 @@ export class GitCloneService {
         }
       }
 
-      // Flush packet
       response += '0000';
 
       return response;
@@ -108,7 +103,6 @@ export class GitCloneService {
    */
   static async handleUploadPack(fs: MemFS): Promise<Uint8Array> {
     try {
-      // Collect objects from ALL branches
       const reachableObjects = new Set<string>();
 
       // Get all branches (same approach as handleInfoRefs to avoid hanging)
@@ -121,13 +115,11 @@ export class GitCloneService {
         branches = [];
       }
 
-      // Collect objects from each branch
       for (const branch of branches) {
         try {
           const commits = await git.log({ fs, dir: '/', ref: branch });
 
           for (const commit of commits) {
-            // Add commit OID
             reachableObjects.add(commit.oid);
 
             // Walk tree to get all blobs recursively (this also adds the tree OID)
@@ -168,10 +160,8 @@ export class GitCloneService {
       // NAK packet: "0008NAK\n"
       const nakPacket = new Uint8Array([0x30, 0x30, 0x30, 0x38, 0x4e, 0x41, 0x4b, 0x0a]);
 
-      // Wrap packfile in sideband format
       const sideband = this.wrapInSideband(packfile);
 
-      // Concatenate NAK + sideband packfile
       const result = new Uint8Array(nakPacket.length + sideband.length);
       result.set(nakPacket, 0);
       result.set(sideband, nakPacket.length);
@@ -205,7 +195,6 @@ export class GitCloneService {
         if (entry.type === 'tree') {
           await this.collectTreeObjects(fs, entry.oid, objects);
         } else {
-          // For blobs, add directly
           objects.add(entry.oid);
         }
       }

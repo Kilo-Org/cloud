@@ -81,7 +81,6 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'anthropic/claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
   'anthropic/claude-sonnet-4-6': 'anthropic/claude-sonnet-4.6',
   'anthropic/claude-sonnet-5-20260630': 'anthropic/claude-sonnet-5',
-  'claude-opus-5': 'anthropic/claude-opus-5',
   'claude-sonnet-4': 'anthropic/claude-sonnet-4',
   'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
   'claude-sonnet-5': 'anthropic/claude-sonnet-5',
@@ -127,6 +126,10 @@ export function mapModelIdToVercel(modelId: string) {
   const slashIndex = internalId.indexOf('/');
   if (slashIndex < 0) {
     return internalId;
+  }
+
+  if (internalId.startsWith('x-ai/')) {
+    return `spacexai${internalId.slice(slashIndex)}`;
   }
 
   const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(internalId);

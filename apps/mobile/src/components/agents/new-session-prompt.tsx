@@ -152,11 +152,19 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
+  const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  // The card rows that render only in some states, read by name in the render
+  // below (the measured card chrome covers their height without a static
+  // budget, so they need no separate reservation here).
+  const showsAttachmentStatus = attachments.some(
+    attachment => attachment.metadataStripFailed === true
+  );
+  const showsCounter =
+    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
   // The chrome the card renders around the input, measured by the card's
   // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
   // the frame leaves for the input.
   const [cardChromeHeight, setCardChromeHeight] = useState(0);
-  const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
   const promptMinHeight = resolveNewSessionPromptMinHeight({
     frameHeight: frameHeight ?? 0,
     cardTop,
@@ -429,7 +437,7 @@ export function NewSessionPrompt({
         onMove={onMoveAttachment}
         onReorder={onReorderAttachments}
       />
-      {attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+      {showsAttachmentStatus ? (
         <AccessibleStatus
           tone="error"
           message={t('agentChat.composer.photoMetadataNotRemoved')}
@@ -470,7 +478,7 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
+        {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text

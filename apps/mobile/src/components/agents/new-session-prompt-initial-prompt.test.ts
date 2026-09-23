@@ -66,6 +66,10 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ────────────────────────────────────────────────────
+const dimensions = vi.hoisted(() => ({
+  current: { fontScale: 1, height: 800, scale: 1, width: 400 },
+}));
+
 vi.mock('react-native', () => ({
   AccessibilityInfo: {
     announceForAccessibility: vi.fn(),
@@ -78,7 +82,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'Text',
   TextInput: 'TextInput',
-  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
+  useWindowDimensions: () => dimensions.current,
   View: 'View',
 }));
 
@@ -119,13 +123,21 @@ vi.mock('@/components/agents/chat-toolbar', () => ({
   ChatToolbar: 'ChatToolbar',
 }));
 
+/** Captures the options the prompt hands the height-measuring hook. */
+const textHeightOptions = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}));
+
 vi.mock('@/components/agents/use-text-height', () => ({
-  useTextHeight: () => ({
-    height: 48,
-    measureElement: null,
-    reset: vi.fn(),
-    setText: vi.fn(),
-  }),
+  useTextHeight: (options: Record<string, unknown>) => {
+    textHeightOptions.current = options;
+    return {
+      height: 48,
+      measureElement: null,
+      reset: vi.fn(),
+      setText: vi.fn(),
+    };
+  },
 }));
 
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
@@ -307,6 +319,8 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
+    dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
+    textHeightOptions.current = null;
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -528,5 +542,18 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(errorIndex).toBeGreaterThanOrEqual(0);
     expect(inputIndex).toBeGreaterThanOrEqual(0);
     expect(errorIndex).toBeLessThan(inputIndex);
+  });
+
+  it('keeps the three-line floor at a large font scale', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // Before the host reports a frame, the floor is the preferred three lines
+    // at the scaled line height: 24 * 2 * 3 + 16 = 160.
+    dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt(defaultProps());
+
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
+    expect(textHeightOptions.current?.minHeight).not.toBe(64);
   });
 });

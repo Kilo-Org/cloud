@@ -273,9 +273,9 @@
       "kiloclawActivitySubtitle": "istanza pronta o in errore, azioni pianificate",
       "kiloclawActivityUnavailable": "Avvia un'istanza KiloClaw per ricevere l'attività di KiloClaw.",
       "balanceAlertsSubtitle": "avvisi di saldo basso dell'organizzazione",
-      "balanceAlertsUnavailable": "Unisciti a un'organizzazione per ricevere avvisi di saldo basso.",
+      "balanceAlertsUnavailable": "Unisciti a un'organizzazione per ricevere avvisi sul saldo.",
       "securityFindingsSubtitle": "nuovi problemi di sicurezza e promemoria SLA",
-      "securityFindingsUnavailable": "Attiva l'agente di sicurezza Kilo su un ambito per ricevere problemi di sicurezza.",
+      "securityFindingsUnavailable": "Attiva l'Agente di sicurezza Kilo su un ambito per ricevere segnalazioni di sicurezza.",
       "spendAlertsSubtitle": "superamenti di soglia e picchi orari",
       "spendAlertsToggle": "Categoria avvisi di spesa"
     },
@@ -1709,10 +1709,6 @@
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
       "linesOf": "righe {{start}}–{{end}} di {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Operazione {{action}} di Cloud Agent non riuscita ({{status}}).",
-      "failed": "Operazione {{action}} di Cloud Agent non riuscita."
-    },
     "collectCopyableText": {
       "unserializableInput": "[input non serializzabile]",
       "errorPrefix": "Errore: {{error}}"
@@ -1808,8 +1804,7 @@
       "assistantProviderRejected": "Il fornitore ha rifiutato la richiesta.",
       "assistantStopped": "La risposta è stata interrotta.",
       "assistantContextOverflow": "La conversazione è troppo lunga per il modello.",
-      "assistantFailed": "Non è stato possibile generare la risposta.",
-      "sendFailed": "Impossibile inviare il messaggio. Riprova."
+      "assistantFailed": "Non è stato possibile generare la risposta."
     },
     "filePart": {
       "loadingImage": "Caricamento dell'immagine",
@@ -2175,11 +2170,6 @@
     "returnSendsMessageSubtitle": "Se disattivato, il tasto Invio inserisce un'interruzione di riga nei campi dei messaggi agli agenti.",
     "biometricUnlock": "Sblocco biometrico",
     "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano.",
-    "featureFlags": "Flag di funzionalità",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -3162,6 +3152,14 @@
     "tooManySignInAttempts": "Troppi tentativi di accesso. Attendi e riprova."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanzato",
+      "balanced": "Auto Bilanciato",
+      "efficient": "Auto Efficiente",
+      "small": "Auto Piccolo",
+      "free": "Auto Gratuito",
+      "organization": "Auto Organizzazione"
+    },
     "dataCollected": "Dati raccolti",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Impossibile aggiornare i preferiti.",

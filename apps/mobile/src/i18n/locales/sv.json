@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
     "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
-    "featureFlags": "Funktionsflaggor",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribering via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +836,9 @@
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
       "kiloclawActivityUnavailable": "Starta en KiloClaw-instans för att få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "balanceAlertsUnavailable": "Gå med i en organisation för att få varningar om lågt saldo.",
+      "balanceAlertsUnavailable": "Gå med i en organisation för att få saldovarningar.",
       "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
-      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsanmärkningar.",
+      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd.",
       "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
       "spendAlertsToggle": "Kategorin utgiftsvarningar"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "rader {{start}}–{{end}} (avkortat)",
       "linesOf": "rader {{start}}–{{end}} av {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Åtgärden {{action}} i Cloud Agent misslyckades ({{status}}).",
-      "failed": "Åtgärden {{action}} i Cloud Agent misslyckades."
-    },
     "collectCopyableText": {
       "unserializableInput": "[indata som inte kan serialiseras]",
       "errorPrefix": "Fel: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Leverantören avvisade begäran.",
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
-      "assistantFailed": "Det gick inte att generera svaret.",
-      "sendFailed": "Det gick inte att skicka meddelandet. Försök igen."
+      "assistantFailed": "Det gick inte att generera svaret."
     },
     "filePart": {
       "loadingImage": "Läser in bild",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "För många inloggningsförsök. Vänta ett tag och försök igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisk Avancerad",
+      "balanced": "Automatisk Balanserad",
+      "efficient": "Automatisk Effektiv",
+      "small": "Automatisk Liten",
+      "free": "Automatisk Gratis",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Data samlas in",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Det gick inte att uppdatera favoriterna.",

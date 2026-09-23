@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Marka la damiyo, furaha gelintu wuxuu sadar cusub ku daraa goobaha farriimaha wakiilka lagu qoro.",
     "biometricUnlock": "Ku fur aqoonsiga astaamaha jirka",
     "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay.",
-    "featureFlags": "Calaamadaha sifooyinka",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Qoraal u beddelidda codka ee Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "Xaaladda kalfadhiga",
       "sessionStatusSubtitle": "dhammaaday / fashilmay / diyaar u ah in la xakameeyo",
       "kiloclawActivitySubtitle": "nuqul diyaar ah ama fashilmay, ficillo la jadwaleeyay",
-      "kiloclawActivityUnavailable": "Bilow nuqul KiloClaw si aad u hesho hawlaha KiloClaw.",
+      "kiloclawActivityUnavailable": "Bilow nuqul KiloClaw si aad u hesho dhaqdhaqaaqa KiloClaw.",
       "balanceAlertsSubtitle": "digniinaha hadhaaga yar ee ururka",
-      "balanceAlertsUnavailable": "Ku biir urur si aad u hesho digniinaha hadhaaga yar.",
+      "balanceAlertsUnavailable": "Ku biir urur si aad u hesho digniinaha hadhaaga.",
       "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA",
-      "securityFindingsUnavailable": "Shid wakiilka amniga Kilo baaxad si aad u hesho natiijooyinka amniga.",
+      "securityFindingsUnavailable": "Daar Wakiilka amniga Kilo baaxad si aad u hesho natiijooyinka amniga.",
       "spendAlertsSubtitle": "dhaafitaanka xadka iyo kor u kaca saacadlaha",
       "spendAlertsToggle": "Qaybta digniinaha kharashka"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",
       "linesOf": "sadarrada {{start}}–{{end}} ee {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Hawsha {{action}} ee Cloud Agent way fashilantay ({{status}}).",
-      "failed": "Hawsha {{action}} ee Cloud Agent way fashilantay."
-    },
     "collectCopyableText": {
       "unserializableInput": "[xogta la geliyay looma rogi karo qaab la kaydin karo]",
       "errorPrefix": "Khalad: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Bixiyaha ayaa diiday codsiga.",
       "assistantStopped": "Jawaabta waa la joojiyay.",
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
-      "assistantFailed": "Jawaabtu way fashilantay.",
-      "sendFailed": "Farriinta lama diri karin. Fadlan mar kale isku day."
+      "assistantFailed": "Jawaabtu way fashilantay."
     },
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Isku dayo soo gelitaan oo aad u badan. Fadlan sug oo mar kale isku day."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomaatig Heerka ugu sarreeya",
+      "balanced": "Otomaatig Dheellitiran",
+      "efficient": "Otomaatig Waxtar leh",
+      "small": "Otomaatig Yar",
+      "free": "Otomaatig Bilaash",
+      "organization": "Otomaatig Hay'adda"
+    },
     "dataCollected": "Xog la ururiyay",
     "free": "Bilaash",
     "couldNotUpdateFavorites": "Kuwa la jecel yahay lama cusboonaysiin karin.",

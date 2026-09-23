@@ -48,6 +48,7 @@ function startInputToSessionCreateRequest(
       repository = {
         type: 'github',
         repo: repo.repo,
+        githubAccessPurpose: 'workflow',
         ...(repo.githubIntegrationId ? { githubIntegrationId: repo.githubIntegrationId } : {}),
         branch: repo.branch,
       };

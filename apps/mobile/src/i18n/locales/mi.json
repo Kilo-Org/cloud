@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Ina weto, ka whakaurua he rārangi hōu mā te pātuhi tāuru ki ngā pouaka karere māngai.",
     "biometricUnlock": "Wetekina mā te tautuhi koiora",
     "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri.",
-    "featureFlags": "Kāreti āhuatanga",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Tuhi ā-reo mā Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Tuhia te tāuru reo mā tētahi tauira Kilo Gateway, kau mā te mōhio kōrero o te pūrere. Ka tukuna tō pūreko ki te Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "Te tūnga o te wātū",
       "sessionStatusSubtitle": "kua oti / i rahua / kua rite hei whakahaere māu",
       "kiloclawActivitySubtitle": "kua rite te tāruatanga / i rahua, ngā mahi kua whakaritea",
-      "kiloclawActivityUnavailable": "Tīmatahia tētahi tāruatanga KiloClaw kia whiwhi ai i ngā mahi KiloClaw.",
+      "kiloclawActivityUnavailable": "Tīmatahia tētahi tāruatanga KiloClaw kia whiwhi ai i te mahi KiloClaw.",
       "balanceAlertsSubtitle": "ngā whakatūpato mō te toenga iti o te rōpū",
-      "balanceAlertsUnavailable": "Whakaurua ki tētahi whakahaerenga kia whiwhi ai i ngā whakatūpato toenga iti.",
+      "balanceAlertsUnavailable": "Whakaurua atu ki tētahi rōpū kia whiwhi ai i ngā whakatūpato toenga.",
       "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA",
-      "securityFindingsUnavailable": "Whakahohea te kaiāwhina haumarutanga Kilo i runga i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga.",
+      "securityFindingsUnavailable": "Whakahohehia te Kaiāwhina haumarutanga Kilo i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga.",
       "spendAlertsSubtitle": "ngā whitinga paepae me ngā pikinga ia hāora",
       "spendAlertsToggle": "Kāwai matohi whakapaunga"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "ngā rārangi {{start}}–{{end}} (kua poroa)",
       "linesOf": "ngā rārangi {{start}}–{{end}} o {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "I rahua te mahi {{action}} a Cloud Agent ({{status}}).",
-      "failed": "I rahua te mahi {{action}} a Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[kāore e taea te huri i te tāuru hei raraunga rokiroki]",
       "errorPrefix": "Hapa: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "I whakakāhoretia te tono e te kaiwhakarato.",
       "assistantStopped": "I whakamutua te whakautu.",
       "assistantContextOverflow": "He roa rawa te kōrerorero mō te tauira.",
-      "assistantFailed": "I rahua te whakautu.",
-      "sendFailed": "Kāore i taea te tuku i te karere. Whakamātau anō."
+      "assistantFailed": "I rahua te whakautu."
     },
     "filePart": {
       "loadingImage": "Kei te uta i te atahanga",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "He nui rawa ngā whakamātau takiuru. Tatari, ka whakamātau anō."
   },
   "models": {
+    "auto": {
+      "frontier": "Aunoa Pae whakamua",
+      "balanced": "Aunoa Taurite",
+      "efficient": "Aunoa Whaihua",
+      "small": "Aunoa Iti",
+      "free": "Aunoa Koreutu",
+      "organization": "Aunoa Whakahaere"
+    },
     "dataCollected": "Kua kohia ngā raraunga",
     "free": "Koreutu",
     "couldNotUpdateFavorites": "Kāore i taea te whakahou i ngā makau.",

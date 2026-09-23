@@ -21,19 +21,17 @@
 // and renders nothing when the comment has no addressable URL.
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { useCommentModerationActions } from '@/components/pr-review/discussion/comment-moderation';
+import { PrCommentFixWithKilo } from '@/components/pr-review/discussion/pr-comment-fix-with-kilo';
+import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
 import { MoreHorizontal } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
-import { PrCommentFixWithKilo } from '@/components/pr-review/discussion/pr-comment-fix-with-kilo';
-import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
-import { i18n } from '@/i18n';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { COMMENT_ACTIONS_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import {
@@ -41,10 +39,8 @@ import {
   type ReviewReactionContent,
   selectCommentAuthorName,
 } from '@/lib/pr-review/discussion/review-discussion-types';
-import { useTRPC } from '@/lib/trpc';
-import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 type CommentRowProps = {
   readonly comment: ReviewComment;
@@ -68,50 +64,6 @@ type CommentRowProps = {
   readonly viewerLogin?: string | null;
 };
 
-const REPORT_PLATFORM = 'mobile';
-
-type ModerationAction = 'report-content' | 'report-user' | 'mute' | 'block';
-
-type ModerationFailure =
-  | { kind: 'terminal'; message: string }
-  | { kind: 'retryable'; message: string };
-
-const TERMINAL_KEYS = {
-  'report-content': 'prReview.discussion.moderation.reportContent.terminal',
-  'report-user': 'prReview.discussion.moderation.reportUser.terminal',
-  mute: 'prReview.discussion.moderation.mute.terminal',
-  block: 'prReview.discussion.moderation.block.terminal',
-} as const satisfies Record<ModerationAction, string>;
-
-const RETRYABLE_KEYS = {
-  'report-content': 'prReview.discussion.moderation.reportContent.retryable',
-  'report-user': 'prReview.discussion.moderation.reportUser.retryable',
-  mute: 'prReview.discussion.moderation.mute.retryable',
-  block: 'prReview.discussion.moderation.block.retryable',
-} as const satisfies Record<ModerationAction, string>;
-
-/** Terminal moderation failures must not be retried; everything else is retryable. */
-export function moderationFailure(action: ModerationAction, error: unknown): ModerationFailure {
-  const code = readTrpcErrorField(error, 'code');
-  if (isTerminalTrpcCode(code)) {
-    return { kind: 'terminal', message: i18n.t(TERMINAL_KEYS[action]) };
-  }
-  return { kind: 'retryable', message: i18n.t(RETRYABLE_KEYS[action]) };
-}
-
-/** Terminal failures toast once; retryable failures offer a Retry CTA. */
-function showModerationFailure(action: ModerationAction, error: unknown, retry: () => void): void {
-  const failure = moderationFailure(action, error);
-  if (failure.kind === 'terminal') {
-    announcingToast.error(failure.message);
-    return;
-  }
-  Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.retry'), onPress: retry },
-  ]);
-}
-
 export function CommentRow({
   comment,
   onToggleReaction,
@@ -129,67 +81,9 @@ export function CommentRow({
   const relative = timeAgo(timestamp);
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  const invalidateHiddenUsers = () => {
-    void queryClient.invalidateQueries({ queryKey: trpc.moderation.listHiddenUsers.queryKey() });
-  };
-
-  const reportContent = useMutation(
-    trpc.moderation.reportContent.mutationOptions({
-      onSuccess: result =>
-        announcingToast.success(
-          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
-        ),
-      onError: (error, variables) => {
-        showModerationFailure('report-content', error, () => {
-          reportContent.mutate(variables);
-        });
-      },
-    })
-  );
-  const reportUser = useMutation(
-    trpc.moderation.reportUser.mutationOptions({
-      onSuccess: result =>
-        announcingToast.success(
-          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
-        ),
-      onError: (error, variables) => {
-        showModerationFailure('report-user', error, () => {
-          reportUser.mutate(variables);
-        });
-      },
-    })
-  );
-  const blockUser = useMutation(
-    trpc.moderation.blockUser.mutationOptions({
-      onSuccess: (_result, input) => {
-        invalidateHiddenUsers();
-        announcingToast.success(t('prReview.discussion.blockedUser', { login: input.githubLogin }));
-      },
-      onError: (error, variables) => {
-        showModerationFailure('block', error, () => {
-          blockUser.mutate(variables);
-        });
-      },
-    })
-  );
-  const muteUser = useMutation(
-    trpc.moderation.muteUser.mutationOptions({
-      onSuccess: (_result, input) => {
-        invalidateHiddenUsers();
-        announcingToast.success(t('prReview.discussion.mutedUser', { login: input.githubLogin }));
-      },
-      onError: (error, variables) => {
-        showModerationFailure('mute', error, () => {
-          muteUser.mutate(variables);
-        });
-      },
-    })
-  );
+  const moderation = useCommentModerationActions();
 
   function openOverflow() {
     const author = comment.author;
@@ -204,19 +98,19 @@ export function CommentRow({
       userActions.push({
         label: t('prReview.discussion.reportUser'),
         run: () => {
-          reportUser.mutate({ targetId: author.login, reason: 'other' });
+          moderation.report({ action: 'report-user', githubLogin: author.login });
         },
       });
       userActions.push({
         label: t('prReview.discussion.mute'),
         run: () => {
-          muteUser.mutate({ githubLogin: author.login });
+          moderation.report({ action: 'mute', githubLogin: author.login });
         },
       });
       userActions.push({
         label: t('prReview.discussion.block'),
         run: () => {
-          blockUser.mutate({ githubLogin: author.login });
+          moderation.report({ action: 'block', githubLogin: author.login });
         },
       });
     }
@@ -228,23 +122,17 @@ export function CommentRow({
     const disabledButtonIndices = isSelf ? userActions.map((_, index) => 1 + index) : [];
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
         disabledButtonIndices,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         if (index === undefined) {
           return;
         }
         if (index === 0) {
-          reportContent.mutate({
-            surface: 'pr_discussion_content',
-            targetKind: 'comment',
-            targetId: String(comment.commentId),
-            reason: 'other',
-            context: { platform: REPORT_PLATFORM },
-          });
+          moderation.report({ action: 'report-content', commentId: comment.commentId });
           return;
         }
         userActions[index - 1]?.run();

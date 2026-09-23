@@ -1,5 +1,8 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { findKiloExclusiveModel, isDisabledKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isDisabledKiloExclusiveModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
 import type {
   GatewayRequest,
@@ -110,8 +113,9 @@ export type OpenAiChatGptRoutingResult =
     };
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
-  const model = requestedModel.trim();
-  // Retired Kilo aliases are not upstream model IDs either.
+  const model = requestedModel.trim().toLowerCase();
+  // Disabling a Kilo-only alias must not turn it into a delegated OpenAI model;
+  // retired Kilo aliases are not upstream model IDs either.
   return (
     OPENAI_MODEL_PREFIX.test(model) &&
     !isGptOssModel(model) &&
@@ -227,6 +231,7 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
     id: 'openai-chatgpt',
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
+    disableUrlSuffix: false,
     apiKey,
     apiKeyHeader: null,
     supportedChatApis: ['responses'],

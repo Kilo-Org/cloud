@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "ਇਹ ਸੈਟਿੰਗ ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਕੁੰਜੀ ਏਜੰਟ ਨੂੰ ਸੁਨੇਹਾ ਲਿਖਣ ਵਾਲੇ ਖਾਨੇ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।",
     "biometricUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ ਨਾਲ ਅਨਲੌਕ ਕਰੋ",
     "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।",
-    "featureFlags": "ਫ਼ੀਚਰ ਫ਼ਲੈਗ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
     "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "ਸੈਸ਼ਨ ਦੀ ਸਥਿਤੀ",
       "sessionStatusSubtitle": "ਪੂਰਾ ਹੋਇਆ / ਅਸਫਲ / ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ",
       "kiloclawActivitySubtitle": "ਇੰਸਟੈਂਸ ਤਿਆਰ/ਅਸਫਲ, ਨਿਰਧਾਰਤ ਕਾਰਵਾਈਆਂ",
-      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਪਾਉਣ ਲਈ ਇੱਕ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
+      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਲੈਣ ਲਈ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
       "balanceAlertsSubtitle": "ਸੰਸਥਾ ਦਾ ਬੈਲੰਸ ਘੱਟ ਹੋਣ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
-      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਪਾਉਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਲੈਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
       "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ",
-      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਨਤੀਜੇ ਪਾਉਣ ਲਈ ਇੱਕ ਦਾਇਰੇ ਵਿੱਚ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।",
+      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਲੈਣ ਲਈ ਇੱਕ ਦਾਇਰੇ 'ਤੇ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।",
       "spendAlertsSubtitle": "ਸੀਮਾ ਟੱਪਣਾ ਅਤੇ ਹਰ ਘੰਟੇ ਵਾਧਾ",
       "spendAlertsToggle": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਦੀ ਸ਼੍ਰੇਣੀ"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",
       "linesOf": "ਕੁੱਲ {{total}} ਵਿੱਚੋਂ ਲਾਈਨਾਂ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent ਦੀ {{action}} ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ ({{status}})।",
-      "failed": "Cloud Agent ਦੀ {{action}} ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ਇਨਪੁੱਟ ਨੂੰ ਸੀਰੀਅਲਾਈਜ਼ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ]",
       "errorPrefix": "ਗਲਤੀ: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "ਪ੍ਰਦਾਤਾ ਨੇ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ।",
       "assistantStopped": "ਜਵਾਬ ਰੋਕ ਦਿੱਤਾ ਗਿਆ।",
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
-      "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "sendFailed": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
     },
     "filePart": {
       "loadingImage": "ਚਿੱਤਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "ਸਾਈਨ-ਇਨ ਦੀਆਂ ਬਹੁਤ ਜ਼ਿਆਦਾ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਚੁੱਕੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਉਡੀਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "models": {
+    "auto": {
+      "frontier": "ਆਟੋ ਫਰੰਟੀਅਰ",
+      "balanced": "ਆਟੋ ਸੰਤੁਲਿਤ",
+      "efficient": "ਆਟੋ ਕੁਸ਼ਲ",
+      "small": "ਆਟੋ ਛੋਟਾ",
+      "free": "ਆਟੋ ਮੁਫ਼ਤ",
+      "organization": "ਸੰਸਥਾ ਆਟੋ"
+    },
     "dataCollected": "ਡੇਟਾ ਇਕੱਠਾ ਹੁੰਦਾ ਹੈ",
     "free": "ਮੁਫ਼ਤ",
     "couldNotUpdateFavorites": "ਪਸੰਦੀਦਾ ਸੂਚੀ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",

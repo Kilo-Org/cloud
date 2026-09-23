@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。",
     "biometricUnlock": "生体認証でロック解除",
     "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。",
-    "featureFlags": "機能フラグ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gatewayによる文字起こし",
     "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -335,11 +330,11 @@
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
-      "kiloclawActivityUnavailable": "KiloClawのアクティビティを受け取るには、KiloClawインスタンスを起動してください。",
+      "kiloclawActivityUnavailable": "KiloClawアクティビティを受け取るには、KiloClawインスタンスを開始してください。",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
       "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
       "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
-      "securityFindingsUnavailable": "セキュリティの検出事項を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。",
+      "securityFindingsUnavailable": "セキュリティの検出結果を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。",
       "spendAlertsSubtitle": "しきい値の超過と毎時の急増",
       "spendAlertsToggle": "支出アラートのカテゴリ"
     },
@@ -1729,10 +1724,6 @@
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
       "linesOf": "{{total}}行中{{start}}–{{end}}行目"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentの{{action}}に失敗しました（{{status}}）。",
-      "failed": "Cloud Agentの{{action}}に失敗しました。"
-    },
     "collectCopyableText": {
       "unserializableInput": "[シリアル化できない入力]",
       "errorPrefix": "エラー: {{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "プロバイダーがリクエストを拒否しました。",
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
-      "assistantFailed": "応答に失敗しました。",
-      "sendFailed": "メッセージを送信できませんでした。もう一度お試しください。"
+      "assistantFailed": "応答に失敗しました。"
     },
     "filePart": {
       "loadingImage": "画像を読み込み中",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらく待ってから、もう一度お試しください。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動最先端",
+      "balanced": "自動バランス",
+      "efficient": "自動効率",
+      "small": "自動小型",
+      "free": "自動無料",
+      "organization": "組織の自動"
+    },
     "dataCollected": "データ収集あり",
     "free": "無料",
     "couldNotUpdateFavorites": "お気に入りを更新できませんでした。",

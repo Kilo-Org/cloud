@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Якщо вимкнено, клавіша вводу вставляє новий рядок у полях введення повідомлень агентам.",
     "biometricUnlock": "Біометричне розблокування",
     "biometricUnlockSubtitle": "Запитувати біометричне розблокування під час запуску та після п'яти хвилин у фоновому режимі.",
-    "featureFlags": "Прапори функцій",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -337,9 +332,9 @@
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
       "kiloclawActivityUnavailable": "Запустіть екземпляр KiloClaw, щоб отримувати активність KiloClaw.",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
-      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати сповіщення про низький баланс.",
+      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати попередження про баланс.",
       "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA",
-      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми безпеки.",
+      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми.",
       "spendAlertsSubtitle": "перевищення порогів і погодинні сплески",
       "spendAlertsToggle": "Категорія «Сповіщення про витрати»"
     },
@@ -1761,10 +1756,6 @@
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",
       "linesOf": "рядки {{start}}–{{end}} з {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не вдалося виконати дію «{{action}}» у Cloud Agent ({{status}}).",
-      "failed": "Не вдалося виконати дію «{{action}}» у Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[вхідні дані неможливо серіалізувати]",
       "errorPrefix": "Помилка: {{error}}"
@@ -1860,8 +1851,7 @@
       "assistantProviderRejected": "Постачальник відхилив запит.",
       "assistantStopped": "Формування відповіді зупинено.",
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
-      "assistantFailed": "Не вдалося сформувати відповідь.",
-      "sendFailed": "Не вдалося надіслати повідомлення. Спробуйте ще раз."
+      "assistantFailed": "Не вдалося сформувати відповідь."
     },
     "filePart": {
       "loadingImage": "Завантаження зображення",
@@ -3205,6 +3195,14 @@
     "tooManySignInAttempts": "Забагато спроб входу. Зачекайте та спробуйте ще раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Передовий",
+      "balanced": "Авто Збалансований",
+      "efficient": "Авто Ефективний",
+      "small": "Авто Малий",
+      "free": "Авто Безкоштовний",
+      "organization": "Авто організації"
+    },
     "dataCollected": "Збір даних",
     "free": "Безкоштовно",
     "couldNotUpdateFavorites": "Не вдалося оновити обране.",

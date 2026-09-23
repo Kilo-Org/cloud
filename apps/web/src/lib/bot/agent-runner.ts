@@ -92,7 +92,12 @@ async function buildSystemPrompt(
   const owner = ownerFromIntegration(platformIntegration);
 
   const [githubContext, gitlabContext, conversationContext] = await Promise.all([
-    getGitHubRepositoryContext(owner),
+    getGitHubRepositoryContext(
+      owner,
+      thread.adapter.name === 'slack' && platformIntegration.platform === 'slack'
+        ? 'agent'
+        : 'workflow'
+    ),
     getGitLabRepositoryContext(owner),
     botPlatform.getConversationContext({ thread, triggerMessage, platformIntegration }),
   ]);

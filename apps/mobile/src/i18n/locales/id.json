@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen.",
     "biometricUnlock": "Buka kunci dengan biometrik",
     "biometricUnlockSubtitle": "Minta autentikasi biometrik saat aplikasi dibuka dan setelah lima menit di latar belakang.",
-    "featureFlags": "Bendera fitur",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripsikan masukan suara dengan model Kilo Gateway alih-alih pengenalan bicara perangkat. Rekaman Anda dikirim ke Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -337,9 +332,9 @@
       "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
       "kiloclawActivityUnavailable": "Mulai instans KiloClaw untuk mendapatkan aktivitas KiloClaw.",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
-      "balanceAlertsUnavailable": "Gabung ke organisasi untuk mendapatkan peringatan saldo rendah.",
+      "balanceAlertsUnavailable": "Bergabunglah dengan organisasi untuk mendapatkan peringatan saldo.",
       "securityFindingsSubtitle": "temuan baru dan pengingat SLA",
-      "securityFindingsUnavailable": "Aktifkan agen keamanan Kilo pada cakupan untuk mendapatkan temuan keamanan.",
+      "securityFindingsUnavailable": "Aktifkan Agen keamanan Kilo pada cakupan untuk mendapatkan temuan keamanan.",
       "spendAlertsSubtitle": "melewati ambang batas dan lonjakan per jam",
       "spendAlertsToggle": "Kategori peringatan pengeluaran"
     },
@@ -1729,10 +1724,6 @@
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
       "linesOf": "baris {{start}}–{{end}} dari {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Tindakan {{action}} pada Cloud Agent gagal ({{status}}).",
-      "failed": "Tindakan {{action}} pada Cloud Agent gagal."
-    },
     "collectCopyableText": {
       "unserializableInput": "[masukan tidak dapat diserialisasi]",
       "errorPrefix": "Kesalahan: {{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "Penyedia menolak permintaan.",
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Percakapan ini terlalu panjang untuk diproses oleh model.",
-      "assistantFailed": "Gagal menghasilkan respons.",
-      "sendFailed": "Gagal mengirim pesan. Coba lagi."
+      "assistantFailed": "Gagal menghasilkan respons."
     },
     "filePart": {
       "loadingImage": "Memuat gambar",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Terlalu banyak percobaan masuk. Tunggu sebentar dan coba lagi."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatis Tercanggih",
+      "balanced": "Otomatis Seimbang",
+      "efficient": "Otomatis Efisien",
+      "small": "Otomatis Kecil",
+      "free": "Otomatis Gratis",
+      "organization": "Otomatis Organisasi"
+    },
     "dataCollected": "Data dikumpulkan",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Tidak dapat memperbarui favorit.",

@@ -36,7 +36,6 @@ const {
 }: typeof import('@pierre/diffs') = require('@pierre/diffs');
 const {
   default: WorktreeFileRenderer,
-  parseSavedWorktreePatch,
   prepareWorktreeFileHighlighter,
 }: typeof import('./WorktreeFileRenderer') = require('./WorktreeFileRenderer');
 const {
@@ -45,6 +44,7 @@ const {
 }: typeof import('./worktree-file') = require('./worktree-file');
 const {
   getWorktreeDiffExpansion,
+  parseSavedWorktreePatch,
 }: typeof import('./worktree-file-diff') = require('./worktree-file-diff');
 
 const patch = `diff --git a/src/example.ts b/src/example.ts

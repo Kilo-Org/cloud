@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်ထံ စာရေးသည့်အကွက်တွင် စာကြောင်းအသစ် ထည့်ပေးပါသည်။",
     "biometricUnlock": "ဇီဝအချက်အလက်ဖြင့် သော့ဖွင့်ခြင်း",
     "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။",
-    "featureFlags": "လုပ်ဆောင်ချက်အလံများ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ဖြင့် အသံမှစာသားပြောင်းခြင်း",
     "gatewayTranscriptionSubtitle": "စက်၏ အသံခွဲခြားသိရှိမှုအစား Kilo Gateway မော်ဒယ်ဖြင့် အသံထည့်သွင်းမှုကို စာသားပြောင်းပါ။ သင့်အသံသွင်းချက်ကို Kilo Gateway သို့ ပို့ပါမည်။",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "စက်ရှင်အခြေအနေ",
       "sessionStatusSubtitle": "ပြီးဆုံး / မအောင်မြင် / ထိန်းချုပ်ရန် အသင့်",
       "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
-      "kiloclawActivityUnavailable": "KiloClaw လုပ်ဆောင်ချက်များ ရရှိရန် KiloClaw စနစ်တစ်ခု စတင်ပါ။",
+      "kiloclawActivityUnavailable": "KiloClaw လုပ်ဆောင်ချက် ရရှိရန် KiloClaw စနစ်တစ်ခုကို စတင်ပါ။",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
-      "balanceAlertsUnavailable": "လက်ကျန်နည်း သတိပေးချက်များ ရရှိရန် အဖွဲ့အစည်းတစ်ခုသို့ ပါဝင်ပါ။",
+      "balanceAlertsUnavailable": "လက်ကျန် သတိပေးချက်များ ရရှိရန် အဖွဲ့အစည်းတစ်ခုသို့ ပါဝင်ပါ။",
       "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ",
-      "securityFindingsUnavailable": "လုံခြုံရေးတွေ့ရှိချက်များ ရရှိရန် နယ်ပယ်တစ်ခုတွင် Kilo လုံခြုံရေးအေးဂျင့်ကို ဖွင့်ပါ။",
+      "securityFindingsUnavailable": "လုံခြုံရေး တွေ့ရှိချက်များ ရရှိရန် နယ်ပယ်တစ်ခုတွင် Kilo လုံခြုံရေးအေးဂျင့်ကို ဖွင့်ပါ။",
       "spendAlertsSubtitle": "သတ်မှတ်ချက် ကျော်လွန်မှုနှင့် နာရီအလိုက် မြင့်တက်မှု",
       "spendAlertsToggle": "အသုံးစရိတ် သတိပေးချက် အမျိုးအစား"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",
       "linesOf": "စာကြောင်း {{start}}–{{end}} / စုစုပေါင်း {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} မအောင်မြင်ပါ ({{status}})။",
-      "failed": "Cloud Agent {{action}} မအောင်မြင်ပါ။"
-    },
     "collectCopyableText": {
       "unserializableInput": "[သိမ်းဆည်းပို့ဆောင်နိုင်သည့်ပုံစံသို့ ပြောင်း၍မရသော ထည့်သွင်းဒေတာ]",
       "errorPrefix": "အမှား: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "ဝန်ဆောင်မှုပေးသူက တောင်းဆိုမှုကို ငြင်းပယ်ခဲ့ပါသည်။",
       "assistantStopped": "တုံ့ပြန်မှုကို ရပ်တန့်လိုက်ပါသည်။",
       "assistantContextOverflow": "စကားဝိုင်းသည် မော်ဒယ်က လက်ခံနိုင်သည့် အရှည်ထက် ကျော်လွန်နေပါသည်။",
-      "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။",
-      "sendFailed": "မက်ဆေ့ခ်ျကို ပို့၍မရပါ။ ထပ်ကြိုးစားပါ။"
+      "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။"
     },
     "filePart": {
       "loadingImage": "ပုံ ဖွင့်နေသည်",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "အကောင့်ဝင်ရန် ကြိုးစားသည့်အကြိမ်ရေ များလွန်းပါသည်။ ခဏစောင့်ပြီး ထပ်စမ်းကြည့်ပါ။"
   },
   "models": {
+    "auto": {
+      "frontier": "အလိုအလျောက် ထိပ်တန်း",
+      "balanced": "အလိုအလျောက် မျှတ",
+      "efficient": "အလိုအလျောက် ထိရောက်",
+      "small": "အလိုအလျောက် သေး",
+      "free": "အလိုအလျောက် အခမဲ့",
+      "organization": "အဖွဲ့အစည်း အလိုအလျောက်"
+    },
     "dataCollected": "ဒေတာစုဆောင်းသည်",
     "free": "အခမဲ့",
     "couldNotUpdateFavorites": "စိတ်ကြိုက်များကို ပြင်ဆင်၍မရပါ။",

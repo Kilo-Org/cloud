@@ -51,7 +51,7 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 
-import type { Env, SandboxId } from '../types.js';
+import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
@@ -98,10 +98,11 @@ type SharedSandboxRouteMetadata = NonNullable<
 >;
 
 /**
- * The plane a new session will be created on. Vercel sandboxes exist only on the
- * control plane, so those allocations force it; every other request — including a
- * Cloudflare allocation — defers to `sessionPlaneForNewOwner`. Single source of
- * truth: the allocation checks and the session-ID generation must agree.
+ * The plane a new session will be created on. Vercel and DO-managed Cloudflare
+ * containers exist only on the control plane, so those allocations force it;
+ * every other request — including a Cloudflare allocation — defers to
+ * `sessionPlaneForNewOwner`. Single source of truth: the allocation checks and
+ * the session-ID generation must agree.
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,
@@ -710,6 +711,7 @@ async function allocateNewSession(
       sandboxProvider = selectSandboxProvider({
         env: ctx.env,
         orgId,
+        userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
         devcontainer: input.runtime?.devcontainer,
@@ -925,6 +927,7 @@ function rebuildRecordedSessionAllocation(
     .optional()
     .safeParse(canonical.reportingCreatedAt);
   const worktreeCreate = worktreeEnabledForCreate(input, ctx, row);
+  const recordedProvider = agentSandboxProviderSchema.safeParse(sandboxProvider);
 
   if (
     !reportingCreatedAt.success ||
@@ -934,7 +937,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
+    !recordedProvider.success
   ) {
     throw creationInProgressError();
   }
@@ -983,7 +986,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
-    sandboxProvider,
+    sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     initialTurn,
@@ -1410,6 +1413,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         type: 'github',
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
+        githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
         branch: repository.branch,
       };
     case 'gitlab':

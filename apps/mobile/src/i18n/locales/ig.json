@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Mgbe agbanyụrụ ya, igodo nloghachi na-etinye ahịrị ọhụrụ n'ebe ide ozi ndị nnọchi anya.",
     "biometricUnlock": "Mepee mkpọchi site na njirimara ahụ",
     "biometricUnlockSubtitle": "Wepụ mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ.",
-    "featureFlags": "Ọkọ atụmatụ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "Ọnọdụ nnọkọ",
       "sessionStatusSubtitle": "agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
-      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ihe omume KiloClaw.",
+      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ọrụ KiloClaw.",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
-      "balanceAlertsUnavailable": "Sonye n'òtù iji nweta ịdọ aka na ntị maka ego fọdụrụ.",
+      "balanceAlertsUnavailable": "Sonye na ụlọ ọrụ iji nweta ịdọ aka na ntị ego.",
       "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
-      "securityFindingsUnavailable": "Gbanye onye enyemaka nchebe Kilo na mpaghara iji nweta ihe achọpụtara gbasara nchebe.",
+      "securityFindingsUnavailable": "Gbanye Onye enyemaka nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
       "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
       "linesOf": "ahịrị {{start}}–{{end}} n'ime {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} na Cloud Agent agaghị nke ọma ({{status}}).",
-      "failed": "{{action}} na Cloud Agent agaghị nke ọma."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ntinye a na-apụghị ịgbanwe ka ọ bụrụ usoro nchekwa]",
       "errorPrefix": "Njehie: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Onye na-enye ọrụ jụrụ arịrịọ ahụ.",
       "assistantStopped": "Akwụsịrị nzaghachi ahụ.",
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
-      "assistantFailed": "Nzaghachi ahụ agaghị nke ọma.",
-      "sendFailed": "Enweghị ike iziga ozi. Biko nwaa ọzọ."
+      "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."
     },
     "filePart": {
       "loadingImage": "Na-ebudata onyonyo",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."
   },
   "models": {
+    "auto": {
+      "frontier": "Akpaaka Kachasị elu",
+      "balanced": "Akpaaka Nhatanha",
+      "efficient": "Akpaaka Na-arụ ọrụ nke ọma",
+      "small": "Akpaaka Nta",
+      "free": "Akpaaka N'efu",
+      "organization": "Akpaaka Òtù"
+    },
     "dataCollected": "Data anakọtara",
     "free": "N'efu",
     "couldNotUpdateFavorites": "Enweghị ike imelite ihe kacha amasị gị.",

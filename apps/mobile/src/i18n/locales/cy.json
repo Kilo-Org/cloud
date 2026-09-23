@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Pan fydd yr opsiwn hwn wedi'i ddiffodd, mae'r fysell Dychwelyd yn mewnosod llinell newydd ym mlychau negeseuon yr asiantau.",
     "biometricUnlock": "Datgloi â biometreg",
     "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir.",
-    "featureFlags": "Baneri nodweddion",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -903,11 +898,11 @@
       "sessionStatusTitle": "Statws sesiwn",
       "sessionStatusSubtitle": "wedi gorffen / wedi methu / yn barod i'w reoli",
       "kiloclawActivitySubtitle": "enghraifft yn barod neu wedi methu, gweithredoedd wedi'u hamserlennu",
-      "kiloclawActivityUnavailable": "Dechreuwch enghraifft KiloClaw i gael gweithgaredd KiloClaw.",
+      "kiloclawActivityUnavailable": "Dechreuwch enghraifft KiloClaw i gael gweithgarwch KiloClaw.",
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
-      "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans isel.",
+      "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans.",
       "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
-      "securityFindingsUnavailable": "Galluogwch asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
+      "securityFindingsUnavailable": "Galluogwch Asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
       "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
       "spendAlertsToggle": "Categori rhybuddion gwariant"
     },
@@ -2361,10 +2356,6 @@
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
       "linesOf": "llinellau {{start}}–{{end}} o {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Methodd y weithred {{action}} yn Cloud Agent ({{status}}).",
-      "failed": "Methodd y weithred {{action}} yn Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[mewnbwn na ellir ei gyfresoli]",
       "errorPrefix": "Gwall: {{error}}"
@@ -2460,8 +2451,7 @@
       "assistantProviderRejected": "Gwrthododd y darparwr y cais.",
       "assistantStopped": "Ataliwyd yr ymateb.",
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
-      "assistantFailed": "Methodd yr ymateb.",
-      "sendFailed": "Methu anfon y neges. Ceisiwch eto."
+      "assistantFailed": "Methodd yr ymateb."
     },
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",
@@ -3291,6 +3281,14 @@
     "tooManySignInAttempts": "Rydych wedi ceisio mewngofnodi gormod o weithiau. Arhoswch a rhowch gynnig eto."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatig Blaengar",
+      "balanced": "Awtomatig Cytbwys",
+      "efficient": "Awtomatig Effeithlon",
+      "small": "Awtomatig Bach",
+      "free": "Awtomatig Am ddim",
+      "organization": "Sefydliad Awtomatig"
+    },
     "dataCollected": "Cesglir data",
     "free": "Am ddim",
     "couldNotUpdateFavorites": "Methu diweddaru'r ffefrynnau.",

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng sẽ chèn dòng mới vào ô nhập tin nhắn gửi cho tác nhân.",
     "biometricUnlock": "Mở khóa bằng sinh trắc học",
     "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút.",
-    "featureFlags": "Cờ tính năng",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -335,11 +330,11 @@
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
-      "kiloclawActivityUnavailable": "Khởi động một máy KiloClaw để nhận hoạt động KiloClaw.",
+      "kiloclawActivityUnavailable": "Khởi chạy một instance KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư thấp.",
+      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư.",
       "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
-      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật.",
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận các vấn đề bảo mật.",
       "spendAlertsSubtitle": "vượt ngưỡng và tăng vọt theo giờ",
       "spendAlertsToggle": "Danh mục cảnh báo chi tiêu"
     },
@@ -1729,10 +1724,6 @@
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
       "linesOf": "dòng {{start}}–{{end}} trong tổng số {{total}} dòng"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Thao tác {{action}} của Cloud Agent không thành công ({{status}}).",
-      "failed": "Thao tác {{action}} của Cloud Agent không thành công."
-    },
     "collectCopyableText": {
       "unserializableInput": "[đầu vào không thể tuần tự hóa]",
       "errorPrefix": "Lỗi: {{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "Nhà cung cấp đã từ chối yêu cầu.",
       "assistantStopped": "Quá trình tạo phản hồi đã dừng.",
       "assistantContextOverflow": "Cuộc trò chuyện vượt quá giới hạn độ dài mà mô hình có thể xử lý.",
-      "assistantFailed": "Không thể tạo phản hồi.",
-      "sendFailed": "Không thể gửi tin nhắn. Vui lòng thử lại."
+      "assistantFailed": "Không thể tạo phản hồi."
     },
     "filePart": {
       "loadingImage": "Đang tải hình ảnh",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một lát rồi thử lại."
   },
   "models": {
+    "auto": {
+      "frontier": "Tự động Tiên tiến",
+      "balanced": "Tự động Cân bằng",
+      "efficient": "Tự động Hiệu quả",
+      "small": "Tự động Nhỏ",
+      "free": "Tự động Miễn phí",
+      "organization": "Tự động Tổ chức"
+    },
     "dataCollected": "Có thu thập dữ liệu",
     "free": "Miễn phí",
     "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích.",

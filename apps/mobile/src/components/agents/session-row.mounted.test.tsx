@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- one cohesive mounted suite: stored row, share list, and remote row share the mock harness; test-renderer mounts the real rows and their native presentation without a DOM. */
 import { createElement, type ReactElement } from 'react';
+import { Platform } from 'react-native';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,31 +13,31 @@ import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
+import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import { StoredSessionRow } from './session-row';
 
-vi.mock('react-native', async () => {
-  const React = await import('react');
-  return {
-    View: 'View',
-    Pressable: 'Pressable',
-    TextInput: 'TextInput',
-    Platform: { OS: 'ios' },
-    FlatList: ({
-      data,
-      renderItem,
-    }: {
-      data: ShareDestinationRow[];
-      renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
-    }) =>
-      React.createElement(
-        'FlatList',
-        null,
-        data.map(item =>
-          React.createElement('Cell', { key: item.session_id }, renderItem({ item }))
-        )
-      ),
-  };
-});
+// The share destination list renders through FlashList v2; the stub feeds the
+// real `renderItem` every row, exactly as the old react-native FlatList stub did.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: ({
+    data,
+    renderItem,
+  }: {
+    data: ShareDestinationRow[];
+    renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
+  }) =>
+    createElement(
+      'FlashList',
+      null,
+      data.map(item => createElement('Cell', { key: item.session_id }, renderItem({ item })))
+    ),
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  TextInput: 'TextInput',
+  Platform: { OS: 'ios' },
+}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
@@ -181,6 +182,16 @@ describe('StoredSessionRow live speech', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('paints the untitled label for a session that still carries the backend placeholder', () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the row
+    // shows its own label instead of the machine string.
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session - 2026-09-22T01:09:45.623Z' } })
+    );
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain('New session - 2026-09-22T01:09:45.623Z');
+  });
+
   it('updates the dot and speech in place while retaining metadata and provenance', () => {
     const props = { session: { ...session, associatedPr: { number: 42 } }, metaWhileLive: true };
     const renderer = mount(row(props));
@@ -270,6 +281,23 @@ describe('StoredSessionRow live speech', () => {
     }
   );
 
+  it.each(['New session - 2026-09-22T02:05:22.778Z', 'Child session - 2026-09-22T02:05:22.778Z'])(
+    'paints the localized unnamed name instead of the backend placeholder %s',
+    placeholder => {
+      const renderer = mount(row({ session: { ...session, title: placeholder } }));
+      expect(texts(renderer)).toContain('Untitled session');
+      expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain(
+        'Untitled session'
+      );
+      expect(texts(renderer)).not.toContain(placeholder);
+    }
+  );
+
+  it('keeps a real server title on the row', () => {
+    const renderer = mount(row({ session: { ...session, title: 'Verifier Rename Check' } }));
+    expect(texts(renderer)).toContain('Verifier Rename Check');
+  });
+
   it.each([false, true])('keeps Home/card speech unchanged for live=%s', live => {
     const renderer = mount(
       row({
@@ -325,6 +353,125 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+
+  const placeholderTitle = 'New session - 2026-09-21T15:44:47.176Z';
+
+  it('renders the generic untitled label for the server creation-default title', () => {
+    const renderer = mount(row({ session: { ...session, title: placeholderTitle } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(placeholderTitle);
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain('Untitled session');
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-21');
+  });
+
+  it('seeds the rename prompt blank for the server creation-default title, never the placeholder', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: placeholderTitle },
+        onRename: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row button');
+    }
+    act(() => {
+      (button.props as { onLongPress?: () => void }).onLongPress?.();
+    });
+    const options = vi.mocked(showSessionActionMenu).mock.calls[0]?.[0];
+    if (!options?.onRename) {
+      throw new Error('Missing rename action');
+    }
+    options.onRename();
+    // The base seeds the field blank for an unnamed session, where the
+    // placeholder copy prompts for a name; the raw server title never reaches
+    // the prompt.
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
+  });
+
+  it('keeps a real title that merely starts with "New session"', () => {
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session plan for the login redirect' } })
+    );
+    expect(texts(renderer)).toContain('New session plan for the login redirect');
+  });
+});
+
+describe('StoredSessionRow rename prefill', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+    vi.mocked(showSessionActionMenu).mockClear();
+    vi.mocked(showRenamePrompt).mockClear();
+  });
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  function openRename(renderer: TestRenderer.ReactTestRenderer) {
+    const button = hosts(renderer, 'Pressable')[0];
+    const pressable = button?.props as { onLongPress?: () => void } | undefined;
+    act(() => {
+      pressable?.onLongPress?.();
+    });
+    act(() => {
+      vi.mocked(showSessionActionMenu).mock.calls.at(-1)?.[0].onRename?.();
+    });
+  }
+
+  it('seeds the rename prompt empty for a session the backend has not named', () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the field
+    // must not surface that machine string, so an unnamed session opens blank.
+    const renderer = mount(
+      row({
+        session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' },
+        onDelete: vi.fn<() => void>(),
+        onRename: vi.fn<() => void>(),
+      })
+    );
+    openRename(renderer);
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
+  });
+
+  it('seeds the rename prompt with the trimmed stored title for a named session', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: '  Fix login bug  ' },
+        onDelete: vi.fn<() => void>(),
+        onRename: vi.fn<() => void>(),
+      })
+    );
+    openRename(renderer);
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('Fix login bug', expect.any(Function));
+  });
+
+  it('opens the Android rename field empty for a session the backend has not named', () => {
+    (Platform as { OS: string }).OS = 'android';
+    try {
+      const renderer = mount(
+        row({
+          session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' },
+          onDelete: vi.fn<() => void>(),
+          onRename: vi.fn<() => void>(),
+        })
+      );
+      openRename(renderer);
+      const modal = hosts(renderer, 'RenameModal')[0];
+      expect(modal?.props.initialValue).toBe('');
+    } finally {
+      (Platform as { OS: string }).OS = 'ios';
+    }
+  });
 });
 
 describe('RemoteSessionRow live speech', () => {
@@ -381,6 +528,13 @@ describe('RemoteSessionRow live speech', () => {
     ]);
     expect(texts(renderer)).toContain('5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live');
+  });
+
+  it('paints the localized unnamed name instead of the backend placeholder title', () => {
+    const renderer = mountRemote({ title: 'New session - 2026-09-22T02:05:22.778Z' });
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain('New session - 2026-09-22T02:05:22.778Z');
   });
 
   it('speaks Idle once the agent stops working', () => {

@@ -17,7 +17,7 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
@@ -174,6 +174,7 @@ export function ProfileScreen() {
             icon={GitPullRequest}
             title={t('common.codeReviewer')}
             subtitle={t('profile.codeReviewerSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             onPress={() => {
@@ -186,6 +187,7 @@ export function ProfileScreen() {
             icon={ShieldCheck}
             title={t('common.securityAgent')}
             subtitle={t('profile.securityAgentSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             last
@@ -207,6 +209,7 @@ export function ProfileScreen() {
               icon={GitMerge}
               title={t('common.prReview')}
               subtitle={t('profile.prReviewSubtitle')}
+              hue="gold"
               className="rounded-lg bg-secondary px-3"
               last
               onPress={() => {
@@ -240,6 +243,7 @@ export function ProfileScreen() {
                     : t('profile.manageOrganization')
                 }
                 subtitle={orgName}
+                hue="lime"
                 className="rounded-lg bg-secondary px-3"
                 disabled={!orgRole}
                 last
@@ -260,6 +264,7 @@ export function ProfileScreen() {
             icon={SlidersHorizontal}
             title={t('common.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
@@ -271,6 +276,7 @@ export function ProfileScreen() {
           <ConfigureRow
             icon={BookOpenCheck}
             title={t('tour.tutorialLabel')}
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
@@ -283,7 +289,13 @@ export function ProfileScreen() {
             providers (and we're not loading/erroring) so the header never dangles. */}
         {/* No layout animation on this section: siblings above mount/resize
             asynchronously; LinearTransition would animate this container's
-            position lag as a visible header overlap. Opacity fades are safe. */}
+            position lag as a visible header overlap.
+            The rows below carry no entering fade either: a Reanimated entering
+            animation does not run while the app is backgrounded, so the row
+            stayed mounted at opacity 0 and left the header alone above the tab
+            bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
+            row's height, so painting a row directly cannot shift the sections
+            below — only the skeleton's exit fade remains. */}
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
           isLoading ||
@@ -324,16 +336,17 @@ export function ProfileScreen() {
             )}
 
             {data?.providers.map((p, index) => (
-              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+              <View key={`${p.provider}-${p.email}`}>
                 <ConfigureRow
                   icon={KeyRound}
                   title={providerLabel(p.provider)}
                   subtitle={p.email}
                   subtitleNumberOfLines={1}
+                  hue="moss"
                   className="rounded-lg bg-secondary px-3"
                   last={index === data.providers.length - 1}
                 />
-              </Animated.View>
+              </View>
             ))}
           </View>
         )}
@@ -343,6 +356,7 @@ export function ProfileScreen() {
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
+            hue="fern"
             onPress={() => {
               showFeedbackPrompt(userId);
             }}
@@ -350,12 +364,19 @@ export function ProfileScreen() {
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
+            hue="fern"
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
+          <ActionTile
+            icon={LogOut}
+            label={t('common.signOut')}
+            hue="fern"
+            onPress={confirmSignOut}
+          />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
+            hue="fern"
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}

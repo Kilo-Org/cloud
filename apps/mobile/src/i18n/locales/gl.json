@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes.",
     "biometricUnlock": "Desbloquear con biometría",
     "biometricUnlockSubtitle": "Solicitar o desbloqueo ao abrir a aplicación e despois de cinco minutos en segundo plano.",
-    "featureFlags": "Bandeiras de funcións",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrición con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcribe o ditado cun modelo de Kilo Gateway no canto do recoñecemento de voz do dispositivo. A túa gravación envíaselle a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +836,9 @@
       "kiloclawActivitySubtitle": "instancia lista ou con erros, accións programadas",
       "kiloclawActivityUnavailable": "Inicia unha instancia de KiloClaw para recibir actividade de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organización",
-      "balanceAlertsUnavailable": "Únete a unha organización para recibir alertas de saldo baixo.",
+      "balanceAlertsUnavailable": "Únete a unha organización para recibir avisos de saldo.",
       "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA",
-      "securityFindingsUnavailable": "Activa o axente de seguridade de Kilo nun ámbito para recibir problemas de seguridade.",
+      "securityFindingsUnavailable": "Activa o Axente de seguridade de Kilo nun ámbito para recibir problemas de seguridade.",
       "spendAlertsSubtitle": "superacións de limiares e picos por hora",
       "spendAlertsToggle": "Categoría de alertas de gasto"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",
       "linesOf": "liñas {{start}}–{{end}} de {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Fallou a acción {{action}} de Cloud Agent ({{status}}).",
-      "failed": "Fallou a acción {{action}} de Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[entrada non serializable]",
       "errorPrefix": "Erro: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "O provedor rexeitou a solicitude.",
       "assistantStopped": "Detívose a resposta.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
-      "assistantFailed": "Non se puido xerar a resposta.",
-      "sendFailed": "Non se puido enviar a mensaxe. Téntao de novo."
+      "assistantFailed": "Non se puido xerar a resposta."
     },
     "filePart": {
       "loadingImage": "Cargando a imaxe",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Demasiados intentos de inicio de sesión. Agarda e téntao de novo."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avanzado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Gratis",
+      "organization": "Automático de organización"
+    },
     "dataCollected": "Recolle datos",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Non se puideron actualizar os favoritos.",

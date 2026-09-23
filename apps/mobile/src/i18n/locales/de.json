@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Ist diese Option deaktiviert, fügt die Eingabetaste im Eingabefeld für Agenten einen Zeilenumbruch ein.",
     "biometricUnlock": "Mit Biometrie entsperren",
     "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich.",
-    "featureFlags": "Feature-Flags",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway-Transkription",
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -335,11 +330,11 @@
       "sessionStatusTitle": "Sitzungsstatus",
       "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
-      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivitäten zu erhalten.",
+      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivität zu erhalten.",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
-      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Warnungen bei niedrigem Guthaben zu erhalten.",
+      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Guthabenwarnungen zu erhalten.",
       "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
-      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten für einen Bereich, um Sicherheitsbefunde zu erhalten.",
+      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten in einem Bereich, um Sicherheitsbefunde zu erhalten.",
       "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
       "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
     },
@@ -1729,10 +1724,6 @@
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",
       "linesOf": "zeilen {{start}}–{{end}} von {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Die Aktion „{{action}}“ in Cloud Agent ist fehlgeschlagen ({{status}}).",
-      "failed": "Die Aktion „{{action}}“ in Cloud Agent ist fehlgeschlagen."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nicht serialisierbare Eingabe]",
       "errorPrefix": "Fehler: {{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "Der Anbieter hat die Anfrage abgelehnt.",
       "assistantStopped": "Die Erstellung der Antwort wurde abgebrochen.",
       "assistantContextOverflow": "Die Unterhaltung ist zu lang für das Modell.",
-      "assistantFailed": "Die Antwort konnte nicht erstellt werden.",
-      "sendFailed": "Die Nachricht konnte nicht gesendet werden. Bitte versuche es erneut."
+      "assistantFailed": "Die Antwort konnte nicht erstellt werden."
     },
     "filePart": {
       "loadingImage": "Bild wird geladen",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Du hast zu viele Anmeldeversuche unternommen. Bitte warte einen Moment und versuche es erneut."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Spitzenmodell",
+      "balanced": "Auto Ausgewogen",
+      "efficient": "Auto Effizient",
+      "small": "Auto Klein",
+      "free": "Auto Kostenlos",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Daten werden erfasst",
     "free": "Kostenlos",
     "couldNotUpdateFavorites": "Die Favoriten konnten nicht aktualisiert werden.",

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Þegar slökkt er á þessu setur færsluhnappurinn inn línuskil í ritlum fulltrúa.",
     "biometricUnlock": "Aflæsing með lífkennum",
     "biometricUnlockSubtitle": "Krefjast aflæsingar við ræsingu og eftir fimm mínútur í bakgrunni.",
-    "featureFlags": "Eiginleikafánar",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Umritun í gegnum Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +836,9 @@
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
       "kiloclawActivityUnavailable": "Ræstu KiloClaw-tilvik til að fá KiloClaw-virkni.",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
-      "balanceAlertsUnavailable": "Skráðu þig í fyrirtæki til að fá viðvaranir um lága inneign.",
+      "balanceAlertsUnavailable": "Skráðu þig í félag til að fá viðvaranir um inneign.",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
-      "securityFindingsUnavailable": "Virkjaðu Kilo öryggiserindreka á sviði til að fá öryggisniðurstöður.",
+      "securityFindingsUnavailable": "Virkjaðu Kilo-öryggiserindreka á sviði til að fá öryggisniðurstöður.",
       "spendAlertsSubtitle": "yfirferðir þröskulda og uppsveiflur á klukkustund",
       "spendAlertsToggle": "Flokkur útgjaldaviðvarana"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
       "linesOf": "línur {{start}}–{{end}} af {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Aðgerðin {{action}} í Cloud Agent mistókst ({{status}}).",
-      "failed": "Aðgerðin {{action}} í Cloud Agent mistókst."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ekki er hægt að raðgreina inntakið]",
       "errorPrefix": "Villa: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Veitandinn hafnaði beiðninni.",
       "assistantStopped": "Hætt var að mynda svarið.",
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
-      "assistantFailed": "Ekki tókst að mynda svarið.",
-      "sendFailed": "Ekki tókst að senda skilaboð. Reyndu aftur."
+      "assistantFailed": "Ekki tókst að mynda svarið."
     },
     "filePart": {
       "loadingImage": "Hleður myndinni",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Of margar innskráningartilraunir. Bíddu og reyndu aftur."
   },
   "models": {
+    "auto": {
+      "frontier": "Sjálfvirkt Fremst",
+      "balanced": "Sjálfvirkt Jafnvægis",
+      "efficient": "Sjálfvirkt Skilvirkt",
+      "small": "Sjálfvirkt Lítið",
+      "free": "Sjálfvirkt Ókeypis",
+      "organization": "Sjálfvirkt Stofnunar"
+    },
     "dataCollected": "Gögnum safnað",
     "free": "Ókeypis",
     "couldNotUpdateFavorites": "Ekki tókst að uppfæra eftirlæti.",

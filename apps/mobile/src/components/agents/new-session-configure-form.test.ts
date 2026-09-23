@@ -51,6 +51,10 @@ const keyboardSubscribers = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The profile row and the environment row render the reanimated `Skeleton`
+// while their content loads; its module reaches the Reanimated worklets entry,
+// which this plain Node project cannot resolve, and the loading cases assert
+// the stub by name — its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -77,10 +81,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-// The element tree finds the loading Skeleton by that name, and the real
-// component animates through Reanimated's worklets package (and the motion
-// policy's `expo-battery`), neither of which this node project can load.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
@@ -125,25 +125,16 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile row and the environment row both render a loading `Skeleton`,
-// whose module imports `react-native-reanimated`: this pure suite does not set
-// Reanimated up, and this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The stub is the type the
-// pending-environment case asserts by name; its own rendering is not under test
-// here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
+}));
+
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
 }));
 
 // ── hooks ──────────────────────────────────────────────────────────
@@ -197,6 +188,26 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
+/** Height of the first node carrying an explicit `style.height` (an in-scroll spacer). */
+function findElementHeight(node: Node): number | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const props = node.props ?? {};
+  const style = props.style as { height?: unknown } | undefined;
+  if (typeof style?.height === 'number') {
+    return style.height;
+  }
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementHeight(child as Node);
+    if (found !== null) {
+      return found;
+    }
+  }
+  return null;
+}
+
 function findElement(node: Node, typeName: string): Record<string, unknown> | null {
   if (node === null || typeof node !== 'object') {
     return null;
@@ -238,6 +249,14 @@ function findOnLayoutHandler(
     }
   }
   return null;
+}
+
+/** The pinned footer's own bottom padding — the form's single clearance source. */
+function findFooterPaddingBottom(node: Node): number | null {
+  const lift = findElementByType(node, 'AppAwareKeyboardPaddingView');
+  const footer = findElementByType(lift?.children as Node, 'View');
+  const style = footer?.style as { paddingBottom?: unknown } | undefined;
+  return typeof style?.paddingBottom === 'number' ? style.paddingBottom : null;
 }
 
 const INSTANCE: InstancePickerInstance = {
@@ -346,7 +365,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   it.each(['android', 'ios'] as const)(
-    'clears the navigation bar at the screen root and lifts the body above the IME on %s',
+    'floors the pinned footer at the safe-area bottom and lifts it above the IME on %s',
     async os => {
       platformState.OS = os;
       insetsState.bottom = 42;
@@ -356,10 +375,9 @@ describe('NewSessionConfigureForm', () => {
         // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
         const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
 
-        // The root pads by the safe-area inset, so the pinned Start footer
-        // (its child) can never render inside the navigation bar's region.
-        expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 42 });
-        // Neither platform resizes the window for the IME, so the body sits
+        // The helper floors the raw inset at 16 and adds 16: max(42, 16) + 16.
+        expect(findFooterPaddingBottom(element)).toBe(58);
+        // Neither platform resizes the window for the IME, so the footer sits
         // inside a keyboard-lift view that adds the IME height on top of the
         // safe area — the same implementation on iOS and Android.
         expect(findElementByType(element, 'AppAwareKeyboardPaddingView')).not.toBeNull();
@@ -386,20 +404,23 @@ describe('NewSessionConfigureForm', () => {
       expect(scrollBody).not.toBeNull();
       expect(findElementByType(scrollBody, 'NewSessionStartButton')).toBeNull();
 
-      // It renders in the footer instead: a sibling of the body inside the
-      // keyboard-lift view, so it is always on screen and the IME lifts it.
+      // It renders in the footer instead: a sibling of the body, wrapped in
+      // the keyboard-lift view, so it is always on screen and the IME lifts it.
       const liftView = findElement(element, 'AppAwareKeyboardPaddingView');
       expect(liftView).not.toBeNull();
-      expect(findElementByType(liftView, 'ScrollView')).not.toBeNull();
       expect(findElementByType(liftView, 'NewSessionStartButton')).not.toBeNull();
+      // The footer alone rides the lift view; the scroll body stays outside it,
+      // so the IME shrinks the body instead of covering the action.
+      expect(findElementByType(liftView, 'ScrollView')).toBeNull();
 
       // Below the body, not above it: the pinned bottom bar.
-      const liftChildren = (liftView?.props as { children?: Node[] } | undefined)?.children ?? [];
-      const bodyIndex = liftChildren.findIndex(
+      const rootView = findElement(element, 'View');
+      const rootChildren = (rootView?.props as { children?: Node[] } | undefined)?.children ?? [];
+      const bodyIndex = rootChildren.findIndex(
         child => (child as { type?: unknown } | undefined)?.type === 'ScrollView'
       );
-      const footerIndex = liftChildren.findIndex(
-        child => findElementByType(child, 'NewSessionStartButton') !== null
+      const footerIndex = rootChildren.findIndex(
+        child => findElementByType(child, 'AppAwareKeyboardPaddingView') !== null
       );
       expect(bodyIndex).toBeGreaterThanOrEqual(0);
       expect(footerIndex).toBeGreaterThan(bodyIndex);
@@ -826,9 +847,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: kilo remote hint ──
-  it('names both `kilo remote` and `/remote` for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language ──
+  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
+    const cliTerms = ['kilo remote', '/remote', 'CLI session', 'local kilo process'];
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const cloud = NewSessionConfigureForm({
@@ -836,10 +860,14 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
-    // The help draws the commands as prose: the authoring markers must not
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(cloud, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    // The help draws the sentence as prose: the authoring markers must not
     // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
@@ -849,13 +877,80 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(remote, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
-  // ── Case 14: reorder wiring lock ──
+  // ── Case 14: bottom navigation-bar clearance ──
+  it('reserves the bottom safe-area inset on the pinned footer so Start clears the navigation bar', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    insetsState.bottom = 44;
+    try {
+      // The inset is 44; the helper floors at 16 and adds 16.
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+      // The footer is the single source: the root adds no raw inset, so the
+      // padded chain is the floor once, not inset + floor (double padding).
+      expect(findElementByType(element, 'View')?.style).toBeUndefined();
+      expect(findFooterPaddingBottom(element)).toBe(60);
+    } finally {
+      insetsState.bottom = 0;
+    }
+  });
+
+  // ── Case 14b: the clearance leaves no dead space in the scroll body ──
+  it('leaves no in-scroll spacer after the last field', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    insetsState.bottom = 44;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+      const scrollBody = findElementByType(element, 'ScrollView');
+      expect(scrollBody).not.toBeNull();
+      expect(findElementHeight(scrollBody?.children as Node)).toBeNull();
+    } finally {
+      insetsState.bottom = 0;
+    }
+  });
+
+  // ── Case 14a: the primary action is pinned outside the scroll body ──
+  it('pins Start and the cloud-create recovery outside the scroll body, under the keyboard lift', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      cloudCreateError: { retryable: true, message: 'prepare failed' },
+    }) as Node;
+
+    // A Start inside the scroll sits below the fold while the composer's
+    // auto-focus keyboard is up, so the primary action must not live there.
+    const scrollBody = findElementByType(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findElementByType(scrollBody?.children as Node, 'NewSessionStartButton')).toBeNull();
+    expect(
+      findElementByType(scrollBody?.children as Node, 'NewSessionCloudCreateError')
+    ).toBeNull();
+
+    // Both ride the keyboard-lift footer below the body: the lift shrinks the
+    // body and keeps the action above the IME on either platform.
+    const lift = findElementByType(element, 'AppAwareKeyboardPaddingView');
+    expect(lift).not.toBeNull();
+    expect(findElementByType(lift?.children as Node, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByType(lift?.children as Node, 'NewSessionCloudCreateError')).not.toBeNull();
+  });
+
+  // ── Case 13: reorder wiring lock ──
   it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -897,6 +992,19 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+
+  // ── Case 15: the scroll frame is measured and handed to the prompt ──
+  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    // The ScrollView reports its height so the prompt can yield its floor to it.
+    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
+    // The mocked useState holds the initial measurement (0) and never setStates.
+    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
   });
 
   // ── Case 16: reveal the composer card's bottom row above the IME ──

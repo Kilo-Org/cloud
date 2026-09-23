@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe.",
     "biometricUnlock": "Feloldás biometrikus azonosítással",
     "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges.",
-    "featureFlags": "Funkciójelzők",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Átírás Kilo Gateway-n keresztül",
     "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -841,9 +836,9 @@
       "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
       "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
-      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy figyelmeztetéseket kapj alacsony egyenlegről.",
+      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy egyenleg-figyelmeztetéseket kapj.",
       "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
-      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörben, hogy biztonsági találatokat kapj.",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági problémákat kapj.",
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategória"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",
       "linesOf": "{{start}}–{{end}}. sor, összesen {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "A Cloud Agent művelete nem sikerült: {{action}} ({{status}}).",
-      "failed": "A Cloud Agent művelete nem sikerült: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nem szerializálható bemenet]",
       "errorPrefix": "Hiba: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "A szolgáltató elutasította a kérést.",
       "assistantStopped": "A válasz létrehozása leállt.",
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
-      "assistantFailed": "Nem sikerült létrehozni a választ.",
-      "sendFailed": "Nem sikerült elküldeni az üzenetet. Próbáld újra."
+      "assistantFailed": "Nem sikerült létrehozni a választ."
     },
     "filePart": {
       "loadingImage": "Kép betöltése",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Túl sok bejelentkezési kísérlet történt. Várj egy kicsit, majd próbáld újra."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatikus Csúcskategóriás",
+      "balanced": "Automatikus Kiegyensúlyozott",
+      "efficient": "Automatikus Hatékony",
+      "small": "Automatikus Kicsi",
+      "free": "Automatikus Ingyenes",
+      "organization": "Szervezeti automatikus"
+    },
     "dataCollected": "Adatgyűjtés",
     "free": "Ingyenes",
     "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket.",

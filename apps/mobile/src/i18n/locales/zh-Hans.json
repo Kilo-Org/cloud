@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "关闭后，按回车键会在智能体的消息输入框中换行。",
     "biometricUnlock": "使用生物识别解锁",
     "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。",
-    "featureFlags": "功能标志",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 转写",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -335,11 +330,11 @@
       "sessionStatusTitle": "会话状态",
       "sessionStatusSubtitle": "已完成 / 已失败 / 可接管",
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
-      "kiloclawActivityUnavailable": "启动 KiloClaw 实例即可获取 KiloClaw 活动。",
+      "kiloclawActivityUnavailable": "启动 KiloClaw 实例以接收 KiloClaw 活动。",
       "balanceAlertsSubtitle": "组织余额不足警告",
-      "balanceAlertsUnavailable": "加入组织即可获取余额不足提醒。",
+      "balanceAlertsUnavailable": "加入组织以接收余额提醒。",
       "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒",
-      "securityFindingsUnavailable": "在范围内启用 Kilo 安全智能体即可获取安全问题。",
+      "securityFindingsUnavailable": "在某个范围启用 Kilo 安全智能体以接收安全问题。",
       "spendAlertsSubtitle": "阈值突破与每小时激增",
       "spendAlertsToggle": "支出提醒类别"
     },
@@ -1729,10 +1724,6 @@
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
       "linesOf": "第 {{start}}–{{end}} 行，共 {{total}} 行"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}}失败（{{status}}）。",
-      "failed": "Cloud Agent {{action}}失败。"
-    },
     "collectCopyableText": {
       "unserializableInput": "[无法序列化的输入]",
       "errorPrefix": "错误：{{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "提供商拒绝了该请求。",
       "assistantStopped": "已停止生成回复。",
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
-      "assistantFailed": "生成回复失败。",
-      "sendFailed": "发送消息失败。请重试。"
+      "assistantFailed": "生成回复失败。"
     },
     "filePart": {
       "loadingImage": "正在加载图片",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "登录尝试次数过多。请稍等片刻再试。"
   },
   "models": {
+    "auto": {
+      "frontier": "自动前沿",
+      "balanced": "自动均衡",
+      "efficient": "自动高效",
+      "small": "自动小型",
+      "free": "自动免费",
+      "organization": "组织自动"
+    },
     "dataCollected": "会收集数据",
     "free": "免费",
     "couldNotUpdateFavorites": "无法更新收藏。",

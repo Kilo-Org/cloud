@@ -401,6 +401,10 @@ describe('NewSessionRepositorySection connect cards after selection', () => {
     });
     const error = renderer.root.findByType('QueryError' as never);
     expect(error.props.title).toBe(i18n.t('agentChat.newSession.couldNotLoadGitlabRepositories'));
+    // The error row's action is the provider-list refresh, so it carries that
+    // name rather than the generic "Retry" (scenario e7: the digest must show
+    // the 'Refresh repositories' control on the error row).
+    expect(error.props.retryLabel).toBe(i18n.t('agentChat.newSession.refreshRepositories'));
     act(() => {
       (error.props.onRetry as () => void)();
     });

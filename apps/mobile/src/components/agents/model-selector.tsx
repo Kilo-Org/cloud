@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
+import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
@@ -24,6 +25,7 @@ import { modelPickerSlot } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 import { modelSelectorBadges } from './model-selector-badges';
+import { resolveModelSelectorLabel } from './model-selector-label';
 
 type ModelSelectorProps = {
   value: string;
@@ -130,16 +132,18 @@ export function ModelSelector({
   if (isLoading) {
     // Keep the chip shell and its affordance while the model list loads: the
     // sibling selectors on the composer keep their labels, so a blank pill here
-    // reads as a control with no text or affordance.
+    // reads as a control with no text or affordance. The shell is marked
+    // accessible so its label and busy state reach a screen reader.
     return (
       <View
+        accessible
         accessibilityRole="button"
-        accessibilityLabel={t('common.loading')}
+        accessibilityLabel={t('common.model')}
         accessibilityState={{ busy: true, disabled: true }}
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
       >
         <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
-          {t('common.loading')}
+          {t('common.model')}
         </Text>
         <ChevronDown size={14} color={colors.mutedForeground} />
       </View>
@@ -152,7 +156,18 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const label = selectedModel?.name ?? (!providerAware && value ? value : t('common.model'));
+  // A matched option can be one of Kilo's own Auto models, whose backend name no
+  // catalog translates, so resolve its label first and let the helper fall back
+  // to the short name (or the generic label) for a stored reference the catalog
+  // does not carry.
+  const label = resolveModelSelectorLabel({
+    selectedName: selectedModel
+      ? autoModelLabel(selectedModel.displayId, selectedModel.name)
+      : undefined,
+    value,
+    providerAware,
+    fallbackLabel: t('common.model'),
+  });
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
@@ -242,10 +257,11 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  const name = autoModelLabel(option.displayId, option.name);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
-      option.name,
+      name,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       free && !byok ? freeModelFreeLabel() : undefined,
@@ -260,8 +276,12 @@ export function ModelPickerOptionRow({
   // The row is a NON-accessible container with two sibling controls: the
   // main select (row content) and the favorite star. A pressable nested
   // inside a pressable would shadow the favorite for assistive technology,
-  // so the two must never nest. The selected check stays a static sibling
-  // to preserve the exact visual order (content, star, check).
+  // so the two must never nest. The selected check is a static sibling to
+  // the LEFT of the star, in a fixed-width column reserved in every row so
+  // selecting a row never moves the row content or the star, and the star is
+  // the row's last child with the constant pr-4 padding, so every row's star
+  // shares one right-alignment column and the check can never sit right of
+  // it.
   return (
     <View className="border-b border-border">
       <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
@@ -276,7 +296,7 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{option.name}</Text>
+            <Text className="text-base text-foreground">{name}</Text>
             {option.modelRef ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
@@ -322,6 +342,9 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
+        <View className="w-[18px] items-center justify-center">
+          {selected ? <Check size={18} color={colors.primary} /> : null}
+        </View>
         <Pressable
           onPress={() => {
             void Haptics.selectionAsync();
@@ -332,8 +355,8 @@ export function ModelPickerOptionRow({
           accessibilityRole="button"
           accessibilityLabel={
             isFavorite
-              ? t('agentChat.modelSelector.removeFromFavorites', { name: option.name })
-              : t('agentChat.modelSelector.addToFavorites', { name: option.name })
+              ? t('agentChat.modelSelector.removeFromFavorites', { name })
+              : t('agentChat.modelSelector.addToFavorites', { name })
           }
           accessibilityState={{ selected: isFavorite }}
         >
@@ -343,9 +366,6 @@ export function ModelPickerOptionRow({
             fill={isFavorite ? colors.primary : 'transparent'}
           />
         </Pressable>
-        <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={colors.primary} /> : null}
-        </View>
       </View>
       {selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">

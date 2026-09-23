@@ -43,6 +43,7 @@ import {
 import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -148,6 +149,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
@@ -228,12 +230,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       repo => repo.fullName
     );
     const options = [t('common.allRepositories'), ...repoNames, t('common.cancel')];
-    showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, index => {
-      if (index === undefined || index === options.length - 1) {
-        return;
+    showActionSheetWithOptions(
+      { ...themedSheet, options, cancelButtonIndex: options.length - 1 },
+      index => {
+        if (index === undefined || index === options.length - 1) {
+          return;
+        }
+        setRepoFullName(index === 0 ? undefined : repoNames[index - 1]);
       }
-      setRepoFullName(index === 0 ? undefined : repoNames[index - 1]);
-    });
+    );
   };
 
   return (

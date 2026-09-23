@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Ja šī opcija ir izslēgta, ievades taustiņš aģenta ziņojuma ievades laukā ievieto jaunu rindu.",
     "biometricUnlock": "Biometriskā atbloķēšana",
     "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm.",
-    "featureFlags": "Funkciju karodziņi",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -855,11 +850,11 @@
       "sessionStatusTitle": "Sesijas statuss",
       "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
       "kiloclawActivitySubtitle": "instance gatava / kļūda, ieplānotas darbības",
-      "kiloclawActivityUnavailable": "Palaid KiloClaw instanci, lai saņemtu KiloClaw darbību.",
+      "kiloclawActivityUnavailable": "Palaidiet KiloClaw instanci, lai saņemtu KiloClaw aktivitāti.",
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
-      "balanceAlertsUnavailable": "Pievienojies organizācijai, lai saņemtu brīdinājumus par mazu atlikumu.",
+      "balanceAlertsUnavailable": "Pievienojieties organizācijai, lai saņemtu bilances brīdinājumus.",
       "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
-      "securityFindingsUnavailable": "Iespējo Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
+      "securityFindingsUnavailable": "Iespējojiet Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
       "spendAlertsSubtitle": "sliekšņu pārsniegumi un stundas lēcieni",
       "spendAlertsToggle": "Izdevumu brīdinājumu kategorija"
     },
@@ -2265,10 +2260,6 @@
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
       "linesOf": "rindas {{start}}–{{end}} no {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Neizdevās veikt Cloud Agent darbību „{{action}}” ({{status}}).",
-      "failed": "Neizdevās veikt Cloud Agent darbību „{{action}}”."
-    },
     "collectCopyableText": {
       "unserializableInput": "[neserializējama ievade]",
       "errorPrefix": "Kļūda: {{error}}"
@@ -2364,8 +2355,7 @@
       "assistantProviderRejected": "Pakalpojumu sniedzējs noraidīja pieprasījumu.",
       "assistantStopped": "Atbildes sagatavošana tika apturēta.",
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
-      "assistantFailed": "Neizdevās sagatavot atbildi.",
-      "sendFailed": "Neizdevās nosūtīt ziņojumu. Lūdzu, mēģini vēlreiz."
+      "assistantFailed": "Neizdevās sagatavot atbildi."
     },
     "filePart": {
       "loadingImage": "Ielādē attēlu",
@@ -3162,6 +3152,14 @@
     "tooManySignInAttempts": "Pārāk daudz pierakstīšanās mēģinājumu. Uzgaidi un mēģini vēlreiz."
   },
   "models": {
+    "auto": {
+      "frontier": "Automātiskais Jaudīgākais",
+      "balanced": "Automātiskais Līdzsvarotais",
+      "efficient": "Automātiskais Efektīvais",
+      "small": "Automātiskais Mazais",
+      "free": "Automātiskais Bezmaksas",
+      "organization": "Organizācijas automātiskais"
+    },
     "dataCollected": "Dati tiek vākti",
     "free": "Bezmaksas",
     "couldNotUpdateFavorites": "Neizdevās atjaunināt izlasi.",

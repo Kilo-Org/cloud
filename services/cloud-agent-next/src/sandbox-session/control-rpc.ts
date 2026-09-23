@@ -1,6 +1,9 @@
-import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
+import type {
+  CloudflareContainersInstance,
+  VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import type { CredentialContainmentRequirements } from '../sandbox-control/physical-lifecycle.js';
+import type { CredentialContainmentRequirements } from '../sandbox-state/model/allocation.js';
 import {
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionAbortPayloadSchema,
@@ -10,16 +13,14 @@ import {
 import { DEFAULT_DO_RETRY_CONFIG, type DORetryScope } from '@kilocode/worker-utils';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
 import type { AttachRouteInput } from '../sandbox-control/session-routes.js';
-import type { ConnectionState, PhysicalState } from '../sandbox-control/status-projection.js';
+import type { ConnectionState, PhysicalState } from '../shared/sandbox-status.js';
 import type {
   SandboxTerminalAccessInput,
   SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
-import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
-import type { Env } from '../types.js';
+import type { AgentSandboxProvider, Env } from '../types.js';
 import type {
   ControlRuntimeCredentialProxyFence,
-  RuntimeQuarantineResult,
   SandboxAcquisition,
 } from '../persistence/SandboxControl.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
@@ -35,8 +36,9 @@ type SandboxControlRpc = {
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
-    provider?: 'cloudflare' | 'vercel';
+    provider?: AgentSandboxProvider;
     resources?: VercelSandboxResources;
+    instance?: CloudflareContainersInstance;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -45,16 +47,20 @@ type SandboxControlRpc = {
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
+    allocationIncarnation?: string;
     operationResults?: true;
     runtimeRecovery?: true;
+    runtimeReplacementInFlight?: true;
     attachment?: SessionAttachPayload;
   }>;
-  getStatus(): Promise<{
+  getStatus(input?: { sessionId?: string }): Promise<{
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
+    allocationIncarnation?: string;
     operationResults?: true;
     runtimeRecovery?: true;
+    runtimeReplacementInFlight?: true;
   }>;
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -62,14 +68,6 @@ type SandboxControlRpc = {
     kiloSessionId: string;
     directory: string;
   }): Promise<ControlRuntimeCredentialProxyFence | null>;
-  quarantineRuntime(input: {
-    ownerId: string;
-    sessionId: string;
-    wrapperInstanceId: string;
-    reason: string;
-    nativeRuntimeId?: string;
-    authorization?: SessionOperationAuthorization;
-  }): Promise<RuntimeQuarantineResult>;
   attachSession(input: AttachRouteInput): Promise<unknown>;
   bindRuntimeCredentialProxyHandle(input: {
     ownerId: string;
@@ -114,7 +112,8 @@ export function sandboxControlRpc(
         'prepareSessionCredentials'
       ),
     ensureReady: input => stub().ensureReady(input),
-    getStatus: () => withDORetry(stub, control => control.getStatus(), 'getStatus', config()),
+    getStatus: input =>
+      withDORetry(stub, control => control.getStatus(input), 'getStatus', config()),
     getRuntimeCredentialProxyFence: input =>
       withDORetry(
         stub,
@@ -122,7 +121,6 @@ export function sandboxControlRpc(
         'getRuntimeCredentialProxyFence',
         config()
       ),
-    quarantineRuntime: input => stub().quarantineRuntime(input),
     attachSession: input => stub().attachSession(input),
     bindRuntimeCredentialProxyHandle: input =>
       withDORetry(

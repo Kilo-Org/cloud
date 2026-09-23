@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom.",
     "biometricUnlock": "Odklepanje z biometrijo",
     "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju.",
-    "featureFlags": "Zastavice funkcij",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -871,11 +866,11 @@
       "sessionStatusTitle": "Stanje seje",
       "sessionStatusSubtitle": "končano / neuspešno / pripravljeno za upravljanje",
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
-      "kiloclawActivityUnavailable": "Zaženi instanco KiloClaw, da prejemaš dejavnost KiloClaw.",
+      "kiloclawActivityUnavailable": "Zaženite instanco KiloClaw, da prejemate dejavnost KiloClaw.",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
-      "balanceAlertsUnavailable": "Pridruži se organizaciji, da prejemaš opozorila o nizkem stanju.",
+      "balanceAlertsUnavailable": "Pridružite se organizaciji, da prejemate opozorila o stanju.",
       "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA",
-      "securityFindingsUnavailable": "Vklopi varnostnega agenta Kilo v obsegu, da prejemaš varnostne ugotovitve.",
+      "securityFindingsUnavailable": "Omogočite Varnostnega agenta Kilo v obsegu, da prejemate varnostne ugotovitve.",
       "spendAlertsSubtitle": "preseganja pragov in urni skoki",
       "spendAlertsToggle": "Kategorija opozoril o porabi"
     },
@@ -2297,10 +2292,6 @@
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
       "linesOf": "vrstice {{start}}–{{end}} od {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo ({{status}}).",
-      "failed": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo."
-    },
     "collectCopyableText": {
       "unserializableInput": "[vnosa ni mogoče serializirati]",
       "errorPrefix": "Napaka: {{error}}"
@@ -2396,8 +2387,7 @@
       "assistantProviderRejected": "Ponudnik je zavrnil zahtevo.",
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
-      "assistantFailed": "Odgovora ni bilo mogoče ustvariti.",
-      "sendFailed": "Sporočila ni bilo mogoče poslati. Poskusi znova."
+      "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
     },
     "filePart": {
       "loadingImage": "Nalaganje slike",
@@ -3205,6 +3195,14 @@
     "tooManySignInAttempts": "Preveč poskusov prijave. Počakaj in poskusi znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Samodejno Vrhunski",
+      "balanced": "Samodejno Uravnoteženo",
+      "efficient": "Samodejno Učinkovito",
+      "small": "Samodejno Malo",
+      "free": "Samodejno Brezplačno",
+      "organization": "Samodejno organizacije"
+    },
     "dataCollected": "Zbiranje podatkov",
     "free": "Brezplačno",
     "couldNotUpdateFavorites": "Priljubljenih ni bilo mogoče posodobiti.",

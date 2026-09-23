@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "આ બંધ હોય ત્યારે રિટર્ન કી એજન્ટના સંદેશના ખાનામાં નવી પંક્તિ ઉમેરે છે.",
     "biometricUnlock": "બાયોમેટ્રિક્સથી અનલૉક કરો",
     "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે.",
-    "featureFlags": "ફીચર ફ્લેગ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway દ્વારા અવાજને લખાણમાં ફેરવવું",
     "gatewayTranscriptionSubtitle": "ઉપકરણની સ્પીચ રિકગ્નિશનને બદલે Kilo Gateway મોડેલ વડે વૉઇસ ઇનપુટને લખાણમાં ફેરવો. તમારું રેકોર્ડિંગ Kilo Gateway પર મોકલાય છે.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -843,7 +838,7 @@
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
       "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
-      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો.",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે એક અવકાશમાં Kilo સુરક્ષા એજન્ટ સક્ષમ કરો.",
       "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
       "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",
       "linesOf": "કુલ {{total}} પંક્તિઓમાંથી {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentની {{action}} ક્રિયા નિષ્ફળ ગઈ ({{status}}).",
-      "failed": "Cloud Agentની {{action}} ક્રિયા નિષ્ફળ ગઈ."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ક્રમબદ્ધ સ્વરૂપમાં ફેરવી ન શકાય તેવું ઇનપુટ]",
       "errorPrefix": "ભૂલ: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "પ્રદાતાએ વિનંતી નકારી કાઢી.",
       "assistantStopped": "જવાબ અટકાવવામાં આવ્યો.",
       "assistantContextOverflow": "મોડલ માટે વાતચીત ખૂબ લાંબી છે.",
-      "assistantFailed": "જવાબ મળી શક્યો નહીં.",
-      "sendFailed": "સંદેશ મોકલી શકાયો નહીં. ફરી પ્રયાસ કરો."
+      "assistantFailed": "જવાબ મળી શક્યો નહીં."
     },
     "filePart": {
       "loadingImage": "છબી લોડ થઈ રહી છે",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "સાઇન ઇન કરવાના ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને થોડી રાહ જુઓ અને ફરી પ્રયત્ન કરો."
   },
   "models": {
+    "auto": {
+      "frontier": "આપમેળે અગ્રણી",
+      "balanced": "આપમેળે સંતુલિત",
+      "efficient": "આપમેળે કાર્યક્ષમ",
+      "small": "આપમેળે નાનું",
+      "free": "આપમેળે મફત",
+      "organization": "સંસ્થા આપમેળે"
+    },
     "dataCollected": "ડેટા એકત્ર થાય છે",
     "free": "મફત",
     "couldNotUpdateFavorites": "મનપસંદની યાદી અપડેટ કરી શકાઈ નહીં.",

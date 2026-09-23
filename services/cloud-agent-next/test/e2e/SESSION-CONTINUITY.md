@@ -1,9 +1,10 @@
 # Session continuity E2E catalog
 
 Requirement source: `.specs/cloud-agent-session.md` -- `Persistence` and
-`Continuity`. This file maps that contract to concrete, reusable lifecycle
-scenarios. It is the working plan for the harness; update the status column as
-scenarios land.
+`Continuity`. This file maps that contract to the shared lifecycle scenarios in
+`scenarios-shared.ts` and its `scenarios-shared-*.ts` modules. The local-only
+registry and its bodies were removed; every runnable scenario is a shared
+definition dispatched by `run.ts`, so this file is the single inventory.
 
 ## The contract in one line
 
@@ -22,12 +23,13 @@ narrow, documented set of unrecoverable causes.
 - **Continuity**: history/transcript is restored after a cold environment;
   uncommitted files are explicitly not guaranteed (see Data loss below).
 - **Isolation**: siblings in one worktree share files but not chat state or
-  questions.
+  questions. The runtime serializes streaming model turns, so isolation is
+  per-chat control/state, not concurrent streaming.
 - **Repeatability**: each scenario is green across N repeats with no unexplained
   flake.
 
 Status legend: `PASS` verified live | `PARTIAL` exists but does not assert the
-full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
+full contract | `PLANNED` not written | `GAP` no shared scenario covers it.
 
 ## Scenario catalog
 
@@ -35,122 +37,72 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| A1 | `long-session-20` | 20+ turns, real writes/reads/edits, one sandbox the whole time | PARTIAL -- `long-session` does 11 turns and asserts checkpoint identity; extend the count |
-| A2 | `cold-resume-history` | auto idle-stop -> resume on a new container -> message history restored -> next turn completes | PARTIAL -- `cold-resume` asserts history first and a stable Git HEAD; dirty-file survival is observed only (not guaranteed across environment replacement) |
-| A3 | `warm-cold-cycles` | work -> idle -> resume -> work -> idle -> resume in one session | PARTIAL -- `warm-cold-cycles` runs two full cycles with independent idle-stop evidence, old-primary absence, distinct replacement container, history, and a completed ordered-lifecycle follow-up; each cycle records its resumed message id and dirty-file survival (non-gating), and completed cycles are retained even if a later cycle fails |
-| A4 | `interrupt-then-continue` | interrupt mid-turn; the next message continues the same chat, in the SAME container while the idle timer has not fired | PASS -- `interrupt-then-continue` asserts `cloud.message.failed reason=interrupted`, a completed follow-up, and an unchanged container id |
-| A5 | `recover-same-session` | induce a transient failure (heartbeat lapse / wrapper crash / allocation loss); the next message on the SAME session completes | PARTIAL -- `recover-same-session` captures the target connection by `sandboxId` + connection/wrapper identity, requires a matched `deadline_fired deadlineId=heartbeatExpiry` followed by a matched `recovery_outcome cause=heartbeat_expired outcome=started` before any recovery send, and completes a new ordered-lifecycle message on the original session. Proven: heartbeat-expiry attribution for the captured connection. Not proven: disconnect-classified runs are generic same-session recovery, not heartbeat coverage; and the wrapper pre-pause last-send line is captured but not used for classification |
-| A6 | `short-sessions` | one-turn chats opened, completed, and repeated | PARTIAL -- `cold`/`hot` approximate it; no repeat/open-close loop |
+| A1 | `long-conversation` | One cold turn plus twelve hot turns -- nine `echo:<token>`, one paced `slow`, and a real `file:write`/`file:read` pair whose parsed echo body equals a writer nonce generated independently of the reader-visible path and tag. Every hot turn completes with no re-preparation and a stable allocation reference. | PARTIAL -- does not reach 20+ turns |
+| A2 | `leave-and-return` | Boots, leaves the session unattended, requires the allocation to disappear, then resumes on a distinct non-null allocation with the boot marker replayed from a fresh stream. | PARTIAL -- no two-sided history or stable Git HEAD assertion |
+| A3 | `warm-cold-cycles` | work -> idle -> resume twice in one session | GAP -- the local-only scenario was removed; `question-idle-resume` covers one idle cycle |
+| A4 | `interrupt-then-continue` | Interrupts an actively running paced turn, asserts `cloud.message.failed reason=interrupted`, then completes a follow-up on the same session. | PASS |
+| A5 | `recover-same-session` | Induce a transient failure and have the next message on the SAME session complete | PARTIAL -- the shared `external-kill`/`kill-mid-flight`/`wrapper-freeze-*` scenarios prove the user-visible recovery on a distinct allocation, without identity-correlated heartbeat attribution for a generic lapse |
+| A6 | `cold` / `hot` | one-turn and warm follow-up chats | PARTIAL -- no repeat/open-close loop |
 
 ### B. Multi-chat / worktree
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| B1 | `new-chat-after-completed` | a chat completes a turn, then a sibling chat is created and works | PASS -- `multi-session-collab`, fixed this cycle |
-| B2 | `three-chat-chain` | planner -> implementer -> reviewer artifacts across three chats | PASS -- `multi-session-collab` |
-| B3 | `many-siblings` | 3-5 chats interleaved; simultaneous gates; targeted cancel | PARTIAL -- `worktree-shared` covers 2 siblings + simultaneous gates + targeted cancel |
-| B4 | `parallel-sessions` | two independent sessions running turns at the same time | PASS -- `concurrent-chats` runs three independent sessions behind simultaneous gates, proves overlapping `running`, and splits clean-load vs recovered-under-load |
+| B1 | `worktree-chat` | Creates a worktree chat through the public tRPC surface; verifies workspace/worktree identity, idempotent same-key replay, a cold echo boot, and one hot echo turn with stable allocation references. | PASS |
+| B2 | `worktree-multi-chat` | Two chats in one worktree with shared worktree identity, chat-content isolation, and a shared-checkout write/overwrite/read proof. | PARTIAL -- does not cover a three-chat chain |
+| B3 | `many-siblings` | 3-5 chats interleaved; targeted interrupt/delete | PARTIAL -- `worktree-multi-chat` covers two chats, a lazy sibling create, sequential question ownership (asked in the root while the sibling is idle), targeted interrupt of the sibling while the root holds a paced turn (root nonterminal, allocation-stable, then completing), and targeted delete of the sibling leaving the root accepting another turn. Three-plus siblings stay uncovered. |
+| B4 | `concurrent-chats` | Two independent sessions each hold a paced turn with proven overlapping `running`, and both reach a completed terminal (or recover) on their own chat. | PASS |
 
 ### C. Interactive tools
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| C1 | `question-isolation` | a question is answerable in its own chat only; sibling isolation; replay after refresh | PASS -- `worktree-shared` (`question=isolated; questionRefresh=replayed`) |
-| C2 | `unanswered-question-idle` | an unanswered question does not pin the environment; idle winds it down; restore then answer/continue | PARTIAL -- `question-idle-resume` requires a positive `inspectControlPlaneQuestions` observation scoped to the captured question while the primary is inspectable (inspection failure is INCONCLUSIVE), the parked turn to settle terminal (`failed`/`interrupted`) before continuing (the exact-match target heartbeat payload `reportedState`/allocation-wide `pendingMessages` plus payload-derived `sessionState`/`sessionWaitingOn` is the input-wait proof and may be absent once terminal), idle-stop within budget, and continued work on a replacement container. Sibling isolation is not claimed |
-| C3 | `targeted-cancel` | cancelling a sibling does not disturb the other root | PASS -- `worktree-shared` `targetedCancellation` |
+| C1 | `question-isolation` | Ask in the root while the sibling is idle: the question is visible only on the root's stream, the sibling cannot answer it, and a reconnect replays the same id with no new model request. | PASS -- `worktree-multi-chat` |
+| C2 | `unanswered-question-idle` | An unanswered question does not pin the environment; idle winds it down; restore then continue. | PARTIAL -- `question-idle-resume` requires `toolResults.question=0`, the allocation to disappear inside the 15-minute idle window, the parked message terminal before the continuation, and a distinct non-null replacement. Sibling isolation is not claimed |
+| C3 | `targeted-cancel` | Cancelling a sibling does not disturb the other root. | PASS -- `worktree-multi-chat` targeted interrupt (`reason=interrupted`, root still running, allocation unchanged) and targeted delete (`survivor-completes`) |
 
 ### D. Liveness under load
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| D1 | `rapid-varied-turns` | back-to-back turns at varied token rates, plus large streamed tool output (bash/file reads) | PARTIAL -- `large-stream` requests a 256 KiB real read-tool output plus a paced follow-up; coverage is claimed only for the exact `call_<tag>_read` completed read whose streamed part is correlated AND whose persisted output meets the request, otherwise `requestedBytes`/`observedBytes`/`writtenFileBytes` are recorded and coverage is not claimed |
-| D2 | `concurrent-sessions` | several sessions each doing turns at once; no heartbeat expiry, no failed messages | PARTIAL -- `concurrent-chats` classifies each of three sessions `completed_clean`/`completed_after_recovery`/`wedged`/`failed` from matched `recovery_outcome` evidence, sends a same-chat follow-up where the turn did not complete, and reports the clean-vs-recovered split. Proven: no session wedges or fails without a completed same-chat follow-up. Not proven: the exact load level that triggers recovery, or a clean run with zero expiries every time |
-| D3 | `long-slow-turn` | one long streamed turn; heartbeat keeps flowing; turn completes | PARTIAL -- `interrupt-mid-stream`/`hang` cover abort, not sustained length |
-| D4 | `stall-injection` | deterministically stall the wrapper; the worker recovers the SAME session | PARTIAL -- `recover-same-session` freezes the owned primary with `docker pause` and requires the identity-matched heartbeat-expiry recovery chain; a generic `control_disconnected` outcome proves same-session recovery, not heartbeat-lapse coverage |
-| D5 | `feed-stale-recovery` | freeze only the Kilo server of a SHARED worktree runtime so its inbound `/global/event` feed goes silent; the wrapper/container stay alive and the feed recovers without retiring the runtime | PASS (observed) -- `feed-stale-recovery` opens two chats in one worktree, asserts the sibling attached with `reuse reason=live_entry` to the shared Kilo process, `kill -STOP`s only that PID (never the container), observes `phase=stale`/`phase=recovering reason=feed_stale`, verifies the outbound wrapper heartbeat still advances while the feed is silent, releases before the 120s episode deadline, then requires no `Kilo worktree retired reason=feed_stale`, a `phase=recovered` feed line carrying the ORIGINAL native runtime id, chat A's follow-up on that surviving runtime, and chat B's follow-up plus convergence of both roots on one worktree runtime in the original container. In local dev (credential containment off) the sibling re-attach refreshes its session credentials and rotates the shared entry's native runtime; the scenario treats that refresh as an orthogonal product action, not a feed-stale retirement. On pre-change code the retirement is logged ~30-40s in and the scenario fails fast on the `Kilo worktree retired` line |
-| D6 | `wrapper-freeze-settled-reap` | freeze ONLY the control-wrapper Bun process (`bun run ...kilocode-control-wrapper.js`) after a completed turn; recovery exhausts without a re-ready runtime and reaps the allocation with the settled-reap cause, then a distinct replacement serves the same session | PARTIAL -- `wrapper-freeze-settled-reap` boots, completes a real gated turn, captures the target connection by `sandboxId` + connection/wrapper identity, captures the control-wrapper Bun PID in one `docker exec` scanning `/proc/*/cmdline` (exactly one argv carrying both `bun` and `kilocode-control-wrapper.js`; zero/ambiguous throws; never the Kilo PID), `SIGSTOP`s only that PID, and proves the container is still listed. It then requires the identity-matched `deadline_fired deadlineId=heartbeatExpiry` followed by `recovery_outcome cause=heartbeat_expired outcome=started`, asserts no identity-matched `wrapper_ready` after the freeze (the freeze plus a silent readiness log is the "no ready runtime at the stop decision" proof), requires the `physical_committed` `running -> stopping` tombstone with `cause`/`stopCause` equal to `RECOVERY_SETTLED_REAP_REASON`, the old primary absent, and a completed follow-up on a DISTINCT replacement container. The freeze is held until that stop commit, which proves the cleanup deadline elapsed. Not proven: the production provider's `forceDestroy` latency and the platform idle timer, native-retirement escalation, and sibling-work protection (unit-tested only) |
-| D7 | `wrapper-freeze-inflight-reap` | the incident shape: freeze the control-wrapper Bun process while a gated turn is still held; the original message terminalises `runtime_unhealthy`, the route stays stale-active, recovery exhausts and reaps with the settled cause, and the SAME `workspace_*` session continues on a replacement | PARTIAL -- `wrapper-freeze-inflight-reap` sends a real gated turn, confirms an identity-matched active route report from the captured connection, freezes ONLY the control-wrapper PID while the gate is held, and requires: an exact `cloud.message.failed status=failed` terminal for the message id; an `accepted_reconciliation result=runtime_unhealthy` record whose `messageId` exactly matches the sent message and whose retained `sessionId`/`expectedWrapperInstanceId` match the captured session and wrapper (a record without `messageId` does not match, so a wrong-cause failure in another session cannot satisfy the scenario); the last identity-matched heartbeat reports `active` and no post-freeze heartbeat changes it (stale-active); the same `deadline_fired`/`recovery_outcome` chain and settled `physical_committed` cause as D6; the old primary absent; and a completed follow-up on the SAME `workspace_*` session with a DISTINCT replacement. Not proven: production timings/provider, and sibling-work protection |
+| D1 | `large-stream` | Stages a real `file:seed` write and asks the model to read it; requires a correlated completed read whose persisted echo meets the 48 KiB floor, plus a paced follow-up. | PARTIAL -- the write tool argument carries the large payload; the measured proof is the read-back echo |
+| D2 | `concurrent-chats` | Several sessions each doing turns at once; no wedged session without a completed same-chat follow-up. | PARTIAL -- reports the clean-vs-recovered split; does not prove the exact load that triggers recovery |
+| D3 | `long-slow-turn` | One long streamed turn; heartbeat keeps flowing; turn completes | GAP -- `interrupt-mid-stream` covers abort, not sustained length |
+| D4 | `stall-injection` | Deterministically stall the wrapper; the worker recovers the SAME session | GAP -- no shared scenario injects a heartbeat lapse with attribution |
+| D5 | `feed-stale-recovery` | Silence a shared worktree runtime's `global/event` feed while the wrapper/container stay alive; no feed-stale retirement | GAP -- the local-only scenario is not replaced by a shared one |
+| D6 | `wrapper-freeze-settled-reap` | Freeze only the identity-matched control-wrapper process after a completed turn; recovery exhausts without a re-ready runtime and reaps with the settled cause, then a distinct replacement serves the session. | PASS locally -- requires the identity-matched `health_unhealthy_unresponsive` `allocation_transition` into `stopping.destroying`, a terminal `native_stop`, the heartbeat-expiry recovery start, no `wrapper_ready` after the freeze, and a distinct replacement. Needs `sandboxFaults`, so unsupported deployed |
+| D7 | `wrapper-freeze-inflight-reap` | The incident shape: freeze the control-wrapper process while a paced turn is held; the message terminalises `runtime_unhealthy`, the route stays stale-active, recovery reaps with the settled cause, and the SAME session continues on a replacement. | PASS locally -- adds the `runtime_unhealthy` accepted-reconciliation matched to the held message and a still-active heartbeat to the D6 evidence; distinct replacement on the same `workspace_*` session. Needs `sandboxFaults`, so unsupported deployed |
 
-`wrapper-freeze-settled-reap`/`wrapper-freeze-inflight-reap` must NOT report a
-stop when the frozen wrapper sends a `wrapper_ready` frame after the freeze: the
-readiness veto defers the settled reap with a retained five-minute retry, so a
-re-readied run is *deferred*, not terminalised, and must not be asserted to stop.
-Both scenarios therefore assert no identity-matched `wrapper_ready` after the
-freeze before accepting the settled-reap cause.
+The freeze scenarios must NOT report a stop when the frozen wrapper sends a
+`wrapper_ready` frame after the freeze: the readiness veto defers the settled
+reap, so a re-readied run is deferred, not terminalised. Both assert no
+identity-matched `wrapper_ready` after the freeze before accepting the cause.
+
+`external-kill` and `kill-mid-flight` cover the user-visible outcome: the
+affected turn reaches a matching durable terminal and a follow-up on the same
+session completes on a distinct non-null allocation reference.
 
 ### E. Delivery correctness
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| E1 | `exactly-once-retry` | an ambiguous send that is retried produces exactly one turn | PLANNED |
-| E2 | `send-while-in-flight` | a follow-up while a turn is running is queued and delivered in order | PASS -- `queue-while-busy` (FIFO through `cloud.message.*`) |
-| E3 | `send-during-recovery` | a send during recovery is queued and delivered, not terminalized | PLANNED |
+| E1 | `exactly-once-retry` | An ambiguous send retried produces exactly one turn | PLANNED |
+| E2 | `send-while-in-flight` | A follow-up while a turn is running is queued and delivered in order | PASS -- `queue-while-busy` |
+| E3 | `send-during-recovery` | A send during recovery is queued and delivered, not terminalized | PLANNED |
 
 ## Data loss is out of scope (for now)
 
 Uncommitted file changes are not guaranteed across environment replacement
-(spec Persistence rule 4). `cold-resume` asserts message history and a stable
-Git HEAD first, and records dirty-file survival as a non-gating observation
-(`fileSurvived=true|false (observed, exact-equality)`, or
-`fileSurvived=error:<reason>` when the inspection itself fails). It no longer
-fails the scenario when the sentinel is missing.
-
-## Enablers to build
-
-1. **Fake directives**
-   - `big-stream:<bytes>[:chunkBytes]` -- large content stream to stress framing.
-   - `tool-stream:<tag>:<bytes>` -- landed; writes `bytes` with the real write
-     tool, reads it back with the real read tool, then completes. `large-stream`
-     uses it.
-   - `rate:<chunks>:<ms>` and rate variation around `realistic` for token/sec.
-   - `question:<tag>:<text>` -- landed; raises a real Kilo question that stays
-     open until answered. The parked turn settles either by the fenced
-     five-minute inactivity abort or by idle shutdown, so C2 proves the
-     question does not pin the environment.
-2. **Fault injection (test-only seams)**
-   - `pauseOwnedPrimary`/`unpauseOwnedPrimary` (chunk 2) freeze and unfreeze the
-     exact owned primary; `recover-same-session` uses this to lapse heartbeats.
-    - `signalKiloServerProcess` freezes/unfreezes the exact in-container Kilo
-      server PID with `docker exec kill -STOP`/`kill -CONT` while the container
-      and wrapper stay alive; `feed-stale-recovery` uses this to silence only the
-      inbound `/global/event` feed.
-    - `captureControlWrapperProcess` captures the exact control-wrapper Bun
-      process (`bun run ...kilocode-control-wrapper.js`) in one `docker exec`
-      scanning `/proc/*/cmdline`; the `wrapper-freeze-*` scenarios pair it with
-      `signalKiloServerProcess` to `SIGSTOP`/`SIGCONT` only that PID. This is a
-      process freeze, not a wrapper exit/reconnect, so it does NOT satisfy the
-      A5 wrapper-exit/reconnect enabler below.
-    - Force a wrapper process exit / reconnect (A5) -- still uses existing kill paths.
-   - Reuse existing `external-kill` / `kill-mid-flight` loss paths, but fix their
-     cleanup ownership probe first (it currently throws on restore paths).
-3. **Observability (needed to root-cause, not just detect)**
-   - Heartbeat: last *sent* (wrapper) vs *received* and *accepted/rearmed*
-     (worker), per connection, plus what armed the expiry (`readyAt` vs
-     heartbeat). A lapse must be attributable, not guessed.
-   - Dispatch: phase, failure category, attempt count, retry decision, and the
-     outcome that made the same-session retry succeed.
-   - Recovery: which cause triggered it and the recovery resolution. The worker
-     emits a synchronous `recovery_outcome` diagnostic (`cause`,
-     `outcome: started|skipped`, connection/wrapper/sandbox/allocation ids,
-     `deadlineId`, `committedAt`). `recover-same-session` requires a matched
-     `deadline_fired deadlineId=heartbeatExpiry` followed by a matched
-     `recovery_outcome cause=heartbeat_expired outcome=started`; a
-     `control_disconnected` started outcome is generic same-session recovery,
-     and `skipped`/missing/ambiguous ordering is INCONCLUSIVE. Timestamp-only
-     correlation is not accepted.
-   - Heartbeat per-session evidence: the worker heartbeat diagnostic emits a
-     bounded `.`-joined `sessionReport` plus, when the DO has exactly one route,
-     exact `kiloSessionId`/`sessionState`/`sessionWaitingOn` fields.
-     `question-idle-resume` reads only an exact target `kiloSessionId` match on
-     the captured connection; missing target evidence is INCONCLUSIVE.
+(spec Persistence rule 4). `worktree-multi-chat` proves a sibling reads the
+root's uncommitted file within one live worktree; it does not assert survival
+across an environment replacement.
 
 ## Running
 
 ```bash
 export E2E_USER_EMAIL=evgeny@kilocode.ai
-export WORKER_URL=http://localhost:8894
-export FAKE_LLM_URL=http://localhost:8911
-export KILO_SESSION_INGEST_URL=http://localhost:8900
+export WORKER_URL=http://localhost:11294
+export FAKE_LLM_URL=http://localhost:11311
 pnpm -C services/cloud-agent-next exec tsx test/e2e/run.ts <scenario> _
 ```
 
@@ -160,29 +112,21 @@ Wrapper source changes need a sandbox image rebuild before they take effect
 Run each scenario N times for flake detection. Record the environment (load,
 concurrent chats) on the run, and never treat "a fresh run passed" as recovery.
 
-## Existing scenario inventory (for reuse)
+## Registry
 
-`run.ts` lifecycle names today: `cold`, `hot`, `followup`, `cold-hot`,
-`worktree-shared`, `long-session`, `cold-resume`, `multi-session-collab`,
-`external-kill`, `kill-mid-flight`, `queue-while-busy`,
-`queue-rapid-fire-no-gate`, `queue-overflow`, `queue-interrupt-clears`,
-`llm-error`, `chunked-streaming`, `empty-response`, `interrupt-mid-stream`,
-`unknown-model`, `waiters-clean`, `callback-completion`,
-`callback-batch-followup`, `callback-interrupt`, `gate-0`, plus the continuity
-scenarios: `recover-same-session`, `interrupt-then-continue`,
-`warm-cold-cycles`, `question-idle-resume`, `large-stream`, `concurrent-chats`,
-`feed-stale-recovery`, `wrapper-freeze-settled-reap`,
-`wrapper-freeze-inflight-reap`.
+Every runnable lifecycle is a shared definition in `scenarios-shared.ts` and its
+`scenarios-shared-*.ts` modules. `run.ts` dispatches only `SHARED_SCENARIOS`:
+`cold`, `hot`, `cold-hot`, `worktree-chat`, `worktree-multi-chat`,
+`long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
+`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
+`wrapper-freeze-inflight-reap`, `queue-while-busy`, `queue-rapid-fire-no-gate`,
+`queue-overflow`, `queue-interrupt-clears`, `llm-error`, `chunked-streaming`,
+`empty-response`, `interrupt-mid-stream`, `interrupt-then-continue`,
+`question-idle-resume`, `unknown-model`, `auth-reject`, `callback-completion`,
+`callback-batch-followup`, `callback-interrupt`.
 
-Continuity scenario default timeouts (`CONTINUITY_SCENARIO_TIMEOUT_MS` in
-`lifecycle-continuity.ts`): 8, 6, 25, 20, 10, 15, 10, 12, and 12 minutes in the
-order above. All nine require the unified API, `kilo/fake-deterministic`, and
-control-plane + worktree enrollment, like the file-state scenarios.
-
-Status gaps: the nine continuity scenarios exercise the same-session recovery
-core (A3/A4/A5/C2/D1/D2/D4/D6/D7) plus the silent-feed recovery path (D5), but
-A5/D4 remain PARTIAL: a run attributed to `heartbeat_expiry` proves heartbeat-lapse
-recovery for the captured connection, while a `control_disconnected` run proves
-only generic same-session recovery. D6/D7 are new and are not a live pass claim
-until run and observed green; that result is recorded per run, not asserted here.
-Remaining gaps are E1/E3 and repeat/flake counts.
+Each definition either carries its own `defaultTimeoutMs` (1–30 minutes) or
+relies on the scenario function's own default timeout; `run.ts` accepts
+`--timeout-ms` for exactly the registry names, and the deployed smoke budget is
+derived from the effective per-scenario defaults. All long scenarios require the
+unified API, `kilo/fake-deterministic`, and control-plane + worktree enrollment.

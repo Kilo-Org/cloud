@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Raha tsy mandeha ity safidy ity, dia mampiditra andalana vaovao ao amin'ny faritra fanoratana hafatra ho an'ny mpanampy ny bokotra fampidirana.",
     "biometricUnlock": "Vahao amin'ny biometrika ny hidy",
     "biometricUnlockSubtitle": "Ilaina ny mamaha ny hidy rehefa manomboka ny rindranasa sy rehefa tsy naseho nandritra ny dimy minitra.",
-    "featureFlags": "Saina endri-javatra",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Fanovana feo ho soratra amin'ny Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Aova ho soratra amin'ny modely Kilo Gateway ny fampidirana amin'ny feo fa tsy ny famantarana ny feon'ny fitaovana. Alefa amin'ny Kilo Gateway ny rakitra nosoronanao.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "Satan'ny fotoam-piasana",
       "sessionStatusSubtitle": "vita / tsy nahomby / vonona hofehezina",
       "kiloclawActivitySubtitle": "dika mandeha vonona na tsy nahomby, hetsika voalahatra",
-      "kiloclawActivityUnavailable": "Alefaso ny instance KiloClaw hahazoana ny hetsika KiloClaw.",
+      "kiloclawActivityUnavailable": "Alefaso dika mandeha KiloClaw mba hahazoana hetsika KiloClaw.",
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
-      "balanceAlertsUnavailable": "Midira ao amin'ny fikambanana hahazoana fampitandremana momba ny ambim-bola kely.",
+      "balanceAlertsUnavailable": "Miaraha amin'ny fikambanana iray mba hahazoana fampitandremana momba ny ambim-bola.",
       "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA",
-      "securityFindingsUnavailable": "Alefaso ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray hahazoana ny olana hita amin'ny fiarovana.",
+      "securityFindingsUnavailable": "Ampio ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray mba hahazoana ny olana ara-piarovana hita.",
       "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
       "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
       "linesOf": "andalana {{start}}–{{end}} amin'ny {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Tsy nahomby ny {{action}} amin'ny Cloud Agent ({{status}}).",
-      "failed": "Tsy nahomby ny {{action}} amin'ny Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[angona nampidirina tsy azo avadika ho endrika fitahirizana]",
       "errorPrefix": "Hadisoana: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Nolavin'ny mpamatsy ny fangatahana.",
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
-      "assistantFailed": "Tsy nahomby ny famaliana.",
-      "sendFailed": "Tsy nahomby ny fandefasana ny hafatra. Andramo indray azafady."
+      "assistantFailed": "Tsy nahomby ny famaliana."
     },
     "filePart": {
       "loadingImage": "Maka sary",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Betsaka loatra ny andrana fidirana. Miandrasa kely ary andramo indray azafady."
   },
   "models": {
+    "auto": {
+      "frontier": "Ho azy Lohalaharana",
+      "balanced": "Ho azy Voalanjalanja",
+      "efficient": "Ho azy Mahomby",
+      "small": "Ho azy Kely",
+      "free": "Ho azy Maimaimpoana",
+      "organization": "Ho azy Fikambanana"
+    },
     "dataCollected": "Angona voaangona",
     "free": "Maimaimpoana",
     "couldNotUpdateFavorites": "Tsy nahomby ny fanavaozana ny ankafizinao.",

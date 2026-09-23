@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Kipengele hiki kikiwa kimezimwa, kitufe cha kuingiza huongeza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala.",
     "biometricUnlock": "Fungua kwa bayometriki",
     "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano.",
-    "featureFlags": "Alamu za vipengele",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Unukuzi wa sauti kupitia Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
-      "kiloclawActivityUnavailable": "Anzisha nakala ya KiloClaw ili kupata shughuli za KiloClaw.",
+      "kiloclawActivityUnavailable": "Anzisha instance ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
-      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio la chini.",
+      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio.",
       "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
-      "securityFindingsUnavailable": "Washa wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya ukaguzi wa usalama.",
+      "securityFindingsUnavailable": "Washa Wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya usalama.",
       "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
       "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "mistari {{start}}–{{end}} (imekatwa)",
       "linesOf": "mistari {{start}}–{{end}} kati ya {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Kitendo {{action}} cha Cloud Agent kimeshindikana ({{status}}).",
-      "failed": "Kitendo {{action}} cha Cloud Agent kimeshindikana."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ingizo lisiloweza kubadilishwa kuwa mfuatano wa data]",
       "errorPrefix": "Hitilafu: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Mtoa huduma alikataa ombi.",
       "assistantStopped": "Jibu lilisimamishwa.",
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
-      "assistantFailed": "Imeshindikana kutoa jibu.",
-      "sendFailed": "Imeshindikana kutuma ujumbe. Tafadhali jaribu tena."
+      "assistantFailed": "Imeshindikana kutoa jibu."
     },
     "filePart": {
       "loadingImage": "Inapakia picha",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Majaribio ya kuingia ni mengi mno. Tafadhali subiri kisha ujaribu tena."
   },
   "models": {
+    "auto": {
+      "frontier": "Kiotomatiki Ya hali ya juu",
+      "balanced": "Kiotomatiki Wastani",
+      "efficient": "Kiotomatiki Ufanisi",
+      "small": "Kiotomatiki Ndogo",
+      "free": "Kiotomatiki Bure",
+      "organization": "Kiotomatiki ya Shirika"
+    },
     "dataCollected": "Data hukusanywa",
     "free": "Bure",
     "couldNotUpdateFavorites": "Imeshindikana kusasisha vipendwa.",

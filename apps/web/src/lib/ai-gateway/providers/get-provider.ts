@@ -3,7 +3,10 @@ import type {
   OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isKiloExclusiveModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
@@ -101,6 +104,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiUrlOverrides: directByok.base_url_overrides,
+      disableUrlSuffix: false,
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,

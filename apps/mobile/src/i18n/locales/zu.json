@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Uma lokhu kuvaliwe, inkinobho yokubuyela ifaka umugqa omusha ezindaweni zokubhalela abenzeli.",
     "biometricUnlock": "Vula ngebhayomethrikhi",
     "biometricUnlockSubtitle": "Vula uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lusebenza ngemuva.",
-    "featureFlags": "Amaflagi ezici",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
-      "kiloclawActivityUnavailable": "Qala uhlelo lwe-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
+      "kiloclawActivityUnavailable": "Qala i-instance ye-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
-      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi ephansi.",
+      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi.",
       "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA",
-      "securityFindingsUnavailable": "Vula i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha.",
+      "securityFindingsUnavailable": "Nika amandla i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha.",
       "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
       "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",
       "linesOf": "imigqa {{start}}–{{end}} kweyingu-{{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Isenzo se-Cloud Agent sehlulekile: {{action}} ({{status}}).",
-      "failed": "Isenzo se-Cloud Agent sehlulekile: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[okufakiwe okungaguqulelwa kufomethi yokugcina idatha]",
       "errorPrefix": "Iphutha: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Umhlinzeki wenqabe isicelo.",
       "assistantStopped": "Impendulo yamiswa.",
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
-      "assistantFailed": "Impendulo yehlulekile.",
-      "sendFailed": "Asikwazanga ukuthumela umlayezo. Sicela uzame futhi."
+      "assistantFailed": "Impendulo yehlulekile."
     },
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "Imizamo eminingi kakhulu yokungena. Sicela ulinde bese uzama futhi."
   },
   "models": {
+    "auto": {
+      "frontier": "Okuzenzakalelayo Ehamba phambili",
+      "balanced": "Okuzenzakalelayo Okulingene",
+      "efficient": "Okuzenzakalelayo Osebenza kahle",
+      "small": "Okuzenzakalelayo Okuncane",
+      "free": "Okuzenzakalelayo Mahhala",
+      "organization": "Okuzenzakalelayo Inhlangano"
+    },
     "dataCollected": "Idatha iyaqoqwa",
     "free": "Mahhala",
     "couldNotUpdateFavorites": "Asikwazanga ukubuyekeza okuthandwayo.",

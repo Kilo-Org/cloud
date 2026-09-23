@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "که دا تنظیم بند وي، د انټر کیلي د ایجنټ د پیغام لیکلو په ځای کې نوې کرښه زیاتوي.",
     "biometricUnlock": "د بایومیټریک له لارې د قلف خلاصول",
     "biometricUnlockSubtitle": "د اپلیکیشن د پیل پر مهال او په شالید کې له پنځو دقیقو تېرولو وروسته قلف خلاص کړئ.",
-    "featureFlags": "د ځانګړتیاوو بیرغونه",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
     "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -839,11 +834,11 @@
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
-      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره د KiloClaw انسټانس پیل کړئ.",
+      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره یو KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
-      "balanceAlertsUnavailable": "د بیلانس خبرتیاوې ترلاسه کولو لپاره یو سازمان ته وګډون وکړئ.",
+      "balanceAlertsUnavailable": "د بیلانس خبرداریو ترلاسه کولو لپاره یو سازمان ته ورسئ.",
       "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
-      "securityFindingsUnavailable": "امنیتي موندنې ترلاسه کولو لپاره په یوه ساحه کې د Kilo امنیتي اجنټ فعال کړئ.",
+      "securityFindingsUnavailable": "د امنیتي موندنو ترلاسه کولو لپاره په یوه ساحه کې Kilo امنیتي اجنټ فعال کړئ.",
       "spendAlertsSubtitle": "د حدونو تېرېدل او ساعتي زیاتوالی",
       "spendAlertsToggle": "د لګښت خبرتیاوو کټګوري"
     },
@@ -2233,10 +2228,6 @@
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
       "linesOf": "له {{total}} کرښو څخه {{start}}–{{end}} کرښې"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "د Cloud Agent {{action}} ناکام شو ({{status}}).",
-      "failed": "د Cloud Agent {{action}} ناکام شو."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ننوتلي معلومات په لېږد وړ بڼه نه بدلېږي]",
       "errorPrefix": "تېروتنه: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "چمتو کوونکي غوښتنه رد کړه.",
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
-      "assistantFailed": "ځواب ناکام شو.",
-      "sendFailed": "پیغام ونه لېږل شو. بیا هڅه وکړئ."
+      "assistantFailed": "ځواب ناکام شو."
     },
     "filePart": {
       "loadingImage": "انځور بارېږي",
@@ -3119,6 +3109,14 @@
     "tooManySignInAttempts": "د ننوتلو ډېرې هڅې وشوې. مهرباني وکړئ انتظار وکړئ او بیا هڅه وکړئ."
   },
   "models": {
+    "auto": {
+      "frontier": "اتومات مخکښ",
+      "balanced": "اتومات متوازن",
+      "efficient": "اتومات اغیزمن",
+      "small": "اتومات کوچنی",
+      "free": "اتومات وړیا",
+      "organization": "اتومات اداره"
+    },
     "dataCollected": "معلومات راټولېږي",
     "free": "وړیا",
     "couldNotUpdateFavorites": "د خوښې ماډلونه تازه نه شول.",

@@ -17,7 +17,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { resolveSessionDisplayTitle } from '@/lib/session-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
@@ -109,7 +109,7 @@ export function StoredSessionRow({
   // The server's creation-default title (`New session - <ISO timestamp>`) is
   // an internal marker, never row copy: resolve it once here so the same
   // label feeds the row, the accessibility label, and the rename prompt.
-  const title = resolveSessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
+  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);

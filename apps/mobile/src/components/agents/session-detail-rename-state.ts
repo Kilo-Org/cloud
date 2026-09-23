@@ -1,6 +1,5 @@
 import { i18n } from '@/i18n';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
-import { resolveSessionDisplayTitle } from '@/lib/session-title';
 
 export type RenameState = {
   isModalOpen: boolean;
@@ -60,7 +59,7 @@ type SessionDetailRenameState = {
  * authoritative server title and the reducer state.
  *
  * Both the server title and the cached fallback run through
- * `resolveSessionDisplayTitle`, so the server's creation-default placeholder
+ * `sessionDisplayTitle`, so the server's creation-default placeholder
  * (`New session - <ISO timestamp>`) can never reach the header or seed the
  * rename field — either would otherwise show a raw timestamp. A missing or
  * placeholder fallback becomes the generic `Session` label. The user's
@@ -73,8 +72,8 @@ export function getSessionDetailRenameState(input: {
   renameState: RenameState;
 }): SessionDetailRenameState {
   const fallbackTitle =
-    resolveSessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
-  const serverTitle = resolveSessionDisplayTitle(input.serverTitle);
+    sessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
+  const serverTitle = sessionDisplayTitle(input.serverTitle);
   const baseTitle = input.isLoaded ? (serverTitle ?? fallbackTitle) : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {

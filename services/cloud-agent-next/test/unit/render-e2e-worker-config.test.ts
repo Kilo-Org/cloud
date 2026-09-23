@@ -40,7 +40,6 @@ const REMOVED_CONTAINER_CLASSES = [
   // alongside the older sandbox classes; the pinned list must gain it whenever
   // production adds a container class.
   'SandboxContainers',
-  'SandboxContainers',
 ];
 
 const KEPT_DO_CLASSES = [
@@ -61,6 +60,10 @@ function render() {
 }
 
 describe('buildE2eWorkerConfig', () => {
+  it('pins each removed container class exactly once', () => {
+    expect(new Set(REMOVED_CONTAINER_CLASSES).size).toBe(REMOVED_CONTAINER_CLASSES.length);
+  });
+
   it('rebases identity, main and schema', () => {
     const { config } = render();
     expect(config.main).toBe('../src/e2e-entry.ts');

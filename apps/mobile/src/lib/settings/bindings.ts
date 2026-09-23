@@ -25,8 +25,8 @@ export const NOTIFICATION_PREFERENCES_QUERY_KEY = [
   { type: 'query' },
 ] as const;
 
-export const booleanSchema = z.boolean();
-export const stringSchema = z.string();
+const booleanSchema = z.boolean();
+const stringSchema = z.string();
 const stringListSchema = z.array(z.string());
 
 /** The value as a model reads it back, for a refusal that has to quote it. */

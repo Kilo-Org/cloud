@@ -34,7 +34,7 @@ import { trpcClient } from '@/lib/trpc';
 import {
   isToolSummaryTranslationEnabled,
   readToolSummaryTranslationModel,
-  writeToolSummaryTranslationEnabled,
+  setToolSummaryTranslationEnabled,
   writeToolSummaryTranslationModel,
 } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 import {
@@ -144,7 +144,7 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
     name: 'toolSummaryTranslation',
     description: 'Translate tool summaries in the transcript to the app language.',
     read: isToolSummaryTranslationEnabled,
-    write: writeToolSummaryTranslationEnabled,
+    write: setToolSummaryTranslationEnabled,
   },
 ];
 

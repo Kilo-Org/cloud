@@ -35,7 +35,7 @@ import { type ChatPlace } from './scope';
  */
 
 /** Why a server's tools are, or are not, on hand. */
-export type RemoteMcpStatus = 'idle' | 'connecting' | 'ready' | 'failed';
+type RemoteMcpStatus = 'idle' | 'connecting' | 'ready' | 'failed';
 
 /** One server's discovery result, keyed by the server's id. */
 export type RemoteMcpDiscovery = {

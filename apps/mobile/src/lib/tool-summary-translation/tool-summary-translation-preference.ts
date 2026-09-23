@@ -63,9 +63,6 @@ export function setToolSummaryTranslationEnabled(next: boolean): void {
   enabledStore.set(next);
 }
 
-/** Alias the settings registry writes through, mirroring its writer naming. */
-export const writeToolSummaryTranslationEnabled = setToolSummaryTranslationEnabled;
-
 export function writeToolSummaryTranslationModel(next: ToolSummaryTranslationModel): void {
   modelStore.set(next);
 }

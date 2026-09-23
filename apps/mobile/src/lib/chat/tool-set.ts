@@ -27,8 +27,8 @@ import { isSettingsToolsEnabled } from './settings-tools-switch';
 const BASE_TOOL_NAME = 'time';
 
 /** The names the settings tools are called by. Fixed: they are part of the cached prefix. */
-export const SETTINGS_LIST_TOOL = 'settings_list';
-export const SETTINGS_SET_TOOL = 'settings_set';
+const SETTINGS_LIST_TOOL = 'settings_list';
+const SETTINGS_SET_TOOL = 'settings_set';
 
 /** The names of the settings tools, in the order they are offered. */
 export const SETTINGS_TOOL_NAMES: readonly string[] = [SETTINGS_LIST_TOOL, SETTINGS_SET_TOOL];

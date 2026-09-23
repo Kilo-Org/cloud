@@ -13,7 +13,7 @@ import { type Effect } from 'effect';
  */
 
 /** The value forms the tool schema offers. */
-export type AppSettingKind = 'boolean' | 'string' | 'enum' | 'list';
+type AppSettingKind = 'boolean' | 'string' | 'enum' | 'list';
 
 /** One setting as the tool describes it to the model. */
 export type AppSetting = Readonly<{
@@ -34,7 +34,7 @@ export type AppSettingsService = Readonly<{
 }>;
 
 /** What a stored setting holds, as the registry reads it back. */
-export type SettingValue = boolean | string | readonly string[];
+type SettingValue = boolean | string | readonly string[];
 
 /** One setting's read/write wiring over its store. */
 export type SettingBinding = Readonly<{

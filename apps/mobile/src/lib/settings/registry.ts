@@ -5,7 +5,7 @@ import { unknownSetting } from './bindings';
 import { ENTRIES } from './catalog';
 import { type AppSetting, type AppSettingsService, type SettingBinding } from './types';
 
-export type { AppSetting, AppSettingKind, AppSettingsService, SettingBinding } from './types';
+export type { AppSetting, AppSettingsService } from './types';
 
 /**
  * The settings registry: the model-facing list and the read/write service over

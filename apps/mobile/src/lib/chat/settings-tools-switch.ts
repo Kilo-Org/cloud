@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from 'react';
-
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { SETTINGS_TOOLS_ENABLED_KEY } from '@/lib/storage-keys';
 
@@ -37,10 +35,6 @@ export function setSettingsToolsEnabled(enabled: boolean): void {
 
 export function subscribeSettingsToolsEnabled(listener: () => void): () => void {
   return store.subscribe(listener);
-}
-
-export function useSettingsToolsEnabled(): boolean {
-  return useSyncExternalStore(store.subscribe, store.get);
 }
 
 export function clearSettingsToolsEnabled(): void {

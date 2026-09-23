@@ -2,13 +2,12 @@
 
 import React, { type ReactNode } from 'react';
 import { WorktreeReviewCommentForm } from './WorktreeReviewCommentForm';
-import { type WorktreeReviewComment, type WorktreeReviewFreshness } from './worktree-review';
+import { type WorktreeReviewComment } from './worktree-review';
 import { formatWorktreeReviewRange, type WorktreeReviewEditor } from './worktree-review-bindings';
 
 export type WorktreeReviewListProps = {
   comments: readonly WorktreeReviewComment[];
-  freshness?: ReadonlyMap<string, WorktreeReviewFreshness>;
-  showFreshness?: boolean;
+  unappliedCommentIds?: ReadonlySet<string>;
   renderActions?: (comment: WorktreeReviewComment) => ReactNode;
   editor?: WorktreeReviewEditor | null;
   editorError?: string;
@@ -18,14 +17,6 @@ export type WorktreeReviewListProps = {
   onOpenComment?: (comment: WorktreeReviewComment) => void;
   compact?: boolean;
 };
-
-function freshnessLabel(freshness: WorktreeReviewFreshness | undefined): string {
-  return freshness === 'current'
-    ? 'Current saved capture'
-    : freshness === 'stale'
-      ? 'Older saved capture'
-      : 'Capture freshness unknown';
-}
 
 function groupCommentsByPath(
   comments: readonly WorktreeReviewComment[]
@@ -84,8 +75,7 @@ function ReviewEditorRow({
 
 export function WorktreeReviewList({
   comments,
-  freshness,
-  showFreshness = false,
+  unappliedCommentIds,
   renderActions,
   editor,
   editorError,
@@ -116,7 +106,6 @@ export function WorktreeReviewList({
           <h3 className="font-mono text-sm break-all">{group.path}</h3>
           <ol className="space-y-2">
             {group.comments.map(comment => {
-              const status = freshness?.get(comment.id);
               const editing = editor?.commentId === comment.id;
               const openComment = onOpenComment ? () => onOpenComment(comment) : undefined;
               return (
@@ -152,9 +141,9 @@ export function WorktreeReviewList({
                           <p className="text-muted-foreground text-xs">
                             {formatWorktreeReviewRange(comment.anchor.range)}
                           </p>
-                          {showFreshness && (
+                          {unappliedCommentIds?.has(comment.id) && (
                             <span className="text-muted-foreground shrink-0 text-xs">
-                              {freshnessLabel(status)}
+                              Older saved capture
                             </span>
                           )}
                         </div>

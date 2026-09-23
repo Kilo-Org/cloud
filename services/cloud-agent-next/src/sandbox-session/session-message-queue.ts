@@ -330,6 +330,29 @@ export function assignPreparationAttemptId(
   };
 }
 
+/**
+ * Terminal kind for a waiting message. A durable `cancellation` records an
+ * admitted user stop intent, so the message settles as `cancelled` regardless
+ * of the internal reason that reached the coordinator; otherwise it is a
+ * failure.
+ */
+export function terminalizeWaitingMessage(
+  message: SessionMessage,
+  reason: string,
+  at: number
+): SessionMessage {
+  if (message.cancellation !== undefined) {
+    return {
+      ...message,
+      state: terminalMessageState(message.state, 'cancelled', at, 'coordinator', {}),
+    };
+  }
+  return {
+    ...message,
+    state: terminalMessageState(message.state, 'failed', at, 'coordinator', { reason }),
+  };
+}
+
 export function failWaitingMessages(
   messages: readonly SessionMessage[],
   reason: string,
@@ -357,10 +380,7 @@ export function failWaitingMessages(
         return message;
       }
       failedIds.push(message.messageId);
-      return {
-        ...message,
-        state: terminalMessageState(message.state, 'failed', at, 'coordinator', { reason }),
-      };
+      return terminalizeWaitingMessage(message, reason, at);
     }),
     failedIds,
   };

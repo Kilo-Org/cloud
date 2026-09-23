@@ -79,6 +79,7 @@ import {
 } from '../persistence/session-metadata.js';
 import {
   bindingFromLegacyProvider,
+  isManagedContainerBillingExempt,
   sameSandboxProviderBinding,
 } from '../sandbox-provider-binding.js';
 import type { OperationResult } from '../persistence/types.js';
@@ -3882,7 +3883,11 @@ export class SandboxSession extends DurableObject<Env> {
     // otherwise the existing operation must be reconciled first.
     let attemptId = assigned.attemptId;
     const provider = getSandboxProvider(metadata);
-    let acquisition = provider === 'cloudflare' ? { id: attemptId, deadlineAt } : undefined;
+    const providerBinding = getSandboxProviderBinding(metadata);
+    let acquisition =
+      provider === 'cloudflare' || provider === 'onprem'
+        ? { id: attemptId, deadlineAt }
+        : undefined;
     const allowCreate = acquisition === undefined && options?.allowCreate === true;
     let wrapperInstanceId = activeWrapperInstanceId(queued);
     const isCurrent = () => this.queuedMessage(messageId, epoch, wrapperInstanceId) !== undefined;
@@ -4191,16 +4196,20 @@ export class SandboxSession extends DurableObject<Env> {
               provider,
               resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
               instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
-              providerBinding: getSandboxProviderBinding(metadata),
+              providerBinding,
               ...(acquisition ? { acquisition } : { allowCreate }),
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }
                 : {}),
-              billing: buildSandboxBillingInput(
-                metadata,
-                sandboxId,
-                isCloudAgentContainerBillingEnabled(this.env, metadata.identity)
-              ),
+              ...(isManagedContainerBillingExempt(providerBinding)
+                ? {}
+                : {
+                    billing: buildSandboxBillingInput(
+                      metadata,
+                      sandboxId,
+                      isCloudAgentContainerBillingEnabled(this.env, metadata.identity)
+                    ),
+                  }),
             }),
           DEADLINE_MS.startup
         );

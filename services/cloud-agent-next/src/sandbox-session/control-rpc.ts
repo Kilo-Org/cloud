@@ -22,6 +22,7 @@ import type { AgentSandboxProvider, Env } from '../types.js';
 import type {
   ControlRuntimeCredentialProxyFence,
   SandboxAcquisition,
+  SandboxProviderFailureReason,
 } from '../persistence/SandboxControl.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
@@ -53,12 +54,8 @@ type SandboxControlRpc = {
     operationResults?: true;
     runtimeRecovery?: true;
     attachment?: SessionAttachPayload;
-    failureReason?:
-      | 'byoc_credential_missing'
-      | 'byoc_vercel_not_ready'
-      | 'byoc_vercel_forbidden'
-      | 'byoc_vercel_capacity'
-      | 'environment_failed';
+    hardStopAt?: number;
+    failureReason?: SandboxProviderFailureReason;
   }>;
   getStatus(): Promise<{
     connection: ConnectionState;
@@ -67,12 +64,8 @@ type SandboxControlRpc = {
     allocationIncarnation?: string;
     operationResults?: true;
     runtimeRecovery?: true;
-    failureReason?:
-      | 'byoc_credential_missing'
-      | 'byoc_vercel_not_ready'
-      | 'byoc_vercel_forbidden'
-      | 'byoc_vercel_capacity'
-      | 'environment_failed';
+    hardStopAt?: number;
+    failureReason?: SandboxProviderFailureReason;
   }>;
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;

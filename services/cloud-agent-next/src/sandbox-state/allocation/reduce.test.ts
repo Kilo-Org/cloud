@@ -1003,6 +1003,84 @@ describe('allocation reducer — design §5 transitions', () => {
     expect(commandKinds(decision)).toEqual(['Stop', 'NotifySession']);
   });
 
+  it('rejects an identity-fenced CANCEL once the allocation was replaced', () => {
+    const record = allocated({ kind: 'healthy' });
+    expect(
+      decideAllocation(
+        record,
+        {
+          type: 'CANCEL',
+          scope: 'allocation',
+          reason: 'stale',
+          fence: { intentId: 'intent-0', providerRef: TARGET.providerRef },
+        },
+        NOW
+      )
+    ).toBeUndefined();
+    expect(
+      decideAllocation(
+        record,
+        {
+          type: 'CANCEL',
+          scope: 'allocation',
+          reason: 'current',
+          fence: { intentId: CREATE_INTENT.intentId, providerRef: TARGET.providerRef },
+        },
+        NOW
+      )?.state.state.kind
+    ).toBe('stopping');
+  });
+
+  it('rejects a fenced CANCEL whose provider reference no longer matches', () => {
+    expect(
+      decideAllocation(
+        allocated({ kind: 'healthy' }),
+        {
+          type: 'CANCEL',
+          scope: 'allocation',
+          reason: 'stale',
+          fence: { intentId: CREATE_INTENT.intentId, providerRef: 'provider-ref-other' },
+        },
+        NOW
+      )
+    ).toBeUndefined();
+  });
+
+  it('rejects a fenced CANCEL while stopping.destroying and emits no effect', () => {
+    const record = stoppingRecord();
+    // A stale cancellation naming a replaced allocation must not re-drive the
+    // current cleanup episode.
+    expect(
+      decideAllocation(
+        record,
+        {
+          type: 'CANCEL',
+          scope: 'allocation',
+          reason: 'stale',
+          fence: { intentId: 'intent-0', providerRef: TARGET.providerRef },
+        },
+        NOW
+      )
+    ).toBeUndefined();
+    // Even a fence matching the current record is rejected: the fenced contract
+    // only admits `allocated`, so a cleanup episode cannot be restarted.
+    expect(
+      decideAllocation(
+        record,
+        {
+          type: 'CANCEL',
+          scope: 'allocation',
+          reason: 'stale',
+          fence: { intentId: CREATE_INTENT.intentId, providerRef: TARGET.providerRef },
+        },
+        NOW
+      )
+    ).toBeUndefined();
+    expect(
+      commandKinds(decideAllocation(record, { type: 'CANCEL', scope: 'allocation' }, NOW))
+    ).toEqual(['Destroy']);
+  });
+
   it('every emitted command carries an operation id', () => {
     const decision = decideAllocation(
       stopped(),

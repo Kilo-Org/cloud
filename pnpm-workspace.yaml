@@ -2,6 +2,7 @@ packages:
   - apps/*
   - services/*
   - services/cloud-agent-next/wrapper
+  - services/cloud-agent-next/onprem
   - services/gastown/container
   - services/kiloclaw/controller
   - services/kiloclaw/plugins/*

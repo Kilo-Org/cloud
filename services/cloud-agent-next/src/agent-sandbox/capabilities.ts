@@ -14,6 +14,7 @@ export const PROVIDER_CAPABILITIES: Record<AgentSandboxProvider, ProviderCapabil
   cloudflare: { terminal: true, devcontainer: true },
   vercel: { terminal: false, devcontainer: false },
   'cloudflare-containers': { terminal: false, devcontainer: false },
+  onprem: { terminal: false, devcontainer: false },
 };
 
 export function sessionHasTerminal(

@@ -13,6 +13,10 @@ import {
   type ControlPlaneOwnerEnv,
   type SessionPlane,
 } from './session-plane.js';
+import {
+  onPremProviderBindingSchema,
+  type OnPremProviderBinding,
+} from './shared/onprem-protocol.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
   parseVercelSandboxEnrollment,
@@ -64,6 +68,7 @@ export type SandboxRoutingOptions = {
   sandboxAllocation?: SandboxAllocation;
   devcontainer?: boolean;
   createdOnPlatform?: string;
+  onprem?: OnPremProviderBinding;
   /** BYOC Vercel is intrinsically isolated and never uses a shared owner route. */
   byoc?: boolean;
 };
@@ -426,6 +431,19 @@ export async function generateSandboxRoutingTarget(
     const prefix = SANDBOX_ALLOCATION_ID_PREFIX[allocation];
     // `cloudflare-shared` has no isolated prefix: it falls through to the shared route.
     if (prefix) return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, prefix) };
+  }
+  if (routingOptions.onprem) {
+    const binding = onPremProviderBindingSchema.parse(routingOptions.onprem);
+    if (
+      binding.organizationId !== orgId?.toLowerCase() ||
+      sessionPlaneFromId(sessionId) !== 'control' ||
+      routingOptions.devcontainer ||
+      routingOptions.createdOnPlatform === 'code-review' ||
+      routingOptions.sandboxAllocation !== undefined
+    ) {
+      throw new Error('On-prem sandboxes require an isolated organization control-plane session');
+    }
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
   }
   if (routingOptions.devcontainer) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'dind') };

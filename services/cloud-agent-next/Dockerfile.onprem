@@ -1,0 +1,86 @@
+FROM docker.io/oven/bun:1.3.14-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04 AS bun
+FROM docker.io/library/node:24.14.1-bookworm-slim@sha256:b506e7321f176aae77317f99d67a24b272c1f09f1d10f1761f2773447d8da26c
+
+ARG TARGETARCH
+
+LABEL org.opencontainers.image.title="Kilo on-prem control wrapper" \
+      org.opencontainers.image.version="2.4.0" \
+      ai.kilo.cli.version="7.4.20" \
+      ai.kilo.sdk.version="7.4.20"
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    HOME=/tmp/kilo-onprem-home \
+    KILO_PLATFORM=cloud-agent \
+    KILO_DISABLE_AUTOUPDATE=true \
+    pnpm_config_store_dir=/var/cache/kilo/pnpm-store
+
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+
+RUN set -eu; \
+    test "$TARGETARCH" = arm64; \
+    test "$(dpkg --print-architecture)" = arm64; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl git git-lfs gh jq openssh-client; \
+    git lfs install --system --skip-repo; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -eu; \
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      https://registry.npmjs.org/pnpm/-/pnpm-11.1.2.tgz -o /tmp/pnpm.tgz; \
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      https://registry.npmjs.org/@kilocode/cli/-/cli-7.4.20.tgz -o /tmp/kilo-cli.tgz; \
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      https://registry.npmjs.org/@kilocode/cli-linux-arm64/-/cli-linux-arm64-7.4.20.tgz -o /tmp/kilo-native.tgz; \
+    printf '%s\n' \
+      '415a1cc25974731e75455c1468371be74c5aa5fb7621b50d4056d222451609f11412f23fd602e6169f1e060466641f798597e1be961a10688836a67b16569499  /tmp/pnpm.tgz' \
+      'bbff42bd3b9fe539221c5a9ee580c572c8252f55d63032777f80a39faa8810c1cf4ab3781c138bc688399227eb0686239a686181f5fbdc2f03c97291c171b0c4  /tmp/kilo-cli.tgz' \
+      '494272f99bab57c377774a0ee4cf20fbaeebee3d28173b3e7b82159afa8ff935be7cf9a1ab13cdcad71db895f2e6fe12b94af0c6fbad1eaa883e7dbc93dfec76  /tmp/kilo-native.tgz' \
+      | sha512sum --check -; \
+    mkdir -p /opt/pnpm /opt/kilo-cli/node_modules/@kilocode/cli /opt/kilo-cli/node_modules/@kilocode/cli-linux-arm64; \
+    tar -xzf /tmp/pnpm.tgz -C /opt/pnpm --strip-components=1 --no-same-owner; \
+    tar -xzf /tmp/kilo-cli.tgz -C /opt/kilo-cli/node_modules/@kilocode/cli --strip-components=1 --no-same-owner; \
+    tar -xzf /tmp/kilo-native.tgz -C /opt/kilo-cli/node_modules/@kilocode/cli-linux-arm64 --strip-components=1 --no-same-owner; \
+    chmod -R go-w /opt/pnpm /opt/kilo-cli; \
+    chmod 0555 /opt/pnpm/bin/pnpm.mjs /opt/pnpm/bin/pnpx.mjs \
+      /opt/kilo-cli/node_modules/@kilocode/cli/bin/kilo \
+      /opt/kilo-cli/node_modules/@kilocode/cli-linux-arm64/bin/kilo /usr/local/bin/bun; \
+    ln -s /usr/local/bin/bun /usr/local/bin/bunx; \
+    ln -s /opt/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm; \
+    ln -s /opt/pnpm/bin/pnpx.mjs /usr/local/bin/pnpx; \
+    ln -s /opt/kilo-cli/node_modules/@kilocode/cli/bin/kilo /usr/local/bin/kilo; \
+    ln -s /usr/local/bin/kilo /usr/local/bin/kilocode; \
+    rm /tmp/pnpm.tgz /tmp/kilo-cli.tgz /tmp/kilo-native.tgz
+
+RUN set -eu; \
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      https://gitlab.com/gitlab-org/cli/-/releases/v1.93.0/downloads/glab_1.93.0_linux_arm64.deb -o /tmp/glab.deb; \
+    printf '%s\n' '91341e72f41aa19d005cf0a0cf97029810909c0bb6381072f86c1ee8d41b327a  /tmp/glab.deb' | sha256sum --check -; \
+    dpkg -i /tmp/glab.deb; \
+    rm /tmp/glab.deb
+
+COPY --chown=0:0 --chmod=0555 scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+COPY --chown=0:0 --chmod=0555 wrapper/dist/control-wrapper.js /usr/local/bin/kilocode-control-wrapper.js
+COPY --chown=0:0 --chmod=0555 wrapper/dist/restore-session.js /usr/local/bin/kilo-restore-session.js
+COPY --chown=0:0 --chmod=0555 wrapper/dist/bb /usr/local/bin/bb
+COPY --chown=0:0 --chmod=0555 wrapper/onprem-entrypoint.sh /usr/local/bin/kilo-onprem-entry
+
+RUN set -eu; \
+    ln -s /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential; \
+    git config --system credential.helper /opt/kilo-cloud/kilo-git-credential; \
+    git config --system credential.useHttpPath false; \
+    git config --system http.followRedirects false; \
+    mkdir -p /workspace /var/cache/kilo/pnpm-store; \
+    chown 1000:1000 /workspace /var/cache/kilo/pnpm-store; \
+    export HOME=/tmp/kilo-image-check; \
+    test "$(node --version)" = v24.14.1; \
+    test "$(bun --version)" = 1.3.14; \
+    test "$(pnpm --version)" = 11.1.2; \
+    test "$(kilo --version)" = 7.4.20; \
+    test -x /usr/bin/timeout; \
+    rm -rf /tmp/kilo-image-check
+
+USER 1000:1000
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/kilo-onprem-entry"]
+CMD []

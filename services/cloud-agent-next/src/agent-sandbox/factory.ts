@@ -22,6 +22,12 @@ export function createAgentSandbox(
   metadata: SessionMetadata,
   runtimeContext?: AgentSandboxRuntimeContext
 ): AgentSandbox {
+  if (getSandboxProvider(metadata) === 'onprem') {
+    throw new AgentSandboxUnavailableError(
+      'On-prem sandboxes require the current control plane',
+      'provider_not_configured'
+    );
+  }
   if (getSandboxProvider(metadata) === 'vercel') {
     const binding = getSandboxProviderBinding(metadata);
     const source = binding.kind === 'vercel' ? binding.source : undefined;

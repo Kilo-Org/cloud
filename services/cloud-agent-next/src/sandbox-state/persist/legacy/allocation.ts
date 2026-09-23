@@ -9,11 +9,12 @@
  * `record.containment` (with `providerRef`) and `stopTombstone.wrapperInstanceId`.
  */
 import { z } from 'zod';
-import type {
-  AllocationRecord,
-  AllocationState,
-  AllocationTarget,
-  ProviderCapabilities,
+import {
+  onPremAllocationConfigSchema,
+  type AllocationRecord,
+  type AllocationState,
+  type AllocationTarget,
+  type ProviderCapabilities,
 } from '../../model/allocation.js';
 import { POLICY } from '../../schedule.js';
 
@@ -53,6 +54,7 @@ export const legacyCreateIntentSchema = z
     createdAt: timestamp,
     allocationName: z.string().min(1).optional(),
     vercel: legacyVercelConfigSchema.optional(),
+    onprem: onPremAllocationConfigSchema.optional(),
     containment: legacyCredentialContainmentSchema.optional(),
   })
   .strict();
@@ -99,14 +101,16 @@ function capabilitiesFor(vercel: boolean): ProviderCapabilities {
 function targetFor(record: LegacyAllocation): AllocationTarget {
   const createIntent = record.createIntent;
   const vercel = createIntent?.vercel;
+  const onprem = createIntent?.onprem;
   const target: AllocationTarget = {
-    provider: vercel ? 'vercel' : 'cloudflare',
+    provider: onprem ? 'onprem' : vercel ? 'vercel' : 'cloudflare',
     providerRef: record.providerRef,
     capabilities: capabilitiesFor(vercel !== undefined),
   };
   if (createIntent?.allocationName !== undefined)
     target.allocationName = createIntent.allocationName;
   if (vercel !== undefined) target.vercel = vercel;
+  if (onprem !== undefined) target.onprem = onprem;
   if (createIntent?.containment !== undefined) target.containment = createIntent.containment;
   if (record.containment !== undefined) target.resolvedContainment = record.containment;
   return target;

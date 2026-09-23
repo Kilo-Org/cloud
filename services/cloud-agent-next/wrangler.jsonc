@@ -344,6 +344,10 @@
         "class_name": "VercelSnapshotBuild",
         "name": "VERCEL_SNAPSHOT_BUILD",
       },
+      {
+        "class_name": "OnPremInstallation",
+        "name": "ONPREM_INSTALLATION",
+      },
     ],
   },
   "migrations": [
@@ -398,6 +402,10 @@
     {
       "new_sqlite_classes": ["VercelSnapshotBuild"],
       "tag": "v12",
+    },
+    {
+      "new_sqlite_classes": ["OnPremInstallation"],
+      "tag": "v13",
     },
   ],
   /**
@@ -691,6 +699,10 @@
           {
             "class_name": "VercelSnapshotBuild",
             "name": "VERCEL_SNAPSHOT_BUILD",
+          },
+          {
+            "class_name": "OnPremInstallation",
+            "name": "ONPREM_INSTALLATION",
           },
         ],
       },

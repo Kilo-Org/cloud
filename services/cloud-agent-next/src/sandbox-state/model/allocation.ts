@@ -9,11 +9,12 @@
  * `AllocationStopIntent` here.
  */
 import { z } from 'zod';
+import { onPremProviderBindingSchema, onPremProfileSchema } from '../../shared/onprem-protocol.js';
 import { healthStateSchema, type ConnectingHealth } from './health.js';
 
 const timestamp = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 
-export const allocationProviderSchema = z.enum(['cloudflare', 'vercel']);
+export const allocationProviderSchema = z.enum(['cloudflare', 'vercel', 'onprem']);
 
 export const vercelAllocationConfigSchema = z
   .object({
@@ -37,6 +38,22 @@ export const vercelAllocationConfigSchema = z
   .strict();
 
 export type VercelAllocationConfig = z.infer<typeof vercelAllocationConfigSchema>;
+
+/**
+ * On-prem allocation configuration pinned at demand time: the installation
+ * binding, the resolved profile and the fixed-lifetime cap the allocation
+ * cannot outlive, whichever it is driven to first. Provider-analogous to
+ * `vercelAllocationConfigSchema`.
+ */
+export const onPremAllocationConfigSchema = z
+  .object({
+    binding: onPremProviderBindingSchema,
+    profile: onPremProfileSchema,
+    hardStopAt: timestamp,
+  })
+  .strict();
+
+export type OnPremAllocationConfig = z.infer<typeof onPremAllocationConfigSchema>;
 
 export const credentialContainmentSchema = z
   .object({
@@ -89,6 +106,7 @@ export const allocationTargetSchema = z
     providerRef: z.string().min(1).nullable(),
     allocationName: z.string().min(1).optional(),
     vercel: vercelAllocationConfigSchema.optional(),
+    onprem: onPremAllocationConfigSchema.optional(),
     containment: credentialContainmentSchema.optional(),
     resolvedContainment: allocationContainmentSchema.optional(),
     capabilities: providerCapabilitiesSchema,

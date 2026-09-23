@@ -1,6 +1,7 @@
 import { withTimeout } from '@kilocode/worker-utils';
 import type { ConnectionState, PhysicalState } from '../shared/sandbox-status.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import type { SandboxProviderFailureReason } from '../persistence/SandboxControl.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
@@ -138,22 +139,12 @@ export type QueueFailureReason =
   | 'preparation_timeout'
   | 'runtime_unhealthy'
   | 'missing_metadata'
-  | 'byoc_credential_missing'
-  | 'byoc_vercel_not_ready'
-  | 'byoc_vercel_forbidden'
-  | 'byoc_vercel_capacity';
+  | SandboxProviderFailureReason;
 
 type ControlStatus = {
   connection: ConnectionState;
   physical: PhysicalState;
-  failureReason?: Extract<
-    QueueFailureReason,
-    | 'byoc_credential_missing'
-    | 'byoc_vercel_not_ready'
-    | 'byoc_vercel_forbidden'
-    | 'byoc_vercel_capacity'
-    | 'environment_failed'
-  >;
+  failureReason?: SandboxProviderFailureReason;
 };
 
 export function controlDispatchDisposition(status: ControlStatus): ControlDispatchDisposition {
@@ -231,6 +222,10 @@ export function safeErrorFromQueueReason(reason: string): string {
       return 'Vercel access was denied. Check the token, team, and project permissions.';
     case 'byoc_vercel_capacity':
       return 'Vercel capacity or spend limits blocked this sandbox. Check the project limits.';
+    case 'onprem_unavailable':
+      return 'The selected on-prem installation is unavailable. Contact an organization admin.';
+    case 'onprem_lifetime_exhausted':
+      return 'The on-prem sandbox reached its fixed lifetime limit.';
     default:
       return 'Environment failed';
   }

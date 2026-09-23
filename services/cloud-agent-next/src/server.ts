@@ -68,6 +68,8 @@ import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js
 import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
+import { onPremRoutes } from './onprem/routes.js';
+import { createOnPremCredentialRoutes } from './onprem/credential-route.js';
 
 const app = new Hono<HonoContext>();
 
@@ -285,6 +287,25 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+app.route('/', onPremRoutes);
+app.route(
+  '/',
+  createOnPremCredentialRoutes((env, sandboxId, input) =>
+    withDORetry(
+      () => getSandboxControlStub(env, sandboxId),
+      async stub => {
+        try {
+          return await stub.resolveOnPremCredential(input);
+        } catch (error) {
+          throw Object.assign(new Error('onprem_unavailable'), {
+            retryable: error instanceof Error && 'retryable' in error && error.retryable === true,
+          });
+        }
+      },
+      'resolveOnPremCredential'
+    )
+  )
+);
 
 app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);

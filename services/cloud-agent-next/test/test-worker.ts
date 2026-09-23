@@ -25,6 +25,7 @@ import { getSandboxSessionStub, resolveSessionStub } from '../src/sandbox-sessio
 import { SESSION_ID_RE } from '../src/shared/protocol.js';
 import { terminalPtyIdSchema } from '../src/shared/sandbox-control-protocol.js';
 import type { Env } from '../src/types';
+import { onPremRoutes } from '../src/onprem/routes.js';
 
 type RecordedPushCall = SendCloudAgentSessionNotificationParams;
 
@@ -71,6 +72,7 @@ export class CloudAgentSession extends RealCloudAgentSession {
 export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 export { SandboxControl } from '../src/persistence/SandboxControl.js';
 export { SandboxSession } from '../src/sandbox-session/SandboxSession.js';
+export { OnPremInstallation } from '../src/onprem/installation.js';
 
 type TestEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
@@ -78,6 +80,7 @@ type TestEnv = {
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
   SANDBOX_SESSION: Env['SANDBOX_SESSION'];
+  ONPREM_INSTALLATION: Env['ONPREM_INSTALLATION'];
 };
 
 function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
@@ -117,6 +120,13 @@ function isTerminalRouteIdentity(ownerId: string, sessionId: string, ptyId: stri
 export default {
   async fetch(request: Request, env: TestEnv): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith('/internal/onprem/') || url.pathname.startsWith('/onprem/')) {
+      return onPremRoutes.fetch(request, {
+        ONPREM_INSTALLATION: env.ONPREM_INSTALLATION,
+        INTERNAL_API_SECRET: 'onprem-test-internal-key',
+      });
+    }
 
     if (url.pathname.startsWith('/sandbox-control/')) {
       const upgradeHeader = request.headers.get('Upgrade');

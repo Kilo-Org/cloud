@@ -29,10 +29,22 @@ import type {
   SessionMessageTerminalSource,
 } from './model/session.js';
 
+/**
+ * Identity fence for an allocation `CANCEL`: a caller that observed a specific
+ * allocation must not stop its replacement. When present the reducer accepts the
+ * cancel only while `allocated` still carries the same create intent and provider
+ * reference.
+ */
+export type AllocationCancelFence = {
+  intentId: string;
+  providerRef: string | null;
+};
+
 export type AllocationCancelEvent = {
   type: 'CANCEL';
   scope: 'allocation';
   reason?: string;
+  fence?: AllocationCancelFence;
 };
 
 export type HealthCancelEvent = {

@@ -12,5 +12,7 @@ export function providerSupportsEnforcedBilling(provider: AgentSandboxProvider):
       return true;
     case 'vercel':
       return false;
+    case 'onprem':
+      return false;
   }
 }

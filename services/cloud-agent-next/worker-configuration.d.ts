@@ -59,6 +59,7 @@ interface __BaseEnv_Env {
 	SANDBOX_SESSION: DurableObjectNamespace<import("./src/index").SandboxSession>;
 	SANDBOX_CONTAINERS: DurableObjectNamespace<import("./src/index").SandboxContainers>;
 	VERCEL_SNAPSHOT_BUILD: DurableObjectNamespace<import("./src/index").VercelSnapshotBuild>;
+	ONPREM_INSTALLATION: DurableObjectNamespace<import("./src/index").OnPremInstallation>;
 	SESSION_INGEST: Service /* entrypoint SessionIngestRPC from session-ingest */;
 	GIT_TOKEN_SERVICE: Service /* entrypoint GitTokenRPCEntrypoint from git-token-service-dev */ | Service /* entrypoint GitTokenRPCEntrypoint from git-token-service */;
 	NOTIFICATIONS: Service /* entrypoint NotificationsService from notifications */;
@@ -70,7 +71,7 @@ interface __BaseEnv_Env {
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "Sandbox" | "CloudAgentSession" | "SandboxSmall" | "SandboxDIND" | "UserKiloFacade" | "SandboxCodeReview" | "SandboxContainment" | "SandboxSmallContainment" | "SandboxCodeReviewContainment" | "StreamTicketNonceDO" | "SandboxControl" | "SandboxSession" | "SandboxContainers" | "VercelSnapshotBuild";
+		durableNamespaces: "Sandbox" | "CloudAgentSession" | "SandboxSmall" | "SandboxDIND" | "UserKiloFacade" | "SandboxCodeReview" | "SandboxContainment" | "SandboxSmallContainment" | "SandboxCodeReviewContainment" | "StreamTicketNonceDO" | "SandboxControl" | "SandboxSession" | "SandboxContainers" | "VercelSnapshotBuild" | "OnPremInstallation";
 	}
 	interface DevEnv {
 		SHARED_SANDBOX_OVERRIDES: KVNamespace;
@@ -130,6 +131,7 @@ declare namespace Cloudflare {
 		SANDBOX_SESSION: DurableObjectNamespace<import("./src/index").SandboxSession>;
 		SANDBOX_CONTAINERS: DurableObjectNamespace<import("./src/index").SandboxContainers>;
 		VERCEL_SNAPSHOT_BUILD: DurableObjectNamespace<import("./src/index").VercelSnapshotBuild>;
+	ONPREM_INSTALLATION: DurableObjectNamespace<import("./src/index").OnPremInstallation>;
 		SESSION_INGEST: Service /* entrypoint SessionIngestRPC from session-ingest */;
 		GIT_TOKEN_SERVICE: Service /* entrypoint GitTokenRPCEntrypoint from git-token-service-dev */;
 		NOTIFICATIONS: Service /* entrypoint NotificationsService from notifications */;

@@ -33,7 +33,11 @@ export type AlarmScheduler = {
 };
 
 /** The infrastructure anchors the canonical allocation machine does not own. */
-export type ControlAlarmAnchorId = 'credentialExpiry' | 'socketHandshake' | 'byocSnapshotRecovery';
+export type ControlAlarmAnchorId =
+  | 'credentialExpiry'
+  | 'socketHandshake'
+  | 'byocSnapshotRecovery'
+  | 'hardStop';
 
 export type ControlAlarmAnchorState = {
   credentialExpiryAt: number | null;
@@ -43,6 +47,8 @@ export type ControlAlarmAnchorState = {
    * instead of discarding the other anchors.
    */
   byocSnapshotRecoveryAt?: number | null;
+  /** On-prem fixed-lifetime cap; optional for the same reason as above. */
+  hardStopAt?: number | null;
 };
 
 export type ControlAlarmAnchors = {
@@ -51,6 +57,7 @@ export type ControlAlarmAnchors = {
   credentialExpiryAt: number | null;
   socketHandshakeAt: number | null;
   byocSnapshotRecoveryAt?: number | null;
+  hardStopAt?: number | null;
 };
 
 type AnchorStorage = {
@@ -67,6 +74,7 @@ const controlAlarmAnchorStateSchema = z.object({
   credentialExpiryAt: z.number().int().nonnegative().nullable(),
   socketHandshakeAt: z.number().int().nonnegative().nullable(),
   byocSnapshotRecoveryAt: z.number().int().nonnegative().nullable().optional(),
+  hardStopAt: z.number().int().nonnegative().nullable().optional(),
 });
 
 export function emptyControlAlarmAnchors(): ControlAlarmAnchorState {
@@ -79,6 +87,7 @@ export function controlAlarmAnchorAt(
 ): number | null {
   if (id === 'credentialExpiry') return anchors.credentialExpiryAt;
   if (id === 'socketHandshake') return anchors.socketHandshakeAt;
+  if (id === 'hardStop') return anchors.hardStopAt ?? null;
   return anchors.byocSnapshotRecoveryAt ?? null;
 }
 
@@ -132,7 +141,9 @@ export async function setControlAlarmAnchor(
       ? { ...current, credentialExpiryAt: at }
       : id === 'socketHandshake'
         ? { ...current, socketHandshakeAt: at }
-        : { ...current, byocSnapshotRecoveryAt: at };
+        : id === 'hardStop'
+          ? { ...current, hardStopAt: at }
+          : { ...current, byocSnapshotRecoveryAt: at };
   await storage.put(CONTROL_ALARM_ANCHORS_KEY, next);
   return next;
 }
@@ -155,7 +166,9 @@ export function setControlAlarmAnchorSync(
       ? { ...current, credentialExpiryAt: at }
       : id === 'socketHandshake'
         ? { ...current, socketHandshakeAt: at }
-        : { ...current, byocSnapshotRecoveryAt: at };
+        : id === 'hardStop'
+          ? { ...current, hardStopAt: at }
+          : { ...current, byocSnapshotRecoveryAt: at };
   storage.put(CONTROL_ALARM_ANCHORS_KEY, next);
   return next;
 }
@@ -179,6 +192,9 @@ export function dueControlAlarmAnchors(
   ) {
     due.push({ id: 'byocSnapshotRecovery', at: anchors.byocSnapshotRecoveryAt });
   }
+  if (anchors.hardStopAt !== null && anchors.hardStopAt !== undefined && anchors.hardStopAt <= now) {
+    due.push({ id: 'hardStop', at: anchors.hardStopAt });
+  }
   return due.sort((a, b) => a.at - b.at).map(entry => entry.id);
 }
 
@@ -193,6 +209,9 @@ export function composeControlAlarmAt(anchors: ControlAlarmAnchors): number | nu
   if (anchors.socketHandshakeAt !== null) candidates.push(anchors.socketHandshakeAt);
   if (anchors.byocSnapshotRecoveryAt !== null && anchors.byocSnapshotRecoveryAt !== undefined) {
     candidates.push(anchors.byocSnapshotRecoveryAt);
+  }
+  if (anchors.hardStopAt !== null && anchors.hardStopAt !== undefined) {
+    candidates.push(anchors.hardStopAt);
   }
   return candidates.length === 0 ? null : Math.min(...candidates);
 }

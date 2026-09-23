@@ -14,7 +14,11 @@ export type TransitionKind =
   | 'route';
 
 /** Infrastructure alarm anchors still recorded on the transition log. */
-export type DeadlineId = 'credentialExpiry' | 'socketHandshake' | 'byocSnapshotRecovery';
+export type DeadlineId =
+  | 'credentialExpiry'
+  | 'socketHandshake'
+  | 'byocSnapshotRecovery'
+  | 'hardStop';
 
 export type DeadlineAction = 'armed' | 'cancelled' | 'fired';
 

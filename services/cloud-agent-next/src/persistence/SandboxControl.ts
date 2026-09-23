@@ -149,6 +149,7 @@ import {
   type AllocationRecord,
   type AllocationTarget,
   type CreatingAllocation,
+  type OnPremAllocationConfig,
   type StopProof,
   type CredentialContainmentRequirements,
 } from '../sandbox-state/model/allocation.js';
@@ -249,7 +250,30 @@ import {
   type ByocVercelRuntimeSnapshot,
 } from '../byoc/vercel-credential-resolver.js';
 import {
+  createOnPremProviderAdapter,
+  OnPremAcknowledgementPendingError,
+  OnPremLifetimeError,
+  parseOnPremCreateIntent,
+} from '../sandbox-control/onprem-provider.js';
+import {
+  getAllocation as getOnPremAllocation,
+  resolveProfile as resolveOnPremProfile,
+} from '../onprem/client.js';
+import { resolveOnPremCredentialGrant } from '../sandbox-control/onprem-credentials.js';
+import {
+  onPremCredentialRpcInputSchema,
+  type OnPremCredentialRpcInput,
+  type OnPremCredentialResolution,
+} from '../shared/onprem-credential-protocol.js';
+import {
+  decodeOnPremProviderRef,
+  onPremProfileSchema,
+  type OnPremProfile,
+  type OnPremProviderBinding,
+} from '../shared/onprem-protocol.js';
+import {
   bindingFromLegacyProvider,
+  isManagedContainerBillingExempt,
   providerKindFromBinding,
   SandboxProviderBindingSchema,
   sameSandboxProviderBinding,
@@ -300,6 +324,7 @@ const SNAPSHOT_VALIDATOR_REF_KEY = 'snapshot_validator_ref';
 const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
+const ONPREM_ACKNOWLEDGEMENT_KEY = 'onprem_acknowledgement';
 const TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS = 60 * 60 * 1000;
 const BYOC_SNAPSHOT_RECOVERY_MAX_ATTEMPTS = 5;
 
@@ -335,6 +360,22 @@ const sandboxAcquisitionSchema = z.object({
   id: z.string().min(1).max(128),
   deadlineAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 });
+
+const onPremAcknowledgementSchema = z.discriminatedUnion('state', [
+  z
+    .object({
+      state: z.literal('waiting'),
+      providerRef: z.string().min(1).max(128),
+      deadlineAt: sandboxAcquisitionSchema.shape.deadlineAt,
+    })
+    .strict(),
+  z
+    .object({
+      state: z.literal('acknowledged'),
+      providerRef: z.string().min(1).max(128),
+    })
+    .strict(),
+]);
 
 export type SandboxAcquisition = z.infer<typeof sandboxAcquisitionSchema>;
 
@@ -578,6 +619,7 @@ export type SandboxControlStatus = StatusProjection & {
   allocationIncarnation?: string;
   operationResults?: true;
   runtimeRecovery?: true;
+  hardStopAt?: number;
   failureReason?: SandboxProviderFailureReason;
 };
 
@@ -586,12 +628,19 @@ export type SandboxProviderFailureReason =
   | 'byoc_vercel_not_ready'
   | 'byoc_vercel_forbidden'
   | 'byoc_vercel_capacity'
-  | 'environment_failed';
+  | 'environment_failed'
+  | 'onprem_unavailable'
+  | 'onprem_lifetime_exhausted';
 
 function providerFailureReason(
   binding: SandboxProviderBinding,
   error: unknown
 ): SandboxProviderFailureReason | undefined {
+  if (binding.kind === 'onprem') {
+    return error instanceof OnPremLifetimeError
+      ? 'onprem_lifetime_exhausted'
+      : 'onprem_unavailable';
+  }
   if (error instanceof ByocCredentialMissingError) return 'byoc_credential_missing';
   if (error instanceof ByocVercelNotReadyError) return 'byoc_vercel_not_ready';
   if (
@@ -800,6 +849,7 @@ export class SandboxControl extends DurableObject<Env> {
       if (!this.isByocBinding()) {
         this.provider = this.createProviderAdapter(this.providerKind, record);
       }
+      await this.syncOnPremHardStop(record);
       this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
       this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
         .optional()
@@ -1299,6 +1349,7 @@ export class SandboxControl extends DurableObject<Env> {
       (!maintenance && allocation.state.kind !== 'allocated') ||
       (!maintenance && canonicalStopIntent(allocation) !== null) ||
       canonicalProviderRefOf(allocation) !== runtime.providerInstanceId ||
+      !this.matchesLiveOnPremProviderReference(allocation, runtime.providerInstanceId) ||
       !isCurrent()
     ) {
       throw new ControlRequestError({
@@ -1331,6 +1382,7 @@ export class SandboxControl extends DurableObject<Env> {
           current.state.kind !== 'allocated' ||
           canonicalStopIntent(current) !== null ||
           canonicalProviderRefOf(current) !== runtime.providerInstanceId ||
+          !this.matchesLiveOnPremProviderReference(current, runtime.providerInstanceId) ||
           !sameCanonicalAllocation(allocation, current) ||
           !isCurrent()
         ) {
@@ -1548,10 +1600,15 @@ export class SandboxControl extends DurableObject<Env> {
     });
     const provider = binding.kind;
     const record = await this.readCanonicalAllocation();
-    const requiredContainment = getWorktreeCredentialContainment(
-      requiresContainmentSandbox(metadata)
-    );
-    if (!this.matchesCanonicalContainment(record, requiredContainment)) {
+    const requiredContainment =
+      provider === 'onprem'
+        ? WORKTREE_CREDENTIAL_CONTAINMENT
+        : getWorktreeCredentialContainment(requiresContainmentSandbox(metadata));
+    if (
+      (provider === 'onprem' &&
+        (record.state.kind !== 'allocated' || record.state.target.providerRef === null)) ||
+      !this.matchesCanonicalContainment(record, requiredContainment)
+    ) {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const resolvedProviderRef = canonicalProviderRefOf(record);
@@ -1601,6 +1658,9 @@ export class SandboxControl extends DurableObject<Env> {
       if (
         (deadlineAt !== undefined && Date.now() >= deadlineAt) ||
         !sameCanonicalAllocation(record, currentRecord) ||
+        (provider === 'onprem' &&
+          (currentRecord.state.kind !== 'allocated' ||
+            currentRecord.state.target.providerRef !== resolvedProviderRef)) ||
         !this.matchesCanonicalContainment(currentRecord, requiredContainment)
       ) {
         throw new Error('Sandbox changed during credential preparation');
@@ -1712,6 +1772,110 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Resolve a proxied request the on-prem installation forwards from the pod's
+   * network namespace. The installation is the authority on whether the
+   * allocation is still active and acknowledged, so the request is re-verified
+   * against it before any grant is revealed.
+   */
+  async resolveOnPremCredential(
+    input: OnPremCredentialRpcInput
+  ): Promise<OnPremCredentialResolution | null> {
+    try {
+      const parsed = onPremCredentialRpcInputSchema.safeParse(input);
+      if (!parsed.success) return null;
+      const { binding, providerRef, podUid, ...request } = parsed.data;
+      return await this.withCredentialUpdate(async () => {
+        const record = await this.readCanonicalAllocation();
+        const ownerId = await this.requireOwner();
+        if (
+          this.providerBinding.kind !== 'onprem' ||
+          !sameSandboxProviderBinding(this.providerBinding, binding) ||
+          record.state.kind !== 'allocated' ||
+          record.state.target.providerRef !== providerRef ||
+          !this.matchesCanonicalContainment(record, WORKTREE_CREDENTIAL_CONTAINMENT) ||
+          this.runtimeDeleted ||
+          this.exclusiveDeletionWorktreeId
+        ) {
+          return null;
+        }
+        const allocation = await withTimeout(
+          getOnPremAllocation(this.env, binding.organizationId, providerRef),
+          DEADLINE_MS.stopAttempt,
+          'On-prem credential allocation verification timed out'
+        );
+        if (
+          !allocation ||
+          allocation.sandboxId !== this.sandboxId ||
+          allocation.providerRef !== providerRef ||
+          allocation.pod?.uid !== podUid ||
+          !sameSandboxProviderBinding(allocation.binding, binding) ||
+          allocation.phase !== 'launched' ||
+          allocation.status !== 'active' ||
+          !allocation.acknowledgementFresh ||
+          allocation.acknowledgedAt === null ||
+          allocation.acknowledgedAt > Date.now()
+        ) {
+          return null;
+        }
+        return this.ctx.storage.transaction(async () => {
+          const grants = await loadSessionCredentialGrants(this.ctx.storage);
+          const currentOwnerId = await this.readOwner();
+          const current = await this.readCanonicalAllocation();
+          const now = Date.now();
+          if (
+            this.providerBinding.kind !== 'onprem' ||
+            !sameSandboxProviderBinding(this.providerBinding, binding) ||
+            currentOwnerId !== ownerId ||
+            current.state.kind !== 'allocated' ||
+            current.state.target.providerRef !== providerRef ||
+            !sameCanonicalAllocation(current, record) ||
+            !this.matchesCanonicalContainment(current, WORKTREE_CREDENTIAL_CONTAINMENT) ||
+            this.runtimeDeleted ||
+            this.exclusiveDeletionWorktreeId ||
+            now >= allocation.hardStopAt
+          ) {
+            return null;
+          }
+          const createIntent = current.state.createIntent;
+          const target = current.state.target;
+          const onprem = target.onprem;
+          if (
+            onprem === undefined ||
+            target.allocationName === undefined ||
+            allocation.allocationId !== createIntent.intentId ||
+            allocation.createdAt !== createIntent.createdAt ||
+            allocation.allocationName !== target.allocationName ||
+            allocation.profile.id !== onprem.profile.id ||
+            allocation.profile.revision !== onprem.profile.revision ||
+            allocation.hardStopAt !== onprem.hardStopAt
+          ) {
+            return null;
+          }
+          for (const grant of grants) {
+            if (
+              grant.provider !== 'onprem' ||
+              grant.sandboxId !== this.sandboxId ||
+              grant.userId !== ownerId ||
+              grant.orgId !== binding.organizationId ||
+              this.deletingWorktrees.has(grant.scopeId)
+            ) {
+              continue;
+            }
+            const resolved = resolveOnPremCredentialGrant({ grant, request, now });
+            if (resolved) {
+              const expiresAt = Math.min(resolved.expiresAt, allocation.hardStopAt);
+              return expiresAt > Date.now() ? { headers: resolved.headers, expiresAt } : null;
+            }
+          }
+          return null;
+        });
+      });
+    } catch {
+      return null;
+    }
+  }
+
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
@@ -1749,9 +1913,11 @@ export class SandboxControl extends DurableObject<Env> {
       'Sandbox credential metadata timed out'
     );
     const worktreeId = metadata.workspace?.worktreeId;
-    const requiredContainment = getWorktreeCredentialContainment(
-      requiresContainmentSandbox(metadata)
-    );
+    const metadataBinding = getSandboxProviderBinding(metadata);
+    const requiredContainment =
+      metadataBinding.kind === 'onprem'
+        ? WORKTREE_CREDENTIAL_CONTAINMENT
+        : getWorktreeCredentialContainment(requiresContainmentSandbox(metadata));
     if (input.worktreeId !== undefined && input.worktreeId !== worktreeId) {
       throw new Error('Worktree identity conflict');
     }
@@ -1760,7 +1926,6 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
       this.runtimeDeleted = false;
     }
-    const metadataBinding = getSandboxProviderBinding(metadata);
     const requestedBinding =
       input.providerBinding !== undefined
         ? SandboxProviderBindingSchema.parse(input.providerBinding)
@@ -1786,8 +1951,11 @@ export class SandboxControl extends DurableObject<Env> {
       resources: input.resources,
       instance: input.instance,
     });
-    if (acquisition && binding.kind !== 'cloudflare') {
-      throw new Error('Sandbox acquisition is only supported for Cloudflare');
+    if (acquisition && binding.kind !== 'cloudflare' && binding.kind !== 'onprem') {
+      throw new Error('Sandbox acquisition is only supported for Cloudflare and on-prem');
+    }
+    if (binding.kind === 'onprem' && !acquisition) {
+      throw new Error('On-prem sandboxes require an acquisition receipt');
     }
     const billing = await this.billingInput(ownerId, input.billing, worktreeId);
     let record: AllocationRecord;
@@ -1913,38 +2081,93 @@ export class SandboxControl extends DurableObject<Env> {
         throw new Error(error);
       }
     }
+    const readyRuntime = this.readyWrapperRuntime();
+    if (
+      this.providerBinding.kind === 'onprem' &&
+      !creating &&
+      record.state.kind === 'allocated' &&
+      record.state.target.providerRef !== null &&
+      readyRuntime
+    ) {
+      try {
+        await this.verifyOnPremLifetime(
+          record,
+          Math.min(acquisition?.deadlineAt ?? Infinity, Date.now() + DEADLINE_MS.stopAttempt),
+          readyRuntime
+        );
+      } catch (error) {
+        // The installation never acknowledged within the bound, or the
+        // allocation changed underneath the wait. Record the failure against the
+        // exact allocation that was verified and stop only that one: a stale
+        // lookup that resolves after a replacement must not touch the successor.
+        const reason = providerFailureReason(this.providerBinding, error) ?? 'onprem_unavailable';
+        const stopped = await this.stopVerifiedCanonicalAllocation({
+          record,
+          reason,
+          identity: readyRuntime,
+        });
+        if (!stopped) {
+          if (acquisition) {
+            throw new SandboxAcquisitionLostError(
+              'Sandbox allocation changed during lifetime verification'
+            );
+          }
+          return currentStatus();
+        }
+        const settled = await this.readCanonicalAllocation();
+        return this.statusForAllocation(settled, this.allocationIncarnationOf(settled));
+      }
+    }
     const preparationDeadline = Math.min(
       acquisition?.deadlineAt ?? Number.MAX_SAFE_INTEGER,
       Date.now() + DEADLINE_MS.startup
     );
-    let attachment: SessionAttachPayload;
-    try {
-      attachment = await withTimeout(
-        this.withCredentialUpdate(() =>
-          withTimeout(
-            this.prepareOwnedSessionCredentials(
-              { ownerId, sessionId: input.sessionId },
-              undefined,
-              preparationDeadline
-            ),
-            Math.max(1, preparationDeadline - Date.now()),
-            'Sandbox credential preparation timed out'
-          )
-        ),
-        Math.max(1, preparationDeadline - Date.now()),
-        'Sandbox credential preparation timed out'
-      );
-    } catch (error) {
-      const current = await this.readCanonicalAllocation();
-      if (
-        creating &&
-        sameCanonicalAllocation(current, record) &&
-        current.state.kind === 'creating'
-      ) {
-        await this.failCanonicalCreate(current, 'credential_preparation_failed');
+    const prepareAttachment = async (): Promise<SessionAttachPayload> => {
+      try {
+        return await withTimeout(
+          this.withCredentialUpdate(() =>
+            withTimeout(
+              this.prepareOwnedSessionCredentials(
+                { ownerId, sessionId: input.sessionId },
+                undefined,
+                preparationDeadline
+              ),
+              Math.max(1, preparationDeadline - Date.now()),
+              'Sandbox credential preparation timed out'
+            )
+          ),
+          Math.max(1, preparationDeadline - Date.now()),
+          'Sandbox credential preparation timed out'
+        );
+      } catch (error) {
+        const current = await this.readCanonicalAllocation();
+        if (creating && sameCanonicalAllocation(current, record)) {
+          if (current.state.kind === 'creating') {
+            if (this.providerBinding.kind === 'onprem') {
+              await this.ctx.storage.put(
+                FAILURE_REASON_KEY,
+                providerFailureReason(this.providerBinding, error) ?? 'onprem_unavailable'
+              );
+            }
+            await this.failCanonicalCreate(current, 'credential_preparation_failed');
+          } else if (
+            this.providerBinding.kind === 'onprem' &&
+            current.state.kind === 'allocated'
+          ) {
+            // On-prem credentials are prepared only after create/launch, so this
+            // failure leaves a live allocation rather than a `creating` record.
+            // Stop that same allocation instead of leaving it running.
+            await this.stopVerifiedCanonicalAllocation({
+              record: current,
+              reason: providerFailureReason(this.providerBinding, error) ?? 'onprem_unavailable',
+            });
+          }
+        }
+        throw error;
       }
-      throw error;
-    }
+    };
+    let attachment: SessionAttachPayload | undefined;
+    if (this.providerBinding.kind !== 'onprem' || !creating) attachment = await prepareAttachment();
     if (creating && createCommands) {
       const intent = record.state.kind === 'creating' ? record.state.createIntent : undefined;
       const intentId = intent?.intentId;
@@ -2007,6 +2230,19 @@ export class SandboxControl extends DurableObject<Env> {
         }
       }
     }
+    if (creating && this.providerBinding.kind === 'onprem') {
+      // On-prem credentials require a bound, acknowledged allocation, so the
+      // attachment is prepared after the create/launch effect settles instead of
+      // while the record is still `creating`.
+      const afterCreate = await this.readCanonicalAllocation();
+      if (afterCreate.state.kind === 'allocated') {
+        attachment = await prepareAttachment();
+        const prepared = await this.readCanonicalAllocation();
+        if (!sameCanonicalAllocation(prepared, record) || prepared.state.kind === 'stopped') {
+          return currentStatus();
+        }
+      }
+    }
     if (this.providerKind === 'vercel') {
       const afterCreate = await this.readCanonicalAllocation();
       if (afterCreate.state.kind === 'allocated') {
@@ -2037,7 +2273,7 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async acquireCanonicalAllocation(
     acquisition: SandboxAcquisition,
-    requiredContainment: CredentialContainmentRequirements,
+    requestedContainment: CredentialContainmentRequirements,
     worktreeId: string | undefined,
     sessionId: string
   ): Promise<
@@ -2047,8 +2283,15 @@ export class SandboxControl extends DurableObject<Env> {
     | { action: 'wait'; record: AllocationRecord }
   > {
     void sessionId;
+    const requiredContainment =
+      this.providerBinding.kind === 'onprem'
+        ? WORKTREE_CREDENTIAL_CONTAINMENT
+        : requestedContainment;
     const vercel = await this.vercelIntentConfigForDemand();
-    const committed = await this.ctx.storage.transaction(async () => {
+    // Phase 1 decides reuse, cleanup and wait from persisted state alone. The
+    // on-prem profile resolver is a network call that gates only a fresh
+    // allocation, so warm reuse and cleanup progression never require it.
+    const selection = await this.ctx.storage.transaction(async () => {
       const record = await this.readCanonicalAllocation();
       this.assertWorktreeAdmission(worktreeId);
       if (
@@ -2106,14 +2349,51 @@ export class SandboxControl extends DurableObject<Env> {
       if (record.state.kind !== 'stopped') {
         return { action: 'wait' as const, record, from: record, commands: undefined };
       }
+      return { action: 'fresh' as const, record, from: record, commands: undefined };
+    });
+    if (selection.action === 'reuse') return { action: 'reuse', record: selection.record };
+    if (selection.action === 'wait') return { action: 'wait', record: selection.record };
+    if (selection.action === 'advance') {
+      await this.allocationOrchestrator.run(selection.commands);
+      const after = await this.readCanonicalAllocation();
+      await this.afterCanonicalCommit(selection.from, after);
+      return { action: 'wait', record: after };
+    }
+    // A fresh allocation needs the on-prem installation profile. Resolve it
+    // outside the storage transaction, then recheck admission and that the
+    // record is still stopped before committing the new target.
+    const onpremResolution = await this.resolveDemandOnPremProfile();
+    if (onpremResolution !== undefined && !onpremResolution.resolved) {
+      return { action: 'wait' as const, record: await this.readCanonicalAllocation() };
+    }
+    const onpremBinding = onpremResolution?.binding;
+    const onpremProfile = onpremResolution?.profile;
+    const committed = await this.ctx.storage.transaction(async () => {
+      const record = await this.readCanonicalAllocation();
+      this.assertWorktreeAdmission(worktreeId);
+      if (record.state.kind !== 'stopped') {
+        return { action: 'wait' as const, record, from: record, commands: undefined };
+      }
       const intentId = crypto.randomUUID();
       const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
-      const target = this.canonicalTarget(requiredContainment, allocationName, vercel);
+      const createdAt = Date.now();
+      const target = this.canonicalTarget(
+        requiredContainment,
+        allocationName,
+        vercel,
+        onpremBinding === undefined || onpremProfile === undefined
+          ? undefined
+          : {
+              binding: onpremBinding,
+              profile: onpremProfile,
+              hardStopAt: createdAt + onpremProfile.maxLifetimeMs,
+            }
+      );
       const event: AcquireEvent = {
         type: 'ACQUIRE',
         requestId: acquisition.id,
         target,
-        createIntent: { intentId, createdAt: Date.now() },
+        createIntent: { intentId, createdAt },
         deliveryDeadlineAt: acquisition.deadlineAt,
       };
       const decision = await this.allocationOrchestrator.dispatch(event);
@@ -2129,11 +2409,6 @@ export class SandboxControl extends DurableObject<Env> {
     });
     if (committed.action === 'create') {
       await this.afterCanonicalCommit(committed.from, committed.record);
-    } else if (committed.action === 'advance') {
-      await this.allocationOrchestrator.run(committed.commands);
-      const after = await this.readCanonicalAllocation();
-      await this.afterCanonicalCommit(committed.from, after);
-      return { action: 'wait', record: after };
     }
     return committed;
   }
@@ -2230,6 +2505,45 @@ export class SandboxControl extends DurableObject<Env> {
     if (decision === undefined) return;
     await this.allocationOrchestrator.run(decision.commands);
     await this.afterCanonicalCommit(record, await this.readCanonicalAllocation());
+  }
+
+  /**
+   * Stop the exact allocation a caller verified, and record the failure reason
+   * with it. The `CANCEL` carries the allocation's create intent and provider
+   * reference, so the reducer rejects it once a replacement is committed: a
+   * stale lifetime failure never stops or marks the successor. The optional
+   * connection identity fences the caller's own runtime; when it is supplied and
+   * no longer current the caller has lost ownership and nothing changes.
+   * Returns whether the fenced stop was applied.
+   */
+  private async stopVerifiedCanonicalAllocation(input: {
+    record: AllocationRecord;
+    reason: SandboxProviderFailureReason;
+    identity?: SandboxControlConnectionIdentity;
+  }): Promise<boolean> {
+    if (input.record.state.kind !== 'allocated') return false;
+    const fence = {
+      intentId: input.record.state.createIntent.intentId,
+      providerRef: input.record.state.target.providerRef,
+    };
+    const decision = await this.ctx.storage.transaction(async () => {
+      if (input.identity !== undefined && !this.isCurrentConnection(input.identity)) {
+        return undefined;
+      }
+      const decided = await this.allocationOrchestrator.dispatch({
+        type: 'CANCEL',
+        scope: 'allocation',
+        reason: input.reason,
+        fence,
+      });
+      if (decided === undefined) return undefined;
+      await this.ctx.storage.put(FAILURE_REASON_KEY, input.reason);
+      return decided;
+    });
+    if (decision === undefined) return false;
+    await this.allocationOrchestrator.run(decision.commands);
+    await this.afterCanonicalCommit(input.record, await this.readCanonicalAllocation());
+    return true;
   }
 
   private async failCanonicalCreate(record: AllocationRecord, reason: string): Promise<void> {
@@ -2364,6 +2678,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (to.state.kind === 'allocated' && from.state.kind !== 'allocated') {
       await this.scheduleNextLeaseCheck('initial', Date.now());
     }
+    await this.syncOnPremHardStop(to);
     await this.scheduleAlarm();
   }
 
@@ -2592,9 +2907,7 @@ export class SandboxControl extends DurableObject<Env> {
           }
           const grants = await loadSessionCredentialGrants(this.ctx.storage);
           if (grants.some(grant => grant.members.some(member => member.sessionId === sessionId))) {
-            if (this.providerKind === 'vercel') {
-              await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
-            }
+            await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
             await saveSessionCredentialGrants(
               this.ctx.storage,
               removeSessionCredentialMembership(grants, sessionId)
@@ -2666,7 +2979,8 @@ export class SandboxControl extends DurableObject<Env> {
         binding.kind !== input.location.provider ||
         (binding.kind === 'vercel' &&
           binding.source.kind === 'byoc' &&
-          binding.source.organizationId !== input.organizationId)
+          binding.source.organizationId !== input.organizationId) ||
+        (binding.kind === 'onprem' && binding.organizationId !== input.organizationId)
       ) {
         throw new Error('Sandbox provider binding mismatch');
       }
@@ -2944,6 +3258,9 @@ export class SandboxControl extends DurableObject<Env> {
     const runtime = await this.readTerminalRuntime(input, true);
     if (!runtime.allowed) return runtime;
 
+    if (this.providerBinding.kind === 'onprem') {
+      return this.renewTerminalCredentialLease(input, runtime);
+    }
     const enforced = isCloudAgentContainerBillingEnabled(this.env, {
       userId: input.ownerId,
       ...(input.organizationId ? { orgId: input.organizationId } : {}),
@@ -3082,6 +3399,9 @@ export class SandboxControl extends DurableObject<Env> {
       return { allowed: false, reason: 'runtime_changed' };
     }
     await this.renewProviderLease(runtime.connection);
+    if (runtime.provider === 'onprem' && !this.isCurrentConnection(runtime.connection)) {
+      return { allowed: false, reason: 'runtime_changed' };
+    }
     return { allowed: true };
   }
 
@@ -3112,9 +3432,11 @@ export class SandboxControl extends DurableObject<Env> {
   private canonicalTarget(
     requiredContainment: CredentialContainmentRequirements,
     allocationName: string,
-    vercel: ProviderAllocationIntent['vercel']
+    vercel: ProviderAllocationIntent['vercel'],
+    onprem?: OnPremAllocationConfig
   ): AllocationTarget {
-    const provider = this.providerKind === 'vercel' ? 'vercel' : 'cloudflare';
+    const provider =
+      onprem !== undefined ? 'onprem' : this.providerKind === 'vercel' ? 'vercel' : 'cloudflare';
     const capabilities =
       provider === 'vercel'
         ? { persistentWorkspace: true, destroysOnStop: false }
@@ -3126,6 +3448,7 @@ export class SandboxControl extends DurableObject<Env> {
       capabilities,
       containment: requiredContainment,
       ...(vercel === undefined ? {} : { vercel }),
+      ...(onprem === undefined ? {} : { onprem }),
     };
   }
 
@@ -3138,6 +3461,17 @@ export class SandboxControl extends DurableObject<Env> {
     // current one.
     if (state.target.providerRef !== null && state.target.providerRef !== providerRef) return false;
     const allocationName = state.target.allocationName ?? this.sandboxId;
+    if (this.providerBinding.kind === 'onprem') {
+      const onprem = state.target.onprem;
+      const ref = decodeOnPremProviderRef(providerRef);
+      return (
+        ref !== null &&
+        onprem !== undefined &&
+        ref.installationId === onprem.binding.installationId &&
+        ref.allocationId === state.createIntent.intentId &&
+        Date.now() < onprem.hardStopAt
+      );
+    }
     if (this.providerKind === 'vercel') {
       return decodeVercelProviderRef(providerRef)?.sandboxName === allocationName;
     }
@@ -3151,12 +3485,46 @@ export class SandboxControl extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Request-admission predicate for an on-prem allocation: the live provider
+   * reference must still match the allocation's pinned identity and the fixed
+   * lifetime must not be exhausted. The canonical predicate owns both checks so
+   * admission never re-derives the expiry. Non-on-prem providers admit on the
+   * generic reference check.
+   */
+  private matchesLiveOnPremProviderReference(
+    record: AllocationRecord,
+    providerRef: string
+  ): boolean {
+    if (this.providerBinding.kind !== 'onprem') return true;
+    const state = record.state;
+    if (state.kind !== 'creating' && state.kind !== 'allocated') return false;
+    return this.matchesCanonicalProviderReference(state, providerRef);
+  }
+
   /** Canonical form of `matchesContainment`, over the aggregate state kinds. */
   private matchesCanonicalContainment(
     record: AllocationRecord,
     requiredContainment: CredentialContainmentRequirements
   ): boolean {
     const state = record.state;
+    if (this.providerBinding.kind === 'onprem') {
+      // On-prem containment is always the full worktree containment, and a
+      // reached fixed-lifetime cap makes the credentials unavailable even before
+      // the stop effect runs. Otherwise fall through to the generic checks.
+      const onprem =
+        state.kind === 'creating' || state.kind === 'allocated' || state.kind === 'stopping'
+          ? state.target.onprem
+          : undefined;
+      if (
+        !requiredContainment.kilocode ||
+        !requiredContainment.github ||
+        !requiredContainment.worktreeScoped ||
+        (onprem !== undefined && Date.now() >= onprem.hardStopAt)
+      ) {
+        return false;
+      }
+    }
     if (state.kind === 'creating') {
       const containment = state.target.containment;
       return (
@@ -3208,12 +3576,20 @@ export class SandboxControl extends DurableObject<Env> {
     const projection = projectStatus({ allocation: record, ownerPresent: true, now: Date.now() });
     const failureReason =
       await this.ctx.storage.get<SandboxProviderFailureReason>(FAILURE_REASON_KEY);
+    const hardStopAt =
+      this.providerBinding.kind === 'onprem' &&
+      (record.state.kind === 'creating' ||
+        record.state.kind === 'allocated' ||
+        record.state.kind === 'stopping')
+        ? record.state.target.onprem?.hardStopAt
+        : undefined;
     return {
       ...projection,
       physical,
       connection,
       work,
       ...(failureReason === undefined ? {} : { failureReason }),
+      ...(hardStopAt === undefined ? {} : { hardStopAt }),
       ...(record.state.kind === 'allocated' && runtime?.wrapperInstanceId
         ? { wrapperInstanceId: runtime.wrapperInstanceId }
         : {}),
@@ -3377,6 +3753,7 @@ export class SandboxControl extends DurableObject<Env> {
       FAILURE_REASON_KEY,
       NEXT_LEASE_CHECK_AT_KEY,
       BYOC_SNAPSHOT_RECOVERY_KEY,
+      ONPREM_ACKNOWLEDGEMENT_KEY,
       BILLING_INPUT_KEY,
       CREDENTIAL_POLICY_DIRTY_KEY,
       PROVIDER_LOCATOR_KEY,
@@ -3540,6 +3917,33 @@ export class SandboxControl extends DurableObject<Env> {
         getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
       });
     }
+    if (kind === 'onprem') {
+      if (this.providerBinding.kind !== 'onprem') {
+        throw new Error('On-prem provider adapter requires an on-prem binding');
+      }
+      const live =
+        state !== undefined &&
+        (state.kind === 'creating' || state.kind === 'allocated' || state.kind === 'stopping');
+      const target = live && state !== undefined ? state.target : undefined;
+      const createIntent = live && state !== undefined ? state.createIntent : null;
+      return createOnPremProviderAdapter({
+        env: this.env,
+        binding: this.providerBinding,
+        sandboxId: this.sandboxId,
+        intent:
+          target !== undefined && createIntent !== null
+            ? {
+                intentId: createIntent.intentId,
+                createdAt: createIntent.createdAt,
+                ...(target.allocationName === undefined
+                  ? {}
+                  : { allocationName: target.allocationName }),
+                ...(target.containment === undefined ? {} : { containment: target.containment }),
+                ...(target.onprem === undefined ? {} : { onprem: target.onprem }),
+              }
+            : null,
+      });
+    }
     return createCloudflareProviderAdapter({
       sandboxId: allocationName,
       getSandbox: (id, options) =>
@@ -3568,6 +3972,12 @@ export class SandboxControl extends DurableObject<Env> {
    * build the create bound.
    */
   private async providerFor(target?: AllocationTarget): Promise<ProviderAdapter> {
+    if (this.providerBinding.kind === 'onprem') {
+      // The on-prem adapter is rebuilt per operation from the pinned canonical
+      // target, like BYOC: the installation runner is a per-request destination,
+      // never in-memory connection state.
+      return this.createProviderAdapter('onprem', await this.readCanonicalAllocation());
+    }
     if (!this.isByocBinding()) return this.provider;
     if (this.providerBinding.kind !== 'vercel' || this.providerBinding.source.kind !== 'byoc') {
       return this.provider;
@@ -3773,6 +4183,38 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   /**
+   * Resolve the on-prem profile before any provider side effect and pin it onto
+   * the demand-time target. The profile is installation-owned state, so the
+   * allocation cannot be created without it: a resolution failure records the
+   * reason and reports unresolved, leaving the allocation stopped for the head
+   * to terminalize with it.
+   */
+  private async resolveDemandOnPremProfile(): Promise<
+    | { resolved: true; binding: OnPremProviderBinding; profile: OnPremProfile }
+    | { resolved: false }
+    | undefined
+  > {
+    if (this.providerBinding.kind !== 'onprem') return undefined;
+    const binding = this.providerBinding;
+    try {
+      const profile = onPremProfileSchema.parse(
+        await withTimeout(
+          resolveOnPremProfile(this.env, binding),
+          DEADLINE_MS.startup,
+          'On-prem profile resolution timed out'
+        )
+      );
+      return { resolved: true, binding, profile };
+    } catch (error) {
+      if (providerFailureReason(binding, error) !== undefined) {
+        await this.recordProviderFailure(error);
+        return { resolved: false };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * The demand-time Vercel intent block. For a BYOC binding it resolves the
    * customer credential and persists the credential's build generation on the
    * block, so the missing-snapshot projection survives a DO eviction; for a
@@ -3909,7 +4351,7 @@ export class SandboxControl extends DurableObject<Env> {
     supplied?: SandboxBillingInput,
     worktreeId?: string
   ): Promise<SandboxBillingInput | undefined> {
-    if (this.isByocBinding()) return undefined;
+    if (isManagedContainerBillingExempt(this.providerBinding)) return undefined;
     const raw = await this.ctx.storage.get<unknown>(BILLING_INPUT_KEY);
     const stored = raw === undefined ? undefined : parseSandboxBillingInput(raw);
     let input = supplied === undefined ? stored : parseSandboxBillingInput(supplied);
@@ -3987,6 +4429,25 @@ export class SandboxControl extends DurableObject<Env> {
       await this.retryByocSnapshotRecovery();
       return;
     }
+    if (id === 'hardStop') {
+      const record = await this.readCanonicalAllocation();
+      const hardStopAt =
+        record.state.kind === 'creating' ||
+        record.state.kind === 'allocated' ||
+        record.state.kind === 'stopping'
+          ? record.state.target.onprem?.hardStopAt
+          : undefined;
+      if (
+        this.providerBinding.kind === 'onprem' &&
+        record.state.kind === 'allocated' &&
+        hardStopAt !== undefined &&
+        hardStopAt <= Date.now()
+      ) {
+        await this.ctx.storage.put(FAILURE_REASON_KEY, 'onprem_lifetime_exhausted');
+        await this.beginCanonicalStop(record, 'onprem_lifetime_exhausted');
+      }
+      return;
+    }
     if (id === 'credentialExpiry') {
       try {
         await this.enforceWorktreeNetworkPolicy(await this.requireOwner());
@@ -4003,7 +4464,12 @@ export class SandboxControl extends DurableObject<Env> {
     const record = await this.readCanonicalAllocation();
     const state = record.state;
     if (state.kind !== 'creating' && state.kind !== 'allocated') return false;
-    if (this.providerKind === 'vercel' && state.kind !== 'allocated') return false;
+    if (
+      (this.providerKind === 'vercel' || this.providerBinding.kind === 'onprem') &&
+      state.kind !== 'allocated'
+    ) {
+      return false;
+    }
     return (
       this.matchesCanonicalProviderReference(state, providerInstanceId) &&
       this.matchesCanonicalWorktreeContainment(record)
@@ -4021,7 +4487,8 @@ export class SandboxControl extends DurableObject<Env> {
     const state = record.state;
     if (
       (state.kind !== 'creating' && state.kind !== 'allocated') ||
-      (this.providerKind === 'vercel' && state.kind !== 'allocated') ||
+      ((this.providerKind === 'vercel' || this.providerBinding.kind === 'onprem') &&
+        state.kind !== 'allocated') ||
       !this.matchesCanonicalProviderReference(state, identity.providerInstanceId) ||
       !this.matchesCanonicalWorktreeContainment(record)
     ) {
@@ -4293,6 +4760,124 @@ export class SandboxControl extends DurableObject<Env> {
     await this.renewProviderLease(identity);
   }
 
+  /**
+   * Confirm the on-prem installation still owns the allocation and has
+   * acknowledged it. The installation runner reports observation asynchronously,
+   * so a lease renewal before the first acknowledgement is expected to be
+   * pending; the wait is bounded by the acknowledgement deadline, then by
+   * `DEADLINE_MS.startup` past the create intent, so a runner that never
+   * acknowledges cannot keep the allocation alive forever.
+   */
+  private async verifyOnPremLifetime(
+    record: AllocationRecord,
+    deadlineAt: number,
+    identity: SandboxControlConnectionIdentity
+  ): Promise<void> {
+    const binding = this.providerBinding;
+    if (
+      binding.kind !== 'onprem' ||
+      record.state.kind !== 'allocated' ||
+      record.state.target.providerRef === null ||
+      record.state.target.onprem === undefined
+    ) {
+      throw new Error('On-prem lifetime requires a registered allocation');
+    }
+    const providerRef = record.state.target.providerRef;
+    const intent = parseOnPremCreateIntent(
+      {
+        intentId: record.state.createIntent.intentId,
+        createdAt: record.state.createIntent.createdAt,
+        ...(record.state.target.allocationName === undefined
+          ? {}
+          : { allocationName: record.state.target.allocationName }),
+        ...(record.state.target.containment === undefined
+          ? {}
+          : { containment: record.state.target.containment }),
+        onprem: record.state.target.onprem,
+      },
+      binding
+    );
+    const provider = await this.providerFor(record.state.target);
+    let verificationDeadline = deadlineAt;
+    const readAcknowledgement = async () => {
+      const stored = onPremAcknowledgementSchema
+        .optional()
+        .parse(await this.ctx.storage.get(ONPREM_ACKNOWLEDGEMENT_KEY));
+      return stored?.providerRef === providerRef ? stored : undefined;
+    };
+    const assertCurrent = async () => {
+      const current = await this.readCanonicalAllocation();
+      const currentState = current.state;
+      if (Date.now() >= verificationDeadline) {
+        throw new Error('On-prem lifetime verification timed out');
+      }
+      if (
+        currentState.kind !== 'allocated' ||
+        currentState.target.providerRef !== providerRef ||
+        !sameCanonicalAllocation(current, record) ||
+        !sameSandboxProviderBinding(this.providerBinding, binding) ||
+        !this.matchesCanonicalProviderReference(currentState, providerRef) ||
+        !this.isCurrentConnection(identity)
+      ) {
+        throw new Error('On-prem allocation changed during lifetime verification');
+      }
+    };
+    while (true) {
+      const acknowledgement = await this.ctx.storage.transaction(async () => {
+        await assertCurrent();
+        const current = await readAcknowledgement();
+        if (current?.state === 'acknowledged') return current;
+        const waiting: z.infer<typeof onPremAcknowledgementSchema> = {
+          state: 'waiting',
+          providerRef,
+          deadlineAt: Math.min(
+            verificationDeadline,
+            intent.createdAt + DEADLINE_MS.startup,
+            current?.deadlineAt ?? Infinity
+          ),
+        };
+        if (current?.deadlineAt !== waiting.deadlineAt) {
+          await this.ctx.storage.put(ONPREM_ACKNOWLEDGEMENT_KEY, waiting);
+        }
+        return waiting;
+      });
+      if (acknowledgement.state === 'waiting') {
+        verificationDeadline = Math.min(verificationDeadline, acknowledgement.deadlineAt);
+      }
+      await assertCurrent();
+      try {
+        await withTimeout(
+          provider.ensureLeaseAtLeast(providerRef, leaseAtLeastMs()),
+          Math.max(1, verificationDeadline - Date.now()),
+          'On-prem lifetime verification timed out'
+        );
+        await this.ctx.storage.transaction(async () => {
+          const current = await readAcknowledgement();
+          if (current?.state === 'waiting') {
+            verificationDeadline = Math.min(verificationDeadline, current.deadlineAt);
+          }
+          await assertCurrent();
+          await this.ctx.storage.put(ONPREM_ACKNOWLEDGEMENT_KEY, {
+            state: 'acknowledged',
+            providerRef,
+          });
+        });
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof OnPremAcknowledgementPendingError) ||
+          acknowledgement.state === 'acknowledged'
+        ) {
+          throw error;
+        }
+        await assertCurrent();
+        await new Promise<void>(resolve =>
+          setTimeout(resolve, Math.min(1_000, verificationDeadline - Date.now()))
+        );
+      }
+    }
+  }
+
   private async renewProviderLease(identity: SandboxControlConnectionIdentity): Promise<void> {
     const record = await this.readCanonicalAllocation();
     const state = record.state;
@@ -4322,21 +4907,25 @@ export class SandboxControl extends DurableObject<Env> {
     let timedOut = false;
     this.logDiagnostic('lease', { ...diagnostic, result: 'started' });
     try {
-      await withTimeout(
-        (await this.providerFor(state.target)).ensureLeaseAtLeast(providerRef, leaseAtLeastMs()),
-        DEADLINE_MS.stopAttempt,
-        'Sandbox lease renewal timed out',
-        () => {
-          timedOut = true;
-        }
-      );
+      if (this.providerBinding.kind === 'onprem') {
+        await this.verifyOnPremLifetime(record, Date.now() + DEADLINE_MS.stopAttempt, identity);
+      } else {
+        await withTimeout(
+          (await this.providerFor(state.target)).ensureLeaseAtLeast(providerRef, leaseAtLeastMs()),
+          DEADLINE_MS.stopAttempt,
+          'Sandbox lease renewal timed out',
+          () => {
+            timedOut = true;
+          }
+        );
+      }
       this.logDiagnostic('lease', {
         ...diagnostic,
         result: 'completed',
         durationMs: Date.now() - startedAt,
       });
       await this.scheduleNextLeaseCheck('renewal', Date.now());
-    } catch {
+    } catch (error) {
       this.logDiagnostic(
         'lease',
         {
@@ -4346,6 +4935,15 @@ export class SandboxControl extends DurableObject<Env> {
         },
         'warn'
       );
+      if (this.providerBinding.kind === 'onprem') {
+        // Fenced to the allocation and connection that were verified: a stale
+        // acknowledgement failure must not stop a replacement allocation.
+        await this.stopVerifiedCanonicalAllocation({
+          record,
+          reason: providerFailureReason(this.providerBinding, error) ?? 'onprem_unavailable',
+          identity,
+        });
+      }
     }
   }
 
@@ -5660,6 +6258,34 @@ export class SandboxControl extends DurableObject<Env> {
     await this.scheduleAlarm();
   }
 
+  /**
+   * Keep the on-prem hard-stop anchor in step with the canonical allocation: an
+   * on-prem allocation is capped by the profile's fixed lifetime, and the cap is
+   * the canonical target's, not a side record. The anchor is armed only while the
+   * allocation is running, so the canonical stop ladder (not a re-fired past
+   * deadline) owns teardown once the cap is reached.
+   */
+  private async syncOnPremHardStop(record: AllocationRecord): Promise<void> {
+    if (this.providerBinding.kind !== 'onprem') return;
+    const state = record.state;
+    const live = state.kind === 'creating' || state.kind === 'allocated';
+    const hardStopAt = live ? state.target.onprem?.hardStopAt : undefined;
+    const anchors = await loadControlAlarmAnchors(this.ctx.storage);
+    const armed = anchors.hardStopAt ?? null;
+    if (hardStopAt === undefined || !live) {
+      if (armed !== null) {
+        await this.cancelInfrastructureAnchor('hardStop');
+      }
+      if (await this.ctx.storage.get(ONPREM_ACKNOWLEDGEMENT_KEY)) {
+        await this.ctx.storage.delete(ONPREM_ACKNOWLEDGEMENT_KEY);
+      }
+      return;
+    }
+    if (armed !== hardStopAt) {
+      await this.armInfrastructureAnchor('hardStop', hardStopAt);
+    }
+  }
+
   private async armInfrastructureAnchor(id: ControlAlarmAnchorId, at: number): Promise<void> {
     await this.ctx.storage.transaction(async () => {
       const current = await loadControlAlarmAnchors(this.ctx.storage);
@@ -5695,6 +6321,7 @@ export class SandboxControl extends DurableObject<Env> {
         credentialExpiryAt: anchors.credentialExpiryAt,
         socketHandshakeAt: anchors.socketHandshakeAt,
         byocSnapshotRecoveryAt: anchors.byocSnapshotRecoveryAt ?? null,
+        hardStopAt: anchors.hardStopAt ?? null,
       }
     );
   }
@@ -5750,6 +6377,7 @@ export class SandboxControl extends DurableObject<Env> {
       createdAt,
       ...(target.allocationName === undefined ? {} : { allocationName: target.allocationName }),
       ...(vercel === undefined ? {} : { vercel }),
+      ...(target.onprem === undefined ? {} : { onprem: target.onprem }),
       ...(target.containment === undefined ? {} : { containment: target.containment }),
       ...(billing === undefined ? {} : { billing }),
       ...(networkPolicy === undefined ? {} : { networkPolicy }),
@@ -5873,6 +6501,7 @@ export class SandboxControl extends DurableObject<Env> {
       createdAt: createIntent.createdAt,
       ...(target.allocationName === undefined ? {} : { allocationName: target.allocationName }),
       ...(vercel === undefined ? {} : { vercel }),
+      ...(target.onprem === undefined ? {} : { onprem: target.onprem }),
       ...(target.containment === undefined ? {} : { containment: target.containment }),
     };
   }

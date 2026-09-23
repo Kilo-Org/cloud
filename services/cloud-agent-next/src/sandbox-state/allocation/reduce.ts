@@ -11,7 +11,12 @@
 import type { Command, Decision } from '../commands.js';
 import { operationId } from '../commands.js';
 import type { StateMeta, TransitionMeta } from '../registry.js';
-import { isHealthEvent, type AllocationInputEvent, type ResultFence } from '../events.js';
+import {
+  isHealthEvent,
+  type AllocationCancelFence,
+  type AllocationInputEvent,
+  type ResultFence,
+} from '../events.js';
 import type {
   AllocationCreateIntent,
   AllocationRecord,
@@ -379,6 +384,22 @@ function fenceMatches(
   return true;
 }
 
+/**
+ * A fenced allocation `CANCEL` is accepted only while the allocation it names is
+ * still the current `allocated` record. In every other state the cancellation is
+ * stale: it must not re-drive a cleanup episode against a replacement allocation.
+ */
+function fenceAllowsAllocationCancel(
+  state: AllocationState,
+  fence: AllocationCancelFence
+): boolean {
+  return (
+    state.kind === 'allocated' &&
+    fence.intentId === state.createIntent.intentId &&
+    fence.providerRef === state.target.providerRef
+  );
+}
+
 function effectCommand(
   target: AllocationTarget,
   reason: string,
@@ -538,6 +559,15 @@ export function decideAllocation(
   now: number
 ): Decision<AllocationRecord> | undefined {
   const { state } = record;
+
+  if (
+    event.type === 'CANCEL' &&
+    event.scope === 'allocation' &&
+    event.fence !== undefined &&
+    !fenceAllowsAllocationCancel(state, event.fence)
+  ) {
+    return undefined;
+  }
 
   switch (state.kind) {
     case 'stopped': {

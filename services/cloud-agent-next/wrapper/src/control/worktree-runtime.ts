@@ -38,6 +38,7 @@ import {
   settleNativeCleanup,
   stopWithinCleanupBudget,
 } from './worktree-runtime-cleanup.js';
+import { onPremKiloTargets } from './onprem-env.js';
 import {
   forgetAttachedRoot,
   ownerDirectoryForSession,
@@ -292,6 +293,7 @@ export function buildWorktreeKiloEnvironment(
   inherited: NodeJS.ProcessEnv = process.env
 ): Record<string, string> {
   const env: Record<string, string> = {};
+  const targets = onPremKiloTargets(kilo.targets, inherited.KILO_ONPREM_BROKER_URL);
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
   const isRuntimeOwned = (name: string): boolean =>
     reserved.has(name) ||
@@ -319,7 +321,7 @@ export function buildWorktreeKiloEnvironment(
           apiKey: kilo.token,
           kilocodeToken: kilo.token,
           ...(kilo.organizationId ? { kilocodeOrganizationId: kilo.organizationId } : {}),
-          baseURL: kilo.targets.providerBaseUrl,
+          baseURL: targets.providerBaseUrl,
         },
       },
     },
@@ -340,10 +342,10 @@ export function buildWorktreeKiloEnvironment(
     KILOCODE_TOKEN: kilo.token,
     ...(kilo.organizationId ? { KILOCODE_ORGANIZATION_ID: kilo.organizationId } : {}),
     KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kilo.token } }),
-    KILOCODE_BACKEND_BASE_URL: kilo.targets.backendBaseUrl,
-    KILO_API_URL: kilo.targets.backendBaseUrl,
-    KILO_OPENROUTER_BASE: kilo.targets.providerBaseUrl,
-    KILO_SESSION_INGEST_URL: kilo.targets.sessionIngestBaseUrl,
+    KILOCODE_BACKEND_BASE_URL: targets.backendBaseUrl,
+    KILO_API_URL: targets.backendBaseUrl,
+    KILO_OPENROUTER_BASE: targets.providerBaseUrl,
+    KILO_SESSION_INGEST_URL: targets.sessionIngestBaseUrl,
     KILO_CONFIG_CONTENT: config,
     OPENCODE_CONFIG_CONTENT: config,
   };

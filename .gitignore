@@ -15,6 +15,7 @@ node_modules/
 /build
 packages/trpc/dist/
 **/wrapper/dist/
+/services/cloud-agent-next/onprem/dist/
 *.tsbuildinfo
 next-env.d.ts
 

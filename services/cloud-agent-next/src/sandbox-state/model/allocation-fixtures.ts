@@ -12,6 +12,7 @@ import {
   type AllocationRecord,
   type AllocationTarget,
   type CredentialContainmentRequirements,
+  type OnPremAllocationConfig,
   type VercelAllocationConfig,
 } from './allocation.js';
 import { connectingHealth } from './health.js';
@@ -23,14 +24,15 @@ export type AllocationFixtureContainment = CredentialContainmentRequirements & {
 
 export type AllocationFixture = {
   state: 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
-  /** Overrides the provider inferred from `createIntent.vercel`. */
-  provider?: 'cloudflare' | 'vercel';
+  /** Overrides the provider inferred from `createIntent.vercel`/`onprem`. */
+  provider?: 'cloudflare' | 'vercel' | 'onprem';
   providerRef?: string | null;
   createIntent?: {
     intentId: string;
     createdAt: number;
     allocationName?: string;
     vercel?: VercelAllocationConfig;
+    onprem?: OnPremAllocationConfig;
     containment?: CredentialContainmentRequirements;
   } | null;
   stopTombstone?: {
@@ -55,7 +57,8 @@ const VERCEL_CAPABILITIES = { persistentWorkspace: true, destroysOnStop: false }
 function targetFor(fixture: AllocationFixture): AllocationTarget {
   const intent = fixture.createIntent ?? null;
   const vercel = intent?.vercel;
-  const provider = fixture.provider ?? (vercel ? 'vercel' : 'cloudflare');
+  const onprem = intent?.onprem;
+  const provider = fixture.provider ?? (onprem ? 'onprem' : vercel ? 'vercel' : 'cloudflare');
   const target: AllocationTarget = {
     provider,
     providerRef: fixture.providerRef ?? null,
@@ -63,6 +66,7 @@ function targetFor(fixture: AllocationFixture): AllocationTarget {
   };
   if (intent?.allocationName !== undefined) target.allocationName = intent.allocationName;
   if (vercel !== undefined) target.vercel = vercel;
+  if (onprem !== undefined) target.onprem = onprem;
   if (intent?.containment !== undefined) target.containment = intent.containment;
   if (fixture.containment !== undefined) target.resolvedContainment = fixture.containment;
   return target;

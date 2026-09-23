@@ -6,7 +6,7 @@ import { resolveSecret } from '../auth.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
 import {
-  getSandboxProvider,
+  getSandboxProviderBinding,
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
@@ -26,6 +26,7 @@ import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
+import { parseCanonicalOnPremUrl } from '../shared/onprem-credential-protocol.js';
 import {
   agentSandboxProviderSchema,
   parseCanonicalBitbucketCloneUrl,
@@ -219,6 +220,15 @@ export const sessionCredentialGrantSchema = z
     ) {
       reject();
     }
+    if (
+      grant.provider === 'onprem' &&
+      (grant.containmentEnabled === false ||
+        !grant.orgId ||
+        grant.outboundContainerId !== undefined ||
+        Object.values(grant.kilo.targets).some(target => !parseCanonicalOnPremUrl(target)))
+    ) {
+      reject();
+    }
     if (grant.containmentEnabled === false) {
       if (
         grant.kilo.alias !== undefined ||
@@ -277,7 +287,7 @@ export const sessionCredentialGrantSchema = z
     if (!alias || alias.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) {
       reject();
     }
-    if (grant.provider === 'vercel') {
+    if (grant.provider === 'vercel' || grant.provider === 'onprem') {
       if (
         grant.scm.purpose !== 'github' ||
         !grant.scm.nativeToken ||
@@ -486,7 +496,9 @@ function repositoryFromMetadata(
     if (repository.token) invalidCredentials();
     return { type: 'git', url, ...(repository.platform ? { platform: repository.platform } : {}) };
   }
-  if (requiresContainmentSandbox(metadata) && provider === 'vercel') invalidCredentials();
+  if (provider === 'onprem' || (requiresContainmentSandbox(metadata) && provider === 'vercel')) {
+    invalidCredentials();
+  }
   if (repository.type === 'gitlab') {
     if (
       repository.token &&
@@ -899,8 +911,15 @@ export async function prepareSessionCredentials(input: {
   });
   const token = realTokenSchema.safeParse(metadata.auth.kilocodeToken);
   if (!member.success || !token.success) invalidCredentials();
-  const provider = getSandboxProvider(metadata);
-  const containmentEnabled = requiresContainmentSandbox(metadata);
+  const binding = getSandboxProviderBinding(metadata);
+  const provider = binding.kind;
+  if (
+    binding.kind === 'onprem' &&
+    (binding.organizationId !== metadata.identity.orgId || input.outboundContainerId !== undefined)
+  ) {
+    invalidCredentials();
+  }
+  const containmentEnabled = provider === 'onprem' || requiresContainmentSandbox(metadata);
   const targets = deriveKiloSandboxTargets(env, token.data, {
     requireHttps: provider === 'vercel',
   });

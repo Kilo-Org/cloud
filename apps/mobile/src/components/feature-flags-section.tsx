@@ -17,9 +17,8 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  * the source and the relation are each catalog copy, so the line reads in the
  * app language; `preferences.featureFlagApplied`,
  * `preferences.featureFlagSkipped` and `preferences.featureFlagNotLoaded`
- * carry the source and relation words. The non-English catalogs still hold the
- * English copy for those three keys (`PENDING_TRANSLATION_VALUES` in
- * `tools/i18n/check-catalogs.mjs`), which the translation slice lands.
+ * carry the source and relation words, and every non-English catalog
+ * translates those three keys.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();

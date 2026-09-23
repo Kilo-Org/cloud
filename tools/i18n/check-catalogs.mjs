@@ -116,23 +116,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'tour.cloudOptionTitle',
 ]);
 
-/**
- * Keys whose English copy every locale still carries because the translation
- * slice has not landed them yet. Only `en.json` copy may be written outside
- * that slice (`apps/mobile/AGENTS.md`; every other slice's catalog edit is
- * reverted), so copy a slice changes sits in `en.json` alone until then. The
- * value check below tolerates these keys exactly as it tolerates
- * `ENGLISH_IDENTICAL_ALLOWLIST`; `apps/mobile/src/i18n/catalog-parity.test.ts`
- * carries the same list and fails when one of these values is translated in
- * some catalogs but not all, so the record cannot rot. Delete an entry once
- * every catalog translates it.
- */
-const PENDING_TRANSLATION_VALUES = new Set([
-  'preferences.featureFlagApplied',
-  'preferences.featureFlagSkipped',
-  'preferences.featureFlagNotLoaded',
-]);
-
 /** The supported tags, read from the one source of truth. */
 function supportedLanguages() {
   const source = readFileSync(LANGUAGES_FILE, 'utf8');
@@ -633,11 +616,10 @@ for (const catalog of CATALOGS) {
 
   // A mobile key whose value equals English in every non-English locale was
   // never translated. Allowlist the proper nouns and format-only strings that
-  // are legitimately identical, and tolerate the copy the translation slice has
-  // not landed yet; fail everything else.
+  // are legitimately identical; fail everything else.
   if (catalog.name === 'mobile') {
     for (const [key, englishValue] of english) {
-      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || PENDING_TRANSLATION_VALUES.has(key)) {
+      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key)) {
         continue;
       }
       let allEqual = true;

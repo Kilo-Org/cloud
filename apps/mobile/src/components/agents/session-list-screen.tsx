@@ -36,6 +36,7 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
@@ -48,11 +49,6 @@ import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
 const SKELETON_ROW_COUNT = 8;
-
-/** The See-all label's uppercase micro type, kept out of the JSX so the long
- * class list does not force the `Text` open tag to wrap. */
-const SEE_ALL_TEXT_CLASS =
-  'shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary';
 
 export function AgentSessionListScreen() {
   const router = useRouter();
@@ -218,12 +214,19 @@ export function AgentSessionListScreen() {
   // controls keep their full width — sharing that row through the old
   // `headerRight` half-row cap squeezed both columns on a narrow viewport until
   // the title broke mid-word and this label stacked onto two lines (device
-  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). The reserved row
-  // height keeps the header from moving when the filter button appears with the
-  // loaded sessions, and the box can shrink so an extreme accessibility scale
-  // ellipsizes the label instead of wrapping it to a second line.
+  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
+  // control keeps the header's full width at every display size, and the
+  // reserved row height keeps the header from moving when the filter button
+  // appears with the loaded sessions; the box can shrink so an extreme
+  // accessibility scale ellipsizes the label instead of wrapping it to a
+  // second line.
+  // The controls row is a section header, not a bare action: its label owns the
+  // row start and grows, so the controls keep the row end — the same shape the
+  // Home live-sessions header uses. A row holding only the trailing 'See all'
+  // read as a section header whose label was missing (e2, agents).
   const headerActions = (
     <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
+      <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
@@ -235,9 +238,9 @@ export function AgentSessionListScreen() {
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text numberOfLines={1} className={SEE_ALL_TEXT_CLASS}>
+        <Eyebrow numberOfLines={1} className="shrink text-center text-[11px] text-primary">
           {seeAllLabel}
-        </Text>
+        </Eyebrow>
       </Pressable>
       {query.canFilter ? (
         <SessionFilterButton

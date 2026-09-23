@@ -30,9 +30,6 @@ const status = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Platform: { OS: 'android' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
   Keyboard: {
     addListener: (event: string, listener: (event: unknown) => void) => {
@@ -75,11 +72,6 @@ vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   selectionAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
-}));
-// The screen reveals its submit action through the shared keyboard-lift view,
-// which reads the safe-area insets.
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));

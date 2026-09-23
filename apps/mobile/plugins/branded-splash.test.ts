@@ -179,6 +179,9 @@ describe('shared branded splash', () => {
     // also carries the colors every other Android plugin contributes. This
     // suite owns only the splash color: assert it is present, as the styles
     // assertion below does, rather than pinning the whole file.
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
     // compileModsAsync introspects the project's existing android resources, so
     // the colors array also carries the project's other theme colors. Assert the
     // splash color this plugin owns instead of the array's exact contents.

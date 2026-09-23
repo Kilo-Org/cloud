@@ -12,8 +12,10 @@ import { SessionListSearchHeader } from './session-list-search-header';
 const state = vi.hoisted(() => ({
   insets: { top: 59, right: 0, bottom: 34, left: 0 },
 }));
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
 vi.mock('react-native', () => ({
+  I18nManager: i18nManager,
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -132,9 +134,36 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
   });
 });
 
+describe('SessionListSearchHeader typed query alignment', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    i18nManager.isRTL = false;
+  });
+  afterEach(() => {
+    act(() => {
+      for (const renderer of renderers.splice(0)) {
+        renderer.unmount();
+      }
+    });
+  });
+
+  it('passes no alignment style in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
+    expect(searchInput(renderer).props.style).toBeUndefined();
+  });
+
+  it('aligns the typed query to the field start edge in RTL', async () => {
+    i18nManager.isRTL = true;
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
+    expect(searchInput(renderer).props.style).toEqual({ textAlign: 'right' });
+  });
+});
+
 describe('SessionListSearchHeader clear control', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    i18nManager.isRTL = false;
   });
   afterEach(() => {
     act(() => {

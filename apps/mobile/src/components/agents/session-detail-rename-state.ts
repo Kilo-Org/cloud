@@ -137,6 +137,12 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
+  // A placeholder title (`New session - <ISO>`) is the ingest service's "no
+  // title yet" marker, not a name the user wrote. Count it as absent so the
+  // header falls back to the same localized label a title-less session shows;
+  // the session still exists, so renaming stays enabled. `namedSessionTitle`
+  // also keeps a title the app's own rename flow wrote, even one that happens
+  // to look like the placeholder.
   const serverTitle = namedSessionTitle(input.serverTitle, input.sessionId);
   const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
@@ -150,7 +156,9 @@ export function getSessionDetailRenameState(input: {
 
 /**
  * Title from a v2 `session.updated` event for this session, or undefined
- * when the event is for another session or carries no usable title.
+ * when the event is for another session or carries no usable title. A live
+ * placeholder title is not usable either: returning it would repaint the raw
+ * machine timestamp over the localized fallback.
  */
 export function titleFromSessionUpdatedEvent(
   sessionId: string,

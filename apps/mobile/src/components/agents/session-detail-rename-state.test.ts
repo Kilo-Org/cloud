@@ -42,6 +42,22 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('treats a machine placeholder server title as absent and shows the fallback label', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T16:37:00.000Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({

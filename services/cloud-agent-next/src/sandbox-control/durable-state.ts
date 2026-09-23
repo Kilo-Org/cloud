@@ -11,26 +11,28 @@ import {
   SandboxRuntimeMetadataSchema,
   type SandboxRuntimeMetadata,
 } from '../shared/sandbox-status.js';
-import type { DeadlineTable } from './deadlines.js';
-import { DEADLINE_IDS, emptyDeadlines } from './deadlines.js';
-import { initialPhysicalRecord, type PhysicalRecord } from './physical-lifecycle.js';
 import type { SessionRoute } from './session-routes.js';
 import {
   sessionCredentialGrantSchema,
   type SessionCredentialGrant,
 } from './session-credentials.js';
 import { emptyTransitionLog, type TransitionRow } from './transition-log.js';
-import { sandboxRecoveryDecisionSchema, type SandboxRecoveryDecision } from './control-recovery.js';
+import { CONTROL_ALARM_ANCHORS_KEY, LEGACY_CONTROL_DEADLINES_KEY } from './control-alarm.js';
+import { eraseAllocationRecord } from '../sandbox-state/persist/access.js';
+import type { SyncRecordReader, SyncRecordWriter } from '../sandbox-state/persist/access.js';
+import {
+  loadAllocation as loadCanonicalAllocation,
+  loadAllocationSync as loadCanonicalAllocationSync,
+  type LoadResult,
+} from '../sandbox-state/persist/load.js';
+import { storeAllocation as storeCanonicalAllocation } from '../sandbox-state/persist/store.js';
+import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
 
-export const PHYSICAL_KEY = 'physical_record';
 const ROUTES_KEY = 'session_routes';
 export const SESSION_REFERENCES_KEY = 'session_references';
-const DEADLINES_KEY = 'deadlines';
 const LOG_KEY = 'transition_log';
 const CREDENTIAL_GRANTS_KEY = 'worktree_credential_grants';
 const RUNTIME_METADATA_KEY = 'runtime_metadata';
-const NATIVE_RUNTIME_RETIREMENTS_KEY = 'native_runtime_retirements';
-const RECOVERY_DECISIONS_KEY = 'recovery_decisions';
 
 type ControlStorage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -38,35 +40,6 @@ type ControlStorage = {
   delete(keys: string[]): Promise<number>;
 };
 
-const timestampSchema = z.number().int().nonnegative().max(8_640_000_000_000_000);
-const physicalRecordSchema = z.object({
-  state: z.enum(['stopped', 'creating', 'running', 'stopping', 'failed', 'unknown']),
-  providerRef: z.string().min(1).nullable(),
-  createIntent: z.object({ intentId: z.string().min(1), createdAt: timestampSchema }).nullable(),
-  stopTombstone: z
-    .object({
-      reason: z.string(),
-      attempts: z.number().int().nonnegative(),
-      createdAt: timestampSchema,
-    })
-    .nullable(),
-  resumable: z.boolean(),
-});
-const deadlineTableSchema = z.partialRecord(z.enum(DEADLINE_IDS), timestampSchema);
-const sessionRouteSchema = z.object({
-  sessionId: z.string().min(1),
-  kiloSessionId: z.string().min(1),
-  directory: z.string().min(1),
-  worktreeId: z.string().min(1).optional(),
-  ownerId: z.string().min(1),
-  lastState: z.enum(['idle', 'active', 'finalizing']).nullable(),
-  lastStateAt: timestampSchema.nullable(),
-  idleForMs: z.number().int().nonnegative().nullable(),
-  waitingOn: z.enum(['model', 'tool', 'finalizing', 'preparation', 'input']).nullable(),
-  nativeRuntimeId: z.string().uuid().optional(),
-  retiringNativeRuntimeId: z.string().uuid().optional(),
-});
-const routeTableSchema = z.array(sessionRouteSchema);
 const sessionReferenceSchema = z
   .object({
     sessionId: z.string().min(1).max(128),
@@ -83,48 +56,6 @@ export const sessionReferenceStateSchema = z.object({
     .max(MAX_REFERENCE_ENTRIES)
     .refine(entries => serializedReferenceBytes(entries) <= MAX_REFERENCE_BYTES),
 });
-const nativeRuntimeRetirementRecipientSchema = sessionRouteSchema.pick({
-  sessionId: true,
-  kiloSessionId: true,
-  directory: true,
-  worktreeId: true,
-  ownerId: true,
-  nativeRuntimeId: true,
-});
-const nativeRuntimeRetirementSchema = z.object({
-  directory: z.string().min(1),
-  nativeRuntimeId: z.string().uuid(),
-  allocation: z.object({
-    providerRef: z.string().min(1),
-    createIntentId: z.string().min(1).optional(),
-  }),
-  connection: z.object({
-    connectionId: z.string().uuid(),
-    providerInstanceId: z.string().min(1),
-    wrapperInstanceId: z.string().uuid(),
-  }),
-  recipients: z.array(nativeRuntimeRetirementRecipientSchema).min(1),
-  reason: z.string().min(1).max(256),
-  operationId: z.string().uuid().optional(),
-  cleanupDeadlineAt: timestampSchema,
-  replayUntil: timestampSchema,
-  attempts: z.number().int().nonnegative(),
-  nextAttemptAt: timestampSchema.optional(),
-  notificationAttempts: z.number().int().nonnegative().default(0),
-  nextNotificationAttemptAt: timestampSchema.optional(),
-  notificationState: z.enum(['pending', 'delivered', 'exhausted']).default('pending'),
-  state: z.enum(['pending', 'completed', 'released', 'unconfirmed']),
-  disposition: z.enum(['pending', 'retired', 'operation_only', 'physical_fallback']),
-});
-
-export type NativeRuntimeRetirementReceipt = z.infer<typeof nativeRuntimeRetirementSchema>;
-
-export type StoredSandboxControlState = {
-  physical: PhysicalRecord | null;
-  deadlines: DeadlineTable | null;
-  routes: SessionRoute[] | null;
-  runtime?: SandboxRuntimeMetadata;
-};
 
 export function initialRuntimeMetadata(sandboxId: string): SandboxRuntimeMetadata {
   const classification = classifySandboxId(sandboxId);
@@ -151,39 +82,40 @@ export async function saveRuntimeMetadata(
   await storage.put(RUNTIME_METADATA_KEY, SandboxRuntimeMetadataSchema.parse(runtime));
 }
 
-export async function readSandboxControlState(storage: {
-  get(key: string): Promise<unknown>;
-}): Promise<StoredSandboxControlState> {
-  const [physical, deadlines, routes, runtime] = await Promise.all([
-    storage.get(PHYSICAL_KEY),
-    storage.get(DEADLINES_KEY),
-    storage.get(ROUTES_KEY),
-    loadRuntimeMetadata(storage),
-  ]);
-  const parsedPhysical = physicalRecordSchema.safeParse(physical);
-  const parsedDeadlines = deadlineTableSchema.safeParse(deadlines);
-  const parsedRoutes = routeTableSchema.safeParse(routes);
-  return {
-    physical: parsedPhysical.success ? parsedPhysical.data : null,
-    deadlines: parsedDeadlines.success ? parsedDeadlines.data : null,
-    routes: parsedRoutes.success ? parsedRoutes.data : null,
-    ...(runtime ? { runtime } : {}),
-  };
+/** Synchronous twin of `saveRuntimeMetadata` for use inside `transactionSync`. */
+export function saveRuntimeMetadataSync(
+  storage: SyncRecordWriter,
+  runtime: SandboxRuntimeMetadata
+): void {
+  storage.put(RUNTIME_METADATA_KEY, SandboxRuntimeMetadataSchema.parse(runtime));
 }
 
-export async function loadPhysicalRecord(
+/**
+ * Canonical allocation aggregate under `sandbox_allocation_state`. The live path
+ * reads and writes only this; a fail-closed load is surfaced as a thrown error,
+ * never a silent fallback to the removed flat record.
+ */
+export async function loadAllocation(
   storage: ControlStorage,
   resumable = false
-): Promise<PhysicalRecord> {
-  const stored = await storage.get<PhysicalRecord>(PHYSICAL_KEY);
-  return stored ?? initialPhysicalRecord(resumable);
+): Promise<AllocationRecord> {
+  return unwrapAllocation(await loadCanonicalAllocation(storage, resumable));
 }
 
-export async function savePhysicalRecord(
+export function loadAllocationSync(storage: SyncRecordReader, resumable = false): AllocationRecord {
+  return unwrapAllocation(loadCanonicalAllocationSync(storage, resumable));
+}
+
+function unwrapAllocation(result: LoadResult<AllocationRecord>): AllocationRecord {
+  if (!result.ok) throw new Error(`Invalid canonical allocation: ${result.reason}`);
+  return result.value;
+}
+
+export async function storeAllocation(
   storage: ControlStorage,
-  record: PhysicalRecord
+  record: AllocationRecord
 ): Promise<void> {
-  await storage.put(PHYSICAL_KEY, record);
+  await storeCanonicalAllocation(storage, record);
 }
 
 export async function loadRouteTable(storage: ControlStorage): Promise<Map<string, SessionRoute>> {
@@ -222,48 +154,6 @@ export async function saveSessionReferences(
   await storage.put(SESSION_REFERENCES_KEY, sessionReferenceStateSchema.parse(state));
 }
 
-export async function loadNativeRuntimeRetirements(
-  storage: ControlStorage
-): Promise<NativeRuntimeRetirementReceipt[]> {
-  const stored = await storage.get(NATIVE_RUNTIME_RETIREMENTS_KEY);
-  const parsed = nativeRuntimeRetirementSchema.array().safeParse(stored ?? []);
-  if (!parsed.success) throw new Error('Invalid native runtime retirement receipts');
-  return parsed.data;
-}
-
-export async function saveNativeRuntimeRetirements(
-  storage: ControlStorage,
-  receipts: NativeRuntimeRetirementReceipt[]
-): Promise<void> {
-  await storage.put(
-    NATIVE_RUNTIME_RETIREMENTS_KEY,
-    nativeRuntimeRetirementSchema.array().parse(receipts)
-  );
-}
-
-export async function loadRecoveryDecisions(
-  storage: ControlStorage
-): Promise<SandboxRecoveryDecision[]> {
-  return sandboxRecoveryDecisionSchema
-    .array()
-    .parse((await storage.get(RECOVERY_DECISIONS_KEY)) ?? []);
-}
-
-export async function saveRecoveryDecisions(
-  storage: ControlStorage,
-  recovery: SandboxRecoveryDecision[]
-): Promise<void> {
-  await storage.put(RECOVERY_DECISIONS_KEY, sandboxRecoveryDecisionSchema.array().parse(recovery));
-}
-
-export async function loadDeadlines(storage: ControlStorage): Promise<DeadlineTable> {
-  return (await storage.get<DeadlineTable>(DEADLINES_KEY)) ?? emptyDeadlines();
-}
-
-export async function saveDeadlines(storage: ControlStorage, table: DeadlineTable): Promise<void> {
-  await storage.put(DEADLINES_KEY, table);
-}
-
 export async function loadTransitionLog(storage: ControlStorage): Promise<TransitionRow[]> {
   return (await storage.get<TransitionRow[]>(LOG_KEY)) ?? emptyTransitionLog();
 }
@@ -291,16 +181,22 @@ export async function saveSessionCredentialGrants(
   await storage.put(CREDENTIAL_GRANTS_KEY, grants);
 }
 
+/** Synchronous twin of `saveSessionCredentialGrants` for use inside `transactionSync`. */
+export function saveSessionCredentialGrantsSync(
+  storage: SyncRecordWriter,
+  grants: SessionCredentialGrant[]
+): void {
+  storage.put(CREDENTIAL_GRANTS_KEY, grants);
+}
+
 export async function eraseSandboxRecord(storage: ControlStorage): Promise<void> {
-  await storage.delete([
-    PHYSICAL_KEY,
+  await eraseAllocationRecord(storage, [
     ROUTES_KEY,
     SESSION_REFERENCES_KEY,
-    DEADLINES_KEY,
     LOG_KEY,
     CREDENTIAL_GRANTS_KEY,
     RUNTIME_METADATA_KEY,
-    NATIVE_RUNTIME_RETIREMENTS_KEY,
-    RECOVERY_DECISIONS_KEY,
+    CONTROL_ALARM_ANCHORS_KEY,
+    LEGACY_CONTROL_DEADLINES_KEY,
   ]);
 }

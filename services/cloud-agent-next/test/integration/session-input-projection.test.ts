@@ -12,6 +12,9 @@ import type { SandboxSession } from '../../src/sandbox-session/SandboxSession';
 import type { ResponseFrame, SessionSyncResult } from '../../src/shared/sandbox-control-protocol';
 import { events } from '../../src/db/sqlite-schema';
 
+import { writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
+import { acceptedState } from '../../src/sandbox-session/session-state.test-helpers.js';
 const root = 'ses_00000000000000000000000001';
 const question = {
   id: 'question_repaired',
@@ -51,11 +54,14 @@ async function seed(instance: SandboxSession, state: DurableObjectState, initial
   const wrapperInstanceId = crypto.randomUUID();
   const message = {
     messageId: 'msg_projection',
-    state: 'accepted',
-    acceptedAt: Date.now(),
-    wrapperInstanceId,
+    state: acceptedState({
+      acceptedAt: Date.now(),
+      lastActivityAt: Date.now(),
+      executionDeadlineAt: Date.now() + 60_000,
+      wrapperInstanceId,
+    }),
   };
-  state.storage.kv.put('session_messages', [message]);
+  writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [message]);
   state.storage.kv.put('session_pending_interactions', {
     revision: 1,
     questions: initial.questions,
@@ -202,7 +208,7 @@ describe('Session pending-input projection', () => {
           questions: [],
           permissions: [],
         });
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
         expect(client.frames.filter(frame => frame.streamEventType === 'connected')).toHaveLength(
           1
         );
@@ -262,7 +268,7 @@ describe('Session pending-input projection', () => {
             initial.permissions.length ? permission.id : null
           );
           expect(f.storedEvents()).toEqual([]);
-          expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+          expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
         } finally {
           client.socket.close();
           await f.cleanup();
@@ -384,7 +390,7 @@ describe('Session pending-input projection', () => {
           questions: [question],
           permissions: [permission],
         });
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
       } finally {
         filtered.socket.close();
         client.socket.close();

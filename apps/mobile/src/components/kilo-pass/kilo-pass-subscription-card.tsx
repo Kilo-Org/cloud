@@ -1,7 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef } from 'react';
-import { AppState, Linking, Platform, Pressable, View } from 'react-native';
+import { Linking, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -73,30 +72,6 @@ export function KiloPassSubscriptionCard({
       queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
     ]);
   };
-
-  // Returning to the app may follow a store-management trip (App Store or Play);
-  // refetch both the presentation and state so the card reflects any change.
-  const refetchRef = useRef({
-    presentation: presentationQuery.refetch,
-    state: stateQuery.refetch,
-  });
-  useEffect(() => {
-    refetchRef.current = {
-      presentation: presentationQuery.refetch,
-      state: stateQuery.refetch,
-    };
-  }, [presentationQuery.refetch, stateQuery.refetch]);
-  useEffect(() => {
-    const appStateSubscription = AppState.addEventListener('change', state => {
-      if (state === 'active') {
-        void refetchRef.current.presentation();
-        void refetchRef.current.state();
-      }
-    });
-    return () => {
-      appStateSubscription.remove();
-    };
-  }, []);
 
   const handlePress = () => {
     if (contentState.kind !== 'card') {

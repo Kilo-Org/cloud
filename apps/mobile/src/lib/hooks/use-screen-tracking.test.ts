@@ -3,8 +3,8 @@ import { createElement, type FC } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { beginAuthenticatedOwner } from '@/lib/context-scope';
 import { SCREEN_TRACKING_SETTLE_DEBOUNCE_MS } from '@/lib/hooks/screen-tracking-decision';
-import { SCREEN_TRACKING_GENERATION_POLL_MS } from '@/lib/hooks/use-screen-tracking';
 
 const mocks = vi.hoisted(() => {
   const state = {
@@ -78,7 +78,11 @@ import { useScreenTracking } from './use-screen-tracking';
 const HOME = '(app)/(tabs)/(0_home)';
 const PROFILE = '(app)/(tabs)/(3_profile)';
 
+// Counts harness renders so a state update that should bail out is observable.
+let renderCount = 0;
+
 const TestHarness: FC<{ bootstrapSettled: boolean }> = ({ bootstrapSettled }) => {
+  renderCount += 1;
   useScreenTracking(bootstrapSettled);
   return null;
 };
@@ -123,6 +127,7 @@ describe('useScreenTracking', () => {
     mocks.state.postHogReady = true;
     mocks.state.generation = 1;
     mocks.captureScreen.mockReset();
+    renderCount = 0;
   });
 
   afterEach(() => {
@@ -145,6 +150,15 @@ describe('useScreenTracking', () => {
     advance(SCREEN_TRACKING_SETTLE_DEBOUNCE_MS - 1);
 
     expect(mocks.captureScreen).not.toHaveBeenCalled();
+  });
+
+  it('registers no timer once the settle window elapses', () => {
+    mount();
+    advanceSettleWindow();
+
+    // The hook may keep no interval (the generation transition is subscribed,
+    // not polled), so no timer survives the one-shot settle timeout.
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('never captures a transient route that changes within the settle window', () => {
@@ -192,6 +206,21 @@ describe('useScreenTracking', () => {
     expect(mocks.captureScreen).toHaveBeenCalledWith(HOME);
   });
 
+  it('does not re-render when a navigation state event keeps the stale flag unchanged', () => {
+    mount();
+    advanceSettleWindow();
+    const rendersAfterSettle = renderCount;
+
+    act(() => {
+      mocks.emitNavStateChange();
+    });
+
+    // The listener keeps only the derived `stale` boolean and skips the state
+    // write when it did not change, so the root layout no longer re-renders per
+    // navigation event.
+    expect(renderCount).toBe(rendersAfterSettle);
+  });
+
   it('captures the first settled leaf when PostHog becomes ready late', () => {
     mocks.state.postHogReady = false;
     mount();
@@ -222,9 +251,12 @@ describe('useScreenTracking', () => {
 
     // The account switch bumps the generation while the old client is still
     // ready. `captureScreen` would silently drop the event, so the hook must
-    // neither capture nor mark HOME as captured for generation 2.
+    // neither capture nor mark HOME as captured for generation 2. The owner
+    // store publishes the same transition the generation poll used to detect.
     mocks.state.generation = 2;
-    advance(SCREEN_TRACKING_GENERATION_POLL_MS);
+    act(() => {
+      beginAuthenticatedOwner();
+    });
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
 
     // The consent gate discards the stale client and re-inits it under

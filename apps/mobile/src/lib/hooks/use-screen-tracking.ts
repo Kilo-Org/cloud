@@ -2,16 +2,13 @@ import { useNavigationContainerRef, useSegments } from 'expo-router';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { captureScreen, isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
+import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
 import {
   decideScreenTracking,
   SCREEN_TRACKING_SETTLE_DEBOUNCE_MS,
   type ScreenTrackingCapture,
 } from '@/lib/hooks/screen-tracking-decision';
 import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
-
-// The telemetry controller exposes no subscription, so the generation counter
-// is polled while mounted.
-export const SCREEN_TRACKING_GENERATION_POLL_MS = 500;
 
 /**
  * Captures a PostHog `$screen` event for the settled visible leaf route: the
@@ -42,37 +39,35 @@ export function useScreenTracking(bootstrapSettled: boolean): void {
 
   // `useRootNavigationState` is a static snapshot, so a stale-to-false
   // transition would never re-evaluate. Subscribe to the container's `state`
-  // events instead. The cast widens the runtime state shape.
+  // events instead, but keep only the derived `stale` boolean: mirroring the
+  // whole tree re-rendered the root layout on every navigation event. The ref
+  // compares before dispatching, so an event that leaves the flag unchanged
+  // never enters React at all. The cast widens the runtime state shape.
   const navigationRef = useNavigationContainerRef();
-  const [navState, setNavState] = useState<{ stale?: boolean } | undefined>(
-    () => navigationRef.current?.getRootState() as { stale?: boolean } | undefined
+  const [navStale, setNavStale] = useState<boolean | undefined>(
+    () => (navigationRef.current?.getRootState() as { stale?: boolean } | undefined)?.stale
   );
+  const lastNavStaleRef = useRef(navStale);
   useEffect(() => {
     const update = () => {
-      setNavState(navigationRef.current?.getRootState() as { stale?: boolean } | undefined);
+      const next = (navigationRef.current?.getRootState() as { stale?: boolean } | undefined)
+        ?.stale;
+      if (lastNavStaleRef.current === next) {
+        return;
+      }
+      lastNavStaleRef.current = next;
+      setNavStale(previous => (previous === next ? previous : next));
     };
     update();
     return navigationRef.addListener('state', update);
   }, [navigationRef]);
 
-  const settled = settledSegmentsKey === segmentsKey && navState?.stale === false;
+  const settled = settledSegmentsKey === segmentsKey && navStale === false;
 
-  // Re-evaluate on account generation changes. The telemetry controller
-  // exposes no subscription, so poll its generation counter while mounted.
-  const [generationTick, setGenerationTick] = useState(0);
-  useEffect(() => {
-    let lastGeneration = currentGeneration();
-    const timer = setInterval(() => {
-      const nextGeneration = currentGeneration();
-      if (nextGeneration !== lastGeneration) {
-        lastGeneration = nextGeneration;
-        setGenerationTick(tick => tick + 1);
-      }
-    }, SCREEN_TRACKING_GENERATION_POLL_MS);
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
+  // The telemetry generation only changes on the sign-in/sign-out transition,
+  // which is also when the owner store publishes. Subscribe to that store
+  // instead of polling the generation counter for the life of the process.
+  const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
 
   // The analytics module does not export its client generation, so observe it
   // when readiness flips true (`initPostHog` records it just before notifying).
@@ -88,6 +83,8 @@ export function useScreenTracking(bootstrapSettled: boolean): void {
   }, [analyticsReady]);
 
   useEffect(() => {
+    // `owner` is the transition signal; the generation is read fresh here
+    // because the telemetry controller exposes no subscription.
     const generation = currentGeneration();
     const decision = decideScreenTracking({
       segments,
@@ -107,12 +104,5 @@ export function useScreenTracking(bootstrapSettled: boolean): void {
       // eslint-disable-next-line no-console -- dev-only E2E assertion hook for screen tracking
       console.log('[screen-tracking]', decision.screenName);
     }
-  }, [
-    segments,
-    settled,
-    analyticsReady,
-    bootstrapSettled,
-    generationTick,
-    postHogClientGeneration,
-  ]);
+  }, [owner, segments, settled, analyticsReady, bootstrapSettled, postHogClientGeneration]);
 }

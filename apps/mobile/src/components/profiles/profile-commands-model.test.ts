@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCommand,
   commandRowA11yLabel,
+  MAX_SETUP_COMMANDS,
   moveCommand,
   removeCommand,
   replaceCommand,
@@ -14,6 +15,11 @@ describe('setup command list operations', () => {
   it('appends a blank command to an empty and a populated list', () => {
     expect(addCommand(commands)).toEqual(['pnpm install', 'pnpm build', 'pnpm test', '']);
     expect(addCommand([])).toEqual(['']);
+  });
+
+  it('refuses a command beyond the server list cap', () => {
+    const atCap = Array.from({ length: MAX_SETUP_COMMANDS }, (_, index) => `cmd ${index}`);
+    expect(addCommand(atCap)).toEqual(atCap);
   });
 
   it('replaces the command at an index', () => {

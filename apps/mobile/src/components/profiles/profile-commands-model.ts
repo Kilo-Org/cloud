@@ -4,11 +4,19 @@
  * No React and no React Native imports. `setCommands` replaces the whole list,
  * so the screen edits an ordered `string[]` and this module is the list's only
  * entry point: it re-exports the s2 list operations (`addCommand`,
- * `replaceCommand`, `removeCommand`, `moveCommand`) and adds the per-row
- * position label the row's controls carry.
+ * `replaceCommand`, `removeCommand`, `moveCommand`) and the server's list/row
+ * bounds (`MAX_SETUP_COMMANDS`, `MAX_SETUP_COMMAND_LENGTH`), and adds the
+ * per-row position label the row's controls carry.
  */
 
-export { addCommand, moveCommand, removeCommand, replaceCommand } from '@/lib/agent-profile-forms';
+export {
+  addCommand,
+  MAX_SETUP_COMMAND_LENGTH,
+  MAX_SETUP_COMMANDS,
+  moveCommand,
+  removeCommand,
+  replaceCommand,
+} from '@/lib/agent-profile-forms';
 
 /**
  * Position label for a command row's controls, e.g. `2 / 3`. Digits only, so

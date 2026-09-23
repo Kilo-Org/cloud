@@ -15,12 +15,15 @@ export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-s
 /**
  * Keep the previous rows across a refetch of the SAME query key. React Query's
  * `keepPreviousData` also keeps them across a query-key change, so switching
- * organization would render the previous organization's profile rows while the
+ * organization would render the previous organization's rows while the
  * actions already use the newly selected scope. Comparing the previous query's
  * key to the current one drops the placeholder the moment the input changes and
  * still keeps the rows across a same-input refetch.
+ *
+ * Exported so every context-scoped list hook shares the guard; `useRepoBindings`
+ * has the same organization switch to survive.
  */
-function keepPreviousDataForQueryKey<TQueryData>(
+export function keepPreviousDataForQueryKey<TQueryData>(
   queryKey: readonly unknown[]
 ): (
   previousData: TQueryData | undefined,

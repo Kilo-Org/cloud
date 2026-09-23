@@ -11,6 +11,9 @@ import {
   type KiloCommandFormError,
   type KiloCommandFormState,
   type KiloCommandSource,
+  MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
+  MAX_KILO_COMMAND_NAME_LENGTH,
+  MAX_KILO_COMMAND_TEMPLATE_LENGTH,
   validateKiloCommandForm,
 } from '@/components/profiles/profile-kilo-commands-model';
 import { SheetHeader } from '@/components/sheet-header';
@@ -115,6 +118,7 @@ export function KiloCommandFormSheet({
           required
           autoCapitalize="none"
           autoCorrect={false}
+          maxLength={MAX_KILO_COMMAND_NAME_LENGTH}
           placeholder={t('profiles.slashCommands.namePlaceholder')}
           onChangeText={value => {
             nameRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
@@ -125,6 +129,7 @@ export function KiloCommandFormSheet({
           label={t('profiles.slashCommands.description')}
           defaultValue={initial.description}
           disabled={isSaving}
+          maxLength={MAX_KILO_COMMAND_DESCRIPTION_LENGTH}
           placeholder={t('profiles.descriptionPlaceholder')}
           onChangeText={value => {
             descriptionRef.current = value;
@@ -138,6 +143,7 @@ export function KiloCommandFormSheet({
           required
           multiline
           textAlignVertical="top"
+          maxLength={MAX_KILO_COMMAND_TEMPLATE_LENGTH}
           className="min-h-32 leading-5"
           autoCapitalize="none"
           autoCorrect={false}

@@ -105,8 +105,22 @@ export function isValidVariableKey(value: string): boolean {
   return trimmed.length > 0 && trimmed.length <= VARIABLE_KEY_MAX_LENGTH;
 }
 
-/** Append a blank setup command for the user to type into. */
+/** Server bound: each setup command is at most 500 characters. */
+export const MAX_SETUP_COMMAND_LENGTH = 500;
+
+/** Server bound: a profile or session accepts at most 20 setup commands. */
+export const MAX_SETUP_COMMANDS = 20;
+
+/**
+ * Append a blank setup command for the user to type into. The server caps the
+ * list at `MAX_SETUP_COMMANDS` (`CommandsSchema`'s
+ * `z.array(z.string().max(500)).max(20)`), so at the cap the list is returned
+ * unchanged rather than producing a payload the server would reject.
+ */
 export function addCommand(commands: readonly string[]): string[] {
+  if (commands.length >= MAX_SETUP_COMMANDS) {
+    return [...commands];
+  }
   return [...commands, ''];
 }
 

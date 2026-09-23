@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/empty-state';
 import {
   addCommand,
   commandRowA11yLabel,
+  MAX_SETUP_COMMAND_LENGTH,
+  MAX_SETUP_COMMANDS,
   moveCommand,
   removeCommand,
   replaceCommand,
@@ -166,6 +168,7 @@ export function ProfileCommandsScreen({
           defaultValue={command}
           placeholder={t('profiles.commandPlaceholder')}
           className="min-h-[44px] leading-[normal]"
+          maxLength={MAX_SETUP_COMMAND_LENGTH}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
@@ -251,7 +254,7 @@ export function ProfileCommandsScreen({
     content = (
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
-        <Button onPress={add}>
+        <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
           <Text>{t('profiles.addCommand')}</Text>
         </Button>
       </>

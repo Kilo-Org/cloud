@@ -30,6 +30,18 @@ const BUILTIN_COMMAND_NAMES = new Set([
 
 const COMMAND_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
 
+/**
+ * Server bounds, mirrored so the form can refuse an over-long value before it
+ * reaches the API: `kiloCommandNameSchema` caps the name at 50,
+ * `kiloCommandCreateInputSchema` caps the description at 2000 and the template
+ * at 100,000 (`packages/cloud-agent-profile/src/profile-kilo-commands-service.ts`).
+ * The form passes these to the fields' `maxLength`, matching web's
+ * `KiloCommandsTab` maxLength inputs, so the over-long value is never typed.
+ */
+export const MAX_KILO_COMMAND_NAME_LENGTH = 50;
+export const MAX_KILO_COMMAND_DESCRIPTION_LENGTH = 2000;
+export const MAX_KILO_COMMAND_TEMPLATE_LENGTH = 100_000;
+
 /** The fields of a kilo command the screen reads. Structural, so tests are easy. */
 export type KiloCommandSource = Readonly<{
   id: string;
@@ -122,7 +134,10 @@ export type KiloCommandFormError =
  * Validate the form before a save. Returns the field at fault, or `null` when
  * valid. Mirrors the server's `kiloCommandNameSchema` and template minimum: a
  * non-empty name that starts with a lowercase letter, stays in `[a-z0-9-]`,
- * does not collide with a built-in command, and a non-empty template.
+ * does not collide with a built-in command, and a non-empty template. The
+ * server's name/template/description length bounds are enforced by the form
+ * fields' `maxLength` (see the `MAX_KILO_COMMAND_*` constants), so an over-long
+ * value cannot be typed in the first place.
  */
 export function validateKiloCommandForm(state: KiloCommandFormState): KiloCommandFormError | null {
   const name = state.name.trim();

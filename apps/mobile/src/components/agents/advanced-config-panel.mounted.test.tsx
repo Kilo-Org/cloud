@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
 import { type ProfileSelectorProfile } from './profile-selector-model';
+import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
 const push = vi.fn<(href: string) => void>();
@@ -296,6 +297,28 @@ describe('AdvancedConfigPanel', () => {
 
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
     expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+  });
+
+  it('caps manual setup commands at the server list and row bounds', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    press(buttonByText(renderer, 'Add command'));
+    expect(field(renderer, 'Command').props.maxLength).toBe(500);
+
+    for (let index = 1; index < MAX_SETUP_COMMANDS; index += 1) {
+      press(buttonByText(renderer, 'Add command'));
+    }
+    const commandFields = () =>
+      renderer.root
+        .findAllByType('FormField' as never)
+        .filter(node => node.props.label === 'Command');
+    expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
+    expect(buttonByText(renderer, 'Add command')?.props.disabled).toBe(true);
+
+    // A 21st row is refused even if the disabled control is pressed.
+    press(buttonByText(renderer, 'Add command'));
+    expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
   });
 
   it('keeps No profile and manual config working with no profiles at all', () => {

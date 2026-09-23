@@ -1,10 +1,11 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { toast } from 'sonner-native';
 
 import { mergeRepositoryOptions, type RepoOption } from '@/components/profiles/repo-bindings-model';
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
 import { type AgentRepoBinding } from '@/lib/hooks/agent-profile-types';
+import { keepPreviousDataForQueryKey } from '@/lib/hooks/use-agent-profiles';
 import { useTRPC } from '@/lib/trpc';
 
 /** Stable empty fallbacks so an unsettled result is not a new array each render. */
@@ -16,18 +17,21 @@ const NO_REPOSITORIES: RepoOption[] = [];
  * `listRepoBindings({})`; org context carries `organizationId`, exactly like
  * every other `agentProfiles.*` input.
  *
- * `placeholderData: keepPreviousData` keeps the rows across a refetch, so the
- * list never blanks while an unbind reconciles. `isLoading` is `isPending`, not
- * React Query v5's `isLoading`, so an offline first fetch still counts as
- * unloaded rather than empty.
+ * `placeholderData` keeps the rows across a refetch of the same key, so the
+ * list never blanks while an unbind reconciles; a different key (an
+ * organization switch) starts empty instead of showing another scope's rows
+ * while `useRepoBindingMutations` already targets the new scope. `isLoading` is
+ * `isPending`, not React Query v5's `isLoading`, so an offline first fetch still
+ * counts as unloaded rather than empty.
  */
 export function useRepoBindings(organizationId?: string) {
   const trpc = useTRPC();
+  const options = trpc.agentProfiles.listRepoBindings.queryOptions(
+    organizationId === undefined ? {} : { organizationId }
+  );
   const query = useQuery({
-    ...trpc.agentProfiles.listRepoBindings.queryOptions(
-      organizationId === undefined ? {} : { organizationId }
-    ),
-    placeholderData: keepPreviousData,
+    ...options,
+    placeholderData: keepPreviousDataForQueryKey(options.queryKey),
   });
 
   return {

@@ -253,20 +253,30 @@ describe('buildAgentPayload', () => {
     ).toBe('high');
   });
 
+  it('keeps the effort variant when the model changes to one that shares it', () => {
+    // The sheet clears `state.variant` only when the typed model does not offer
+    // it (`agent-form-sheet.tsx`), so a non-empty variant the form still carries
+    // belongs to the new model and must survive the switch.
+    const existing = { ...agentSource().config, variant: 'high' };
+    expect(
+      buildAgentPayload(formState({ model: 'openai/gpt', variant: 'high' }), existing).config
+        .variant
+    ).toBe('high');
+  });
+
   it('sends a picked variant for a new agent once a model is typed', () => {
     expect(
       buildAgentPayload(formState({ model: 'anthropic/claude', variant: 'low' })).config.variant
     ).toBe('low');
   });
 
-  it('drops the effort variant when the model is cleared or changed', () => {
+  it('drops the effort variant when the model is cleared or the form carries none', () => {
     const existing = { ...agentSource().config, variant: 'high' };
     expect(
       buildAgentPayload(formState({ model: '', variant: 'high' }), existing).config.variant
     ).toBeUndefined();
     expect(
-      buildAgentPayload(formState({ model: 'openai/gpt', variant: 'high' }), existing).config
-        .variant
+      buildAgentPayload(formState({ model: 'openai/gpt', variant: '' }), existing).config.variant
     ).toBeUndefined();
   });
 

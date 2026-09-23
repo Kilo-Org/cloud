@@ -260,8 +260,11 @@ function parseInt10(value: string): number | undefined {
  * The agent's existing config is spread first, so fields the form does not
  * surface (hidden/disable flags, `color`) survive an edit. Sampling fields
  * mirror web: a blank string clears the override, `steps` only when it is a
- * positive integer. The effort variant is dropped when the model it belongs to
- * is cleared or changed — the server rejects a variant without a matching model.
+ * positive integer. The effort variant is dropped when the model is cleared or
+ * the form carries none — the server rejects a variant without a matching
+ * model, and `agent-form-sheet.tsx` clears `state.variant` whenever the typed
+ * model does not offer it, so a non-empty variant belongs to the new model even
+ * when the model string changed.
  */
 export function buildAgentPayload(
   state: AgentFormState,
@@ -269,8 +272,7 @@ export function buildAgentPayload(
 ): AgentPayload {
   const model = state.model.trim();
   const variant = state.variant.trim();
-  const keepVariant =
-    variant.length > 0 && model.length > 0 && (existing === undefined || existing.model === model);
+  const keepVariant = variant.length > 0 && model.length > 0;
   const config = {
     ...existing,
     prompt: state.prompt.trim() || undefined,

@@ -4,6 +4,7 @@ import {
   addCommand,
   cleanVariableKey,
   isValidVariableKey,
+  MAX_SETUP_COMMANDS,
   moveCommand,
   parseSkillFrontmatter,
   removeCommand,
@@ -125,6 +126,11 @@ describe('setup command list operations', () => {
   it('appends a blank command', () => {
     expect(addCommand(commands)).toEqual(['pnpm install', 'pnpm build', 'pnpm test', '']);
     expect(addCommand([])).toEqual(['']);
+  });
+
+  it('refuses a command beyond the server list cap', () => {
+    const atCap = Array.from({ length: MAX_SETUP_COMMANDS }, (_, index) => `cmd ${index}`);
+    expect(addCommand(atCap)).toEqual(atCap);
   });
 
   it('replaces the command at an index', () => {

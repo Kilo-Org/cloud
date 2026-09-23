@@ -5,6 +5,8 @@ import { Pressable, View } from 'react-native';
 import {
   addCommand,
   commandRowA11yLabel,
+  MAX_SETUP_COMMAND_LENGTH,
+  MAX_SETUP_COMMANDS,
   moveCommand,
   removeCommand,
   replaceCommand,
@@ -155,6 +157,7 @@ export function ManualSetupCommandsEditor({
               placeholder={t('profiles.commandPlaceholder')}
               className="min-h-[44px] leading-[normal]"
               disabled={disabled}
+              maxLength={MAX_SETUP_COMMAND_LENGTH}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="done"
@@ -209,7 +212,7 @@ export function ManualSetupCommandsEditor({
           onChange(addCommand(commands));
           setGeneration(current => current + 1);
         }}
-        disabled={disabled}
+        disabled={disabled || commands.length >= MAX_SETUP_COMMANDS}
         accessibilityLabel={t('profiles.addCommand')}
       >
         <Plus size={16} color={colors.foreground} />

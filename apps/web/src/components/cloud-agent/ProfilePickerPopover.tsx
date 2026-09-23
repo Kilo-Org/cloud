@@ -89,6 +89,11 @@ export function ProfilePickerPopover({
   });
   const profilesLoading = organizationId ? combinedProfilesLoading : personalProfilesLoading;
   const profilesError = organizationId ? combinedProfilesError : personalProfilesError;
+  // React Query keeps `error` set while retaining `data` when a background
+  // refetch fails (a window-focus refetch, or the invalidation refetch a profile
+  // mutation triggers). Only surface the retry state when there is nothing
+  // cached to show, so a transient failure never blanks a working picker.
+  const profilesData = organizationId ? combinedData : personalProfilesData;
   const refetchProfiles = organizationId ? refetchCombinedProfiles : refetchPersonalProfiles;
 
   const allProfiles: ProfileSummaryWithOwner[] = useMemo(
@@ -223,7 +228,7 @@ export function ProfilePickerPopover({
               allProfiles={allProfiles}
               selectedOverrideProfileId={selectedOverrideProfileId}
               isLoading={profilesLoading}
-              isError={!!profilesError}
+              isError={!!profilesError && !profilesData}
               onRetry={() => {
                 void refetchProfiles();
               }}

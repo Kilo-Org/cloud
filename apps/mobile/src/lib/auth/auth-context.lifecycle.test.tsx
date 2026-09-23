@@ -1555,6 +1555,65 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
+  it('regression: the refusal-triggered sign-out cleanup still authenticates with the owner token', async () => {
+    const { getCtx, unmount } = await mountProvider();
+
+    // A session with a refresh token and an expiry inside the refresh margin,
+    // so a foreground event initiates a proactive refresh.
+    await act(async () => {
+      await getCtx().signIn('active-token', 'active-refresh', 3600);
+    });
+
+    const listeners = hoisted.appState.addEventListener.mock.calls;
+    const eventListener = listeners.at(-1)?.[1];
+
+    // Serve the foreground's expiry read and the refresh's refresh-token read.
+    // eslint-disable-next-line require-await -- mock returning a resolved promise
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'token-expires-at') {
+        return String(Date.now() + 60_000);
+      }
+      if (key === 'refresh-token') {
+        return 'active-refresh';
+      }
+      return null;
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 }));
+
+    // The 401 clear runs before the refusal-triggered sign-out. The owner must
+    // still serve the token to runLogoutCleanup's revoke/unregister, which run
+    // before the epoch bump and read the Authorization header through
+    // `getAuthTokenForRequest`.
+    const tokens: typeof TokenOwnerModule = await import('./token-owner');
+    let cleanupToken: string | null | 'unset' = 'unset';
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      cleanupToken = await tokens.getAuthTokenForRequest();
+    });
+
+    await act(async () => {
+      eventListener?.('active');
+      await Promise.resolve();
+    });
+
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The remote cleanup authenticated with the session's own access token.
+    expect(cleanupToken).toBe('active-token');
+
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
   it('regression: a signed-out launch re-runs the OS search clear the teardown cannot await', async () => {
     // The beforeEach leaves every read null: the launch positively restored no
     // session, which is the retry for a teardown-time clear that failed or a

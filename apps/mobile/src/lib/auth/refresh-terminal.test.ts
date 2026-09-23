@@ -29,7 +29,12 @@ vi.mock('expo-secure-store', () => ({
 import { resetAuthTerminalReports } from '@/lib/auth/auth-response-class';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { performRefresh } from '@/lib/auth/credentials';
-import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import {
+  clearActiveToken,
+  getAuthTokenForRequest,
+  setActiveToken,
+  setSignOutTeardownActive,
+} from '@/lib/auth/token-owner';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import * as SecureStore from 'expo-secure-store';
@@ -95,6 +100,31 @@ describe('refresh terminal classification', () => {
     // The terminal failure is reported once, not once per attempt.
     expect(events).toHaveLength(1);
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
+  });
+
+  it('keeps the in-memory owner serving after the 401 clear so sign-out cleanup can authenticate', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '123');
+    setActiveToken('dead-token', null);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 })
+    );
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
+    // The stored pair is gone, so the next refresh is refused without a
+    // request and the loop is stopped...
+    expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
+    // ...but the in-memory owner must keep serving until sign-out's teardown
+    // clears it: runLogoutCleanup's revoke/unregister run BEFORE the epoch
+    // bump and read this same token for their Authorization header.
+    await expect(getAuthTokenForRequest()).resolves.toBe('dead-token');
   });
 
   it('keeps a 429 transient, carries Retry-After, and keeps the pair', async () => {

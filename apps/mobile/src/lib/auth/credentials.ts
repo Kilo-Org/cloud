@@ -5,7 +5,7 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { classifyAuthResponse, reportAuthTerminalFailure } from '@/lib/auth/auth-response-class';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
-import { clearActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
+import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
@@ -72,7 +72,7 @@ export async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Delete the stored bearer pair, and drop the in-memory owner with it.
+ * Delete the stored bearer pair.
  *
  * Called when a 401 proves the credential is gone: keeping the dead pair is
  * what makes every later request try again and fail again. The deletes run on
@@ -80,6 +80,14 @@ export async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
  * epoch first wins and this clear is skipped rather than resurrecting a
  * teardown. `epoch` is the session that owned the refusal, captured before the
  * request that produced it.
+ *
+ * The in-memory owner is deliberately NOT dropped here. Sign-out's teardown
+ * clears it, and until then it must keep serving: the refusal-triggered
+ * sign-out's remote cleanup (device-session revoke, push-token unregister)
+ * runs BEFORE the epoch bump and reads the owner for its Authorization header
+ * (`getAuthTokenForRequest`). Emptying the owner here would send that cleanup
+ * unauthenticated and fail it. Dropping the stored refresh token is what stops
+ * the loop: the next refresh finds none and is refused without a request.
  */
 async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
   const superseded = (): boolean => !isCurrentAuthEpoch(epoch) || isSignOutTeardownActive();
@@ -93,16 +101,13 @@ async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
     // Best effort, like sign-out's credential batch: a keychain rejection must
     // not escape into doRefresh's catch, which would downgrade this terminal
     // 401 into a retryable outcome and restart the very loop it must stop. The
-    // refusal is reported and the in-memory owner dropped below regardless.
+    // refusal is reported by the caller regardless.
     await Promise.allSettled([
       SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
       SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
     ]);
   });
-  if (!superseded()) {
-    clearActiveToken();
-  }
 }
 
 /**

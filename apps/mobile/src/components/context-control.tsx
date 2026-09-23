@@ -1,6 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import { Platform, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,13 +16,6 @@ import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
-
-// The native iOS action sheet renders only the option strings and has no icon
-// API, so a check passed through the Android-only `icons` gutter never appears
-// there. The option label is the one element both the native iOS sheet and the
-// Android sheet render, so iOS marks the current account in the label instead:
-// U+2713, the text-presentation check the platform menus use.
-const CHECK_MARK = '\u2713';
 
 /** The caller supplies its cached memberships; the picker does not fetch data. */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
@@ -47,31 +40,22 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
     // an account the user is not on.
     const isCurrent = (index: number) =>
       index === 0 ? organizationId === null : orgs[index - 1]?.organizationId === organizationId;
-    // iOS has no icon gutter, so the current-account mark rides the label there.
-    // Android keeps every label unmarked and paints the check in the shared left
-    // gutter instead: each account row holds the gutter with a transparent check
-    // so the labels line up, and Cancel takes no gutter at all.
-    const options =
-      Platform.OS === 'ios'
-        ? labels.map((label, index) =>
-            index !== cancelButtonIndex && isCurrent(index) ? `${CHECK_MARK} ${label}` : label
-          )
-        : labels;
-    const icons =
-      Platform.OS === 'ios'
-        ? undefined
-        : labels.map((_, index) =>
-            index === cancelButtonIndex ? null : (
-              <Check
-                key={index}
-                size={18}
-                color={isCurrent(index) ? colors.foreground : 'transparent'}
-              />
-            )
-          );
+    // The current account is marked by the check icon in the shared left gutter,
+    // on every platform. The native iOS action sheet renders option strings only
+    // — it has no icon API, no separator style and no palette — so iOS would show
+    // a second, unmarked implementation; `AppRootProviders` therefore mounts this
+    // library's own JS sheet (the Android sheet) on iOS too, and one option array
+    // and one icon gutter serve both platforms. Every account row holds the
+    // gutter with a check, transparent when the row is not the current account, so
+    // the labels line up; Cancel takes no gutter at all.
+    const icons = labels.map((_, index) =>
+      index === cancelButtonIndex ? null : (
+        <Check key={index} size={18} color={isCurrent(index) ? colors.foreground : 'transparent'} />
+      )
+    );
     showActionSheetWithOptions(
       {
-        options,
+        options: labels,
         icons,
         cancelButtonIndex,
         title: t('profile.selectAccount'),
@@ -79,8 +63,7 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
         textStyle: { color: colors.foreground },
         titleTextStyle: { color: colors.mutedForeground },
         // A rule between rows turns the list from plain copy into distinct
-        // choices. The native iOS sheet draws its own separators; these color the
-        // Android sheet's.
+        // choices.
         showSeparators: true,
         separatorStyle: { backgroundColor: colors.border, height: 0.5 },
       },

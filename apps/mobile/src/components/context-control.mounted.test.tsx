@@ -13,8 +13,8 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
-// Mutable so a test can prove the platform split: iOS carries the
-// current-account mark in the option label, Android paints it in the gutter.
+// Mutable so a test can prove both platforms receive the one sheet the picker
+// builds: the current-account mark rides the gutter icon, never a label branch.
 const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
 // not just that the dark values are passed through. Values mirror the real
@@ -244,25 +244,25 @@ describe('ContextControl', () => {
     }
   );
 
-  it.each([
-    { stored: null, expected: ['✓ Personal', name, 'Cancel'] },
-    { stored: 'org-a', expected: ['Personal', `✓ ${name}`, 'Cancel'] },
-    { stored: 'org-missing', expected: ['Personal', name, 'Cancel'] },
-  ])(
-    'marks the current account in the option label on iOS (stored=$stored)',
-    async ({ stored, expected }) => {
-      platform.OS = 'ios';
-      storage.read.mockResolvedValue(stored);
+  it.each(['android', 'ios'] as const)(
+    'marks the current account in the shared gutter on %s',
+    async os => {
+      platform.OS = os;
+      storage.read.mockResolvedValue('org-a');
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
       await press(picker(ui));
       const native = nativePicker();
-      expect(native.options.options).toEqual(expected);
-      expect(native.options.icons).toBeUndefined();
+      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
+      expect(gutter(native.options.icons)).toEqual([
+        { size: 18, color: 'transparent' },
+        { size: 18, color: DARK_COLORS.foreground },
+        null,
+      ]);
     }
   );
 
-  it('marks the current account in the gutter on Android and in the label on iOS', async () => {
+  it('opens one sheet on both platforms, with no per-platform label branch', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
@@ -272,14 +272,9 @@ describe('ContextControl', () => {
     platform.OS = 'ios';
     await press(picker(ui));
     const ios = nativePicker().options;
-    expect(android.options).toEqual(['Personal', name, 'Cancel']);
-    expect(ios.options).toEqual(['Personal', `✓ ${name}`, 'Cancel']);
-    expect(gutter(android.icons)).toEqual([
-      { size: 18, color: 'transparent' },
-      { size: 18, color: DARK_COLORS.foreground },
-      null,
-    ]);
-    expect(ios.icons).toBeUndefined();
+    expect(ios.options).toEqual(android.options);
+    expect(ios.icons).toBeDefined();
+    expect(gutter(ios.icons)).toEqual(gutter(android.icons));
   });
 
   it('checks Personal when the membership list is empty', async () => {

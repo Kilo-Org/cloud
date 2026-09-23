@@ -342,8 +342,8 @@ expected set, else `0`; an expected capability gap is a reported skip, not a
 failure.
 Each scenario owns its cleanup; the runner only repeats `interruptSession` and
 `deleteSession` as a tolerant backstop. The same script runs in the
-`workflow_dispatch`-only `E2E Deployed` workflow
-(`.github/workflows/e2e-deployed.yml`). See
+`workflow_dispatch`-only `Cloud Agent E2E tests` workflow
+(`.github/workflows/cloud-agent-e2e-tests.yml`). See
 [`../README.md`](../README.md#deployed-matrix-runner) for the scenario matrix
 and the env contract.
 
@@ -351,8 +351,8 @@ Aggregate-runtime risk: the four public-surface scenarios have declared
 ceilings of 10 + 25 + 12 + 30 minutes, plus cleanup (up to about 2.5 minutes)
 and transport overhead. Their budgets mix per-turn and overall timeouts, as the
 existing scenarios do (`cold-hot` alone permits four 240 s turn waits), so no
-whole-matrix total is derivable from the registry. The workflow's
-`timeout-minutes: 300` is a reasonable operational ceiling, not a certified
+whole-matrix total is derivable from the registry. The workflow's per-batch
+`timeout-minutes: 90` is a reasonable operational ceiling, not a certified
 whole-matrix bound. None of the four public-surface scenarios uses a `gate` or
 `hang`; `worktree-multi-chat` does issue a targeted interrupt of the sibling
 chat.

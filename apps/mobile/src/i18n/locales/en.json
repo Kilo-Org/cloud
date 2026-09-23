@@ -3051,7 +3051,34 @@
       "unauthorized": "Kilo tools refused this session",
       "unauthorizedDescription": "Sign in again to use the Kilo tools in this chat.",
       "unavailable": "Kilo tools are not available",
-      "unavailableDescription": "The Kilo server is not there for this account."
+      "unavailableDescription": "The Kilo server is not there for this account.",
+      "sheetTitle": "Chat tools",
+      "serversSection": "MCP servers",
+      "addServer": "Add MCP server",
+      "addServerTitle": "Add an MCP server",
+      "editServerTitle": "Edit this MCP server",
+      "fieldName": "Display name",
+      "fieldUrl": "Server URL",
+      "fieldUrlInvalid": "Enter a valid server URL.",
+      "fieldToken": "Bearer token (optional)",
+      "enableServer": "Enable this server",
+      "editServer": "Edit server",
+      "deleteServer": "Delete server",
+      "deleteTitle": "Delete this server?",
+      "deleteMessage": "Its tools leave every chat.",
+      "kiloBuiltIn": "Built in. Turn it on or off for this chat; it cannot be edited or deleted.",
+      "serversEmptyTitle": "No remote servers yet",
+      "serversEmptyDescription": "Add one to offer its tools in your chats.",
+      "settingsToolsTitle": "Let Kilo change app settings",
+      "settingsToolsSubtitle": "Applies to theme, language, notifications, models and the rest of Preferences.",
+      "settingsToolsOn": "On — the settings tools are sent to the model",
+      "settingsToolsOff": "Off — no settings tool is sent to the model",
+      "serverChecking": "Checking this server…",
+      "serverToolCount": "{{count}} tools",
+      "serverUnreachable": "Couldn't reach this server"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Confirm this change?"
   }
 }

@@ -210,12 +210,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+    const { autoTopUpReservationFailed, balance, settings, plan, balanceLimitedByUserAllowance } =
       await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
       return await creditsBlockedResponse({
         user,
+        ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
         balance,
         organizationId,
         balanceLimitedByUserAllowance,

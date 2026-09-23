@@ -68,6 +68,18 @@ export type AutoTopUpEntity =
   | { type: 'user'; user: UserForBalance }
   | { type: 'organization'; organization: AutoTopUpOrganization };
 
+export type AutoTopUpReservation = {
+  entity: AutoTopUpEntity;
+  traceId: string;
+  config: {
+    id: string;
+    stripe_payment_method_id: string;
+    amount_cents: number | null;
+  };
+  attemptStartedAt: string;
+  stripeCustomerId: string;
+};
+
 async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<boolean> {
   const subscription = await getKiloPassStateForUser(db, kiloUserId);
   if (!subscription) return false;
@@ -110,7 +122,8 @@ async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<bo
  * Credit application is handled by the `invoice.paid` Stripe webhook.
  */
 export async function maybePerformAutoTopUp(user: UserForBalance): Promise<void> {
-  return await maybePerformAutoTopUpForEntity({ type: 'user', user });
+  const reservation = await reserveAutoTopUp(user);
+  if (reservation) await performReservedAutoTopUp(reservation);
 }
 
 /**
@@ -120,10 +133,25 @@ export async function maybePerformAutoTopUp(user: UserForBalance): Promise<void>
 export async function maybePerformOrganizationAutoTopUp(
   organization: AutoTopUpOrganization
 ): Promise<void> {
-  return await maybePerformAutoTopUpForEntity({ type: 'organization', organization });
+  const reservation = await reserveOrganizationAutoTopUp(organization);
+  if (reservation) await performReservedAutoTopUp(reservation);
 }
 
-async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<void> {
+export async function reserveAutoTopUp(
+  user: UserForBalance
+): Promise<AutoTopUpReservation | undefined> {
+  return await reserveAutoTopUpForEntity({ type: 'user', user });
+}
+
+export async function reserveOrganizationAutoTopUp(
+  organization: AutoTopUpOrganization
+): Promise<AutoTopUpReservation | undefined> {
+  return await reserveAutoTopUpForEntity({ type: 'organization', organization });
+}
+
+async function reserveAutoTopUpForEntity(
+  entity: AutoTopUpEntity
+): Promise<AutoTopUpReservation | undefined> {
   const { auto_top_up_enabled, initialBalance_USD } =
     entity.type === 'user'
       ? {
@@ -140,14 +168,14 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
         };
   // Only for users with auto-top-up enabled
   if (!auto_top_up_enabled) {
-    return;
+    return undefined;
   }
 
   // Only trigger if balance is below threshold
   const threshold =
     entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
   if (initialBalance_USD >= threshold) {
-    return;
+    return undefined;
   }
 
   // If the user has an active Kilo Pass and has NOT received their bonus credits for the current
@@ -155,7 +183,7 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
   if (entity.type === 'user') {
     const shouldWait = await shouldWaitForKiloPassBonusCredits(entity.user.id);
     if (shouldWait) {
-      return;
+      return undefined;
     }
   }
 
@@ -174,43 +202,23 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
     threshold_USD: threshold,
   });
 
-  // Perform the auto-top-up - only user.id is needed, fresh data is fetched inside
-  const result = await performAutoTopUpForEntity(entity, traceId);
-
-  if (!result.success && result.error === 'concurrent_attempt_in_progress') {
-    logExceptInTest(`Auto-top-up skipped for ${entityLabel}: concurrent attempt in progress`, {
-      traceId,
-    });
-    return;
-  }
-
-  if (result.success) {
-    logExceptInTest(`Auto-top-up successful for ${entityLabel}`, {
-      traceId,
-      entity_type: entity.type,
-      entity_id: entityId,
-      stripe_id: result.stripe_id,
-    });
-  } else {
-    sentryLogger('auto-topup', 'warning')(`Auto-top-up failed for ${entityLabel}`, {
-      ...result,
-      traceId,
-    });
-  }
-}
-
-/**
- * Generalized auto-top-up logic that works for both users and organizations.
- */
-async function performAutoTopUpForEntity(
-  entity: AutoTopUpEntity,
-  traceId: string
-): Promise<AutoTopUpResult> {
   const ownerColumn =
     entity.type === 'user'
       ? auto_top_up_configs.owned_by_user_id
       : auto_top_up_configs.owned_by_organization_id;
   const ownerId = entity.type === 'user' ? entity.user.id : entity.organization.id;
+  const ownerEnabled =
+    entity.type === 'user'
+      ? sql`EXISTS (
+          SELECT 1 FROM ${kilocode_users}
+          WHERE ${kilocode_users.id} = ${ownerId}
+            AND ${kilocode_users.auto_top_up_enabled} = TRUE
+        )`
+      : sql`EXISTS (
+          SELECT 1 FROM ${organizations}
+          WHERE ${organizations.id} = ${ownerId}
+            AND ${organizations.auto_top_up_enabled} = TRUE
+        )`;
 
   // Atomically check and acquire lock in a single query using SQL NOW()
   const [config] = await db
@@ -219,6 +227,8 @@ async function performAutoTopUpForEntity(
     .where(
       and(
         eq(ownerColumn, ownerId),
+        isNull(auto_top_up_configs.disabled_reason),
+        ownerEnabled,
         or(
           isNull(auto_top_up_configs.attempt_started_at),
           lt(
@@ -244,9 +254,12 @@ async function performAutoTopUpForEntity(
 
     if (!existingConfig) {
       await disableAutoTopUpForEntity(entity, 'no_payment_method_saved');
-      return failureResult('no_payment_method_saved');
+      return undefined;
     }
-    return failureResult('concurrent_attempt_in_progress');
+    logExceptInTest(`Auto-top-up skipped for ${entityLabel}: concurrent attempt in progress`, {
+      traceId,
+    });
+    return undefined;
   }
 
   // Re-check balance after acquiring lock to prevent duplicate top-ups
@@ -255,25 +268,101 @@ async function performAutoTopUpForEntity(
   // calling getBalanceForUser which would create a cycle (it calls maybePerformAutoTopUp)
   const { currentBalance_USD, stripe_customer_id } =
     await getEntityBalanceAndStripeCustomer(entity);
-  const threshold =
-    entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
   if (currentBalance_USD >= threshold) {
     // Balance is now sufficient, release lock and exit
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult('balance_already_sufficient');
+    if (config.attempt_started_at) {
+      await releaseAutoTopUpReservation(config.id, config.attempt_started_at);
+    }
+    return undefined;
   }
 
   if (!stripe_customer_id) {
-    await disableAutoTopUpForEntity(entity, 'no_stripe_customer');
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult('no_stripe_customer');
+    if (config.attempt_started_at) {
+      await disableAutoTopUpForEntity(entity, 'no_stripe_customer', {
+        configId: config.id,
+        attemptStartedAt: config.attempt_started_at,
+      });
+    }
+    return undefined;
   }
+  if (!config.attempt_started_at) {
+    throw new Error(`Auto Top-Up reservation ${config.id} has no attempt timestamp`);
+  }
+
+  return {
+    entity,
+    traceId,
+    config: {
+      id: config.id,
+      stripe_payment_method_id: config.stripe_payment_method_id,
+      amount_cents: config.amount_cents,
+    },
+    attemptStartedAt: config.attempt_started_at,
+    stripeCustomerId: stripe_customer_id,
+  };
+}
+
+export async function performReservedAutoTopUp(reservation: AutoTopUpReservation): Promise<void> {
+  const result = await chargeReservedAutoTopUp(reservation);
+  const { entity, traceId } = reservation;
+  const entityId = entity.type === 'user' ? entity.user.id : entity.organization.id;
+  const entityLabel = entity.type === 'user' ? `user ${entityId}` : `organization ${entityId}`;
+
+  if (result.success) {
+    logExceptInTest(`Auto-top-up successful for ${entityLabel}`, {
+      traceId,
+      entity_type: entity.type,
+      entity_id: entityId,
+      stripe_id: result.stripe_id,
+    });
+  } else {
+    sentryLogger('auto-topup', 'warning')(`Auto-top-up failed for ${entityLabel}`, {
+      ...result,
+      traceId,
+    });
+  }
+}
+
+async function chargeReservedAutoTopUp(
+  reservation: AutoTopUpReservation
+): Promise<AutoTopUpResult> {
+  const {
+    attemptStartedAt,
+    config,
+    entity,
+    stripeCustomerId: stripe_customer_id,
+    traceId,
+  } = reservation;
+  const ownerId = entity.type === 'user' ? entity.user.id : entity.organization.id;
+  const ownerEnabled =
+    entity.type === 'user'
+      ? sql`EXISTS (
+          SELECT 1 FROM ${kilocode_users}
+          WHERE ${kilocode_users.id} = ${ownerId}
+            AND ${kilocode_users.auto_top_up_enabled} = TRUE
+        )`
+      : sql`EXISTS (
+          SELECT 1 FROM ${organizations}
+          WHERE ${organizations.id} = ${ownerId}
+            AND ${organizations.auto_top_up_enabled} = TRUE
+        )`;
+  const [ownedReservation] = await db
+    .update(auto_top_up_configs)
+    .set({ attempt_started_at: sql`NOW()` })
+    .where(
+      and(
+        eq(auto_top_up_configs.id, config.id),
+        eq(auto_top_up_configs.attempt_started_at, attemptStartedAt),
+        isNull(auto_top_up_configs.disabled_reason),
+        ownerEnabled
+      )
+    )
+    .returning({ attempt_started_at: auto_top_up_configs.attempt_started_at });
+  if (!ownedReservation) return failureResult('reservation_no_longer_owned');
+  if (!ownedReservation.attempt_started_at) {
+    throw new Error(`Auto Top-Up reservation ${config.id} lost its execution timestamp`);
+  }
+  const executionStartedAt = ownedReservation.attempt_started_at;
 
   const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
   const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;
@@ -366,11 +455,10 @@ async function performAutoTopUpForEntity(
 
     // Payment did not complete successfully (e.g. requires authentication).
     const errorStatus = `unexpected_status_${paidInvoice.status}`;
-    await disableAutoTopUpForEntity(entity, errorStatus);
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
+    await disableAutoTopUpForEntity(entity, errorStatus, {
+      configId: config.id,
+      attemptStartedAt: executionStartedAt,
+    });
     return failureResult(errorStatus);
   } catch (error) {
     // StripeCardError = card was declined (insufficient funds, expired, etc.)
@@ -393,13 +481,34 @@ async function performAutoTopUpForEntity(
       });
     }
 
-    await disableAutoTopUpForEntity(entity, code);
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
+    await disableAutoTopUpForEntity(entity, code, {
+      configId: config.id,
+      attemptStartedAt: executionStartedAt,
+    });
     return failureResult(code);
   }
+}
+
+type AutoTopUpReservationOwnership = {
+  configId: string;
+  attemptStartedAt: string;
+};
+
+async function releaseAutoTopUpReservation(
+  configId: string,
+  attemptStartedAt: string
+): Promise<boolean> {
+  const released = await db
+    .update(auto_top_up_configs)
+    .set({ attempt_started_at: null })
+    .where(
+      and(
+        eq(auto_top_up_configs.id, configId),
+        eq(auto_top_up_configs.attempt_started_at, attemptStartedAt)
+      )
+    )
+    .returning({ id: auto_top_up_configs.id });
+  return released.length === 1;
 }
 
 /**
@@ -450,16 +559,16 @@ type KnownFailureReason = keyof typeof failureReasonMessages;
 /**
  * Disable auto-top-up for an entity (user or organization).
  */
-async function disableAutoTopUpForEntity(entity: AutoTopUpEntity, reason: string): Promise<void> {
+async function disableAutoTopUpForEntity(
+  entity: AutoTopUpEntity,
+  reason: string,
+  ownership?: AutoTopUpReservationOwnership
+): Promise<void> {
   const message =
     failureReasonMessages[reason as KnownFailureReason] ?? failureReasonMessages.unknown_error;
   const isUnmappedCode = !(reason in failureReasonMessages);
   const entityLabel =
     entity.type === 'user' ? `user ${entity.user.id}` : `organization ${entity.organization.id}`;
-
-  sentryLogger('auto-topup', 'info')(`Disabling auto-top-up for ${entityLabel}: ${reason}`, {
-    ...(isUnmappedCode && { unmapped_code: reason }),
-  });
 
   const ownerColumn =
     entity.type === 'user'
@@ -467,29 +576,52 @@ async function disableAutoTopUpForEntity(entity: AutoTopUpEntity, reason: string
       : auto_top_up_configs.owned_by_organization_id;
   const ownerId = entity.type === 'user' ? entity.user.id : entity.organization.id;
 
-  // Update auto_top_up_configs (shared for both entity types)
-  await db
-    .update(auto_top_up_configs)
-    .set({ disabled_reason: reason })
-    .where(eq(ownerColumn, ownerId));
+  const disabled = await db.transaction(async tx => {
+    if (ownership) {
+      const ownedConfig = await tx
+        .update(auto_top_up_configs)
+        .set({ attempt_started_at: null, disabled_reason: reason })
+        .where(
+          and(
+            eq(auto_top_up_configs.id, ownership.configId),
+            eq(auto_top_up_configs.attempt_started_at, ownership.attemptStartedAt)
+          )
+        )
+        .returning({ id: auto_top_up_configs.id });
+      if (ownedConfig.length === 0) return false;
+    } else {
+      await tx
+        .update(auto_top_up_configs)
+        .set({ disabled_reason: reason })
+        .where(eq(ownerColumn, ownerId));
+    }
+
+    if (entity.type === 'user') {
+      await tx
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: false })
+        .where(eq(kilocode_users.id, entity.user.id));
+    } else {
+      await tx
+        .update(organizations)
+        .set({ auto_top_up_enabled: false })
+        .where(eq(organizations.id, entity.organization.id));
+    }
+    return true;
+  });
+  if (!disabled) return;
+
+  sentryLogger('auto-topup', 'info')(`Disabling auto-top-up for ${entityLabel}: ${reason}`, {
+    ...(isUnmappedCode && { unmapped_code: reason }),
+  });
 
   if (entity.type === 'user') {
-    await db
-      .update(kilocode_users)
-      .set({ auto_top_up_enabled: false })
-      .where(eq(kilocode_users.id, entity.user.id));
-
     // Send email notification for users
     const user = await findUserById(entity.user.id);
     if (user?.google_user_email) {
       await sendAutoTopUpFailedEmail(user.google_user_email, { reason: message });
     }
   } else {
-    await db
-      .update(organizations)
-      .set({ auto_top_up_enabled: false })
-      .where(eq(organizations.id, entity.organization.id));
-
     // Send email notification to org owners and billing managers
     const members = await getOrganizationMembers(entity.organization.id);
     const ownerEmails = members

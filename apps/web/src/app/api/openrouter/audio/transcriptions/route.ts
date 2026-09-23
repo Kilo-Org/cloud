@@ -254,16 +254,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
-    organizationId,
-    user
-  );
+  const { autoTopUpReservationFailed, balance, settings, plan, balanceLimitedByUserAllowance } =
+    await getBalanceAndOrgSettings(organizationId, user);
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
   if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
     return await creditsBlockedResponse({
       user,
+      ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
       balance,
       organizationId,
       balanceLimitedByUserAllowance,

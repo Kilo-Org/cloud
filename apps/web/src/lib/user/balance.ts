@@ -1,9 +1,10 @@
 import { createTimer } from '@/lib/timer';
 import { processLocalExpirations } from '@/lib/creditExpiration';
 import { after } from 'next/server';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
+import { performReservedAutoTopUp, reserveAutoTopUp } from '@/lib/autoTopUp';
 import type { UserForBalance } from '@/lib/user/balance-types';
 import { subHours } from 'date-fns';
+import { captureException } from '@sentry/nextjs';
 
 export type BalanceForUser = Awaited<ReturnType<typeof getBalanceForUser>>;
 export async function getBalanceForUser(
@@ -31,7 +32,18 @@ export async function getBalanceForUser(
     user = { ...user, ...result };
   }
 
-  after(() => maybePerformAutoTopUp(user));
+  let autoTopUpReservationFailed = false;
+  try {
+    const autoTopUpReservation = await reserveAutoTopUp(user);
+    if (autoTopUpReservation) {
+      after(() => performReservedAutoTopUp(autoTopUpReservation));
+    }
+  } catch (error) {
+    autoTopUpReservationFailed = true;
+    captureException(error, {
+      tags: { source: 'auto_top_up_reservation', entity_type: 'user' },
+    });
+  }
   const balance = (user.total_microdollars_acquired - user.microdollars_used) / 1_000_000;
-  return { balance };
+  return { ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }), balance };
 }

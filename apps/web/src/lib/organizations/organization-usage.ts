@@ -29,7 +29,8 @@ import { sendBalanceAlertEmail } from '@/lib/email';
 import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
-import { maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
+import { performReservedAutoTopUp, reserveOrganizationAutoTopUp } from '@/lib/autoTopUp';
+import { captureException } from '@sentry/nextjs';
 
 /**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
@@ -43,6 +44,7 @@ export async function getBalanceAndOrgSettings(
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
   balanceLimitedByUserAllowance?: boolean;
+  autoTopUpReservationFailed?: boolean;
 }> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   const result = organizationId
@@ -66,6 +68,7 @@ export async function getBalanceForOrganizationUser(
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
   balanceLimitedByUserAllowance?: boolean;
+  autoTopUpReservationFailed?: boolean;
 }> {
   const { limitType = 'daily', fromDb = db } = options;
   const startTime = performance.now();
@@ -123,7 +126,11 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: 0 (not a member)`
     );
 
-    return { balance: 0, settings: {}, balanceLimitedByUserAllowance: false };
+    return {
+      balance: 0,
+      settings: {},
+      balanceLimitedByUserAllowance: false,
+    };
   }
 
   const {
@@ -162,15 +169,23 @@ export async function getBalanceForOrganizationUser(
     }
   }
 
-  // Trigger org auto-top-up after expiration check so it receives post-expiry values
-  after(() =>
-    maybePerformOrganizationAutoTopUp({
+  let autoTopUpReservationFailed = false;
+  try {
+    const autoTopUpReservation = await reserveOrganizationAutoTopUp({
       id: organizationId,
       auto_top_up_enabled,
       total_microdollars_acquired,
       microdollars_used,
-    })
-  );
+    });
+    if (autoTopUpReservation) {
+      after(() => performReservedAutoTopUp(autoTopUpReservation));
+    }
+  } catch (error) {
+    autoTopUpReservationFailed = true;
+    captureException(error, {
+      tags: { source: 'auto_top_up_reservation', entity_type: 'organization' },
+    });
+  }
 
   // If organization requires seats, ignore any user limits and return full organization balance
   if (require_seats) {
@@ -181,6 +196,7 @@ export async function getBalanceForOrganizationUser(
     );
 
     return {
+      ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
       balance: fromMicrodollars(organization_balance),
       settings,
       plan,
@@ -196,6 +212,7 @@ export async function getBalanceForOrganizationUser(
     );
 
     return {
+      ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
       balance: fromMicrodollars(organization_balance),
       settings,
       plan,
@@ -218,6 +235,7 @@ export async function getBalanceForOrganizationUser(
   );
 
   return {
+    ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
     balance: fromMicrodollars(cappedBalance),
     settings,
     plan,

@@ -641,7 +641,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   }
 
   async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+    const { autoTopUpReservationFailed, balance, settings, plan, balanceLimitedByUserAllowance } =
       await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
@@ -651,6 +651,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     });
     if (modelRestrictionError) {
       return {
+        autoTopUpReservationFailed,
         balance,
         balanceLimitedByUserAllowance,
         effectiveProviderConfig: providerConfig,
@@ -676,6 +677,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
       }
     }
     return {
+      autoTopUpReservationFailed,
       balance,
       balanceLimitedByUserAllowance,
       effectiveProviderConfig,
@@ -767,6 +769,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
+      autoTopUpReservationFailed,
       balance,
       balanceLimitedByUserAllowance,
       effectiveProviderConfig,
@@ -784,6 +787,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     ) {
       return await creditsBlockedResponse({
         user,
+        ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
         balance,
         organizationId,
         balanceLimitedByUserAllowance,

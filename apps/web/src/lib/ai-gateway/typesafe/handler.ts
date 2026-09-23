@@ -58,12 +58,16 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
-    organizationId,
-    user
-  );
+  const { autoTopUpReservationFailed, balance, settings, plan, balanceLimitedByUserAllowance } =
+    await getBalanceAndOrgSettings(organizationId, user);
   if (balance <= 0) {
-    return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
+    return creditsBlockedResponse({
+      user,
+      ...(autoTopUpReservationFailed && { autoTopUpReservationFailed: true }),
+      balance,
+      organizationId,
+      balanceLimitedByUserAllowance,
+    });
   }
 
   const { error, providerConfig } = checkOrganizationModelRestrictions({

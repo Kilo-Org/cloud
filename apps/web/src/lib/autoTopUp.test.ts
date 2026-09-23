@@ -4,7 +4,12 @@ import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { maybePerformAutoTopUp, maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+  performReservedAutoTopUp,
+  reserveAutoTopUp,
+} from '@/lib/autoTopUp';
 import { sendAutoTopUpFailedEmail } from '@/lib/email';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
@@ -111,6 +116,7 @@ describe('autoTopUp', () => {
 
   describe('maybePerformAutoTopUp (user)', () => {
     beforeEach(async () => {
+      jest.clearAllMocks();
       // Reset user state before each test
       await db
         .update(kilocode_users)
@@ -140,6 +146,28 @@ describe('autoTopUp', () => {
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config).toBeUndefined();
+    });
+
+    it('does not reserve when stale input says enabled but primary state is disabled', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_primary_disabled',
+        amount_cents: 5000,
+        disabled_reason: 'card_declined',
+      });
+      const staleUser = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+
+      await expect(reserveAutoTopUp(staleUser)).resolves.toBeUndefined();
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
+      });
+      expect(config?.attempt_started_at).toBeNull();
     });
 
     it('does nothing when balance is above threshold', async () => {
@@ -212,6 +240,141 @@ describe('autoTopUp', () => {
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config?.attempt_started_at).not.toBeNull();
+    });
+
+    it('atomically reserves only one concurrent eligible attempt', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_concurrent_reservation',
+        amount_cents: 5000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+
+      const reservations = await Promise.all([reserveAutoTopUp(user), reserveAutoTopUp(user)]);
+
+      expect(reservations.filter(reservation => reservation !== undefined)).toHaveLength(1);
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
+      });
+      expect(config?.attempt_started_at).not.toBeNull();
+      const { client } = await import('@/lib/stripe-client');
+      expect(client.invoices.create).not.toHaveBeenCalled();
+    });
+
+    it('executes Stripe work with the existing reservation', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_reserved_execution',
+        amount_cents: 5000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const { client } = await import('@/lib/stripe-client');
+      (client.invoices.create as jest.Mock).mockResolvedValue({
+        id: 'inv_reserved_execution',
+        created: 1_700_000_000,
+      });
+      (client.invoices.update as jest.Mock).mockResolvedValue({ id: 'inv_reserved_execution' });
+      (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_reserved_execution' });
+      (client.invoices.pay as jest.Mock).mockResolvedValue({
+        id: 'inv_reserved_execution',
+        status: 'paid',
+      });
+
+      const reservation = await reserveAutoTopUp(user);
+
+      expect(reservation).toBeDefined();
+      expect(client.invoices.create).not.toHaveBeenCalled();
+      if (!reservation) throw new Error('Expected an Auto Top-Up reservation');
+      await performReservedAutoTopUp(reservation);
+      expect(client.invoices.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not execute Stripe work after a newer attempt replaces the reservation', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_replaced_reservation',
+        amount_cents: 5000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const reservation = await reserveAutoTopUp(user);
+      if (!reservation) throw new Error('Expected an Auto Top-Up reservation');
+      await db
+        .update(auto_top_up_configs)
+        .set({ attempt_started_at: new Date(Date.now() + 1_000).toISOString() })
+        .where(eq(auto_top_up_configs.id, reservation.config.id));
+      const { client } = await import('@/lib/stripe-client');
+
+      await performReservedAutoTopUp(reservation);
+
+      expect(client.invoices.create).not.toHaveBeenCalled();
+    });
+
+    it('does not disable or clear a replacement lease after Stripe fails', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_replaced_during_execution',
+        amount_cents: 5000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const reservation = await reserveAutoTopUp(user);
+      if (!reservation) throw new Error('Expected an Auto Top-Up reservation');
+      const replacementStartedAt = new Date(Date.now() + 1_000).toISOString();
+      const { client } = await import('@/lib/stripe-client');
+      (client.invoices.create as jest.Mock).mockImplementation(async () => {
+        await db
+          .update(auto_top_up_configs)
+          .set({ attempt_started_at: replacementStartedAt })
+          .where(eq(auto_top_up_configs.id, reservation.config.id));
+        throw new Error('synthetic Stripe failure');
+      });
+
+      await performReservedAutoTopUp(reservation);
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.id, reservation.config.id),
+      });
+      const userAfterFailure = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, testUser.id),
+      });
+      expect(new Date(config?.attempt_started_at ?? 0)).toEqual(new Date(replacementStartedAt));
+      expect(config?.disabled_reason).toBeNull();
+      expect(userAfterFailure?.auto_top_up_enabled).toBe(true);
     });
 
     // Note: Testing no_stripe_customer_id scenario is difficult because stripe_customer_id is NOT NULL in schema.

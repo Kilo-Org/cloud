@@ -207,10 +207,15 @@ export async function creditsBlockedResponse(params: {
   balance?: number;
   organizationId?: string;
   balanceLimitedByUserAllowance?: boolean;
+  autoTopUpReservationFailed?: boolean;
 }) {
   if (
     !params.balanceLimitedByUserAllowance &&
-    (await isAutoTopUpInFlight({ userId: params.user.id, organizationId: params.organizationId }))
+    (params.autoTopUpReservationFailed ||
+      (await isAutoTopUpInFlight({
+        userId: params.user.id,
+        organizationId: params.organizationId,
+      })))
   ) {
     return topUpInProgressResponse();
   }

@@ -33,6 +33,14 @@ describe('isAutoTopUpInFlight', () => {
   });
 
   beforeEach(async () => {
+    await db
+      .update(kilocode_users)
+      .set({ auto_top_up_enabled: true })
+      .where(eq(kilocode_users.id, userId));
+    await db
+      .update(organizations)
+      .set({ auto_top_up_enabled: true })
+      .where(eq(organizations.id, organizationId));
     await db.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await db
       .delete(auto_top_up_configs)
@@ -61,6 +69,20 @@ describe('isAutoTopUpInFlight', () => {
     });
 
     await expect(isAutoTopUpInFlight({ userId })).resolves.toBe(true);
+  });
+
+  it('returns false for a recent marker when primary auto top-up state is disabled', async () => {
+    await db.insert(auto_top_up_configs).values({
+      owned_by_user_id: userId,
+      stripe_payment_method_id: 'pm_test_disabled_inflight',
+      attempt_started_at: new Date().toISOString(),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ auto_top_up_enabled: false })
+      .where(eq(kilocode_users.id, userId));
+
+    await expect(isAutoTopUpInFlight({ userId })).resolves.toBe(false);
   });
 
   it('returns false when the attempt lock is older than the in-flight window', async () => {

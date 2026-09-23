@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
-import { auto_top_up_configs } from '@kilocode/db/schema';
-import { and, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db/schema';
+import { and, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm';
 import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@/lib/autoTopUpConstants';
 
 /**
@@ -25,6 +25,17 @@ export async function isAutoTopUpInFlight(params: {
       ? eq(auto_top_up_configs.owned_by_user_id, params.userId)
       : undefined;
   if (!ownerMatch) return false;
+  const ownerEnabled = params.organizationId
+    ? sql`EXISTS (
+        SELECT 1 FROM ${organizations}
+        WHERE ${organizations.id} = ${params.organizationId}
+          AND ${organizations.auto_top_up_enabled} = TRUE
+      )`
+    : sql`EXISTS (
+        SELECT 1 FROM ${kilocode_users}
+        WHERE ${kilocode_users.id} = ${params.userId}
+          AND ${kilocode_users.auto_top_up_enabled} = TRUE
+      )`;
 
   const [config] = await db
     .select({ id: auto_top_up_configs.id })
@@ -32,6 +43,8 @@ export async function isAutoTopUpInFlight(params: {
     .where(
       and(
         ownerMatch,
+        ownerEnabled,
+        isNull(auto_top_up_configs.disabled_reason),
         isNotNull(auto_top_up_configs.attempt_started_at),
         gt(
           auto_top_up_configs.attempt_started_at,

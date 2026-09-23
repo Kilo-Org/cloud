@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
+import { after } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
@@ -13,6 +14,8 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { getBalanceForUser } from '@/lib/user/balance';
+import { performReservedAutoTopUp, reserveAutoTopUp } from '@/lib/autoTopUp';
 import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
@@ -57,6 +60,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@/lib/autoTopUp');
 jest.mock('@/lib/autoTopUpInFlight');
 jest.mock('@/lib/creditTransactions', () => ({
   ...(jest.requireActual('@/lib/creditTransactions') as Record<string, unknown>),
@@ -121,6 +125,9 @@ jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
+const mockedAfter = jest.mocked(after);
+const mockedPerformReservedAutoTopUp = jest.mocked(performReservedAutoTopUp);
+const mockedReserveAutoTopUp = jest.mocked(reserveAutoTopUp);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
@@ -525,9 +532,120 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('reserves an eligible auto top-up before returning a low-balance response', async () => {
+    let deferredAutoTopUp: (() => void | Promise<void>) | undefined;
+    let attemptStarted = false;
+    const user = {
+      id: 'user-123',
+      google_user_email: 'test@example.com',
+      total_microdollars_acquired: 0,
+      microdollars_used: 1_000_000,
+      next_credit_expiration_at: null,
+      auto_top_up_enabled: true,
+    } as User;
+    mockedGetUserFromAuth.mockResolvedValue({
+      user,
+      authFailedResponse: null,
+      organizationId: undefined,
+    });
+    mockedGetBalanceAndOrgSettings.mockImplementation(async (_organizationId, balanceUser) => ({
+      ...(await getBalanceForUser(balanceUser)),
+      balanceLimitedByUserAllowance: false,
+    }));
+    mockedAfter.mockImplementation(callback => {
+      if (typeof callback !== 'function') throw new Error('Expected an after callback');
+      deferredAutoTopUp = async () => {
+        await callback();
+      };
+    });
+    mockedReserveAutoTopUp.mockImplementation(async balanceUser => {
+      attemptStarted = true;
+      return {
+        entity: { type: 'user', user: balanceUser },
+        traceId: 'synthetic-trace-id',
+        config: {
+          id: 'synthetic-config-id',
+          stripe_payment_method_id: 'pm_synthetic',
+          amount_cents: 2_000,
+        },
+        attemptStartedAt: '2026-09-23T21:00:00.000Z',
+        stripeCustomerId: 'cus_synthetic',
+      };
+    });
+    mockedIsAutoTopUpInFlight.mockImplementation(async () => attemptStarted);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(deferredAutoTopUp).toBeDefined();
+    expect(mockedReserveAutoTopUp).toHaveBeenCalledWith(user);
+    expect(mockedPerformReservedAutoTopUp).not.toHaveBeenCalled();
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('continues a positive-balance request when auto top-up reservation fails', async () => {
+    const user = {
+      id: 'user-123',
+      google_user_email: 'test@example.com',
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 0,
+      next_credit_expiration_at: null,
+      auto_top_up_enabled: true,
+    } as User;
+    mockedGetUserFromAuth.mockResolvedValue({
+      user,
+      authFailedResponse: null,
+      organizationId: undefined,
+    });
+    mockedGetBalanceAndOrgSettings.mockImplementation(async (_organizationId, balanceUser) => ({
+      ...(await getBalanceForUser(balanceUser)),
+      balanceLimitedByUserAllowance: false,
+    }));
+    mockedReserveAutoTopUp.mockRejectedValue(new Error('synthetic reservation failure'));
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a retryable response when depleted auto top-up reservation fails', async () => {
+    const user = {
+      id: 'user-123',
+      google_user_email: 'test@example.com',
+      total_microdollars_acquired: 0,
+      microdollars_used: 1_000_000,
+      next_credit_expiration_at: null,
+      auto_top_up_enabled: true,
+    } as User;
+    mockedGetUserFromAuth.mockResolvedValue({
+      user,
+      authFailedResponse: null,
+      organizationId: undefined,
+    });
+    mockedGetBalanceAndOrgSettings.mockImplementation(async (_organizationId, balanceUser) => ({
+      ...(await getBalanceForUser(balanceUser)),
+      balanceLimitedByUserAllowance: false,
+    }));
+    mockedReserveAutoTopUp.mockRejectedValue(new Error('synthetic reservation failure'));
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    expect(mockedIsAutoTopUpInFlight).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('keeps the 402 when the block is a per-user allowance limit', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      autoTopUpReservationFailed: true,
       balance: 0,
       settings: undefined,
       plan: undefined,

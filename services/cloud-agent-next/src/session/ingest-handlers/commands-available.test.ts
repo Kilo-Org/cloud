@@ -42,6 +42,28 @@ describe('handleCommandsAvailable', () => {
     );
   });
 
+  it('keeps a skill-sourced row the wrapper reports for the session', async () => {
+    const setAvailableCommands = vi.fn().mockResolvedValue(undefined);
+    await handleCommandsAvailable(
+      {
+        commands: [
+          { name: 'review', description: 'Review', source: 'command', hints: [] },
+          {
+            name: 'kilo-config',
+            description: 'Guide for Kilo configuration',
+            source: 'skill',
+            hints: [],
+          },
+        ],
+      },
+      { setAvailableCommands, logger: silentLogger }
+    );
+
+    expect(setAvailableCommands).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ name: 'kilo-config', source: 'skill' })])
+    );
+  });
+
   it('warns and skips when commands array is missing', async () => {
     const setAvailableCommands = vi.fn();
     const warn = vi.fn();

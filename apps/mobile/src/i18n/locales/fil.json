@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "i-import ang transkript ng sesyon sa OpenAI Codex",
       "reviewDescription": "suriin ang mga pagbabago [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gamitin ang /{{command}}",
+      "useSkillCommand": "Gamitin ang kasanayan /{{command}}",
+      "skillBadge": "Kasanayan",
       "insert": "Ipasok",
       "upgradeRequiredFallback": "I-upgrade ang iyong CLI para magamit ang utos na ito.",
       "exitCapabilityUnavailable": "I-update ang iyong CLI para lumabas sa sesyon.",

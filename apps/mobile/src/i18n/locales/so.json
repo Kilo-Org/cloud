@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "soo geli qoraalka kalfadhiga OpenAI Codex",
       "reviewDescription": "dib u eeg isbeddellada [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Isticmaal /{{command}}",
+      "useSkillCommand": "Isticmaal xirfad /{{command}}",
+      "skillBadge": "Xirfad",
       "insert": "Geli",
       "upgradeRequiredFallback": "Fadlan cusboonaysii CLI-gaaga si aad u isticmaasho amarkan.",
       "exitCapabilityUnavailable": "Cusboonaysii CLI-gaaga si aad uga baxdo kalfadhiga.",

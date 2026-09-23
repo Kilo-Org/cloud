@@ -2068,6 +2068,8 @@
       "resumeCodexDescription": "匯入 OpenAI Codex 工作階段記錄",
       "reviewDescription": "檢閱變更 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
+      "useSkillCommand": "使用技能 /{{command}}",
+      "skillBadge": "技能",
       "insert": "插入",
       "upgradeRequiredFallback": "請升級 CLI，才能使用此指令。",
       "exitCapabilityUnavailable": "請更新 CLI，才能結束工作階段。",

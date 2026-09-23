@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex සැසියේ පිටපත ආයාත කරන්න",
       "reviewDescription": "වෙනස්කම් සමාලෝචනය කරන්න [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} භාවිත කරන්න",
+      "useSkillCommand": "කුසලතා /{{command}} භාවිත කරන්න",
+      "skillBadge": "කුසලතා",
       "insert": "ඇතුළත් කරන්න",
       "upgradeRequiredFallback": "මෙම විධානය භාවිත කිරීමට ඔබේ CLI යාවත්කාලීන කරන්න.",
       "exitCapabilityUnavailable": "සැසියෙන් ඉවත් වීමට ඔබේ CLI යාවත්කාලීන කරන්න.",

@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "importér et OpenAI Codex-sessionstranskript",
       "reviewDescription": "gennemgå ændringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Brug /{{command}}",
+      "useSkillCommand": "Brug færdigheden /{{command}}",
+      "skillBadge": "Færdighed",
       "insert": "Indsæt",
       "upgradeRequiredFallback": "Opdatér din CLI for at bruge denne kommando.",
       "exitCapabilityUnavailable": "Opdatér din CLI for at afslutte sessionen.",

@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "shigo da rubutun zaman OpenAI Codex",
       "reviewDescription": "duba canje-canje [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Yi amfani da /{{command}}",
+      "useSkillCommand": "Yi amfani da ƙwarewa /{{command}}",
+      "skillBadge": "Ƙwarewa",
       "insert": "Saka",
       "upgradeRequiredFallback": "Sabunta CLI ɗinka don amfani da wannan umarnin.",
       "exitCapabilityUnavailable": "Sabunta CLI ɗinka don fita daga zaman.",

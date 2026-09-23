@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "kawemai i tētahi tuhinga wātū OpenAI Codex",
       "reviewDescription": "arotake i ngā huringa [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Whakamahia /{{command}}",
+      "useSkillCommand": "Whakamahia te pūkenga /{{command}}",
+      "skillBadge": "Pūkenga",
       "insert": "Whakaurua",
       "upgradeRequiredFallback": "Whakahoutia tō CLI kia taea ai te whakamahi i tēnei whakahau.",
       "exitCapabilityUnavailable": "Whakahoutia tō CLI kia taea ai te puta i te wātū.",

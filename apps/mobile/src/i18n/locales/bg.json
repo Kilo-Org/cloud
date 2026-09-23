@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "импортирай транскрипт от сесия на OpenAI Codex",
       "reviewDescription": "прегледай промените [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Използвай /{{command}}",
+      "useSkillCommand": "Използвай умението /{{command}}",
+      "skillBadge": "Умение",
       "insert": "Вмъкни",
       "upgradeRequiredFallback": "Актуализирай CLI, за да използваш тази команда.",
       "exitCapabilityUnavailable": "Актуализирай CLI, за да прекратиш сесията.",

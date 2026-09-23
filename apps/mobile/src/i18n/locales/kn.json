@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex ಸೆಷನ್‌ನ ಪ್ರತಿಯನ್ನು ಆಮದು ಮಾಡಿ",
       "reviewDescription": "ಬದಲಾವಣೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ಬಳಸಿ",
+      "useSkillCommand": "ಕೌಶಲ್ಯ /{{command}} ಬಳಸಿ",
+      "skillBadge": "ಕೌಶಲ್ಯ",
       "insert": "ಸೇರಿಸಿ",
       "upgradeRequiredFallback": "ಈ ಆಜ್ಞೆಯನ್ನು ಬಳಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
       "exitCapabilityUnavailable": "ಸೆಶನ್‌ನಿಂದ ನಿರ್ಗಮಿಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",

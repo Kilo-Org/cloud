@@ -84,6 +84,25 @@ describe('createMobileSlashCommandList', () => {
     expect(list).toBe(SAMPLE_COMMANDS);
   });
 
+  it('lists a cloud-agent skill row and invokes it like any other command', () => {
+    const skill: SlashCommandInfo = {
+      name: 'kilo-config',
+      description: 'Guide for Kilo configuration',
+      source: 'skill',
+      hints: [],
+    };
+    const list = createMobileSlashCommandList('cloud-agent', [COMPACT, skill], null);
+
+    expect(getSlashCommandSuggestions('/', list)).toEqual([COMPACT, skill]);
+    expect(
+      parseChatComposerSubmission('/kilo-config', list, {
+        hasAttachments: false,
+        sessionType: 'cloud-agent',
+        remoteCommandState: null,
+      })
+    ).toEqual({ type: 'command', command: 'kilo-config', arguments: '' });
+  });
+
   it('does not strip a CLI-reported /goal from a remote catalog', () => {
     const list = createMobileSlashCommandList('remote', [GOAL], remoteState({ commands: [GOAL] }));
     expect(list.map(command => command.name)).toEqual(['goal', 'new']);

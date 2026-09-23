@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Հեռակա · ≥ {{min}}",
     "featureFlagSkipped": "Կանխադրված · < {{min}}",
-    "featureFlagNotLoaded": "Կանխադրված · բեռնված չէ",
+    "featureFlagNotLoaded": "Կանխադրված · Բեռնված չէ",
     "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
     "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
     "transcriptionModel": "$t(transcriptionModel.title)",

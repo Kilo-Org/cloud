@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "عن بُعد · ≥ {{min}}",
     "featureFlagSkipped": "افتراضي · < {{min}}",
-    "featureFlagNotLoaded": "افتراضي · لم يتم التحميل",
+    "featureFlagNotLoaded": "افتراضي · غير محمّل",
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

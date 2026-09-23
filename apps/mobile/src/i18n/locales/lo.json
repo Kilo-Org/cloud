@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "ທາງໄກ · ≥ {{min}}",
     "featureFlagSkipped": "ຄ່າເລີ່ມຕົ້ນ · < {{min}}",
-    "featureFlagNotLoaded": "ຄ່າເລີ່ມຕົ້ນ · ຍັງບໍ່ໄດ້ໂຫຼດ",
+    "featureFlagNotLoaded": "ຄ່າເລີ່ມຕົ້ນ · ບໍ່ໄດ້ໂຫຼດ",
     "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

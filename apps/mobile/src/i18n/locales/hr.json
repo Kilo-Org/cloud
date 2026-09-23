@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Udaljeno · ≥ {{min}}",
     "featureFlagSkipped": "Zadano · < {{min}}",
-    "featureFlagNotLoaded": "Zadano · nije učitano",
+    "featureFlagNotLoaded": "Zadano · Nije učitano",
     "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

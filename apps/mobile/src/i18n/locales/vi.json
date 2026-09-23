@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Từ xa · ≥ {{min}}",
     "featureFlagSkipped": "Mặc định · < {{min}}",
-    "featureFlagNotLoaded": "Mặc định · chưa tải",
+    "featureFlagNotLoaded": "Mặc định · Chưa tải",
     "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

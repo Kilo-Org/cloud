@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "መተግበሪያው ሲጀመር እና ከበስተጀርባ ለአምስት ደቂቃዎች ከቆየ በኋላ መክፈት ያስፈልጋል።",
     "featureFlags": "የተግባር ባንዲራዎች",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "የርቀት · ≥ {{min}}",
+    "featureFlagApplied": "ከርቀት · ≥ {{min}}",
     "featureFlagSkipped": "ነባሪ · < {{min}}",
     "featureFlagNotLoaded": "ነባሪ · አልተጫነም",
     "gatewayTranscription": "በKilo Gateway ድምጽን ወደ ጽሑፍ መቀየር",

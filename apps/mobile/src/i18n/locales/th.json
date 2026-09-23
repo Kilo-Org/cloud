@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "ระยะไกล · ≥ {{min}}",
     "featureFlagSkipped": "ค่าเริ่มต้น · < {{min}}",
-    "featureFlagNotLoaded": "ค่าเริ่มต้น · ยังไม่ได้โหลด",
+    "featureFlagNotLoaded": "ค่าเริ่มต้น · ยังไม่โหลด",
     "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
     "transcriptionModel": "$t(transcriptionModel.title)",

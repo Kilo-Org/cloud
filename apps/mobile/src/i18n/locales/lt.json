@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Nuotolinis · ≥ {{min}}",
     "featureFlagSkipped": "Numatytoji · < {{min}}",
-    "featureFlagNotLoaded": "Numatytoji · neįkelta",
+    "featureFlagNotLoaded": "Numatytoji · Neįkelta",
     "gatewayTranscription": "Transkribavimas per Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

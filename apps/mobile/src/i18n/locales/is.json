@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Fjarlægt · ≥ {{min}}",
     "featureFlagSkipped": "Sjálfgefið · < {{min}}",
-    "featureFlagNotLoaded": "Sjálfgefið · ekki hlaðið",
+    "featureFlagNotLoaded": "Sjálfgefið · Ekki hlaðið",
     "gatewayTranscription": "Umritun í gegnum Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

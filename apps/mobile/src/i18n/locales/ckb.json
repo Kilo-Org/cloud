@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "دوور · ≥ {{min}}",
     "featureFlagSkipped": "بنەڕەتی · < {{min}}",
-    "featureFlagNotLoaded": "بنەڕەتی · بارنەکراوە",
+    "featureFlagNotLoaded": "بنەڕەتی · بار نەکراوە",
     "gatewayTranscription": "گۆڕینی دەنگ بۆ دەق بە Kilo Gateway",
     "gatewayTranscriptionSubtitle": "دەنگەکانت بە مۆدێلێکی Kilo Gateway بگۆڕە بۆ دەق، نەک بە ناسینەوەی قسەکردنی ئامێرەکەت. تۆمارەکەت بۆ Kilo Gateway دەنێردرێت.",
     "transcriptionModel": "$t(transcriptionModel.title)",

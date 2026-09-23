@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Қашықтағы · ≥ {{min}}",
     "featureFlagSkipped": "Әдепкі · < {{min}}",
-    "featureFlagNotLoaded": "Әдепкі · жүктелмеген",
+    "featureFlagNotLoaded": "Әдепкі · Жүктелмеген",
     "gatewayTranscription": "Kilo Gateway арқылы дауысты мәтінге айналдыру",
     "gatewayTranscriptionSubtitle": "Дауыстық енгізуді құрылғының сөзді тануының орнына Kilo Gateway моделі арқылы мәтінге айналдырыңыз. Жазбаңыз Kilo Gateway-ге жіберіледі.",
     "transcriptionModel": "$t(transcriptionModel.title)",

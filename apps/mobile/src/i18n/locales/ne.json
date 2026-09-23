@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "दूरस्थ · ≥ {{min}}",
     "featureFlagSkipped": "पूर्वनिर्धारित · < {{min}}",
-    "featureFlagNotLoaded": "पूर्वनिर्धारित · लोड गरिएको छैन",
+    "featureFlagNotLoaded": "पूर्वनिर्धारित · लोड भएको छैन",
     "gatewayTranscription": "Kilo Gateway मार्फत बोलीलाई पाठमा रूपान्तरण",
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
     "transcriptionModel": "$t(transcriptionModel.title)",

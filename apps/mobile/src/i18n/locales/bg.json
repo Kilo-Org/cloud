@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Отдалечено · ≥ {{min}}",
     "featureFlagSkipped": "По подразбиране · < {{min}}",
-    "featureFlagNotLoaded": "По подразбиране · не е заредено",
+    "featureFlagNotLoaded": "По подразбиране · Не е заредено",
     "gatewayTranscription": "Транскрипция през Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

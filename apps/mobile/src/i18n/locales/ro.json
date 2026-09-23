@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "La distanță · ≥ {{min}}",
     "featureFlagSkipped": "Implicit · < {{min}}",
-    "featureFlagNotLoaded": "Implicit · neîncărcat",
+    "featureFlagNotLoaded": "Implicit · Neîncărcat",
     "gatewayTranscription": "Transcriere cu Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

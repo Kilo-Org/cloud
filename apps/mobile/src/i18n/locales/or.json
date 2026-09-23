@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ।",
     "featureFlags": "ବିଶେଷତ୍ୱ ପତାକା",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ଦୂରସ୍ଥ · ≥ {{min}}",
+    "featureFlagApplied": "ରିମୋଟ୍ · ≥ {{min}}",
     "featureFlagSkipped": "ପୂର୍ବନିର୍ଦ୍ଧାରିତ · < {{min}}",
     "featureFlagNotLoaded": "ପୂର୍ବନିର୍ଦ୍ଧାରିତ · ଲୋଡ୍ ହୋଇନାହିଁ",
     "gatewayTranscription": "Kilo Gateway ମାଧ୍ୟମରେ କଥାକୁ ଲେଖାରେ ବଦଳାଇବା",

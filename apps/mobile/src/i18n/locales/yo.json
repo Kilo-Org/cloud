@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Jíjìn · ≥ {{min}}",
     "featureFlagSkipped": "Ìpìlẹ̀ · < {{min}}",
-    "featureFlagNotLoaded": "Ìpìlẹ̀ · kò gbé e",
+    "featureFlagNotLoaded": "Ìpìlẹ̀ · A kò gbé wọlé",
     "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

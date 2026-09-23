@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Fog · ≥ {{min}}",
     "featureFlagSkipped": "Aasaasi · < {{min}}",
-    "featureFlagNotLoaded": "Aasaasi · lama soo dejin",
+    "featureFlagNotLoaded": "Aasaasi · Lama soo dejin",
     "gatewayTranscription": "Qoraal u beddelidda codka ee Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

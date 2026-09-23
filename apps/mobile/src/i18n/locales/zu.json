@@ -279,7 +279,7 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Kude · ≥ {{min}}",
     "featureFlagSkipped": "Okuzenzakalelayo · < {{min}}",
-    "featureFlagNotLoaded": "Okuzenzakalelayo · akukalayishwa",
+    "featureFlagNotLoaded": "Okuzenzakalelayo · Akulayishiwe",
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

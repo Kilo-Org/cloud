@@ -12,6 +12,7 @@ import {
   mountTab,
   pushMock,
   replyScrollFns,
+  rerenderTab,
   resetState,
 } from './pr-review-discussion-tab.test-helpers';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -342,5 +343,57 @@ describe('PrReviewDiscussionTab keyboard-lift gating and reply-scroll wiring', (
     // content-position settle, the pre-existing behavior).
     listProps.onScrollBeginDrag?.();
     expect(replyScrollFns.invalidate).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Fix 11: the merge is memoized on its two identity-stable inputs, so a
+// re-render with unchanged data hands FlashList the same array instead of a
+// freshly merged and sorted one (which would re-diff the whole list).
+describe('PrReviewDiscussionTab merged list memoization (Fix 11)', () => {
+  it('reuses the same listItems array across a re-render with unchanged inputs', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+
+    const first = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const firstItems = first.props.listItems;
+
+    rerenderTab(renderer);
+
+    const second = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(second.props.listItems).toBe(firstItems);
+
+    renderer.unmount();
+  });
+
+  it('reuses the same listItems array when the hook hands back a fresh empty conversation each render', () => {
+    // The real hook returns a brand-new `[]` for a PR whose first page carries
+    // no conversation comments: `retainConversationAcrossMounts` falls back to
+    // a fresh literal per call. A memo keyed on that raw array never hits, so
+    // the tab substitutes a stable empty reference.
+    discussionState.threads = [{ threadId: 'T1', isResolved: false, comments: [] }];
+    discussionState.conversation = [];
+    const renderer = mountTab();
+
+    const first = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const firstItems = first.props.listItems;
+
+    // A NEW empty array, exactly like the hook's next call.
+    discussionState.conversation = [];
+    rerenderTab(renderer);
+
+    const second = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(second.props.listItems).toBe(firstItems);
+
+    renderer.unmount();
+  });
+
+  it('mounts the happy list inside the shared comment-moderation provider', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+
+    const provider = renderer.root.find(node => String(node.type) === 'CommentModerationProvider');
+    expect(provider.find(node => String(node.type) === 'PrReviewDiscussionList')).toBeDefined();
+
+    renderer.unmount();
   });
 });

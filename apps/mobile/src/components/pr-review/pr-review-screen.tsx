@@ -306,6 +306,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             : t('prReview.screen.title', { number })
         }
         eyebrow={`${owner}/${repo}`}
+        eyebrowNumberOfLines={1}
         headerRight={
           <View className="flex-row items-center gap-1">
             {webUrl ? (

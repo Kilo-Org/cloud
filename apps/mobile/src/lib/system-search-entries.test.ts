@@ -73,6 +73,24 @@ describe('session documents', () => {
     expect(storedSessionSearchDocument({ session_id: 'c', title: null })).toBeNull();
   });
 
+  it('skips a session that still carries the backend placeholder', () => {
+    // Indexing the placeholder would put one identical machine string per
+    // fresh session into the system search.
+    expect(
+      storedSessionSearchDocument({
+        session_id: 'd',
+        title: 'New session - 2026-09-22T01:09:45.623Z',
+      })
+    ).toBeNull();
+    expect(
+      activeSessionSearchDocument({
+        id: 'live-5',
+        title: 'New session - 2026-09-22T01:09:45.623Z',
+        organizationId: null,
+      })
+    ).toBeNull();
+  });
+
   it('builds the live-session document from the camelCase active row', () => {
     const document = activeSessionSearchDocument({
       id: 'live-1',

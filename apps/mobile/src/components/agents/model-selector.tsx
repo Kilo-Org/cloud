@@ -7,8 +7,8 @@ import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
@@ -129,7 +129,20 @@ export function ModelSelector({
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
 
   if (isLoading) {
-    return <Skeleton className="h-8 w-28 rounded-full" />;
+    return (
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityState={{ busy: true, disabled: true }}
+        accessibilityLabel={t('common.model')}
+        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
+      >
+        <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
+          {t('common.model')}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
+    );
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));
@@ -138,7 +151,10 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const label = selectedModel?.name ?? (!providerAware && value ? value : t('common.model'));
+  const fallbackLabel = !providerAware && value ? value : t('common.model');
+  const label = selectedModel
+    ? autoModelLabel(selectedModel.displayId, selectedModel.name)
+    : fallbackLabel;
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
@@ -228,10 +244,11 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  const name = autoModelLabel(option.displayId, option.name);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
-      option.name,
+      name,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       free && !byok ? freeModelFreeLabel() : undefined,
@@ -247,7 +264,9 @@ export function ModelPickerOptionRow({
   // main select (row content) and the favorite star. A pressable nested
   // inside a pressable would shadow the favorite for assistive technology,
   // so the two must never nest. The selected check stays a static sibling
-  // to preserve the exact visual order (content, star, check).
+  // to preserve the exact visual order (content, star, check), and it keeps
+  // its slot on every row (transparent when unselected) so the star column
+  // never shifts between selected and unselected rows.
   return (
     <View className="border-b border-border">
       <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
@@ -262,7 +281,7 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{option.name}</Text>
+            <Text className="text-base text-foreground">{name}</Text>
             {option.modelRef ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
@@ -318,8 +337,8 @@ export function ModelPickerOptionRow({
           accessibilityRole="button"
           accessibilityLabel={
             isFavorite
-              ? t('agentChat.modelSelector.removeFromFavorites', { name: option.name })
-              : t('agentChat.modelSelector.addToFavorites', { name: option.name })
+              ? t('agentChat.modelSelector.removeFromFavorites', { name })
+              : t('agentChat.modelSelector.addToFavorites', { name })
           }
           accessibilityState={{ selected: isFavorite }}
         >
@@ -330,7 +349,7 @@ export function ModelPickerOptionRow({
           />
         </Pressable>
         <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={colors.primary} /> : null}
+          <Check size={18} color={selected ? colors.primary : 'transparent'} />
         </View>
       </View>
       {selected && option.variants.length > 1 ? (

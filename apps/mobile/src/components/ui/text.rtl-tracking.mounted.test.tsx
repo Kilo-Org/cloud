@@ -102,11 +102,46 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    // The eyebrow variant drops its own display classes under RTL (the shared
-    // design pinned by text.mounted.test.tsx and section-header.mounted.test.tsx),
-    // and the style reset still lands so any tracked class a caller adds is
-    // neutralized as well.
+    // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
+    // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
+    // display classes, so an RTL eyebrow drops them — it carries no tracked
+    // class of its own (the rule `text.mounted.test.tsx` pins) — and drops the
+    // capitals and tracked class instead of carrying a class the interface
+    // language never asked for (`section-header.mounted.test.tsx`) rather than
+    // keeping them like a caller-supplied tracked class. Assert on the class
+    // list and on the rendered string alike: the token list pins the exact
+    // classes, the substring check catches a `tracking` that shows up only
+    // inside another token, and the LTR-only class is pinned by name. No
+    // uppercase or tracked class is left for the shared RTL reset to neutralize
+    // on this label — the reset style is its whole treatment — and the zero
+    // letter-spacing reset still lands.
     expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
+    const className = hostText(root).props.className as string;
+    const classes = className.split(' ');
+    expect(classes).not.toContain('uppercase');
+    expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+    expect(className).not.toContain('uppercase');
+    expect(className).not.toContain('tracking-[1.5px]');
+    expect(className).not.toContain('tracking');
+    expect(hostText(root).props.className as string).not.toContain('tracking-');
+    expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
+
+  it('neutralizes a caller-supplied tracked class on the shared Eyebrow label', () => {
+    i18nManager.isRTL = true;
+    // The eyebrow variant owns its Latin display classes, so an RTL eyebrow
+    // drops them (the rule `text.mounted.test.tsx` pins) rather than keeping
+    // them like a caller-supplied tracked class; a caller-supplied tracked
+    // class stays on the element and the zero letter-spacing reset neutralizes
+    // it (see rtl-text.ts).
+    const root = mount(createElement(Eyebrow, { className: 'tracking-[1.5px]' }, 'استكشف'));
+
+    const classes = (hostText(root).props.className as string).split(' ');
+    expect(classes).not.toContain('uppercase');
+    expect(classes).toContain('tracking-[1.5px]');
+    // The variant's own letter-spaced class is dropped, so the caller's is the
+    // only tracking class the label carries.
+    expect(classes.filter(name => name.startsWith('tracking'))).toHaveLength(1);
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

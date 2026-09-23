@@ -15,7 +15,6 @@ const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
-  Modal: 'Modal',
   Platform: {
     get OS() {
       return platform.os;
@@ -25,6 +24,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
@@ -32,10 +35,13 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// The screen reads its landscape side insets through `@/lib/screen-insets`,
-// whose real module loads the native safe-area package; the node project cannot
-// transform that source, so the suite fails to load without this mock. The
-// sign-out confirmation does not depend on the inset values.
+// ProfileScreen reads its landscape side insets through `@/lib/screen-insets`,
+// which imports `react-native-safe-area-context`; that package's React Native
+// source is Flow-typed and this transform cannot parse it (see
+// `test/render-with-providers.tsx`), so the harness mocks it exactly as
+// `profile-screen.queries.mounted.test.tsx` does. The sign-out confirmation
+// does not depend on the inset values, so stub the hook with the hoisted
+// `insets` above.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
@@ -149,6 +155,11 @@ function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
   return typeof node.type === 'string' && node.type === type;
 }
 
+function alertButtons(call: unknown): { style?: string; onPress?: () => void }[] {
+  const buttons = (call as unknown[] | undefined)?.[2];
+  return Array.isArray(buttons) ? (buttons as { style?: string; onPress?: () => void }[]) : [];
+}
+
 describe('ProfileScreen sign-out confirmation', () => {
   beforeEach(() => {
     signOutFn.mockReset();
@@ -164,53 +175,44 @@ describe('ProfileScreen sign-out confirmation', () => {
     });
   }
 
-  // The finding: the native Android alert painted sign-out and cancel the same
-  // teal, so the destructive choice had no distinct affordance. Android renders
-  // the in-app dialog whose sign-out control carries the destructive (red)
-  // variant.
-  it('opens the in-app dialog whose destructive control signs out on android', async () => {
-    platform.os = 'android';
-    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
+  // The confirmation is the one shared native alert on both platforms:
+  // plugins/withAndroidAlertDialogTheme repaints Android's AppCompat dialog with
+  // the app tokens, and iOS's `UIAlertController` already follows the device
+  // appearance. No platform mounts an in-app confirmation of its own, so the
+  // same tap takes the same path whichever value the device reports.
+  for (const os of ['android', 'ios'] as const) {
+    it(`opens the shared native alert on ${os}`, async () => {
+      platform.os = os;
+      const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
 
-    pressSignOutTile(renderer);
+      pressSignOutTile(renderer);
 
-    // Android never falls back to the native alert.
-    expect(alertFn).not.toHaveBeenCalled();
-    // Opening the confirmation signs nobody out; only its destructive control does.
-    expect(signOutFn).not.toHaveBeenCalled();
-    const confirm = renderer.root.find(
-      node => isType(node, 'Button') && node.props.variant === 'destructive'
-    );
-    act(() => {
-      (confirm.props as { onPress?: () => void }).onPress?.();
+      expect(alertFn).toHaveBeenCalledTimes(1);
+      expect(alertFn.mock.calls[0]?.[0]).toBe('Sign out?');
+      // Opening the confirmation signs nobody out; only its own choices act.
+      expect(signOutFn).not.toHaveBeenCalled();
+      const buttons = alertButtons(alertFn.mock.calls[0]);
+      expect(buttons.find(button => button.style === 'cancel')?.onPress).toBeUndefined();
+      expect(buttons.some(button => button.style === 'destructive')).toBe(true);
+      // The alert is the whole confirmation: no in-app dialog renders beside it.
+      expect(
+        renderer.root.findAll(
+          node => isType(node, 'Button') && node.props.variant === 'destructive'
+        )
+      ).toHaveLength(0);
+
+      unmount();
     });
-    expect(signOutFn).toHaveBeenCalledTimes(1);
+  }
 
-    unmount();
-  });
-
-  // `apps/mobile/AGENTS.md`: "Prefer native sheets, alerts, pickers, gestures,
-  // and keyboard behavior. Confirm destructive actions with `Alert.alert()`."
-  // iOS keeps the native alert, whose `style: 'destructive'` already renders the
-  // sign-out choice in red.
-  it('keeps the native alert whose destructive button signs out on ios', async () => {
-    platform.os = 'ios';
+  it("signs out only when the alert's destructive choice is pressed", async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
 
     pressSignOutTile(renderer);
 
-    // No in-app dialog on iOS: the confirmation is the native alert.
-    expect(
-      renderer.root.findAll(node => isType(node, 'Button') && node.props.variant === 'destructive')
-    ).toHaveLength(0);
-    expect(alertFn).toHaveBeenCalledTimes(1);
-    // Opening the confirmation signs nobody out; only the destructive alert
-    // button does.
-    expect(signOutFn).not.toHaveBeenCalled();
-    const buttons = alertFn.mock.calls[0]?.[2] as
-      | { style?: string; onPress?: () => void }[]
-      | undefined;
-    const destructive = buttons?.find(button => button.style === 'destructive');
+    const destructive = alertButtons(alertFn.mock.calls[0]).find(
+      button => button.style === 'destructive'
+    );
     act(() => {
       destructive?.onPress?.();
     });

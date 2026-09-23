@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
-import { ScreenHeader } from './screen-header';
+import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
 const routerState = vi.hoisted(() => ({
@@ -23,6 +23,8 @@ const routerState = vi.hoisted(() => ({
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** A normal phone window: wide enough for the title and its actions to share a row. */
+const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
@@ -32,6 +34,7 @@ vi.mock('react-native', () => ({
   Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: layout.width, height: 800, fontScale: layout.fontScale }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
@@ -73,6 +76,21 @@ function findTitlePressable(root: TestInstance): TestInstance {
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
+  );
+}
+
+/**
+ * The row the header puts `headerRight` on when the window is too narrow for
+ * the title and the actions to share one. Only that variant carries `mt-2`
+ * without the single-row wrapper's `max-w-[50%]`.
+ */
+function isStackedActionsRow(node: TestInstance): boolean {
+  const className = String(node.props.className ?? '');
+  return (
+    typeof node.type === 'string' &&
+    (node.type as string) === 'View' &&
+    className.includes('mt-2') &&
+    !className.includes('max-w-[50%]')
   );
 }
 
@@ -198,6 +216,7 @@ describe('ScreenHeader mounted', () => {
     i18nManager.isRTL = false;
     platform.OS = 'ios';
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    Object.assign(layout, { width: 390, fontScale: 1 });
   });
 
   it('gives the back control a 44-point target and no hit slop', () => {
@@ -679,5 +698,121 @@ describe('ScreenHeader mounted', () => {
 
     expect(iosStyle).toEqual({ paddingTop: 32 });
     expect(androidStyle).toEqual(iosStyle);
+  });
+
+  it('caps the eyebrow to one line with a middle ellipsis when eyebrowNumberOfLines is set', () => {
+    const renderer = renderHeader({
+      title: '#1',
+      eyebrow: 'KILO-STUB/DISCUSSION-MIXED',
+      eyebrowNumberOfLines: 1,
+    });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
+  });
+
+  it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
+    const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['\u00A0']);
+  });
+});
+
+describe('header actions row', () => {
+  it('keeps the actions on the title row at a normal phone width', () => {
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const actions = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        String(node.props.className ?? '').includes('max-w-[50%]')
+    );
+    // The inline wrapper's gap is the logical start margin (`ms-3`), which the
+    // RTL swap cannot mirror away; the title's box keeps its `shrink` cap.
+    expect(actions.props.className).toContain('ms-3');
+  });
+
+  it('drops the actions to their own row when the window cannot hold the title beside them', () => {
+    // The e1 geometry: 160dp wide with a 1.5 font scale left the 30px title
+    // 48dp, which broke it and the mono link beside it into letter columns.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          String(node.props.className ?? '').includes('max-w-[50%]')
+      )
+    ).toHaveLength(0);
+    // The title still shares its row with the back control; only the actions moved.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+  });
+
+  it('reflows a centered modal header the same way', () => {
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', modal: true, headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+  });
+
+  it('leaves a header without actions on its single row', () => {
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+});
+
+describe('header status line', () => {
+  it('keeps the eyebrow on one line at the reported narrow geometry', () => {
+    // e1: a 160dp window at a 1.5 font scale broke '1 LIVE' into a letter
+    // column beside the title and grew the header down over the search field.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.children).toEqual(['1 LIVE']);
+  });
+});
+
+describe('shouldStackHeaderActions', () => {
+  it('reflows at the reported 160dp window with a 1.5 font scale', () => {
+    expect(shouldStackHeaderActions(160, 1.5)).toBe(true);
+  });
+
+  it('keeps one row at every phone width the scenarios cover', () => {
+    expect(shouldStackHeaderActions(320, 1)).toBe(false);
+    expect(shouldStackHeaderActions(360, 1)).toBe(false);
+    expect(shouldStackHeaderActions(360, 2)).toBe(false);
+    expect(shouldStackHeaderActions(390, 2)).toBe(false);
+  });
+
+  it('reflows a window too narrow for the title beside the actions', () => {
+    expect(shouldStackHeaderActions(160, 1)).toBe(true);
+    expect(shouldStackHeaderActions(220, 1.5)).toBe(true);
+    expect(shouldStackHeaderActions(320, 2.5)).toBe(true);
+  });
+
+  it('treats a missing window measurement as a single row', () => {
+    expect(shouldStackHeaderActions(Number.NaN, 1)).toBe(false);
+    expect(shouldStackHeaderActions(160, Number.NaN)).toBe(true);
   });
 });

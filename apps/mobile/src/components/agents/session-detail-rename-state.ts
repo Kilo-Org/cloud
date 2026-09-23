@@ -1,4 +1,4 @@
-import { isDefaultSessionTitle } from '@kilocode/cloud-agent-sdk';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 export type RenameState = {
   isModalOpen: boolean;
@@ -71,12 +71,12 @@ export const SESSION_TITLE_MAX_LENGTH = 200;
  * null the same way), and rendering it in the header truncates to
  * "New session - 2026-…" instead of showing the title in full. Treat it as
  * untitled so the header keeps its short fallback copy.
+ *
+ * Shared with every other title surface through `sessionDisplayTitle`
+ * (`@/lib/session-display-title`), so the placeholder rule has one owner.
  */
 export function displaySessionTitle(title: string | null | undefined): string | undefined {
-  if (title == null || title.trim().length === 0 || isDefaultSessionTitle(title)) {
-    return undefined;
-  }
-  return title;
+  return sessionDisplayTitle(title);
 }
 
 /**
@@ -90,7 +90,7 @@ export function getSessionDetailRenameState(input: {
   renameState: RenameState;
 }): SessionDetailRenameState {
   const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
+    ? (sessionDisplayTitle(input.serverTitle) ?? input.fallbackTitle)
     : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
@@ -115,6 +115,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  const title = payload.session.title;
-  return displaySessionTitle(title);
+  return sessionDisplayTitle(payload.session.title);
 }

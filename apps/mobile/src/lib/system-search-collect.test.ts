@@ -17,7 +17,7 @@ import {
 // recents come from SecureStore, so it is mocked to a settable list. Every
 // other document is built from the react-query cache below.
 const recentPrs = vi.hoisted(() => ({
-  getRecentPrs: vi.fn<() => Promise<RecentPrsModule.RecentPr[]>>(),
+  getRecentPrsForIndex: vi.fn<() => Promise<RecentPrsModule.RecentPr[] | undefined>>(),
 }));
 
 vi.mock('expo-secure-store', () => ({
@@ -28,7 +28,7 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@/lib/pr-review/recent-prs', async importOriginal => {
   const actual = await importOriginal<typeof RecentPrsModule>();
-  return { ...actual, getRecentPrs: recentPrs.getRecentPrs };
+  return { ...actual, getRecentPrsForIndex: recentPrs.getRecentPrsForIndex };
 });
 
 const SESSION_LIST_KEY = [
@@ -196,14 +196,14 @@ function projection(document: {
 
 describe('collectSystemSearchDocuments', () => {
   beforeEach(() => {
-    recentPrs.getRecentPrs.mockReset();
-    recentPrs.getRecentPrs.mockResolvedValue([]);
+    recentPrs.getRecentPrsForIndex.mockReset();
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([]);
   });
 
   it('collects one document per cached entity, in cache order', async () => {
     const client = new QueryClient();
     seed(client);
-    recentPrs.getRecentPrs.mockResolvedValue([
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([
       // The same PR as the cached inbox row, with the title the authorized
       // load stored. The id is claimed once.
       {
@@ -267,7 +267,9 @@ describe('collectSystemSearchDocuments', () => {
   });
 
   it('observes the recents scopes only when the stored list was read', async () => {
-    recentPrs.getRecentPrs.mockRejectedValue(new Error('SecureStore unavailable'));
+    // An unreadable store is `undefined`, not an empty list: the collector
+    // must not read it as evidence that the recents are gone.
+    recentPrs.getRecentPrsForIndex.mockResolvedValue(undefined);
 
     const { observedSources } = await collectSystemSearchDocuments(new QueryClient());
 
@@ -281,7 +283,7 @@ describe('collectSystemSearchDocuments', () => {
     // The stored list is empty now: the user removed the entry, or newer opens
     // evicted it. No inbox query can speak for a GitLab recents entry, so the
     // recents scope read above is the only evidence that may remove it.
-    recentPrs.getRecentPrs.mockResolvedValue([]);
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([]);
     const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
     const indexed = recentPrSearchDocument({
@@ -607,7 +609,7 @@ describe('collectSystemSearchDocuments', () => {
     client.setQueryData(PROVIDER_INBOX_KEY, providerInbox);
     // The same GitLab MR also sits in the stored recents: the collector
     // dedupes by id, so the index carries one entry per PR, not two.
-    recentPrs.getRecentPrs.mockResolvedValue([
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([
       {
         owner: 'group/sub',
         repo: 'repo',

@@ -317,19 +317,25 @@ export async function beginWorktreeDeletion(env: Env, params: CloudAgentWorktree
 }
 
 /**
- * True only when the list is non-empty and every entry belongs to
- * `cloudAgentSessionId`. The single owner of the "exact sole member" test, used
- * by both the marker and the fresh-membership branch of
- * `retireWorktreeIfSoleMember`.
+ * True only when exactly one entry owns the worktree: exactly one session
+ * carries a non-null `cloudAgentSessionId` (a non-null id on a row carrying
+ * this worktree id is a root, since `discoverMembers` throws
+ * `WORKTREE_ACCESS_DENIED` for any other) and it equals
+ * `cloudAgentSessionId`. Descendants carry a null `cloudAgentSessionId` and
+ * belong to their root, so they neither count as owners nor block retirement.
+ * Zero owners is not exclusive.
+ *
+ * The single owner of the "exact sole member" test, used by both the marker and
+ * the fresh-membership branch of `retireWorktreeIfSoleMember`.
  */
 function exactSoleMember(
   sessions: readonly { cloudAgentSessionId: string | null }[],
   cloudAgentSessionId: string
 ): boolean {
-  return (
-    sessions.length > 0 &&
-    sessions.every(session => session.cloudAgentSessionId === cloudAgentSessionId)
+  const owners = sessions.flatMap(session =>
+    session.cloudAgentSessionId === null ? [] : [session.cloudAgentSessionId]
   );
+  return owners.length === 1 && owners[0] === cloudAgentSessionId;
 }
 
 /**
@@ -366,7 +372,12 @@ export async function retireWorktreeIfSoleMember(
     if (members.length === 0) return { kind: 'unresolved' };
     if (!exactSoleMember(members, params.cloudAgentSessionId)) return { kind: 'shared' };
     const state = await beginWorktreeDeletionOn(tx, params);
-    return state.completed ? { kind: 'unresolved' } : { kind: 'exclusive' };
+    if (state.completed) return { kind: 'unresolved' };
+    // A competing root can commit between the read above and the manifest write
+    // inside `beginWorktreeDeletionOn`, so the committed manifest is authoritative.
+    return exactSoleMember(state.manifest.sessions, params.cloudAgentSessionId)
+      ? { kind: 'exclusive' }
+      : { kind: 'unresolved' };
   });
 }
 

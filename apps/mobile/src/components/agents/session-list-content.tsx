@@ -2,7 +2,7 @@
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -34,7 +34,7 @@ import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
@@ -114,8 +114,10 @@ export function AgentSessionListContent({
 
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom, left, right } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const { left, right } = useSafeAreaInsets();
+  // The tabs layout's width-aware label decision rides along, so the list
+  // clearance tracks the bar height the layout actually renders.
+  const tabBarHeight = useEffectiveTabBarHeight();
   const { deleteSession, renameSession } = useSessionMutations();
   // The stored refetch resolves void: a pull failure surfaces through the
   // query error state (showInlineError below), so a settlement is always
@@ -145,16 +147,7 @@ export function AgentSessionListContent({
   // must clear it or the last rows are stuck underneath it. The history list
   // owns no FAB, so a bottom-only TabBar clearance is the only inset the
   // content container needs.
-  const tabBarOnlyClearanceStyle = useMemo(
-    () => ({
-      paddingBottom: getEffectiveTabBarHeight({
-        bottomInset: bottom,
-        platform: Platform.OS,
-        fontScale,
-      }),
-    }),
-    [bottom, fontScale]
-  );
+  const tabBarOnlyClearanceStyle = useMemo(() => ({ paddingBottom: tabBarHeight }), [tabBarHeight]);
 
   // The landscape side insets keep row text clear of the sensor housing
   // (portrait insets are 0, keeping the geometry unchanged). They live on a

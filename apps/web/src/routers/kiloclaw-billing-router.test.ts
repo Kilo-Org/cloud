@@ -29,7 +29,7 @@ import {
   user_affiliate_events,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
+import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';

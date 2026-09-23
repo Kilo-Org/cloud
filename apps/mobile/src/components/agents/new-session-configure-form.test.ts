@@ -886,6 +886,19 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
+  // ── Case 15: the scroll frame is measured and handed to the prompt ──
+  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    // The ScrollView reports its height so the prompt can yield its floor to it.
+    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
+    // The mocked useState holds the initial measurement (0) and never setStates.
+    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
+  });
+
   // ── Case 16: reveal the composer card's bottom row above the IME ──
   it('scrolls the composer card bottom above the keyboard once it opens', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');

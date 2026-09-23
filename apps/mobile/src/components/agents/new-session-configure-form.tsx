@@ -115,21 +115,25 @@ export function NewSessionConfigureForm({
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
   const { bottom } = useSafeAreaInsets();
+  // The scroll frame's own height, reported by the ScrollView below. It already
+  // shrinks with the keyboard because `AppAwareKeyboardPaddingView` pads this
+  // parent; the prompt yields its minimum height to it so the whole composer
+  // card renders above the bottom system bar.
+  const [frameHeight, setFrameHeight] = useState(0);
+  // The composer card's top offset inside the scroll content, reported by the
+  // wrapper below and threaded to the prompt. The prompt's own `onLayout` reads
+  // `0` against that padding-free wrapper, dropping the content container's
+  // `pt-4` gap and overstating the room the frame leaves for the input.
+  const [composerTop, setComposerTop] = useState(0);
   const isRemote = runOnInstance !== null;
-  // The frame this form scrolls in: the height left once the navigation-bar
-  // inset and the keyboard-lift padding are taken out. `NewSessionPrompt`
-  // measures its input's min-height floor against this frame, so the input
-  // gives lines up to the keyboard and takes them back when it leaves — the
-  // window-based floor could not, because the window never resizes for the IME.
-  const [promptViewportHeight, setPromptViewportHeight] = useState(0);
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
 
-  function handleScrollViewportLayout(event: LayoutChangeEvent) {
-    const nextHeight = Math.round(event.nativeEvent.layout.height);
-    setPromptViewportHeight(current => (current === nextHeight ? current : nextHeight));
+  function handleScrollFrameLayout(event: LayoutChangeEvent) {
+    const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+    setFrameHeight(current => (current === next ? current : next));
   }
 
   const body = (
@@ -143,7 +147,7 @@ export function NewSessionConfigureForm({
       onLayout={event => {
         // The one layout feeds both consumers: the form frame height sets the
         // prompt's input floor, and the hook's viewport height drives the reveal.
-        handleScrollViewportLayout(event);
+        handleScrollFrameLayout(event);
         composerReveal.onViewportLayout(event.nativeEvent.layout.height);
       }}
       onScroll={event => {
@@ -160,6 +164,8 @@ export function NewSessionConfigureForm({
             y: event.nativeEvent.layout.y,
             height: event.nativeEvent.layout.height,
           });
+          const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
+          setComposerTop(current => (current === nextTop ? current : nextTop));
         }}
       >
         <NewSessionPrompt
@@ -188,7 +194,8 @@ export function NewSessionConfigureForm({
           shareId={shareId}
           voiceInputSettlerRef={voiceInputSettlerRef}
           initialPrompt={initialPrompt}
-          promptViewportHeight={promptViewportHeight}
+          frameHeight={frameHeight}
+          cardTop={composerTop}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
         />

@@ -1,11 +1,19 @@
+/* eslint-disable max-lines -- exit refresh, rename seed, and long-press preview share the live-sync mock harness */
 import { createElement } from 'react';
 import { Pressable } from 'react-native';
 import { type QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as Haptics from 'expo-haptics';
+
 import { RemoteSessionRow } from './remote-session-row';
-import { showRenamePrompt } from './session-row-actions';
+import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
+import {
+  closeSessionPreviewStore,
+  getSessionPreviewSnapshot,
+  releaseSessionPreviewStore,
+} from './session-preview-state';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
@@ -25,19 +33,28 @@ import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/
 
 const state = vi.hoisted(() => ({
   organizationId: null as string | null,
-  exit: undefined as (() => void) | undefined,
-  rename: undefined as (() => void) | undefined,
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
   send: vi.fn(),
+  renameSession: vi.fn<(id: string, title: string) => void>(),
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: state.organizationId, isLoaded: true }),
+}));
+vi.mock('@/lib/agent-session-cache', () => ({
+  prefetchSessionTranscript: vi.fn(),
 }));
 vi.mock('@/lib/trpc', () => {
   const trpc = {
     activeSessions: {
       list: {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
+      },
+    },
+    cliSessionsV2: {
+      getSessionMessages: {
+        queryOptions: (input: { session_id: string }) => ({
+          queryKey: ['transcript', input.session_id],
+        }),
       },
     },
   };
@@ -47,7 +64,7 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
   useUserWebConnection: () => ({ sendCommand: state.send }),
 }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
-  useSessionMutations: () => ({ renameSession: vi.fn() }),
+  useSessionMutations: () => ({ renameSession: state.renameSession }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({ mutedSoft: '#777' }) }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, Pressable: 'Pressable', View: 'View' }));
@@ -64,14 +81,6 @@ vi.mock('@/components/ui/session-row', () => ({ SessionRow: 'SessionRow' }));
 vi.mock('@/components/agents/session-platform-icon', () => ({
   selectRowPlatformPresentation: () => ({ iconKind: null, spokenPlatform: null }),
   SessionPlatformIcon: () => null,
-}));
-vi.mock('@/components/agents/session-row-actions', () => ({
-  showSessionActionMenu: (options: { onExit?: () => void; onRename?: () => void }) => {
-    state.exit = options.onExit;
-    state.rename = options.onRename;
-  },
-  copySessionId: vi.fn(),
-  showRenamePrompt: vi.fn(),
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
   showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
@@ -124,17 +133,27 @@ function attach(queryKey: readonly unknown[] = QUERY_KEY) {
   });
   owner.attach();
 }
+function pressableProps() {
+  if (!renderer) {
+    throw new Error('Missing row');
+  }
+  return renderer.root.findByType(Pressable).props as {
+    onPress?: () => void;
+    onPressIn?: () => void;
+    onLongPress?: () => void;
+    onAccessibilityAction?: (event: { nativeEvent: { actionName: string } }) => void;
+    accessibilityActions?: { name: string; label: string }[];
+  };
+}
+
 async function exit() {
   await act(async () => {
-    if (!renderer) {
-      throw new Error('Missing row');
-    }
-    const props = renderer.root.findByType(Pressable).props as { onLongPress: () => void };
-    props.onLongPress();
-    if (!state.exit) {
+    pressableProps().onLongPress?.();
+    const onExit = getSessionPreviewSnapshot().target?.onExit;
+    if (!onExit) {
       throw new Error('Missing exit action');
     }
-    state.exit();
+    onExit();
     await flush();
   });
 }
@@ -142,10 +161,13 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   setSignOutActive(false);
   state.organizationId = null;
-  state.exit = undefined;
-  state.rename = undefined;
   state.request.mockReset().mockResolvedValue({ sessions: [] });
   state.send.mockReset().mockResolvedValue(undefined);
+  state.renameSession.mockReset();
+  vi.mocked(Haptics.impactAsync).mockClear();
+  vi.mocked(prefetchSessionTranscript).mockClear();
+  closeSessionPreviewStore();
+  releaseSessionPreviewStore();
   client = createKiloAppQueryClient();
   client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
   client.setQueryData(QUERY_KEY, cached);
@@ -169,6 +191,8 @@ afterEach(async () => {
   owner = undefined;
   unsubscribe = undefined;
   setSignOutActive(false);
+  closeSessionPreviewStore();
+  releaseSessionPreviewStore();
 });
 
 describe('row title', () => {
@@ -279,8 +303,8 @@ describe('row exit refresh caller', () => {
 });
 
 describe('RemoteSessionRow rename prefill', () => {
-  it('seeds the rename prompt empty for a session the backend has not named', async () => {
-    // The row hides `New session - ${ISO}` on screen; the rename prompt must
+  it('seeds initialRenameValue empty for a session the backend has not named', async () => {
+    // The row hides `New session - ${ISO}` on screen; the rename field must
     // not reopen that machine string, so an unnamed session opens blank.
     await render(
       makeCached({
@@ -290,15 +314,86 @@ describe('RemoteSessionRow rename prefill', () => {
       })
     );
     act(() => {
-      if (!renderer) {
-        throw new Error('Missing row');
-      }
-      const props = renderer.root.findByType(Pressable).props as { onLongPress: () => void };
-      props.onLongPress();
+      pressableProps().onLongPress?.();
+    });
+    expect(getSessionPreviewSnapshot().target).toMatchObject({
+      sessionId: 'remote-rename',
+      title: 'Untitled session',
+      initialRenameValue: '',
+    });
+  });
+});
+
+describe('RemoteSessionRow long-press preview', () => {
+  it('writes the row session into the store and does not fire a haptic', async () => {
+    const onPress = vi.fn<() => void>();
+    await act(async () => {
+      const tree = createElement(
+        QueryClientProvider,
+        { client },
+        createElement(RemoteSessionRow, { session, onPress })
+      );
+      renderer = TestRenderer.create(tree);
+      await flush();
     });
     act(() => {
-      state.rename?.();
+      pressableProps().onLongPress?.();
     });
-    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
+    const snapshot = getSessionPreviewSnapshot();
+    expect(snapshot.visible).toBe(true);
+    expect(snapshot.target).toMatchObject({
+      sessionId: 'a1',
+      title: 'test',
+      initialRenameValue: 'test',
+      live: true,
+      statusKind: 'running',
+      needsInput: false,
+    });
+    expect(snapshot.target?.onDelete).toBeUndefined();
+    expect(snapshot.target?.onExit).toEqual(expect.any(Function));
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    act(() => {
+      snapshot.target?.onRename?.('Renamed');
+    });
+    expect(state.renameSession).toHaveBeenCalledWith('a1', 'Renamed');
+  });
+
+  it('still fires onPress', async () => {
+    const onPress = vi.fn<() => void>();
+    await act(async () => {
+      const tree = createElement(
+        QueryClientProvider,
+        { client },
+        createElement(RemoteSessionRow, { session, onPress })
+      );
+      renderer = TestRenderer.create(tree);
+      await flush();
+    });
+    act(() => {
+      pressableProps().onPress?.();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(getSessionPreviewSnapshot().target).toBeNull();
+  });
+
+  it('prefetches the transcript query options on press-in', async () => {
+    await render();
+    act(() => {
+      pressableProps().onPressIn?.();
+    });
+    expect(prefetchSessionTranscript).toHaveBeenCalledWith(client, {
+      queryKey: ['transcript', 'a1'],
+    });
+  });
+
+  it('opens the preview from the rotor manage action', async () => {
+    await render();
+    const props = pressableProps();
+    expect(props.accessibilityActions).toEqual([{ name: 'manage', label: 'Session actions' }]);
+    act(() => {
+      props.onAccessibilityAction?.({ nativeEvent: { actionName: 'manage' } });
+    });
+    expect(getSessionPreviewSnapshot().target?.sessionId).toBe('a1');
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
   });
 });

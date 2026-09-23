@@ -50,7 +50,7 @@ export const SESSION_TRANSCRIPT_STALE_TIME_MS = 60_000;
  */
 export async function prefetchSessionTranscript(
   queryClient: Pick<QueryClient, 'prefetchQuery'>,
-  options: Parameters<QueryClient['prefetchQuery']>[0]
+  options: { queryKey: readonly unknown[] }
 ): Promise<void> {
   await queryClient.prefetchQuery({
     ...options,

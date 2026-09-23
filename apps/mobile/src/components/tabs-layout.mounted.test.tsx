@@ -54,6 +54,9 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 24, top: 0, left: 0, right: 0 }),
 }));
+vi.mock('@/components/agents/session-preview-overlay', () => ({
+  SessionPreviewOverlay: () => null,
+}));
 vi.mock('@/components/centered-state-surface', async () => {
   const react = await import('react');
   return {

@@ -2050,6 +2050,7 @@
       "idCopied": "Session ID copied",
       "couldNotCopyId": "Could not copy session ID",
       "untitled": "Untitled session",
+      "actions": "Session actions",
       "sessionDeleted": "Session deleted",
       "needsInput": "needs input",
       "fromPlatform": "from {{platform}}",

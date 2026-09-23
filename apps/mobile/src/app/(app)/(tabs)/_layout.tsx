@@ -6,6 +6,7 @@ import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { SessionPreviewOverlay } from '@/components/agents/session-preview-overlay';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
@@ -299,5 +300,10 @@ export default function TabsLayout() {
       </Tabs>
     </StateSurfaceInsets>
   );
-  return <TabBarLabelContext value={showTabLabel}>{tabsLayout}</TabBarLabelContext>;
+  return (
+    <TabBarLabelContext value={showTabLabel}>
+      {tabsLayout}
+      <SessionPreviewOverlay />
+    </TabBarLabelContext>
+  );
 }

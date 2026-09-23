@@ -1,4 +1,3 @@
-import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -6,7 +5,6 @@ import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
-import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 export function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -85,26 +83,6 @@ export async function copySessionLink(
   }
 }
 
-type SessionActionMenuOptions = {
-  showActionSheetWithOptions: (
-    options: ActionSheetOptions,
-    onSelect: (index?: number) => void
-  ) => void;
-  onCopySessionId: () => void;
-  /** Omitted → no Rename entry. */
-  onRename?: () => void;
-  /**
-   * Omitted → no Exit session entry. Additive for the running-session row:
-   * the old menu form (Copy / Rename / Delete / Cancel) stays unchanged for
-   * callers that omit `onExit`.
-   */
-  onExit?: () => void;
-  /** Omitted → no Delete entry. */
-  onDelete?: () => void;
-  /** Themed sheet base options (`useThemedActionSheetOptions()`), spread first. */
-  themedSheet: ThemedActionSheetOptions;
-};
-
 export type SessionActionMenuItem = {
   key: 'copyId' | 'rename' | 'exit' | 'delete';
   label: string;
@@ -120,9 +98,8 @@ export type SessionActionMenu = {
 /**
  * The one session action set, in today's order: Copy session ID, optional
  * Rename, optional Exit session, optional Delete session. Delete wins when
- * both exist; Exit is destructive only when Delete is absent. The panel and
- * the sheet both build from here so their order, copy and indices cannot
- * diverge.
+ * both exist; Exit is destructive only when Delete is absent. The preview
+ * panel builds from here so its order, copy and indices cannot diverge.
  */
 export function buildSessionActionMenuItems(input: {
   onCopySessionId: () => void;
@@ -165,42 +142,4 @@ export function buildSessionActionMenuItems(input: {
   }
 
   return { items, cancelLabel: i18n.t('common.cancel') };
-}
-
-/**
- * Shared session long-press menu. Builds one options list — Copy session ID,
- * optional Rename, optional Exit session, optional Delete session, Cancel —
- * and dispatches by index. Exit session is additive when `onExit` is passed;
- * callers that omit it keep the old Copy / Rename / Delete / Cancel form.
- * iOS delegates to native ActionSheetIOS via @expo/react-native-action-sheet;
- * Android gets backdrop-tap and hardware-back dismiss from the library.
- */
-export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
-  const { showActionSheetWithOptions, themedSheet } = opts;
-
-  const { items, cancelLabel } = buildSessionActionMenuItems({
-    onCopySessionId: opts.onCopySessionId,
-    onRename: opts.onRename,
-    onExit: opts.onExit,
-    onDelete: opts.onDelete,
-  });
-
-  const options = [...items.map(item => item.label), cancelLabel];
-  const cancelButtonIndex = options.length - 1;
-  const destructiveButtonIndex = items.findIndex(item => item.destructive);
-
-  showActionSheetWithOptions(
-    {
-      ...themedSheet,
-      options,
-      cancelButtonIndex,
-      ...(destructiveButtonIndex !== -1 && { destructiveButtonIndex }),
-    },
-    index => {
-      if (index === undefined || index === cancelButtonIndex) {
-        return;
-      }
-      items[index]?.run();
-    }
-  );
 }

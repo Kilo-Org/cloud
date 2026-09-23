@@ -1,19 +1,25 @@
 /* eslint-disable max-lines -- one cohesive mounted suite: stored row, share list, and remote row share the mock harness; test-renderer mounts the real rows and their native presentation without a DOM. */
 import { createElement, type ReactElement } from 'react';
-import { Platform } from 'react-native';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as Haptics from 'expo-haptics';
+
 import { makeCached } from '@/lib/active-sessions-live-sync.test-helpers';
 import { ShareDestinationList } from '@/components/share/share-destination-list';
 import { type ShareDestinationRow } from '@/components/share/share-destinations';
+import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
-import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
+import {
+  closeSessionPreviewStore,
+  getSessionPreviewSnapshot,
+  releaseSessionPreviewStore,
+} from './session-preview-state';
 import { StoredSessionRow } from './session-row';
 
 vi.mock('react-native', async () => {
@@ -80,20 +86,24 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
 }));
-vi.mock('./session-row-actions', () => ({
-  copySessionId: vi.fn(),
-  showDeleteConfirm: vi.fn(),
-  showRenamePrompt: vi.fn(),
-  showSessionActionMenu: vi.fn(),
-}));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null, isLoaded: true }),
+}));
+vi.mock('@/lib/agent-session-cache', () => ({
+  prefetchSessionTranscript: vi.fn(),
 }));
 vi.mock('@/lib/trpc', () => {
   const trpc = {
     activeSessions: {
       list: {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
+      },
+    },
+    cliSessionsV2: {
+      getSessionMessages: {
+        queryOptions: (input: { session_id: string }) => ({
+          queryKey: ['transcript', input.session_id],
+        }),
       },
     },
   };
@@ -131,11 +141,16 @@ const session: StoredSession = {
   associatedPr: null,
 };
 const mounted: TestRenderer.ReactTestRenderer[] = [];
+const previewQueryClient: QueryClient = createKiloAppQueryClient();
+
+function wrapped(ui: ReactElement): ReactElement {
+  return createElement(QueryClientProvider, { client: previewQueryClient }, ui);
+}
 
 function mount(ui: ReactElement): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(ui);
+    ref.current = TestRenderer.create(wrapped(ui));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -204,7 +219,7 @@ describe('StoredSessionRow live speech', () => {
     expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
 
     act(() => {
-      renderer.update(row({ ...props, live: true }));
+      renderer.update(wrapped(row({ ...props, live: true })));
     });
     expect(hosts(renderer, 'Pressable')[0]).toBe(button);
     expect(button?.props.accessibilityLabel).toBe(
@@ -217,7 +232,7 @@ describe('StoredSessionRow live speech', () => {
     expect(texts(renderer)).toContain('feature/live · #42');
 
     act(() => {
-      renderer.update(row({ ...props, live: false }));
+      renderer.update(wrapped(row({ ...props, live: false })));
     });
     expect(button?.props.accessibilityLabel).toBe(nonliveLabel);
     expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
@@ -356,13 +371,20 @@ describe('StoredSessionRow live speech', () => {
   );
 });
 
-describe('StoredSessionRow rename prefill', () => {
+describe('StoredSessionRow long-press preview', () => {
+  const onDelete = vi.fn<() => void>();
+  const onRename = vi.fn<(newTitle: string) => void>();
+
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     __resetSessionAttentionForTests();
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
-    vi.mocked(showSessionActionMenu).mockClear();
-    vi.mocked(showRenamePrompt).mockClear();
+    vi.mocked(Haptics.impactAsync).mockClear();
+    vi.mocked(prefetchSessionTranscript).mockClear();
+    onDelete.mockClear();
+    onRename.mockClear();
+    closeSessionPreviewStore();
+    releaseSessionPreviewStore();
   });
   afterEach(async () => {
     act(() => {
@@ -371,63 +393,112 @@ describe('StoredSessionRow rename prefill', () => {
       }
     });
     mounted.length = 0;
+    closeSessionPreviewStore();
+    releaseSessionPreviewStore();
     vi.restoreAllMocks();
     await i18n.changeLanguage('en');
   });
 
-  function openRename(renderer: TestRenderer.ReactTestRenderer) {
-    const button = hosts(renderer, 'Pressable')[0];
-    const pressable = button?.props as { onLongPress?: () => void } | undefined;
-    act(() => {
-      pressable?.onLongPress?.();
-    });
-    act(() => {
-      vi.mocked(showSessionActionMenu).mock.calls.at(-1)?.[0].onRename?.();
-    });
+  function managedRow(overrides: Partial<Parameters<typeof StoredSessionRow>[0]> = {}) {
+    return row({ onDelete, onRename, ...overrides });
   }
 
-  it('seeds the rename prompt empty for a session the backend has not named', () => {
-    // The backend seeds a fresh session with `New session - ${ISO}`; the field
-    // must not surface that machine string, so an unnamed session opens blank.
-    const renderer = mount(
-      row({
-        session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' },
-        onDelete: vi.fn<() => void>(),
-        onRename: vi.fn<() => void>(),
-      })
-    );
-    openRename(renderer);
-    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
+  function pressableProps(renderer: TestRenderer.ReactTestRenderer) {
+    return hosts(renderer, 'Pressable')[0]?.props as
+      | {
+          onPress?: () => void;
+          onPressIn?: () => void;
+          onLongPress?: () => void;
+          onAccessibilityAction?: (event: { nativeEvent: { actionName: string } }) => void;
+          accessibilityActions?: { name: string; label: string }[];
+        }
+      | undefined;
+  }
+
+  it('writes the row session into the store and does not fire a haptic', () => {
+    const renderer = mount(managedRow());
+    act(() => {
+      pressableProps(renderer)?.onLongPress?.();
+    });
+    const snapshot = getSessionPreviewSnapshot();
+    expect(snapshot.visible).toBe(true);
+    expect(snapshot.target).toMatchObject({
+      sessionId: 'stored-1',
+      title: 'Fix login bug',
+      initialRenameValue: 'Fix login bug',
+      live: false,
+      statusKind: null,
+      needsInput: false,
+      totalCostMicrodollars: 120_000,
+      onRename,
+      onDelete,
+    });
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    expect(hosts(renderer, 'RenameModal')).toHaveLength(0);
   });
 
-  it('seeds the rename prompt with the trimmed stored title for a named session', () => {
-    const renderer = mount(
-      row({
-        session: { ...session, title: '  Fix login bug  ' },
-        onDelete: vi.fn<() => void>(),
-        onRename: vi.fn<() => void>(),
-      })
-    );
-    openRename(renderer);
-    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('Fix login bug', expect.any(Function));
+  it('still fires onPress', () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = mount(managedRow({ onPress }));
+    act(() => {
+      pressableProps(renderer)?.onPress?.();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(getSessionPreviewSnapshot().target).toBeNull();
   });
 
-  it('opens the Android rename field empty for a session the backend has not named', () => {
-    (Platform as { OS: string }).OS = 'android';
-    try {
-      const renderer = mount(
-        row({
-          session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' },
-          onDelete: vi.fn<() => void>(),
-          onRename: vi.fn<() => void>(),
-        })
-      );
-      openRename(renderer);
-      const modal = hosts(renderer, 'RenameModal')[0];
-      expect(modal?.props.initialValue).toBe('');
-    } finally {
-      (Platform as { OS: string }).OS = 'ios';
-    }
+  it('prefetches the transcript query options on press-in', () => {
+    const renderer = mount(managedRow());
+    act(() => {
+      pressableProps(renderer)?.onPressIn?.();
+    });
+    expect(prefetchSessionTranscript).toHaveBeenCalledWith(previewQueryClient, {
+      queryKey: ['transcript', 'stored-1'],
+    });
+  });
+
+  it('opens the preview from the rotor manage action', () => {
+    const renderer = mount(managedRow());
+    const props = pressableProps(renderer);
+    expect(props?.accessibilityActions).toEqual([{ name: 'manage', label: 'Session actions' }]);
+    act(() => {
+      props?.onAccessibilityAction?.({ nativeEvent: { actionName: 'manage' } });
+    });
+    expect(getSessionPreviewSnapshot().target?.sessionId).toBe('stored-1');
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  it('seeds initialRenameValue empty for a session the backend has not named', () => {
+    const renderer = mount(
+      managedRow({ session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' } })
+    );
+    act(() => {
+      pressableProps(renderer)?.onLongPress?.();
+    });
+    expect(getSessionPreviewSnapshot().target).toMatchObject({
+      title: 'Untitled session',
+      initialRenameValue: '',
+    });
+  });
+
+  it('seeds initialRenameValue with the trimmed stored title for a named session', () => {
+    const renderer = mount(managedRow({ session: { ...session, title: '  Fix login bug  ' } }));
+    act(() => {
+      pressableProps(renderer)?.onLongPress?.();
+    });
+    expect(getSessionPreviewSnapshot().target?.initialRenameValue).toBe('Fix login bug');
+  });
+
+  it('forwards live and statusKind the same way the row paints them', () => {
+    const renderer = mount(managedRow({ live: true, session: { ...session, status: 'question' } }));
+    act(() => {
+      pressableProps(renderer)?.onLongPress?.();
+    });
+    expect(getSessionPreviewSnapshot().target).toMatchObject({
+      live: true,
+      statusKind: 'needsInput',
+      needsInput: true,
+    });
   });
 });
 

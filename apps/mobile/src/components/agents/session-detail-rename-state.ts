@@ -1,4 +1,4 @@
-import { displaySessionTitle } from '@/lib/session-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 export type RenameState = {
   isModalOpen: boolean;
@@ -65,7 +65,7 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const serverTitle = displaySessionTitle(input.serverTitle);
+  const serverTitle = sessionDisplayTitle(input.serverTitle);
   const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
@@ -90,9 +90,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  const title = payload.session.title;
-  if (title == null || title.trim().length === 0) {
-    return undefined;
-  }
-  return title;
+  return sessionDisplayTitle(payload.session.title);
 }

@@ -100,12 +100,12 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function render() {
+async function render(row: ActiveSession = session) {
   await act(async () => {
     const tree = createElement(
       QueryClientProvider,
       { client },
-      createElement(RemoteSessionRow, { session, onPress: vi.fn<() => void>() })
+      createElement(RemoteSessionRow, { session: row, onPress: vi.fn<() => void>() })
     );
     if (renderer) {
       renderer.update(tree);
@@ -169,6 +169,15 @@ afterEach(async () => {
   owner = undefined;
   unsubscribe = undefined;
   setSignOutActive(false);
+});
+
+describe('row title', () => {
+  it('paints the untitled label for a session that still carries the backend placeholder', async () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the tray
+    // row shows its own label instead of the machine string.
+    await render({ ...session, title: 'New session - 2026-09-22T01:09:45.623Z' });
+    expect(renderer?.root.findByType('SessionRow').props.title).toBe('Untitled session');
+  });
 });
 
 describe('row exit refresh caller', () => {
@@ -272,19 +281,7 @@ describe('row exit refresh caller', () => {
 describe('RemoteSessionRow rename prefill', () => {
   it('seeds the rename prompt with the raw backend title, not the untitled fallback', async () => {
     const rawTitle = 'New session - 2026-09-20T08:10:35.172Z';
-    await act(async () => {
-      renderer = TestRenderer.create(
-        createElement(
-          QueryClientProvider,
-          { client },
-          createElement(RemoteSessionRow, {
-            session: makeCached({ id: 'remote-rename', createdOnPlatform: 'cli', title: rawTitle }),
-            onPress: vi.fn<() => void>(),
-          })
-        )
-      );
-      await flush();
-    });
+    await render(makeCached({ id: 'remote-rename', createdOnPlatform: 'cli', title: rawTitle }));
     act(() => {
       if (!renderer) {
         throw new Error('Missing row');

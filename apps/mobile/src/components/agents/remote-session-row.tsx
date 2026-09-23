@@ -25,7 +25,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { displaySessionTitle } from '@/lib/session-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -91,7 +91,7 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = displaySessionTitle(session.title) ?? t('agents.sessionRow.untitled');
+  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   // The rename field seeds the session's own title, never the display fallback:
   // `showRenamePrompt` saves whatever the field holds, so prefilling the
   // untitled copy would persist that localized string as a real title on a

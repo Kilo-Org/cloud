@@ -8,8 +8,13 @@ import { createSessionManagementHandlers } from '../../src/router/handlers/sessi
 import { createSessionSendHandlers } from '../../src/router/handlers/session-send.js';
 import {
   createSessionMessageRecord,
-  type SessionMessageRecord,
+  type SessionMessage,
 } from '../../src/sandbox-session/session-message-queue.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
+import {
+  acceptedState,
+  terminalState,
+} from '../../src/sandbox-session/session-state.test-helpers.js';
 import { createEventQueries } from '../../src/session/queries/index.js';
 import {
   PENDING_SESSION_MESSAGE_LIMIT,
@@ -24,6 +29,8 @@ import {
 } from '../../src/session/session-message-state.js';
 import type { SessionMetadata } from '../../src/persistence/session-metadata.js';
 
+import { writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
 const access = vi.hoisted(() => new Map<string, string>());
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: () => ({}) }));
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', () => ({
@@ -75,11 +82,16 @@ function cancel(sessionId: string, index: number, userId = ownerId) {
 
 function snapshot(session: Session) {
   return runInDurableObject(session, async (_instance, state) => ({
-    messages: state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [],
+    messages: readRawSessionMessages(state.storage.kv),
     metadata: state.storage.kv.get<SessionMetadata>('session_metadata'),
     events: createEventQueries(drizzle(state.storage), state.storage.sql).findByFilters({}),
     alarm: await state.storage.getAlarm(),
   }));
+}
+
+/** Seed/rewrite canonical messages. `unresolved` is valid alongside an accepted head. */
+function seed(storage: Parameters<typeof writeSessionMessages>[0], messages: SessionMessage[]) {
+  writeSessionMessages(storage, { kind: 'unresolved' }, messages);
 }
 
 async function fixture() {
@@ -92,17 +104,20 @@ async function fixture() {
     agent,
   });
   await runInDurableObject(session, (_instance, state) => {
-    state.storage.kv.put('session_messages', [
+    seed(state.storage.kv, [
       {
-        ...createSessionMessageRecord({
-          turn: { type: 'prompt', messageId: id(0), prompt: 'accepted head' },
-          agent,
+        messageId: id(0),
+        state: acceptedState({
+          intent: {
+            turn: { type: 'prompt', messageId: id(0), prompt: 'accepted head' },
+            agent,
+          },
+          legacyInvalidIntent: undefined,
+          acceptedAt: Date.now(),
+          lastActivityAt: Date.now(),
         }),
-        state: 'accepted',
-        acceptedAt: Date.now(),
-        lastActivityAt: Date.now(),
-      },
-    ] satisfies SessionMessageRecord[]);
+      } satisfies SessionMessage,
+    ]);
   });
   const broadcast = await runInDurableObject(session, instance => {
     const observed = vi.fn(instance['broadcastQueuedMessage'].bind(instance));
@@ -218,10 +233,10 @@ describe('public control queue capacity and cancellation', () => {
     );
     expect(responses.filter(response => response.status === 429)).toHaveLength(6);
     const stored = await snapshot(session);
-    expect(stored.messages.filter(message => message.state === 'queued')).toHaveLength(
+    expect(stored.messages.filter(message => message.state.kind === 'queued')).toHaveLength(
       PENDING_SESSION_MESSAGE_LIMIT
     );
-    for (const message of stored.messages.filter(message => message.state === 'queued')) {
+    for (const message of stored.messages.filter(message => message.state.kind === 'queued')) {
       expect(await session.getMessageResult(message.messageId)).toMatchObject({
         type: 'found',
         result: { status: 'queued' },
@@ -242,9 +257,7 @@ describe('public control queue capacity and cancellation', () => {
     const after = await snapshot(session);
     expect(after.messages[0]).toEqual(before.messages[0]);
     expect(after.messages.find(message => message.messageId === id(4))).toMatchObject({
-      state: 'cancelled',
-      intent: before.messages[4].intent,
-      terminalAt: expect.any(Number),
+      state: { kind: 'cancelled', intent: before.messages[4].state.intent, at: expect.any(Number) },
     });
     expect(
       after.events.filter(event => event.stream_event_type === 'cloud.message.failed')
@@ -263,7 +276,7 @@ describe('public control queue capacity and cancellation', () => {
     expect((await send(sessionId, 12)).status).toBe(429);
     expect(
       (await snapshot(session)).messages
-        .filter(message => message.state === 'queued')
+        .filter(message => message.state.kind === 'queued')
         .map(message => message.messageId)
     ).toEqual([1, 2, 3, 5, 6, 7, 8, 9, 10, 11].map(id));
     const persisted = await snapshot(session);
@@ -305,9 +318,9 @@ describe('public control queue capacity and cancellation', () => {
     await send(sessionId, 1);
     await send(sessionId, 2);
     await runInDurableObject(session, async (_instance, state) => {
-      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
-      state.storage.kv.put(
-        'session_messages',
+      const messages = readRawSessionMessages(state.storage.kv);
+      seed(
+        state.storage.kv,
         messages.filter(message => message.messageId !== id(0))
       );
       await state.storage.deleteAlarm();
@@ -317,10 +330,13 @@ describe('public control queue capacity and cancellation', () => {
       result: { data: { dropped: true } },
     });
     const after = await snapshot(session);
-    expect(after.messages.find(message => message.state === 'queued')).toEqual(before.messages[1]);
+    expect(after.messages.find(message => message.state.kind === 'queued')).toEqual(
+      before.messages[1]
+    );
     expect(after.alarm).not.toBeNull();
-    expect(after.messages[0]).toMatchObject({ state: 'cancelled' });
-    expect(after.messages[0].preparationAttemptId).toBeUndefined();
+    expect(after.messages[0]).toMatchObject({ state: { kind: 'cancelled' } });
+    // The canonical cancelled union drops the queued preparation attempt.
+    expect(after.messages[0].state).not.toHaveProperty('preparationAttemptId');
   });
 
   it('denies unauthenticated and other-owner access and cannot cancel another session message', async () => {
@@ -337,18 +353,58 @@ describe('public control queue capacity and cancellation', () => {
   });
 
   it.each([
-    { state: 'accepted' as const, acceptedAt: 1 },
-    { unresolvedDispatch: true as const },
-    { state: 'failed' as const, terminalAt: 1 },
-    { state: 'cancelled' as const, terminalAt: 1 },
-  ])('refuses accepted, ambiguous and stale targets: %j', async patch => {
+    {
+      name: 'accepted',
+      patch: (message: SessionMessage) => ({
+        ...message,
+        state: acceptedState({
+          intent: message.state.intent,
+          legacyInvalidIntent: undefined,
+          acceptedAt: 1,
+          lastActivityAt: 1,
+        }),
+      }),
+    },
+    {
+      name: 'unresolved dispatch',
+      patch: (message: SessionMessage) => ({
+        ...message,
+        state: {
+          ...(message.state as Extract<SessionMessage['state'], { kind: 'queued' }>),
+          unresolvedDispatch: true as const,
+        },
+      }),
+    },
+    {
+      name: 'failed',
+      patch: (message: SessionMessage) => ({
+        ...message,
+        state: terminalState('failed', {
+          intent: message.state.intent,
+          legacyInvalidIntent: undefined,
+          at: 1,
+        }),
+      }),
+    },
+    {
+      name: 'cancelled',
+      patch: (message: SessionMessage) => ({
+        ...message,
+        state: terminalState('cancelled', {
+          intent: message.state.intent,
+          legacyInvalidIntent: undefined,
+          at: 1,
+        }),
+      }),
+    },
+  ])('refuses accepted, ambiguous and stale targets: $name', async ({ patch }) => {
     const { session, sessionId } = await fixture();
     await send(sessionId, 1);
     await runInDurableObject(session, (_instance, state) => {
-      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
-      state.storage.kv.put(
-        'session_messages',
-        messages.map(message => (message.messageId === id(1) ? { ...message, ...patch } : message))
+      const messages = readRawSessionMessages(state.storage.kv);
+      seed(
+        state.storage.kv,
+        messages.map(message => (message.messageId === id(1) ? patch(message) : message))
       );
     });
     const before = await snapshot(session);
@@ -362,16 +418,35 @@ describe('public control queue capacity and cancellation', () => {
   });
 
   it.each([
-    { preparationAttemptId: 'attempt-original', deliveryDeadlineAt: Date.now() + 60_000 },
-    { wrapperInstanceId: 'wrapper-original' },
-  ])('drops a queued preparing or wrapper-bound target: %j', async patch => {
+    {
+      name: 'preparing',
+      patch: (message: SessionMessage) => ({
+        ...message,
+        state: {
+          ...(message.state as Extract<SessionMessage['state'], { kind: 'queued' }>),
+          preparationAttemptId: 'attempt-original',
+          deadlineAt: Date.now() + 60_000,
+        },
+      }),
+    },
+    {
+      name: 'wrapper-bound',
+      patch: (message: SessionMessage) => ({
+        ...message,
+        state: {
+          ...(message.state as Extract<SessionMessage['state'], { kind: 'queued' }>),
+          wrapperInstanceId: 'wrapper-original',
+        },
+      }),
+    },
+  ])('drops a queued $name target', async ({ patch }) => {
     const { session, sessionId } = await fixture();
     await send(sessionId, 1);
     await runInDurableObject(session, (_instance, state) => {
-      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
-      state.storage.kv.put(
-        'session_messages',
-        messages.map(message => (message.messageId === id(1) ? { ...message, ...patch } : message))
+      const messages = readRawSessionMessages(state.storage.kv);
+      seed(
+        state.storage.kv,
+        messages.map(message => (message.messageId === id(1) ? patch(message) : message))
       );
     });
     const before = await snapshot(session);
@@ -380,12 +455,21 @@ describe('public control queue capacity and cancellation', () => {
     });
     const after = await snapshot(session);
     expect(after).not.toEqual(before);
-    expect(after.messages.find(message => message.messageId === id(1))).toMatchObject({
-      ...patch,
-      state: 'cancelled',
-      failedReason: 'queued_message_cancelled',
-      terminalAt: expect.any(Number),
+    // The cancelled union drops the queued deadline; it keeps the intent and the
+    // cancellation reason.
+    const beforeTarget = before.messages.find(message => message.messageId === id(1));
+    const afterTarget = after.messages.find(message => message.messageId === id(1));
+    expect(afterTarget).toMatchObject({
+      state: {
+        kind: 'cancelled',
+        reason: 'queued_message_cancelled',
+        at: expect.any(Number),
+      },
     });
+    // Ordinary cancellation is not allocation loss, so the delivery identity the
+    // queued message owned is retained (only STOPPED terminalization clears it).
+    expect(afterTarget?.state.wrapperInstanceId).toBe(beforeTarget?.state.wrapperInstanceId);
+    expect(afterTarget?.state.preparationAttemptId).toBe(beforeTarget?.state.preparationAttemptId);
   });
 
   it('counts the preparing head and frees a slot when that head is cancelled', async () => {
@@ -393,17 +477,20 @@ describe('public control queue capacity and cancellation', () => {
     for (let index = 1; index <= PENDING_SESSION_MESSAGE_LIMIT; index++)
       await send(sessionId, index);
     await runInDurableObject(session, (_instance, state) => {
-      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
-      state.storage.kv.put(
-        'session_messages',
+      const messages = readRawSessionMessages(state.storage.kv);
+      seed(
+        state.storage.kv,
         messages
           .filter(message => message.messageId !== id(0))
           .map(message =>
             message.messageId === id(1)
               ? {
                   ...message,
-                  preparationAttemptId: 'original',
-                  deliveryDeadlineAt: Date.now() + 60_000,
+                  state: {
+                    ...(message.state as Extract<SessionMessage['state'], { kind: 'queued' }>),
+                    preparationAttemptId: 'original',
+                    deadlineAt: Date.now() + 60_000,
+                  },
                 }
               : message
           )
@@ -416,10 +503,115 @@ describe('public control queue capacity and cancellation', () => {
     expect(
       (await snapshot(session)).messages.find(message => message.messageId === id(1))
     ).toMatchObject({
-      state: 'cancelled',
-      failedReason: 'queued_message_cancelled',
-      preparationAttemptId: 'original',
+      state: { kind: 'cancelled', reason: 'queued_message_cancelled' },
     });
     expect((await send(sessionId, 11)).status).toBe(200);
+  });
+});
+
+describe('preserved queued work after allocation loss', () => {
+  it('arms a preserved null-deadline row and fails it at the delivery bound', async () => {
+    const sessionId = `workspace_${crypto.randomUUID()}`;
+    access.set(sessionId, ownerId);
+    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
+    const wrapperInstanceId = crypto.randomUUID();
+    const kiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const incarnation = 'incarnation-preserved-queue';
+    const messageId = id(0);
+    await session.registerSession({
+      identity: { sessionId, userId: ownerId, createdOnPlatform: 'cloud-agent-web' },
+      auth: { kiloSessionId, kilocodeToken: 'test-token' },
+      agent,
+      workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+    });
+    await runInDurableObject(session, async (_instance, state) => {
+      seed(state.storage.kv, [
+        createSessionMessageRecord({
+          turn: { type: 'prompt', messageId, prompt: 'preserved after loss' },
+          agent,
+        }),
+      ]);
+      await state.storage.put('terminal_attached_session', {
+        ownerId,
+        sessionId,
+        kiloSessionId,
+        directory: '/workspace/preserved',
+        sandboxId,
+        wrapperInstanceId,
+        allocationIncarnation: incarnation,
+      });
+      // Clear any registration alarm so the assertion below is caused by the
+      // preserved-queue arm, not an older one.
+      await state.storage.deleteAlarm();
+    });
+
+    await runInDurableObject(session, async instance => {
+      await instance.notifyStopped({
+        reason: 'idle',
+        stopProof: {
+          effect: 'destroy',
+          at: Date.now(),
+          providerRef: encodeCloudflareProviderRef({
+            sandboxId,
+            containment: true,
+            instanceId: incarnation,
+          }),
+          incarnation,
+          reason: 'idle',
+          wrapper: wrapperInstanceId,
+        },
+      });
+    });
+
+    await waitFor(async () => {
+      const armed = await runInDurableObject(session, (_instance, state) =>
+        state.storage.getAlarm()
+      );
+      expect(armed).not.toBeNull();
+    });
+    await runInDurableObject(session, async (_instance, state) => {
+      const [row] = readRawSessionMessages(state.storage.kv);
+      expect(row).toMatchObject({ state: { kind: 'queued', deadlineAt: null } });
+    });
+
+    // Acquisition never succeeds (no receipt/wrapper): the drain must park the
+    // preserved row and keep it queued rather than dropping it.
+    const stubControl = {
+      ensureReady: async () => ({
+        physical: 'creating' as const,
+        connection: 'not_ready' as const,
+      }),
+    };
+    const drain = () =>
+      runInDurableObject(session, async instance => {
+        const original = instance['env'].SANDBOX_CONTROL;
+        instance['env'].SANDBOX_CONTROL = { getByName: () => stubControl } as never;
+        try {
+          await instance.alarm();
+        } finally {
+          instance['env'].SANDBOX_CONTROL = original;
+        }
+      });
+
+    await drain();
+    const drained = await runInDurableObject(
+      session,
+      (_instance, state) => readRawSessionMessages(state.storage.kv)[0]
+    );
+    expect(drained?.state.kind).toBe('queued');
+    const deadlineAt = drained?.state.kind === 'queued' ? drained.state.deadlineAt : null;
+    expect(deadlineAt).toEqual(expect.any(Number));
+
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(deadlineAt!);
+    try {
+      await drain();
+    } finally {
+      clock.mockRestore();
+    }
+    const [failed] = await runInDurableObject(session, (_instance, state) =>
+      readRawSessionMessages(state.storage.kv)
+    );
+    expect(failed).toMatchObject({ state: { kind: 'failed', reason: 'preparation_timeout' } });
   });
 });

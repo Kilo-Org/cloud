@@ -133,7 +133,7 @@ import {
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
 import {
-  displaySessionTitle,
+  namedSessionTitle,
   SESSION_TITLE_MAX_LENGTH,
 } from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
@@ -174,6 +174,7 @@ import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -395,11 +396,12 @@ export function SessionDetailContent({
     setFollowTailNonce(count => count + 1);
   }, []);
 
-  const { bottom } = useSafeAreaInsets();
   // The strip below the keyboard container reserves the device safe area so the
   // composer's tail clears the navigation bar / home indicator. The container
   // above does not add it again (`containerReservesBottomInset`), so the space
   // is resolved once per screen instead of twice.
+  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -1589,15 +1591,19 @@ export function SessionDetailContent({
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
   // A `New session - <ISO>` placeholder is not a title: showing it truncates
   // the header to "New session - 2026-…". Fall through to the short fallback
-  // until auto-titling (or a rename) supplies a real one.
-  const serverTitle = isSessionLoaded ? displaySessionTitle(fetchedData.title) : undefined;
+  // until auto-titling (or a rename) supplies a real one. `namedSessionTitle`
+  // applies the shared placeholder rule and still returns a placeholder-shaped
+  // title the user's own rename wrote, so the header keeps their name.
+  const serverTitle = isSessionLoaded ? namedSessionTitle(fetchedData.title, sessionId) : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". The route's
+    // cached metadata can hold the backend's ISO placeholder, which must not
+    // paint either.
+    fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
@@ -1792,11 +1798,11 @@ export function SessionDetailContent({
     const removeIndex = actions.indexOf('remove');
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: t('agentChat.goal.title'),
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         const action = index === undefined ? undefined : actions[index];
@@ -1827,7 +1833,7 @@ export function SessionDetailContent({
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {

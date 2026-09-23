@@ -29,6 +29,7 @@ type ListProps = {
   }>;
   extraData: number;
   onEndReached: () => void;
+  onScrollBeginDrag: () => void;
 };
 const controls = vi.hoisted(() => ({
   scrollResets: 0,
@@ -287,6 +288,42 @@ describe('AgentSessionListContent liveness', () => {
     }
   );
 
+  it('parks pagination after a programmatic page-one reset until the user drags', () => {
+    const onEndReached = vi.fn<() => void>();
+    const retained = Array.from({ length: 12 }, (_, index) => session(`row-${index}`));
+    const pageOne = retained.slice(0, 4);
+    const props = contentProps({
+      sections: [{ title: 'Today', data: retained }],
+      onEndReached,
+    });
+    const renderer = mount(props);
+    // The foreground reconcile drops the retained pages, so the list shrinks
+    // under the viewport once the new page one lands and FlashList reports that
+    // shrink as an end-reach. Honoring it is the page-per-retained-page
+    // refetch device defect e2 measured.
+    act(() => {
+      renderer.update(
+        createElement(AgentSessionListContent, {
+          ...props,
+          sections: [{ title: 'Today', data: pageOne }],
+        })
+      );
+    });
+    const shrunk = renderer.root.find(node => isHost(node, 'FlashList'));
+    act(() => {
+      (shrunk.props as ListProps).onEndReached();
+    });
+    expect(onEndReached).not.toHaveBeenCalled();
+    // The next end-reach the user's own drag produces resumes pagination.
+    act(() => {
+      (shrunk.props as ListProps).onScrollBeginDrag();
+    });
+    act(() => {
+      (shrunk.props as ListProps).onEndReached();
+    });
+    expect(onEndReached).toHaveBeenCalledTimes(1);
+  });
+
   it.each([false, true])('preserves retry recovery for searching=%s', isSearching => {
     const recovered = contentProps({
       sections: [{ title: 'Today', data: [session('recovered')] }],
@@ -482,6 +519,27 @@ describe('AgentSessionListContent liveness', () => {
       expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(floating ? 0 : 1);
     }
   );
+
+  it('reserves the clearance between the refresh band and the rows', () => {
+    // The band is in flow above the list, so the container's `gap-2` is the
+    // only clearance between them: without it the list's top edge sits flush
+    // on the band and a row resting across that edge is cut mid-text directly
+    // under "Couldn't refresh" (device defect p5). The clearance matches the
+    // live surface's `mx-4 gap-2` band-to-list gap.
+    const renderer = mount(
+      contentProps({
+        isError: true,
+        sections: [{ title: 'Today', data: [session('cached')] }],
+      })
+    );
+    const surface = hosts(renderer, 'AnimatedView').find(
+      node => (node.props as { className?: string }).className === 'flex-1 gap-2'
+    );
+    expect(surface).toBeDefined();
+    // The band and the list are both children of that surface.
+    expect(surface?.findAll(node => isHost(node, 'AccessibleStatus'))).toHaveLength(1);
+    expect(surface?.findAll(node => isHost(node, 'FlashList'))).toHaveLength(1);
+  });
 
   it.each([
     { hasAnySessions: false },

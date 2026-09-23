@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrganization } from '@/lib/organization-context';
+import { withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -147,14 +148,15 @@ export type CreditTransaction =
   RouterOutputs['organizations']['creditTransactionsPage']['entries'][number];
 
 /**
- * Cursor-paginated credit transactions for an organization. Mirrors the legacy
- * `useOrgCreditTransactions` surface (flat `entries`) but pages through
- * `organizations.creditTransactionsPage` with `useInfiniteQuery` so the screen
- * can offer "Load more" instead of scanning every row at once.
+ * Build the credit-transactions infinite-query options. Kept as a pure builder
+ * so the retention bound and the cursor passthrough are testable without
+ * mounting the hook.
  */
-export function useOrgCreditTransactionsPage(organizationId: string | null) {
-  const trpc = useTRPC();
-  const query = useInfiniteQuery(
+export function buildOrgCreditTransactionsPageQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  organizationId: string | null
+) {
+  return withInfiniteRetention(
     trpc.organizations.creditTransactionsPage.infiniteQueryOptions(
       { organizationId: organizationId ?? '' },
       {
@@ -164,6 +166,17 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
       }
     )
   );
+}
+
+/**
+ * Cursor-paginated credit transactions for an organization. Mirrors the legacy
+ * `useOrgCreditTransactions` surface (flat `entries`) but pages through
+ * `organizations.creditTransactionsPage` with `useInfiniteQuery` so the screen
+ * can offer \"Load more\" instead of scanning every row at once.
+ */
+export function useOrgCreditTransactionsPage(organizationId: string | null) {
+  const trpc = useTRPC();
+  const query = useInfiniteQuery(buildOrgCreditTransactionsPageQueryOptions(trpc, organizationId));
 
   const pages = query.data?.pages;
   const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
@@ -176,14 +189,15 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
 export type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries'][number];
 
 /**
- * Cursor-paginated invoices for an organization. Mirrors the legacy
- * `useOrgInvoices` surface (flat `entries`) but pages through
- * `organizations.invoicesPage` with `useInfiniteQuery` so the screen can offer
- * "Load more" instead of loading every invoice at once.
+ * Build the invoices infinite-query options. Kept as a pure builder so the
+ * retention bound, the fixed `period: 'year'` input, and the cursor
+ * passthrough are testable without mounting the hook.
  */
-export function useOrgInvoicesPage(organizationId: string | null) {
-  const trpc = useTRPC();
-  const query = useInfiniteQuery(
+export function buildOrgInvoicesPageQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  organizationId: string | null
+) {
+  return withInfiniteRetention(
     trpc.organizations.invoicesPage.infiniteQueryOptions(
       { organizationId: organizationId ?? '', period: 'year' },
       {
@@ -193,6 +207,17 @@ export function useOrgInvoicesPage(organizationId: string | null) {
       }
     )
   );
+}
+
+/**
+ * Cursor-paginated invoices for an organization. Mirrors the legacy
+ * `useOrgInvoices` surface (flat `entries`) but pages through
+ * `organizations.invoicesPage` with `useInfiniteQuery` so the screen can offer
+ * \"Load more\" instead of loading every invoice at once.
+ */
+export function useOrgInvoicesPage(organizationId: string | null) {
+  const trpc = useTRPC();
+  const query = useInfiniteQuery(buildOrgInvoicesPageQueryOptions(trpc, organizationId));
 
   const pages = query.data?.pages;
   const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);

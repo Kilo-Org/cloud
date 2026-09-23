@@ -482,7 +482,13 @@ describe('LanguagePickerSheet search field', () => {
     if (!input) {
       throw new Error('language search input not found');
     }
-    const field = input.parent;
+    // The field is the shared single-line `Input`, which renders the TextInput
+    // directly, so the pill is the input's wrapper row rather than its parent:
+    // the single-line-input guard forbids a raw <TextInput> under the pill, and
+    // the shared box is what keeps the placeholder and the value in one box.
+    const field = findByType(renderer.root, 'View').find(node =>
+      String(node.props.className).includes('rounded-full')
+    );
     if (!field) {
       throw new Error('language search field container not found');
     }

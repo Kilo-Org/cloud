@@ -12,6 +12,9 @@ import { type ShareGateState } from './share-gate-state';
 vi.mock('react-native', () => ({
   View: 'View',
   TextInput: 'TextInput',
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
   FlatList: (props: {
     data: ShareDestinationRow[];
     ListHeaderComponent?: ReactNode;

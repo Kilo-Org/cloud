@@ -11,6 +11,7 @@ import {
 import {
   matchIdleStopEvidence,
   parseFramedLogRecords,
+  type IdleStopEvidenceInput,
   type LogRecord,
 } from '../e2e/idle-stop-evidence.js';
 
@@ -137,14 +138,15 @@ const ownedIdleInitiation = (overrides: Record<string, unknown> = {}): LogRecord
   time: 2_000,
   tags: { $logger: { level: 'debug' } },
   sandboxId: 'sandbox-owned',
+  provider: 'cloudflare',
+  aggregate: 'allocation',
+  from: 'allocated.healthy',
+  to: 'stopping.destroying',
+  event: 'deadline',
+  reason: 'idle',
   allocationId: 'allocation-owned',
-  physicalSandboxId: 'physical-owned',
-  wrapperInstanceId: 'wrapper-owned',
-  fromState: 'running',
-  toState: 'stopping',
-  cause: 'idle',
   logTag: 'sandbox_control',
-  diagnosticEvent: 'physical_committed',
+  diagnosticEvent: 'allocation_transition',
   ...overrides,
 });
 
@@ -153,14 +155,21 @@ const ownedTerminalStop: LogRecord = {
   level: 'info',
   time: 3_000,
   tags: { $logger: { level: 'debug' } },
-  sandboxId: 'sandbox-owned',
-  allocationId: 'allocation-owned',
-  physicalSandboxId: 'physical-owned',
-  wrapperInstanceId: 'wrapper-owned',
+  provider: 'cloudflare',
+  allocationName: 'allocation-name-owned',
   result: 'terminal',
   logTag: 'sandbox_control',
-  diagnosticEvent: 'provider_stop',
+  diagnosticEvent: 'native_stop',
 };
+
+const idleStopInput = (overrides: Partial<IdleStopEvidenceInput> = {}): IdleStopEvidenceInput => ({
+  allocationId: 'allocation-owned',
+  sandboxId: 'sandbox-owned',
+  allocationName: 'allocation-name-owned',
+  provider: 'cloudflare',
+  cursorCapturedAt: 1_000,
+  ...overrides,
+});
 
 describe('idle-stop log framing and evidence', () => {
   it('frames a sanitized pretty-printed local excerpt across chunk boundaries', () => {
@@ -170,27 +179,27 @@ describe('idle-stop log framing and evidence', () => {
   time: 2000,
   tags: { '$logger': { level: 'debug' } },
   sandboxId: 'sandbox-owned',
+  provider: 'cloudflare',
+  aggregate: 'allocation',
+  from: 'allocated.healthy',
+  to: 'stopping.destroying',
+  event: 'deadline',
+  reason: 'idle',
+  at: 2000,
   allocationId: 'allocation-owned',
-  physicalSandboxId: 'physical-owned',
-  wrapperInstanceId: 'wrapper-owned',
-  fromState: 'running',
-  toState: 'stopping',
-  cause: 'idle',
   logTag: 'sandbox_control',
-  diagnosticEvent: 'physical_committed'
+  diagnosticEvent: 'allocation_transition'
 }
 {
   message: 'Sandbox control diagnostic',
   level: 'info',
   time: 3000,
   tags: { '$logger': { level: 'debug' } },
-  sandboxId: 'sandbox-owned',
-  allocationId: 'allocation-owned',
-  physicalSandboxId: 'physical-owned',
-  wrapperInstanceId: 'wrapper-owned',
+  provider: 'cloudflare',
+  allocationName: 'allocation-name-owned',
   result: 'terminal',
   logTag: 'sandbox_control',
-  diagnosticEvent: 'provider_stop'
+  diagnosticEvent: 'native_stop'
 }\n`;
     const chunks: string[] = [];
     for (let offset = 0; offset < excerpt.length; offset += 11) {
@@ -200,18 +209,14 @@ describe('idle-stop log framing and evidence', () => {
     const records = parseFramedLogRecords(chunks);
     expect(records).toHaveLength(2);
     expect(records[0]).toMatchObject({
-      allocationId: 'allocation-owned',
-      physicalSandboxId: 'physical-owned',
-      diagnosticEvent: 'physical_committed',
+      aggregate: 'allocation',
+      from: 'allocated.healthy',
+      to: 'stopping.destroying',
+      reason: 'idle',
+      at: 2000,
     });
-    expect(
-      matchIdleStopEvidence(records, {
-        allocationId: 'allocation-owned',
-        physicalSandboxId: 'physical-owned',
-        cursorCapturedAt: 1_000,
-      })
-    ).toMatchObject({
-      physicalCommittedAt: 2_000,
+    expect(matchIdleStopEvidence(records, idleStopInput())).toMatchObject({
+      stopInitiatedAt: 2_000,
       providerStopAt: 3_000,
       elapsedMs: 2_000,
     });
@@ -223,92 +228,75 @@ describe('idle-stop log framing and evidence', () => {
     ).toEqual([{ logTag: 'sandbox_control', diagnosticEvent: 'other' }]);
   });
 
-  it('does not treat a stopping-to-stopping stop attempt as idle initiation', () => {
+  it('parses provider identification fields from a pretty-framed native stop', () => {
+    const excerpt = `wrangler:info\n{
+  logTag: 'sandbox_control',
+  diagnosticEvent: 'native_stop',
+  provider: 'vercel',
+  allocationName: 'allocation-name-owned',
+  providerSessionId: 'provider-session-1',
+  result: 'terminal',
+  time: 3000
+}\n`;
+    expect(parseFramedLogRecords([excerpt])).toEqual([
+      {
+        logTag: 'sandbox_control',
+        diagnosticEvent: 'native_stop',
+        provider: 'vercel',
+        allocationName: 'allocation-name-owned',
+        providerSessionId: 'provider-session-1',
+        result: 'terminal',
+        time: 3000,
+      },
+    ]);
+  });
+
+  it('does not treat a non-allocated source as idle initiation', () => {
     expect(
       matchIdleStopEvidence(
-        [
-          ownedIdleInitiation({
-            fromState: 'stopping',
-            toState: 'stopping',
-            cause: 'stop_attempt',
-            stopCause: 'idle',
-          }),
-          ownedTerminalStop,
-        ],
-        {
-          allocationId: 'allocation-owned',
-          physicalSandboxId: 'physical-owned',
-          cursorCapturedAt: 1_000,
-        }
+        [ownedIdleInitiation({ from: 'stopping.destroying' }), ownedTerminalStop],
+        idleStopInput()
       )
     ).toBeNull();
   });
 
-  it('ignores another sandbox idle deadline and an owned non-idle deadline', () => {
+  it('ignores another sandbox initiation and an owned non-idle initiation', () => {
     const records: LogRecord[] = [
-      {
-        logTag: 'sandbox_control',
-        diagnosticEvent: 'deadline_fired',
-        deadlineId: 'idleStop',
-        deadlineAt: 1_500,
-        sandboxId: 'sandbox-other',
-        physicalSandboxId: 'physical-other',
-      },
-      {
-        logTag: 'sandbox_control',
-        diagnosticEvent: 'deadline_fired',
-        deadlineId: 'heartbeatExpiry',
-        deadlineAt: 1_750,
-        sandboxId: 'sandbox-owned',
-        physicalSandboxId: 'physical-owned',
-      },
+      ownedIdleInitiation({ sandboxId: 'sandbox-other', allocationId: 'allocation-other' }),
+      ownedIdleInitiation({ reason: 'health_unhealthy_unresponsive' }),
       ownedIdleInitiation(),
       ownedTerminalStop,
     ];
-    expect(
-      matchIdleStopEvidence(records, {
-        allocationId: 'allocation-owned',
-        physicalSandboxId: 'physical-owned',
-        cursorCapturedAt: 1_000,
-      })
-    ).toMatchObject({
-      physicalCommittedAt: 2_000,
+    expect(matchIdleStopEvidence(records, idleStopInput())).toMatchObject({
+      stopInitiatedAt: 2_000,
       providerStopAt: 3_000,
       elapsedMs: 2_000,
     });
-    expect(
-      matchIdleStopEvidence(records, {
-        allocationId: 'allocation-owned',
-        physicalSandboxId: 'physical-owned',
-        cursorCapturedAt: 1_000,
-      })?.deadlineAt
-    ).toBeUndefined();
   });
 
-  it('matches production records by the durable sandbox id, not the Docker family name', () => {
+  it('correlates the provider stop by the derived allocation name', () => {
     const durableSandboxId = 'ses-e6bbc28ff55c4ae31bb72d3b06b2304367355dc4102ca96a';
     const allocationName = 'ses-c03b955ecf30b89fd7be09014a7e34e5d1b674464b566eb7';
-    const dockerFamilyName = 'workerd-abc-SandboxSmall-0123456789abcdef';
     const records: LogRecord[] = [
       {
         logTag: 'sandbox_control',
-        diagnosticEvent: 'physical_committed',
+        diagnosticEvent: 'allocation_transition',
         time: 2_000,
         sandboxId: durableSandboxId,
+        provider: 'cloudflare',
+        aggregate: 'allocation',
+        from: 'allocated.healthy',
+        to: 'stopping.destroying',
+        event: 'deadline',
+        reason: 'idle',
         allocationId: '2d49a855-427d-4561-b79a-c53ebc701075',
-        physicalSandboxId: allocationName,
-        wrapperInstanceId: '923ff13e-4dc7-42d5-b2ab-1960e74c9003',
-        fromState: 'running',
-        toState: 'stopping',
-        cause: 'idle',
       },
       {
         logTag: 'sandbox_control',
-        diagnosticEvent: 'provider_stop',
+        diagnosticEvent: 'native_stop',
         time: 3_000,
-        sandboxId: durableSandboxId,
-        allocationId: '2d49a855-427d-4561-b79a-c53ebc701075',
-        wrapperInstanceId: '923ff13e-4dc7-42d5-b2ab-1960e74c9003',
+        provider: 'cloudflare',
+        allocationName,
         result: 'terminal',
       },
     ];
@@ -317,22 +305,38 @@ describe('idle-stop log framing and evidence', () => {
       matchIdleStopEvidence(records, {
         allocationId: durableSandboxId,
         sandboxId: durableSandboxId,
+        allocationName,
+        provider: 'cloudflare',
         cursorCapturedAt: 1_000,
       })
     ).toMatchObject({
-      physicalCommittedAt: 2_000,
+      stopInitiatedAt: 2_000,
       providerStopAt: 3_000,
       elapsedMs: 2_000,
     });
 
-    // The Docker family name is neither the durable id nor the derived
-    // physical id, so it must not match the production records.
+    // A different allocation name must fail closed rather than accept another
+    // session's terminal stop.
     expect(
       matchIdleStopEvidence(records, {
-        allocationId: dockerFamilyName,
-        physicalSandboxId: dockerFamilyName,
+        allocationId: durableSandboxId,
+        sandboxId: durableSandboxId,
+        allocationName: 'ses-unrelated',
+        provider: 'cloudflare',
         cursorCapturedAt: 1_000,
       })
+    ).toBeNull();
+  });
+
+  it('requires a provider match for the native stop', () => {
+    expect(
+      matchIdleStopEvidence([ownedIdleInitiation(), ownedTerminalStop], idleStopInput())
+    ).not.toBeNull();
+    expect(
+      matchIdleStopEvidence(
+        [ownedIdleInitiation(), ownedTerminalStop],
+        idleStopInput({ provider: 'vercel' })
+      )
     ).toBeNull();
   });
 });

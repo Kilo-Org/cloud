@@ -26,8 +26,12 @@ export function showRenamePrompt(currentTitle: string, onRename: (newTitle: stri
       {
         text: i18n.t('common.rename'),
         onPress: (newName: string | undefined) => {
-          if (newName?.trim()) {
-            onRename(newName.trim());
+          const trimmed = newName?.trim();
+          // Same guard as `RenameModal`: a no-edit confirm must not persist the
+          // seeded value. Without it, confirming the prefilled untitled copy
+          // would store that localized string as the session's real title.
+          if (trimmed && trimmed !== currentTitle.trim()) {
+            onRename(trimmed);
           }
         },
       },

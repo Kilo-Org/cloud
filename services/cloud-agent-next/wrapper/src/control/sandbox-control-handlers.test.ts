@@ -193,7 +193,11 @@ function deps(
   });
 }
 
-function runtimeDeps(kiloClient: WrapperKiloClient, rootScope?: 'shared' | 'sole') {
+function runtimeDeps(
+  kiloClient: WrapperKiloClient,
+  rootScope?: 'shared' | 'sole',
+  runtimeOverrides?: Partial<NonNullable<HandlerDeps['kiloRuntimes']>>
+) {
   const abort = new AbortController();
   const events: SessionEventPayload[] = [];
   const retired: string[] = [];
@@ -203,6 +207,7 @@ function runtimeDeps(kiloClient: WrapperKiloClient, rootScope?: 'shared' | 'sole
       const base = deps({ kiloClient });
       if (rootScope !== undefined && base.kiloRuntimes)
         base.kiloRuntimes.rootRetirementScope = () => rootScope;
+      if (runtimeOverrides && base.kiloRuntimes) Object.assign(base.kiloRuntimes, runtimeOverrides);
       return {
         kiloRuntimes: base.kiloRuntimes,
         worktreeCleanupClient: base.worktreeCleanupClient,
@@ -3342,7 +3347,7 @@ describe('owned control execution', () => {
     });
   });
 
-  it('does not shut down the wrapper when an operation abort finds directory-local native uncertainty', async () => {
+  it('does not retire the shared runtime for a message-scoped abort with directory-local native uncertainty', async () => {
     const running = Promise.withResolvers<Completion>();
     const started = Promise.withResolvers<void>();
     const { handlerDeps, retired } = runtimeDeps(
@@ -3372,7 +3377,7 @@ describe('owned control execution', () => {
         },
         handlerDeps
       );
-      expect(directoryRetirement).toHaveBeenCalled();
+      expect(directoryRetirement).not.toHaveBeenCalled();
       expect(stopped).toMatchObject({
         ok: true,
         result: { status: 'unconfirmed', quiescent: false },
@@ -3388,9 +3393,68 @@ describe('owned control execution', () => {
     }
   });
 
-  it('shuts down the wrapper when an operation abort cannot stop operation-owned processes', async () => {
+  it('does not retire the shared runtime or process for a message-scoped abort with unconfirmed cleanup', async () => {
     const running = Promise.withResolvers<Completion>();
     const started = Promise.withResolvers<void>();
+    let sharedDeferrals = 0;
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'active' } }),
+        abortSession: async () => true,
+      }),
+      undefined,
+      {
+        deferRuntimeRetirementIfShared: async (): Promise<'shared'> => {
+          sharedDeferrals += 1;
+          return 'shared';
+        },
+      }
+    );
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory').mockResolvedValue(
+      'unconfirmed'
+    );
+    let restoreRequestRetirement: (() => void) | undefined;
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      const requestRetirement = spyOn(task, 'requestRetirement');
+      restoreRequestRetirement = () => requestRetirement.mockRestore();
+      const stopped = await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 200,
+        },
+        handlerDeps
+      );
+      expect(stopped).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(requestRetirement).not.toHaveBeenCalledWith(
+        'Kilo cancellation failed',
+        expect.anything()
+      );
+      expect(sharedDeferrals).toBe(0);
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await waitForTasks(handlerDeps);
+      restoreRequestRetirement?.();
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('still retires the shared runtime when a non-abort execution failure leaves cleanup unconfirmed', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    let sharedDeferrals = 0;
     const { handlerDeps, retired } = runtimeDeps(
       fakeKilo({
         sendPrompt: () => {
@@ -3398,38 +3462,27 @@ describe('owned control execution', () => {
           return running.promise;
         },
         abortSession: async () => false,
-      })
-    );
-    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory').mockResolvedValue(
-      'operation_process_stop_unconfirmed'
+      }),
+      undefined,
+      {
+        deferRuntimeRetirementIfShared: async (): Promise<'unconfirmed'> => {
+          sharedDeferrals += 1;
+          return 'unconfirmed';
+        },
+      }
     );
     try {
       await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
       await started.promise;
       const task = handlerDeps.operations.active(session.kiloSessionId);
       if (!task) throw new Error('Missing operation record');
-      const stopped = await handleControlRequest(
-        'session.abort',
-        session,
-        {
-          messageId: promptPayload.messageId,
-          operationId: '11111111-1111-4111-8111-111111111111',
-          cleanupDeadlineAt: Date.now() + 1_000,
-        },
-        handlerDeps
-      );
-      expect(directoryRetirement).toHaveBeenCalled();
-      expect(stopped).toMatchObject({
-        ok: true,
-        result: { status: 'unconfirmed', quiescent: false },
-      });
-      expect(retired).toEqual(['Native cancellation did not settle']);
-      expect(handlerDeps.signal?.aborted).toBe(true);
-      expect(task.cleanup).toBe('unconfirmed');
+      running.reject(new Error('provider exploded'));
+      await task.done;
+      expect(sharedDeferrals).toBe(1);
+      expect(retired).toEqual([]);
     } finally {
-      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      running.resolve(completion());
       await waitForTasks(handlerDeps);
-      directoryRetirement.mockRestore();
     }
   });
 

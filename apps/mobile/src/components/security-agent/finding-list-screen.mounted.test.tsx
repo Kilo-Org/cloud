@@ -1,9 +1,9 @@
 import { DEFAULT_SECURITY_FINDING_FILTERS } from '@kilocode/app-shared/security-agent';
+import { FlashList } from '@shopify/flash-list';
 import { act, type ComponentProps, createElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SecurityAgentFilterFindingsRoute from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/filter';
-import { FlatList } from 'react-native';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PickerSheet } from '@/components/picker-sheet';
 import { EmptyState } from '@/components/empty-state';
@@ -34,8 +34,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
-  FlatList: 'FlatList',
 }));
+vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.push, back: vi.fn() }),
   useFocusEffect: vi.fn(),
@@ -120,7 +120,7 @@ describe('Security Agent list surfaces', () => {
     const empty = root.findByType(EmptyState);
     expect(empty.props.title).toBe('securityAgent.findingList.emptyTitle');
     expect(empty.props.placement).not.toBe('top');
-    expect(root.findAllByType(FlatList)).toHaveLength(0);
+    expect(root.findAllByType(FlashList)).toHaveLength(0);
     expect(root.findAllByType(ScreenHeader)).toHaveLength(1);
     await refresh(empty.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
     expect(findings.refetch).toHaveBeenCalledOnce();
@@ -170,7 +170,7 @@ describe('Security Agent list surfaces', () => {
       findings.isFetchNextPageError = true;
       findings.hasNextPage = true;
       const root = await mount();
-      const list = root.findByType(FlatList);
+      const list = root.findByType(FlashList);
       expect(root.findAllByType(EmptyState)).toHaveLength(0);
       expect(root.findAllByType(QueryError)).toHaveLength(0);
       act(list.props.onEndReached as () => void);
@@ -184,6 +184,21 @@ describe('Security Agent list surfaces', () => {
       expect(findings.fetchNextPage).toHaveBeenCalledTimes(2);
     }
   );
+
+  it('spaces rows with a measured separator instead of the ignored contentContainerStyle gap', async () => {
+    findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };
+    const root = await mount();
+    const list = root.findByType(FlashList);
+    // FlashList v2 positions every cell absolutely and ignores `gap`, so the
+    // 12px inter-row gap must ride on the measured separator, not the content
+    // style — otherwise every card renders flush against the next.
+    expect(list.props.contentContainerStyle).not.toHaveProperty('gap');
+    const Separator = list.props.ItemSeparatorComponent as () => ReactElement;
+    mounted?.unmount();
+    mounted = await renderWithProviders(createElement(Separator));
+    const spacer = mounted.renderer.root.findByType('View');
+    expect(spacer.props.className).toBe('h-3');
+  });
 
   it('keeps expired filter guidance outside a scroller', async () => {
     mounted = await renderWithProviders(<SecurityAgentFilterFindingsRoute />);

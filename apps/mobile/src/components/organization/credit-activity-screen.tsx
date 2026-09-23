@@ -1,9 +1,10 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
-import { type ReactNode, useEffect } from 'react';
+import { memo, type ReactNode, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
@@ -25,6 +26,20 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+
+// FlashList takes `contentContainerStyle` (no className), so the FlatList's
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
+// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
+// `gap` references), so the 12px inter-row gap rides on the measured item
+// separator instead of `contentContainerStyle.gap`.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  flexGrow: 1,
+  paddingHorizontal: 24,
+  paddingTop: 16,
+} satisfies ViewStyle;
+
+const CreditRowSeparator = () => <View className="h-3" />;
 
 const CREDIT_CATEGORY_KEYS = {
   organization_custom: 'organization.creditActivity.category.organization_custom',
@@ -56,7 +71,9 @@ function CreditRowSkeleton() {
   );
 }
 
-function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>) {
+const CreditRow = memo(function CreditRow({
+  transaction,
+}: Readonly<{ transaction: CreditTransaction }>) {
   const { t } = useTranslation();
   const amount = fromMicrodollars(transaction.amount_microdollars);
   const isPositive = amount >= 0;
@@ -91,7 +108,7 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
       </View>
     </View>
   );
-}
+});
 
 function firstSearchParam(value: string | string[] | undefined): string | undefined {
   if (!Array.isArray(value) && value !== undefined && value.length > 0) {
@@ -143,6 +160,13 @@ export function OrganizationCreditActivityScreen() {
   } = useOrgCreditTransactionsPage(reconcile.queryOrganizationId);
   const paddingBottom = useTabBarBottomPadding();
   useRouteForegroundRefresh([[['organizations']]]);
+
+  // `CreditRow` is memoized at module scope, so the renderer keeps one identity
+  // across data updates and only the changed rows re-render.
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<CreditTransaction>) => <CreditRow transaction={item} />,
+    []
+  );
 
   const showBoundary =
     isResolving ||
@@ -253,11 +277,14 @@ export function OrganizationCreditActivityScreen() {
 
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-        <FlatList
+        <FlashList
+          style={listStyle}
           data={transactions}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => <CreditRow transaction={item} />}
-          contentContainerClassName="grow gap-3 px-6 pt-4"
+          renderItem={renderItem}
+          getItemType={() => 'transaction'}
+          ItemSeparatorComponent={CreditRowSeparator}
+          contentContainerStyle={listContentContainerStyle}
           ListEmptyComponent={
             <EmptyState
               placement="top"

@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import {
   type MessageDeliveryState,
   type Part,
@@ -111,6 +111,25 @@ function MessageBubbleImpl({
     onLongPressDetails?.(message);
   }, [message, onLongPressDetails]);
 
+  // The bubble is memo-wrapped, but the transcript still re-renders its rows
+  // while a message streams. Memoize the derived text on the parts identity so
+  // the filter/map/join and the first-human-part scan run once per part list
+  // instead of on every one of those renders.
+  const userTextContent = useMemo(
+    () =>
+      isUser
+        ? parts
+            .filter(part => isTextPart(part))
+            .map(p => p.text)
+            .join('\n\n')
+        : '',
+    [isUser, parts]
+  );
+  // Copy-to-composer re-sends only the first human-authored text part, so a
+  // synthesized attachment notice is not copied and a file-only row hides the
+  // button entirely.
+  const copyText = useMemo(() => (isUser ? firstHumanText(parts) : ''), [isUser, parts]);
+
   // Keep actions on the separate host so interactive descendants remain reachable.
   // Accessible Copy retains the existing ActionSheet path; details matches long-press.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
@@ -139,16 +158,6 @@ function MessageBubbleImpl({
     failure?.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
       : onRetryMessage !== undefined;
-  const userTextContent = isUser
-    ? parts
-        .filter(part => isTextPart(part))
-        .map(p => p.text)
-        .join('\n\n')
-    : '';
-  // Copy-to-composer re-sends only the first human-authored text part, so a
-  // synthesized attachment notice is not copied and a file-only row hides the
-  // button entirely.
-  const copyText = isUser ? firstHumanText(parts) : '';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
       <View className="gap-1 px-4 py-1">

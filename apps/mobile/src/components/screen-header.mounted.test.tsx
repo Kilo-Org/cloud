@@ -2,6 +2,7 @@
 // eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
+import { type Href } from 'expo-router';
 import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
@@ -324,7 +325,7 @@ describe('ScreenHeader mounted', () => {
       let titleOpened = false;
       const renderer = renderHeader({
         title: 'Session',
-        backFallback: '/(app)/(tabs)/(2_agents)',
+        backFallback: '/(app)/(tabs)/(2_agents)' as Href,
         onTitlePress: () => {
           titleOpened = true;
         },
@@ -344,8 +345,8 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: true, backFallback: undefined },
-    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' },
-    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' },
+    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
+    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
   ] as const)(
     'preserves custom onBack precedence for history=$history, fallback=$backFallback',
     ({ history, backFallback }) => {
@@ -414,7 +415,7 @@ describe('ScreenHeader mounted', () => {
     const explicitlyHidden = renderHeader({
       title: 'Sessions',
       showBackButton: false,
-      backFallback: '/(app)/(tabs)/(2_agents)',
+      backFallback: '/(app)/(tabs)/(2_agents)' as Href,
     });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });

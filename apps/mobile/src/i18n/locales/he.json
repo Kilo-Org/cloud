@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע.",
     "featureFlags": "דגלי תכונות",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "מרוחק · ≥ {{min}}",
+    "featureFlagApplied": "מהשרת · ≥ {{min}}",
     "featureFlagSkipped": "ברירת מחדל · < {{min}}",
     "featureFlagNotLoaded": "ברירת מחדל · לא נטען",
     "gatewayTranscription": "תמלול דרך Kilo Gateway",

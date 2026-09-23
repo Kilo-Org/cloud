@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे.",
     "featureFlags": "वैशिष्ट्य ध्वज",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "दूरस्थ · ≥ {{min}}",
+    "featureFlagApplied": "सर्व्हरवरून · ≥ {{min}}",
     "featureFlagSkipped": "डीफॉल्ट · < {{min}}",
     "featureFlagNotLoaded": "डीफॉल्ट · लोड झाले नाही",
     "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",

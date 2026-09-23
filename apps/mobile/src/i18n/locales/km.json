@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។",
     "featureFlags": "ទង់លក្ខណៈពិសេស",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ពីចម្ងាយ · ≥ {{min}}",
+    "featureFlagApplied": "ពីម៉ាស៊ីនបម្រើ · ≥ {{min}}",
     "featureFlagSkipped": "លំនាំដើម · < {{min}}",
     "featureFlagNotLoaded": "លំនាំដើម · មិនបានផ្ទុក",
     "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",

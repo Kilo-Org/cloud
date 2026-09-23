@@ -54,7 +54,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
     encodeCloudflareProviderRef({
       sandboxId: intent.allocationName ?? deps.logicalSandboxId,
-      containment: false,
+      containment: Boolean(intent.containment?.kilocode || intent.containment?.github),
       instanceId: intent.intentId,
     });
 
@@ -65,11 +65,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   const decodeOwnedProviderRef = (ref: string | null): CloudflareProviderRef | null => {
     const decoded = decodeCloudflareProviderRef(ref);
-    return decoded !== null &&
-      decoded.sandboxId === deps.allocationName &&
-      decoded.containment === false
-      ? decoded
-      : null;
+    return decoded !== null && decoded.sandboxId === deps.allocationName ? decoded : null;
   };
 
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
@@ -117,24 +113,20 @@ export function createCloudflareContainersProviderAdapter(deps: {
     destroysOnStop: true,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
-      if (intent.containment && (intent.containment.kilocode || intent.containment.github)) {
-        throw new AgentSandboxUnavailableError(
-          'Cloudflare containers do not support credential containment',
-          'capability_unavailable'
-        );
-      }
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
     async launch(ref, env) {
-      if (decodeOwnedProviderRef(ref) === null) {
+      const owned = decodeOwnedProviderRef(ref);
+      if (owned === null) {
         throw new Error('Invalid Cloudflare containers allocation');
       }
       const container = deps.getContainer(deps.logicalSandboxId);
       await container.launchWrapper({
         allocationRef: ref,
         instance,
+        containment: owned.containment,
         env: {
           ...env,
           PROVIDER_INSTANCE_ID: ref,

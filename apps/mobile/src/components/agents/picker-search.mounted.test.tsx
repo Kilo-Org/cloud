@@ -217,6 +217,32 @@ describe('repository picker query alignment', () => {
   });
 });
 
+describe('model picker query alignment', () => {
+  function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    return input;
+  }
+
+  it('aligns the query and its native placeholder to the field start edge in RTL', async () => {
+    // `textAlign: 'auto'` resolves against the first strong character, so a
+    // Latin query and the Arabic placeholder stay at the left edge while the
+    // clear and search controls sit at the right, leaving a dead gap between
+    // them. The model picker had no alignment at all before this.
+    i18nManager.isRTL = true;
+    const renderer = await mount(ModelPickerContent);
+    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
+  });
+
+  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(ModelPickerContent);
+    expect(searchInput(renderer).props.style).toBeUndefined();
+  });
+});
+
 async function mount(Component: () => ReactNode) {
   const mounted = await renderWithProviders(createElement(Component));
   onTestFinished(mounted.unmount);

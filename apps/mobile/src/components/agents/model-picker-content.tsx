@@ -22,6 +22,7 @@ import {
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { withRtlInputAlignment } from '@/lib/rtl-text';
 
 export function ModelPickerContent() {
   const router = useRouter();
@@ -189,6 +190,13 @@ export function ModelPickerContent() {
               autoCorrect={false}
               returnKeyType="search"
               className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+              // `textAlign: 'auto'` resolves against the query's first strong
+              // character, so a Latin query and the native placeholder stay at
+              // the field's left edge in an RTL interface while the clear and
+              // search controls sit at the right, leaving a dead gap between
+              // them. Naming the alignment keeps both on the interface's start
+              // edge, as the repository picker and language search fields do.
+              style={withRtlInputAlignment(undefined)}
               onChangeText={setSearch}
             />
             {/* In-field clear, on every platform: `clearButtonMode` is iOS

@@ -583,6 +583,7 @@
     "reviewPullRequest": "Revize demann fizyon an",
     "headLine": "{{counts}} · dènye komit {{sha}}",
     "entry": {
+      "eyebrow": "Louvri yon demann fizyon oswa yon merge request ak URL li",
       "pastePrLink": "Kole yon lyen demann fizyon oswa merge request",
       "noRecentPrs": "Pa gen revizyon resan",
       "noRecentPrsDescription": "Kole yon lyen pi wo a pou kòmanse yon revizyon — l ap parèt isit la pwochen fwa a.",

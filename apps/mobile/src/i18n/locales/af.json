@@ -583,6 +583,7 @@
     "reviewPullRequest": "Hersien trekversoek",
     "headLine": "{{counts}} · jongste vaslegging {{sha}}",
     "entry": {
+      "eyebrow": "Maak 'n trekversoek of merge request met sy URL oop",
       "pastePrLink": "Plak 'n trekversoek- of merge request-skakel",
       "noRecentPrs": "Geen onlangse hersieninge nie",
       "noRecentPrsDescription": "Plak hierbo 'n skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",

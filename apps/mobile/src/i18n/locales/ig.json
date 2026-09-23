@@ -583,6 +583,7 @@
     "reviewPullRequest": "Nyochaa arịrịọ njikọta",
     "headLine": "{{counts}} · ndekọ mgbanwe kacha ọhụrụ {{sha}}",
     "entry": {
+      "eyebrow": "Meghe arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta site na URL",
       "pastePrLink": "Mado njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
       "noRecentPrs": "Enweghị nyocha ọhụrụ",
       "noRecentPrsDescription": "Mado njikọ n'elu iji malite nyocha — ọ ga-apụta ebe a oge ọzọ.",

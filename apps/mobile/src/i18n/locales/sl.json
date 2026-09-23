@@ -605,6 +605,7 @@
     "reviewPullRequest": "Preglej zahtevek za združitev",
     "headLine": "{{counts}} · zadnja potrditev {{sha}}",
     "entry": {
+      "eyebrow": "Odpri zahtevek za združitev ali merge request z naslovom URL",
       "pastePrLink": "Prilepi povezavo do zahtevka za združitev ali merge requesta",
       "noRecentPrs": "Ni nedavnih pregledov",
       "noRecentPrsDescription": "Za začetek pregleda zgoraj prilepite povezavo — naslednjič se pojavi tukaj.",

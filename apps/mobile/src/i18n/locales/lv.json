@@ -594,6 +594,7 @@
     "reviewPullRequest": "Pārskatīt izmaiņu pieprasījumu",
     "headLine": "{{counts}} · jaunākais komits {{sha}}",
     "entry": {
+      "eyebrow": "Atver izmaiņu pieprasījumu vai merge request, izmantojot URL",
       "pastePrLink": "Ielīmēt izmaiņu pieprasījuma vai merge request saiti",
       "noRecentPrs": "Nav nesenu pārskatu",
       "noRecentPrsDescription": "Ielīmē saiti augšā, lai sāktu pārskatīšanu — nākamreiz tā būs redzama šeit.",

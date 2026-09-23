@@ -583,6 +583,7 @@
     "reviewPullRequest": "รีวิว PR",
     "headLine": "{{counts}} · คอมมิตล่าสุด {{sha}}",
     "entry": {
+      "eyebrow": "เปิดพูลรีเควสต์หรือ merge request ด้วย URL",
       "pastePrLink": "วางลิงก์พูลรีเควสต์หรือ merge request",
       "noRecentPrs": "ยังไม่มีรีวิวล่าสุด",
       "noRecentPrsDescription": "วางลิงก์ด้านบนเพื่อเริ่มรีวิว ครั้งต่อไปจะแสดงที่นี่",

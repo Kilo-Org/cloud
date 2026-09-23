@@ -2603,6 +2603,7 @@
       "moreLinesAbove_other": "上方还有 {{displayCount}} 行。"
     },
     "entry": {
+      "eyebrow": "通过 URL 打开拉取请求或合并请求",
       "pastePrLink": "粘贴拉取请求或合并请求链接",
       "noRecentPrs": "暂无最近审查",
       "noRecentPrsDescription": "在上方粘贴链接即可开始审查，下次就能在这里找到它。",

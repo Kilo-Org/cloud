@@ -2603,6 +2603,7 @@
       "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
     },
     "entry": {
+      "eyebrow": "Open een PR of merge request via een URL",
       "pastePrLink": "PR- of merge request-koppeling plakken",
       "noRecentPrs": "Geen recente beoordelingen",
       "noRecentPrsDescription": "Plak hierboven een koppeling om een beoordeling te starten — deze verschijnt de volgende keer hier.",

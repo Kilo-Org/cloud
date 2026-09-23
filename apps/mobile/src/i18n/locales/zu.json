@@ -583,6 +583,7 @@
     "reviewPullRequest": "Buyekeza isicelo sokuhlanganisa",
     "headLine": "{{counts}} · irekhodi lakamuva {{sha}}",
     "entry": {
+      "eyebrow": "Vula i-PR noma isicelo sokuhlanganisa nge-URL",
       "pastePrLink": "Namathisela isixhumanisi se-PR noma sesicelo sokuhlanganisa",
       "noRecentPrs": "Azikho izibuyekeza zakamuva",
       "noRecentPrsDescription": "Namathisela isixhumanisi ngenhla ukuze uqale ukubuyekeza — sizovela lapha okwesinye isikhathi.",

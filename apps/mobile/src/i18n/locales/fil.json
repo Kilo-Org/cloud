@@ -583,6 +583,7 @@
     "reviewPullRequest": "Suriin ang pull request",
     "headLine": "{{counts}} · kasalukuyang commit {{sha}}",
     "entry": {
+      "eyebrow": "Buksan ang pull request o merge request gamit ang URL nito",
       "pastePrLink": "I-paste ang link ng pull request o merge request",
       "noRecentPrs": "Walang kamakailang pagsusuri",
       "noRecentPrsDescription": "I-paste ang link sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",

@@ -583,6 +583,7 @@
     "reviewPullRequest": "Módosítási kérelem kódellenőrzése",
     "headLine": "{{counts}} · legutóbbi véglegesítés: {{sha}}",
     "entry": {
+      "eyebrow": "Nyiss meg egy PR-t vagy merge requestet az URL megadásával",
       "pastePrLink": "PR- vagy merge request-hivatkozás beillesztése",
       "noRecentPrs": "Nincs közelmúltbeli kódellenőrzés",
       "noRecentPrsDescription": "Illessz be fent egy hivatkozást a kódellenőrzés indításához — legközelebb itt fog megjelenni.",

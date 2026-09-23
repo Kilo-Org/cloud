@@ -2633,6 +2633,7 @@
       "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}."
     },
     "entry": {
+      "eyebrow": "Apri una pull request o una merge request tramite URL",
       "pastePrLink": "Incolla il collegamento a una pull request o merge request",
       "noRecentPrs": "Nessuna revisione recente",
       "noRecentPrsDescription": "Incolla qui sopra un collegamento per iniziare una revisione — la prossima volta comparirà qui.",

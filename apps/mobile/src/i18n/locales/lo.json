@@ -583,6 +583,7 @@
     "reviewPullRequest": "ກວດທານຄຳຂໍລວມໂຄດ",
     "headLine": "{{counts}} · ຄອມມິດຫຼ້າສຸດ {{sha}}",
     "entry": {
+      "eyebrow": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື merge request ດ້ວຍ URL",
       "pastePrLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
       "noRecentPrs": "ຍັງບໍ່ມີການກວດທານຫຼ້າສຸດ",
       "noRecentPrsDescription": "ວາງລິ້ງຂ້າງເທິງເພື່ອເລີ່ມການກວດທານ — ຄັ້ງໜ້າມັນຈະສະແດງຢູ່ນີ້",

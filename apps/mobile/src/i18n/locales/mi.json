@@ -583,6 +583,7 @@
     "reviewPullRequest": "Arotakehia te tono kume",
     "headLine": "{{counts}} · tāpaetanga hou rawa {{sha}}",
     "entry": {
+      "eyebrow": "Whakatuwheratia he tono kume, he tono whakakotahi rānei mā te URL",
       "pastePrLink": "Whakapirihia he hono tono kume, tono whakakotahi rānei",
       "noRecentPrs": "Kāore he arotake o nā tata nei",
       "noRecentPrsDescription": "Whakapirihia he hono ki runga hei tīmata i te arotake — ka kitea i konei ā muri ake.",

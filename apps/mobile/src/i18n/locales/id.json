@@ -2603,6 +2603,7 @@
       "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas"
     },
     "entry": {
+      "eyebrow": "Buka PR atau merge request melalui URL",
       "pastePrLink": "Tempel tautan PR atau merge request",
       "noRecentPrs": "Belum ada riwayat tinjauan",
       "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",

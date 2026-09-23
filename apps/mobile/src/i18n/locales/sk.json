@@ -605,6 +605,7 @@
     "reviewPullRequest": "Skontrolovať žiadosť o zlúčenie",
     "headLine": "{{counts}} · najnovší commit {{sha}}",
     "entry": {
+      "eyebrow": "Otvorte PR alebo merge request pomocou URL",
       "pastePrLink": "Vložiť odkaz na PR alebo merge request",
       "noRecentPrs": "Žiadne nedávne recenzie",
       "noRecentPrsDescription": "Ak chcete začať recenziu, vložte vyššie odkaz — nabudúce sa zobrazí tu.",

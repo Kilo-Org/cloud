@@ -583,6 +583,7 @@
     "reviewPullRequest": "Yfirfara sameiningarbeiðni",
     "headLine": "{{counts}} · nýjasta innsending: {{sha}}.",
     "entry": {
+      "eyebrow": "Opnaðu samrunabeiðni eða merge request með URL-slóð",
       "pastePrLink": "Líma tengil á samrunabeiðni eða merge request",
       "noRecentPrs": "Engar nýlegar yfirferðir",
       "noRecentPrsDescription": "Límdu tengil hér að ofan til að hefja yfirferð — hún birtist hér næst.",

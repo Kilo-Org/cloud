@@ -583,6 +583,7 @@
     "reviewPullRequest": "Revisar a solicitude de integración",
     "headLine": "{{counts}} · última remisión {{sha}}",
     "entry": {
+      "eyebrow": "Abre unha solicitude de integración ou de fusión mediante o seu URL",
       "pastePrLink": "Pegar unha ligazón a unha solicitude de integración ou de fusión",
       "noRecentPrs": "Non hai revisións recentes",
       "noRecentPrsDescription": "Pega arriba unha ligazón para comezar a revisión — aparecerá aquí a próxima vez.",

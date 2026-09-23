@@ -583,6 +583,7 @@
     "reviewPullRequest": "Semak permintaan tarik",
     "headLine": "{{counts}} · komit terkini {{sha}}",
     "entry": {
+      "eyebrow": "Buka permintaan tarik atau permintaan gabungan melalui URL",
       "pastePrLink": "Tampal pautan permintaan tarik atau permintaan gabungan",
       "noRecentPrs": "Tiada semakan terkini",
       "noRecentPrsDescription": "Tampal pautan di atas untuk memulakan semakan — ia akan muncul di sini pada kali berikutnya.",

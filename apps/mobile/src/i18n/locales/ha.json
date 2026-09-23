@@ -583,6 +583,7 @@
     "reviewPullRequest": "Yi bitar buƙatar haɗawa",
     "headLine": "{{counts}} · rikodin ƙarshe {{sha}}",
     "entry": {
+      "eyebrow": "Buɗe buƙatar haɗa canje-canje ko buƙatar haɗawa ta URL",
       "pastePrLink": "Manna mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa",
       "noRecentPrs": "Babu bitutu na baya-bayan nan",
       "noRecentPrsDescription": "Manna mahaɗi a sama don fara bita — zai bayyana a nan a karo na gaba.",

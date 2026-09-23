@@ -2603,6 +2603,7 @@
       "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。"
     },
     "entry": {
+      "eyebrow": "透過 URL 開啟提取請求或合併請求",
       "pastePrLink": "貼上提取請求或合併請求連結",
       "noRecentPrs": "尚無最近審查",
       "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",

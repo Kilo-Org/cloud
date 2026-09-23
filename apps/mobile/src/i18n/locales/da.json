@@ -583,6 +583,7 @@
     "reviewPullRequest": "Gennemgå pull request",
     "headLine": "{{counts}} · seneste commit {{sha}}",
     "entry": {
+      "eyebrow": "Åbn en pull request eller merge request via dens URL",
       "pastePrLink": "Indsæt et pull request- eller merge request-link",
       "noRecentPrs": "Ingen seneste gennemgange",
       "noRecentPrsDescription": "Indsæt et link ovenfor for at starte en gennemgang — den vises her næste gang.",

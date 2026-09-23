@@ -583,6 +583,7 @@
     "reviewPullRequest": "Granska PR",
     "headLine": "{{counts}} · senaste incheckning {{sha}}",
     "entry": {
+      "eyebrow": "Öppna en PR eller merge request via en URL",
       "pastePrLink": "Klistra in en PR- eller merge request-länk",
       "noRecentPrs": "Inga senaste granskningar",
       "noRecentPrsDescription": "Klistra in en länk ovan för att börja granska — den visas här nästa gång.",

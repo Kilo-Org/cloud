@@ -583,6 +583,7 @@
     "reviewPullRequest": "Katselmoi muutospyyntö",
     "headLine": "{{counts}} · uusin muutostallennus {{sha}}",
     "entry": {
+      "eyebrow": "Avaa muutospyyntö tai yhdistämispyyntö URL-osoitteella",
       "pastePrLink": "Liitä muutospyynnön tai yhdistämispyynnön linkki",
       "noRecentPrs": "Ei viimeaikaisia katselmointeja",
       "noRecentPrsDescription": "Aloita katselmointi liittämällä linkki yllä olevaan kenttään — se näkyy tässä seuraavalla kerralla.",

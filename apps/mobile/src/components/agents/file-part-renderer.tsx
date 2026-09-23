@@ -17,6 +17,7 @@ import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   downloadRemoteFile,
   getSafeCacheFilename,
@@ -104,6 +105,7 @@ type PreviewMode = 'markdown' | 'text';
 export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendererProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const resolved = useResolvedFilePartUrl(part);
@@ -191,6 +193,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
       }
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: [
             t('agentChat.filePart.openAsText'),
             t('agentChat.filePart.openInExternalApp'),

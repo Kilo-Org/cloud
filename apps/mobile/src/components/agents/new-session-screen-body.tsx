@@ -67,6 +67,7 @@ import {
 } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
+import { displaySessionTitle } from '@/lib/session-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
@@ -714,7 +715,7 @@ export function NewSessionScreenBody() {
         <View className="px-4 pt-4">
           <Text className="text-sm text-muted-foreground">
             {t('agentChat.newSession.continueFrom', {
-              title: cloneSourceTitle || t('agentChat.session.title'),
+              title: displaySessionTitle(cloneSourceTitle) ?? t('agentChat.session.title'),
             })}
           </Text>
         </View>

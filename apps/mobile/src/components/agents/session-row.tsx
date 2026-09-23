@@ -107,6 +107,11 @@ export function StoredSessionRow({
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // The rename field seeds the session's own title, never the display fallback:
+  // `showRenamePrompt` saves whatever the field holds, so prefilling the
+  // untitled copy would persist that localized string as a real title on a
+  // no-edit tap (the raw backend default is a harmless no-op).
+  const renameInitialValue = session.title ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -134,7 +139,7 @@ export function StoredSessionRow({
       onRename: onRename
         ? () => {
             if (Platform.OS === 'ios') {
-              showRenamePrompt(title, newTitle => {
+              showRenamePrompt(renameInitialValue, newTitle => {
                 onRename(newTitle);
               });
             } else {
@@ -238,7 +243,7 @@ export function StoredSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
           onClose={() => {
             setRenameVisible(false);
           }}

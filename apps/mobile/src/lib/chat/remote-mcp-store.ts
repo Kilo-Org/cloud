@@ -259,6 +259,18 @@ export function subscribeRemoteMcpServers(listener: () => void): () => void {
   return store.subscribe(listener);
 }
 
+/**
+ * Whether the persisted list has been read yet.
+ *
+ * Until it has, the store's value is the empty default, so an empty list means
+ * "not read" rather than "none": a screen that draws the empty state from
+ * `length === 0` alone would flash "no servers" at a returning user whose list
+ * is still on disk.
+ */
+export function getRemoteMcpServersHasLoaded(): boolean {
+  return store.getHasLoaded();
+}
+
 /** The list a screen draws. */
 export function useRemoteMcpServers(): StoredRemoteMcpServer[] {
   return useSyncExternalStore(store.subscribe, store.get);

@@ -194,6 +194,24 @@ describe('remote MCP server store', () => {
     expect(mod.listRemoteMcpServers()).toEqual([stored]);
   });
 
+  it('reports the list unread until the disk read settles', async () => {
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the read must stay pending until the test releases it
+      () => read.promise
+    );
+    const mod = await freshStore();
+
+    // The store's default is the empty list, so a screen that trusts the length
+    // alone would draw "no servers" for a returning user whose list is on disk.
+    expect(mod.getRemoteMcpServersHasLoaded()).toBe(false);
+
+    read.resolve(null);
+    await flushMicrotasks();
+
+    expect(mod.getRemoteMcpServersHasLoaded()).toBe(true);
+  });
+
   it('unions a write with the persisted list when it races the cold read', async () => {
     const read = Promise.withResolvers<string | null>();
     getItemAsync.mockImplementation(

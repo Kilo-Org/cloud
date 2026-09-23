@@ -1,9 +1,11 @@
+import { type ReactNode } from 'react';
 import { Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Server } from '@/components/ui/icons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 
 import { type RemoteMcpServerRow } from './mcp-settings-state';
@@ -12,60 +14,86 @@ import { type RemoteMcpServerRow } from './mcp-settings-state';
  * The remote MCP servers section of the chat-tools sheet.
  *
  * One row per server the person added: what it is, what it answered, the switch
- * that turns it on for the chats, and the edit and delete controls. The empty
- * state and the Add button belong to the section, so a list that is being
- * checked never loses the way to add one.
+ * that turns it on for the chats, the edit and delete controls, and a Retry
+ * when the server could not be reached. The empty state and the Add button
+ * belong to the section, so a list that is being checked never loses the way to
+ * add one.
+ *
+ * The list is only empty once it has been read. Until the store answers, the
+ * section draws one row-shaped skeleton in the space the list will take, so a
+ * returning user's saved servers do not flash as "none" and the Add button
+ * below does not jump when the list arrives.
  *
  * The Kilo server is not drawn here: it is the build's own, so it offers
  * neither an edit nor a delete.
  */
 
 type McpServersSectionProps = {
+  /** Whether the stored list has been read, so an empty list means none. */
+  readonly loaded: boolean;
   readonly servers: readonly RemoteMcpServerRow[];
+  /** The servers whose Retry is in flight, so only those buttons show it. */
+  readonly retryingIds: readonly string[];
   readonly onToggle: (id: string, next: boolean) => void;
   readonly onEdit: (id: string) => void;
   readonly onDelete: (id: string) => void;
+  readonly onRetry: (id: string) => void;
   readonly onAdd: () => void;
 };
 
 export function McpServersSection({
+  loaded,
   servers,
+  retryingIds,
   onToggle,
   onEdit,
   onDelete,
+  onRetry,
   onAdd,
 }: Readonly<McpServersSectionProps>) {
   const { t } = useTranslation();
+  let list: ReactNode = null;
+  if (!loaded) {
+    // The list has not been read, so its emptiness is not known: draw the shape
+    // the rows will take rather than claiming there are none.
+    list = <McpServerRowSkeleton />;
+  } else if (servers.length === 0) {
+    list = (
+      <EmptyState
+        icon={Server}
+        title={t('modelChat.mcp.serversEmptyTitle')}
+        description={t('modelChat.mcp.serversEmptyDescription')}
+        placement="top"
+        className="px-0 pt-0"
+      />
+    );
+  } else {
+    list = servers.map(row => (
+      <McpServerRow
+        key={row.id}
+        row={row}
+        retrying={retryingIds.includes(row.id)}
+        onToggle={next => {
+          onToggle(row.id, next);
+        }}
+        onEdit={() => {
+          onEdit(row.id);
+        }}
+        onDelete={() => {
+          onDelete(row.id);
+        }}
+        onRetry={() => {
+          onRetry(row.id);
+        }}
+      />
+    ));
+  }
   return (
     <View className="gap-2">
       <Text className="px-1 text-xs font-semibold uppercase text-muted-foreground">
         {t('modelChat.mcp.serversSection')}
       </Text>
-      {servers.length === 0 ? (
-        <EmptyState
-          icon={Server}
-          title={t('modelChat.mcp.serversEmptyTitle')}
-          description={t('modelChat.mcp.serversEmptyDescription')}
-          placement="top"
-          className="px-0 pt-0"
-        />
-      ) : (
-        servers.map(row => (
-          <McpServerRow
-            key={row.id}
-            row={row}
-            onToggle={next => {
-              onToggle(row.id, next);
-            }}
-            onEdit={() => {
-              onEdit(row.id);
-            }}
-            onDelete={() => {
-              onDelete(row.id);
-            }}
-          />
-        ))
-      )}
+      {list}
       <Button variant="secondary" onPress={onAdd}>
         <Text>{t('modelChat.mcp.addServer')}</Text>
       </Button>
@@ -73,15 +101,53 @@ export function McpServersSection({
   );
 }
 
+/**
+ * The row's shape before the list is read.
+ *
+ * The same card, the same three bands and the same heights as `McpServerRow`:
+ * a name-and-URL block, the one-line status, and the button row. It is a
+ * placeholder for the list, not a second spinner, so it is drawn once and
+ * nothing else is stacked on it.
+ */
+function McpServerRowSkeleton() {
+  return (
+    <View className="gap-2 rounded-lg bg-secondary p-3">
+      <View className="flex-row items-center gap-3">
+        <View className="min-w-0 flex-1">
+          <Skeleton className="h-5 w-1/2 rounded-md" />
+          <Skeleton className="mt-0.5 h-4 w-2/3 rounded-md" />
+        </View>
+      </View>
+      <View className="min-h-6 justify-center">
+        <Skeleton className="h-4 w-1/3 rounded-md" />
+      </View>
+      <View className="flex-row gap-2">
+        <Skeleton className="h-9 w-20 rounded-md" />
+        <Skeleton className="h-9 w-24 rounded-md" />
+      </View>
+    </View>
+  );
+}
+
 type McpServerRowProps = {
   readonly row: RemoteMcpServerRow;
+  /** This row's Retry is in flight, so its button shows it is working. */
+  readonly retrying: boolean;
   readonly onToggle: (next: boolean) => void;
   readonly onEdit: () => void;
   readonly onDelete: () => void;
+  readonly onRetry: () => void;
 };
 
 /** One remote server: what it is, what it answered, and what may be done to it. */
-function McpServerRow({ row, onToggle, onEdit, onDelete }: Readonly<McpServerRowProps>) {
+function McpServerRow({
+  row,
+  retrying,
+  onToggle,
+  onEdit,
+  onDelete,
+  onRetry,
+}: Readonly<McpServerRowProps>) {
   const { t } = useTranslation();
   return (
     <View className="gap-2 rounded-lg bg-secondary p-3">
@@ -107,7 +173,16 @@ function McpServerRow({ row, onToggle, onEdit, onDelete }: Readonly<McpServerRow
           {t(row.statusKey, { count: row.toolCount })}
         </Text>
       </View>
+      {/* Retry joins the controls that are always here, so a row that failed
+          grows no taller and a row that recovers shrinks no shorter. It stays
+          while this row's ask is in flight, even if discovery has already left
+          failed, so the busy state is this button and not a second spinner. */}
       <View className="flex-row gap-2">
+        {row.retry || retrying ? (
+          <Button variant="secondary" size="sm" loading={retrying} onPress={onRetry}>
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        ) : null}
         <Button variant="secondary" size="sm" onPress={onEdit}>
           <Text>{t('modelChat.mcp.editServer')}</Text>
         </Button>

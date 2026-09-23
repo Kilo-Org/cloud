@@ -182,7 +182,9 @@ type RemoteMcpStatusKey =
 
 /**
  * One remote server, as a row. It always offers enable, edit and delete: the
- * person added it, so the person may change it or take it away.
+ * person added it, so the person may change it or take it away. A server whose
+ * discovery failed also offers a Retry, because that is the one thing the row
+ * can do about it.
  */
 export type RemoteMcpServerRow = {
   readonly id: string;
@@ -191,6 +193,8 @@ export type RemoteMcpServerRow = {
   readonly enabled: boolean;
   readonly statusKey: RemoteMcpStatusKey;
   readonly toolCount: number;
+  /** Whether the row offers a Retry. Only a failed discovery can be asked again. */
+  readonly retry: boolean;
   readonly canEdit: true;
   readonly canDelete: true;
 };
@@ -223,6 +227,18 @@ function remoteStatusKey(
 }
 
 /**
+ * Whether a row offers a Retry.
+ *
+ * Every failed discovery is retryable — the server was down, the credential was
+ * refused, or the protocol was answered wrong — so the failure itself is the
+ * whole condition. A server that is off is asked nothing and a server that
+ * answered is already the answer, so neither offers one.
+ */
+function remoteRetry(enabled: boolean, state: RemoteMcpServerState | undefined): boolean {
+  return enabled && state?.status === 'failed';
+}
+
+/**
  * One row per stored server, in the stored order.
  *
  * The stored list decides which rows exist, what they are called and whether
@@ -243,6 +259,7 @@ export function remoteServerRows(
       enabled: server.enabled,
       statusKey: remoteStatusKey(server.enabled, state),
       toolCount: server.enabled ? (state?.toolCount ?? 0) : 0,
+      retry: remoteRetry(server.enabled, state),
       canEdit: true,
       canDelete: true,
     };

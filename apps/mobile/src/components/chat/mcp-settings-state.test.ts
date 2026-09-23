@@ -165,6 +165,7 @@ describe('the remote server rows', () => {
         enabled: true,
         statusKey: 'modelChat.mcp.serverToolCount',
         toolCount: 3,
+        retry: false,
         canEdit: true,
         canDelete: true,
       },
@@ -202,7 +203,30 @@ describe('the remote server rows', () => {
       [discovered({ status: 'failed', toolCount: 0, retryable: true })]
     );
 
-    expect(rows[0]).toMatchObject({ statusKey: 'modelChat.mcp.serverUnreachable', toolCount: 0 });
+    expect(rows[0]).toMatchObject({
+      statusKey: 'modelChat.mcp.serverUnreachable',
+      toolCount: 0,
+      retry: true,
+    });
+  });
+
+  it('offers a Retry only on the row whose discovery failed', () => {
+    const rows = remoteServerRows(
+      [stored({ id: 'a' }), stored({ id: 'b' }), stored({ id: 'c', enabled: false })],
+      [
+        discovered({ id: 'a', status: 'failed', retryable: true }),
+        discovered({ id: 'b', status: 'ready', toolCount: 2 }),
+        discovered({ id: 'c', enabled: false, status: 'failed', retryable: true }),
+      ]
+    );
+
+    expect(rows.map(row => row.retry)).toEqual([true, false, false]);
+  });
+
+  it('offers no Retry on a server the discovery has not reached yet', () => {
+    const rows = remoteServerRows([stored()], []);
+
+    expect(rows[0]?.retry).toBe(false);
   });
 
   it('says a server answered with no tools', () => {

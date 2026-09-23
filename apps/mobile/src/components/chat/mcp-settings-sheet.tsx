@@ -33,8 +33,8 @@ import {
   settingsToolsView,
   type SettingsToolsView,
 } from './mcp-settings-state';
+import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
-import { RemoteMcpServerForm } from './remote-mcp-server-form';
 
 /**
  * The chat-tools sheet.
@@ -63,9 +63,15 @@ export type McpSettings = {
   readonly setSettingsToolsEnabled: (next: boolean) => void;
   /** One row per stored remote server, in the stored order. */
   readonly servers: readonly RemoteMcpServerRow[];
+  /** Whether the stored list has been read, so an empty list means none. */
+  readonly loaded: boolean;
   /** The stored servers behind those rows, so an edit can prefill the form. */
   readonly storedServers: readonly StoredRemoteMcpServer[];
   readonly setServerEnabled: (id: string, next: boolean) => void;
+  /** The servers whose Retry is in flight, so only those buttons show it. */
+  readonly retryingServerIds: readonly string[];
+  /** Asks one failed server again, with the longer deadline a Retry gets. */
+  readonly retryServer: (id: string) => void;
   /** Adds a server, discovers it, and answers whether the write landed. */
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   /** Replaces one server, discovers it, and answers whether the write landed. */
@@ -174,8 +180,11 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
     settingsToolsEnabled,
     setSettingsToolsEnabled: setGroupEnabled,
     servers: remoteServerRows(remote.servers, remote.discovered),
+    loaded: remote.loaded,
     storedServers: remote.servers,
     setServerEnabled: remote.setEnabled,
+    retryingServerIds: remote.retryingIds,
+    retryServer: remote.retryServer,
     addServer: remote.addServer,
     updateServer: remote.updateServer,
     deleteServer: remote.deleteServer,
@@ -189,14 +198,9 @@ type McpSettingsSheetProps = {
   settings: McpSettings;
 };
 
-/** Which form the nested sheet is showing, or none. */
-type FormTarget =
-  | { readonly kind: 'add' }
-  | { readonly kind: 'edit'; readonly server: StoredRemoteMcpServer };
-
 export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSettingsSheetProps>) {
   const { t } = useTranslation();
-  const [form, setForm] = useState<FormTarget | null>(null);
+  const [form, setForm] = useState<McpServerFormTarget | null>(null);
   const { view, settingsTools } = settings;
   const kilo = kiloServerRow(view);
 
@@ -334,45 +338,27 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
 
         {/* 3. The remote servers the person added. */}
         <McpServersSection
+          loaded={settings.loaded}
           servers={settings.servers}
+          retryingIds={settings.retryingServerIds}
           onToggle={(id, next) => {
             settings.setServerEnabled(id, next);
           }}
           onEdit={openEdit}
           onDelete={confirmDelete}
+          onRetry={id => {
+            settings.retryServer(id);
+          }}
           onAdd={openAdd}
         />
       </ScrollView>
       {form === null ? null : (
-        <SessionPageSheet visible onClose={closeForm}>
-          <SheetHeader
-            title={t(
-              form.kind === 'edit'
-                ? 'modelChat.mcp.editServerTitle'
-                : 'modelChat.mcp.addServerTitle'
-            )}
-            // The form's own Save is the only commit; the header closes the
-            // sheet without writing, so it is a Close and not a second Done.
-            doneLabel={t('common.close')}
-            onDone={closeForm}
-            topInset="ios-page-sheet"
-          />
-          {/* The form's fields live in a scroll view with the keyboard insets
-              adjusted, so a focused field is never under the keyboard and the
-              Save stays reachable on a small screen. */}
-          <ScrollView
-            className="flex-1"
-            contentContainerClassName="px-6 pb-6 pt-4"
-            automaticallyAdjustKeyboardInsets
-            keyboardShouldPersistTaps="handled"
-          >
-            <RemoteMcpServerForm
-              server={form.kind === 'edit' ? form.server : undefined}
-              onSave={submitForm}
-              saving={settings.saving}
-            />
-          </ScrollView>
-        </SessionPageSheet>
+        <McpServerFormSheet
+          target={form}
+          saving={settings.saving}
+          onSubmit={submitForm}
+          onClose={closeForm}
+        />
       )}
     </SessionPageSheet>
   );

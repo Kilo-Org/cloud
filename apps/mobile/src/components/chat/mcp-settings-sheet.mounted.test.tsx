@@ -27,6 +27,7 @@ import { act, TestRenderer } from '@/test/renderer';
 const h = vi.hoisted(() => {
   const group = { value: true, listeners: new Set<() => void>() };
   const servers = { value: [] as StoredRemoteMcpServer[], listeners: new Set<() => void>() };
+  const hasLoaded = { value: true };
   const discovered = { value: [] as RemoteMcpServerState[], listeners: new Set<() => void>() };
   const kilo = { value: { status: 'ready' as const, tools: [{}, {}, {}] } };
   const stores = { group, servers, discovered };
@@ -38,6 +39,7 @@ const h = vi.hoisted(() => {
   return {
     group,
     servers,
+    hasLoaded,
     discovered,
     kilo,
     alert: vi.fn<(...args: unknown[]) => void>(),
@@ -84,6 +86,7 @@ vi.mock('@/lib/chat/settings-tools-switch', () => ({
 
 vi.mock('@/lib/chat/remote-mcp-store', () => ({
   listRemoteMcpServers: () => h.servers.value,
+  getRemoteMcpServersHasLoaded: () => h.hasLoaded.value,
   subscribeRemoteMcpServers: (listener: () => void) => {
     h.servers.listeners.add(listener);
     return () => {
@@ -139,6 +142,7 @@ vi.mock('@/components/ui/icons', () => ({
   Wrench: 'Wrench',
 }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/chat/remote-mcp-server-form', () => ({
   RemoteMcpServerForm: 'RemoteMcpServerForm',
@@ -166,6 +170,22 @@ function server(id: string, overrides: Partial<StoredRemoteMcpServer> = {}): Sto
     url: `https://${id}.example/mcp`,
     auth: { type: 'none' },
     enabled: true,
+    ...overrides,
+  };
+}
+
+function serverState(
+  id: string,
+  overrides: Partial<RemoteMcpServerState> = {}
+): RemoteMcpServerState {
+  return {
+    id,
+    name: `Server ${id}`,
+    url: `https://${id}.example/mcp`,
+    enabled: true,
+    status: 'idle',
+    toolCount: 0,
+    retryable: false,
     ...overrides,
   };
 }
@@ -242,6 +262,7 @@ async function tapRow(title: string, next: boolean): Promise<void> {
 beforeEach(() => {
   h.group.value = true;
   h.servers.value = [];
+  h.hasLoaded.value = true;
   h.discovered.value = [];
   h.kilo.value = { status: 'ready', tools: [{}, {}, {}] };
   h.mcpEnabledFor.mockResolvedValue(true);
@@ -374,6 +395,44 @@ describe('the chat-tools sheet', () => {
     expect(empty?.props.title).toBe('No remote servers yet');
     expect(empty?.props.description).toBe('Add one to offer its tools in your chats.');
     expect(buttonFor('Add MCP server')).toBeDefined();
+  });
+
+  it('draws a skeleton instead of the empty state while the list is still being read', async () => {
+    h.hasLoaded.value = false;
+    await mount();
+
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(nodes('EmptyState')).toHaveLength(0);
+    // The way to add one belongs to the section, so the wait never hides it.
+    expect(buttonFor('Add MCP server')).toBeDefined();
+  });
+
+  it('retries a failed server through the discovery when its Retry is pressed', async () => {
+    h.servers.value = [server('alpha')];
+    h.discovered.value = [serverState('alpha', { status: 'failed', retryable: true })];
+    const pending = Promise.withResolvers<readonly RemoteMcpServerState[]>();
+    h.ensureRemoteMcp.mockReturnValue(pending.promise);
+    await mount();
+
+    const retry = required(buttonFor('Retry'), 'Retry');
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place, { retry: true });
+    // The busy flag is that row's, so the person can see the ask they made.
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(true);
+
+    await act(async () => {
+      pending.resolve([]);
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
+    // The chat's tool list has to move onto what the Retry just found.
+    expect(h.refreshChatTools).toHaveBeenCalled();
   });
 
   it('turns a server off for the chats and tells the registry', async () => {

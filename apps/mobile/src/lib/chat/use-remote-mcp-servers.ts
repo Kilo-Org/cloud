@@ -11,6 +11,7 @@ import {
 import {
   addRemoteMcpServer,
   deleteRemoteMcpServer,
+  getRemoteMcpServersHasLoaded,
   listRemoteMcpServers,
   type RemoteMcpServerDraft,
   setRemoteMcpServerEnabled,
@@ -37,9 +38,15 @@ import { type ChatPlace } from './scope';
 export type RemoteMcpServers = {
   /** The stored servers, in the order they were added. */
   readonly servers: readonly StoredRemoteMcpServer[];
+  /** Whether the stored list has been read, so an empty list means none. */
+  readonly loaded: boolean;
   /** What each enabled server answered, joined by id. */
   readonly discovered: readonly RemoteMcpServerState[];
+  /** The servers whose Retry is in flight, so their buttons show it is working. */
+  readonly retryingIds: readonly string[];
   readonly setEnabled: (id: string, next: boolean) => void;
+  /** Asks one failed server again, with the longer deadline a Retry gets. */
+  readonly retryServer: (id: string) => void;
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly deleteServer: (id: string) => Promise<boolean>;
@@ -50,8 +57,10 @@ export type RemoteMcpServers = {
 export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
   const { t } = useTranslation();
   const servers = useSyncExternalStore(subscribeRemoteMcpServers, listRemoteMcpServers);
+  const loaded = useSyncExternalStore(subscribeRemoteMcpServers, getRemoteMcpServersHasLoaded);
   const discovered = useSyncExternalStore(subscribeRemoteMcp, remoteMcpState);
   const [saving, setSaving] = useState(false);
+  const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(() => new Set());
 
   /** The reason a write failed, said out loud because the store kept its value. */
   const failed = useCallback(
@@ -74,6 +83,40 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
       }
     },
     [place]
+  );
+
+  /**
+   * Asks one server again, on the person's tap.
+   *
+   * The discovery is the module's and the answer is per server, so the busy
+   * flag is too: a second row's Retry is its own button, and one row working
+   * must not put a spinner on another. The Retry deadline is the longer one a
+   * person's own ask gets, so a server that is slow to answer is not failed on
+   * the automatic deadline. After it answers, the registry is told so an open
+   * chat moves onto the tools the Retry just found.
+   */
+  const retryServer = useCallback(
+    (id: string) => {
+      if (place === null) {
+        return;
+      }
+      setRetryingIds(current => new Set(current).add(id));
+      void (async () => {
+        try {
+          await ensureRemoteMcp(place, { retry: true });
+          await refreshChatTools();
+        } catch (error) {
+          failed(error);
+        } finally {
+          setRetryingIds(current => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        }
+      })();
+    },
+    [failed, place]
   );
 
   const addServer = useCallback(
@@ -130,5 +173,16 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     [failed]
   );
 
-  return { servers, discovered, setEnabled, addServer, updateServer, deleteServer, saving };
+  return {
+    servers,
+    loaded,
+    discovered,
+    retryingIds: [...retryingIds],
+    setEnabled,
+    retryServer,
+    addServer,
+    updateServer,
+    deleteServer,
+    saving,
+  };
 }

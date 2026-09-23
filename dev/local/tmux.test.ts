@@ -3,7 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 
 import {
   breakPane,
@@ -31,6 +31,71 @@ const hasTmux = (() => {
     return false;
   }
 })();
+
+// tmux takes its server-wide `default-shell` from the ambient $SHELL, and new
+// detached sessions default to 80x24. An agent harness exports a
+// non-interactive $SHELL (a wrapper that runs one command), so a pane there
+// dies with ctrl-c instead of returning to its shell, and a long worktree path
+// pushes the echoed relaunch command past 80 columns. Both break the fixtures
+// below for reasons that have nothing to do with restartServiceInTmux. Pin a
+// real shell and a wide session so the fixtures exercise the product, not the
+// host's environment.
+const fixtureKeepAliveSession = `kilo-tmux-fixture-${process.pid}`;
+const readGlobalTmuxOption = (name: string): string | undefined => {
+  try {
+    const value = execFileSync('tmux', ['show-options', '-g', '-v', name], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+};
+if (hasTmux) {
+  // `set-option -g` needs a running server, and a server with no sessions exits.
+  try {
+    execFileSync('tmux', ['new-session', '-d', '-s', fixtureKeepAliveSession, 'sleep 300'], {
+      stdio: 'ignore',
+    });
+  } catch {
+    // A server is already running with a session of this name.
+  }
+  // Overriding these two server-wide options must not outlive the suite: a
+  // developer's tmux server would keep the fixture's shell and geometry. Read
+  // the values that were in effect before the override so `after()` can put
+  // them back.
+  const savedGlobalOptions: [string, string | undefined][] = [
+    ['default-shell', readGlobalTmuxOption('default-shell')],
+    ['default-size', readGlobalTmuxOption('default-size')],
+  ];
+  execFileSync(
+    'tmux',
+    ['set-option', '-g', 'default-shell', fs.existsSync('/bin/bash') ? '/bin/bash' : '/bin/sh'],
+    { stdio: 'ignore' }
+  );
+  execFileSync('tmux', ['set-option', '-g', 'default-size', '200x50'], { stdio: 'ignore' });
+  after(() => {
+    // Restore the options before killing the keep-alive session: if that were
+    // the server's last session it would exit and the restore would fail.
+    for (const [name, value] of savedGlobalOptions) {
+      try {
+        if (value === undefined) {
+          execFileSync('tmux', ['set-option', '-gu', name], { stdio: 'ignore' });
+        } else {
+          execFileSync('tmux', ['set-option', '-g', name, value], { stdio: 'ignore' });
+        }
+      } catch {
+        // Server already gone; nothing left to restore.
+      }
+    }
+    try {
+      execFileSync('tmux', ['kill-session', '-t', fixtureKeepAliveSession], { stdio: 'ignore' });
+    } catch {
+      // Session already gone.
+    }
+  });
+}
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =

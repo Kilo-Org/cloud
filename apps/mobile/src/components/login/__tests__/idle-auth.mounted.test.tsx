@@ -21,7 +21,7 @@ import {
 } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
-import { IdleAuth } from '../idle-auth';
+import { IdleAuth, PROVIDER_GLYPH_SLOT_CLASS } from '../idle-auth';
 import '@/i18n';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
@@ -230,6 +230,24 @@ function boxDp(className: string): { width: number; height: number } {
 /** The label Text inside a provider Button, whichever icon sits beside it. */
 function labelText(button: I): I {
   return button.find(n => typeof n.type === 'string' && (n.type as string) === 'Text');
+}
+
+/**
+ * Every node inside a provider Button that carries the reserved glyph-slot
+ * className. The slot is what puts the label on the same axis in all three
+ * rows, so the suite asserts exactly one per row and that all three match.
+ */
+function glyphSlots(button: I): I[] {
+  return button.findAll(n => String(n.props.className).includes(PROVIDER_GLYPH_SLOT_CLASS));
+}
+
+function glyphSlot(button: I): I {
+  const slots = glyphSlots(button);
+  const slot = slots[0];
+  if (!slot || slots.length !== 1) {
+    throw new Error(`expected exactly one glyph slot, found ${slots.length}`);
+  }
+  return slot;
 }
 
 /**
@@ -502,6 +520,72 @@ describe('IdleAuth provider label layout', () => {
 
     act(() => {
       renderer.unmount();
+    });
+  });
+
+  it('reserves one identical glyph slot per provider row', async () => {
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const buttons = [
+      findButton(renderer.root, 'Sign in with Apple'),
+      findButton(renderer.root, 'Sign in with Google'),
+      findButton(renderer.root, 'Sign in with a passkey'),
+    ];
+    // Exactly one slot per row, with the identical className, so the three
+    // flex-1 labels start from the same x with the marks in the same place.
+    const slotClasses = buttons.map(button => String(glyphSlot(button).props.className));
+    expect(slotClasses[0]).toBe(PROVIDER_GLYPH_SLOT_CLASS);
+    expect(slotClasses[1]).toBe(slotClasses[0]);
+    expect(slotClasses[2]).toBe(slotClasses[0]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the passkey label className byte-identical while the ceremony runs', async () => {
+    const idle = await mountIdleAuth(vi.fn<StartFn>());
+    const idleClasses = String(
+      labelText(findButton(idle.root, 'Sign in with a passkey')).props.className
+    );
+    act(() => {
+      idle.unmount();
+    });
+
+    nativeAuth.busy = 'passkey';
+    const busy = await mountIdleAuth(vi.fn<StartFn>());
+    const busyButton = findButton(busy.root, 'Sign in with a passkey');
+    // The spinner takes the reserved slot, so the label does not move.
+    expect(glyphSlot(busyButton)).toBeTruthy();
+    expect(String(labelText(busyButton).props.className)).toBe(idleClasses);
+
+    act(() => {
+      busy.unmount();
+    });
+  });
+
+  it('keeps the Apple label className byte-identical while the request runs', async () => {
+    providers.appleAvailable = true;
+    const idle = await mountIdleAuth(vi.fn<StartFn>());
+    const idleClasses = String(
+      labelText(findButton(idle.root, 'Sign in with Apple')).props.className
+    );
+    act(() => {
+      idle.unmount();
+    });
+
+    nativeAuth.busy = 'apple';
+    const busy = await mountIdleAuth(vi.fn<StartFn>());
+    const busyButton = findButton(busy.root, 'Sign in with Apple');
+    // Replacing the 18pt mark with the spinner inside the same slot cannot
+    // move the label.
+    expect(glyphSlot(busyButton)).toBeTruthy();
+    expect(String(labelText(busyButton).props.className)).toBe(idleClasses);
+
+    act(() => {
+      busy.unmount();
     });
   });
 });

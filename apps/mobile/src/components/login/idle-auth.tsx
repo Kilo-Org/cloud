@@ -26,6 +26,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
 
+// One fixed slot per provider row. It reserves the same width in all three
+// rows, so the flex-1 label starts from the same x, and it holds whichever of
+// the mark, the inline spinner, or nothing the row has - swapping an 18pt mark
+// for the spinner cannot move the label. The passkey row draws no mark but
+// still reserves the slot.
+export const PROVIDER_GLYPH_SLOT_CLASS = 'h-[18px] w-[18px] items-center justify-center';
+
 export function IdleAuth({
   start,
   initialEmail = '',
@@ -233,11 +240,13 @@ export function IdleAuth({
           onPress={() => void signInWithApple()}
           accessibilityLabel={t('login.signInWithApple')}
         >
-          {busy === 'apple' ? (
-            <ActivityIndicator size="small" />
-          ) : (
-            <AppleLogo size={18} color={colors.foreground} />
-          )}
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'apple' ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <AppleLogo size={18} color={colors.foreground} />
+            )}
+          </View>
           <Text className="flex-1 text-center text-[17px] font-medium">
             {t('login.signInWithApple')}
           </Text>
@@ -256,7 +265,9 @@ export function IdleAuth({
           onPress={() => void signInWithGoogle()}
           accessibilityLabel={t('login.signInWithGoogle')}
         >
-          {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
+          </View>
           <Text className="flex-1 text-center text-[17px] font-medium">
             {t('login.signInWithGoogle')}
           </Text>
@@ -281,7 +292,9 @@ export function IdleAuth({
             }}
             accessibilityLabel={t('login.signInWithPasskey')}
           >
-            {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
+            <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+              {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
+            </View>
             <Text className="flex-1 text-center text-[17px] font-medium">
               {t('login.signInWithPasskey')}
             </Text>

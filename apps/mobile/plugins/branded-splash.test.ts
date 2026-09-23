@@ -179,6 +179,10 @@ describe('shared branded splash', () => {
     // prebuilt `android/` tree contributes its own colors alongside the ones
     // Expo generates. Assert the splash background this plugin owns is
     // present, not that it is the only color.
+    // arrayContaining, not an exact array: introspection seeds android.colors
+    // from the checked-out prebuild, which also carries the app's other colors
+    // (colorPrimary, app_background, notification_icon_color). Asserting the
+    // exact length made this pass only on a tree with no prebuilt android/.
     // Introspection runs against the real project root, so `withAndroidColors`
     // also reads whatever the project's own prebuild has already written to
     // `android/app/src/main/res/values/colors.xml` (that directory is

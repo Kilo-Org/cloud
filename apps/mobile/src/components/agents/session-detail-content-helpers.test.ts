@@ -100,11 +100,13 @@ describe('retryFailedMessage', () => {
       ['m-retried', { status: 'failed', error: 'boom', reason: 'execution' }],
     ]);
 
+    // The marker folds onto the message row as `timeMarker`, so the failed
+    // submission is the only item and its key no longer carries a `time:` row.
     expect(
       mergeSessionTranscript([submission], [], deliveryStates).map(item =>
         getSessionTranscriptItemKey(item)
       )
-    ).toEqual(['time:m-retried', 'm-retried']);
+    ).toEqual(['m-retried']);
 
     await retryFailedMessage({
       message: submission,

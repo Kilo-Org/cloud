@@ -173,10 +173,6 @@ function requireSdkData<T>(
   return result.data;
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type KiloServerHandle = {
   url: string;
   close: () => void;
@@ -325,10 +321,6 @@ export type WrapperKiloClient = {
   /** The in-process server URL — for diagnostics */
   readonly serverUrl: string;
 };
-
-// ---------------------------------------------------------------------------
-// Implementation
-// ---------------------------------------------------------------------------
 
 export function createWrapperKiloClient(
   sdkClient: SDKClient,

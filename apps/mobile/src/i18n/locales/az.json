@@ -214,7 +214,6 @@
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
     "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
-    "creditBalanceEmpty": "Kredit balansın boşdur. Bu hesabın kreditləri iOS tətbiqindən kənarda idarə olunur.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "1 və ya daha böyük əmsal daxil et",
     "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
     "pushOffByCategory": "Bildirişlərdə söndürülüb"
+  },
+  "credits": {
+    "title": "Kredit al",
+    "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
+    "packLabel": "{{amount}} dəyərində kredit əlavə et",
+    "priceUnavailable": "Qiymət mövcud deyil",
+    "purchased": "Kredit balansına əlavə edildi.",
+    "empty": "Kredit paketləri hazırda əlçatan deyil.",
+    "noMatchingProducts": "App Store tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   }
 }

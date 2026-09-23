@@ -214,7 +214,6 @@
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
     "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na bonus na kredito.",
-    "creditBalanceEmpty": "Wala ka nang kredito. Para sa akawnt na ito, pinamamahalaan ang kredito sa labas ng iOS app.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso"
+  },
+  "credits": {
+    "title": "Bumili ng kredito",
+    "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "packLabel": "Magdagdag ng {{amount}} na kredito",
+    "priceUnavailable": "Hindi available ang presyo",
+    "purchased": "Naidagdag na ang kredito sa iyong balance.",
+    "empty": "Hindi available ang mga credit pack sa ngayon.",
+    "noMatchingProducts": "Walang katugmang credit pack na ibinalik ang App Store.",
+    "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
+    "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
+    "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
   }
 }

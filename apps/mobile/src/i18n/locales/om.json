@@ -214,7 +214,6 @@
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
     "bonusCreditsExpiring": "Kiriiditiin badhaasaa {{amount}} gaafa {{date}} yeroon isaa darba.",
-    "creditBalanceEmpty": "Hafteen kiriiditii kee duwwaa dha. Kiriiditiin herrega kanaa appilikeeshinii iOS tiin alatti bulfama.",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "Baay'isaa 1 ykn isaa ol galchi",
     "permissionDenied": "Akeekkachiisa baasii bulchuuf hayyamni sitti hin jiru.",
     "pushOffByCategory": "Beeksisota keessatti cufaa"
+  },
+  "credits": {
+    "title": "Kireedita bituu",
+    "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
+    "packLabel": "Kireedita {{amount}} dabali",
+    "priceUnavailable": "Gatii hin argamu",
+    "purchased": "Kireeditiin baalansii kee irratti dabalameera.",
+    "empty": "Paakeejii kireeditii yeroo ammaa hin argamu.",
+    "noMatchingProducts": "App Store paakeejii kireeditii walsimu hin deebisne.",
+    "noMatchingProductsPlay": "Google Play paakeejii kireeditii walsimu hin deebisne.",
+    "purchaseOwnedByAnotherAccount": "Kireeditiin Apple Account kana irratti jiru kan herrega Kilo biraati. Fayyadamuuf herrega Kilo sanatti seeni.",
+    "purchaseOwnedByAnotherAccountPlay": "Kireeditiin akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Fayyadamuuf akaawuntii Kilo sana seeni."
   }
 }

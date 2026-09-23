@@ -214,7 +214,6 @@
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
     "bonusCreditsExpiring": "{{amount}} के बोनस क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
-    "creditBalanceEmpty": "आपके पास कोई क्रेडिट नहीं बचा है। इस खाते के क्रेडिट iOS ऐप के बाहर प्रबंधित किए जाते हैं।",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "1 या उससे अधिक का गुणक दर्ज करें",
     "permissionDenied": "आपको खर्च की चेतावनियाँ प्रबंधित करने की अनुमति नहीं है।",
     "pushOffByCategory": "सूचनाओं में बंद"
+  },
+  "credits": {
+    "title": "क्रेडिट खरीदें",
+    "description": "क्रेडिट एक बार की खरीद है जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में जोड़ी जाती है। स्टोर आपके खाते से शुल्क लेता है और स्टोर द्वारा भुगतान की पुष्टि के बाद क्रेडिट जोड़े जाते हैं।",
+    "packLabel": "{{amount}} के क्रेडिट जोड़ें",
+    "priceUnavailable": "कीमत उपलब्ध नहीं",
+    "purchased": "आपके बैलेंस में क्रेडिट जोड़े गए।",
+    "empty": "क्रेडिट पैक अभी उपलब्ध नहीं हैं।",
+    "noMatchingProducts": "App Store ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
+    "noMatchingProductsPlay": "Google Play ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
+    "purchaseOwnedByAnotherAccount": "इस Apple Account का क्रेडिट किसी दूसरे Kilo खाते से जुड़ा है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।",
+    "purchaseOwnedByAnotherAccountPlay": "इस Google Play खाते का क्रेडिट किसी दूसरे Kilo खाते से संबंधित है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।"
   }
 }

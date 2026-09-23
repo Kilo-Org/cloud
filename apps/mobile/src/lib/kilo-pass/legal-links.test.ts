@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { getKiloPassLegalLinks, kiloPassLegalDisclosure } from './legal-links';
+import { getStoreLegalLinks, kiloPassLegalDisclosure } from './legal-links';
 
 describe('Kilo Pass legal disclosure links', () => {
   it('includes functional privacy policy and Terms of Use links for the purchase flow', () => {
-    expect(getKiloPassLegalLinks('https://app.example.com')).toEqual([
+    expect(getStoreLegalLinks('https://app.example.com')).toEqual([
       {
         label: 'Privacy Policy',
         url: 'https://app.example.com/privacy-app',
@@ -29,7 +29,7 @@ describe('Kilo Pass legal disclosure links', () => {
   });
 
   it('composes the full footer disclosure with legal link labels', () => {
-    const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks('https://app.example.com');
+    const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks('https://app.example.com');
 
     expect(
       `${kiloPassLegalDisclosure('ios')} By subscribing, you agree to the ${termsOfUseLink.label} and acknowledge the ${privacyPolicyLink.label}.`

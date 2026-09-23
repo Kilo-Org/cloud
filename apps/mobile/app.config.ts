@@ -376,6 +376,11 @@ const config: ExpoConfig = {
     // plugin's single platform piece is the AppTheme override it writes, and it
     // is registered once here for both prebuilds.
     './plugins/withAndroidAlertDialogButtonCase',
+    // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
+    // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
+    // by capability — iOS's UIAlertController already follows the system
+    // appearance and takes no app-token override (see the plugin's doc comment).
+    './plugins/withAndroidAlertDialogTheme',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

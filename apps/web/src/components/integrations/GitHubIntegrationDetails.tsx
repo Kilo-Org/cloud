@@ -25,7 +25,6 @@ import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { buildGitHubInstallState } from './github-install-state';
 import { useConfirm } from '@/components/ui/confirm';
 import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
-import { InstallationCustomizations } from './GitHubRepositoryCustomizationsPreview';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -41,10 +40,6 @@ type GitHubIntegrationDetailsProps = {
   existingPendingOrg?: string;
   appReturnPath?: string;
   onInstallationDetected?: () => void;
-  /** Reveals the Repository Customizations UI (default AI model / PR review
-   *  mode plus per-repository overrides) behind the PER_REPO_SETTINGS flag.
-   *  Computed server-side and threaded down since this is a client component. */
-  perRepoSettingsEnabled?: boolean;
 };
 
 /**
@@ -250,10 +245,7 @@ export function GitHubIntegrationDetails(props: GitHubIntegrationDetailsProps) {
       <GitHubIntegrationOutcomeToasts {...props} />
       {props.organizationId && !props.appReturnPath ? (
         <div className="space-y-6">
-          <OrganizationGitHubInstallations
-            organizationId={props.organizationId}
-            perRepoSettingsEnabled={props.perRepoSettingsEnabled}
-          />
+          <OrganizationGitHubInstallations organizationId={props.organizationId} />
           <Card>
             <CardHeader>
               <div className="space-y-1.5">
@@ -294,7 +286,6 @@ function GitHubIntegrationDetailsContent({
   pendingApproval,
   appReturnPath,
   onInstallationDetected,
-  perRepoSettingsEnabled,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -920,19 +911,17 @@ function GitHubIntegrationDetailsContent({
               </div>
 
               {/* Model Selection */}
-              {!perRepoSettingsEnabled && (
-                <div className="space-y-3 rounded-lg border p-4">
-                  <ModelCombobox
-                    label="AI Model"
-                    helperText="Select the AI model to use when responding to GitHub bot mentions"
-                    models={modelOptions}
-                    value={selectedModel}
-                    onValueChange={handleModelChange}
-                    isLoading={isLoadingModels}
-                    placeholder="Select a model"
-                  />
-                </div>
-              )}
+              <div className="space-y-3 rounded-lg border p-4">
+                <ModelCombobox
+                  label="AI Model"
+                  helperText="Select the AI model to use when responding to GitHub bot mentions"
+                  models={modelOptions}
+                  value={selectedModel}
+                  onValueChange={handleModelChange}
+                  isLoading={isLoadingModels}
+                  placeholder="Select a model"
+                />
+              </div>
 
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
@@ -1022,15 +1011,6 @@ function GitHubIntegrationDetailsContent({
           )}
         </CardContent>
       </Card>
-
-      {isInstalled && installation && !isPendingApproval && perRepoSettingsEnabled && (
-        <InstallationCustomizations
-          integrationId={installation.id}
-          organizationId={organizationId}
-          models={modelOptions}
-          initiallyOpen={false}
-        />
-      )}
 
       {!organizationId ? (
         <Card id="github-identity">

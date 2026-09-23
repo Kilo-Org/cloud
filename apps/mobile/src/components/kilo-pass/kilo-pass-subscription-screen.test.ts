@@ -151,8 +151,10 @@ vi.mock('@kilocode/app-shared/commerce', () => ({
 }));
 
 // The owner is the single `useIAP` call site (plan assumption 8). The mock
-// records mounts so the screen test can assert the owner is not mounted for
-// non-native / Android presentations, which means `useIAP` is never invoked.
+// records mounts so the screen test can assert the owner is mounted exactly
+// once at the route entry — including while the presentation is loading — so
+// the store connect overlaps the presentation request and `useIAP` is never
+// invoked twice.
 vi.mock('./kilo-pass-native-iap-owner', () => ({
   KiloPassNativeIapOwner: ({ children }: { children: unknown }) => {
     mocks.ownerMount();
@@ -308,7 +310,9 @@ describe('KiloPassSubscriptionScreen', () => {
       expect(
         renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
       ).toHaveLength(0);
-      expect(mocks.ownerMount).not.toHaveBeenCalled();
+      // The owner wraps every variant so the store connect overlaps the
+      // presentation request; it stays the single `useIAP` call site.
+      expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
       renderer.unmount();
     }
   );
@@ -508,7 +512,7 @@ describe('KiloPassSubscriptionScreen', () => {
     expect(
       renderer.root.findAll(node => String(node.type) === 'RestorePurchasesButton')
     ).toHaveLength(0);
-    expect(mocks.ownerMount).not.toHaveBeenCalled();
+    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -525,7 +529,7 @@ describe('KiloPassSubscriptionScreen', () => {
     expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).toContain('Manage');
     expect(productTiles(renderer)).toHaveLength(0);
-    expect(mocks.ownerMount).not.toHaveBeenCalled();
+    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -549,6 +553,17 @@ describe('KiloPassSubscriptionScreen', () => {
     await press(retryButton);
 
     expect(mocks.nativeIap.productsRefetch).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('mounts the single useIAP owner once on Android even when the presentation is unavailable', async () => {
+    mockedPlatform.OS = 'android';
+    mocks.presentation.data = { kind: 'unavailable', webUrl: null };
+
+    const renderer = await renderScreen();
+
+    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -580,18 +595,27 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('does not mount the IAP owner (single useIAP call site) on Android', async () => {
-    mockedPlatform.OS = 'android';
-    mocks.presentation.data = { kind: 'unavailable', webUrl: null };
+  it('mounts the IAP owner while the presentation is loading so the store connect overlaps it', async () => {
+    mockedPlatform.OS = 'ios';
+    mocks.presentation.isPending = true;
+    mocks.presentation.data = null;
 
     const renderer = await renderScreen();
 
-    expect(mocks.ownerMount).not.toHaveBeenCalled();
+    // The owner is mounted before the presentation answer arrives, which is what
+    // starts the native store connection and the store-product query in parallel.
+    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'kilo-pass-native-iap'
+      )
+    ).toHaveLength(0);
 
     renderer.unmount();
   });
 
-  it('mounts the IAP owner only for native_iap on iOS', async () => {
+  it('mounts the single IAP owner for native_iap on iOS', async () => {
     setNativeIapPresentation();
     mocks.nativeIap.products = [];
 

@@ -36686,6 +36686,17 @@
     ],
     "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
   },
+  "user.hasGatewayUsage": {
+    "path": "user.hasGatewayUsage",
+    "kind": "query",
+    "summary": "Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "hasgatewayusage"
+    ],
+    "searchBlob": "user.hasGatewayUsage Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests. user hasgatewayusage"
+  },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
     "kind": "mutation",

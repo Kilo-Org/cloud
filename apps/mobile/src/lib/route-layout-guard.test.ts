@@ -57,6 +57,10 @@ describe('expo-router route file names', () => {
     expect(readsAsLayout('tabs-layout.mounted.test.tsx')).toBe(false);
     expect(isLayoutFile('_layout.mounted.test.tsx')).toBe(false);
     expect(isLayoutFile('_layout.tsx')).toBe(true);
+    // A platform token followed by another dot-segment is not a platform
+    // variant: expo-router still reads the route name as `_layout`.
+    expect(readsAsLayout('_layout.ios.foo.tsx')).toBe(true);
+    expect(isLayoutFile('_layout.ios.foo.tsx')).toBe(false);
   });
 
   it('allows the platform-specific layout variants expo-router resolves', () => {

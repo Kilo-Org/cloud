@@ -5,7 +5,7 @@
 // safe because sign-out clears the React Query cache (`queryClient.clear()`), so
 // a new owner refetches and never reuses the previous owner's cached balance.
 
-import { createElement, type ElementType } from 'react';
+import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -85,10 +85,6 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 
-const showPicker = vi.hoisted(() => vi.fn());
-vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: showPicker }),
-}));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 
@@ -106,9 +102,15 @@ vi.mock('react-native-reanimated', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  // The account picker's sheet is a native modal; honored like the real one so
+  // the closed sheet renders nothing.
+  Modal: (props: { visible?: boolean; children?: ReactNode }) =>
+    props.visible ? createElement('Modal', null, props.children) : null,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
@@ -124,6 +126,7 @@ vi.mock('@/lib/hooks/use-hide-balance-preference', async () => {
 });
 
 vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
   ChevronDown: 'ChevronDown',
   Eye: 'Eye',
   EyeOff: 'EyeOff',
@@ -192,21 +195,34 @@ async function mountCard(
   };
 }
 
-function openNativePicker(renderer: ReactTestRenderer) {
+async function openSheet(renderer: ReactTestRenderer) {
   const control = renderer.root.find(
     node => node.type === Pressable && node.props.accessibilityHint === 'Select account'
   );
-  const open = control.props.onPress as () => void;
-  act(() => {
-    open();
+  await act(() => {
+    (control.props.onPress as () => void)();
   });
-  const call = showPicker.mock.lastCall as
-    | [{ options: string[]; cancelButtonIndex: number }, (index: number) => void]
-    | undefined;
-  if (!call) {
-    throw new Error('native picker did not open');
-  }
-  return call;
+}
+
+/** The sheet's account rows, in option order. */
+function accountLabels(renderer: ReactTestRenderer) {
+  return renderer.root
+    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
+    .map(node => node.props.accessibilityLabel as string);
+}
+
+/** Presses one row of the open sheet: an account (radio) or Cancel (button). */
+async function choose(renderer: ReactTestRenderer, label: string) {
+  const target = renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessibilityLabel === label &&
+      node.props.onPress !== undefined &&
+      (node.props.accessibilityRole === 'radio' ? true : node.props.accessibilityHint === undefined)
+  );
+  await act(() => {
+    (target.props.onPress as () => void)();
+  });
 }
 
 beforeEach(() => {
@@ -227,7 +243,6 @@ beforeEach(() => {
     await saveCompletion;
     savedMetadata.delete(key);
   });
-  showPicker.mockReset();
   getContextBalanceQueryFn.mockReset();
   getContextBalanceQueryFn.mockResolvedValue(null);
   personalCreditBlocksQueryFn.mockReset();
@@ -249,22 +264,19 @@ describe('CreditsCard balance state', () => {
       expected: 'org-a',
       label: organizationName,
     },
-  ])('uses supplied memberships for native selection: $expected', async state => {
+  ])('uses supplied memberships for the picker: $expected', async state => {
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'missing-org');
     const { renderer, texts, unmount } = await mountCard(
       createTestQueryClient(),
       state.orgs as OrgListEntry[]
     );
-    const call = openNativePicker(renderer);
-    expect(call[0].options).toEqual(state.options);
-    await act(() => {
-      call[1](call[0].cancelButtonIndex);
-    });
+    await openSheet(renderer);
+    expect([...accountLabels(renderer), 'Cancel']).toEqual(state.options);
+    await choose(renderer, 'Cancel');
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('missing-org');
     expect(texts()).toContain('Organization');
-    await act(() => {
-      call[1](state.choice);
-    });
+    await openSheet(renderer);
+    await choose(renderer, state.label);
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
     const label = renderer.root.findByProps({ children: state.label });
     expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
@@ -282,10 +294,8 @@ describe('CreditsCard balance state', () => {
       ] as OrgListEntry[];
       storage.write.mockRejectedValueOnce(new Error('write failed'));
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-      const firstPicker = openNativePicker(renderer);
-      await act(() => {
-        firstPicker[1](1);
-      });
+      await openSheet(renderer);
+      await choose(renderer, 'Supplied organization');
       expect(texts()).toContain('Could not save setting');
       expect(texts()).toContain('Supplied organization');
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
@@ -297,10 +307,8 @@ describe('CreditsCard balance state', () => {
       (id === null ? storage.remove : storage.write).mockRejectedValueOnce(
         new Error('latest save failed')
       );
-      const latestPicker = openNativePicker(renderer);
-      await act(() => {
-        latestPicker[1](id === null ? 0 : 2);
-      });
+      await openSheet(renderer);
+      await choose(renderer, id === null ? 'Personal' : 'Latest organization');
       const label = id === null ? 'Personal' : 'Latest organization';
       expect(texts()).toContain(label);
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');

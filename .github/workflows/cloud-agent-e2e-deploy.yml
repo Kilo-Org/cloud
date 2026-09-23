@@ -1,4 +1,4 @@
-name: E2E Deploy
+name: Cloud Agent E2E deploy
 
 on:
   workflow_dispatch:
@@ -7,11 +7,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e-deploy
+  group: cloud-agent-e2e-deploy
   cancel-in-progress: false
 
 jobs:
-  e2e-deploy:
+  deploy:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

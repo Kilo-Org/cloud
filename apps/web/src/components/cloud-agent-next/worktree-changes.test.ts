@@ -12,6 +12,7 @@ import {
   getWorktreeChangesTotals,
   groupWorktreeChangesByDirectory,
   preserveNewerWorktreeChanges,
+  resolveWorktreeChangesSelection,
   worktreeChangesMessages,
   type WorktreeChangesFile,
   type WorktreeChangesTreeNode,
@@ -606,6 +607,28 @@ describe('groupWorktreeChangesByDirectory', () => {
       { directory: '', files: [deleted] },
       { directory: 'a', files: [added] },
     ]);
+  });
+});
+
+describe('resolveWorktreeChangesSelection', () => {
+  const file = (path: string): WorktreeChangesFile => ({ ...snapshot.files[0], path });
+  const a = file('src/a.ts');
+  const b = file('src/b.ts');
+
+  it('selects the first file in flat list order when nothing is selected', () => {
+    expect(resolveWorktreeChangesSelection(null, [b])).toBe('src/b.ts');
+    expect(resolveWorktreeChangesSelection(null, [b, a])).toBe('src/a.ts');
+  });
+
+  it('keeps a still-present selection and follows the list when it vanishes', () => {
+    expect(resolveWorktreeChangesSelection('src/b.ts', [a, b])).toBe('src/b.ts');
+    expect(resolveWorktreeChangesSelection('src/b.ts', [a])).toBe('src/a.ts');
+    expect(resolveWorktreeChangesSelection('src/a.ts', [a, b])).toBe('src/a.ts');
+  });
+
+  it('clears the selection for an empty list', () => {
+    expect(resolveWorktreeChangesSelection('src/a.ts', [])).toBeNull();
+    expect(resolveWorktreeChangesSelection(null, [])).toBeNull();
   });
 });
 

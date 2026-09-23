@@ -15,7 +15,9 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  * `Enabled · remote · ≥ 1.0.4`: the value the UI acts on, whether it came
  * from PostHog or the flag's default, and the gate that decided. The source
  * and relation copy is technical notation (see the i18n allowlist); the
- * translated part is the value word and the section header.
+ * translated part is the value word and the section header. The build string
+ * sits at the end of that header row, so it reads as an annotation on the
+ * section rather than one more settings entry.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();
@@ -46,19 +48,21 @@ export function FeatureFlagsSection() {
   }
   return (
     <View className="mt-3 gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('preferences.featureFlags')}
-      </Text>
+      <View className="flex-row items-baseline justify-between">
+        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+          {t('preferences.featureFlags')}
+        </Text>
+        <Text variant="muted" className="text-xs">
+          {t('preferences.featureFlagsBuild', {
+            version: statuses[0]?.appVersion ?? '?',
+          })}
+        </Text>
+      </View>
       <View className="gap-3">
         {statuses.map(status => (
           <FlagRow key={status.key} status={status} />
         ))}
       </View>
-      <Text variant="muted" className="text-xs">
-        {t('preferences.featureFlagsBuild', {
-          version: statuses[0]?.appVersion ?? '?',
-        })}
-      </Text>
     </View>
   );
 }

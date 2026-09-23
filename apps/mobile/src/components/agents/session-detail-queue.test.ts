@@ -88,7 +88,6 @@ vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
   normalizeTransportPayload: vi.fn((x: unknown) => x),
 }));
 vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
-  formatSafeCloudAgentFailureDiagnostic: vi.fn(),
   withCloudAgentDiagnostics: vi.fn((_op: string, _org: unknown, fn: () => unknown) => fn()),
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({

@@ -4,6 +4,7 @@ import {
   PLATFORM_FILTERS,
   type ProjectFilterOption,
 } from '@/components/agents/session-list-helpers';
+import { resolveSessionDisplayTitle } from '@/lib/session-title';
 
 /** The part of an active session the live filters read. */
 export type LiveFilterSession = {
@@ -76,9 +77,15 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
   };
 }
 
+/**
+ * Index the values the row actually paints. The title goes through
+ * `resolveSessionDisplayTitle`, so the server's creation-default placeholder
+ * (`New session - <ISO timestamp>`) is not searchable: the row shows the
+ * generic untitled label for it, never that timestamp.
+ */
 function matchesSearch(session: LiveFilterSession, needle: string): boolean {
   return [
-    session.title,
+    resolveSessionDisplayTitle(session.title),
     session.id,
     session.gitUrl,
     session.gitUrl ? formatGitUrlProject(session.gitUrl) : undefined,

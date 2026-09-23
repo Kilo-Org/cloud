@@ -2233,10 +2233,6 @@
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
       "linesOf": "บรรทัด {{start}}–{{end}} จากทั้งหมด {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} ของ Cloud Agent ไม่สำเร็จ ({{status}})",
-      "failed": "{{action}} ของ Cloud Agent ไม่สำเร็จ"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ข้อมูลขาเข้าที่แปลงเป็นข้อความไม่ได้]",
       "errorPrefix": "ข้อผิดพลาด: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "ผู้ให้บริการปฏิเสธคำขอ",
       "assistantStopped": "หยุดสร้างคำตอบแล้ว",
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
-      "assistantFailed": "สร้างคำตอบไม่สำเร็จ",
-      "sendFailed": "ส่งข้อความไม่สำเร็จ กรุณาลองอีกครั้ง"
+      "assistantFailed": "สร้างคำตอบไม่สำเร็จ"
     },
     "filePart": {
       "loadingImage": "กำลังโหลดรูปภาพ",

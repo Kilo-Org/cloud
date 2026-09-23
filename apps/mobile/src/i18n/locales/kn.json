@@ -2233,10 +2233,6 @@
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",
       "linesOf": "ಒಟ್ಟು {{total}} ಸಾಲುಗಳಲ್ಲಿ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} ವಿಫಲವಾಗಿದೆ ({{status}}).",
-      "failed": "Cloud Agent {{action}} ವಿಫಲವಾಗಿದೆ."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ಸೀರಿಯಲೈಸ್ ಮಾಡಲಾಗದ ಇನ್‌ಪುಟ್]",
       "errorPrefix": "ದೋಷ: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "ಪೂರೈಕೆದಾರರು ವಿನಂತಿಯನ್ನು ತಿರಸ್ಕರಿಸಿದ್ದಾರೆ.",
       "assistantStopped": "ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ನಿಲ್ಲಿಸಲಾಗಿದೆ.",
       "assistantContextOverflow": "ಸಂಭಾಷಣೆಯ ಉದ್ದವು ಮಾದರಿ ನಿಭಾಯಿಸಬಹುದಾದ ಮಿತಿಯನ್ನು ಮೀರಿದೆ.",
-      "assistantFailed": "ಪ್ರತಿಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ.",
-      "sendFailed": "ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "assistantFailed": "ಪ್ರತಿಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ."
     },
     "filePart": {
       "loadingImage": "ಚಿತ್ರ ಲೋಡ್ ಆಗುತ್ತಿದೆ",

@@ -2241,10 +2241,6 @@
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
       "linesOf": "lines {{start}}–{{end}} of {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} failed ({{status}})",
-      "failed": "Cloud Agent {{action}} failed"
-    },
     "collectCopyableText": {
       "unserializableInput": "[unserializable input]",
       "errorPrefix": "Error: {{error}}"
@@ -2351,8 +2347,7 @@
       "assistantProviderRejected": "The provider rejected the request.",
       "assistantStopped": "The response was stopped.",
       "assistantContextOverflow": "The conversation is too long for the model.",
-      "assistantFailed": "The response failed.",
-      "sendFailed": "Failed to send message. Please try again."
+      "assistantFailed": "The response failed."
     },
     "filePart": {
       "loadingImage": "Loading image",

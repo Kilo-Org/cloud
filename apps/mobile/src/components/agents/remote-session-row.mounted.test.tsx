@@ -97,12 +97,12 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function render() {
+async function render(current: ActiveSession = session) {
   await act(async () => {
     const tree = createElement(
       QueryClientProvider,
       { client },
-      createElement(RemoteSessionRow, { session, onPress: vi.fn<() => void>() })
+      createElement(RemoteSessionRow, { session: current, onPress: vi.fn<() => void>() })
     );
     if (renderer) {
       renderer.update(tree);
@@ -283,5 +283,29 @@ describe('row exit refresh caller', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual(current);
     expect(state.request.mock.calls).toHaveLength(0);
+  });
+});
+
+describe('RemoteSessionRow display title', () => {
+  function mountedRow() {
+    if (!renderer) {
+      throw new Error('Missing row');
+    }
+    return renderer.root.findByType('SessionRow');
+  }
+
+  it('renders the generic untitled label for the server creation-default title', async () => {
+    await render(
+      makeCached({ createdOnPlatform: 'cli', title: 'New session - 2026-09-21T15:45:00.532Z' })
+    );
+    expect(mountedRow().props.title).toBe('Untitled session');
+    const label = renderer?.root.findByType(Pressable).props.accessibilityLabel as string;
+    expect(label).toContain('Untitled session');
+    expect(label).not.toContain('2026-09-21');
+  });
+
+  it('keeps a real title unchanged', async () => {
+    await render(makeCached({ createdOnPlatform: 'cli', title: 'Live work' }));
+    expect(mountedRow().props.title).toBe('Live work');
   });
 });

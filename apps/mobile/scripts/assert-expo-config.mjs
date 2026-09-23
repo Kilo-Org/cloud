@@ -45,6 +45,11 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// The manifest fix carries the native alert title override beside the backup
+// rules and optional-feature declarations. React Native's bundled
+// `alert_title_layout.xml` pins the title to `viewStart`; without this plugin
+// the Arabic discard confirm's title sits on the opposite edge from its message.
+const ANDROID_MANIFEST_FIX_PLUGIN = './plugins/withAndroidManifestFix';
 // The alert dialog theme points AppCompat's DayNight defaults
 // (`colorBackgroundFloating`, `colorAccent`) at the app's surfaces; without it
 // every `Alert.alert()` confirmation renders as a foreign grey/teal panel.
@@ -226,6 +231,14 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// The manifest fix plugin writes the native alert title override (plus the
+// backup rules and optional hardware features); without it React Native's
+// bundled `viewStart` title layout returns and the Arabic discard confirm's
+// title no longer shares its message's start edge.
+check(
+  pluginNames.includes(ANDROID_MANIFEST_FIX_PLUGIN),
+  `plugins must include "${ANDROID_MANIFEST_FIX_PLUGIN}"`
 );
 // The alert dialog theme repaints AppCompat's stock dialog surface and accent
 // with the app's own tokens; without it the sign-out confirmation (and every

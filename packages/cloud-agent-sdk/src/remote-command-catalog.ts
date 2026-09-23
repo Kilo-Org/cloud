@@ -3,11 +3,12 @@
  *
  * The wire format is protocol v1. The CLI may send at most 256 commands,
  * 32 hints each, 2,000 characters per string, and a serialized payload of
- * 512 KiB measured in UTF-8 bytes. Skill-sourced commands are kept so their
- * descriptions reach the remote CLI composer this catalog feeds; the
- * cloud-agent path builds its own catalog in the wrapper, which filters skill
- * rows out before `commands.available`. The resulting catalog is the existing
- * `SlashCommandInfo` shape consumed by the chat composer.
+ * 512 KiB measured in UTF-8 bytes. Skill-sourced commands are kept by both
+ * paths: this parser hands them to the remote CLI composer, and the cloud-agent
+ * wrapper keeps them in its own catalog before `commands.available`, bounded by
+ * the same 256-command / 512 KiB limits and never dropping a skill row. The
+ * resulting catalog is the existing `SlashCommandInfo` shape consumed by the
+ * chat composer.
  */
 import type { SlashCommandInfo } from './schemas';
 import { remoteCommandCatalogV1Schema } from './schemas';

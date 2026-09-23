@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "ներմուծիր OpenAI Codex աշխատաշրջանի արտագրությունը",
       "reviewDescription": "վերանայիր փոփոխությունները [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Օգտագործել /{{command}}",
+      "useSkillCommand": "Օգտագործել հմտությունը /{{command}}",
+      "skillBadge": "Հմտություն",
       "insert": "Տեղադրել",
       "upgradeRequiredFallback": "Այս հրամանն օգտագործելու համար թարմացրեք ձեր CLI-ն։",
       "exitCapabilityUnavailable": "Թարմացրեք ձեր CLI-ն՝ նիստից դուրս գալու համար։",

@@ -2648,6 +2648,8 @@
       "resumeCodexDescription": "importuok OpenAI Codex sesijos transkriptą",
       "reviewDescription": "peržiūrėk pakeitimus [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Naudoti /{{command}}",
+      "useSkillCommand": "Naudoti įgūdį /{{command}}",
+      "skillBadge": "Įgūdis",
       "insert": "Įterpti",
       "upgradeRequiredFallback": "Norėdami naudoti šią komandą, atnaujinkite CLI.",
       "exitCapabilityUnavailable": "Norėdami baigti sesiją, atnaujinkite CLI.",

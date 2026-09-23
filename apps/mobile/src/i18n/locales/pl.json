@@ -2112,6 +2112,8 @@
       "resumeCodexDescription": "importuj transkrypcję sesji OpenAI Codex",
       "reviewDescription": "przejrzyj zmiany [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Użyj /{{command}}",
+      "useSkillCommand": "Użyj umiejętności /{{command}}",
+      "skillBadge": "Umiejętność",
       "insert": "Wstaw",
       "upgradeRequiredFallback": "Zaktualizuj swoje CLI, aby użyć tego polecenia.",
       "exitCapabilityUnavailable": "Zaktualizuj swoje CLI, aby zakończyć sesję.",

@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex سیشن کی نقل درآمد کریں",
       "reviewDescription": "تبدیلیوں کا جائزہ لیں [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} استعمال کریں",
+      "useSkillCommand": "/{{command}} مہارت استعمال کریں",
+      "skillBadge": "مہارت",
       "insert": "داخل کریں",
       "upgradeRequiredFallback": "براہ کرم یہ کمانڈ استعمال کرنے کے لیے اپنا CLI اپ گریڈ کریں۔",
       "exitCapabilityUnavailable": "سیشن سے باہر نکلنے کے لیے اپنا CLI اپ ڈیٹ کریں۔",

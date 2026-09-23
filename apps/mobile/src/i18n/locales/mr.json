@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex सत्राचे ट्रान्स्क्रिप्ट आयात करा",
       "reviewDescription": "बदलांचे पुनरावलोकन करा [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} वापरा",
+      "useSkillCommand": "/{{command}} कौशल्य वापरा",
+      "skillBadge": "कौशल्य",
       "insert": "घाला",
       "upgradeRequiredFallback": "ही कमांड वापरण्यासाठी कृपया तुमचे CLI अद्ययावत करा.",
       "exitCapabilityUnavailable": "सत्रातून बाहेर पडण्यासाठी तुमचे CLI अद्ययावत करा.",

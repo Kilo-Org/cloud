@@ -27,8 +27,11 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * The notifications.category.*Unavailable reasons landed in all 86 catalogs.
+ * The `/` suggestion list's skill rows (`slash-command-suggestions.tsx`) added
+ * `agentChat.slashCommands.skillBadge` and `agentChat.slashCommands.useSkillCommand`
+ * to `en.json`; the translation slice has landed both in every catalog, so the
+ * set is empty.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

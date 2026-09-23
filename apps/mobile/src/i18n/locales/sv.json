@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "importera en OpenAI Codex-sessionstranskription",
       "reviewDescription": "granska ändringar [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Använd /{{command}}",
+      "useSkillCommand": "Använd färdigheten /{{command}}",
+      "skillBadge": "Färdighet",
       "insert": "Infoga",
       "upgradeRequiredFallback": "Uppdatera din CLI-version för att använda det här kommandot.",
       "exitCapabilityUnavailable": "Uppdatera din CLI-version för att avsluta sessionen.",

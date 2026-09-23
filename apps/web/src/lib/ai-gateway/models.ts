@@ -8,6 +8,7 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -87,6 +88,7 @@ export const preferredModels = [
 
   ...autoFreeModels.map(({ model }) => model),
 
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
   ...(gpt_5_6_sol_discounted_model.status === 'public'
     ? [gpt_5_6_sol_discounted_model.public_id]

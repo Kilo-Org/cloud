@@ -32,7 +32,6 @@ export function verifyBearerToken(request: Request, env: Env): AuthResult {
     };
   }
 
-  // Extract token by removing "Bearer " prefix
   const token = authHeader.slice(7);
 
   if (!env.AUTH_TOKEN || token !== env.AUTH_TOKEN) {
@@ -52,7 +51,6 @@ export function verifyBearerToken(request: Request, env: Env): AuthResult {
     };
   }
 
-  // Authentication successful
   return {
     isAuthenticated: true,
     errorResponse: null,
@@ -80,7 +78,6 @@ export async function verifyGitAuthJWT(
     };
   }
 
-  // Decode Base64 credentials
   const base64Credentials = authHeader.slice(6);
   let credentials: string;
   try {
@@ -97,7 +94,6 @@ export async function verifyGitAuthJWT(
 
   const [username, password] = credentials.split(':');
 
-  // Verify username is x-access-token
   if (username !== 'x-access-token') {
     return {
       isAuthenticated: false,
@@ -108,7 +104,6 @@ export async function verifyGitAuthJWT(
     };
   }
 
-  // Verify JWT token
   const jwtResult = verifyGitToken(password, repoId, jwtSecret);
   if (jwtResult.valid === false) {
     return {
@@ -149,7 +144,6 @@ export async function verifyGitAuth(
     };
   }
 
-  // Decode Base64 credentials
   const base64Credentials = authHeader.slice(6);
   let credentials: string;
   try {
@@ -166,7 +160,6 @@ export async function verifyGitAuth(
 
   const [username, password] = credentials.split(':');
 
-  // Verify username is x-access-token
   if (username !== 'x-access-token') {
     return {
       isAuthenticated: false,
@@ -177,7 +170,6 @@ export async function verifyGitAuth(
     };
   }
 
-  // Try JWT verification first (new method)
   const jwtResult = verifyGitToken(password, repoId, jwtSecret);
   if (jwtResult.valid === true) {
     return {
@@ -186,7 +178,6 @@ export async function verifyGitAuth(
     };
   }
 
-  // Fall back to legacy token verification
   const isValidLegacy = await verifyLegacyToken(password);
   if (isValidLegacy) {
     // Legacy tokens grant full access
@@ -196,7 +187,6 @@ export async function verifyGitAuth(
     };
   }
 
-  // Both methods failed
   return {
     isAuthenticated: false,
     errorResponse: new Response('Unauthorized: Invalid token', {

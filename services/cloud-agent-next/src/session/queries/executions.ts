@@ -15,29 +15,17 @@ import type {
 } from '../types.js';
 import { Ok, Err, type Result } from '../../lib/result.js';
 
-// ---------------------------------------------------------------------------
-// Storage Keys
-// ---------------------------------------------------------------------------
-
 const EXECUTIONS_KEY = 'executions';
 const INTERRUPT_KEY = 'interrupt_requested';
 
 /** Storage interface for key-value operations */
 type KVStorage = DurableObjectState['storage'];
 
-// ---------------------------------------------------------------------------
-// Error Types
-// ---------------------------------------------------------------------------
-
 export type AddExecutionError = { code: 'ALREADY_EXISTS' };
 
 export type UpdateStatusError =
   | { code: 'NOT_FOUND' }
   | { code: 'INVALID_TRANSITION'; from: ExecutionStatus; to: ExecutionStatus };
-
-// ---------------------------------------------------------------------------
-// Query Factory
-// ---------------------------------------------------------------------------
 
 /**
  * Create execution query functions bound to a DurableObject storage.

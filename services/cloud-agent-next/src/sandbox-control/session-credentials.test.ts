@@ -1141,22 +1141,29 @@ describe('direct worktree credentials', () => {
     ).toBe(false);
   });
 
-  it('rejects contained cloudflare-containers grants', async () => {
-    const env = environment(createBroker().broker);
+  it('contains Kilo and GitHub credentials for cloudflare-containers', async () => {
+    const { broker } = createBroker();
     const data = metadata({
-      repository: undefined,
       workspace: { sandboxId: VERCEL_SANDBOX_ID, sandboxProvider: 'cloudflare-containers' },
     });
+    const { grant, payload } = await prepare(environment(broker), data);
 
-    await expect(
-      prepareSessionCredentials({
-        env,
-        metadata: data,
-        sandboxId: VERCEL_SANDBOX_ID,
-        outboundContainerId: OUTBOUND_CONTAINER_ID,
-        now: NOW,
-      })
-    ).rejects.toThrow('Invalid contained worktree credentials');
+    expect(grant.provider).toBe('cloudflare-containers');
+    expect(grant.outboundContainerId).toBe(OUTBOUND_CONTAINER_ID);
+    expect(grant.kilo.alias).toEqual(expect.any(String));
+    expect(grant.scm?.alias).toEqual(expect.any(String));
+    expect(grant.scm?.nativeToken).toBeUndefined();
+    expect(payload.env).toMatchObject({
+      KILOCODE_TOKEN: grant.kilo.alias,
+      GH_TOKEN: grant.scm?.alias,
+    });
+    expect(broker.issueKiloSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({ outboundContainerId: OUTBOUND_CONTAINER_ID })
+    );
+    expect(broker.issueGitHubSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({ outboundContainerId: OUTBOUND_CONTAINER_ID })
+    );
+    expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
   });
 
   it('preserves profile overrides while trusting metadata for Kilo identity and scope', async () => {

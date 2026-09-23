@@ -461,6 +461,12 @@ describe('explicit sandbox session creation', () => {
       });
       expect(metadata.workspace?.sandboxAllocation).toBe(preset);
       expect(metadata.workspace?.sandboxProvider).toBe(getSandboxAllocationProvider(preset));
+      expect(metadata.workspace?.credentialContainment).toEqual({
+        github: true,
+        gitlab: false,
+        bitbucket: false,
+        kilocode: true,
+      });
       expect(metadata.workspace).not.toHaveProperty('resources');
       if (preset === 'cloudflare-shared') {
         expect(resolveSharedSandboxAssignment).toHaveBeenCalledOnce();
@@ -804,6 +810,7 @@ describe('explicit sandbox session creation', () => {
         workspace: expect.objectContaining({
           sandboxProvider: 'cloudflare-containers',
           worktreeId: WORKTREE_ID,
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );

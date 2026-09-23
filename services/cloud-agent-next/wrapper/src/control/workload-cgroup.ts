@@ -136,6 +136,10 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
         fields.peakBytes ?? '',
         fields.pressureSomeTotal ?? '',
         fields.pressureFullTotal ?? '',
+        fields.toolCount ?? '',
+        fields.serverCount ?? '',
+        fields.migratedCount ?? '',
+        fields.cpuController ?? '',
       ].join(':');
       const bucket = scopeId ?? 'global';
       if (last.get(bucket) === key) return;

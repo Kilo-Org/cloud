@@ -693,6 +693,53 @@ describe('workload cgroup integration', () => {
     expect(await waitFor(() => !fs.existsSync(owned))).toBe(true);
   });
 
+  it('moves a kilo serve process born in the tools group back to server', async () => {
+    const placement = workloadPlacement();
+    if (!placement) return;
+    const before = new Set(
+      fs.readdirSync(placement.parentReference).filter(name => name.startsWith('kilo-control-'))
+    );
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'workload-owned-'));
+    temporaryDirectories.push(directory);
+    const kilo = path.join(directory, 'kilo');
+    const tool = path.join(directory, 'tool.sh');
+    const nestedPidFile = path.join(directory, 'nested.pid');
+    fs.writeFileSync(
+      tool,
+      `#!/bin/sh\nwhile ! grep -q /tools /proc/self/cgroup; do sleep 0.1; done\n"${kilo}" serve --from-tool &\necho $! > "${nestedPidFile}"\nsleep 30\n`,
+      { mode: 0o755 }
+    );
+    fs.writeFileSync(
+      kilo,
+      `#!/bin/sh\nif [ "$2" = --from-tool ]; then sleep 30; exit; fi\n"${tool}" &\nwait\n`,
+      { mode: 0o755 }
+    );
+    const scope = createOwnedProcessScope(placement);
+    spawned.push(scope);
+    const server = scope.spawn(kilo, ['serve', '--port=0'], { cwd: directory, env: process.env });
+    if (!scope.observesOccupancy()) return;
+    const owned = findManagedScope(placement, before);
+    expect(owned).toBeDefined();
+    if (!owned) return;
+    expect(
+      await waitFor(() => {
+        try {
+          return Number(fs.readFileSync(nestedPidFile, 'utf8').trim()) > 0;
+        } catch {
+          return false;
+        }
+      })
+    ).toBe(true);
+    const nestedPid = Number(fs.readFileSync(nestedPidFile, 'utf8').trim());
+    expect(
+      await waitFor(() =>
+        cgroupPids(path.join(owned, 'server', 'cgroup.procs')).includes(nestedPid)
+      )
+    ).toBe(true);
+    expect(cgroupPids(path.join(owned, 'tools', 'cgroup.procs'))).not.toContain(nestedPid);
+    expect(server.pid).toBeDefined();
+  });
+
   it('does not create workload children for an unmanaged scope', async () => {
     if (process.platform !== 'linux') return;
     const membership = readSelfCgroupMembership();

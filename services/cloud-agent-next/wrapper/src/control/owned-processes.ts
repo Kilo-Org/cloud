@@ -85,6 +85,7 @@ type Cgroup = {
     serverReference: string;
     toolsReference: string;
     toolsProcs: number;
+    serverProcs: number;
     cpuController: boolean;
   };
 };
@@ -492,7 +493,7 @@ function createManagedCgroup(placement: WorkloadPlacement): Cgroup | undefined {
       descriptors,
       procs,
       procsReference: serverReference,
-      managed: { serverReference, toolsReference, toolsProcs, cpuController },
+      managed: { serverReference, toolsReference, toolsProcs, serverProcs: procs, cpuController },
       ...(kill !== undefined ? { kill } : {}),
     };
   } catch (error) {
@@ -660,35 +661,54 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       const table = await readProcessTable('/proc');
       const snapshot = await snapshotCgroup(group, deadline);
       const { serverPids, toolPids } = classifyWorkloadMembers(snapshot.pids, table, root);
+      const migrateInto = async (
+        pids: number[],
+        members: Set<number>,
+        procs: number,
+        reference: string
+      ): Promise<number> => {
+        let moved = 0;
+        for (const pid of pids) {
+          if (members.has(pid)) continue;
+          deadline.check();
+          const outcome = await migrateWorkloadProcess({
+            pid,
+            entry: table.get(pid),
+            procRoot: '/proc',
+            write: value => writeSync(procs, String(value), 0, 'utf8'),
+            confirmMembership: async () => {
+              const after = new Set(
+                parsePids(await readText(path.join(reference, 'cgroup.procs'), deadline))
+              );
+              return after.has(pid);
+            },
+          });
+          if (outcome === 'migrated') {
+            moved += 1;
+            continue;
+          }
+          workloadReporter?.emit(scopeId, {
+            phase: 'failed',
+            workloadPhase: 'migration',
+            workloadFailure: outcome,
+          });
+        }
+        return moved;
+      };
+      const serverMembers = new Set(
+        parsePids(await readText(path.join(managed.serverReference, 'cgroup.procs'), deadline))
+      );
       const toolsMembers = new Set(
         parsePids(await readText(path.join(managed.toolsReference, 'cgroup.procs'), deadline))
       );
-      let migrated = 0;
-      for (const pid of toolPids) {
-        if (toolsMembers.has(pid)) continue;
-        deadline.check();
-        const outcome = await migrateWorkloadProcess({
-          pid,
-          entry: table.get(pid),
-          procRoot: '/proc',
-          write: value => writeSync(managed.toolsProcs, String(value), 0, 'utf8'),
-          confirmMembership: async () => {
-            const after = new Set(
-              parsePids(await readText(path.join(managed.toolsReference, 'cgroup.procs'), deadline))
-            );
-            return after.has(pid);
-          },
-        });
-        if (outcome === 'migrated') {
-          migrated += 1;
-          continue;
-        }
-        workloadReporter?.emit(scopeId, {
-          phase: 'failed',
-          workloadPhase: 'migration',
-          workloadFailure: outcome,
-        });
-      }
+      const migrated =
+        (await migrateInto(
+          serverPids,
+          serverMembers,
+          managed.serverProcs,
+          managed.serverReference
+        )) +
+        (await migrateInto(toolPids, toolsMembers, managed.toolsProcs, managed.toolsReference));
       if (migrated > 0) {
         workloadReporter?.emit(scopeId, {
           phase: 'completed',

@@ -899,5 +899,25 @@ describe('workload diagnostics', () => {
     expect(reports).toHaveLength(2);
     expect(reports[0].fields.currentBytes).toBe(1024);
     expect(reports[1].fields.currentBytes).toBe(2048);
+    reporter.emit('kilo-control-1', {
+      phase: 'completed',
+      workloadPhase: 'stats',
+      currentBytes: 2048,
+      toolCount: 1,
+      serverCount: 1,
+      migratedCount: 0,
+      cpuController: true,
+    });
+    reporter.emit('kilo-control-1', {
+      phase: 'completed',
+      workloadPhase: 'stats',
+      currentBytes: 2048,
+      toolCount: 2,
+      serverCount: 1,
+      migratedCount: 0,
+      cpuController: true,
+    });
+    expect(reports).toHaveLength(4);
+    expect(reports[3].fields.toolCount).toBe(2);
   });
 });

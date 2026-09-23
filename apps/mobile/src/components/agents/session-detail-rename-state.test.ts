@@ -58,6 +58,23 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('hides a backend default title behind the fallback copy', () => {
+    // `New session - <ISO>` is machine output, not a user-facing title.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-20T08:10:35.172Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
   it('shows the localized fallback instead of the backend placeholder title', () => {
     expect(
       getSessionDetailRenameState({

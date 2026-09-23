@@ -10,6 +10,11 @@ import { cn } from '@/lib/utils';
  * icon. `tint` carries the tile background/border classes and the hue the icon
  * is stroked with; class names stay string literals on `tint` so NativeWind's
  * static scanner compiles them.
+ *
+ * `tint` is the single explicit entry point for a tile's colour: a caller
+ * resolves it from the shared palette (`rowTint` / `toneColor`) and passes it
+ * in. No caller may derive a tint from a label, title, translation or hash of
+ * any string — that made a row's colour change with the language.
  */
 export function IconTile({
   icon: Icon,

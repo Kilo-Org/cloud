@@ -4,8 +4,11 @@ import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { classifyAuthResponse, reportAuthTerminalFailure } from '@/lib/auth/auth-response-class';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
-import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
-import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
+import {
+  readStoredValueRetryingNull,
+  readStoredValueWithRetry,
+} from '@/lib/auth/secure-store-read';
+import { getActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
@@ -43,6 +46,7 @@ type RefreshRefused = {
   ok: false;
   refused: true;
   superseded?: false;
+  unreadable?: false;
   /** The session that owned the refusal. A handler must drop the refusal when
    *  this is no longer the current epoch: the epoch can move while the clear
    *  awaits, and signing out then would tear down the newer session. */
@@ -52,11 +56,31 @@ type RefreshTransient = {
   ok: false;
   refused: false;
   superseded?: false;
+  unreadable?: false;
   /** The server's own back-off from a 429/503 `Retry-After`, when it sent one. */
   retryAfterMs?: number;
 };
-type RefreshSuperseded = { ok: false; refused: false; superseded: true };
-export type RefreshOutcome = RefreshSuccess | RefreshRefused | RefreshTransient | RefreshSuperseded;
+type RefreshSuperseded = { ok: false; refused: false; superseded: true; unreadable?: false };
+/**
+ * The refresh-token read spent its whole budget on `null` while the rest of
+ * the credential set may still hold a session: an unreadable credential read,
+ * not an absent session. Never a refusal — a null member is not a signed-out
+ * session, so the caller must not sign out. `presentKeys` carries storage-key
+ * names only, never a value.
+ */
+type RefreshUnreadable = {
+  ok: false;
+  refused: false;
+  superseded?: false;
+  unreadable: true;
+  presentKeys: readonly string[];
+};
+export type RefreshOutcome =
+  | RefreshSuccess
+  | RefreshRefused
+  | RefreshTransient
+  | RefreshSuperseded
+  | RefreshUnreadable;
 
 // The one refresh route. Named so the classification fingerprints and the
 // request path can never drift apart.
@@ -87,7 +111,8 @@ export async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
  * runs BEFORE the epoch bump and reads the owner for its Authorization header
  * (`getAuthTokenForRequest`). Emptying the owner here would send that cleanup
  * unauthenticated and fail it. Dropping the stored refresh token is what stops
- * the loop: the next refresh finds none and is refused without a request.
+ * the loop: the next refresh finds none and returns without a request
+ * (unreadable, not a refusal — see `RefreshUnreadable`).
  */
 async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
   const superseded = (): boolean => !isCurrentAuthEpoch(epoch) || isSignOutTeardownActive();
@@ -193,6 +218,31 @@ export async function performRefresh(): Promise<RefreshOutcome> {
   }
 }
 
+/**
+ * The credential key names present after the refresh-token read answered
+ * `null`: a names-only diagnostic, never a value. The token and the expiry are
+ * read as one unit so a session is never called absent because one member
+ * could not be read. Both reads are best-effort: the null already settled the
+ * outcome, so a rejection here cannot change it.
+ */
+async function readPresentCredentialKeys(): Promise<readonly string[]> {
+  const [storedAuthToken, storedExpiresAt] = await Promise.allSettled([
+    readStoredValueWithRetry(AUTH_TOKEN_KEY),
+    readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY),
+  ]);
+  const presentKeys: string[] = [];
+  const hasAuthToken =
+    (storedAuthToken.status === 'fulfilled' && storedAuthToken.value !== null) ||
+    getActiveToken() !== null;
+  if (hasAuthToken) {
+    presentKeys.push(AUTH_TOKEN_KEY);
+  }
+  if (storedExpiresAt.status === 'fulfilled' && storedExpiresAt.value !== null) {
+    presentKeys.push(TOKEN_EXPIRES_AT_KEY);
+  }
+  return presentKeys;
+}
+
 async function doRefresh(): Promise<RefreshOutcome> {
   const sessionVersion = currentAuthEpoch();
   // A refresh is superseded when the session moved or sign-out teardown
@@ -205,13 +255,30 @@ async function doRefresh(): Promise<RefreshOutcome> {
     return { ok: false, refused: false, superseded: true };
   }
   try {
-    const storedRefreshToken = await readStoredValueWithRetry(REFRESH_TOKEN_KEY);
+    let storedRefreshToken = await readStoredValueWithRetry(REFRESH_TOKEN_KEY);
     if (superseded()) {
       return { ok: false, refused: false, superseded: true };
     }
-    if (!storedRefreshToken) {
-      // No refresh token: cannot recover from this 401 — sign out.
-      return { ok: false, refused: true, sessionVersion };
+    if (storedRefreshToken === null) {
+      // A null is not proof of an absent session: a keychain item written
+      // WHEN_UNLOCKED_THIS_DEVICE_ONLY answers null while the device is not
+      // yet unlocked. Retry the null exactly like a rejection before
+      // concluding the credential set cannot refresh.
+      storedRefreshToken = await readStoredValueRetryingNull(REFRESH_TOKEN_KEY);
+      if (superseded()) {
+        return { ok: false, refused: false, superseded: true };
+      }
+    }
+    if (storedRefreshToken === null) {
+      // The credential set is one unit: a refresh-token null while another
+      // member is present is an unreadable credential read, never a
+      // signed-out session. Only the server 401 below refuses.
+      return {
+        ok: false,
+        refused: false,
+        unreadable: true,
+        presentKeys: await readPresentCredentialKeys(),
+      };
     }
 
     // Bound the refresh network I/O at the control-plane deadline so a hung

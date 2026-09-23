@@ -79,7 +79,10 @@ describe('refresh terminal classification', () => {
     const events = recordEvents();
 
     // Two foregrounds against the same dead credential: the first stops the
-    // loop and clears, the second has no refresh token left to offer.
+    // loop and clears, the second has no refresh token left to offer. A null
+    // read is not proof of an absent session (a locked keychain answers null),
+    // so the second attempt is an unreadable credential read, never a refusal:
+    // it makes no request and the loop stays stopped.
     const first = await performRefresh();
     const second = await performRefresh();
 
@@ -90,8 +93,9 @@ describe('refresh terminal classification', () => {
     });
     expect(second).toEqual({
       ok: false,
-      refused: true,
-      sessionVersion: currentAuthEpoch(),
+      refused: false,
+      unreadable: true,
+      presentKeys: [],
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
@@ -118,8 +122,8 @@ describe('refresh terminal classification', () => {
       refused: true,
       sessionVersion: currentAuthEpoch(),
     });
-    // The stored pair is gone, so the next refresh is refused without a
-    // request and the loop is stopped...
+    // The stored pair is gone, so the next refresh makes no request (it is an
+    // unreadable credential read, not a refusal) and the loop is stopped...
     expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
     // ...but the in-memory owner must keep serving until sign-out's teardown
     // clears it: runLogoutCleanup's revoke/unregister run BEFORE the epoch

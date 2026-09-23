@@ -128,13 +128,37 @@ describe('performRefresh', () => {
     setSignOutTeardownActive(false);
   });
 
-  it('returns refused when no refresh token is stored', async () => {
+  it('returns unreadable, not refused, when no refresh token is stored but a token is', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
     const outcome = await performRefresh();
+
+    // A null refresh-token read is a failed read of one member, not an
+    // absent session: it must never refuse (which the handler signs out on).
     expect(outcome).toEqual({
       ok: false,
-      refused: true,
-      sessionVersion: currentAuthEpoch(),
+      refused: false,
+      unreadable: true,
+      presentKeys: [AUTH_TOKEN_KEY],
     });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('returns unreadable, not refused, for an empty credential set', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      ok: false,
+      refused: false,
+      unreadable: true,
+      presentKeys: [],
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   it('returns refused when the server responds with 401', async () => {

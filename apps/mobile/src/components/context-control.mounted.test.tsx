@@ -12,14 +12,14 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
-// Mutable so a test can prove both platforms receive the one sheet the picker
+// Mutable so the per-platform suite hands each platform the one sheet the picker
 // builds: the current-account mark rides the row's checked state, never a
 // per-platform label branch.
-const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
+const platform = vi.hoisted(() => ({ OS: 'android' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
-// not just that the dark values are passed through. Values mirror the real
-// light/dark tokens in theme-colors.generated.ts.
-const theme = vi.hoisted(() => ({
+// not just that one set of values is passed through. The initial values mirror
+// the real dark tokens in theme-colors.generated.ts.
+const appearance = vi.hoisted((): { colors: Record<string, string>; bottom: number } => ({
   colors: {
     card: '#17171A',
     foreground: '#F2F0EB',
@@ -27,8 +27,14 @@ const theme = vi.hoisted(() => ({
     border: 'rgba(255, 255, 255, 0.07)',
     primary: '#E8F27A',
   },
+  bottom: 18,
 }));
-const DARK_COLORS = { ...theme.colors };
+
+// The palette the hook returns unless a test overrides it. The theme test
+// reassigns `appearance.colors`, so the per-platform hook restores this default
+// instead of leaking a test's palette into the tests that run after it.
+const DEFAULT_COLORS = appearance.colors;
+const DARK_COLORS = { ...appearance.colors };
 const LIGHT_COLORS = {
   card: '#FFFFFF',
   foreground: '#14130F',
@@ -63,12 +69,14 @@ vi.mock('react-native', () => ({
   View: 'View',
   useWindowDimensions: () => ({ width: 400, height: 800 }),
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: appearance.bottom }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => theme.colors,
+  useThemeColors: () => appearance.colors,
 }));
 
 const Text = 'Text' as ElementType;
@@ -177,7 +185,7 @@ beforeEach(() => {
   persisted = null;
   rerender = undefined;
   platform.OS = 'android';
-  theme.colors = { ...DARK_COLORS };
+  appearance.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
@@ -195,7 +203,13 @@ afterEach(() => {
   }
 });
 
-describe('ContextControl', () => {
+describe.each(['ios', 'android'])('ContextControl on %s', os => {
+  beforeEach(() => {
+    platform.OS = os;
+    appearance.colors = DEFAULT_COLORS;
+    appearance.bottom = 18;
+  });
+
   it.each([
     { id: null, label: 'Personal', result: [] },
     { id: 'org-a', label: name, result: orgs },
@@ -249,27 +263,23 @@ describe('ContextControl', () => {
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
   });
 
-  it.each(['android', 'ios'] as const)(
-    'separates the rows and exposes the current account through the radio state on %s',
-    async os => {
-      platform.OS = os;
-      storage.read.mockResolvedValue('org-a');
-      const ui = await mount();
-      await waitFor(() => !picker(ui).props.disabled);
-      await openSheet(ui);
-      const opened = rows(ui);
-      expect(opened.map(row => row.label)).toEqual(['Personal', name]);
-      // A screen reader hears the current account through `checked`, the app's
-      // radio convention (`ui/radio-group.tsx`), not through icon colour alone.
-      expect(opened.map(row => row.checked)).toEqual([false, true]);
-      expect(opened.map(row => row.role)).toEqual(['radio', 'radio']);
-      // Each account row draws the shared divider, and only the current row
-      // carries the check; Cancel is a plain button with no radio state.
-      expect(opened.map(row => row.divider)).toEqual([true, true]);
-      expect(opened.map(row => row.check)).toEqual([false, true]);
-      expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
-    }
-  );
+  it('separates the rows and exposes the current account through the radio state', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    const opened = rows(ui);
+    expect(opened.map(row => row.label)).toEqual(['Personal', name]);
+    // A screen reader hears the current account through `checked`, the app's
+    // radio convention (`ui/radio-group.tsx`), not through icon colour alone.
+    expect(opened.map(row => row.checked)).toEqual([false, true]);
+    expect(opened.map(row => row.role)).toEqual(['radio', 'radio']);
+    // Each account row draws the shared divider, and only the current row
+    // carries the check; Cancel is a plain button with no radio state.
+    expect(opened.map(row => row.divider)).toEqual([true, true]);
+    expect(opened.map(row => row.check)).toEqual([false, true]);
+    expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
+  });
 
   it.each([
     { stored: null, checked: 'Personal' },
@@ -310,7 +320,7 @@ describe('ContextControl', () => {
 
     // Switching the active palette and re-rendering must change what the sheet
     // paints; the picker cannot be hardcoding the dark tokens.
-    theme.colors = { ...LIGHT_COLORS };
+    appearance.colors = { ...LIGHT_COLORS };
     await act(() => {
       rerender?.();
     });
@@ -355,9 +365,10 @@ describe('ContextControl', () => {
     await waitFor(() => texts(ui).includes("Couldn't load your organizations"));
     expect(retry(ui).props.accessibilityHint).toBe("Couldn't load your organizations");
     const status = ui.renderer.root.find(
-      node => node.type === Text && node.props.accessibilityLiveRegion === 'polite'
+      node => node.type === Text && node.props.children === "Couldn't load your organizations"
     );
     expect(status.children).toContain("Couldn't load your organizations");
+    expect(status.props.accessibilityLiveRegion).toBe(os === 'android' ? 'polite' : undefined);
     await press(retry(ui));
     await waitFor(() => texts(ui).includes(name));
     expect(texts(ui)).not.toContain('Retry');

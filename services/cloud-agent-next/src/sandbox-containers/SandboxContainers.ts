@@ -505,6 +505,11 @@ export class SandboxContainers extends DurableObject<Env> {
       if (!settlement.ok) throw new Error(settlement.message);
     }
     const updated: ContainersRecord = { ...record, instance };
+    // Launch never introduces billing attribution (admission owns that); it only
+    // clears a flag the new size can no longer honour.
+    if (resolveContainersBillingIdentity(instance) === undefined) {
+      delete updated.billingConfigured;
+    }
     await this.writeRecord(updated);
     return updated;
   }

@@ -34,6 +34,22 @@ afterEach(() => {
   });
 });
 
+/**
+ * Flattens the field's nested style array the way React Native does, without
+ * `StyleSheet` (the `react-native` mock above does not provide it).
+ */
+function flattenStyle(style: unknown): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const entry of Array.isArray(style) ? style : [style]) {
+    if (Array.isArray(entry)) {
+      Object.assign(merged, flattenStyle(entry));
+    } else if (typeof entry === 'object' && entry !== null) {
+      Object.assign(merged, entry);
+    }
+  }
+  return merged;
+}
+
 describe('FormField reserved validation space', () => {
   it.each([
     ['English', en],
@@ -181,10 +197,10 @@ describe('FormField shared single-line box', () => {
 });
 
 describe('FormField direction-aware content alignment', () => {
-  function mountInput(style?: { textAlign: 'center' }) {
+  function mountInput(props: { style?: { textAlign: 'center' }; textAlign?: 'center' } = {}) {
     act(() => {
       renderer = TestRenderer.create(
-        createElement(FormField, { label: i18n.t('login.emailAddress'), style })
+        createElement(FormField, { label: i18n.t('login.emailAddress'), ...props })
       );
     });
     if (!renderer) {
@@ -212,6 +228,14 @@ describe('FormField direction-aware content alignment', () => {
     rtl.isRTL = true;
     const centered = { textAlign: 'center' } as const;
 
-    expect(mountInput(centered).props.style).toEqual([{ textAlign: 'right' }, centered]);
+    expect(mountInput({ style: centered }).props.style).toEqual([{ textAlign: 'right' }, centered]);
+  });
+
+  it('keeps an explicit caller alignment passed as a prop after the RTL default', () => {
+    // The shared field threads a `textAlign` prop straight to `Input`, so the
+    // prop channel must survive the RTL default exactly like the style channel.
+    rtl.isRTL = true;
+
+    expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
   });
 });

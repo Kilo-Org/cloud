@@ -1,4 +1,4 @@
-import { TextInput, type TextInputProps } from 'react-native';
+import { type StyleProp, TextInput, type TextInputProps, type TextStyle } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withRtlInputAlignment } from '@/lib/rtl-text';
@@ -44,6 +44,16 @@ export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT
  * stays left-aligned under a right-aligned label in an RTL catalog
  * (`rtl-text.ts`).
  *
+ * An explicit caller alignment survives that default whichever channel carries
+ * it. A caller's own `style` already wins, because `withRtlInputAlignment`
+ * prepends `{ textAlign: 'right' }` ahead of it. A caller's `textAlign` *prop*
+ * does not: React Native resolves a flattened `style` after the prop, so the
+ * injected right alignment would override a `textAlign="center"` prop in RTL
+ * (the Security Agent SLA day fields, which are centred in every locale).
+ * `Input` folds the prop into the style behind the caller's own style, so the
+ * caller's choice stays last and wins on both platforms and in both
+ * directions.
+ *
  * A `multiline` caller is a different control: it keeps its own box (an
  * explicit `leading-*`) and its own `textAlignVertical`, so neither the shared
  * box nor the forced vertical alignment applies.
@@ -51,12 +61,18 @@ export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT
 function Input({
   className,
   style,
+  textAlign,
   placeholderTextColor,
   multiline,
   textAlignVertical,
   ...props
 }: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
   const colors = useThemeColors();
+  // Fold the explicit `textAlign` prop into the style after the caller's own
+  // style, so it lands after the RTL default too: RN flattens `style` after
+  // the `textAlign` prop, so the prop alone would lose to `withRtlInputAlignment`
+  // in RTL.
+  const contentStyle: StyleProp<TextStyle> | undefined = textAlign ? [style, { textAlign }] : style;
   return (
     <TextInput
       {...props}
@@ -66,7 +82,7 @@ function Input({
         className,
         multiline ? undefined : INPUT_BOX_LINE_HEIGHT_CLASS
       )}
-      style={withRtlInputAlignment(style)}
+      style={withRtlInputAlignment(contentStyle)}
       textAlignVertical={multiline ? textAlignVertical : 'center'}
       placeholderTextColor={placeholderTextColor ?? colors.mutedForeground}
     />

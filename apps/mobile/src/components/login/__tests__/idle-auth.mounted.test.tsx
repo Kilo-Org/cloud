@@ -12,7 +12,8 @@ import { openBrowserAsync } from 'expo-web-browser';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
-  INLINE_LINK_HIT_SLOP,
+  INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
@@ -87,6 +88,7 @@ vi.mock('expo-apple-authentication', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   useColorScheme: () => 'light',
@@ -184,6 +186,31 @@ function findLink(root: I, label: string): I {
   return link;
 }
 
+/** The sentence end a legal link's accessibility label sits at. */
+function linkEdge(label: string | undefined): 'start' | 'end' {
+  return label === 'Terms' ? 'start' : 'end';
+}
+
+/**
+ * The per-side slop the legal link at one end of the sentence must render. The
+ * facing side (4dp) points at the connector, the outer side (12dp) reaches over
+ * plain prose, and the two still add to the 44pt target from the 28dp audit
+ * floor. The sentence is LTR in this suite's native mock.
+ */
+function expectedLinkSlop(edge: 'start' | 'end'): {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+} {
+  return {
+    top: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    bottom: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    left: edge === 'start' ? INLINE_LINK_OUTER_HIT_SLOP_DP : INLINE_LINK_FACING_HIT_SLOP_DP,
+    right: edge === 'start' ? INLINE_LINK_FACING_HIT_SLOP_DP : INLINE_LINK_OUTER_HIT_SLOP_DP,
+  };
+}
+
 /**
  * The legal line's copy in render order: the prefix Text's children plus every
  * link label, connector, and the suffix, concatenated. The sentence's own word
@@ -277,6 +304,19 @@ async function compiledDeclarations(classes: string) {
       .s?.find(([name]) => name === 'target')?.[1]
       .flatMap(rule => rule.d ?? []) ?? []
   );
+}
+
+/** The numeric value of one compiled declaration, through the app's pipeline. */
+async function compiledNumber(classes: string, property: string): Promise<number | undefined> {
+  for (const declaration of await compiledDeclarations(classes)) {
+    if (!Array.isArray(declaration)) {
+      const plain = declaration as Record<string, unknown>;
+      if (property in plain) {
+        return plain[property] as number;
+      }
+    }
+  }
+  return undefined;
 }
 
 /** A Button that keeps the default (brand-filled) variant is a primary action. */
@@ -620,16 +660,17 @@ describe('IdleAuth email continue copy', () => {
       const box = boxDp(link.props.className as string);
       expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
       expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-      // The 44pt design target holds in both axes: across the sentence, where
-      // no neighbour sits beside the row, and vertically through the clearance
-      // the legal row reserves (the layout-repair suite checks that clearance
-      // against the screen's gutter and the Continue button above).
+      // Each link reaches the 44pt design target from its own rect: the facing
+      // side (4dp) points at the connector, the outer side (12dp) reaches over
+      // plain prose, so the two sides are not equal and the reach is
+      // box + facing + outer rather than box + 2 * slop.
       const slop = link.props.hitSlop as {
         top: number;
         bottom: number;
         left: number;
         right: number;
       };
+      expect(slop).toEqual(expectedLinkSlop(linkEdge(link.props.accessibilityLabel as string)));
       expect(box.width + slop.left + slop.right).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
@@ -650,7 +691,7 @@ describe('IdleAuth email continue copy', () => {
     const renderer = await mountIdleAuth(start);
 
     // The connector text is the only node between the two links, so it carries
-    // the shared gap class that keeps their facing slops off each other in a
+    // the shared gap class that keeps their facing reaches off each other in a
     // catalog with a short conjunction (ru " и ", pl " i ", ar " و ",
     // zh " 和 "). `tap-target.test.ts` compiles the class's width.
     const connectors = renderer.root.findAll(
@@ -659,6 +700,11 @@ describe('IdleAuth email continue copy', () => {
     );
     expect(connectors).toHaveLength(1);
     expect(connectors[0]?.props.className).toContain(INLINE_LINK_CONNECTOR_CLASS);
+    // The connector's compiled floor holds both facing reaches apart: 2 * 4dp
+    // plus 2dp of headroom, so the two touch regions never meet between the
+    // links. `tap-target.test.ts` checks the same floor against the constant.
+    const connectorFloorDp = await compiledNumber(INLINE_LINK_CONNECTOR_CLASS, 'minWidth');
+    expect(connectorFloorDp).toBeGreaterThanOrEqual(2 * INLINE_LINK_FACING_HIT_SLOP_DP);
 
     act(() => {
       renderer.unmount();
@@ -810,7 +856,9 @@ describe('IdleAuth layout repairs', () => {
     for (const link of linkPressables(renderer.root)) {
       expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
       expect(String(link.props.className)).toContain(INLINE_LINK_BOX_CLASS);
-      expect(link.props.hitSlop).toEqual(INLINE_LINK_HIT_SLOP);
+      expect(link.props.hitSlop).toEqual(
+        expectedLinkSlop(linkEdge(link.props.accessibilityLabel as string))
+      );
     }
 
     act(() => {
@@ -819,25 +867,12 @@ describe('IdleAuth layout repairs', () => {
   });
 
   it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
-    const box = await compiledDeclarations(INLINE_LINK_BOX_CLASS);
-    const value = (property: string) => {
-      for (const declaration of box) {
-        if (!Array.isArray(declaration)) {
-          const plain = declaration as Record<string, unknown>;
-          if (property in plain) {
-            return plain[property];
-          }
-        }
-      }
-      return undefined;
-    };
-
     // The audit floor stays on the node's own rect...
-    expect(value('minHeight')).toBe(28);
-    expect(value('minWidth')).toBe(28);
+    expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minHeight')).toBe(28);
+    expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minWidth')).toBe(28);
     // ...while the vertical cancel keeps (28 - 14) / 2 out of the text-xs row,
     // so the legal line is no taller than the surrounding prose.
-    expect(value('marginBlock')).toBe(-7);
+    expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')).toBe(-7);
   });
 
   it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {

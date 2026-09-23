@@ -17,6 +17,7 @@ vi.mock('@/lib/config', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   useColorScheme: () => 'light',

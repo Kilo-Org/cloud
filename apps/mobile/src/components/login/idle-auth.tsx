@@ -16,8 +16,8 @@ import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
-  INLINE_LINK_HIT_SLOP,
   INLINE_LINK_ROW_CLASS,
+  inlineLinkHitSlop,
 } from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
@@ -356,21 +356,23 @@ export function IdleAuth({
       <View className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}>
         {/* The sentence is a row of nodes, not one Text with nested handlers: an
             inline link's own box is what the control-size audit measures, so
-            each link carries the shared inline-link box and its own reach. The
-            box adds no height to the line (its 28dp floor is cancelled by the
-            shared layout-neutral form), so the only gaps between the words are
-            the sentence's own spaces, and the connector's min-width keeps both
-            facing slops apart in a catalog with a short conjunction. The links'
-            44pt vertical reach needs `(28 - 14) / 2 + 8 = 15dp` of free space
-            above and below the `text-xs` line, which the screen's `gap-3`
-            gutter (10.5dp) cannot give it, so the row carries the extra 5dp
-            margin: both regions then stay clear of the Continue button above
-            and the ghost button below. */}
+            each link carries the shared inline-link box and its own per-side
+            reach — 4dp toward the connector, 12dp away — which still adds to
+            44pt from the 28dp floor. The box adds no height to the line (its
+            28dp floor is cancelled by the shared layout-neutral form), so the
+            only gaps between the words are the sentence's own spaces, and the
+            connector's min-width keeps both 4dp facing reaches apart in a
+            catalog with a short conjunction. The links' 44pt vertical reach
+            needs `(28 - 14) / 2 + 8 = 15dp` of free space above and below the
+            `text-xs` line, which the screen's `gap-3` gutter (10.5dp) cannot
+            give it, so the row carries the extra 5dp margin: both regions then
+            stay clear of the Continue button above and the ghost button
+            below. */}
 
         <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
         <Pressable
           className={INLINE_LINK_BOX_CLASS}
-          hitSlop={INLINE_LINK_HIT_SLOP}
+          hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
           accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
@@ -382,7 +384,7 @@ export function IdleAuth({
         </Text>
         <Pressable
           className={INLINE_LINK_BOX_CLASS}
-          hitSlop={INLINE_LINK_HIT_SLOP}
+          hitSlop={inlineLinkHitSlop('end')}
           accessibilityRole="link"
           accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}

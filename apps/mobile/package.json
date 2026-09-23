@@ -42,6 +42,7 @@
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kilo-chat-hooks": "workspace:*",
     "@kilocode/notifications": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/trpc": "workspace:*",
     "@react-native-community/netinfo": "12.0.1",
     "@react-native-google-signin/google-signin": "16.1.4",

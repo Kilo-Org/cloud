@@ -8,7 +8,8 @@ import {
   projectSafeAssistantError,
 } from '../shared/assistant-failure.js';
 import type { AssistantMessageInfo, LatestAssistantMessage } from '../session/types.js';
-import type { SessionMessageRecord } from './session-message-queue.js';
+import { terminalMessageState } from '../sandbox-state/session/reduce.js';
+import type { SessionMessage } from '../sandbox-state/model/session.js';
 
 /**
  * A settlement for an accepted turn read from the DO's stored kilocode events.
@@ -62,28 +63,24 @@ export function projectStoredAssistantSettlement(
  * the wrapper never reported this settlement.
  */
 export function applyStoredAssistantSettlement(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   messageId: string,
   settlement: AcceptedStoredSettlement,
   now: number
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   const message = messages.find(item => item.messageId === messageId);
-  if (!message || message.state !== 'accepted') return undefined;
+  if (!message || message.state.kind !== 'accepted') return undefined;
   return messages.map(item =>
     item.messageId !== messageId
       ? item
       : {
           ...item,
-          state: settlement.state,
-          unresolvedDispatch: undefined,
-          terminalAt: now,
-          terminalSource: 'coordinator',
-          ...(settlement.failedReason ? { failedReason: settlement.failedReason } : {}),
-          ...(settlement.failedDetail ? { failedDetail: settlement.failedDetail } : {}),
-          ...(settlement.assistantReason ? { assistantReason: settlement.assistantReason } : {}),
-          ...(settlement.providerOwnership
-            ? { providerOwnership: settlement.providerOwnership }
-            : {}),
+          state: terminalMessageState(item.state, settlement.state, now, 'coordinator', {
+            reason: settlement.failedReason,
+            detail: settlement.failedDetail,
+            assistantReason: settlement.assistantReason,
+            providerOwnership: settlement.providerOwnership,
+          }),
         }
   );
 }

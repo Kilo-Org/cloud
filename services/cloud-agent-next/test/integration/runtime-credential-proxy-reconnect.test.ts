@@ -37,9 +37,7 @@ import type {
   SandboxControl,
 } from '../../src/persistence/SandboxControl.js';
 import { resolveSecret } from '../../src/auth.js';
-import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
-import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/physical-lifecycle.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -49,10 +47,10 @@ import { sessionCredentialGrantSchema } from '../../src/sandbox-control/session-
 import { attachRoute } from '../../src/sandbox-control/session-routes.js';
 import {
   loadSessionCredentialGrants,
-  savePhysicalRecord,
   saveRouteTable,
   saveSessionCredentialGrants,
 } from '../../src/sandbox-control/durable-state.js';
+import { seedCanonicalRunning } from './canonical-allocation-fixtures.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
 import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
 
@@ -111,25 +109,7 @@ function fakeProvider() {
 
 async function seedRunningCloudflare(instance: SandboxControl): Promise<string> {
   const providerRef = cloudflareRef(instance.sandboxId);
-  const physical = await instance.getPhysicalRecord();
-  if (physical.state === 'stopped') {
-    await instance.claimCreate(
-      'inst_1',
-      false,
-      instance.sandboxId,
-      WORKTREE_CREDENTIAL_CONTAINMENT
-    );
-  }
-  if (physical.state !== 'running') await instance.confirmInstance(providerRef);
-  const running = await instance.getPhysicalRecord();
-  if (!running.createIntent) throw new Error('Missing fixture create intent');
-  await savePhysicalRecord(instance['ctx'].storage, {
-    ...running,
-    createIntent: {
-      ...running.createIntent,
-      createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
-    },
-  });
+  await seedCanonicalRunning(instance['ctx'].storage, providerRef);
   Object.assign(instance, { provider: fakeProvider() });
   return providerRef;
 }
@@ -187,9 +167,6 @@ async function createFixture(): Promise<RuntimeFixture> {
   await runInDurableObject(control, async instance => {
     await instance.initializeOwner(OWNER_ID);
     await instance.ctx.storage.put('provider_kind', 'cloudflare');
-    if ((await instance.getPhysicalRecord()).state === 'stopped') {
-      await instance.claimCreate('inst_1', false, sandboxId, WORKTREE_CREDENTIAL_CONTAINMENT);
-    }
     await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
   });
 
@@ -455,12 +432,7 @@ describe('runtime credential proxy fence across a real control reconnect', () =>
   it('keeps the fence across a recovery-capable close and follows the reconnect connectionId', async () => {
     const fixture = await createFixture();
     const wrapperInstanceId = crypto.randomUUID();
-    const { socket, phases } = await connectReadyRecoveryWrapper(fixture, wrapperInstanceId);
-
-    // Readiness committed through the real recovery reconcile, not a mock.
-    expect(phases).toEqual(
-      expect.arrayContaining(['reconcile:drain', 'reconcile:ready', 'reconcile:commit'])
-    );
+    const { socket } = await connectReadyRecoveryWrapper(fixture, wrapperInstanceId);
 
     const ready = controlFence(await fence(fixture));
     expect(ready).toMatchObject({

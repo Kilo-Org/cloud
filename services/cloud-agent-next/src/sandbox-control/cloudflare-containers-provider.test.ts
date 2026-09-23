@@ -10,7 +10,7 @@ import { createCloudflareContainersProviderAdapter } from './cloudflare-containe
 import { decodeCloudflareProviderRef, encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS } from './deadlines.js';
-import { getWorktreeCredentialContainment } from './physical-lifecycle.js';
+import { getWorktreeCredentialContainment } from '../sandbox-state/model/allocation.js';
 import type { ObserveResult, ProviderCreateIntent } from './provider.js';
 
 const LOGICAL_ID = 'ses-00000000000000000000000001';

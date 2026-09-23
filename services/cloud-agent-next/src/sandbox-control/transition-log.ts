@@ -1,6 +1,4 @@
-import type { DeadlineId } from './deadlines.js';
-import type { PhysicalState } from './physical-lifecycle.js';
-import type { ConnectionState } from './status-projection.js';
+import type { ConnectionState } from '../shared/sandbox-status.js';
 import type { SessionActivityState } from './session-routes.js';
 
 export const TRANSITION_LOG_MAX_ROWS = 200;
@@ -14,6 +12,9 @@ export type TransitionKind =
   | 'provider'
   | 'credential'
   | 'route';
+
+/** Infrastructure alarm anchors still recorded on the transition log. */
+export type DeadlineId = 'credentialExpiry' | 'socketHandshake';
 
 export type DeadlineAction = 'armed' | 'cancelled' | 'fired';
 
@@ -46,16 +47,6 @@ export function trimTransitionLog(log: TransitionRow[], now: number): Transition
   const aged = log.filter(row => row.at >= minAt);
   if (aged.length <= TRANSITION_LOG_MAX_ROWS) return aged;
   return aged.slice(aged.length - TRANSITION_LOG_MAX_ROWS);
-}
-
-export function physicalTransition(
-  at: number,
-  from: PhysicalState,
-  to: PhysicalState,
-  cause: string,
-  providerRef: string | null
-): TransitionRow {
-  return { at, kind: 'physical', from, to, cause, providerRef };
 }
 
 export function connectionTransition(

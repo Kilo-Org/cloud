@@ -5,9 +5,11 @@ import { DEADLINE_MS } from '../../src/sandbox-control/deadlines';
 import { events } from '../../src/db/sqlite-schema';
 import type { SandboxSession } from '../../src/sandbox-session/SandboxSession';
 import type {
-  SessionMessageRecord,
+  SessionMessage,
   SessionOperationProof,
 } from '../../src/sandbox-session/session-message-queue';
+import { readRawSessionMessages } from '../../src/sandbox-state/persist/load';
+import { writeSessionMessages } from '../../src/sandbox-state/persist/access';
 import type { SessionOperationAuthorization } from '../../src/shared/sandbox-control-protocol';
 
 const rootKiloSessionId = 'ses_00000000000000000000000009';
@@ -45,20 +47,35 @@ describe('sandbox session no-output recovery', () => {
       };
       const promptProof = (): SessionOperationProof => ({ authorization, dispatched: true });
       const staleActivityAt = () => Date.now() - DEADLINE_MS.kiloInactivity - 1;
-      const record = (recoveryAttempts?: number): SessionMessageRecord => ({
-        version: 2,
+      const record = (recoveryAttempts?: number): SessionMessage => ({
         messageId,
-        state: 'accepted',
-        acceptedAt: staleActivityAt(),
-        lastActivityAt: staleActivityAt(),
-        wrapperInstanceId,
-        operations: { prompt: promptProof() },
-        ...(recoveryAttempts !== undefined ? { recoveryAttempts } : {}),
-        intent: {
-          turn: { type: 'prompt', messageId, prompt: 'keep the typed message' },
-          agent: { mode: 'code', model: 'test-model' },
+        state: {
+          kind: 'accepted',
+          intent: {
+            turn: { type: 'prompt', messageId, prompt: 'keep the typed message' },
+            agent: { mode: 'code', model: 'test-model' },
+          },
+          acceptedAt: staleActivityAt(),
+          lastActivityAt: staleActivityAt(),
+          // The accepted state requires its bounded execution deadline; the
+          // inactivity bound under test does not consult it.
+          executionDeadlineAt: staleActivityAt() + 60 * 60_000,
+          ...(recoveryAttempts !== undefined ? { recoveryAttempts } : {}),
         },
+        proofs: { prompt: promptProof() },
       });
+      // The message envelope must carry a non-`unbound` binding while an
+      // accepted row exists (canonical invariant), so seed a bound handle for
+      // the wrapper the proof names.
+      const seed = (recoveryAttempts?: number): void =>
+        writeSessionMessages(
+          state.storage.kv,
+          {
+            kind: 'bound',
+            handle: { incarnation: 'incarnation_no_output', wrapper: wrapperInstanceId, epoch: 0 },
+          },
+          [record(recoveryAttempts)]
+        );
 
       const control = {
         getStatus: vi.fn(async () => ({
@@ -85,7 +102,7 @@ describe('sandbox session no-output recovery', () => {
         // inactivity bound.
         observeAcceptedOperation: vi.fn(async () => 'running' as const),
       });
-      const messages = () => state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+      const messages = () => readRawSessionMessages(state.storage.kv);
       const failedEvents = () =>
         drizzle(state.storage)
           .select()
@@ -94,32 +111,31 @@ describe('sandbox session no-output recovery', () => {
           .filter(event => event.stream_event_type === 'cloud.message.failed');
       try {
         // First detection: the accepted turn has produced no activity past the bound.
-        state.storage.kv.put('session_messages', [record()]);
+        seed();
         await instance.alarm();
         await state.storage.deleteAlarm();
 
         const recovered = messages()[0];
         if (!recovered) throw new Error('Missing recovered record');
+        if (recovered.state.kind !== 'queued') throw new Error('Expected a re-queued record');
         expect(recovered).toMatchObject({
           messageId,
-          state: 'queued',
-          recoveryAttempts: 1,
-          failedReason: undefined,
+          state: { kind: 'queued', recoveryAttempts: 1 },
         });
         // The typed turn survives under its durable identity, while the
         // ambiguous dispatch state is dropped so a fresh runtime can take it.
-        expect(recovered.intent).toEqual({
+        expect(recovered.state.intent).toEqual({
           turn: { type: 'prompt', messageId, prompt: 'keep the typed message' },
           agent: { mode: 'code', model: 'test-model' },
         });
-        expect(recovered.wrapperInstanceId).toBeUndefined();
-        expect(recovered.operations).toBeUndefined();
-        expect(recovered.acceptedAt).toBeUndefined();
-        expect(recovered.lastActivityAt).toBeUndefined();
+        expect(recovered.state.wrapperInstanceId).toBeUndefined();
+        expect(recovered.state.acceptedAt).toBeUndefined();
+        expect(recovered.state.lastActivityAt).toBeUndefined();
+        expect(recovered.proofs).toBeUndefined();
         expect(failedEvents()).toHaveLength(0);
 
         // Second identical detection on the replacement runtime: terminal.
-        state.storage.kv.put('session_messages', [record(1)]);
+        seed(1);
         await instance.alarm();
         await state.storage.deleteAlarm();
 
@@ -127,10 +143,12 @@ describe('sandbox session no-output recovery', () => {
         if (!terminal) throw new Error('Missing terminal record');
         expect(terminal).toMatchObject({
           messageId,
-          state: 'failed',
-          failedReason: 'accepted_overdue',
-          failedDetail: 'Turn did not complete',
-          recoveryAttempts: 1,
+          state: {
+            kind: 'failed',
+            reason: 'accepted_overdue',
+            detail: 'Turn did not complete',
+            recoveryAttempts: 1,
+          },
         });
         const persistedFailed = failedEvents();
         expect(persistedFailed).toHaveLength(1);

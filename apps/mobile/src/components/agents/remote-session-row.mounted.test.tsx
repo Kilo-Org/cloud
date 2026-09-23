@@ -167,6 +167,27 @@ afterEach(async () => {
   setSignOutActive(false);
 });
 
+describe('row title', () => {
+  it('paints the untitled label for a session that still carries the backend placeholder', async () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the tray
+    // row shows its own label instead of the machine string.
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(RemoteSessionRow, {
+            session: { ...session, title: 'New session - 2026-09-22T01:09:45.623Z' },
+            onPress: vi.fn<() => void>(),
+          })
+        )
+      );
+      await flush();
+    });
+    expect(renderer?.root.findByType('SessionRow').props.title).toBe('Untitled session');
+  });
+});
+
 describe('row exit refresh caller', () => {
   it.each(['matching', 'mismatched', 'absent'] as const)(
     'reconciles its exact query with a %s owner',

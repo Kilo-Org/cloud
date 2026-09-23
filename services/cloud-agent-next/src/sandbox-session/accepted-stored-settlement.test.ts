@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LatestAssistantMessage } from '../session/types.js';
-import type { SessionMessageRecord } from './session-message-queue.js';
+import type { SessionMessage, SessionMessageIntent } from '../sandbox-state/model/session.js';
 import {
   applyStoredAssistantSettlement,
   projectStoredAssistantSettlement,
@@ -18,8 +18,16 @@ function assistant(
   };
 }
 
-function accepted(messageId = 'msg_1'): SessionMessageRecord {
-  return { messageId, state: 'accepted', acceptedAt: 5 };
+const intent = (messageId: string): SessionMessageIntent => ({
+  turn: { type: 'prompt', messageId, prompt: 'hello' },
+  agent: { mode: 'build' },
+});
+
+function accepted(messageId = 'msg_1'): SessionMessage {
+  return {
+    messageId,
+    state: { kind: 'accepted', intent: intent(messageId), acceptedAt: 5, executionDeadlineAt: 500 },
+  };
 }
 
 describe('projectStoredAssistantSettlement', () => {
@@ -55,17 +63,29 @@ describe('projectStoredAssistantSettlement', () => {
 
 describe('applyStoredAssistantSettlement', () => {
   it('only settles a record that is still accepted', () => {
-    const messages = [{ messageId: 'msg_1', state: 'accepted' } as SessionMessageRecord];
+    const messages = [accepted()];
 
     expect(
       applyStoredAssistantSettlement(messages, 'msg_1', { state: 'completed' }, 9)?.[0]
-    ).toMatchObject({ state: 'completed', terminalAt: 9, terminalSource: 'coordinator' });
+    ).toMatchObject({ state: { kind: 'completed', at: 9, source: 'coordinator' } });
     expect(
       applyStoredAssistantSettlement(messages, 'msg_1', { state: 'completed' }, 9)
     ).toHaveLength(1);
     expect(
       applyStoredAssistantSettlement(
-        [{ messageId: 'msg_1', state: 'queued' }],
+        [
+          {
+            messageId: 'msg_1',
+            state: {
+              kind: 'queued',
+              intent: intent('msg_1'),
+              deliveryStep: 'waiting',
+              deadlineAt: null,
+              attachFailures: 0,
+              promptFailures: 0,
+            },
+          },
+        ],
         'msg_1',
         { state: 'completed' },
         9
@@ -90,12 +110,14 @@ describe('applyStoredAssistantSettlement', () => {
       ) ?? [];
 
     expect(settled).toMatchObject({
-      state: 'failed',
-      failedReason: 'assistant_error',
-      failedDetail: 'Assistant request timed out',
-      assistantReason: 'timeout',
-      providerOwnership: 'unknown',
-      terminalSource: 'coordinator',
+      state: {
+        kind: 'failed',
+        reason: 'assistant_error',
+        detail: 'Assistant request timed out',
+        assistantReason: 'timeout',
+        providerOwnership: 'unknown',
+        source: 'coordinator',
+      },
     });
   });
 });

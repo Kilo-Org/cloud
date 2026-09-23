@@ -13,8 +13,9 @@
 // explicit `leading-*`, their own `textAlignVertical`) and cannot use the
 // single-line shared box, so they render the raw control with `multiline`. They
 // are listed in `ALLOWLIST` with the reason they stay raw, and every raw
-// `<TextInput>` in a listed file must carry the `multiline` token, so a new
-// single-line field inside an allowlisted composer still fails.
+// `<TextInput>` in a listed file must carry the real `multiline` prop — not the
+// bare word inside another attribute or string, and not `multiline={false}`, so
+// a new single-line field inside an allowlisted composer still fails.
 //
 // One more exemption exists, and it is not an allowlist: `OWNER_BOUNDARY_INPUTS`
 // pins the pre-existing single-line fields inside the Kilo Claw owner boundary
@@ -42,8 +43,9 @@ const SHARED_INPUT_PATH = 'src/components/ui/input.tsx';
 
 /**
  * The multiline composers that legitimately stay raw, each with why. A raw
- * `<TextInput>` in one of these files must carry the `multiline` token; a new
- * single-line field in one of them is still a violation.
+ * `<TextInput>` in one of these files must carry the real `multiline` prop —
+ * not the word inside a string, and not `multiline={false}`; a new single-line
+ * field in one of them is still a violation.
  */
 const ALLOWLIST: Readonly<Record<string, string>> = {
   'src/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/instructions.tsx':
@@ -91,30 +93,82 @@ const OWNER_BOUNDARY_INPUTS: Readonly<Record<string, string>> = {
 const REACT_NATIVE_IMPORT = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s*['"]react-native['"]/g;
 
 /** An alias binding inside such an import: `TextInput as RNTextInput`. */
-const TEXT_INPUT_ALIAS = /\bTextInput\s+as\s+([A-Za-z_$][\w$]*)\b/;
+const TEXT_INPUT_ALIAS = /\bTextInput\s+as\s+([A-Za-z_$][\w$]*)\b/g;
 
 /**
  * The local names `TextInput` is imported under in `code`.
  *
  * `TextInput` is always scanned, so a source that renders it without a
  * resolvable import is still caught; `TextInput as RNTextInput` adds
- * `RNTextInput`. Longest first, so `RNTextInput` is preferred over a name it
- * contains.
+ * `RNTextInput`. Every alias binding in an import block is read, so a second
+ * `TextInput as X` cannot hide behind the first. Longest first, so
+ * `RNTextInput` is preferred over a name it contains.
  */
 function textInputNames(code: string): string[] {
   const names = new Set<string>(['TextInput']);
   for (const match of code.matchAll(REACT_NATIVE_IMPORT)) {
-    const alias = TEXT_INPUT_ALIAS.exec(match[1] ?? '');
-    const name = alias?.[1];
-    if (name !== undefined) {
-      names.add(name);
+    for (const alias of (match[1] ?? '').matchAll(TEXT_INPUT_ALIAS)) {
+      const name = alias[1];
+      if (name !== undefined) {
+        names.add(name);
+      }
     }
   }
   return [...names].toSorted((a, b) => b.length - a.length);
 }
 
-/** The `multiline` prop, as a whole token. */
-const MULTILINE = /\bmultiline\b/;
+/**
+ * A literal string escaped for `new RegExp`. A local import name is a legal JS
+ * identifier, and `$` is one of its characters, so the name must reach the
+ * pattern as a literal: unescaped, `$TI` is an end anchor that matches nothing.
+ */
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, match => `\\${match}`);
+}
+
+/**
+ * The `multiline` prop on an opening tag.
+ *
+ * The word must be the prop: a `multiline` inside another attribute or a string
+ * value (`placeholder="multiline"`) is not, and the prop must not be explicitly
+ * falsy. An allowlisted composer that renders `multiline={false}` is a
+ * single-line field, so it must still be reported rather than pass on the bare
+ * word. The pattern is matched against the tag with its string literals blanked
+ * out, so only a real attribute token can match.
+ */
+const MULTILINE_PROP = /(?:^|\s)multiline(?![\w$])(?!\s*=\s*\{?\s*false\b)/;
+
+/** Whether the opening tag carries a real, non-falsy `multiline` prop. */
+function carriesMultiline(block: string): boolean {
+  return MULTILINE_PROP.test(withoutStringLiterals(block));
+}
+
+/**
+ * `tag` with the contents of every string and template literal blanked out,
+ * keeping the quotes so positions do not shift. A `multiline` word inside a
+ * string value then cannot be mistaken for the prop.
+ */
+function withoutStringLiterals(tag: string): string {
+  let stripped = '';
+  let quote: string | null = null;
+  for (let index = 0; index < tag.length; index += 1) {
+    const ch = tag.charAt(index);
+    if (quote !== null) {
+      if (ch === '\\') {
+        index += 1;
+      } else if (ch === quote) {
+        quote = null;
+        stripped += ch;
+      }
+    } else {
+      if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+      }
+      stripped += ch;
+    }
+  }
+  return stripped;
+}
 
 type RawInput = { line: number; block: string };
 
@@ -158,7 +212,7 @@ function isAllowedRawInput(path: string, raw: RawInput): boolean {
   if (Object.hasOwn(OWNER_BOUNDARY_INPUTS, `${path}:${raw.line}`)) {
     return true;
   }
-  return Object.hasOwn(ALLOWLIST, path) && MULTILINE.test(raw.block);
+  return Object.hasOwn(ALLOWLIST, path) && carriesMultiline(raw.block);
 }
 
 /**
@@ -169,7 +223,12 @@ function isAllowedRawInput(path: string, raw: RawInput): boolean {
  */
 function rawTextInputs(source: string): RawInput[] {
   const code = stripComments(source);
-  const jsxTextInput = new RegExp(`(?<![<\\w])<(?:${textInputNames(code).join('|')})\\b`, 'g');
+  const jsxTextInput = new RegExp(
+    `(?<![<\\w])<(?:${textInputNames(code)
+      .map(name => escapeRegExp(name))
+      .join('|')})\\b`,
+    'g'
+  );
   const found: RawInput[] = [];
   for (const match of code.matchAll(jsxTextInput)) {
     const start = match.index;
@@ -353,6 +412,36 @@ describe('single-line input guard', () => {
     ]);
   });
 
+  it('reports a field in an allowlisted file that turns multiline off', () => {
+    const allowlisted = 'src/components/agents/chat-composer-input-row.tsx';
+    const explicitlySingleLine = [
+      "import { TextInput } from 'react-native';",
+      '',
+      'export function Composer() {',
+      '  return <TextInput multiline={false} placeholder="x" />;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ [allowlisted]: explicitlySingleLine })).toEqual([
+      `${allowlisted}:4`,
+    ]);
+  });
+
+  it('does not read the word multiline inside a string attribute as the prop', () => {
+    const allowlisted = 'src/components/agents/chat-composer-input-row.tsx';
+    const stringValueOnly = [
+      "import { TextInput } from 'react-native';",
+      '',
+      'export function Composer() {',
+      '  return <TextInput placeholder="multiline" />;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ [allowlisted]: stringValueOnly })).toEqual([
+      `${allowlisted}:4`,
+    ]);
+  });
+
   it('reports a raw single-line field reached through an aliased import', () => {
     expect(
       unsharedSingleLineInputs({ 'src/components/Whatever.tsx': ALIASED_SINGLE_LINE })
@@ -389,6 +478,34 @@ describe('single-line input guard', () => {
     ].join('\n');
     expect(unsharedSingleLineInputs({ 'src/components/Whatever.tsx': multiLineImport })).toEqual([
       'src/components/Whatever.tsx:7',
+    ]);
+  });
+
+  it('reports an aliased field whose alias starts with a dollar sign', () => {
+    const dollarAlias = [
+      "import { TextInput as $TI } from 'react-native';",
+      '',
+      'export function Whatever() {',
+      '  return <$TI placeholder="x" />;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ 'src/components/Whatever.tsx': dollarAlias })).toEqual([
+      'src/components/Whatever.tsx:4',
+    ]);
+  });
+
+  it('resolves every TextInput alias declared in one import block', () => {
+    const twoAliases = [
+      "import { TextInput as A, TextInput as B } from 'react-native';",
+      '',
+      'export function Whatever() {',
+      '  return <B placeholder="x" />;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ 'src/components/Whatever.tsx': twoAliases })).toEqual([
+      'src/components/Whatever.tsx:4',
     ]);
   });
 
@@ -454,7 +571,10 @@ describe('single-line input guard', () => {
       const blocks = rawTextInputs(files[path] ?? '');
       expect(blocks.length, `${path} is allowlisted but holds no raw TextInput`).toBeGreaterThan(0);
       for (const raw of blocks) {
-        expect(raw.block, `${path}:${raw.line} must carry the multiline token`).toMatch(MULTILINE);
+        expect(
+          carriesMultiline(raw.block),
+          `${path}:${raw.line} must carry the multiline prop`
+        ).toBe(true);
       }
     }
   });

@@ -35,14 +35,13 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// The screen reads its side insets through `@/lib/screen-insets`; the native
-// module's source is not parseable by this project's transform, and the
-// sign-out confirmation does not depend on the values.
-// The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
-// whose real module loads the native safe-area package. The node project cannot
-// load that native module, so the screen's own tests stub the hook.
-// The screen reads its side insets through `@/lib/screen-insets`, which imports
-// this native module; its untransformed source breaks the mounted project.
+// ProfileScreen reads its landscape side insets through `@/lib/screen-insets`,
+// which imports `react-native-safe-area-context`; that package's React Native
+// source is Flow-typed and this transform cannot parse it (see
+// `test/render-with-providers.tsx`), so the harness mocks it exactly as
+// `profile-screen.queries.mounted.test.tsx` does. The sign-out confirmation
+// does not depend on the inset values, so stub the hook with the hoisted
+// `insets` above.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

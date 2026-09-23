@@ -97,7 +97,13 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
+vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
+// The idle screen reads the foreground ink for the Apple mark; the real hook
+// pulls expo-router, which the node test environment cannot load.
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#14130f' }),
+}));
 
 const { IdleAuth } = await import('@/components/login/idle-auth');
 const { postAuth } = await import('@/lib/auth/auth-fetch');

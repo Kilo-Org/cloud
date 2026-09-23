@@ -181,6 +181,16 @@ describe('StoredSessionRow live speech', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('paints the untitled label for a session that still carries the backend placeholder', () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the row
+    // shows its own label instead of the machine string.
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session - 2026-09-22T01:09:45.623Z' } })
+    );
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain('New session - 2026-09-22T01:09:45.623Z');
+  });
+
   it('updates the dot and speech in place while retaining metadata and provenance', () => {
     const props = { session: { ...session, associatedPr: { number: 42 } }, metaWhileLive: true };
     const renderer = mount(row(props));
@@ -269,6 +279,23 @@ describe('StoredSessionRow live speech', () => {
       expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
     }
   );
+
+  it.each(['New session - 2026-09-22T02:05:22.778Z', 'Child session - 2026-09-22T02:05:22.778Z'])(
+    'paints the localized unnamed name instead of the backend placeholder %s',
+    placeholder => {
+      const renderer = mount(row({ session: { ...session, title: placeholder } }));
+      expect(texts(renderer)).toContain('Untitled session');
+      expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain(
+        'Untitled session'
+      );
+      expect(texts(renderer)).not.toContain(placeholder);
+    }
+  );
+
+  it('keeps a real server title on the row', () => {
+    const renderer = mount(row({ session: { ...session, title: 'Verifier Rename Check' } }));
+    expect(texts(renderer)).toContain('Verifier Rename Check');
+  });
 
   it.each([false, true])('keeps Home/card speech unchanged for live=%s', live => {
     const renderer = mount(
@@ -381,6 +408,13 @@ describe('RemoteSessionRow live speech', () => {
     ]);
     expect(texts(renderer)).toContain('5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live');
+  });
+
+  it('paints the localized unnamed name instead of the backend placeholder title', () => {
+    const renderer = mountRemote({ title: 'New session - 2026-09-22T02:05:22.778Z' });
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain('New session - 2026-09-22T02:05:22.778Z');
   });
 
   it('speaks Idle once the agent stops working', () => {

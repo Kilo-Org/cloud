@@ -51,6 +51,10 @@ const keyboardSubscribers = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The profile row and the environment row render the reanimated `Skeleton`
+// while their content loads; its module reaches the Reanimated worklets entry,
+// which this plain Node project cannot resolve, and the loading cases assert
+// the stub by name — its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -77,10 +81,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-// The element tree finds the loading Skeleton by that name, and the real
-// component animates through Reanimated's worklets package (and the motion
-// policy's `expo-battery`), neither of which this node project can load.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
@@ -125,25 +125,16 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile row and the environment row both render a loading `Skeleton`,
-// whose module imports `react-native-reanimated`: this pure suite does not set
-// Reanimated up, and this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The stub is the type the
-// pending-environment case asserts by name; its own rendering is not under test
-// here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
+}));
+
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
 }));
 
 // ── hooks ──────────────────────────────────────────────────────────
@@ -827,8 +818,9 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 12: kilo remote hint ──
-  it('names both `kilo remote` and `/remote` for cloud and remote targets', async () => {
+  it('renders the plain remote-run hint for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const HINT = 'Run kilo remote in a project on your computer to start sessions there.';
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const cloud = NewSessionConfigureForm({
@@ -836,11 +828,12 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
-    // The help draws the commands as prose: the authoring markers must not
-    // reach the screen.
+    expect(findTextContent(cloud, t => t === HINT)).toBe(true);
+    // The help draws the command as prose: the CLI-only entry point, the
+    // internal vocabulary and the authoring markers must not reach the screen.
+    expect(findTextContent(cloud, t => t.includes('/remote'))).toBe(false);
+    expect(findTextContent(cloud, t => t.includes('CLI session'))).toBe(false);
+    expect(findTextContent(cloud, t => t.includes('local kilo process'))).toBe(false);
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -849,9 +842,10 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
+    expect(findTextContent(remote, t => t === HINT)).toBe(true);
+    expect(findTextContent(remote, t => t.includes('/remote'))).toBe(false);
+    expect(findTextContent(remote, t => t.includes('CLI session'))).toBe(false);
+    expect(findTextContent(remote, t => t.includes('local kilo process'))).toBe(false);
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 

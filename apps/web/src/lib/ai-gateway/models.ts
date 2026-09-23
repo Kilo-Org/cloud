@@ -8,6 +8,7 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -19,7 +20,7 @@ import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -83,7 +84,8 @@ export const preferredModels = [
 
   ...autoFreeModels.map(({ model }) => model),
 
-  GPT_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  GPT_SOL_CURRENT_MODEL_ID,
   DEEPSEEK_V4_1_FLASH_MODEL_ID,
   GLM_FLASH_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,

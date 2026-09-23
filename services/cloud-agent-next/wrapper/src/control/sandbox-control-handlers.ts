@@ -1193,6 +1193,7 @@ async function handleAbort(
           : { status: 'already_idle' }
       );
     }
+    task.markMessageScopedAbort();
     if (!parsed.data.operationId) {
       task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
       const result = await task.done;
@@ -1333,7 +1334,13 @@ async function handleAbort(
       });
     }
 
-    if (!quiescent && !publicationScope && target && Date.now() < deadlineAt) {
+    if (
+      !task.messageScopedAbort &&
+      !quiescent &&
+      !publicationScope &&
+      target &&
+      Date.now() < deadlineAt
+    ) {
       const retirementReason = 'Native cancellation did not settle';
       const retirement = await deps.operations.retireDirectory(
         session.directory,
@@ -1346,7 +1353,7 @@ async function handleAbort(
       if (runtimeRetired) nativeRuntimeId = target.runtimeId;
       quiescent = task.confirmCleanup(nativeRetirement !== 'unconfirmed', deadlineAt);
       if (retirement === 'operation_process_stop_unconfirmed') deps.retireRuntime(retirementReason);
-    } else if (!quiescent) {
+    } else if (!quiescent && !task.messageScopedAbort) {
       task.requestRetirement('Kilo cancellation failed', deadlineAt);
     }
     const result = await task.done;

@@ -123,13 +123,16 @@ import {
 } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
+  collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
+  type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -168,6 +171,7 @@ import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -389,7 +393,12 @@ export function SessionDetailContent({
     setFollowTailNonce(count => count + 1);
   }, []);
 
+  // The strip below the keyboard container reserves the device safe area so the
+  // composer's tail clears the navigation bar / home indicator. The container
+  // above does not add it again (`containerReservesBottomInset`), so the space
+  // is resolved once per screen instead of twice.
   const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -960,10 +969,33 @@ export function SessionDetailContent({
   );
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
+  //
+  // The previous build's part→item-key map. A later build that folds new parts
+  // into an existing run — an older page prepending, or a tool part streaming
+  // into the run — reuses the key the row was already on screen under, so
+  // FlashList's viewport anchor survives. The effect refreshes the map after the
+  // commit, so the render that first shows the change still reads the old one.
+  const carriedTranscriptKeysByPartRef = useRef<TranscriptItemKeysByPart | null>(null);
   const transcript = useMemo(
-    () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
+    () =>
+      condenseToolCalls
+        ? condenseTranscriptToolRuns(
+            baseTranscript,
+            carriedTranscriptKeysByPartRef.current ?? undefined
+          )
+        : baseTranscript,
     [condenseToolCalls, baseTranscript]
   );
+  // Only the condensed build reads the map back, so while condensing is off the
+  // walk over every content-rendering part and its `Map` allocation would be
+  // dead work on every streaming update. The guard skips both; the map is
+  // refreshed again on the commit after condensing turns back on.
+  useEffect(() => {
+    if (!condenseToolCalls) {
+      return;
+    }
+    carriedTranscriptKeysByPartRef.current = collectTranscriptItemKeysByPart(transcript);
+  }, [condenseToolCalls, transcript]);
 
   // The list branch must never mount with zero items: a zero-item FlashList
   // paints blank dead space with no loading and no empty state (mobile-app
@@ -1273,17 +1305,27 @@ export function SessionDetailContent({
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
       }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
-      }
       if (item.type === 'tool-run') {
         // Match the inset and row rhythm of a message row so the condensed row
         // sits flush with its neighbours rather than full-bleed.
-        return (
+        const run = (
           <View className="px-4 py-1">
             <MessageErrorBoundary>
               <CondensedToolRunRow parts={item.parts} />
             </MessageErrorBoundary>
+          </View>
+        );
+        // A condensed run can open a burst: its message's marker rides here so
+        // marker and row share one FlashList key and one measured height.
+        return (
+          <View>
+            {item.timeMarker && (
+              <TranscriptTimeMarker
+                created={item.timeMarker.created}
+                dayChanged={item.timeMarker.dayChanged}
+              />
+            )}
+            {run}
           </View>
         );
       }
@@ -1294,7 +1336,7 @@ export function SessionDetailContent({
           : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
       const retryPrompt = resolveRetryPrompt(item.message, messages);
-      return (
+      const bubble = (
         <MessageBubble
           message={item.message}
           {...(item.parts ? { partsOverride: item.parts } : {})}
@@ -1319,6 +1361,21 @@ export function SessionDetailContent({
           }
           condenseToolCalls={condenseToolCalls}
         />
+      );
+      // The burst marker rides on its message row so the row keeps one FlashList
+      // key and one measured height: a prepend that moves the marker to an older
+      // message changes no key that is already on screen. Keep the wrapper and
+      // bubble's child slot stable so moving the marker does not remount it.
+      return (
+        <View>
+          {item.timeMarker && (
+            <TranscriptTimeMarker
+              created={item.timeMarker.created}
+              dayChanged={item.timeMarker.dayChanged}
+            />
+          )}
+          {bubble}
+        </View>
       );
     },
     [
@@ -1535,13 +1592,15 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". The route's
+    // cached metadata can hold the backend's ISO placeholder, which must not
+    // paint either.
+    fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <View className="flex-row items-center gap-2">
+    <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
       <SessionContextMetrics
         info={contextInfo}
@@ -1731,11 +1790,11 @@ export function SessionDetailContent({
     const removeIndex = actions.indexOf('remove');
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: t('agentChat.goal.title'),
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         const action = index === undefined ? undefined : actions[index];
@@ -1766,7 +1825,7 @@ export function SessionDetailContent({
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {

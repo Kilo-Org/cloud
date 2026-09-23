@@ -36,10 +36,10 @@
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/ui": "catalog:",
+    "@vitest/ui": "catalog:vitest4",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "catalog:vitest4",
     "wrangler": "catalog:"
   }
 }

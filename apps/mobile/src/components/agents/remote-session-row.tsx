@@ -25,7 +25,6 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -40,6 +39,7 @@ import {
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
+import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import { type RowVariant } from './session-row';
 import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import {
@@ -91,11 +91,20 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // The backend names an unnamed session with a raw ISO placeholder
+  // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
+  // should see, so the row falls back to the localized unnamed name the same
+  // way the session header does. `namedSessionTitle` makes that judgement
+  // through the shared `sessionDisplayTitle` helper and additionally excludes a
+  // placeholder-shaped title the user's own rename wrote; the subscription
+  // repaints the row once the durable record hydrates after a cold start.
+  useUserSessionTitlesRevision();
+  const title = namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled');
   // Same seeding as the stored row: a session the backend has not named yet
   // opens an empty rename field instead of the `New session - <ISO>` machine
-  // string, and the save paths reject an unchanged or blank value.
-  const renameInitialValue = sessionDisplayTitle(session.title) ?? '';
+  // string, and the save paths reject an unchanged or blank value. A title the
+  // user's own rename wrote is still seeded, so a chosen name is not blanked.
+  const renameInitialValue = namedSessionTitle(session.title, session.id) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

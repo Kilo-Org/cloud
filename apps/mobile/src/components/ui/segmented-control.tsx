@@ -56,8 +56,9 @@ export function SegmentedControl<T extends string>({
                 longer label ("Commit and push") on one line at every width and
                 font scale — the platform shrinks the font to fit rather than
                 truncating, so the label stays readable — and a label that still
-                overflows ellipsizes instead of growing a second line. The
-                radio's accessibilityLabel still carries the full text. */}
+                overflows ellipsizes. Longer locales shrink to fit instead of
+                growing a second line; the radio's accessibilityLabel still
+                carries the full text. */}
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
@@ -65,9 +66,6 @@ export function SegmentedControl<T extends string>({
                 'text-center text-sm',
                 selected ? 'font-medium text-foreground' : 'text-muted-foreground'
               )}
-              // One line per option: a wrapped label makes the two choices
-              // uneven. Longer locales shrink to fit instead of growing a second
-              // line; the radio's accessibilityLabel still carries the full text.
             >
               {option.label}
             </Text>

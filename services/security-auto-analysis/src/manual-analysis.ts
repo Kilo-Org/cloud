@@ -130,6 +130,7 @@ export async function processManualAnalysisStart(params: {
     return { status: 'finding-missing' };
   }
   const isActiveRestart = params.command.restartActive === true;
+  if (!finding.platform_integration_id) return { status: 'token-missing' };
   if (!isActiveRestart) {
     const inflight = await countOwnerInflightAnalyses(params.db, owner);
     if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };

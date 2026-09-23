@@ -1,5 +1,5 @@
 import { type TFunction } from 'i18next';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { FlatList, View } from 'react-native';
@@ -95,7 +95,14 @@ function VoiceLanguageList({
 }>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const filtered = options.filter(option => matchesQuery(option, query));
+  // `matchesQuery` folds the label, the description and every search term of
+  // every option, so the filter only reruns when the option array or the query
+  // changes. An unrelated parent re-render then hands the list the same `data`
+  // identity and no mounted row re-renders.
+  const filtered = useMemo(
+    () => options.filter(option => matchesQuery(option, query)),
+    [options, query]
+  );
 
   if (filtered.length === 0) {
     return (
@@ -148,6 +155,28 @@ function DeviceVoiceLanguages({
   const { t } = useTranslation();
   const { languages, isLoading, isError, refetch } = useVoiceRecognitionLanguages();
 
+  // The fetched locale list is stable while the result stands, so the row
+  // objects (endonyms plus the English search terms) are built once per list
+  // instead of on every render. Built above the early returns so the hook order
+  // is identical in every state.
+  const options = useMemo<VoiceLanguageOption[]>(
+    () => [
+      automaticOption(t),
+      ...languages.map(tag => {
+        const englishName = voiceInputLanguageEnglishName(tag);
+        return {
+          tag,
+          label: voiceInputLanguageDisplayName(tag),
+          description: tag,
+          // The endonym and the tag are already searchable; the English name is
+          // what a user who does not read the native name will type.
+          searchTerms: englishName ? [englishName] : [],
+        };
+      }),
+    ],
+    [t, languages]
+  );
+
   if (isLoading) {
     return <SkeletonRows />;
   }
@@ -167,20 +196,6 @@ function DeviceVoiceLanguages({
     );
   }
 
-  const options: VoiceLanguageOption[] = [
-    automaticOption(t),
-    ...languages.map(tag => {
-      const englishName = voiceInputLanguageEnglishName(tag);
-      return {
-        tag,
-        label: voiceInputLanguageDisplayName(tag),
-        description: tag,
-        // The endonym and the tag are already searchable; the English name is
-        // what a user who does not read the native name will type.
-        searchTerms: englishName ? [englishName] : [],
-      };
-    }),
-  ];
   // The stored tag may have been chosen in gateway mode (an app language), so
   // map it onto the device's locales before checking a row: otherwise no row
   // is checked while the settings row still names a language.
@@ -219,6 +234,28 @@ export function VoiceLanguagePickerSheet() {
     [router]
   );
 
+  // The canonical app language picker's list: every supported language collated
+  // by endonym, with the English name as the secondary line. `languageRows('')`
+  // copies, collates and maps the whole catalog, so it is built once per
+  // translation function instead of on every sheet render. Memoized above the
+  // branch because a hook cannot be called conditionally; the device branch
+  // builds its own list from the fetched locales.
+  const gatewayOptions = useMemo<VoiceLanguageOption[]>(
+    () => [
+      automaticOption(t),
+      ...languageRows('').map(row => ({
+        tag: row.tag,
+        label: row.endonym,
+        description: row.englishName,
+        // The row already shows the endonym and English name; the tag is
+        // searchable too, so "zh-Hant" finds a language whose endonym the
+        // user cannot type.
+        searchTerms: [row.tag],
+      })),
+    ],
+    [t]
+  );
+
   // The SecureStore reads resolve after mount; until both settle the mode and
   // the current check are unknown, so hold the skeletons (same row height as
   // ChoiceRow) and render the rows once, correctly checked. The device-mode
@@ -226,32 +263,16 @@ export function VoiceLanguagePickerSheet() {
   // never runs in gateway mode.
   let content: ReactNode = <SkeletonRows />;
   if (gatewayTranscriptionLoaded && chosenLoaded) {
-    if (gatewayTranscriptionEnabled) {
-      // The canonical app language picker's list: every supported language
-      // collated by endonym, with the English name as the secondary line.
-      const options: VoiceLanguageOption[] = [
-        automaticOption(t),
-        ...languageRows('').map(row => ({
-          tag: row.tag,
-          label: row.endonym,
-          description: row.englishName,
-          // The row already shows the endonym and English name; the tag is
-          // searchable too, so "zh-Hant" finds a language whose endonym the
-          // user cannot type.
-          searchTerms: [row.tag],
-        })),
-      ];
-      content = (
-        <VoiceLanguageList
-          options={options}
-          chosen={reconcileVoiceInputLanguageTag(chosen, SUPPORTED_LANGUAGES)}
-          query={query}
-          onSelect={onSelect}
-        />
-      );
-    } else {
-      content = <DeviceVoiceLanguages chosen={chosen} query={query} onSelect={onSelect} />;
-    }
+    content = gatewayTranscriptionEnabled ? (
+      <VoiceLanguageList
+        options={gatewayOptions}
+        chosen={reconcileVoiceInputLanguageTag(chosen, SUPPORTED_LANGUAGES)}
+        query={query}
+        onSelect={onSelect}
+      />
+    ) : (
+      <DeviceVoiceLanguages chosen={chosen} query={query} onSelect={onSelect} />
+    );
   }
 
   return (

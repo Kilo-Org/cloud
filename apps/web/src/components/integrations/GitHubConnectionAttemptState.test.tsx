@@ -112,6 +112,8 @@ test('surfaces attachable installations alongside the install-new option', () =>
   );
   expect(html).toContain('acme');
   expect(html).toContain('widgets-inc');
+  expect(html).toContain('If this installation is already connected to another Kilo owner');
+  expect(html).toContain('Slack and Cloud Agent access only');
   expect(html).toContain('Install on a different GitHub organization');
 });
 

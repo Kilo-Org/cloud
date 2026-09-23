@@ -1,6 +1,6 @@
 import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, I18nManager, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -102,7 +102,14 @@ export function LanguagePickerSheet({
   // The native layout direction, not the catalog's: the row insets and the
   // search alignment follow how the interface is laid out.
   const isRtl = I18nManager.isRTL;
-  const items = languagePickerItems(query, appliedLanguage, applied === 'device');
+  // The copy/fold/collate of the whole language table and the fresh row objects
+  // are only valid while the query and the applied language stand. Keyed the
+  // same way so a `selected` or `busy` change keeps the list identity and does
+  // not re-render every mounted row.
+  const items = useMemo(
+    () => languagePickerItems(query, appliedLanguage, applied === 'device'),
+    [query, appliedLanguage, applied]
+  );
 
   const handleDone = async () => {
     if (busy) {

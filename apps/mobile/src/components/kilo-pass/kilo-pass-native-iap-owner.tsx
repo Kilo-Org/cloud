@@ -341,18 +341,14 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         enabledAppleProductIds,
         enabledGoogleProductIds,
         loadEnabledAppleProductIds: async () => {
-          const result = await queryClient.fetchQuery(
-            backendStoreKiloPassProductsQueryOptions(trpc)
-          );
+          const result = await queryClient.query(backendStoreKiloPassProductsQueryOptions(trpc));
           return getEnabledProductIds(
             result.products.map(product => product.appleProductId),
             enabledAppleProductIds
           );
         },
         loadEnabledGoogleProductIds: async () => {
-          const result = await queryClient.fetchQuery(
-            backendStoreKiloPassProductsQueryOptions(trpc)
-          );
+          const result = await queryClient.query(backendStoreKiloPassProductsQueryOptions(trpc));
           return getEnabledProductIds(
             result.products.map(product => product.googleProductId),
             enabledGoogleProductIds

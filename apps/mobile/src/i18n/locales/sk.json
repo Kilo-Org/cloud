@@ -278,7 +278,7 @@
     "featureFlags": "Príznaky funkcií",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Vzdialene · ≥ {{min}}",
-    "featureFlagSkipped": "Predvolená · < {{min}}",
+    "featureFlagSkipped": "predvolené · < {{min}}",
     "featureFlagNotLoaded": "Predvolená · Nenačítané",
     "gatewayTranscription": "Prepis cez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",

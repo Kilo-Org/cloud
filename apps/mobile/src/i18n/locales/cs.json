@@ -278,7 +278,7 @@
     "featureFlags": "Příznaky funkcí",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Vzdáleně · ≥ {{min}}",
-    "featureFlagSkipped": "Výchozí · < {{min}}",
+    "featureFlagSkipped": "výchozí · < {{min}}",
     "featureFlagNotLoaded": "Výchozí · Nenačteno",
     "gatewayTranscription": "Přepis přes Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",

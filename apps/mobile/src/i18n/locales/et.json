@@ -278,7 +278,7 @@
     "featureFlags": "Funktsioonilipud",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Kaugelt · ≥ {{min}}",
-    "featureFlagSkipped": "Vaikimisi · < {{min}}",
+    "featureFlagSkipped": "vaikeväärtus · < {{min}}",
     "featureFlagNotLoaded": "Vaikimisi · Laadimata",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",

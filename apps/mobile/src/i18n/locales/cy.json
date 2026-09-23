@@ -278,7 +278,7 @@
     "featureFlags": "Baneri nodweddion",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "o bell · ≥ {{min}}",
-    "featureFlagSkipped": "Rhagosodedig · < {{min}}",
+    "featureFlagSkipped": "rhagosodedig · < {{min}}",
     "featureFlagNotLoaded": "Rhagosodedig · Heb ei lwytho",
     "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",

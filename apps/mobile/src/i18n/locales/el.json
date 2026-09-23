@@ -278,7 +278,7 @@
     "featureFlags": "Σημαίες λειτουργιών",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Απομακρυσμένα · ≥ {{min}}",
-    "featureFlagSkipped": "Προεπιλογή · < {{min}}",
+    "featureFlagSkipped": "προεπιλογή · < {{min}}",
     "featureFlagNotLoaded": "Προεπιλογή · Δεν φορτώθηκε",
     "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",

@@ -278,7 +278,7 @@
     "featureFlags": "Funkciju karodziņi",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Attālināti · ≥ {{min}}",
-    "featureFlagSkipped": "Noklusējuma · < {{min}}",
+    "featureFlagSkipped": "noklusējums · < {{min}}",
     "featureFlagNotLoaded": "Noklusējuma · Nav ielādēts",
     "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",

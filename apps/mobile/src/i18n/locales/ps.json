@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "د اپلیکیشن د پیل پر مهال او په شالید کې له پنځو دقیقو تېرولو وروسته قلف خلاص کړئ.",
     "featureFlags": "د ځانګړتیاوو بیرغونه",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "لرې · ≥ {{min}}",
+    "featureFlagApplied": "له سرور څخه · ≥ {{min}}",
     "featureFlagSkipped": "ډیفالټ · < {{min}}",
     "featureFlagNotLoaded": "ډیفالټ · نه بار شوی",
     "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",

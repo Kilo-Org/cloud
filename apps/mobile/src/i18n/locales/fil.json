@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "I-unlock ang app sa pagbukas at matapos ang limang minuto sa background.",
     "featureFlags": "Mga feature flag",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Malayo · ≥ {{min}}",
+    "featureFlagApplied": "mula sa server · ≥ {{min}}",
     "featureFlagSkipped": "Paunang itinakda · < {{min}}",
     "featureFlagNotLoaded": "Paunang itinakda · Hindi na-load",
     "gatewayTranscription": "Pagsasalin ng boses sa teksto gamit ang Kilo Gateway",

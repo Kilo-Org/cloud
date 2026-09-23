@@ -278,7 +278,7 @@
     "featureFlags": "Indicadores de funciones",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Remota · ≥ {{min}}",
-    "featureFlagSkipped": "Por defecto · < {{min}}",
+    "featureFlagSkipped": "predeterminado · < {{min}}",
     "featureFlagNotLoaded": "Por defecto · Sin cargar",
     "gatewayTranscription": "Transcripción con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcribe el dictado con un modelo de Kilo Gateway en lugar del reconocimiento de voz del dispositivo. Tu grabación se envía a Kilo Gateway.",

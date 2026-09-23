@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "యాప్‌ను తెరిచినప్పుడు, అలాగే అది నేపథ్యంలో ఐదు నిమిషాలు ఉన్న తర్వాత అన్‌లాక్ చేయాలి.",
     "featureFlags": "ఫీచర్ ఫ్లాగులు",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "రిమోట్ · ≥ {{min}}",
+    "featureFlagApplied": "సర్వర్ నుండి · ≥ {{min}}",
     "featureFlagSkipped": "డిఫాల్ట్ · < {{min}}",
     "featureFlagNotLoaded": "డిఫాల్ట్ · లోడ్ కాలేదు",
     "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",

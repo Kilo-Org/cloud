@@ -278,7 +278,7 @@
     "featureFlags": "Flagi funkcji",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Zdalnie · ≥ {{min}}",
-    "featureFlagSkipped": "Domyślna · < {{min}}",
+    "featureFlagSkipped": "domyślne · < {{min}}",
     "featureFlagNotLoaded": "Domyślna · Nie wczytano",
     "gatewayTranscription": "Transkrypcja przez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkrybuj dyktowanie modelem Kilo Gateway zamiast rozpoznawania mowy na urządzeniu. Twoje nagranie zostanie wysłane do Kilo Gateway.",

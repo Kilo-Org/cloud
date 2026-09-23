@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ.",
     "featureFlags": "ທຸງຄຸນສົມບັດ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ທາງໄກ · ≥ {{min}}",
+    "featureFlagApplied": "ຈາກເຊີບເວີ · ≥ {{min}}",
     "featureFlagSkipped": "ຄ່າເລີ່ມຕົ້ນ · < {{min}}",
     "featureFlagNotLoaded": "ຄ່າເລີ່ມຕົ້ນ · ບໍ່ໄດ້ໂຫຼດ",
     "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",

@@ -278,7 +278,7 @@
     "featureFlags": "Tutocin sifofi",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Na nesa · ≥ {{min}}",
-    "featureFlagSkipped": "Na al'ada · < {{min}}",
+    "featureFlagSkipped": "na asali · < {{min}}",
     "featureFlagNotLoaded": "Na al'ada · Ba a loda",
     "gatewayTranscription": "Mayar da magana zuwa rubutu ta Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",

@@ -14,11 +14,11 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  * Each row reads `<value> · <source> · <relation>`, e.g.
  * `Enabled · remote · ≥ 1.0.4`: the value the UI acts on, whether it came
  * from PostHog or the flag's default, and the gate that decided. Every word
- * comes from the catalog — the value, the source and the state; only the
- * `{{min}}`/`v{{version}}` versions and the `≥`/`<` operators are notation.
- * `preferences.featureFlagApplied`, `preferences.featureFlagSkipped` and
- * `preferences.featureFlagNotLoaded` carry the source and relation words, and
- * every non-English catalog translates those three keys.
+ * comes from the catalog — the value, the source and the state; only the flag
+ * key, the `{{min}}`/`v{{version}}` versions and the `≥`/`<` operators are
+ * notation. `preferences.featureFlagApplied`, `preferences.featureFlagSkipped`
+ * and `preferences.featureFlagNotLoaded` carry the source and relation words,
+ * and every non-English catalog translates those three keys.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();

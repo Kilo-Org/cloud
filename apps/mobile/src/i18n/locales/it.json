@@ -2178,7 +2178,7 @@
     "featureFlags": "Flag di funzionalità",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Remota · ≥ {{min}}",
-    "featureFlagSkipped": "Predefinito · < {{min}}",
+    "featureFlagSkipped": "predefinito · < {{min}}",
     "featureFlagNotLoaded": "Predefinito · Non caricato",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",

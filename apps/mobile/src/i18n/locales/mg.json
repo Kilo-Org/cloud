@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "Ilaina ny mamaha ny hidy rehefa manomboka ny rindranasa sy rehefa tsy naseho nandritra ny dimy minitra.",
     "featureFlags": "Saina endri-javatra",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Lavitra · ≥ {{min}}",
+    "featureFlagApplied": "avy amin'ny mpizara · ≥ {{min}}",
     "featureFlagSkipped": "Voafidy mialoha · < {{min}}",
     "featureFlagNotLoaded": "Voafidy mialoha · Tsy voampiditra",
     "gatewayTranscription": "Fanovana feo ho soratra amin'ny Kilo Gateway",

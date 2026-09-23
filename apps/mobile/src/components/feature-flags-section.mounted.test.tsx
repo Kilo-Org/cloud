@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -50,6 +50,9 @@ afterEach(() => {
   view?.unmount();
   view = undefined;
   vi.unstubAllGlobals();
+});
+afterAll(async () => {
+  await i18n.changeLanguage('en');
 });
 
 const applied = {
@@ -140,5 +143,25 @@ describe('FeatureFlagsSection', () => {
     const tree = await mount();
 
     expect(textLines(tree)).toEqual([]);
+  });
+
+  it('reads the whole row from the Arabic catalog', async () => {
+    // The explorer capture showed the fully Arabic Preferences screen mixing
+    // untranslated developer English into each flag row ("مفعّل · default ·
+    // not loaded"). Every word of the row, not only the value, must come from
+    // the Arabic catalog; the check below states that as "no ASCII letter in a
+    // row line".
+    await i18n.changeLanguage('ar');
+    posthog.statuses = [applied, skipped, unloaded];
+    const tree = await mount();
+
+    const lines = textLines(tree);
+    expect(lines).toContain('أعلام الميزات');
+    expect(lines).toContain('مفعّل · من الخادم · ≥ 1.0.4');
+    expect(lines).toContain('معطّل · افتراضي · < 1.0.6');
+    expect(lines).toContain('مفعّل · افتراضي · غير محمّل');
+    for (const line of lines.filter(text => text.includes(' · '))) {
+      expect(line, `untranslated row copy: ${line}`).not.toMatch(/[A-Za-z]/);
+    }
   });
 });

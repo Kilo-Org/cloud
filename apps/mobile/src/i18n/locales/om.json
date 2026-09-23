@@ -278,7 +278,7 @@
     "featureFlags": "Albaasa amalaa",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "Fagootti · ≥ {{min}}",
-    "featureFlagSkipped": "Ofumaan · < {{min}}",
+    "featureFlagSkipped": "jalqaba · < {{min}}",
     "featureFlagNotLoaded": "Ofumaan · Hin fe'ame",
     "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",

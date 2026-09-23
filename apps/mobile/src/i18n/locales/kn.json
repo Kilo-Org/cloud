@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "ಅಪ್ಲಿಕೇಶನ್ ಪ್ರಾರಂಭಿಸಿದಾಗ ಮತ್ತು ಐದು ನಿಮಿಷ ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಇದ್ದ ನಂತರ ಅನ್‌ಲಾಕ್ ಮಾಡಬೇಕು.",
     "featureFlags": "ಫೀಚರ್ ಫ್ಲ್ಯಾಗ್ಗಳು",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ರಿಮೋಟ್ · ≥ {{min}}",
+    "featureFlagApplied": "ಸರ್ವರ್‌ನಿಂದ · ≥ {{min}}",
     "featureFlagSkipped": "ಡೀಫಾಲ್ಟ್ · < {{min}}",
     "featureFlagNotLoaded": "ಡೀಫಾಲ್ಟ್ · ಲೋಡ್ ಆಗಿಲ್ಲ",
     "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",

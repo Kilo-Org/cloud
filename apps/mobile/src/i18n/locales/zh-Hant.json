@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。",
     "featureFlags": "功能旗標",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "遠端 · ≥ {{min}}",
+    "featureFlagApplied": "來自伺服器 · ≥ {{min}}",
     "featureFlagSkipped": "預設 · < {{min}}",
     "featureFlagNotLoaded": "預設 · 未載入",
     "gatewayTranscription": "使用 Kilo Gateway 轉錄",

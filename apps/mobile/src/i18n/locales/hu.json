@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
       "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
-      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy figyelmeztetéseket kapj alacsony egyenlegről.",
+      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy egyenleg-figyelmeztetéseket kapj.",
       "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
-      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörben, hogy biztonsági találatokat kapj.",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági problémákat kapj.",
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategória"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Túl sok bejelentkezési kísérlet történt. Várj egy kicsit, majd próbáld újra."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatikus Csúcskategóriás",
+      "balanced": "Automatikus Kiegyensúlyozott",
+      "efficient": "Automatikus Hatékony",
+      "small": "Automatikus Kicsi",
+      "free": "Automatikus Ingyenes",
+      "organization": "Szervezeti automatikus"
+    },
     "dataCollected": "Adatgyűjtés",
     "free": "Ingyenes",
     "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket.",

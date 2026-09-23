@@ -335,11 +335,11 @@
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
-      "kiloclawActivityUnavailable": "Khởi động một máy KiloClaw để nhận hoạt động KiloClaw.",
+      "kiloclawActivityUnavailable": "Khởi chạy một instance KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư thấp.",
+      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư.",
       "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
-      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật.",
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận các vấn đề bảo mật.",
       "spendAlertsSubtitle": "vượt ngưỡng và tăng vọt theo giờ",
       "spendAlertsToggle": "Danh mục cảnh báo chi tiêu"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một lát rồi thử lại."
   },
   "models": {
+    "auto": {
+      "frontier": "Tự động Tiên tiến",
+      "balanced": "Tự động Cân bằng",
+      "efficient": "Tự động Hiệu quả",
+      "small": "Tự động Nhỏ",
+      "free": "Tự động Miễn phí",
+      "organization": "Tự động Tổ chức"
+    },
     "dataCollected": "Có thu thập dữ liệu",
     "free": "Miễn phí",
     "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích.",

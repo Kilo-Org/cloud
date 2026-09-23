@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Сессия күйі",
       "sessionStatusSubtitle": "аяқталды / сәтсіз аяқталды / басқаруға дайын",
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
-      "kiloclawActivityUnavailable": "KiloClaw белсенділігін алу үшін KiloClaw данасын іске қосыңыз.",
+      "kiloclawActivityUnavailable": "KiloClaw әрекетін алу үшін KiloClaw данасын іске қосыңыз.",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
       "balanceAlertsUnavailable": "Баланс ескертулерін алу үшін ұйымға қосылыңыз.",
       "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар",
-      "securityFindingsUnavailable": "Қауіпсіздік мәселелерін алу үшін Kilo Қауіпсіздік агентін ауқымда қосыңыз.",
+      "securityFindingsUnavailable": "Қауіпсіздік осалдықтарын алу үшін Kilo қауіпсіздік агентін бір аяда қосыңыз.",
       "spendAlertsSubtitle": "шектерден асу және сағаттық секірістер",
       "spendAlertsToggle": "Шығыс ескертулері санаты"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Жүйеге кіру әрекеттері тым көп. Сәл күтіп, қайталап көріңіз."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Озық",
+      "balanced": "Авто Теңгерімді",
+      "efficient": "Авто Тиімді",
+      "small": "Авто Кішкене",
+      "free": "Авто Тегін",
+      "organization": "Ұйымдық авто"
+    },
     "dataCollected": "Деректер жиналады",
     "free": "Тегін",
     "couldNotUpdateFavorites": "Таңдаулыларды жаңарту мүмкін болмады.",

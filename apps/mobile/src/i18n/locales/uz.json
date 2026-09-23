@@ -843,7 +843,7 @@
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
       "balanceAlertsUnavailable": "Balans ogohlantirishlarini olish uchun tashkilotga qo'shiling.",
       "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari",
-      "securityFindingsUnavailable": "Xavfsizlik muammolarini olish uchun Kilo Xavfsizlik agentini qamrovda yoqing.",
+      "securityFindingsUnavailable": "Xavfsizlik zaifliklarini olish uchun bir qamrovda Kilo Xavfsizlik agentini yoqing.",
       "spendAlertsSubtitle": "chegaradan oshish va soatlik ko'tarilishlar",
       "spendAlertsToggle": "Xarajat bildirishnomalari toifasi"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Kirish urinishlari juda ko'p. Iltimos, kuting va qayta urinib ko'ring."
   },
   "models": {
+    "auto": {
+      "frontier": "Avto Ilg'or",
+      "balanced": "Avto Muvozanatli",
+      "efficient": "Avto Samarali",
+      "small": "Avto Kichik",
+      "free": "Avto Bepul",
+      "organization": "Tashkilot Avto"
+    },
     "dataCollected": "Ma'lumot yig'iladi",
     "free": "Bepul",
     "couldNotUpdateFavorites": "Sevimlilarni yangilab bo'lmadi.",

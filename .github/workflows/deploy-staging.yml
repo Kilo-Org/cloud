@@ -3,6 +3,8 @@ name: Deploy Web to Staging
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'apps/mobile/**'
   workflow_dispatch:
 
 permissions:

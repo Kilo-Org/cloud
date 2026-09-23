@@ -339,7 +339,7 @@
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "balanceAlertsUnavailable": "انضم إلى مؤسسة للحصول على تنبيهات الرصيد.",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA",
-      "securityFindingsUnavailable": "فعّل وكيل أمان Kilo على نطاق للحصول على ملاحظات الأمان.",
+      "securityFindingsUnavailable": "فعِّل وكيل الأمان من Kilo على نطاق للحصول على النتائج الأمنية.",
       "spendAlertsSubtitle": "تجاوزات الحدود والارتفاعات الساعية",
       "spendAlertsToggle": "فئة تنبيهات الإنفاق"
     },
@@ -3317,6 +3317,14 @@
     "tooManySignInAttempts": "تجاوزت الحد المسموح لمحاولات تسجيل الدخول. انتظر قليلًا وحاول مرة أخرى."
   },
   "models": {
+    "auto": {
+      "frontier": "تلقائي متقدم",
+      "balanced": "تلقائي متوازن",
+      "efficient": "تلقائي فعّال",
+      "small": "تلقائي صغير",
+      "free": "تلقائي مجاني",
+      "organization": "تلقائي المؤسسة"
+    },
     "dataCollected": "يجمع البيانات",
     "free": "مجاني",
     "couldNotUpdateFavorites": "تعذّر تحديث المفضلة.",

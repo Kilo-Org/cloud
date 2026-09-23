@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
-import { Pressable, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -163,10 +164,21 @@ export function NewSessionConfigureForm({
   // the sheet opens.)
   const { bottom } = useSafeAreaInsets();
   const isRemote = runOnInstance !== null;
+  // The frame this form scrolls in: the height left once the navigation-bar
+  // inset and the keyboard-lift padding are taken out. `NewSessionPrompt`
+  // measures its input's min-height floor against this frame, so the input
+  // gives lines up to the keyboard and takes them back when it leaves — the
+  // window-based floor could not, because the window never resizes for the IME.
+  const [promptViewportHeight, setPromptViewportHeight] = useState(0);
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
+
+  function handleScrollViewportLayout(event: LayoutChangeEvent) {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    setPromptViewportHeight(current => (current === nextHeight ? current : nextHeight));
+  }
 
   const body = (
     <ScrollView
@@ -177,6 +189,9 @@ export function NewSessionConfigureForm({
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
       onLayout={event => {
+        // The one layout feeds both consumers: the form frame height sets the
+        // prompt's input floor, and the hook's viewport height drives the reveal.
+        handleScrollViewportLayout(event);
         composerReveal.onViewportLayout(event.nativeEvent.layout.height);
       }}
       onScroll={event => {
@@ -221,6 +236,7 @@ export function NewSessionConfigureForm({
           shareId={shareId}
           voiceInputSettlerRef={voiceInputSettlerRef}
           initialPrompt={initialPrompt}
+          promptViewportHeight={promptViewportHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
         />

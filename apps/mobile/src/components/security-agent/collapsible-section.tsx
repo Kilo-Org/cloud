@@ -28,7 +28,8 @@ type CollapsibleSectionProps = {
    * box painted at its pre-change position until the transition ends, so
    * siblings that shifted are covered. Pass `false` for such a section: opacity
    * fades stay safe and the position snap does not lag. `profile-screen.tsx`
-   * names the same hazard on a sibling section.
+   * names the same hazard on a sibling section; see `DisclosureLayout` for the
+   * transition it drops.
    */
   animateLayout?: boolean;
   className?: string;
@@ -62,9 +63,14 @@ function useDisclosureRotation(targetAngle: 0 | 180) {
  * Height transition for a block that grows or shrinks — the same Reanimated
  * layout transition on iOS and Android, so one implementation covers both and
  * the change animates instead of snapping. Reduced motion drops the transition.
+ *
  * `animateLayout={false}` drops it too, for a section whose siblings above it
- * mount or resize asynchronously: the transition would paint the section at its
- * pre-change position and cover the sibling that moved.
+ * mount or resize asynchronously, and for a caller that stacks this block under
+ * plain siblings in a scroll column: the transition interpolates this block's
+ * frame while the siblings snap, so for its 200ms it can be drawn over the row
+ * above it (the new-session connect card over the repository picker, e5 spot
+ * check, 2026-09-21). Reanimated has no way to clip a transition to its own
+ * box, so the caller that cannot afford the overlap opts out.
  */
 export function DisclosureLayout({
   className,

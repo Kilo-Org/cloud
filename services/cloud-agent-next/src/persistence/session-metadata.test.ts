@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   CurrentSessionMetadataSchema,
   getEffectiveCredentialContainment,
@@ -432,10 +433,17 @@ describe('session metadata boundary', () => {
     ).toThrow();
   });
 
-  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+  it.each([
+    'cloudflare-single',
+    'cloudflare-shared',
+    'cloudflare-containers-standard-4',
+    'vercel-small',
+    'vercel-large',
+  ] as const)(
     'round-trips the immutable %s preset and rejects inconsistent allocations',
     sandboxAllocation => {
       const sandboxId = `${sandboxAllocation === 'cloudflare-shared' ? 'org' : 'ses'}-${'a'.repeat(48)}`;
+      const provider = getSandboxAllocationProvider(sandboxAllocation);
       const current = {
         metadataSchemaVersion: 2,
         identity: { sessionId: 'workspace_preset', userId: 'oauth/user', orgId: 'org-id' },
@@ -443,7 +451,7 @@ describe('session metadata boundary', () => {
         workspace: {
           sandboxId,
           sandboxAllocation,
-          sandboxProvider: sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare',
+          sandboxProvider: provider,
           ...(sandboxAllocation === 'cloudflare-shared'
             ? { sandboxRoute: { kind: 'shared', routeKey: sandboxId } }
             : {}),
@@ -451,22 +459,22 @@ describe('session metadata boundary', () => {
         lifecycle: { version: 1, timestamp: 1 },
       };
       expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
-      const vercel = sandboxAllocation.startsWith('vercel-');
+      const controlPlaneOnly = provider !== 'cloudflare';
       for (const workspace of [
         { ...current.workspace, sandboxId: `dind-${'a'.repeat(48)}` },
         {
           ...current.workspace,
-          sandboxProvider: current.workspace.sandboxProvider === 'vercel' ? 'cloudflare' : 'vercel',
+          sandboxProvider: provider === 'vercel' ? 'cloudflare' : 'vercel',
         },
         { ...current.workspace, devcontainerRequested: true },
         // `istd-` is the only identity Isolated Standard accepts.
         { ...current.workspace, sandboxAllocation: 'isolated-standard' },
         { ...current.workspace, sandboxAllocation: 'custom' },
-        ...(vercel ? [{ ...current.workspace, sandboxProvider: undefined }] : []),
+        ...(controlPlaneOnly ? [{ ...current.workspace, sandboxProvider: undefined }] : []),
       ]) {
         expect(() => parseSessionMetadata({ ...current, workspace })).toThrow();
       }
-      if (!vercel) {
+      if (!controlPlaneOnly) {
         // Metadata written before the explicit provider field defaults to Cloudflare.
         const implicit = {
           ...current,
@@ -485,9 +493,9 @@ describe('session metadata boundary', () => {
           identity: { ...current.identity, orgId: undefined },
         }).workspace?.sandboxAllocation
       ).toBe(sandboxAllocation);
-      // Cloudflare presets keep the owner's plane; Vercel presets exist only on control.
+      // Cloudflare presets keep the owner's plane; the other providers exist only on control.
       const legacy = { ...current, identity: { ...current.identity, sessionId: 'agent_legacy' } };
-      if (sandboxAllocation.startsWith('vercel-')) {
+      if (controlPlaneOnly) {
         expect(() => parseSessionMetadata(legacy)).toThrow('control-plane session');
       } else {
         expect(serializeSessionMetadata(parseSessionMetadata(legacy))).toEqual(legacy);
@@ -695,6 +703,70 @@ describe('session metadata boundary', () => {
           innerWorkspaceFolder: '/workspaces/repo',
           wrapperPort: 4173,
           configPath: '.devcontainer/devcontainer.json',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('round-trips cloudflare-containers metadata on the control plane', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'workspace_containers_provider',
+        userId: 'user_containers_provider',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef' as const,
+        sandboxProvider: 'cloudflare-containers' as const,
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: 1,
+      },
+    };
+
+    const parsed = parseSessionMetadata(current);
+    expect(parsed).toEqual(current);
+    expect(getSandboxProvider(parsed)).toBe('cloudflare-containers');
+    expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
+  });
+
+  it('rejects cloudflare-containers metadata on a legacy session', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_containers_legacy', userId: 'user_containers_legacy' },
+        auth: {},
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects cloudflare-containers metadata pinned to a shared sandbox identity', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_containers_shared', userId: 'user_containers_shared' },
+        auth: {},
+        workspace: { sandboxId: 'org-abcdef', sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects cloudflare-containers metadata requesting a devcontainer runtime', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_containers_dind', userId: 'user_containers_dind' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          devcontainerRequested: true,
         },
         lifecycle: { version: 1, timestamp: 1 },
       })

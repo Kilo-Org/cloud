@@ -55,6 +55,10 @@ const keyboardSubscribers = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The profile row and the environment row render the reanimated `Skeleton`
+// while their content loads; its module reaches the Reanimated worklets entry,
+// which this plain Node project cannot resolve, and the loading cases assert
+// the stub by name — its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -136,22 +140,9 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
 }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
-
-// The profile row and the environment row both render a loading `Skeleton`,
-// whose module imports `react-native-reanimated`: this pure suite does not set
-// Reanimated up, and this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The stub is the type the
-// pending-environment case asserts by name; its own rendering is not under test
-// here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
@@ -981,7 +972,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 12: kilo remote hint ──
-  it('names both `kilo remote` and `/remote` for cloud and remote targets', async () => {
+  it('names both kilo remote and /remote, with no literal markdown, for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

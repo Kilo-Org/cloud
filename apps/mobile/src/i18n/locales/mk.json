@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Статус на сесија",
       "sessionStatusSubtitle": "завршено / неуспешно / подготвено за контрола",
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
-      "kiloclawActivityUnavailable": "Стартувај инстанца на KiloClaw за да добиеш активност од KiloClaw.",
+      "kiloclawActivityUnavailable": "Стартувајте инстанца KiloClaw за да добивате активност на KiloClaw.",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
-      "balanceAlertsUnavailable": "Приклучи се кон организација за да добиеш предупредувања за ниска состојба.",
+      "balanceAlertsUnavailable": "Придружете се на организација за да добивате предупредувања за состојба.",
       "securityFindingsSubtitle": "нови наоди и потсетници за SLA",
-      "securityFindingsUnavailable": "Вклучи го безбедносниот агент на Kilo во опсег за да добиеш безбедносни наоди.",
+      "securityFindingsUnavailable": "Овозможете го Безбедносниот агент Kilo на опсег за да добивате безбедносни наоди.",
       "spendAlertsSubtitle": "преминувања на прагови и часовни скокови",
       "spendAlertsToggle": "Категорија предупредувања за трошење"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Премногу обиди за најава. Почекај и обиди се повторно."
   },
   "models": {
+    "auto": {
+      "frontier": "Автоматски Напреден",
+      "balanced": "Автоматски Балансиран",
+      "efficient": "Автоматски Ефикасен",
+      "small": "Автоматски Мал",
+      "free": "Автоматски Бесплатен",
+      "organization": "Автоматски на организацијата"
+    },
     "dataCollected": "Се собираат податоци",
     "free": "Бесплатно",
     "couldNotUpdateFavorites": "Не успеа ажурирањето на омилените.",

@@ -51,6 +51,8 @@ import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import type * as SessionTranscript from '@/components/agents/session-transcript';
+import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   resolveSendAttachmentKind,
@@ -127,6 +129,9 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  // The header reads the window to decide whether its actions share the title
+  // row; this phone is wide enough for them to.
+  useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
@@ -284,7 +289,10 @@ vi.mock('@/components/agents/text-part-renderer', () => ({
 vi.mock('@/components/agents/chat-markdown-text', () => ({
   ChatMarkdownText: ({ value }: { value: string }) => createElement('Text', null, value),
 }));
-vi.mock('@/components/agents/tool-cards', () => ({ TaskToolCard: 'TaskToolCard' }));
+vi.mock('@/components/agents/tool-cards', () => ({
+  TaskToolCard: 'TaskToolCard',
+  ReadToolCard: 'ReadToolCard',
+}));
 vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: function MessageList<T>(props: ComponentProps<typeof SessionMessageList<T>>) {
@@ -412,6 +420,21 @@ vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
     setCondenseToolCalls: vi.fn(),
   }),
 }));
+// The part→item-key map is only read back by the condensed build, so the
+// component must not walk the transcript for it while condensing is off.
+const transcriptKeyCollection = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/components/agents/session-transcript', async importOriginal => {
+  const actual = await importOriginal<typeof SessionTranscript>();
+  return {
+    ...actual,
+    collectTranscriptItemKeysByPart: (
+      ...args: Parameters<typeof actual.collectTranscriptItemKeysByPart>
+    ) => {
+      transcriptKeyCollection.calls += 1;
+      return actual.collectTranscriptItemKeysByPart(...args);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-session-model-options', () => ({
   useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
 }));
@@ -607,6 +630,23 @@ let sessionTitleOverride: string | null = null;
 
 function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
+}
+
+/**
+ * The FlashList keys the first message list would mount rows under. The list is
+ * stubbed, so read the props the stub was handed: the same `keyExtractor` the
+ * real FlashList uses for its viewport anchor.
+ */
+function transcriptKeys(renderer: ReactTestRenderer): string[] {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    return [];
+  }
+  const { items, keyExtractor } = list.props as {
+    items: readonly SessionTranscriptItem[];
+    keyExtractor: (item: SessionTranscriptItem) => string;
+  };
+  return items.map(item => keyExtractor(item));
 }
 
 beforeEach(() => {
@@ -993,6 +1033,25 @@ describe('SessionDetailContent header title', () => {
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
+  // flexShrink is 0: unless the cluster and the pill opt in, their children
+  // keep their natural width and paint past the row's right edge, off-screen.
+  it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
+    const { renderer } = await mountDetails();
+    const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {
+      props: { className: string };
+    };
+    expect(headerRight.props.className).toContain('min-w-0');
+    expect(headerRight.props.className).toContain('shrink');
+    const metricsClassName = (
+      renderer.root.findByProps({ testID: 'session-context-metrics' }).props as {
+        className?: string;
+      }
+    ).className;
+    expect(metricsClassName).toContain('shrink');
+    expect(metricsClassName).toContain('min-w-0');
   });
 });
 
@@ -2014,6 +2073,45 @@ describe('SessionDetailContent condensed tool runs', () => {
     expect(runRows).toHaveLength(1);
     expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
   });
+
+  it('keeps the condensed row key when an older tool-only page prepends', async () => {
+    condensePreference.value = true;
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm2', ['t2'])]);
+    // A lone tool part condenses to its message row, keyed by the message id.
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+
+    // Loading older messages prepends an older tool-only message whose part
+    // joins the run. The row FlashList anchored on must keep its key, or the
+    // viewport jumps (the reported defect).
+    await act(async () => {
+      void view.manager.loadOlderMessages();
+      await Promise.resolve();
+    });
+    await view.respond(ROOT_ID, [toolRunMessage(ROOT_ID, 'm1', ['t1'])]);
+
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+  });
+});
+
+describe('SessionDetailContent transcript key collection', () => {
+  it('does not walk the transcript for part keys while condensing is off', async () => {
+    condensePreference.value = false;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBe(0);
+  });
+
+  it('collects part keys once condensing is on', async () => {
+    condensePreference.value = true;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBeGreaterThan(0);
+  });
 });
 
 describe('session detail exit retry row', () => {
@@ -2051,6 +2149,69 @@ describe('session detail exit retry row', () => {
       failureHandlers.nonRetryable?.();
     });
     expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
+  });
+});
+
+describe('transcript time markers', () => {
+  it.each(['message', 'tool-run'] as const)(
+    'keeps the %s subtree mounted when a prepend moves its marker',
+    async kind => {
+      condensePreference.value = kind === 'tool-run';
+      rootPageNextCursor = 'older-cursor';
+      const message =
+        kind === 'tool-run'
+          ? toolRunMessage(ROOT_ID, 'm2', ['t2a', 't2b'])
+          : childMessage(ROOT_ID, 'Existing answer');
+      message.info.time.created = 1_000_000_000;
+      const view = await mountDetails([message]);
+      const findRow = () =>
+        kind === 'tool-run'
+          ? view.renderer.root.find(node => Object.is(node.type, 'CondensedToolRunRow'))
+          : view.renderer.root.findByProps({ children: 'Existing answer' });
+      const before = findRow();
+      expect(before).toBeDefined();
+      const keys = transcriptKeys(view.renderer);
+
+      await act(async () => {
+        void view.manager.loadOlderMessages();
+        await Promise.resolve();
+      });
+      const older = childMessage(ROOT_ID, 'Older answer');
+      older.info = { ...older.info, id: 'm1', time: { created: 999_999_000 } };
+      older.parts = [
+        stubTextPart({ id: 'text-m1', sessionID: ROOT_ID, messageID: 'm1', text: 'Older answer' }),
+      ];
+      await view.respond(ROOT_ID, [older]);
+
+      expect(transcriptKeys(view.renderer)).toEqual(['m1', ...keys]);
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+      ).toHaveLength(1);
+      expect(findRow() === before).toBe(true);
+    }
+  );
+
+  it('renders the marker in the same row as the message that opens the burst', async () => {
+    const message: StoredMessage = {
+      info: { ...assistantMessage('msg-marker').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-marker',
+          sessionID: ROOT_ID,
+          messageID: 'msg-marker',
+          text: 'Marked answer',
+        }),
+      ],
+    };
+
+    const view = await mountDetails([message]);
+
+    // The first message of the page opens the burst, so its row carries the
+    // marker above the bubble instead of the marker being an item of its own.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+    ).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain('Marked answer');
   });
 });
 

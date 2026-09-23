@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Նիստի կարգավիճակ",
       "sessionStatusSubtitle": "ավարտված / ձախողված / պատրաստ է կառավարման",
       "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
-      "kiloclawActivityUnavailable": "Մեկնարկիր KiloClaw միջավայր՝ KiloClaw ակտիվություն ստանալու համար։",
+      "kiloclawActivityUnavailable": "Սկսեք KiloClaw միջավայր՝ KiloClaw ակտիվություն ստանալու համար։",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
-      "balanceAlertsUnavailable": "Միացիր կազմակերպությանը՝ ցածր մնացորդի ծանուցումներ ստանալու համար։",
+      "balanceAlertsUnavailable": "Միացեք կազմակերպությանը՝ մնացորդի նախազգուշացումներ ստանալու համար։",
       "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ",
-      "securityFindingsUnavailable": "Միացրու Kilo անվտանգության գործակալը շրջանակում՝ անվտանգության խնդիրներ ստանալու համար։",
+      "securityFindingsUnavailable": "Միացրեք Kilo անվտանգության գործակալը շրջանակում՝ անվտանգության խնդիրներ ստանալու համար։",
       "spendAlertsSubtitle": "շեմերի հատումներ և ժամային ցատկեր",
       "spendAlertsToggle": "Ծախսերի ծանուցումների կատեգորիա"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Մուտք գործելու չափազանց շատ փորձեր են կատարվել։ Մի քիչ սպասիր և կրկին փորձիր։"
   },
   "models": {
+    "auto": {
+      "frontier": "Ավտոմատ Առաջատար",
+      "balanced": "Ավտոմատ Հավասարակշռված",
+      "efficient": "Ավտոմատ Արդյունավետ",
+      "small": "Ավտոմատ Փոքր",
+      "free": "Ավտոմատ Անվճար",
+      "organization": "Կազմակերպության ավտոմատ"
+    },
     "dataCollected": "Տվյալներ է հավաքում",
     "free": "Անվճար",
     "couldNotUpdateFavorites": "Չհաջողվեց թարմացնել նախընտրածները։",

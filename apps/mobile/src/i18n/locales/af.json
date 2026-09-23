@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
       "kiloclawActivityUnavailable": "Begin 'n KiloClaw-instansie om KiloClaw-aktiwiteit te kry.",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om waarskuwings oor lae saldo te kry.",
+      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om balanswaarskuwings te kry.",
       "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe",
-      "securityFindingsUnavailable": "Aktiveer Kilo-sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry.",
+      "securityFindingsUnavailable": "Aktiveer Kilo Sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry.",
       "spendAlertsSubtitle": "oorskryding van drempels en uurlikse pieke",
       "spendAlertsToggle": "Kategorie vir bestedingswaarskuwings"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Te veel aanmeldpogings. Wag asseblief en probeer weer."
   },
   "models": {
+    "auto": {
+      "frontier": "Outo Toonaangewend",
+      "balanced": "Outo Gebalanseerd",
+      "efficient": "Outo Doeltreffend",
+      "small": "Outo Klein",
+      "free": "Outo Gratis",
+      "organization": "Organisasie-outo"
+    },
     "dataCollected": "Data ingesamel",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Die gunstelinge kon nie bygewerk word nie.",

@@ -337,9 +337,9 @@
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
       "kiloclawActivityUnavailable": "Uruchom instancję KiloClaw, aby otrzymywać aktywność KiloClaw.",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
-      "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać powiadomienia o niskim saldzie.",
+      "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać ostrzeżenia o saldzie.",
       "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA",
-      "securityFindingsUnavailable": "Włącz agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać wykryte problemy z bezpieczeństwem.",
+      "securityFindingsUnavailable": "Włącz Agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać problemy z bezpieczeństwem.",
       "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
       "spendAlertsToggle": "Kategoria alertów o wydatkach"
     },
@@ -3231,6 +3231,14 @@
     "tooManySignInAttempts": "Zbyt wiele prób logowania. Poczekaj i spróbuj ponownie."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatyczny Najlepszy",
+      "balanced": "Automatyczny Zrównoważony",
+      "efficient": "Automatyczny Wydajny",
+      "small": "Automatyczny Mały",
+      "free": "Automatyczny Bezpłatny",
+      "organization": "Automatyczny organizacji"
+    },
     "dataCollected": "Zbieranie danych",
     "free": "Bezpłatny",
     "couldNotUpdateFavorites": "Nie udało się zaktualizować ulubionych.",

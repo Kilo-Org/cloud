@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
       "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin ƙarancin kuɗi.",
+      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin kuɗi.",
       "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
-      "securityFindingsUnavailable": "Kunna wakilin tsaro na Kilo a wani yanki don samun sakamakon binciken tsaro.",
+      "securityFindingsUnavailable": "Kunna Wakilin tsaro na Kilo a kan wani iyaka don samun sakamakon binciken tsaro.",
       "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
       "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "An yi ƙoƙarin shiga da yawa. Jira ɗan lokaci ka sake gwadawa."
   },
   "models": {
+    "auto": {
+      "frontier": "Na atomatik Mafi ƙarfi",
+      "balanced": "Na atomatik Daidaitacce",
+      "efficient": "Na atomatik Mai inganci",
+      "small": "Na atomatik Ƙarami",
+      "free": "Na atomatik Kyauta",
+      "organization": "Na atomatik na ƙungiya"
+    },
     "dataCollected": "Ana tattara bayanai",
     "free": "Kyauta",
     "couldNotUpdateFavorites": "An kasa sabunta waɗanda ka fi so.",

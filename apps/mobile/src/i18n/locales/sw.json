@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
-      "kiloclawActivityUnavailable": "Anzisha nakala ya KiloClaw ili kupata shughuli za KiloClaw.",
+      "kiloclawActivityUnavailable": "Anzisha instance ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
-      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio la chini.",
+      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio.",
       "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
-      "securityFindingsUnavailable": "Washa wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya ukaguzi wa usalama.",
+      "securityFindingsUnavailable": "Washa Wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya usalama.",
       "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
       "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
@@ -3145,6 +3145,14 @@
     "tooManySignInAttempts": "Majaribio ya kuingia ni mengi mno. Tafadhali subiri kisha ujaribu tena."
   },
   "models": {
+    "auto": {
+      "frontier": "Kiotomatiki Ya hali ya juu",
+      "balanced": "Kiotomatiki Wastani",
+      "efficient": "Kiotomatiki Ufanisi",
+      "small": "Kiotomatiki Ndogo",
+      "free": "Kiotomatiki Bure",
+      "organization": "Kiotomatiki ya Shirika"
+    },
     "dataCollected": "Data hukusanywa",
     "free": "Bure",
     "couldNotUpdateFavorites": "Imeshindikana kusasisha vipendwa.",

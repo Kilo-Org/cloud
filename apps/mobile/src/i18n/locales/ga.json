@@ -889,9 +889,9 @@
       "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
       "kiloclawActivityUnavailable": "Tosaigh ásc KiloClaw chun gníomhaíocht KiloClaw a fháil.",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
-      "balanceAlertsUnavailable": "Bí páirteach in eagraíocht chun foláirimh faoi iarmhéid íseal a fháil.",
+      "balanceAlertsUnavailable": "Bí páirteach in eagraíocht chun rabhaidh iarmhéid a fháil.",
       "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA",
-      "securityFindingsUnavailable": "Cumasaigh gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil.",
+      "securityFindingsUnavailable": "Cumasaigh Gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil.",
       "spendAlertsSubtitle": "sáruithe tairsí agus spuaiceanna uaire",
       "spendAlertsToggle": "Catagóir foláirimh chaiteachais"
     },
@@ -3274,6 +3274,14 @@
     "tooManySignInAttempts": "An iomarca iarrachtaí sínithe isteach. Fan agus bain triail as arís le do thoil."
   },
   "models": {
+    "auto": {
+      "frontier": "Uathoibríoch Ardleibhéil",
+      "balanced": "Uathoibríoch Cothrom",
+      "efficient": "Uathoibríoch Éifeachtúil",
+      "small": "Uathoibríoch Beag",
+      "free": "Uathoibríoch Saor in aisce",
+      "organization": "Uathoibríoch Eagraíochta"
+    },
     "dataCollected": "Sonraí bailithe",
     "free": "Saor in aisce",
     "couldNotUpdateFavorites": "Níorbh fhéidir na cinn is fearr leat a nuashonrú.",

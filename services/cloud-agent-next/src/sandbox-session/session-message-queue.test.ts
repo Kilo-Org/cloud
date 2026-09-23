@@ -5545,6 +5545,27 @@ describe('SandboxSession orchestration', () => {
     });
   });
 
+  describe('prompt-phase rejection marking', () => {
+    it('does not mark a completed attach proof on a prompt rejection', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        operationResults: true,
+      });
+      delegateRequest(fixture, 'session.prompt', async () => controlFailure(true, 'not_ready'));
+      await fixture.admit('a');
+      await fixture.flush();
+
+      const record = fixture.record('a');
+      expect(record?.proofs?.attach?.dispatched).toBe(true);
+      expect(record?.proofs?.attach?.rejectionReceived).toBeUndefined();
+      expect(record?.proofs?.attach?.rejectionSubtype).toBeUndefined();
+    });
+  });
+
   describe.each(['session.attach', 'session.prompt'] as const)(
     '%s failure isolation',
     operation => {

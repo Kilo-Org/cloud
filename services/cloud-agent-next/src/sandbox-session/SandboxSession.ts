@@ -4449,9 +4449,12 @@ export class SandboxSession extends DurableObject<Env> {
     const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
     const current = this.loadMessages();
     // Mark the live proof before a retryable completed attach retires it, so the
-    // git subtype survives on the retained proof for the final report.
+    // git subtype survives on the retained proof for the final report. Only the
+    // attach phase may mark an attach proof; a prompt rejection must not stamp a
+    // successfully completed attach proof, which would suppress the attach
+    // failure counter on a later attempt.
     const marked =
-      rejection && attachProof
+      rejection && phase === 'attach' && attachProof
         ? markSessionOperationRejection(
             current,
             attachProof.authorization,

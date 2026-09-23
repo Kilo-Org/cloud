@@ -2233,10 +2233,6 @@
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
       "linesOf": "baris {{start}}–{{end}} daripada {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Tindakan {{action}} pada Cloud Agent gagal ({{status}}).",
-      "failed": "Tindakan {{action}} pada Cloud Agent gagal."
-    },
     "collectCopyableText": {
       "unserializableInput": "[masukan tidak dapat disirikan]",
       "errorPrefix": "Ralat: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Penyedia menolak permintaan.",
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
-      "assistantFailed": "Respons gagal.",
-      "sendFailed": "Gagal menghantar mesej. Sila cuba semula."
+      "assistantFailed": "Respons gagal."
     },
     "filePart": {
       "loadingImage": "Memuatkan imej",

@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 import {
@@ -159,6 +160,13 @@ export function namedSessionTitle(
  * the caller's fallback copy shows instead of the raw ISO string the CLI listed
  * the session under. Pass the session id so a title the user's own rename wrote
  * is not hidden as the backend placeholder.
+ *
+ * Both the server title and the cached fallback run through the shared title
+ * helpers, so the server's creation-default placeholder (`New session -
+ * <ISO timestamp>`) can never reach the header or seed the rename field —
+ * either would otherwise show a raw timestamp. A missing or placeholder
+ * fallback becomes the generic `Session` label. The user's `optimisticTitle`
+ * is their own input and is never filtered.
  */
 export function getSessionDetailRenameState(input: {
   sessionId?: string;
@@ -167,8 +175,10 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
+  const fallbackTitle =
+    sessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
   const serverTitle = namedSessionTitle(input.serverTitle, input.sessionId);
-  const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
+  const baseTitle = input.isLoaded ? (serverTitle ?? fallbackTitle) : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,

@@ -98,7 +98,7 @@ vi.mock('react-native', () => ({
 
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
-import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
@@ -130,7 +130,11 @@ describe('performRefresh', () => {
 
   it('returns refused when no refresh token is stored', async () => {
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: true });
+    expect(outcome).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
   });
 
   it('returns refused when the server responds with 401', async () => {
@@ -140,7 +144,11 @@ describe('performRefresh', () => {
     );
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: true });
+    expect(outcome).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
   });
 
   it('returns transient when the server responds with a non-401 error', async () => {

@@ -47,9 +47,10 @@ export function buildRestoreIncompleteReport(diffs: {
 }): RestoreIncompleteReport | undefined {
   if (diffs.skipped === 0) return undefined;
 
+  const retainedDiffs = diffs.skippedDiffs ?? [];
   const reasons: string[] = [];
   const paths: string[] = [];
-  for (const entry of diffs.skippedDiffs ?? []) {
+  for (const entry of retainedDiffs) {
     const reason =
       typeof entry?.reason === 'string' && entry.reason.length > 0 ? entry.reason : 'unknown';
     if (!reasons.includes(reason)) reasons.push(reason);
@@ -58,8 +59,15 @@ export function buildRestoreIncompleteReport(diffs: {
   }
   if (reasons.length === 0) reasons.push('unknown');
 
+  // The wrapper bounds the records it retains, so a shorter record list than
+  // `skipped` means the cap dropped records. The remainder must then come from
+  // the true total: restore diffs are deduplicated by file, so `skipped` is the
+  // number of distinct skipped paths. Deriving it from the retained records
+  // instead would understate how many paths the report omitted.
+  const recordsCapped = retainedDiffs.length < diffs.skipped;
+  const distinctPaths = recordsCapped ? diffs.skipped : paths.length;
   const listedPaths = paths.slice(0, MAX_REPORTED_PATHS);
-  const omittedPaths = paths.length - listedPaths.length;
+  const omittedPaths = Math.max(0, distinctPaths - listedPaths.length);
   const missing =
     listedPaths.length > 0
       ? ` Missing: ${listedPaths.join(', ')}${omittedPaths > 0 ? ` and ${omittedPaths} more` : ''}`

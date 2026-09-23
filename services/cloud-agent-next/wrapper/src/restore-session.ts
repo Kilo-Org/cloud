@@ -1260,7 +1260,13 @@ export async function restoreSession(
     let applied = 0;
     let skipped = 0;
     const skippedDiffs: RestoreDiffSkip[] = [];
+    // First-seen skip reason -> the first path that carried it. The record cap
+    // below bounds the telemetry frame, but a reason that the first 100 skips do
+    // not carry must still reach `buildRestoreIncompleteReport`; remembering one
+    // path per reason (a small closed set) lets the post-pass restore it.
+    const firstPathForReason = new Map<RestoreSkipReason, string>();
     const recordSkip = (file: string, reason: RestoreSkipReason): void => {
+      if (!firstPathForReason.has(reason)) firstPathForReason.set(reason, file);
       if (skippedDiffs.length < MAX_RECORDED_SKIPPED_DIFFS) {
         skippedDiffs.push({ file, reason });
       }
@@ -1333,6 +1339,20 @@ export async function restoreSession(
       log('restore incomplete; continuing with partially restored workspace');
     } else {
       log('completed successfully');
+    }
+
+    // Keep every distinct skip reason inside the record cap: reserve one record
+    // for a reason the first 100 skips did not carry, so the report cannot
+    // understate the reasons. A reserved record reuses that reason's first path.
+    const retainedReasons = new Set(skippedDiffs.map(entry => entry.reason));
+    const missingReasons = [...firstPathForReason.keys()].filter(
+      reason => !retainedReasons.has(reason)
+    );
+    if (missingReasons.length > 0) {
+      skippedDiffs.length = Math.max(0, MAX_RECORDED_SKIPPED_DIFFS - missingReasons.length);
+      for (const reason of missingReasons) {
+        skippedDiffs.push({ file: firstPathForReason.get(reason) ?? '', reason });
+      }
     }
 
     const diffs: {

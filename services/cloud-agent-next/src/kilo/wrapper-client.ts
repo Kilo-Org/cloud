@@ -27,6 +27,7 @@ import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { shellQuote, validShellEnvEntries } from './utils.js';
 import {
   restoreIncompleteLogFields,
+  wrapperRestoreTelemetrySchema,
   type WorkspaceFailureSubtype,
   type WrapperCommandRequest,
   type WrapperPromptRequest,
@@ -1121,7 +1122,12 @@ export class WrapperClient {
     // the bootstrap metric above: a warm workspace restored from a backup still
     // logs the bootstrap metric, but a genuinely warm reuse does not, and a
     // skipped diff can only happen on a restore path. Do not retry the restore.
-    const restoreFields = restoreIncompleteLogFields(telemetry?.restore);
+    // The response body is only generically typed, so validate the optional
+    // telemetry against the shared runtime schema first: a malformed value must
+    // not throw here and turn the already-successful ready response into a
+    // readiness failure.
+    const restore = wrapperRestoreTelemetrySchema.safeParse(telemetry?.restore);
+    const restoreFields = restoreIncompleteLogFields(restore.success ? restore.data : undefined);
     if (restoreFields) {
       logger.warn('Cloud agent restore incomplete', {
         metric: 'cloud_agent_restore_incomplete',

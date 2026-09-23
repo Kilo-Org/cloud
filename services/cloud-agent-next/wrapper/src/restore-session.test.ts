@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { restoreSession, extractDiffs, seedSessionIngestRegistration } from './restore-session';
+import { buildRestoreIncompleteReport } from './restore-outcome';
 import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
 
 const SESSION_ID = 'ses_test123';
@@ -2155,6 +2156,40 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       },
     });
     expect(fs.existsSync(path.join(workspace, 'src/index.ts'))).toBe(false);
+  });
+
+  it('keeps every distinct skip reason and the true path count when the record cap drops the tail', async () => {
+    // 101 path-traversal skips exhaust the 100-record cap before the single
+    // missing-content skip, whose reason must still be reported; the omitted
+    // path count must come from the true total, not the retained records.
+    const diffs = [
+      ...Array.from({ length: 101 }, (_, index) => ({
+        file: `../escaped-${index}.txt`,
+        after: 'malicious',
+        status: 'modified',
+      })),
+      { file: 'src/nocontent.ts', status: 'modified' },
+    ];
+    mockFetchOk(
+      JSON.stringify({ info: snapshotInfo(), messages: [{ info: { summary: { diffs } } }] })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diffs.applied).toBe(0);
+    expect(result.diffs.skipped).toBe(102);
+    expect(result.diffs.skippedDiffs).toHaveLength(100);
+    expect(new Set(result.diffs.skippedDiffs?.map(entry => entry.reason))).toEqual(
+      new Set(['outside_workspace', 'missing_content'])
+    );
+
+    const report = buildRestoreIncompleteReport(result.diffs);
+    expect(report?.reasons).toEqual(['outside_workspace', 'missing_content']);
+    expect(report?.paths).toHaveLength(50);
+    expect(report?.omittedPaths).toBe(52);
+    expect(report?.message.endsWith('and 52 more')).toBe(true);
   });
 
   it('logs patch structure and Git parser diagnostics without patch contents', async () => {

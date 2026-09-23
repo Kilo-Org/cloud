@@ -94,6 +94,26 @@ describe('buildRestoreIncompleteReport', () => {
     expect(report?.message).toContain('Missing: src/file-0.ts');
     expect(report?.message.endsWith('and 10 more')).toBe(true);
   });
+
+  it('counts the omitted paths against the true total when the wrapper capped its records', () => {
+    // The wrapper retains at most 100 skip records, so 200 skipped paths arrive
+    // as 100 records plus `skipped: 200`. The remainder must use the true total,
+    // not the retained record count, or the report understates what is missing.
+    const skippedDiffs = Array.from({ length: 100 }, (_, index) => ({
+      file: `src/file-${index}.ts`,
+      reason: 'patch_apply_failed',
+    }));
+    const report = buildRestoreIncompleteReport({
+      applied: 0,
+      skipped: 200,
+      total: 200,
+      skippedDiffs,
+    });
+
+    expect(report?.paths).toHaveLength(50);
+    expect(report?.omittedPaths).toBe(150);
+    expect(report?.message.endsWith('and 150 more')).toBe(true);
+  });
 });
 
 describe('buildRestoreIncompleteRules', () => {

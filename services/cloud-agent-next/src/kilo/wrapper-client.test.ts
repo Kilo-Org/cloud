@@ -463,6 +463,36 @@ describe('WrapperClient', () => {
       loggerWarn.mockRestore();
     });
 
+    it('keeps a successful ready response when the restore telemetry is malformed', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          createReadyResponse({
+            workspaceWasWarm: true,
+            restoredFromBackup: true,
+            // The response body is parsed without runtime validation, so a
+            // wrapper bug can send a non-array `skippedDiffs`. Formatting the
+            // log fields must not turn the already-successful ready response
+            // into a readiness failure.
+            restore: {
+              path: 'backup',
+              diffs: { applied: 0, skipped: 1, total: 1, skippedDiffs: {} },
+            },
+          })
+        ),
+      };
+      const client = new WrapperClient({ transport });
+      const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      const response = await client.ensureSessionReady(createReadyRequest());
+
+      expect(response.status).toBe('ready');
+      expect(loggerWarn).not.toHaveBeenCalledWith(
+        'Cloud agent restore incomplete',
+        expect.anything()
+      );
+      loggerWarn.mockRestore();
+    });
+
     it('does not report a complete restore', async () => {
       const transport: WrapperTransport = {
         request: vi.fn().mockResolvedValue(

@@ -129,6 +129,7 @@ export function SessionRow({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
+          {/* i18n-dup-ok: 'sessionRow.scheduled' is the full-caps mono row badge; 'common.scheduled' is the sentence-case connection label and the spoken a11y word, and each locale cases the badge form itself — the same split as sessionRow.needsInput beside glanceable.needsInput. */}
           {scheduledWake
             ? `${t('sessionRow.scheduled')} · ${scheduledWake}`
             : t('sessionRow.scheduled')}

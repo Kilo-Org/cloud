@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Înapoi",
     "idle": "Inactiv",
+    "scheduled": "Programată",
     "keepEditing": "Continuă editarea",
     "keepRunning": "Continuă rularea",
     "kiloclaw": "KiloClaw",
@@ -2781,7 +2782,8 @@
     "optionsExpiredDescription": "Revino la ecranul anterior și redeschide selectorul."
   },
   "sessionRow": {
-    "needsInput": "AȘTEAPTĂ UN RĂSPUNS"
+    "needsInput": "AȘTEAPTĂ UN RĂSPUNS",
+    "scheduled": "PROGRAMATĂ"
   },
   "voiceInput": {
     "listening": "Se ascultă…",
@@ -3218,7 +3220,8 @@
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
     "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
-    "newestResult": "Cel mai recent rezultat"
+    "newestResult": "Cel mai recent rezultat",
+    "scheduledWakes": "se trezește {{time}}"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",

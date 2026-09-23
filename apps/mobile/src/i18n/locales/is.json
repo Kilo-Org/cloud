@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Fara til baka",
     "idle": "Í bið",
+    "scheduled": "Áætlað",
     "keepEditing": "Halda áfram að breyta",
     "keepRunning": "Halda keyrslu áfram",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Farðu til baka á fyrri skjá og opnaðu valgluggann aftur."
   },
   "sessionRow": {
-    "needsInput": "BÍÐUR EFTIR SVARI"
+    "needsInput": "BÍÐUR EFTIR SVARI",
+    "scheduled": "ÁÆTLAÐ"
   },
   "voiceInput": {
     "listening": "Hlusta…",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
-    "newestResult": "Nýjasta niðurstaðan"
+    "newestResult": "Nýjasta niðurstaðan",
+    "scheduledWakes": "vaknar {{time}}"
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",

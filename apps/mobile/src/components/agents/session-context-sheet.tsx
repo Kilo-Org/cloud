@@ -186,6 +186,7 @@ export function SessionContextSheet({
   } else if (connectionDisplay === 'reconnecting') {
     connectionLabel = t('agentChat.sessionConnection.reconnecting');
   } else if (connectionDisplay === 'scheduled') {
+    // i18n-dup-ok: 'common.scheduled' is the sentence-case connection label and the spoken a11y word; 'sessionRow.scheduled' is the full-caps mono row badge, and each locale cases the badge form itself — the same split as glanceable.needsInput beside sessionRow.needsInput.
     connectionLabel = t('common.scheduled');
   }
   const content = getContextSheetContent(info, totalCostMicrodollars);

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Geri qayıt",
     "idle": "Gözləmədə",
+    "scheduled": "Planlaşdırılıb",
     "keepEditing": "Redaktəyə davam et",
     "keepRunning": "İcranı davam etdir",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Geri qayıt və bu seçicini əvvəlki ekrandan yenidən aç."
   },
   "sessionRow": {
-    "needsInput": "CAVAB GÖZLƏYİR"
+    "needsInput": "CAVAB GÖZLƏYİR",
+    "scheduled": "PLANLAŞDIRILIB"
   },
   "voiceInput": {
     "listening": "Dinlənilir...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
-    "newestResult": "Ən yeni nəticə"
+    "newestResult": "Ən yeni nəticə",
+    "scheduledWakes": "{{time}} oyanır"
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",

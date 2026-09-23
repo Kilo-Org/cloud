@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Kembali",
     "idle": "Siaga",
+    "scheduled": "Terjadwal",
     "keepEditing": "Lanjutkan menyunting",
     "keepRunning": "Biarkan berjalan",
     "kiloclaw": "KiloClaw",
@@ -2236,7 +2237,8 @@
     "optionsExpiredDescription": "Kembali dan buka ulang pemilih ini dari layar sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "PERLU MASUKAN"
+    "needsInput": "PERLU MASUKAN",
+    "scheduled": "TERJADWAL"
   },
   "voiceInput": {
     "listening": "Mendengarkan...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi.",
-    "newestResult": "Hasil terbaru"
+    "newestResult": "Hasil terbaru",
+    "scheduledWakes": "bangun {{time}}"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

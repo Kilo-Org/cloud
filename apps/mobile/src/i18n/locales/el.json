@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Επιστροφή",
     "idle": "Σε αδράνεια",
+    "scheduled": "Προγραμματισμένο",
     "keepEditing": "Συνέχιση επεξεργασίας",
     "keepRunning": "Συνέχιση εκτέλεσης",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Επέστρεψε στην προηγούμενη οθόνη και άνοιξε ξανά αυτόν τον επιλογέα."
   },
   "sessionRow": {
-    "needsInput": "ΑΝΑΜΟΝΗ ΑΠΑΝΤΗΣΗΣ"
+    "needsInput": "ΑΝΑΜΟΝΗ ΑΠΑΝΤΗΣΗΣ",
+    "scheduled": "ΠΡΟΓΡΑΜΜΑΤΙΣΜΕΝΟ"
   },
   "voiceInput": {
     "listening": "Ακρόαση...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος.",
     "openSession": "Άνοιξε",
     "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά.",
-    "newestResult": "Νεότερο αποτέλεσμα"
+    "newestResult": "Νεότερο αποτέλεσμα",
+    "scheduledWakes": "ξυπνάει {{time}}"
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",

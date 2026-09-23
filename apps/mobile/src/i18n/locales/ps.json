@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "شاته لاړ شئ",
     "idle": "وزګار",
+    "scheduled": "مهال ویش شوی",
     "keepEditing": "سمون ته دوام ورکړئ",
     "keepRunning": "روان یې پرېږدئ",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "بېرته لاړ شئ او له مخکیني سکرین څخه د غوره کولو دا کړکۍ بیا پرانیزئ."
   },
   "sessionRow": {
-    "needsInput": "ځواب ته اړتیا لري"
+    "needsInput": "ځواب ته اړتیا لري",
+    "scheduled": "مهال ویش شوی"
   },
   "voiceInput": {
     "listening": "اورېدل کېږي...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
-    "newestResult": "تر ټولو نوې پایله"
+    "newestResult": "تر ټولو نوې پایله",
+    "scheduledWakes": "{{time}} بیداریږي"
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",

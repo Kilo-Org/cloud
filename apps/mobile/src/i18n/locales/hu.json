@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Vissza",
     "idle": "Tétlen",
+    "scheduled": "Ütemezve",
     "keepEditing": "Szerkesztés folytatása",
     "keepRunning": "Futtatás folytatása",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Lépj vissza az előző képernyőre, és nyisd meg újra a választóablakot."
   },
   "sessionRow": {
-    "needsInput": "VÁLASZRA VÁR"
+    "needsInput": "VÁLASZRA VÁR",
+    "scheduled": "ÜTEMEZVE"
   },
   "voiceInput": {
     "listening": "Beszéd figyelése…",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
     "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre.",
-    "newestResult": "Legújabb eredmény"
+    "newestResult": "Legújabb eredmény",
+    "scheduledWakes": "{{time}} felébred"
   },
   "transcriptionModel": {
     "title": "Átírási modell",

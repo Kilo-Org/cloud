@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "பின்செல்லவும்",
     "idle": "ஓய்வில்",
+    "scheduled": "திட்டமிடப்பட்டது",
     "keepEditing": "தொடர்ந்து திருத்தவும்",
     "keepRunning": "தொடர்ந்து இயங்க விடவும்",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "முந்தைய திரைக்குத் திரும்பி இந்தத் தேர்வியை மீண்டும் திறக்கவும்."
   },
   "sessionRow": {
-    "needsInput": "உள்ளீடு தேவை"
+    "needsInput": "உள்ளீடு தேவை",
+    "scheduled": "திட்டமிடப்பட்டது"
   },
   "voiceInput": {
     "listening": "கேட்கிறது...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்.",
     "openSession": "திற",
     "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்.",
-    "newestResult": "சமீபத்திய முடிவு"
+    "newestResult": "சமீபத்திய முடிவு",
+    "scheduledWakes": "{{time}} விழிக்கும்"
   },
   "transcriptionModel": {
     "title": "உரையாக்க மாதிரி",

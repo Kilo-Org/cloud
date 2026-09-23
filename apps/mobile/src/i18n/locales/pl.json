@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Wróć",
     "idle": "W gotowości",
+    "scheduled": "Zaplanowano",
     "keepEditing": "Kontynuuj edycję",
     "keepRunning": "Nie przerywaj",
     "kiloclaw": "KiloClaw",
@@ -2286,7 +2287,8 @@
     "optionsExpiredDescription": "Wróć do poprzedniego ekranu i ponownie otwórz okno wyboru."
   },
   "sessionRow": {
-    "needsInput": "CZEKA NA ODPOWIEDŹ"
+    "needsInput": "CZEKA NA ODPOWIEDŹ",
+    "scheduled": "ZAPLANOWANO"
   },
   "voiceInput": {
     "listening": "Nasłuchiwanie...",
@@ -3261,7 +3263,8 @@
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
     "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
-    "newestResult": "Najnowszy wynik"
+    "newestResult": "Najnowszy wynik",
+    "scheduledWakes": "budzi się {{time}}"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

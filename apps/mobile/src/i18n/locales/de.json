@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Zurück",
     "idle": "Inaktiv",
+    "scheduled": "Geplant",
     "keepEditing": "Weiter bearbeiten",
     "keepRunning": "Weiterlaufen lassen",
     "kiloclaw": "KiloClaw",
@@ -2236,7 +2237,8 @@
     "optionsExpiredDescription": "Gehe zurück und öffne diese Auswahl erneut über den vorherigen Bildschirm."
   },
   "sessionRow": {
-    "needsInput": "EINGABE ERFORDERLICH"
+    "needsInput": "EINGABE ERFORDERLICH",
+    "scheduled": "GEPLANT"
   },
   "voiceInput": {
     "listening": "Aufnahme läuft …",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
     "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
-    "newestResult": "Neuestes Ergebnis"
+    "newestResult": "Neuestes Ergebnis",
+    "scheduledWakes": "wacht {{time}} auf"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",

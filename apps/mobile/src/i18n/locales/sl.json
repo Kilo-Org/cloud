@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Nazaj",
     "idle": "Nedejavno",
+    "scheduled": "Načrtovano",
     "keepEditing": "Nadaljuj urejanje",
     "keepRunning": "Nadaljuj izvajanje",
     "kiloclaw": "KiloClaw",
@@ -2822,7 +2823,8 @@
     "optionsExpiredDescription": "Pojdi nazaj in ponovno odpri ta izbirnik s prejšnjega zaslona."
   },
   "sessionRow": {
-    "needsInput": "ČAKA NA VNOS"
+    "needsInput": "ČAKA NA VNOS",
+    "scheduled": "NAČRTOVANO"
   },
   "voiceInput": {
     "listening": "Poslušanje...",
@@ -3261,7 +3263,8 @@
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
-    "newestResult": "Najnovejši rezultat"
+    "newestResult": "Najnovejši rezultat",
+    "scheduledWakes": "zbudi se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",

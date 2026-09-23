@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "უკან დაბრუნება",
     "idle": "უმოქმედოა",
+    "scheduled": "დაგეგმილი",
     "keepEditing": "რედაქტირების გაგრძელება",
     "keepRunning": "მუშაობის გაგრძელება",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "დაბრუნდით წინა ეკრანზე და ხელახლა გახსენით არჩევის ეს ფანჯარა."
   },
   "sessionRow": {
-    "needsInput": "პასუხს ელის"
+    "needsInput": "პასუხს ელის",
+    "scheduled": "დაგეგმილი"
   },
   "voiceInput": {
     "listening": "გისმენ...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
-    "newestResult": "უახლესი შედეგი"
+    "newestResult": "უახლესი შედეგი",
+    "scheduledWakes": "{{time}} იღვიძებს"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",

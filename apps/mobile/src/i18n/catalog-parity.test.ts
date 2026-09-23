@@ -27,17 +27,12 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs. `common.scheduled`, `sessionRow.scheduled` and
- * `glanceable.scheduledWakes` are the scheduled-session labels the count lines,
- * the session list and the glanceable surfaces show; they are pending the
- * translation slice.
+ * Empty: the scheduled-session labels the count lines, the session list and the
+ * glanceable surfaces show (`common.scheduled`, `sessionRow.scheduled`,
+ * `glanceable.scheduledWakes`) have landed in all 86 catalogs, so no key is
+ * pending.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>([
-  'common.scheduled',
-  'sessionRow.scheduled',
-  'glanceable.scheduledWakes',
-]);
+const PENDING_TRANSLATION_KEYS = new Set<string>();
 
 /**
  * The three copy keys the feature-flag row renders: `<value> · <reason>` under

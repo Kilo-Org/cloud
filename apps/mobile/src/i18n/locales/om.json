@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Deebi'i",
     "idle": "Hojii malee",
+    "scheduled": "Karoorfame",
     "keepEditing": "Gulaaluu itti fufi",
     "keepRunning": "Hojii irra tursi",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Gara fuula duraatti deebi'iitii filattoo kana deebi'ii bani."
   },
   "sessionRow": {
-    "needsInput": "DEEBII BARBAADA"
+    "needsInput": "DEEBII BARBAADA",
+    "scheduled": "KAROORFAME"
   },
   "voiceInput": {
     "listening": "Dhaggeeffachaa jira...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
     "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
-    "newestResult": "Bu'aa haaraa"
+    "newestResult": "Bu'aa haaraa",
+    "scheduledWakes": "{{time}} dammaqaa"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",

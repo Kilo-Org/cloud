@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Bumalik",
     "idle": "Walang ginagawa",
+    "scheduled": "Naka-iskedyul",
     "keepEditing": "Ituloy ang pag-edit",
     "keepRunning": "Hayaang tumakbo",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Bumalik sa naunang screen at muling buksan ang pagpipiliang ito."
   },
   "sessionRow": {
-    "needsInput": "NAGHIHINTAY NG SAGOT"
+    "needsInput": "NAGHIHINTAY NG SAGOT",
+    "scheduled": "NAKA-ISKEDYUL"
   },
   "voiceInput": {
     "listening": "Nakikinig...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
-    "newestResult": "Pinakabagong resulta"
+    "newestResult": "Pinakabagong resulta",
+    "scheduledWakes": "gigising {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",

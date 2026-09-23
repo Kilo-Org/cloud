@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "رجوع",
     "idle": "خامل",
+    "scheduled": "مجدول",
     "keepEditing": "متابعة التعديل",
     "keepRunning": "متابعة التشغيل",
     "kiloclaw": "KiloClaw",
@@ -2336,7 +2337,8 @@
     "optionsExpiredDescription": "ارجع إلى الشاشة السابقة وأعد فتح قائمة الاختيار."
   },
   "sessionRow": {
-    "needsInput": "بانتظار تدخلك"
+    "needsInput": "بانتظار تدخلك",
+    "scheduled": "مجدول"
   },
   "voiceInput": {
     "listening": "جارٍ الاستماع...",
@@ -3347,7 +3349,8 @@
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
-    "newestResult": "أحدث نتيجة"
+    "newestResult": "أحدث نتيجة",
+    "scheduledWakes": "يستيقظ {{time}}"
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",

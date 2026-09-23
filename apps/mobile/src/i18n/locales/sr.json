@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Nazad",
     "idle": "U mirovanju",
+    "scheduled": "Zakazano",
     "keepEditing": "Nastavi uređivanje",
     "keepRunning": "Nastavi izvršavanje",
     "kiloclaw": "KiloClaw",
@@ -2781,7 +2782,8 @@
     "optionsExpiredDescription": "Vrati se na prethodni ekran i ponovo otvori ovaj izbor."
   },
   "sessionRow": {
-    "needsInput": "ČEKA UNOS"
+    "needsInput": "ČEKA UNOS",
+    "scheduled": "ZAKAZANO"
   },
   "voiceInput": {
     "listening": "Slušam…",
@@ -3218,7 +3220,8 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
     "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo.",
-    "newestResult": "Najnoviji rezultat"
+    "newestResult": "Najnoviji rezultat",
+    "scheduledWakes": "budi se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",

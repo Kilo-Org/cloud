@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Hoki whakamuri",
     "idle": "Kore mahi",
+    "scheduled": "Kua whakaritea",
     "keepEditing": "Whakatika tonu",
     "keepRunning": "Whakahaere tonu",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Hoki ki te mata o mua, kātahi ka whakatuwhera anō i tēnei pūkōwhiri."
   },
   "sessionRow": {
-    "needsInput": "ME WHAI URUPARE"
+    "needsInput": "ME WHAI URUPARE",
+    "scheduled": "KUA WHAKARITEA"
   },
   "voiceInput": {
     "listening": "E whakarongo ana...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati.",
     "openSession": "Tuwhera",
     "approveFailed": "Kāore i taea te whakaae. Pāwhiria $t(common.approve) hei whakamātau anō.",
-    "newestResult": "Te hua hou rawa"
+    "newestResult": "Te hua hou rawa",
+    "scheduledWakes": "ka oho {{time}}"
   },
   "transcriptionModel": {
     "title": "Tauira tuhi ā-reo",

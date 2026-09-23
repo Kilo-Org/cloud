@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Miverena",
     "idle": "Tsy miasa",
+    "scheduled": "Voalahatra",
     "keepEditing": "Tohizo ny fanovana",
     "keepRunning": "Tohizo ny fampandehanana",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Miverena amin'ny efijery teo aloha ary sokafy indray ity mpisafidy ity."
   },
   "sessionRow": {
-    "needsInput": "MILA VALINY"
+    "needsInput": "MILA VALINY",
+    "scheduled": "VOALAHATRA"
   },
   "voiceInput": {
     "listening": "Mihaino...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
     "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
-    "newestResult": "Vokatra vaovao indrindra"
+    "newestResult": "Vokatra vaovao indrindra",
+    "scheduledWakes": "mifoha {{time}}"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ย้อนกลับ",
     "idle": "รอทำงาน",
+    "scheduled": "กำหนดเวลาไว้",
     "keepEditing": "แก้ไขต่อ",
     "keepRunning": "ให้ทำงานต่อ",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "กลับไปที่หน้าจอก่อนหน้าแล้วเปิดหน้าต่างเลือกนี้อีกครั้ง"
   },
   "sessionRow": {
-    "needsInput": "รอข้อมูลจากคุณ"
+    "needsInput": "รอข้อมูลจากคุณ",
+    "scheduled": "กำหนดเวลาไว้"
   },
   "voiceInput": {
     "listening": "กำลังฟัง...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
     "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
-    "newestResult": "ผลลัพธ์ล่าสุด"
+    "newestResult": "ผลลัพธ์ล่าสุด",
+    "scheduledWakes": "ตื่น {{time}}"
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",

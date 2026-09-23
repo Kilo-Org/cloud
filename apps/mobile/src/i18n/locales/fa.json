@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "بازگشت",
     "idle": "بیکار",
+    "scheduled": "زمانبندیشده",
     "keepEditing": "ادامه ویرایش",
     "keepRunning": "ادامه اجرا",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "به عقب برگردید و این انتخاب‌گر را از صفحه قبلی دوباره باز کنید."
   },
   "sessionRow": {
-    "needsInput": "در انتظار ورودی"
+    "needsInput": "در انتظار ورودی",
+    "scheduled": "زمانبندیشده"
   },
   "voiceInput": {
     "listening": "در حال گوش دادن...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
-    "newestResult": "جدیدترین نتیجه"
+    "newestResult": "جدیدترین نتیجه",
+    "scheduledWakes": "{{time}} بیدار می‌شود"
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",

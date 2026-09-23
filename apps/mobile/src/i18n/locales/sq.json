@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Kthehu",
     "idle": "Në pritje",
+    "scheduled": "E planifikuar",
     "keepEditing": "Vazhdo redaktimin",
     "keepRunning": "Vazhdo ekzekutimin",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Kthehu prapa dhe rihap këtë zgjedhës nga ekrani i mëparshëm."
   },
   "sessionRow": {
-    "needsInput": "PRET PËRGJIGJE"
+    "needsInput": "PRET PËRGJIGJE",
+    "scheduled": "E PLANIFIKUAR"
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
-    "newestResult": "Rezultati më i ri"
+    "newestResult": "Rezultati më i ri",
+    "scheduledWakes": "zgjohet {{time}}"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",

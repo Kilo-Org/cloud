@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Върни се назад",
     "idle": "Без активност",
+    "scheduled": "Планирана",
     "keepEditing": "Продължи редактирането",
     "keepRunning": "Продължи изпълнението",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Върни се назад и отвори отново този прозорец за избор от предишния екран."
   },
   "sessionRow": {
-    "needsInput": "НУЖЕН Е ОТГОВОР"
+    "needsInput": "НУЖЕН Е ОТГОВОР",
+    "scheduled": "ПЛАНИРАНА"
   },
   "voiceInput": {
     "listening": "Слушам…",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
     "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
-    "newestResult": "Най-нов резултат"
+    "newestResult": "Най-нов резултат",
+    "scheduledWakes": "се събужда {{time}}"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",

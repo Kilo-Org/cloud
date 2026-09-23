@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Orqaga qaytish",
     "idle": "Kutmoqda",
+    "scheduled": "Rejalashtirilgan",
     "keepEditing": "Tahrirlashni davom ettirish",
     "keepRunning": "To‘xtatmaslik",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Oldingi ekranga qayting va tanlash oynasini qayta oching."
   },
   "sessionRow": {
-    "needsInput": "JAVOB KUTILMOQDA"
+    "needsInput": "JAVOB KUTILMOQDA",
+    "scheduled": "REJALASHTIRILGAN"
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
-    "newestResult": "Eng yangi natija"
+    "newestResult": "Eng yangi natija",
+    "scheduledWakes": "{{time}} uyg'onadi"
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Téigh ar ais",
     "idle": "Díomhaoin",
+    "scheduled": "Sceidealaithe",
     "keepEditing": "Lean den eagarthóireacht",
     "keepRunning": "Fág ag rith é",
     "kiloclaw": "KiloClaw",
@@ -2863,7 +2864,8 @@
     "optionsExpiredDescription": "Téigh ar ais agus athoscail an roghnóir seo ón scáileán roimhe seo."
   },
   "sessionRow": {
-    "needsInput": "IONCHUR DE DHÍTH"
+    "needsInput": "IONCHUR DE DHÍTH",
+    "scheduled": "SCEIDEALAITHE"
   },
   "voiceInput": {
     "listening": "Ag éisteacht...",
@@ -3304,7 +3306,8 @@
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
     "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
-    "newestResult": "An toradh is nuaí"
+    "newestResult": "An toradh is nuaí",
+    "scheduledWakes": "dúisíonn {{time}}"
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",

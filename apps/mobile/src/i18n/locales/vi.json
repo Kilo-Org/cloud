@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Quay lại",
     "idle": "Đang rảnh",
+    "scheduled": "Đã lên lịch",
     "keepEditing": "Tiếp tục chỉnh sửa",
     "keepRunning": "Tiếp tục chạy",
     "kiloclaw": "KiloClaw",
@@ -2236,7 +2237,8 @@
     "optionsExpiredDescription": "Quay lại màn hình trước rồi mở lại danh sách lựa chọn này."
   },
   "sessionRow": {
-    "needsInput": "CẦN PHẢN HỒI"
+    "needsInput": "CẦN PHẢN HỒI",
+    "scheduled": "ĐÃ LÊN LỊCH"
   },
   "voiceInput": {
     "listening": "Đang nghe...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "newestResult": "Kết quả mới nhất"
+    "newestResult": "Kết quả mới nhất",
+    "scheduledWakes": "thức dậy {{time}}"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",

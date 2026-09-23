@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "फर्कनुहोस्",
     "idle": "निष्क्रिय",
+    "scheduled": "तय भएको",
     "keepEditing": "सम्पादन जारी राख्नुहोस्",
     "keepRunning": "चलिरहन दिनुहोस्",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "पछाडि फर्केर अघिल्लो स्क्रिनबाट यो छनोट सूची फेरि खोल्नुहोस्।"
   },
   "sessionRow": {
-    "needsInput": "जवाफ चाहिन्छ"
+    "needsInput": "जवाफ चाहिन्छ",
+    "scheduled": "तय भएको"
   },
   "voiceInput": {
     "listening": "सुन्दै…",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
     "openSession": "खोल्नुहोस्",
     "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
-    "newestResult": "नवीनतम नतिजा"
+    "newestResult": "नवीनतम नतिजा",
+    "scheduledWakes": "{{time}} उठ्नेछ"
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",

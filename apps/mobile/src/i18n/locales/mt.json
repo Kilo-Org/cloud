@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mur lura",
     "idle": "Bla attività",
+    "scheduled": "Ipprogrammat",
     "keepEditing": "Kompli editja",
     "keepRunning": "Ħallih għaddej",
     "kiloclaw": "KiloClaw",
@@ -2863,7 +2864,8 @@
     "optionsExpiredDescription": "Mur lura u erġa' iftaħ din il-lista tal-għażliet mill-iskrin ta' qabel."
   },
   "sessionRow": {
-    "needsInput": "JISTENNA TWEĠIBA"
+    "needsInput": "JISTENNA TWEĠIBA",
+    "scheduled": "IPPROGRAMMAT"
   },
   "voiceInput": {
     "listening": "Qed nisimgħu…",
@@ -3304,7 +3306,8 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
-    "newestResult": "L-aħħar riżultat"
+    "newestResult": "L-aħħar riżultat",
+    "scheduledWakes": "iqum {{time}}"
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",

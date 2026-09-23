@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ត្រឡប់ក្រោយ",
     "idle": "ទំនេរ",
+    "scheduled": "បានកំណត់ពេល",
     "keepEditing": "បន្តកែសម្រួល",
     "keepRunning": "បន្តដំណើរការ",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "ត្រឡប់ទៅអេក្រង់មុន ហើយបើកផ្ទាំងជ្រើសរើសនេះម្តងទៀត។"
   },
   "sessionRow": {
-    "needsInput": "ត្រូវការការឆ្លើយតប"
+    "needsInput": "ត្រូវការការឆ្លើយតប",
+    "scheduled": "បានកំណត់ពេល"
   },
   "voiceInput": {
     "listening": "កំពុងស្តាប់...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "openSession": "បើក",
     "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
-    "newestResult": "លទ្ធផលថ្មីបំផុត"
+    "newestResult": "លទ្ធផលថ្មីបំផុត",
+    "scheduledWakes": "ភ្ញាក់ {{time}}"
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",

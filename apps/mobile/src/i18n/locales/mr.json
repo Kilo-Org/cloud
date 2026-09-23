@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "मागे जा",
     "idle": "निष्क्रिय",
+    "scheduled": "नियोजित",
     "keepEditing": "संपादन सुरू ठेवा",
     "keepRunning": "चालू ठेवा",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "मागे जा आणि मागील स्क्रीनवरून पर्याय निवडण्याची ही यादी पुन्हा उघडा."
   },
   "sessionRow": {
-    "needsInput": "प्रतिसाद आवश्यक"
+    "needsInput": "प्रतिसाद आवश्यक",
+    "scheduled": "नियोजित"
   },
   "voiceInput": {
     "listening": "ऐकत आहे...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
     "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
-    "newestResult": "नवीनतम निकाल"
+    "newestResult": "नवीनतम निकाल",
+    "scheduledWakes": "{{time}} जागेल"
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",

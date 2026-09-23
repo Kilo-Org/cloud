@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "തിരികെ പോകുക",
     "idle": "നിഷ്ക്രിയം",
+    "scheduled": "ഷെഡ്യൂൾ ചെയ്തത്",
     "keepEditing": "തിരുത്തുന്നത് തുടരുക",
     "keepRunning": "പ്രവർത്തനം തുടരുക",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "മുമ്പത്തെ സ്ക്രീനിലേക്ക് മടങ്ങി ഈ തിരഞ്ഞെടുപ്പ് ജാലകം വീണ്ടും തുറക്കുക."
   },
   "sessionRow": {
-    "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം"
+    "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
+    "scheduled": "ഷെഡ്യൂൾ ചെയ്തത്"
   },
   "voiceInput": {
     "listening": "കേൾക്കുന്നു...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക.",
     "openSession": "തുറക്കുക",
     "approveFailed": "അംഗീകരിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കാൻ $t(common.approve) ടാപ്പ് ചെയ്യുക.",
-    "newestResult": "ഏറ്റവും പുതിയ ഫലം"
+    "newestResult": "ഏറ്റവും പുതിയ ഫലം",
+    "scheduledWakes": "{{time}} ഉണരും"
   },
   "transcriptionModel": {
     "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",

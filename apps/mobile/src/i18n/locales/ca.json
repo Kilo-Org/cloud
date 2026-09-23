@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Torna enrere",
     "idle": "En espera",
+    "scheduled": "Programada",
     "keepEditing": "Continua editant",
     "keepRunning": "Mantén l'execució en curs",
     "kiloclaw": "KiloClaw",
@@ -2781,7 +2782,8 @@
     "optionsExpiredDescription": "Torna enrere i reobre aquest selector des de la pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "PENDENT DE RESPOSTA"
+    "needsInput": "PENDENT DE RESPOSTA",
+    "scheduled": "PROGRAMADA"
   },
   "voiceInput": {
     "listening": "S'està escoltant…",
@@ -3218,7 +3220,8 @@
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
     "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
-    "newestResult": "Resultat més recent"
+    "newestResult": "Resultat més recent",
+    "scheduledWakes": "es desperta {{time}}"
   },
   "transcriptionModel": {
     "title": "Model de transcripció",

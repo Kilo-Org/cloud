@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Koma baya",
     "idle": "A jiran aiki",
+    "scheduled": "An tsara",
     "keepEditing": "Ci gaba da gyarawa",
     "keepRunning": "Ci gaba da aikin",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Koma baya ka sake buɗe wurin zaɓin nan daga shafin da ya gabata."
   },
   "sessionRow": {
-    "needsInput": "ANA BUƘATAR BAYANI"
+    "needsInput": "ANA BUƘATAR BAYANI",
+    "scheduled": "AN TSARA"
   },
   "voiceInput": {
     "listening": "Ana sauraro...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
     "openSession": "Buɗe",
     "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
-    "newestResult": "Sabon sakamako"
+    "newestResult": "Sabon sakamako",
+    "scheduledWakes": "zai farka {{time}}"
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",

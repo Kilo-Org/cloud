@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "वापस जाएँ",
     "idle": "निष्क्रिय",
+    "scheduled": "निर्धारित",
     "keepEditing": "संपादन जारी रखें",
     "keepRunning": "चालू रखें",
     "kiloclaw": "KiloClaw",
@@ -2236,7 +2237,8 @@
     "optionsExpiredDescription": "पिछली स्क्रीन पर वापस जाएँ और विकल्प चुनने की यह स्क्रीन फिर से खोलें।"
   },
   "sessionRow": {
-    "needsInput": "इनपुट चाहिए"
+    "needsInput": "इनपुट चाहिए",
+    "scheduled": "निर्धारित"
   },
   "voiceInput": {
     "listening": "सुनना जारी है…",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
     "openSession": "खोलें",
     "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।",
-    "newestResult": "नवीनतम परिणाम"
+    "newestResult": "नवीनतम परिणाम",
+    "scheduledWakes": "{{time}} जागेगा"
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Dib u noqo",
     "idle": "Hawl la'aan",
+    "scheduled": "La qorsheeyay",
     "keepEditing": "Sii wad wax ka beddelka",
     "keepRunning": "Sii wad socodsiinta",
     "kiloclaw": "KiloClaw",
@@ -2740,7 +2741,8 @@
     "optionsExpiredDescription": "Dib u noqo oo xulahan mar kale ka fur shaashaddii hore."
   },
   "sessionRow": {
-    "needsInput": "JAWAAB SUGAYA"
+    "needsInput": "JAWAAB SUGAYA",
+    "scheduled": "LA QORSHEEYAY"
   },
   "voiceInput": {
     "listening": "Waa la dhegaysanayaa...",
@@ -3175,7 +3177,8 @@
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
     "openSession": "Fur",
     "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
-    "newestResult": "Natiijada ugu cusub"
+    "newestResult": "Natiijada ugu cusub",
+    "scheduledWakes": "wuxuu soo toosaa {{time}}"
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",

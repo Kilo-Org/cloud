@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 import {
   createContext,
@@ -43,6 +42,11 @@ import {
   setSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  deleteStoredValue,
+  readStoredValue,
+  readStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
@@ -92,9 +96,13 @@ import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
 import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/context-scope';
 
-// Pre-load tokens at module level so they're available before React mounts
-export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+// Pre-load tokens at module level so they're available before React mounts.
+// The raw throwing read is deliberate: a rejection here must reach the
+// bootstrap read below, not settle as "nothing stored", so the retry helper —
+// not this preload — owns the failure outcome (it reports the exhausted read at
+// warning level with the stable read fingerprint).
+export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
+const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -494,13 +502,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // deletion are members of the same always-attempted batch.
           await Promise.allSettled([
             writeCredentials(async () => {
-              await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-              await SecureStore.deleteItemAsync(
-                TOKEN_EXPIRES_AT_KEY,
-                IOS_BEARER_SECURE_STORE_OPTIONS
-              );
-              await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+              await deleteStoredValue(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
@@ -608,7 +613,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
       void (async () => {
         try {
-          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          const expiresAtStr = await readStoredValueSafe(TOKEN_EXPIRES_AT_KEY);
           if (!expiresAtStr) {
             return;
           }

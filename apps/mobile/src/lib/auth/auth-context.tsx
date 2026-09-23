@@ -80,6 +80,7 @@ import {
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
+  ORGANIZATION_PERSONAL_STORAGE_KEY,
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
@@ -359,6 +360,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // If this fails, fail sign-in closed: a restart must never restore B's
         // token alongside A's cache identity, even before B's getMe can answer.
         await deleteAccountMetadata(ACTIVE_USER_ID_KEY);
+        // The Personal-choice marker is the same account-scoped selection
+        // state as the organization key: a login — including a direct account
+        // switch — must resolve its own default instead of inheriting the
+        // prior account's explicit Personal choice. Awaited before the new
+        // credentials publish, while still inside the FIFO auth-transition
+        // run, so the provider's restore can never read the prior account's
+        // marker.
+        await deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY);
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -513,6 +522,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
+            // The Personal-choice marker is account-scoped selection state
+            // beside the organization key. Clearing it here (and never on the
+            // token-less cold-launch render, which has no account yet) means
+            // the next account on this device resolves its own default
+            // instead of inheriting the signed-out account's explicit
+            // Personal choice.
+            deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY),
             deleteAccountMetadata(SESSION_FILTERS_KEY),
             deleteAccountMetadata(LIVE_SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),

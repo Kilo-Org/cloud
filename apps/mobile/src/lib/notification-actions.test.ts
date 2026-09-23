@@ -7,6 +7,7 @@ import { NEEDS_INPUT_ACTION_IDS, needsInputCategoryDescriptors } from '@kilocode
 import {
   _resetDeepLinkLaunchForTests,
   _setSecureStoreForTests,
+  consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   setPendingDeepLink,
 } from './deep-link-launch';
@@ -56,6 +57,7 @@ type RaiseData = {
   category: 'attention';
   attentionKind: 'permission' | 'question';
   prUrl?: string;
+  organizationId?: string;
 };
 
 function raiseData(overrides: Partial<RaiseData> = {}): RaiseData {
@@ -638,6 +640,83 @@ describe('handleNeedsInputNotificationResponse — open PR and open session', ()
     );
 
     expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+  });
+});
+
+describe('handleNeedsInputNotificationResponse — session organization', () => {
+  it('stashes the organization a cloud_agent_session tap carries', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: raiseData({ organizationId: 'org-9' }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(consumePendingDeepLink()).toEqual({
+      href: '/(app)/agent-chat/ses_1?via=push',
+      organizationId: 'org-9',
+    });
+  });
+
+  it('stashes null when the tap carries no organization', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({ actionIdentifier: 'expo.modules.notifications.actions.DEFAULT' }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(consumePendingDeepLink()).toEqual({
+      href: '/(app)/agent-chat/ses_1?via=push',
+      organizationId: null,
+    });
+  });
+
+  it('carries the organization on Open session', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.openSession,
+        data: raiseData({ organizationId: 'org-9' }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(consumePendingDeepLink()).toEqual({
+      href: '/(app)/agent-chat/ses_1?via=push',
+      organizationId: 'org-9',
+    });
+  });
+
+  it('carries the organization on Open PR', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.openPr,
+        data: raiseData({
+          prUrl: 'https://github.com/org/repo/pull/7',
+          organizationId: 'org-9',
+        }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(consumePendingDeepLink()).toEqual({
+      href: '/(app)/pr-review/org/repo/7?via=push',
+      organizationId: 'org-9',
+    });
+  });
+
+  it('stashes null for a tap that is not a cloud_agent_session', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: { type: 'security_finding', findingId: 'f1', scope: 'personal' },
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(consumePendingDeepLink()).toEqual({
+      href: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f1?via=push',
+      organizationId: null,
+    });
   });
 });
 

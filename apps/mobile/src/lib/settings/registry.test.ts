@@ -28,6 +28,15 @@ vi.mock('react-native', () => ({ Appearance: appearance }));
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'en-US' }] }));
 
+// The language write runs the manual picker's apply path, which touches the
+// native i18n instance, Expo's reload and the device stores. This suite proves
+// the catalog delegates to it and reports its outcome, so the path is stubbed
+// here and its own behaviour is covered by the language-picker suite.
+const applyLanguagePreference = vi.hoisted(() =>
+  vi.fn<(preference: string, resolved: string) => Promise<{ kind: string }>>()
+);
+vi.mock('@/i18n/apply-language', () => ({ applyLanguagePreference }));
+
 const notificationMutation = vi.hoisted(() => ({
   mutate: vi.fn().mockResolvedValue(undefined),
 }));
@@ -188,6 +197,57 @@ describe('settingsService one source of truth', () => {
       const report = Effect.runSync(settingsService().write(name, false));
       expect(report).toContain(name);
       expect(report).toContain('false');
+    }
+  });
+});
+
+/**
+ * The agent's language write has to apply the way the manual picker does: the
+ * stored preference alone leaves the running app in its old language, so the
+ * write goes through the picker's own apply path and reports what happened.
+ */
+describe('the language write applies the change', () => {
+  beforeEach(() => {
+    applyLanguagePreference.mockReset();
+    applyLanguagePreference.mockResolvedValue({ kind: 'applied-ltr' });
+  });
+
+  it('applies an LTR language through the manual picker path and reports it', async () => {
+    const report = await Effect.runPromise(settingsService().write('language', 'es'));
+
+    expect(applyLanguagePreference).toHaveBeenCalledWith('es', 'es');
+    expect(report).toBe('language set to es');
+  });
+
+  it('resolves "device" to the device language before applying it', async () => {
+    const report = await Effect.runPromise(settingsService().write('language', 'device'));
+
+    expect(applyLanguagePreference).toHaveBeenCalledWith('device', 'en');
+    expect(report).toBe('language set to device');
+  });
+
+  it('reports a direction change that restarts the app as applied', async () => {
+    applyLanguagePreference.mockResolvedValue({ kind: 'restarting-rtl' });
+
+    await expect(Effect.runPromise(settingsService().write('language', 'ar'))).resolves.toBe(
+      'language set to ar'
+    );
+  });
+
+  it.each([
+    ['persist-failed', 'could not be saved'],
+    ['reload-failed', 'could not restart'],
+    ['catalog-failed', 'catalog could not be loaded'],
+  ])('refuses to claim success when the apply fails (%s)', async (kind, fragment) => {
+    applyLanguagePreference.mockResolvedValue({ kind });
+
+    const refused = await Effect.runPromise(
+      Effect.either(settingsService().write('language', 'es'))
+    );
+
+    expect(Either.isLeft(refused)).toBe(true);
+    if (Either.isLeft(refused)) {
+      expect(String(refused.left.cause)).toContain(fragment);
     }
   });
 });

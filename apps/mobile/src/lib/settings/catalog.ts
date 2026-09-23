@@ -1,7 +1,6 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 
-import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type NotificationPreferences } from '@/lib/hooks/agent-push-preference';
 import {
   getCondenseToolCalls,
@@ -10,11 +9,6 @@ import {
 import { getHideBalance, setHideBalance } from '@/lib/hooks/use-hide-balance-preference';
 import { getHideThinking, setHideThinking } from '@/lib/hooks/use-hide-thinking-preference';
 import { getKeepScreenOn, setKeepScreenOn } from '@/lib/hooks/use-keep-screen-on-preference';
-import {
-  getLanguagePreference,
-  type LanguagePreference,
-  setLanguagePreferenceAsync,
-} from '@/lib/hooks/use-language-preference';
 import {
   getLiveActivityEnabled,
   setLiveActivityEnabled,
@@ -64,6 +58,7 @@ import {
   NOTIFICATION_PREFERENCES_QUERY_KEY,
   stringSetting,
 } from './bindings';
+import { languageEntry } from './language-catalog';
 import { notificationToggleEntries } from './notification-catalog';
 import { type AppSettingEntry } from './types';
 
@@ -79,10 +74,8 @@ import { type AppSettingEntry } from './types';
  */
 
 const THEME_OPTIONS = ['system', 'light', 'dark'] as const;
-const LANGUAGE_OPTIONS = ['device', ...SUPPORTED_LANGUAGES];
 const PREVIEW_OPTIONS = ['generic', 'full'] as const;
 
-const languageSchema = z.union([z.literal('device'), z.enum(SUPPORTED_LANGUAGES)]);
 const previewSchema = z.enum(PREVIEW_OPTIONS);
 
 type BooleanToggle = Readonly<{
@@ -180,32 +173,7 @@ export const ENTRIES: readonly AppSettingEntry[] = [
         },
       }),
   },
-  {
-    name: 'language',
-    description: 'The app language: a supported tag, or "device" to follow the system.',
-    kind: 'enum',
-    options: LANGUAGE_OPTIONS,
-    bind: () => ({
-      read: getLanguagePreference,
-      write: value => {
-        const parsed = languageSchema.safeParse(value);
-        if (!parsed.success) {
-          return Effect.fail(invalidValue('language', value, LANGUAGE_OPTIONS.join(', ')));
-        }
-        const language: LanguagePreference = parsed.data;
-        return Effect.tryPromise({
-          try: async () => {
-            const saved = await setLanguagePreferenceAsync(language);
-            if (!saved) {
-              throw new Error('the language could not be saved to disk');
-            }
-            return changed('language', language);
-          },
-          catch: error => failure(`Could not change language: ${String(error)}`),
-        });
-      },
-    }),
-  },
+  languageEntry,
   {
     name: 'notifications.previews',
     description: 'Whether notification previews show their content or stay generic.',

@@ -31,6 +31,7 @@ describe('buildRestoreIncompleteReport', () => {
       total: 10,
       reasons: ['patch_apply_failed', 'missing_content'],
       paths: ['a.ts', 'b.ts', 'c.ts'],
+      omittedPaths: 0,
       message:
         'Session restore incomplete: 3 of 10 files were not restored (the patch did not apply, the snapshot carried no content for the file). Missing: a.ts, b.ts, c.ts',
     });
@@ -96,6 +97,28 @@ describe('buildRestoreIncompleteReport', () => {
 });
 
 describe('buildRestoreIncompleteRules', () => {
+  it('tells the agent how many affected paths the cap omitted', () => {
+    const skippedDiffs = Array.from({ length: 60 }, (_, index) => ({
+      file: `src/file-${index}.ts`,
+      reason: 'patch_apply_failed',
+    }));
+    const report = buildRestoreIncompleteReport({
+      applied: 0,
+      skipped: 60,
+      total: 60,
+      skippedDiffs,
+    });
+    if (!report) throw new Error('expected an incomplete report');
+
+    const rules = buildRestoreIncompleteRules(report);
+
+    expect(report.omittedPaths).toBe(10);
+    expect(rules).toContain('- src/file-0.ts');
+    expect(rules).toContain('- src/file-49.ts');
+    expect(rules).not.toContain('- src/file-50.ts');
+    expect(rules).toContain('and 10 more');
+  });
+
   it('names the count, the reason word and each affected path', () => {
     const report = buildRestoreIncompleteReport({
       applied: 3,

@@ -12,6 +12,8 @@ export type RestoreIncompleteReport = {
   reasons: string[];
   /** Affected workspace-relative paths, first-seen order, capped at 50. */
   paths: string[];
+  /** Distinct affected paths beyond the cap, omitted from `paths`. */
+  omittedPaths: number;
   message: string;
 };
 
@@ -57,10 +59,10 @@ export function buildRestoreIncompleteReport(diffs: {
   if (reasons.length === 0) reasons.push('unknown');
 
   const listedPaths = paths.slice(0, MAX_REPORTED_PATHS);
-  const remainder = paths.length - listedPaths.length;
+  const omittedPaths = paths.length - listedPaths.length;
   const missing =
     listedPaths.length > 0
-      ? ` Missing: ${listedPaths.join(', ')}${remainder > 0 ? ` and ${remainder} more` : ''}`
+      ? ` Missing: ${listedPaths.join(', ')}${omittedPaths > 0 ? ` and ${omittedPaths} more` : ''}`
       : '';
   const message = `Session restore incomplete: ${diffs.skipped} of ${diffs.total} files were not restored (${reasons
     .map(describeReason)
@@ -72,6 +74,7 @@ export function buildRestoreIncompleteReport(diffs: {
     total: diffs.total,
     reasons,
     paths: listedPaths,
+    omittedPaths,
     message,
   };
 }
@@ -91,7 +94,14 @@ export function buildRestoreIncompleteRules(report: RestoreIncompleteReport): st
     ...report.reasons.map(reason => `- ${describeReason(reason)}`),
   ];
   if (report.paths.length > 0) {
-    lines.push('', 'Affected paths:', ...report.paths.map(file => `- ${file}`));
+    lines.push(
+      '',
+      'Affected paths:',
+      ...report.paths.map(file => `- ${file}`),
+      // The report caps the list; without the remainder an agent could read the
+      // listed paths as the whole set.
+      ...(report.omittedPaths > 0 ? [`- and ${report.omittedPaths} more`] : [])
+    );
   }
   lines.push(
     '',

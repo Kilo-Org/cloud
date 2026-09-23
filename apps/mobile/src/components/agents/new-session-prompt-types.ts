@@ -45,6 +45,14 @@ export type NewSessionPromptProps = {
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
   /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
   initialPrompt?: string;
+  /**
+   * Height of the frame the prompt scrolls in, once the safe areas and the
+   * keyboard-lift padding are out. The input's min-height floor measures
+   * against this frame when it is known, so the input gives up lines while the
+   * keyboard is up and grows back when it leaves. Omitted (or 0) falls back to
+   * the window-based floor for the first frame, before the host has laid out.
+   */
+  promptViewportHeight?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
 };

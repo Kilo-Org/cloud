@@ -124,9 +124,20 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, making the exact assertion below machine-dependent.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(
@@ -136,7 +147,7 @@ describe('shared branded splash', () => {
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });
@@ -164,14 +175,18 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // The introspected project root may already hold a generated Android
-    // project, whose colors.xml merges into the mod result. Assert the splash
-    // color is present instead of pinning the whole array's length.
-    expect(evaluated._internal?.modResults?.android?.colors?.resources?.color).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
-      ])
-    );
+    // Assert by containment, not by the array's exact contents: introspection
+    // merges the splash color into the project's own Android resources, so the
+    // array also carries colors this plugin does not own. The plugin's contract
+    // is that its own color is present among them — the same `toMatchObject`
+    // containment shape the styles assertion below uses.
+    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
+    });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

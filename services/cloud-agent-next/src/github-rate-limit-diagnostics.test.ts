@@ -3,8 +3,66 @@ import {
   classifyGitHubRateLimitBody,
   GITHUB_RATE_LIMIT_DIAGNOSTIC_BODY_DEADLINE_MS,
   GITHUB_RATE_LIMIT_DIAGNOSTIC_MAX_BODY_BYTES,
+  GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS,
   inspectGitHubRateLimitResponse,
+  resolveGitHubRateLimitRetryDelayMs,
 } from './github-rate-limit-diagnostics.js';
+
+describe('resolveGitHubRateLimitRetryDelayMs', () => {
+  const now = Date.parse('2026-01-01T00:00:00.000Z');
+
+  it('uses an integer retry-after delta-seconds value', () => {
+    expect(resolveGitHubRateLimitRetryDelayMs({ githubRetryAfter: '30' }, now)).toBe(30_000);
+  });
+
+  it('uses a strict retry-after HTTP-date relative to now', () => {
+    const retryAfter = new Date(now + 30_000).toUTCString();
+
+    expect(resolveGitHubRateLimitRetryDelayMs({ githubRetryAfter: retryAfter }, now)).toBe(30_000);
+  });
+
+  it('clamps a retry-after date already in the past to zero', () => {
+    const retryAfter = new Date(now - 30_000).toUTCString();
+
+    expect(resolveGitHubRateLimitRetryDelayMs({ githubRetryAfter: retryAfter }, now)).toBe(0);
+  });
+
+  it('clamps an oversized retry-after delta to the per-wait maximum', () => {
+    expect(resolveGitHubRateLimitRetryDelayMs({ githubRetryAfter: '9999999999' }, now)).toBe(
+      GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS
+    );
+  });
+
+  it('falls back to x-ratelimit-reset epoch seconds', () => {
+    const reset = String(now / 1000 + 30);
+
+    expect(resolveGitHubRateLimitRetryDelayMs({ githubRateLimitReset: reset }, now)).toBe(30_000);
+  });
+
+  it('prefers retry-after over x-ratelimit-reset', () => {
+    const reset = String(now / 1000 + 120);
+
+    expect(
+      resolveGitHubRateLimitRetryDelayMs(
+        { githubRetryAfter: '10', githubRateLimitReset: reset },
+        now
+      )
+    ).toBe(10_000);
+  });
+
+  it('returns undefined when neither header is usable', () => {
+    expect(resolveGitHubRateLimitRetryDelayMs({}, now)).toBeUndefined();
+    expect(
+      resolveGitHubRateLimitRetryDelayMs({ githubRetryAfter: 'not-a-delay' }, now)
+    ).toBeUndefined();
+    expect(
+      resolveGitHubRateLimitRetryDelayMs({ githubRateLimitReset: 'abc' }, now)
+    ).toBeUndefined();
+    expect(
+      resolveGitHubRateLimitRetryDelayMs({ githubRetryAfter: 'not-a-date' }, now)
+    ).toBeUndefined();
+  });
+});
 
 describe('classifyGitHubRateLimitBody', () => {
   it.each([

@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Te tūnga o te wātū",
       "sessionStatusSubtitle": "kua oti / i rahua / kua rite hei whakahaere māu",
       "kiloclawActivitySubtitle": "kua rite te tāruatanga / i rahua, ngā mahi kua whakaritea",
-      "kiloclawActivityUnavailable": "Tīmatahia tētahi tāruatanga KiloClaw kia whiwhi ai i ngā mahi KiloClaw.",
+      "kiloclawActivityUnavailable": "Tīmatahia tētahi tāruatanga KiloClaw kia whiwhi ai i te mahi KiloClaw.",
       "balanceAlertsSubtitle": "ngā whakatūpato mō te toenga iti o te rōpū",
-      "balanceAlertsUnavailable": "Whakaurua ki tētahi whakahaerenga kia whiwhi ai i ngā whakatūpato toenga iti.",
+      "balanceAlertsUnavailable": "Whakaurua atu ki tētahi rōpū kia whiwhi ai i ngā whakatūpato toenga.",
       "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA",
-      "securityFindingsUnavailable": "Whakahohea te kaiāwhina haumarutanga Kilo i runga i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga.",
+      "securityFindingsUnavailable": "Whakahohehia te Kaiāwhina haumarutanga Kilo i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga.",
       "spendAlertsSubtitle": "ngā whitinga paepae me ngā pikinga ia hāora",
       "spendAlertsToggle": "Kāwai matohi whakapaunga"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "He nui rawa ngā whakamātau takiuru. Tatari, ka whakamātau anō."
   },
   "models": {
+    "auto": {
+      "frontier": "Aunoa Pae whakamua",
+      "balanced": "Aunoa Taurite",
+      "efficient": "Aunoa Whaihua",
+      "small": "Aunoa Iti",
+      "free": "Aunoa Koreutu",
+      "organization": "Aunoa Whakahaere"
+    },
     "dataCollected": "Kua kohia ngā raraunga",
     "free": "Koreutu",
     "couldNotUpdateFavorites": "Kāore i taea te whakahou i ngā makau.",

@@ -6,6 +6,7 @@ export const SEED = {
   id: 'seed',
   apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: [

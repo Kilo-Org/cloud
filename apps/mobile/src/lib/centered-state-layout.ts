@@ -36,6 +36,29 @@ export function intersectStateFrames(frame: StateFrame, clip: StateFrame): State
   return { top, bottom: Math.max(top, Math.min(frame.bottom, clip.bottom)) };
 }
 
+/**
+ * The band a centered state may occupy: the measured viewport clipped to the
+ * surface and to the reserved top/bottom insets. `getCenteredStateLayout`
+ * centers inside it; a state that cannot fit it renders its compact form, so
+ * the two must read the same numbers.
+ */
+export function getCenteredStateBand({
+  surface,
+  viewport,
+  topInset = 0,
+  bottomInset = 0,
+}: {
+  surface: StateFrame;
+  viewport: StateFrame;
+  topInset?: number;
+  bottomInset?: number;
+}) {
+  const visible = intersectStateFrames(viewport, surface);
+  const top = Math.max(visible.top, surface.top + topInset);
+  const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
+  return { top, bottom, band: Math.max(0, bottom - top) };
+}
+
 export function getCenteredStateLayout({
   surface,
   viewport,
@@ -47,9 +70,12 @@ export function getCenteredStateLayout({
   roundToPixel = (value: number) => value,
 }: CenteredStateLayoutInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
-  const visible = intersectStateFrames(viewport, surface);
-  const top = Math.max(visible.top, surface.top + topInset);
-  const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
+  const { top, bottom } = getCenteredStateBand({
+    surface,
+    viewport,
+    topInset,
+    bottomInset,
+  });
   const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
   const fits = contentHeight <= roundToPixel(bottom - top);
   const clearance = Math.min(PREFERRED_CLEARANCE, Math.max(0, (bottom - top - contentHeight) / 2));

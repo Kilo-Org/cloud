@@ -133,6 +133,46 @@ describe('ChatToolbar', () => {
     expect(pasteButtonProps.className).toContain('shrink-0');
   });
 
+  it('pins the chips to one row when the host turns wrap off', () => {
+    const onPaste = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onPaste, wrap: false }) as Node;
+
+    const className =
+      element !== null &&
+      typeof element === 'object' &&
+      typeof element.props?.className === 'string'
+        ? element.props.className
+        : '';
+    expect(className).toContain('flex-row');
+    expect(className).not.toContain('flex-wrap');
+
+    const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
+    expect(pasteButtonProps.className).toContain('shrink-0');
+  });
+
+  it('wraps the chips for the narrow new-session viewport', () => {
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), wrap: true }) as Node;
+
+    const className =
+      element !== null &&
+      typeof element === 'object' &&
+      typeof element.props?.className === 'string'
+        ? element.props.className
+        : '';
+    expect(className).toContain('flex-row');
+    expect(className).toContain('flex-wrap');
+  });
+
+  it('forwards onLayout to the row', () => {
+    const onLayout = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onLayout }) as Node;
+
+    expect(element).toMatchObject({ props: { onLayout } });
+  });
+
   it('packs the paste button with the model chip so it never wraps to a line of its own', () => {
     const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

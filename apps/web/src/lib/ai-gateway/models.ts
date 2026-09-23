@@ -8,6 +8,7 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -19,7 +20,7 @@ import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -87,7 +88,8 @@ export const preferredModels = [
 
   ...autoFreeModels.map(({ model }) => model),
 
-  GPT_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  GPT_SOL_CURRENT_MODEL_ID,
   ...(gpt_5_6_sol_discounted_model.status === 'public'
     ? [gpt_5_6_sol_discounted_model.public_id]
     : []),

@@ -5,7 +5,6 @@ import {
   initialRenameState,
   type RenameState,
   renameStateReducer,
-  titleFromSessionUpdatedEvent,
 } from './session-detail-rename-state';
 
 describe('getSessionDetailRenameState', () => {
@@ -57,6 +56,97 @@ describe('getSessionDetailRenameState', () => {
       modalInitialValue: null,
       isModalOpen: false,
     });
+  });
+
+  it('shows the localized fallback instead of the backend placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the localized fallback for a child-session placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Child session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('shows the localized fallback for a blank server title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '   ',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('keeps a real server title unchanged', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Fix login',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('Fix login');
+  });
+
+  it('seeds the rename modal with the localized fallback for a placeholder title', () => {
+    // The placeholder must not be editable as-is: the header shows "Session",
+    // so the modal must open on "Session" too.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: { ...initialRenameState(), isModalOpen: true },
+      }).modalInitialValue
+    ).toBe(fallbackTitle);
+  });
+
+  it('shows the fallback label when the loaded record still carries the backend placeholder', () => {
+    // A fresh session is seeded with `New session - ${ISO}`; the app must
+    // paint its own label, never the machine string.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T01:09:45.623Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the fallback label when the loaded record carries a blank title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '   ',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
   });
 
   it('shows the optimistic override in the header when one is pending', () => {
@@ -197,38 +287,5 @@ describe('renameStateReducer', () => {
     const changed = renameStateReducer(submitted, { type: 'sessionChanged' });
     expect(changed.isModalOpen).toBe(false);
     expect(changed.optimisticTitle).toBeNull();
-  });
-});
-
-function sessionUpdatedPayload(
-  over: { sessionId?: string; title?: string | null; source?: string } = {}
-) {
-  return {
-    source: over.source ?? 'v2',
-    session: {
-      sessionId: over.sessionId ?? 'ses-1',
-      title: over.title === undefined ? 'Auto Title' : over.title,
-    },
-  };
-}
-
-describe('titleFromSessionUpdatedEvent', () => {
-  it('returns the title for this session', () => {
-    expect(titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload())).toBe('Auto Title');
-  });
-
-  it('ignores another session', () => {
-    expect(
-      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ sessionId: 'ses-2' }))
-    ).toBeUndefined();
-  });
-
-  it('ignores a blank or null title', () => {
-    expect(
-      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: null }))
-    ).toBeUndefined();
-    expect(
-      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
-    ).toBeUndefined();
   });
 });

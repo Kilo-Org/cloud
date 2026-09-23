@@ -12,7 +12,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
+import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -27,9 +27,11 @@ import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gatew
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
     expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
+    expect(GPT_SOL_CURRENT_MODEL_ID).toBe('openai/gpt-6-sol');
 
     const expectedModels = [
-      GPT_CURRENT_MODEL_ID,
+      CLAUDE_OPUS_CURRENT_MODEL_ID,
+      GPT_SOL_CURRENT_MODEL_ID,
       DEEPSEEK_V4_1_FLASH_MODEL_ID,
       GLM_FLASH_CURRENT_MODEL_ID,
     ];
@@ -37,7 +39,6 @@ describe('OpenRouter Models Config', () => {
     expectedModels.forEach(model => {
       expect(preferredModels).toContain(model);
     });
-    expect(preferredModels).not.toContain(CLAUDE_OPUS_CURRENT_MODEL_ID);
 
     const deemphasizedAutoModels = [KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_FRONTIER_MODEL.id];
     deemphasizedAutoModels.forEach(model => {
@@ -45,6 +46,7 @@ describe('OpenRouter Models Config', () => {
     });
 
     const supersededModels = [
+      'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
       'stealth/claude-opus-4.8',
       'stealth/qwen3.6-plus',
@@ -66,7 +68,7 @@ describe('OpenRouter Models Config', () => {
 
     if (gpt_5_6_sol_discounted_model.status === 'public') {
       expect(preferredModels).toContain(gpt_5_6_sol_discounted_model.public_id);
-      expect(preferredModels.indexOf(GPT_CURRENT_MODEL_ID)).toBeLessThan(
+      expect(preferredModels.indexOf(GPT_SOL_CURRENT_MODEL_ID)).toBeLessThan(
         preferredModels.indexOf(gpt_5_6_sol_discounted_model.public_id)
       );
     } else {

@@ -3162,6 +3162,14 @@
     "tooManySignInAttempts": "Troppi tentativi di accesso. Attendi e riprova."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanzato",
+      "balanced": "Auto Bilanciato",
+      "efficient": "Auto Efficiente",
+      "small": "Auto Piccolo",
+      "free": "Auto Gratuito",
+      "organization": "Auto Organizzazione"
+    },
     "dataCollected": "Dati raccolti",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Impossibile aggiornare i preferiti.",

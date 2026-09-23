@@ -15,9 +15,9 @@
  * The freeze scenarios additionally prove the mechanism with
  * identity-correlated `sandbox_control` evidence (the local `sandboxFaults`
  * capability reads the local worker log; the deployed profile provides no
- * `sandboxFaults`): the settled-reap `physical_committed running -> stopping`
- * cause and stopCause, the terminal `provider_stop`, the heartbeat-expiry
- * recovery outcome, no re-ready wrapper, and for the inflight variant the
+ * `sandboxFaults`): the settled-reap `allocation_transition` into
+ * `stopping.destroying`, the terminal `native_stop`, the heartbeat-expiry
+ * recovery start, no re-ready wrapper, and for the inflight variant the
  * `runtime_unhealthy` accepted-reconciliation plus the still-active route. A
  * missing cause fails; a run that merely lost the allocation and got a
  * replacement does not pass.
@@ -63,7 +63,7 @@ import {
 } from './scenarios-shared-runtime.js';
 import { assertScenarioPreconditions } from './public-surface-support.js';
 import { assertReapOutcome } from './sandbox-fault-evidence.js';
-import { RECOVERY_SETTLED_REAP_REASON } from '../../src/sandbox-control/recovery-cleanup.js';
+import { healthUnhealthyReason } from '../../src/sandbox-state/allocation/reduce.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type {
   SandboxFaultObservation,
@@ -72,6 +72,7 @@ import type {
   SessionSandboxObservation,
 } from './scenario-capabilities.js';
 
+const SETTLED_REAP_REASON = healthUnhealthyReason('unresponsive');
 /** Whole-scenario budget for the fault scenarios. */
 const FAULT_TIMEOUT_MS = 15 * 60_000;
 const CONTAINER_BUDGET_MS = 240_000;
@@ -591,7 +592,7 @@ async function runWrapperFreezeSettledReap(
       evidence: reapEvidence,
       reapedAllocationRef: allocation,
       replacementAllocationRef: replacement,
-      settledReapReason: RECOVERY_SETTLED_REAP_REASON,
+      settledReapReason: SETTLED_REAP_REASON,
       inflight: false,
     });
 
@@ -780,7 +781,7 @@ async function runWrapperFreezeInflightReap(
       evidence: reapEvidence,
       reapedAllocationRef: allocation,
       replacementAllocationRef: replacement,
-      settledReapReason: RECOVERY_SETTLED_REAP_REASON,
+      settledReapReason: SETTLED_REAP_REASON,
       inflight: true,
     });
 

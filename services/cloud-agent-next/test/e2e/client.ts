@@ -102,10 +102,6 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
 };
 
-// ---------------------------------------------------------------------------
-// tRPC helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Minimal tRPC HTTP-link client. The cloud-agent-next server mounts tRPC
  * without a superjson transformer, so un-batched requests use raw shapes:
@@ -197,10 +193,6 @@ export async function trpcCall<T>(
   const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
   return envelope.result.data as T;
 }
-
-// ---------------------------------------------------------------------------
-// High-level session operations
-// ---------------------------------------------------------------------------
 
 export type StartSessionResult = {
   cloudAgentSessionId: string;
@@ -521,10 +513,6 @@ export async function sendMessage(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Control-plane helpers
-// ---------------------------------------------------------------------------
-
 const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
@@ -600,10 +588,6 @@ export async function deleteSession(
 ): Promise<{ success: boolean }> {
   return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId }, { signal });
 }
-
-// ---------------------------------------------------------------------------
-// Fake-LLM gate helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Headers for the fake LLM `/test/*` side channel.
@@ -754,10 +738,6 @@ export async function waitForGateEngaged(
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// WebSocket stream
-// ---------------------------------------------------------------------------
-
 export const streamEventSchema = z.object({
   eventId: z.number(),
   executionId: z.string().nullable().default(null),
@@ -783,6 +763,12 @@ export type StreamConnection = {
   get receivedCount(): number;
   /** Whether the socket is still open. */
   get isOpen(): boolean;
+  /**
+   * Close code/reason of the first socket close observed on this connection, or
+   * `null` while no close frame has been seen. It lets a caller tell an observed
+   * transport drop from a wait that simply timed out on a live socket.
+   */
+  closeInfo: { code: number; reason: string } | null;
 };
 
 export type StreamOptions = {
@@ -888,6 +874,7 @@ export function openStream(
   let retryPending = false;
   let currentGeneration = 0;
   let currentWs: WebSocket | undefined;
+  let closeInfo: { code: number; reason: string } | null = null;
   const listeners: Array<{
     predicate: (event: StreamEvent) => boolean;
     resolve: (event: StreamEvent | null) => void;
@@ -960,12 +947,15 @@ export function openStream(
       handleMessage(raw);
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       if (generation !== currentGeneration) return;
       // `ws` emits `error` then `close` for a rejected handshake. While the
       // single retry is pending, this socket's close must not end the shared
       // connection or drop pending waits.
       if (retryPending) return;
+      // First cause wins: a later close (an explicit close after the server
+      // already closed, or a stale socket) must not overwrite the drop evidence.
+      if (closeInfo === null) closeInfo = { code, reason: reason.toString('utf8') };
       finalizeClose();
     });
 
@@ -1115,6 +1105,9 @@ export function openStream(
     get isOpen() {
       return !closed;
     },
+    get closeInfo() {
+      return closeInfo;
+    },
   };
 }
 
@@ -1146,10 +1139,6 @@ export async function openConnectedStream(
   );
   return requireConnected(stream, sessionId);
 }
-
-// ---------------------------------------------------------------------------
-// Scenario helpers
-// ---------------------------------------------------------------------------
 
 export function fakeDirective(conversation: string): string {
   const scope = resolveFakeScope();
@@ -1201,10 +1190,6 @@ export function waitForOpen(ws: WebSocket, timeoutMs = 5_000): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Assertions
-// ---------------------------------------------------------------------------
 
 export type AssertionResult = { ok: boolean; message: string };
 

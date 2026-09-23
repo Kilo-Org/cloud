@@ -285,6 +285,38 @@ export function resolveComposerMaxHeight({
 }
 
 /**
+ * Snap a capped composer input height down to a whole number of text lines.
+ *
+ * A capped multiline input must be `n * lineHeight + verticalPadding`: when the
+ * cap is not line-aligned, Android's `TextInput` scrolls to keep the caret (at
+ * the end of the draft) visible by a partial line, so the first visible line is
+ * painted cut by the input's top edge. Flooring the cap to a whole number of
+ * lines makes the scrolled content land on a line boundary instead.
+ *
+ * The result never falls below `minHeight`, and a degenerate geometry
+ * (non-positive line height or vertical padding) returns the height unchanged
+ * rather than dividing by zero. The caller passes the font-scaled line height
+ * and the input's own unscaled vertical padding.
+ */
+export function alignComposerInputHeightToLines({
+  height,
+  lineHeight,
+  verticalPadding,
+  minHeight,
+}: {
+  height: number;
+  lineHeight: number;
+  verticalPadding: number;
+  minHeight: number;
+}): number {
+  if (lineHeight <= 0 || verticalPadding <= 0) {
+    return height;
+  }
+  const lines = Math.floor((height - verticalPadding) / lineHeight);
+  return Math.max(minHeight, lines * lineHeight + verticalPadding);
+}
+
+/**
  * Clearance the measured-viewport floor keeps between the card's last row (the
  * mode/model toolbar) and the frame's bottom edge, in unscaled points. The
  * frame's bottom edge is the keyboard's top edge while the IME is up, and the

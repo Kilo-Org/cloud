@@ -46,7 +46,10 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
+import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -947,6 +950,63 @@ describe('SessionDetailContent header title', () => {
     ).className;
     expect(metricsClassName).toContain('shrink');
     expect(metricsClassName).toContain('min-w-0');
+  });
+});
+
+describe('session detail header right cluster', () => {
+  it('caps the right cluster inside the header slot and renders no copy control', async () => {
+    const { renderer } = await mountDetails([]);
+    const header = renderer.root.findByType(ScreenHeader);
+    // The copy-link action left the header in #6343 (7fad4e808) and now lives
+    // in the context sheet, so the sliced chain-link control the explorer
+    // captured cannot paint here any more.
+    expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
+
+    // The header caps its right slot at half the row...
+    const slot = header.findAll(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
+    );
+    expect(slot).toHaveLength(1);
+    expect(slot[0]?.props.className).toContain('min-w-0');
+    expect(slot[0]?.props.className).toContain('shrink');
+
+    // ...and the cluster inside it shrinks into that cap, so it can never paint
+    // past the slot edge. It holds the PR badge and the context pill, nothing
+    // else.
+    const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
+    expect(cluster?.props.className).toContain('min-w-0');
+    expect(cluster?.props.className).toContain('shrink');
+    expect(cluster?.findAllByType(SessionPrBadge)).toHaveLength(1);
+    expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(2);
+
+    // The pill is the flexible part of the cluster: it shrinks into the cap
+    // with it, so the cluster can never paint past the slot edge.
+    const metrics = header.findByProps({ testID: 'session-context-metrics' });
+    expect(metrics.props.className).toContain('min-w-0');
+    expect(metrics.props.className).toContain('shrink');
+  });
+
+  // The cost is the only unbounded string in the cluster: a long total must
+  // truncate inside the capped pill instead of crossing the gutter.
+  it('truncates a long cost inside the capped pill', async () => {
+    const priced = assistantMessage('msg-priced');
+    if (priced.info.role !== 'assistant') {
+      throw new Error('expected an assistant message');
+    }
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    const { renderer } = await mountDetails([priced]);
+    const expected = formatSessionTotalCost(1234.56 * 1_000_000);
+    expect(expected).not.toBeNull();
+    const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const cost = metrics.find(
+      node =>
+        Object.is(node.type, 'Text') &&
+        node.children.some(child => typeof child === 'string' && child === expected)
+    );
+    expect(cost.props.numberOfLines).toBe(1);
+    expect(cost.props.className).toContain('shrink');
   });
 });
 

@@ -55,7 +55,9 @@ type SessionDetailRenameState = {
 
 /**
  * Pure helper that derives the session-detail header display state from the
- * authoritative server title and the reducer state.
+ * authoritative server title and the reducer state. A backend default title
+ * (`New session - <ISO>`) is machine output, so it is treated as no title and
+ * the caller's fallback copy shows instead.
  */
 export function getSessionDetailRenameState(input: {
   fallbackTitle: string;
@@ -63,9 +65,8 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (sessionDisplayTitle(input.serverTitle) ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  const serverTitle = sessionDisplayTitle(input.serverTitle);
+  const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,

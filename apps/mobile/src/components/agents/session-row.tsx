@@ -107,6 +107,13 @@ export function StoredSessionRow({
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // The rename field seeds the name a person wrote, never the backend default
+  // or the display fallback: a session still carrying `New session - <ISO>`
+  // opens an empty field (the "Session name" placeholder prompts for a name)
+  // instead of the machine string the row hides. Both save paths already
+  // refuse an unchanged or blank value, so a no-edit confirm cannot persist
+  // the empty seed.
+  const renameInitialValue = sessionDisplayTitle(session.title) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -134,7 +141,7 @@ export function StoredSessionRow({
       onRename: onRename
         ? () => {
             if (Platform.OS === 'ios') {
-              showRenamePrompt(title, newTitle => {
+              showRenamePrompt(renameInitialValue, newTitle => {
                 onRename(newTitle);
               });
             } else {
@@ -238,7 +245,7 @@ export function StoredSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
           onClose={() => {
             setRenameVisible(false);
           }}

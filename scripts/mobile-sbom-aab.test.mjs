@@ -322,6 +322,29 @@ test('readAabComponents carries packaging and classifier as extra properties', (
   });
 });
 
+test('readAabComponents reads an entry listing past the 1 MiB exec default', () => {
+  const metadata = libraryField({
+    maven: mavenLibraryMessage({ groupId: 'com.example', artifactId: 'alpha', version: '1.2.3' }),
+  });
+  // `unzip -Z1` prints one line per entry; enough padding entries push its
+  // output past Node's 1 MiB execFileSync default, which must not fail the read.
+  const padding = Array.from({ length: 6000 }, (_, index) => [
+    `base/assets/${String(index).padStart(6, '0')}-${'x'.repeat(180)}.txt`,
+    '',
+  ]);
+  const listingBytes = padding.reduce((total, [name]) => total + Buffer.byteLength(name) + 1, 0);
+  assert.ok(
+    listingBytes > 1024 * 1024,
+    `fixture listing must exceed the 1 MiB default (got ${listingBytes} bytes)`
+  );
+
+  withFixture([[METADATA_ENTRY, metadata], ...padding], aabPath => {
+    const { counts } = readAabComponents({ aabPath });
+
+    assert.deepEqual(counts, { maven: 1, nativeLibraries: 0 });
+  });
+});
+
 test('readAabComponents rejects an AAB without the dependency metadata', () => {
   withFixture([['base/manifest/AndroidManifest.xml', '<manifest/>']], aabPath => {
     assert.throws(() => readAabComponents({ aabPath }), /dependencies\.pb/);

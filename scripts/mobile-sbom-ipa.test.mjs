@@ -215,6 +215,35 @@ test('parseMachODylibs rejects a non-Mach-O buffer and an oversized image', () =
   assert.throws(() => parseMachODylibs(Buffer.concat([header, command])), /exceed/);
 });
 
+test('parseMachODylibs rejects a fat slice that points back at the fat header', () => {
+  // A fat_arch with sliceOffset 0 and sliceSize == buffer.length yields a slice
+  // identical to its parent, so an unguarded walk recurses until the stack
+  // overflows. It must throw the clear error instead of a RangeError.
+  const header = Buffer.alloc(8);
+  header.writeUInt32BE(0xcafebabe, 0);
+  header.writeUInt32BE(1, 4);
+  const arch = Buffer.alloc(20);
+  arch.writeUInt32BE(0, 8);
+  arch.writeUInt32BE(28, 12);
+  const image = Buffer.concat([header, arch]);
+
+  assert.throws(() => parseMachODylibs(image), /fat Mach-O slice is itself a fat image/);
+});
+
+test('parseMachODylibs rejects a dylib command too short to hold its name offset', () => {
+  // cmdsize 8 ends the command, and the file, at command + 8: the lc_str name
+  // offset at command + 8 is outside both, so the read must raise the file
+  // error rather than a Node buffer RangeError.
+  const command = Buffer.alloc(8);
+  writeU32(command, 0, LC_LOAD_DYLIB, true);
+  writeU32(command, 4, 8, true);
+
+  assert.throws(
+    () => parseMachODylibs(buildThin({ is64: true, littleEndian: true, commands: [command] })),
+    /exceed/
+  );
+});
+
 test('readIpaComponents merges load-command names with Frameworks/ bundles', () => {
   const executable = buildThin({
     is64: true,

@@ -44,6 +44,11 @@ const DYLIB_LOAD_COMMANDS = new Set([
 ]);
 
 const EXCEEDS_FILE = 'Mach-O load commands exceed the file size';
+// A universal image's slices are thin Mach-O images. A slice that is itself fat
+// can only be a self-reference (a malformed fat_arch pointing back at the fat
+// header), which would otherwise recurse until the stack overflows.
+const FAT_NESTED = 'fat Mach-O slice is itself a fat image';
+const MAX_FAT_DEPTH = 1;
 const KILO_IOS_KIND = 'kilo:sbom:ios-kind';
 const KIND_LOAD_COMMAND = 'dylib-load-command';
 const KIND_DYNAMIC_FRAMEWORK = 'dynamic-framework';
@@ -64,8 +69,9 @@ function unknownMagic(magic) {
 /**
  * Read the install names of every dylib the image links at load time, in file
  * order and deduped. Thin 32/64-bit images in both endiannesses and fat
- * (universal) images are supported; a malformed image throws instead of
- * returning a partial list.
+ * (universal) images are supported; a malformed image, including one whose
+ * fat_arch points back at its own fat header, throws instead of returning a
+ * partial list.
  */
 export function parseMachODylibs(buffer) {
   if (!Buffer.isBuffer(buffer)) {
@@ -73,17 +79,20 @@ export function parseMachODylibs(buffer) {
   }
   const names = [];
   const seen = new Set();
-  walkMachO(buffer, names, seen);
+  walkMachO(buffer, names, seen, 0);
   return names;
 }
 
-function walkMachO(buffer, names, seen) {
+function walkMachO(buffer, names, seen, depth) {
   if (buffer.length < 4) {
     throw unknownMagic(undefined);
   }
   const magic = buffer.readUInt32BE(0);
   if (magic === FAT_MAGIC || magic === FAT_CIGAM) {
-    walkFat(buffer, magic === FAT_MAGIC, names, seen);
+    if (depth >= MAX_FAT_DEPTH) {
+      throw new Error(FAT_NESTED);
+    }
+    walkFat(buffer, magic === FAT_MAGIC, names, seen, depth);
     return;
   }
   const variant = THIN_MAGICS.get(magic);
@@ -93,7 +102,7 @@ function walkMachO(buffer, names, seen) {
   walkThin(buffer, variant, names, seen);
 }
 
-function walkFat(buffer, bigEndian, names, seen) {
+function walkFat(buffer, bigEndian, names, seen, depth) {
   const littleEndian = !bigEndian;
   if (buffer.length < 8) {
     throw new Error(EXCEEDS_FILE);
@@ -113,7 +122,7 @@ function walkFat(buffer, bigEndian, names, seen) {
     if (sliceOffset + sliceSize > buffer.length) {
       throw new Error(EXCEEDS_FILE);
     }
-    walkMachO(buffer.subarray(sliceOffset, sliceOffset + sliceSize), names, seen);
+    walkMachO(buffer.subarray(sliceOffset, sliceOffset + sliceSize), names, seen, depth + 1);
   }
 }
 
@@ -143,7 +152,13 @@ function walkThin(buffer, { is64, littleEndian }, names, seen) {
     if (DYLIB_LOAD_COMMANDS.has(cmd)) {
       // dylib_command: the lc_str name offset is the uint32 at command + 8 and
       // is relative to the command start; LC_ID_DYLIB (0x0d) is the library's
-      // own name, not a link, and is skipped.
+      // own name, not a link, and is skipped. A real dylib_command is 24 bytes
+      // (cmd, cmdsize, name offset, timestamp, and two version fields), so a
+      // shorter one cannot hold that offset; reading it would run past the
+      // command, and past the file when the command ends at the buffer end.
+      if (cmdsize < 24) {
+        throw new Error(EXCEEDS_FILE);
+      }
       const nameOffset = readU32(buffer, offset + 8, littleEndian);
       const commandEnd = offset + cmdsize;
       const nameStart = offset + nameOffset;
@@ -322,7 +337,7 @@ function parseDeclaredPods(text) {
     if (!inPodsSection) {
       continue;
     }
-    const match = /^  - ([A-Za-z0-9_+./-]+)/.exec(line);
+    const match = /^ {2}- ([A-Za-z0-9_+./-]+)/.exec(line);
     if (!match) {
       continue;
     }

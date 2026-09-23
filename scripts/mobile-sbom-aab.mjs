@@ -316,8 +316,10 @@ function run(cmd, args, options) {
   });
 }
 
+// The listing is unbounded, so it uses the same raised cap as the entry read:
+// a release AAB's `unzip -Z1` output can pass Node's 1 MiB default.
 function listAabEntries(aabPath) {
-  return run('unzip', ['-Z1', aabPath], { encoding: 'utf8' })
+  return run('unzip', ['-Z1', aabPath], { encoding: 'utf8', maxBuffer: READ_BUFFER_BYTES })
     .split('\n')
     .filter(entry => entry.length > 0);
 }

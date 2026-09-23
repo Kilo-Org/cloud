@@ -12,6 +12,7 @@ import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
+import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import { StoredSessionRow } from './session-row';
 
 vi.mock('react-native', async () => {
@@ -335,6 +336,47 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+});
+
+describe('StoredSessionRow rename prefill', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+    vi.mocked(showSessionActionMenu).mockClear();
+    vi.mocked(showRenamePrompt).mockClear();
+  });
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  it('seeds the rename prompt with the raw backend title, not the untitled fallback', () => {
+    const rawTitle = 'New session - 2026-09-20T08:10:35.172Z';
+    const renderer = mount(
+      row({
+        session: { ...session, title: rawTitle },
+        onDelete: vi.fn<() => void>(),
+        onRename: vi.fn<() => void>(),
+      })
+    );
+    const button = hosts(renderer, 'Pressable')[0];
+    const pressable = button?.props as { onLongPress?: () => void } | undefined;
+    act(() => {
+      pressable?.onLongPress?.();
+    });
+    const menu = vi.mocked(showSessionActionMenu).mock.calls.at(-1)?.[0];
+    act(() => {
+      menu?.onRename?.();
+    });
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith(rawTitle, expect.any(Function));
+  });
 });
 
 describe('RemoteSessionRow live speech', () => {

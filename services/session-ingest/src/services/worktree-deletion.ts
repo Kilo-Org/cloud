@@ -17,6 +17,8 @@ import {
   type UnresolvedCloudAgentSandboxOwner,
   type CloudAgentWorktreeDeletionParams,
   type CloudAgentWorktreeDeletionState,
+  type RetireCloudAgentWorktreeIfSoleMemberParams,
+  type RetireCloudAgentWorktreeIfSoleMemberResult,
   type CloudAgentWorktreeLocation,
   type CreateSessionForCloudAgentParams,
   type RecordCloudAgentWorktreeCleanupParams,
@@ -231,77 +233,140 @@ async function lockRoots(db: WorktreeDb, params: CloudAgentWorktreeDeletionParam
     .for('update');
 }
 
+/**
+ * The whole deletion-journal body, run on a caller-owned transaction so a
+ * caller can hold the same worktree row lock (`lockWorktree`) across its own
+ * check and this write. `beginWorktreeDeletion` acquires the transaction; a
+ * retirement caller passes its open transaction.
+ */
+async function beginWorktreeDeletionOn(
+  tx: WorktreeDb,
+  params: CloudAgentWorktreeDeletionParams
+): Promise<CloudAgentWorktreeDeletionState> {
+  const owners = await tx
+    .select({
+      userId: cli_sessions_v2.kilo_user_id,
+      organizationId: cli_sessions_v2.organization_id,
+      createdAt: cli_sessions_v2.created_at,
+    })
+    .from(cli_sessions_v2)
+    .where(eq(cli_sessions_v2.cloud_agent_worktree_id, params.worktreeId))
+    .orderBy(cli_sessions_v2.created_at);
+  if (
+    owners.some(
+      row =>
+        row.userId !== params.kiloUserId || row.organizationId !== (params.organizationId ?? null)
+    )
+  ) {
+    throw new Error(WORKTREE_ACCESS_DENIED);
+  }
+  const firstOwner = owners[0];
+  if (firstOwner) {
+    await tx
+      .insert(cloud_agent_worktrees)
+      .values({
+        worktree_id: params.worktreeId,
+        kilo_user_id: params.kiloUserId,
+        organization_id: params.organizationId ?? null,
+        created_at: firstOwner.createdAt,
+      })
+      .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
+  }
+  const row = await lockWorktree(tx, params);
+  if (row.deletion_completed_at !== null) return deletionState(row);
+  let manifest: CloudAgentWorktreeDeletionState['manifest'];
+  if (row.deletion_started_at !== null) {
+    manifest = cloudAgentWorktreeDeletionManifestSchema.parse(row.deletion_manifest);
+  } else {
+    await lockRoots(tx, params);
+    manifest = cloudAgentWorktreeDeletionManifestSchema.parse({
+      version: 1,
+      sessions: await discoverMembers(tx, params),
+    });
+  }
+  const runtimeLocations = locations(row);
+  if (runtimeLocations.length === 0) {
+    const cloudAgentSessionId = firstWorktreeSessionId(params.worktreeId);
+    const allocations = await readSessionAllocations(tx, params.kiloUserId, [cloudAgentSessionId]);
+    const source = manifest.sessions.find(
+      session => session.cloudAgentSessionId === cloudAgentSessionId
+    );
+    const recovered = allocationLocation(allocations, {
+      cloudAgentSessionId,
+      sessionId: source?.sessionId ?? null,
+      organizationId: params.organizationId ?? null,
+    });
+    if (recovered) runtimeLocations.push(recovered);
+  }
+  const [updated] = await tx
+    .update(cloud_agent_worktrees)
+    .set({
+      deletion_started_at: row.deletion_started_at ?? new Date().toISOString(),
+      deletion_manifest: manifest,
+      runtime_locations: runtimeLocations,
+    })
+    .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId))
+    .returning();
+  if (!updated) throw new Error(WORKTREE_DELETING);
+  return deletionState(updated);
+}
+
 export async function beginWorktreeDeletion(env: Env, params: CloudAgentWorktreeDeletionParams) {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  return db.transaction(async tx => {
-    const owners = await tx
-      .select({
-        userId: cli_sessions_v2.kilo_user_id,
-        organizationId: cli_sessions_v2.organization_id,
-        createdAt: cli_sessions_v2.created_at,
-      })
-      .from(cli_sessions_v2)
-      .where(eq(cli_sessions_v2.cloud_agent_worktree_id, params.worktreeId))
-      .orderBy(cli_sessions_v2.created_at);
-    if (
-      owners.some(
-        row =>
-          row.userId !== params.kiloUserId || row.organizationId !== (params.organizationId ?? null)
-      )
-    ) {
-      throw new Error(WORKTREE_ACCESS_DENIED);
-    }
-    const firstOwner = owners[0];
-    if (firstOwner) {
-      await tx
-        .insert(cloud_agent_worktrees)
-        .values({
-          worktree_id: params.worktreeId,
-          kilo_user_id: params.kiloUserId,
-          organization_id: params.organizationId ?? null,
-          created_at: firstOwner.createdAt,
-        })
-        .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
-    }
+  return db.transaction(tx => beginWorktreeDeletionOn(tx, params));
+}
+
+/**
+ * True only when the list is non-empty and every entry belongs to
+ * `cloudAgentSessionId`. The single owner of the "exact sole member" test, used
+ * by both the marker and the fresh-membership branch of
+ * `retireWorktreeIfSoleMember`.
+ */
+function exactSoleMember(
+  sessions: readonly { cloudAgentSessionId: string | null }[],
+  cloudAgentSessionId: string
+): boolean {
+  return (
+    sessions.length > 0 &&
+    sessions.every(session => session.cloudAgentSessionId === cloudAgentSessionId)
+  );
+}
+
+/**
+ * Retire a worktree when the deleting session is its only member, so the
+ * caller may stop the sandbox allocation.
+ *
+ * The whole body runs in one transaction under the same worktree row lock
+ * `registerCloudAgentWorktree` takes: a competing sibling registration either
+ * commits first (then it is visible as another member -> `shared`) or loses
+ * after the retirement marker is committed (`registerCloudAgentWorktree` then
+ * throws `WORKTREE_DELETING`). The marker is written as the FULL deletion state
+ * by `beginWorktreeDeletionOn`, never `deletion_started_at` alone.
+ *
+ * `lockWorktree` and `discoverMembers` throw `WORKTREE_ACCESS_DENIED` on an
+ * owner/organization mismatch; those propagate so the caller maps any throw to
+ * `unresolved`.
+ */
+export async function retireWorktreeIfSoleMember(
+  env: Env,
+  params: RetireCloudAgentWorktreeIfSoleMemberParams
+): Promise<RetireCloudAgentWorktreeIfSoleMemberResult> {
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+  return db.transaction(async (tx): Promise<RetireCloudAgentWorktreeIfSoleMemberResult> => {
     const row = await lockWorktree(tx, params);
-    if (row.deletion_completed_at !== null) return deletionState(row);
-    let manifest: CloudAgentWorktreeDeletionState['manifest'];
+    if (row.deletion_completed_at !== null) return { kind: 'unresolved' };
     if (row.deletion_started_at !== null) {
-      manifest = cloudAgentWorktreeDeletionManifestSchema.parse(row.deletion_manifest);
-    } else {
-      await lockRoots(tx, params);
-      manifest = cloudAgentWorktreeDeletionManifestSchema.parse({
-        version: 1,
-        sessions: await discoverMembers(tx, params),
-      });
+      const manifest = cloudAgentWorktreeDeletionManifestSchema.safeParse(row.deletion_manifest);
+      if (!manifest.success) return { kind: 'unresolved' };
+      return exactSoleMember(manifest.data.sessions, params.cloudAgentSessionId)
+        ? { kind: 'exclusive' }
+        : { kind: 'unresolved' };
     }
-    const runtimeLocations = locations(row);
-    if (runtimeLocations.length === 0) {
-      const cloudAgentSessionId = firstWorktreeSessionId(params.worktreeId);
-      const allocations = await readSessionAllocations(tx, params.kiloUserId, [
-        cloudAgentSessionId,
-      ]);
-      const source = manifest.sessions.find(
-        session => session.cloudAgentSessionId === cloudAgentSessionId
-      );
-      const recovered = allocationLocation(allocations, {
-        cloudAgentSessionId,
-        sessionId: source?.sessionId ?? null,
-        organizationId: params.organizationId ?? null,
-      });
-      if (recovered) runtimeLocations.push(recovered);
-    }
-    const [updated] = await tx
-      .update(cloud_agent_worktrees)
-      .set({
-        deletion_started_at: row.deletion_started_at ?? new Date().toISOString(),
-        deletion_manifest: manifest,
-        runtime_locations: runtimeLocations,
-      })
-      .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId))
-      .returning();
-    if (!updated) throw new Error(WORKTREE_DELETING);
-    return deletionState(updated);
+    const members = await discoverMembers(tx, params);
+    if (members.length === 0) return { kind: 'unresolved' };
+    if (!exactSoleMember(members, params.cloudAgentSessionId)) return { kind: 'shared' };
+    const state = await beginWorktreeDeletionOn(tx, params);
+    return state.completed ? { kind: 'unresolved' } : { kind: 'exclusive' };
   });
 }
 

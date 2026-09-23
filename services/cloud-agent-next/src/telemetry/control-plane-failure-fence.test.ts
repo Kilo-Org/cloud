@@ -344,6 +344,16 @@ const cases: readonly FenceCase[] = [
     failureReason: 'unclassified',
   },
   {
+    name: 'session_deleted stays unclassified',
+    reason: 'session_deleted',
+    dispatchState: 'accepted',
+    status: 'failed',
+    stage: 'unknown',
+    code: 'unclassified',
+    responsibility: 'unknown',
+    failureReason: 'unclassified',
+  },
+  {
     name: 'interrupted run carries no responsibility',
     reason: undefined,
     dispatchState: 'pre_dispatch',

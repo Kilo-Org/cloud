@@ -2630,9 +2630,12 @@ export class SandboxSession extends DurableObject<Env> {
     const sandboxId = metadata?.workspace?.sandboxId;
     if (sandboxId && metadata) {
       try {
-        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
-          metadata.identity.sessionId
-        );
+        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference({
+          sessionId: metadata.identity.sessionId,
+          kiloUserId: metadata.identity.userId,
+          ...(metadata.workspace?.worktreeId ? { worktreeId: metadata.workspace.worktreeId } : {}),
+          ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
+        });
       } catch {
         // Tombstone remains; over-blocking is safe.
       }

@@ -1,3 +1,10 @@
+// Tests the `(tabs)` layout's screen options, so it lives outside the route
+// directory instead of next to the layout. A file in
+// `src/app/(app)/(tabs)/` whose name starts with `_layout` is parsed by
+// expo-router as the layout for that directory: it then collides with the real
+// `_layout.tsx` (a route-tree error) and drops every `(tabs)` route from the
+// generated typed routes.
+//
 // Named `tabs-layout`, never `_layout.*`: expo-router's route parser reads the
 // first dot-separated part of a filename, so `_layout.mounted.test.tsx` counts
 // as the layout for this directory. The typed-routes generator walks the

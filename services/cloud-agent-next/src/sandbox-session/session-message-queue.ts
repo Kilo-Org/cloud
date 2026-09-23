@@ -59,6 +59,21 @@ export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'fi
 
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
+const NO_OUTPUT_RECOVERY_LIMIT = 1;
+
+/**
+ * Whether one more no-output recovery may be spent on an accepted turn.
+ *
+ * Both producers of `wrapper_no_output` share this bound: the accepted-message
+ * inactivity timeout in `SandboxSession.failOverdueAcceptedMessage` here, and
+ * the wrapper no-output watchdog in `src/session/wrapper-supervisor.ts`. Each
+ * plane owns its recovery lifecycle, so the same bound is duplicated on purpose:
+ * a turn gets at most one automatic re-dispatch before a second identical
+ * detection terminalizes with the attempt count recorded.
+ */
+export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
+  return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
+}
 
 // ---------------------------------------------------------------------------
 // Canonical field access. The wire model nests per-state fields under `state`;
@@ -464,6 +479,52 @@ export function releaseUnadmittedWaitingMessages(
 }
 
 /**
+ * Re-queue an accepted turn whose runtime produced no output, so the alarm can
+ * re-dispatch the same durable turn on a fresh runtime. The immutable `intent`
+ * (the user's typed message) is preserved, which is what makes the recovery
+ * lossless. Every ambiguous dispatch proof is dropped: a late operation result
+ * for the retired authorization must not revive it, and the cleared prompt
+ * proof is what lets the delivery start a new acquisition instead of
+ * reconciling the old one. Only the matching record changes; every other record
+ * is returned untouched. Returns `undefined` when no accepted record matches.
+ *
+ * The acceptance, activity and execution bounds are cleared with the dispatch
+ * state: all of them were measured against the runtime that just went silent, so
+ * keeping any would fail the replacement delivery immediately or hand the fresh
+ * prompt a bound that belongs to the retired authorization. The recovery count
+ * is the one piece of the retired lifecycle that survives; it is what bounds
+ * both `wrapper_no_output` producers to a single automatic recovery before a
+ * second identical detection terminalizes.
+ */
+export function redispatchAcceptedMessage(
+  messages: readonly SessionMessage[],
+  messageId: string
+): SessionMessage[] | undefined {
+  const message = messages.find(item => item.messageId === messageId);
+  if (!message || message.state.kind !== 'accepted') return undefined;
+  const accepted = message.state;
+  return messages.map(item =>
+    item.messageId !== messageId
+      ? item
+      : {
+          ...withoutProofs(item),
+          state: {
+            kind: 'queued',
+            intent: accepted.intent,
+            ...(accepted.legacyInvalidIntent ? { legacyInvalidIntent: true as const } : {}),
+            ...(accepted.legacy !== undefined ? { legacy: accepted.legacy } : {}),
+            ...(accepted.queuedAt !== undefined ? { queuedAt: accepted.queuedAt } : {}),
+            deliveryStep: 'waiting',
+            deadlineAt: null,
+            attachFailures: 0,
+            promptFailures: 0,
+            recoveryAttempts: (accepted.recoveryAttempts ?? 0) + 1,
+          },
+        }
+  );
+}
+
+/**
  * Replace a finalized preparation attempt with a fresh one so later wait
  * progress is visible. Preparation may resume on an environment rebuild, so a
  * new attempt id is legal while the prompt has not been dispatched.
@@ -768,6 +829,12 @@ export function failedMessageSnapshot(
     delivery: accepted ? 'sent' : 'queued',
     accepted,
     reason: cancelled ? 'interrupted' : reason,
+    // Record the attempt count only once a no-output recovery was spent on this
+    // turn: a first-attempt failure has no recovery to account for, and emitting
+    // `attempts: 1` there would change every other terminal failure payload.
+    ...(message.state.recoveryAttempts !== undefined
+      ? { attempts: message.state.recoveryAttempts + 1 }
+      : {}),
     ...(cancelled
       ? { error: 'The message was interrupted' }
       : detail || reason

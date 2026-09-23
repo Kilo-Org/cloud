@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
+import { type ReactNode, useContext, useEffect, useRef } from 'react';
 import { createStore, Provider as JotaiProvider } from 'jotai';
 import { type SessionManager } from '@kilocode/cloud-agent-sdk';
 import { useLocalSearchParams } from 'expo-router';
@@ -8,13 +8,12 @@ import {
   unregisterLiveSessionManager,
 } from '@/components/agents/live-session-manager-registry';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { SessionManagerContext } from '@/components/agents/session-manager-context';
 import {
   getAuthenticatedOwner,
   isCurrentOwner,
   subscribeAuthenticatedOwner,
 } from '@/lib/context-scope';
-
-const ManagerContext = createContext<SessionManager | null>(null);
 
 type AgentSessionProviderProps = {
   children: ReactNode;
@@ -95,13 +94,15 @@ export function AgentSessionProvider({
 
   return (
     <JotaiProvider store={storeRef.current}>
-      <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
+      <SessionManagerContext.Provider value={managerRef.current}>
+        {children}
+      </SessionManagerContext.Provider>
     </JotaiProvider>
   );
 }
 
 export function useSessionManager(): SessionManager {
-  const manager = useContext(ManagerContext);
+  const manager = useContext(SessionManagerContext);
   if (!manager) {
     throw new Error('useSessionManager must be used within AgentSessionProvider');
   }

@@ -46,13 +46,22 @@ export type NewSessionPromptProps = {
   /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
   initialPrompt?: string;
   /**
-   * Height of the frame the prompt scrolls in, once the safe areas and the
-   * keyboard-lift padding are out. The input's min-height floor measures
-   * against this frame when it is known, so the input gives up lines while the
-   * keyboard is up and grows back when it leaves. Omitted (or 0) falls back to
-   * the window-based floor for the first frame, before the host has laid out.
+   * Height of the scrollable form frame the prompt sits in, in points. The
+   * prompt yields its minimum height to this frame so the whole card renders
+   * above the bottom system bar; omitted or unmeasured keeps the preferred
+   * floor.
    */
-  promptViewportHeight?: number;
+  frameHeight?: number;
+  /**
+   * The card's top offset inside that frame, in points, measured by the host.
+   * The prompt's own `onLayout` reports `y` relative to the padding-free
+   * wrapper that hosts the card (`NewSessionConfigureForm`), so it always reads
+   * `0` and cannot see the frame's top gap (the ScrollView content's `pt-4`
+   * inset). The fit needs the frame-relative offset, so the host measures the
+   * wrapper and passes it here. Omitted or unmeasured keeps `0`, which restores
+   * the preferred floor.
+   */
+  cardTop?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
 };

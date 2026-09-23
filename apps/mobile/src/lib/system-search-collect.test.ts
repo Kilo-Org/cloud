@@ -650,4 +650,59 @@ describe('collectSystemSearchDocuments', () => {
     ]);
     expect(queryFn).not.toHaveBeenCalled();
   });
+
+  it('reuses a query’s documents while its payload identity is unchanged', async () => {
+    const client = new QueryClient();
+    seed(client);
+
+    const first = await collectSystemSearchDocuments(client);
+    const second = await collectSystemSearchDocuments(client);
+
+    // The very same document objects come back: the second collect reused the
+    // memo entry instead of re-decoding the payload and re-fingerprinting
+    // every document.
+    expect(second.documents[0]).toBe(first.documents[0]);
+    expect(second.documents).toEqual(first.documents);
+  });
+
+  it('rebuilds a query’s documents when the cached payload changes', async () => {
+    const client = new QueryClient();
+    seed(client);
+
+    const first = await collectSystemSearchDocuments(client);
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        { cliSessions: [{ ...sessionRow, title: 'Fix login bug (renamed)' }], nextCursor: null },
+      ],
+    });
+    const second = await collectSystemSearchDocuments(client);
+
+    const renamed = second.documents.find(
+      document => document.id === '/(app)/agent-chat/sess-1?organizationId=org-1'
+    );
+    // The changed payload invalidated the memo entry, so the document carries
+    // the new title and is a fresh object rather than the reused one.
+    expect(renamed?.title).toBe('Fix login bug (renamed)');
+    expect(renamed).not.toBe(
+      first.documents.find(
+        document => document.id === '/(app)/agent-chat/sess-1?organizationId=org-1'
+      )
+    );
+  });
+
+  it('keeps one client’s memoized documents out of another client', async () => {
+    const firstClient = new QueryClient();
+    const secondClient = new QueryClient();
+    // Both clients hold the same query keys and the same payload objects, so a
+    // memo keyed by query hash alone would hand the first client's documents to
+    // the second.
+    seed(firstClient);
+    seed(secondClient);
+
+    const first = await collectSystemSearchDocuments(firstClient);
+    const second = await collectSystemSearchDocuments(secondClient);
+
+    expect(second.documents[0]).not.toBe(first.documents[0]);
+    expect(second.documents).toEqual(first.documents);
+  });
 });

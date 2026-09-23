@@ -74,6 +74,10 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
+  // The card reads the window width to pick its stacked narrow presentation
+  // (`narrow-layout.ts`). 390 dp keeps the standard side-by-side row, the same
+  // width the narrow-layout test uses for its non-narrow cases.
+  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 2 }),
 }));
 
 vi.mock('expo-router', () => ({

@@ -1308,7 +1308,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const appType = integration.github_app_type || 'standard';
         const fetchedRepos = await fetchGitHubRepositories(
           integration.platform_installation_id,
-          appType
+          appType,
+          integration.id
         );
         await updateRepositoriesForIntegration(integration.id, fetchedRepos);
         repos = fetchedRepos;
@@ -1334,7 +1335,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         availability = await checkDependabotAlertsAvailability(
           installationId,
           appType,
-          repositoryDetails
+          repositoryDetails,
+          integration.id
         );
       } catch (error) {
         console.error('Failed to check Dependabot alerts availability', {

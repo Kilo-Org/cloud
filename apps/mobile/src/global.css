@@ -79,6 +79,34 @@
   --agent-sky: #2c7fb0;
   --agent-sky-tile-bg: #2c7fb01a;
   --agent-sky-tile-border: #2c7fb033;
+
+  /* Curated row-hue palette — the logo yellow's own family.
+   * Six steps walk one warm band (50deg -> 105deg, an 11deg step) at one fixed
+   * chroma/value per theme, straddling the brand hue (--primary olive #4f5a10,
+   * h~71, and the yellow #e8f27a). Status hues sit outside the band (danger
+   * 8deg, warn 37deg, good 150deg, info 220deg), so no step reads as a status
+   * colour. Tile pairs are the hue + 1a (10%) / + 33 (20%).
+   * Growth: a new row takes its section's step, a new section the next step in
+   * reading order; past fern, extend one 11deg step toward the cool end.
+   */
+  --row-honey: #7c6c1d;
+  --row-honey-tile-bg: #7c6c1d1a;
+  --row-honey-tile-border: #7c6c1d33;
+  --row-gold: #7a7c1d;
+  --row-gold-tile-bg: #7a7c1d1a;
+  --row-gold-tile-border: #7a7c1d33;
+  --row-lime: #697c1d;
+  --row-lime-tile-bg: #697c1d1a;
+  --row-lime-tile-border: #697c1d33;
+  --row-sage: #587c1d;
+  --row-sage-tile-bg: #587c1d1a;
+  --row-sage-tile-border: #587c1d33;
+  --row-moss: #467c1d;
+  --row-moss-tile-bg: #467c1d1a;
+  --row-moss-tile-border: #467c1d33;
+  --row-fern: #357c1d;
+  --row-fern-tile-bg: #357c1d1a;
+  --row-fern-tile-border: #357c1d33;
 }
 
 /* Focus design tokens — DARK (FD palette) */
@@ -148,6 +176,26 @@
     --agent-sky: #6bb5e0;
     --agent-sky-tile-bg: #6bb5e01a;
     --agent-sky-tile-border: #6bb5e033;
+
+    /* Curated row-hue palette (dark values) — same warm band as the light block. */
+    --row-honey: #ebda84;
+    --row-honey-tile-bg: #ebda841a;
+    --row-honey-tile-border: #ebda8433;
+    --row-gold: #e9eb84;
+    --row-gold-tile-bg: #e9eb841a;
+    --row-gold-tile-border: #e9eb8433;
+    --row-lime: #d6eb84;
+    --row-lime-tile-bg: #d6eb841a;
+    --row-lime-tile-border: #d6eb8433;
+    --row-sage: #c4eb84;
+    --row-sage-tile-bg: #c4eb841a;
+    --row-sage-tile-border: #c4eb8433;
+    --row-moss: #b1eb84;
+    --row-moss-tile-bg: #b1eb841a;
+    --row-moss-tile-border: #b1eb8433;
+    --row-fern: #9eeb84;
+    --row-fern-tile-bg: #9eeb841a;
+    --row-fern-tile-border: #9eeb8433;
   }
 }
 
@@ -214,6 +262,26 @@
   --color-agent-sky: var(--agent-sky);
   --color-agent-sky-tile-bg: var(--agent-sky-tile-bg);
   --color-agent-sky-tile-border: var(--agent-sky-tile-border);
+
+  /* Curated row-hue colors (Tailwind classes: bg-row-honey, bg-row-honey-tile-bg, ...) */
+  --color-row-honey: var(--row-honey);
+  --color-row-honey-tile-bg: var(--row-honey-tile-bg);
+  --color-row-honey-tile-border: var(--row-honey-tile-border);
+  --color-row-gold: var(--row-gold);
+  --color-row-gold-tile-bg: var(--row-gold-tile-bg);
+  --color-row-gold-tile-border: var(--row-gold-tile-border);
+  --color-row-lime: var(--row-lime);
+  --color-row-lime-tile-bg: var(--row-lime-tile-bg);
+  --color-row-lime-tile-border: var(--row-lime-tile-border);
+  --color-row-sage: var(--row-sage);
+  --color-row-sage-tile-bg: var(--row-sage-tile-bg);
+  --color-row-sage-tile-border: var(--row-sage-tile-border);
+  --color-row-moss: var(--row-moss);
+  --color-row-moss-tile-bg: var(--row-moss-tile-bg);
+  --color-row-moss-tile-border: var(--row-moss-tile-border);
+  --color-row-fern: var(--row-fern);
+  --color-row-fern-tile-bg: var(--row-fern-tile-bg);
+  --color-row-fern-tile-border: var(--row-fern-tile-border);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);

@@ -1,4 +1,4 @@
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,

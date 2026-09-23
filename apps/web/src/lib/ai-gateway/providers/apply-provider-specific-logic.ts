@@ -6,7 +6,7 @@ import {
   type GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,

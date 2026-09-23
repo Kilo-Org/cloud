@@ -506,6 +506,7 @@ export type SandboxControlStatus = StatusProjection & {
   allocationIncarnation?: string;
   operationResults?: true;
   runtimeRecovery?: true;
+  runtimeReplacementInFlight?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -1982,7 +1983,7 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new SandboxAcquisitionLostError();
       }
-      return this.statusForAllocation(current, this.allocationIncarnationOf(current));
+      return this.statusForAllocation(current, this.allocationIncarnationOf(current), sessionId);
     });
   }
 
@@ -2853,21 +2854,23 @@ export class SandboxControl extends DurableObject<Env> {
     );
   }
 
-  async getStatus(): Promise<SandboxControlStatus> {
+  async getStatus(input?: { sessionId?: string }): Promise<SandboxControlStatus> {
     await this.ensureOperationalInitialized();
     const record = await this.readCanonicalAllocation();
-    return this.statusForAllocation(record, this.allocationIncarnationOf(record));
+    return this.statusForAllocation(record, this.allocationIncarnationOf(record), input?.sessionId);
   }
 
   private async statusForAllocation(
     record: AllocationRecord,
-    allocationIncarnation?: string
+    allocationIncarnation?: string,
+    sessionId?: string
   ): Promise<SandboxControlStatus> {
     const connection = this.connectionState();
     const work = await this.workState();
     const runtime = this.readyWrapperRuntime();
     const physical = legacyPhysicalState(record);
     const projection = projectStatus({ allocation: record, ownerPresent: true, now: Date.now() });
+    const runtimeReplacementInFlight = this.replacementInFlight(record, sessionId);
     return {
       ...projection,
       physical,
@@ -2882,6 +2885,7 @@ export class SandboxControl extends DurableObject<Env> {
         ? { operationResults: true as const }
         : {}),
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
+      ...(runtimeReplacementInFlight ? { runtimeReplacementInFlight: true as const } : {}),
     };
   }
 
@@ -2898,6 +2902,21 @@ export class SandboxControl extends DurableObject<Env> {
     if (status.connection !== 'ready') return status;
     const { wrapperInstanceId: _withheld, ...rest } = status;
     return { ...rest, connection: 'connected' };
+  }
+
+  /**
+   * True while a runtime replacement is in flight for this workspace: the
+   * canonical allocation is still creating its runtime, so the workspace has no
+   * bound runtime and one is on the way. `stopped` and `unknown` allocations are
+   * not a replacement, so a runtime that never comes back still reaches the
+   * caller's terminal preparation path.
+   *
+   * The canonical aggregate is per workspace, not per session, so the probe is
+   * not scoped to one session; `sessionId` is accepted for the RPC contract.
+   */
+  private replacementInFlight(record: AllocationRecord, sessionId?: string): boolean {
+    void sessionId;
+    return record.state.kind === 'creating';
   }
 
   async getSandboxStatus(input: {

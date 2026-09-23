@@ -7,13 +7,13 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   findKiloExclusiveModel,
   isDisabledKiloExclusiveModel,
   kiloExclusiveModels,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';

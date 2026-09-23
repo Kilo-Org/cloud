@@ -1,5 +1,8 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { findKiloExclusiveModel, isDisabledKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isDisabledKiloExclusiveModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
 import type {
   GatewayRequest,

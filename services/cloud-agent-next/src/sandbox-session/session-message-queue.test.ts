@@ -968,6 +968,26 @@ describe('releaseUnconfirmedAttach', () => {
     expect(released?.[0]?.proofs?.attach).toBeUndefined();
   });
 
+  it('keeps the retired epoch high-water mark when the retiring proof has none', () => {
+    const attach = { authorization, dispatched: true };
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...queuedMessage(attach, { preparationAttemptId: 'attempt-missing', deadlineAt: 500 }),
+          proofs: {
+            attach,
+            retiredAttach: { ...attach, completedAt: 1, attachmentEpoch: 4 },
+          },
+        },
+      ],
+      authorization
+    );
+
+    // The retiring proof carries no epoch, so the slot keeps the epoch the
+    // native-runtime fence may hold instead of dropping the pool.
+    expect(released?.[0]?.proofs?.retiredAttach).toMatchObject({ attachmentEpoch: 4 });
+  });
+
   it('refuses a message id that is not in the messages array', () => {
     expect(releaseUnconfirmedAttach([], authorization)).toBeUndefined();
   });

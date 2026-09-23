@@ -464,7 +464,10 @@ export function releaseUnadmittedWaitingMessages(
       ]);
       // Preserve intent and deadline: the head keeps its original preparation
       // bound. A released attach proof is retained for late results.
-      const proofs = releaseAttach && attach ? { retiredAttach: attach } : undefined;
+      const proofs =
+        releaseAttach && attach
+          ? { retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach) }
+          : undefined;
       return withProofs({ ...message, state: cleared }, proofs);
     }),
     releasedIds,
@@ -501,7 +504,10 @@ export function releaseCompletedRetryableAttach(
   return messages.map(message => {
     const attach = message.messageId === messageId ? message.proofs?.attach : undefined;
     if (!attach?.dispatched || attach.result?.ok !== false) return message;
-    const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+    const proofs: MessageProofs = {
+      ...message.proofs,
+      retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+    };
     delete proofs.attach;
     return withProofs(
       {
@@ -536,7 +542,10 @@ export function releaseUnconfirmedAttach(
     !sameSessionOperation(attach.authorization, authorization)
   )
     return undefined;
-  const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+  const proofs: MessageProofs = {
+    ...message.proofs,
+    retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+  };
   delete proofs.attach;
   return messages.map(item =>
     item.messageId !== message.messageId
@@ -834,6 +843,22 @@ function nextAttachmentEpoch(messages: readonly SessionMessage[]): number {
       ])
     ) + 1
   );
+}
+
+/**
+ * Retire an attach proof into the `retiredAttach` slot without losing the epoch
+ * high-water mark. The slot holds one proof, so retiring a proof that has no
+ * epoch — a dispatched attach whose result never arrived — would otherwise drop
+ * the epoch the native-runtime fence holds: the next attach would re-mint it and
+ * the fence would refuse it as a stale result. The retired proof carries the
+ * higher epoch forward as the pool's floor.
+ */
+export function retireAttachProof(
+  attach: SessionOperationProof,
+  previous: SessionOperationProof | undefined
+): SessionOperationProof {
+  const carried = Math.max(attach.attachmentEpoch ?? 0, previous?.attachmentEpoch ?? 0);
+  return carried === 0 ? attach : { ...attach, attachmentEpoch: carried };
 }
 
 export function applySessionOperationResult(

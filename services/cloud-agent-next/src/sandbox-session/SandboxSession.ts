@@ -241,6 +241,7 @@ import {
   recordAcceptedMessageActivity,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  retireAttachProof,
   replacePreparationAttemptId,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
@@ -4595,7 +4596,7 @@ export class SandboxSession extends DurableObject<Env> {
           return message;
         const proofs = message.proofs ? { ...message.proofs } : undefined;
         if (proofs?.attach) {
-          proofs.retiredAttach = proofs.attach;
+          proofs.retiredAttach = retireAttachProof(proofs.attach, proofs.retiredAttach);
           delete proofs.attach;
         }
         return {

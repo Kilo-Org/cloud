@@ -145,6 +145,13 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
           <span className="sr-only">Loading spend alerts</span>
           <CardHeader>
             <CardTitle>Spend alerts</CardTitle>
+            {/* The ready form puts its owner line in a `type-body` line box
+                under the title, so the skeleton reserves the same box: without
+                it the settings arriving drop the switch row and both rule cards
+                one line + gap (27px) instead of rendering into reserved space.
+                `&nbsp;` keeps the box at the line height; `aria-hidden` keeps
+                the blank placeholder out of the accessibility tree. */}
+            <CardDescription aria-hidden="true">&nbsp;</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6" aria-hidden="true">

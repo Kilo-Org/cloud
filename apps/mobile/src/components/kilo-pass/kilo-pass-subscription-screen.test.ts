@@ -789,6 +789,12 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.products = [product];
     mocks.nativeIap.errorMessage =
       'Could not connect to the App Store. Check your connection and try again.';
+    // The owner raises the store-connection flag with that message, and the
+    // catalog can load while the ownership lookup failed. The card is absent
+    // then, so the suppression must key on the card and the flag together: a
+    // regression to `storeConnectionError` alone would hide a failure the card
+    // does not state.
+    mocks.nativeIap.storeConnectionError = true;
     mocks.nativeIap.ownershipCheckFailed = true;
 
     const renderer = await renderScreen();
@@ -805,6 +811,12 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.products = [product];
     mocks.nativeIap.errorMessage =
       'Could not connect to Google Play. Check your connection and try again.';
+    // The owner sets `storeConnectionError` with that message, so this is the
+    // real state when the catalog loaded but the ownership lookup failed. The
+    // card is absent, so `storeErrorMessageHidden` must keep its
+    // `!productsUnavailable` term: a regression to the flag alone would hide the
+    // still-true failure that nothing else on the screen states.
+    mocks.nativeIap.storeConnectionError = true;
     mocks.nativeIap.ownershipCheckFailed = true;
 
     const renderer = await renderScreen();

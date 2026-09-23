@@ -1420,12 +1420,21 @@ describe('KiloPassNativeIapOwner', () => {
     await flushPromises();
 
     const failed = owner.render();
+    // Let that render's ownership effect settle before the retry, so no pending
+    // failure lands after it.
+    await flushPromises();
     expect(failed.errorMessage).toBe(i18n.t('kiloPass.couldNotConnectToAppStore'));
     expect(failed.storeConnectionError).toBe(true);
     expect(failed.ownershipCheckFailed).toBe(true);
 
+    // The store answers now, and the retry runs with no render in between: the
+    // fake dispatcher re-runs effects only on a render, so only the retry's own
+    // state change can clear the failure before its lookup settles. Without this
+    // the assertions below pass even if `retryOwnershipCheck` were a no-op.
     mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
-    owner.render().retryOwnershipCheck();
+    failed.retryOwnershipCheck();
+    const retrying = owner.render();
+    expect(retrying.ownershipCheckFailed).toBe(false);
     await flushPromises();
 
     const recovered = owner.render();

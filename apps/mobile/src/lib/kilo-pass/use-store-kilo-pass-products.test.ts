@@ -162,6 +162,35 @@ describe('useStoreKiloPassProducts retry busy state', () => {
     renderer.unmount();
   });
 
+  it('ends a retry that started while disconnected once the store connects', async () => {
+    // The retry begins with the store down, so the disabled query settles
+    // without fetching and the busy state waits on the connection. The
+    // connection landing cancels that bounded wait, so its effect is then the
+    // only thing that can end the retry.
+    mocks.query.refetch.mockResolvedValue({ status: 'error' });
+    const renderer = await renderProbe(false);
+
+    act(() => {
+      vi.advanceTimersByTime(8000);
+    });
+    expect(current().errorMessage).toBe(PLAY_CONNECTION_MESSAGE);
+
+    await startRetry();
+    expect(current().isRefetching).toBe(true);
+
+    // The minimum busy time passes with the store still down, so the floor
+    // alone must not end the retry.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(current().isRefetching).toBe(true);
+
+    await setConnected(renderer, true);
+    expect(current().isRefetching).toBe(false);
+
+    renderer.unmount();
+  });
+
   it('stays busy until the slow catalog fetch settles, past the minimum busy time', async () => {
     const deferred = createDeferred();
     mocks.query.refetch.mockReturnValue(deferred.promise);

@@ -13,9 +13,7 @@ import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
 import type { CreateIntent } from './physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
-
-const CONTROL_WRAPPER_PATH = '/usr/local/bin/kilocode-control-wrapper.js';
-const CONTROL_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
+import { CONTROL_WRAPPER_LOG_PATH, CONTROL_WRAPPER_PATH } from './container-paths.js';
 
 const providerRefSchema = z
   .object({

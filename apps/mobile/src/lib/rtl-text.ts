@@ -1,5 +1,5 @@
 import { isValidElement, type ReactNode } from 'react';
-import { I18nManager, type TextStyle } from 'react-native';
+import { I18nManager, type StyleProp, type TextStyle } from 'react-native';
 
 /**
  * RN 0.86 does not resolve `textAlign: 'auto'` from the native layout
@@ -14,6 +14,33 @@ import { I18nManager, type TextStyle } from 'react-native';
  * inheriting the component.
  */
 export const RTL_WRITING_DIRECTION: TextStyle = { writingDirection: 'rtl' };
+
+/**
+ * Alignment for a text input's own content. `textAlign: 'auto'` resolves
+ * against the paragraph's first strong character, so Latin content stays
+ * left-aligned inside a right-to-left interface while the field's label and
+ * its neighbours are right-aligned — the sign-in email field showed its
+ * `you@example.com` placeholder at the left edge under an Arabic label (device
+ * 2026-09-22). Naming the alignment keeps every field on the interface's side,
+ * which is what the language search fields already do.
+ *
+ * Applied to a `TextInput` through `withRtlInputAlignment`; `Text` keeps
+ * `RTL_WRITING_DIRECTION` above, which leaves an explicit `text-center` alone.
+ * It reaches the input as an inline style, not a class: NativeWind maps
+ * `textAlign` to a native prop for `TextInput` and crashes on it in this
+ * version, the same reason the language search fields carry theirs inline.
+ */
+const RTL_INPUT_ALIGNMENT: TextStyle = { textAlign: 'right' };
+
+/** The caller's style with the RTL input alignment in front of it, in RTL only. */
+export function withRtlInputAlignment(
+  style: StyleProp<TextStyle> | undefined
+): StyleProp<TextStyle> | undefined {
+  if (!I18nManager.isRTL) {
+    return style;
+  }
+  return [RTL_INPUT_ALIGNMENT, style];
+}
 
 /**
  * Letter-spacing — Tailwind's `tracking-*` — is a Latin typographic device:

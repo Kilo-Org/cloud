@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -94,6 +95,15 @@ export function ModelPickerContent() {
     [bridge, deferredSearch, favoriteIds]
   );
 
+  // Shared by the in-field X and the "No matches" empty state's CTA: drops the
+  // query and the input's visible text in one step, so the full list returns
+  // without backspacing. The field carries its own control because Android has
+  // no native `clearButtonMode` counterpart.
+  const handleClearSearch = useCallback(() => {
+    searchInputRef.current?.clear();
+    setSearch('');
+  }, []);
+
   // The favorite star button in ModelPickerOptionRow already fires its own
   // selection haptic on press — this callback must not fire a second one.
   const handleToggleFavorite = useCallback(
@@ -150,14 +160,6 @@ export function ModelPickerContent() {
     },
     [bridge, closePicker]
   );
-
-  // In-field X: `clearButtonMode` only ever drew a control on iOS, so on
-  // Android the query had no way back. This empties the native text and drops
-  // the query the rows derive from, leaving the keyboard up to retype.
-  const handleClearSearch = useCallback(() => {
-    searchInputRef.current?.clear();
-    setSearch('');
-  }, []);
 
   if (!bridge) {
     return (
@@ -225,6 +227,16 @@ export function ModelPickerContent() {
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.modelPicker.noModelsDescription')
           }
+          action={
+            // The in-field X is one way back; the no-matches body offers the
+            // same recovery the Agents search empty state does, so the only
+            // exit from "No matches" is not backspacing the query away.
+            deferredSearch.trim() ? (
+              <Button variant="outline" onPress={handleClearSearch}>
+                <Text>{t('common.clearSearch')}</Text>
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <FlatList
@@ -233,7 +245,12 @@ export function ModelPickerContent() {
           keyExtractor={item => item.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingBottom: bottom }}
+          // The bottom inset rides on the list's frame, not its content: a
+          // content inset only cleared the end of the list, so a row at the
+          // viewport bottom (the picker's last row) was drawn under the opaque
+          // Android navigation bar. Ending the viewport above the bar is the
+          // same frame inset `session-list-screen` uses for its FAB band.
+          style={{ marginBottom: bottom }}
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (

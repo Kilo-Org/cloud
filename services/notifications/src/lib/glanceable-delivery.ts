@@ -8,6 +8,10 @@
  */
 
 import {
+  isEligibleGlanceableWork,
+  isStartableGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
   type GlanceableLiveActivityContentState,
   type PushData,
   agentNotificationKindForGlanceableSnapshot,
@@ -41,9 +45,10 @@ export type ExpoPushToken = { token: string; locale: string | null };
  * A push-to-start token is used only when no activity target remains, avoiding
  * duplicate activities while allowing fresh work after terminal target retirement.
  *
- * `startable` is the narrower rule the iOS sink starts on: an agent working or
- * waiting on the user. Idle work keeps a card alive but must never raise one,
- * or a push-to-start resurrects the card the sink just retired for idleness.
+ * `startable` is the narrower rule the iOS sink starts on: an agent working,
+ * waiting on the user, or scheduled to wake. Idle work keeps a card alive but
+ * must never raise one, or a push-to-start resurrects the card the sink just
+ * retired for idleness.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
@@ -71,6 +76,8 @@ export function toGlanceableContentState(
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
+    scheduled: snapshot.scheduled,
+    scheduledAt: snapshot.scheduledAt,
   };
   return {
     name: ACTIVE_AGENTS_LIVE_ACTIVITY_NAME,
@@ -176,12 +183,8 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
-  const iosSends = apnsSendsForTokens(
-    iosTokens,
-    eligible,
-    snapshot.running + snapshot.needsInput > 0
-  );
+  const eligible = isEligibleGlanceableWork(snapshot);
+  const iosSends = apnsSendsForTokens(iosTokens, eligible, isStartableGlanceableWork(snapshot));
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,

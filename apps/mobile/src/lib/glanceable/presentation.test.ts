@@ -51,7 +51,7 @@ describe('presentation precedence', () => {
 });
 
 describe('primary rank and locked copy keys', () => {
-  it('ranks needs-input, then running, then idle', () => {
+  it('ranks needs-input, then running, then scheduled, then idle', () => {
     const mixed = snapshot({
       sessions: [
         { status: 'busy' },
@@ -72,6 +72,13 @@ describe('primary rank and locked copy keys', () => {
     expect(primaryGlanceableCount(noInput)).toEqual({
       key: 'common.working',
       kind: 'running',
+      count: 1,
+    });
+
+    const onlyScheduled = snapshot({ sessions: [{ status: 'scheduled' }] });
+    expect(primaryGlanceableCount(onlyScheduled)).toEqual({
+      key: 'common.scheduled',
+      kind: 'scheduled',
       count: 1,
     });
 
@@ -165,6 +172,7 @@ describe('numeric spoken label', () => {
     'glanceable.needsInput': 'Needs input',
     'common.idle': 'Idle',
     'common.working': 'Working',
+    'common.scheduled': 'Scheduled',
     'glanceable.waiting': 'Waiting for agents',
     'glanceable.empty': 'No work in progress',
     'glanceable.stale': 'Updates delayed',

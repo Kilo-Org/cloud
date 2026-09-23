@@ -28,7 +28,7 @@ type GlanceableCount = { label: string; kind: GlanceableCountKind; count: number
 export type GlanceableViewProps = {
   /** Translated locked copy; null while counts show (happy). Stale carries both. */
   statusLine: string | null;
-  /** Non-zero count lines in rank order (needs-input, running, idle). */
+  /** Non-zero count lines in rank order (needs-input, running, scheduled, idle). */
   countLines: GlanceableCount[];
   /** Top-ranked count label for compact surfaces; null when no eligible work. */
   primaryLabel: string | null;
@@ -53,6 +53,12 @@ export type GlanceableViewProps = {
    * draw it.
    */
   needsInputSince: string | null;
+  /**
+   * ISO timestamp of the soonest scheduled wake, or null when nothing is
+   * scheduled or no scheduled row carried a wake time. Only the scheduled
+   * count row carries it, and only `systemMedium` is wide enough to draw it.
+   */
+  scheduledAt: string | null;
   /**
    * Kind of the most recent agent state change, or null while no counts show.
    * The locked frames (waiting/empty/expired/signed-out/privacy) report no
@@ -178,6 +184,7 @@ export function buildGlanceableViewProps(
       newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
     },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
+    scheduledAt: showCounts && snapshot.scheduled > 0 ? snapshot.scheduledAt : null,
     newestResultKind,
     newestResultLabel,
     newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,
@@ -239,7 +246,16 @@ export function buildExpiredWidgetProps(
 ): Partial<GlanceableViewProps> {
   return toWidgetProps(
     buildGlanceableViewProps(
-      { ...snapshot, status: 'expired', running: 0, needsInput: 0, idle: 0, needsInputSince: null },
+      {
+        ...snapshot,
+        status: 'expired',
+        running: 0,
+        needsInput: 0,
+        idle: 0,
+        scheduled: 0,
+        needsInputSince: null,
+        scheduledAt: null,
+      },
       {},
       translate
     )
@@ -320,6 +336,8 @@ export function buildGlanceableLiveActivityContentState(
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
+    scheduled: snapshot.scheduled,
+    scheduledAt: snapshot.scheduledAt,
     ...(canApprove === undefined ? {} : { canApprove }),
     ...(notice === undefined ? {} : { notice }),
   };

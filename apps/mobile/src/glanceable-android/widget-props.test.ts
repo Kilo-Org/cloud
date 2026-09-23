@@ -25,6 +25,7 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
+  'common.scheduled': 'Scheduled',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
@@ -93,6 +94,7 @@ describe('buildAndroidWidgetProps', () => {
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Scheduled', kind: 'scheduled', count: '0' },
       { label: 'Idle', kind: 'idle', count: '3' },
     ]);
   });
@@ -122,7 +124,7 @@ describe('buildAndroidWidgetProps', () => {
       ['empty', [], 'No agents waiting', 0, false],
       // Counts show for stale, and all three rows draw whenever they show, so
       // the widget's rows never reflow as work moves between states.
-      ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
+      ['stale', [{ status: 'busy' }], 'Updates delayed', 4, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Open Kilo to see agents', 0, false],
@@ -233,7 +235,7 @@ describe('newest-result props', () => {
     );
 
     expect(props.statusLine).toBe('Updates delayed');
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
     expect(props.newestResultTitle).toBe('Newest result');
     expect(props.newestResultLabel).toBe('Needs input');
     expect(props.newestResultAgo).toBe(AGO);
@@ -332,6 +334,7 @@ describe('current widget lapsed frame', () => {
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Scheduled', kind: 'scheduled', count: '0' },
       { label: 'Idle', kind: 'idle', count: '3' },
     ]);
     expect(props.primaryLabel).toBe('Needs input');
@@ -350,7 +353,7 @@ describe('current widget lapsed frame', () => {
 
     expect(props.statusLine).toBeNull();
     expect(props.newestResultAgo).toBe(AGO);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   // The deadline keeps its precedence: a lapsed snapshot past `expiresAt` still
@@ -526,6 +529,13 @@ describe('widget actions and the newest line', () => {
     expect(props.actions.approve).toBe(true);
   });
 
+  it('does not offer New agent when a session is scheduled', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
+    expect(props.primaryLabel).toBe('Scheduled');
+  });
+
   it('offers New agent when every connected agent is idle and nothing waits', () => {
     // The idle-only tray has status happy: it keeps a card alive, and nothing
     // waiting means the only action the surface can offer is a new agent. The
@@ -538,7 +548,7 @@ describe('widget actions and the newest line', () => {
       newAgentLabel: 'New agent',
     });
     expect(props.statusLine).toBeNull();
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   it('offers New agent when nothing is eligible, instead of Approve', () => {
@@ -655,7 +665,7 @@ describe('widget actions and the newest line', () => {
     );
     expect(props.newestLine).toBe('Could not approve');
     expect(props.actions.approve).toBe(true);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   it('draws the reserved line only where an action is offered', () => {

@@ -111,6 +111,30 @@ describe('actions', () => {
     expect(props.actions).toEqual({ approve: false, newAgent: true });
   });
 
+  it('does not offer New agent when a session is scheduled', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(props.actions).toEqual({ approve: false, newAgent: false });
+    expect(props.primaryKind).toBe('scheduled');
+  });
+
+  it('carries the soonest wake, or null when a scheduled row has none', () => {
+    const later = '2026-09-24T10:00:00.000Z';
+    const sooner = '2026-09-24T09:00:00.000Z';
+    const withWake = buildGlanceableViewProps(
+      snapshotFor([
+        { status: 'scheduled', scheduledAt: later },
+        { status: 'scheduled', scheduledAt: sooner },
+      ]),
+      {},
+      translate
+    );
+    expect(withWake.scheduledAt).toBe(sooner);
+    expect(withWake.primaryKind).toBe('scheduled');
+
+    const noWake = buildGlanceableViewProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(noWake.scheduledAt).toBeNull();
+  });
+
   it('keeps New agent disabled while a permission waits', () => {
     const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
     expect(props.actions).toEqual({ approve: true, newAgent: false });
@@ -198,6 +222,7 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
       'primaryCount',
       'primaryKind',
       'primaryLabel',
+      'scheduledAt',
       'statusLine',
     ]);
     expect('needsApproval' in props).toBe(false);

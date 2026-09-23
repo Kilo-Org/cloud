@@ -722,7 +722,9 @@ function glanceableSnapshot(
     running: 1,
     needsInput: 0,
     idle: 0,
+    scheduled: 0,
     needsInputSince: '2026-01-01T00:00:00.000Z',
+    scheduledAt: null,
     newestResultKind: 'running',
     newestResultAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -2290,6 +2292,8 @@ describe('cold iOS background delivery', () => {
       needsApproval: 0,
       idle: 0,
       needsInputSince: null,
+      scheduled: 0,
+      scheduledAt: null,
       // No ask is recorded for this cold push, so the app-built state says so
       // explicitly; the layout gates Approve on this flag.
       canApprove: false,

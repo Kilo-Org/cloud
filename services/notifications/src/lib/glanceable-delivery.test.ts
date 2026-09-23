@@ -39,9 +39,11 @@ const snapshot: ActiveAgentsGlanceable = {
   needsInput: 1,
   needsApproval: 1,
   idle: 0,
+  scheduled: 0,
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
   needsInputSince: '2026-08-27T09:00:00.000Z',
+  scheduledAt: null,
   newestResultKind: 'needsInput',
   newestResultAt: '2026-08-27T09:00:00.000Z',
 };
@@ -639,14 +641,33 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsApproval: 0,
       idle: 0,
       needsInputSince: null,
+      scheduled: 0,
+      scheduledAt: null,
     });
 
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     // Idle work keeps a card alive but never raises one, so the push-to-start
-    // token stays unused until an agent works or asks for input.
+    // token stays unused until an agent works, asks for input, or is scheduled.
     current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['old-activity', 'end']]);
+
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:15.000Z'));
+    current = freshSnapshot({
+      running: 0,
+      idle: 0,
+      scheduled: 1,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
+      ['old-activity', 'end'],
+      ['scope-token', 'start'],
+    ]);
+    expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
+      scheduled: 1,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
 
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
     current = freshSnapshot({ running: 1, idle: 1 });
@@ -955,6 +976,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           needsApproval: 0,
           idle: 0,
           needsInputSince: '2026-08-27T10:00:01.000Z',
+          scheduled: 0,
+          scheduledAt: null,
         },
       ]);
       expect([...activityRows.keys()]).toEqual(['scope-token']);
@@ -1507,6 +1530,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 needsApproval: 0,
                 idle: 0,
                 needsInputSince: null,
+                scheduled: 0,
+                scheduledAt: null,
               },
             },
           ]
@@ -1815,6 +1840,8 @@ describe('toGlanceableContentState', () => {
       needsApproval: 1,
       idle: 0,
       needsInputSince: '2026-08-27T09:00:00.000Z',
+      scheduled: 0,
+      scheduledAt: null,
     });
   });
 

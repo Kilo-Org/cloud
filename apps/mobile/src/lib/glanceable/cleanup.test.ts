@@ -242,7 +242,9 @@ describe('cleanup', () => {
       running: 2,
       needsInput: 1,
       idle: 1,
+      scheduled: 0,
       needsInputSince: '2026-08-26T23:00:00.000Z',
+      scheduledAt: null,
       newestResultKind: 'running',
       newestResultAt: '2026-08-26T23:30:00.000Z',
     };
@@ -295,7 +297,9 @@ describe('cleanup', () => {
         running: 0,
         needsInput: 0,
         idle: 0,
+        scheduled: 0,
         needsInputSince: null,
+        scheduledAt: null,
         newestResultKind: null,
         newestResultAt: null,
       };

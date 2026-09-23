@@ -110,16 +110,31 @@ export const pushDataSchema = z.discriminatedUnion('type', [
      */
     needsApproval: z.number().int().min(0).optional(),
     idle: z.number().int().min(0),
+    /**
+     * Sessions scheduled to wake later. Optional on input with a zero default
+     * so a push from a server older than this release still parses; every
+     * mobile reader treats absent as 0.
+     */
+    scheduled: z.number().int().min(0).default(0),
     updatedAt: z.string(),
     expiresAt: z.string(),
     needsInputSince: z.string().nullable(),
-    // The newest agent state change: its kind in the shared three-state
+    /**
+     * Soonest wake among scheduled sessions, or null when none carries one.
+     * Optional on input with a null default so a push from a server older than
+     * this release still parses.
+     */
+    scheduledAt: z.string().nullable().default(null),
+    // The newest agent state change: its kind in the shared status
     // vocabulary and when it happened. Optional on input with a null default,
     // so a payload from a server that predates the fact still parses while the
     // parsed (output) type stays total — the mobile client spreads the parsed
     // fields straight into a `GlanceableAgentsSnapshot`. Remove the optional
     // and the default when every server sends both keys.
-    newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable().default(null),
+    newestResultKind: z
+      .enum(['needsInput', 'running', 'idle', 'scheduled'])
+      .nullable()
+      .default(null),
     newestResultAt: z.string().nullable().default(null),
   }),
 ]);
@@ -135,5 +150,12 @@ export type PushData = z.infer<typeof pushDataSchema>;
  */
 export type GlanceableLiveActivityContentState = Pick<
   Extract<PushData, { type: 'active_agents_glanceable' }>,
-  'status' | 'running' | 'needsInput' | 'needsApproval' | 'idle' | 'needsInputSince'
+  | 'status'
+  | 'running'
+  | 'needsInput'
+  | 'needsApproval'
+  | 'idle'
+  | 'needsInputSince'
+  | 'scheduled'
+  | 'scheduledAt'
 >;

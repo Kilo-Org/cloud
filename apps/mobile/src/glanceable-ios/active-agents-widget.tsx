@@ -112,6 +112,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // small square the pair wraps and truncates both halves.
   const wide = family === 'systemMedium';
   const needsInputSince = props.needsInputSince ?? null;
+  const scheduledAt = props.scheduledAt ?? null;
   // The rows carry zeros too, so their number never says whether work exists —
   // the ranked primary does, because it is null only when every count is zero.
   const hasCounts = primaryKind !== null;
@@ -123,6 +124,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   const GLYPH = {
     needsInput: { icon: 'exclamationmark.circle.fill', color: PlatformColor('systemOrange') },
     running: { icon: 'circle.fill', color: PlatformColor('systemGreen') },
+    scheduled: { icon: 'clock', color: PlatformColor('label') },
     idle: { icon: 'circle', color: PlatformColor('label') },
   } as const;
 
@@ -167,6 +169,14 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     // labels line up on a grid; only the label colour ranks them, because a
     // second font size in a three-row list reads as a mistake.
     const textStyle = compact ? 'caption' : 'subheadline';
+    // One relative time at most per row: a needs-input wait or a scheduled
+    // wake, never both, and only on the wide family that has room for it.
+    let timeAt: string | null = null;
+    if (wide && line.kind === 'needsInput') {
+      timeAt = needsInputSince;
+    } else if (wide && line.kind === 'scheduled') {
+      timeAt = scheduledAt;
+    }
     return (
       <HStack key={line.label} alignment="center" spacing={compact ? 4 : 7}>
         <Image systemName={glyph.icon} color={glyph.color} size={compact ? 11 : 13} />
@@ -200,13 +210,13 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
           {line.label}
         </Text>
         {wide ? <Spacer /> : null}
-        {wide && line.kind === 'needsInput' && needsInputSince !== null ? (
+        {timeAt === null ? null : (
           <Text
-            date={new Date(needsInputSince)}
+            date={new Date(timeAt)}
             dateStyle="relative"
             modifiers={[font({ textStyle }), monospacedDigit(), lineLimit(1), mutedForeground]}
           />
-        ) : null}
+        )}
       </HStack>
     );
   };

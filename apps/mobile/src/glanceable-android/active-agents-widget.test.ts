@@ -41,6 +41,7 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
+  'common.scheduled': 'Scheduled',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.expired': 'Status expired',
@@ -175,7 +176,7 @@ function render(props: ReturnType<typeof buildAndroidWidgetProps>, cell: Cell) {
 }
 
 /** The three count rows as text, in rank order, with every state labelled. */
-const COUNT_ROWS = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+const COUNT_ROWS = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
 
 function propsWithNewest(): ReturnType<typeof buildAndroidWidgetProps> {
   return buildAndroidWidgetProps(
@@ -223,6 +224,8 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Working',
       '1',
+      'Scheduled',
+      '0',
       'Idle',
       '0',
       'Approve',
@@ -246,6 +249,8 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
       'Approve',
     ]);
@@ -262,7 +267,17 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, { width: 120 });
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve']);
+    expect(text).toEqual([
+      '1',
+      'Needs input',
+      '2',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+      'Approve',
+    ]);
   });
 
   it('shows every count, zeros included, at a wide width', () => {
@@ -277,14 +292,27 @@ describe('renderActiveAgentsWidget', () => {
     const text = collectText(rep.light);
 
     // The zero row draws so the rows hold still as work moves between states.
-    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Approve']);
+    expect(text).toEqual([
+      '1',
+      'Needs input',
+      '1',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+      'Approve',
+    ]);
   });
 
   // One cell tall: the counts run in a row instead of stacking. A short row
   // keeps the word only on the ranked state, a wide one labels all three.
   it.each([
-    { width: 250, visibleText: ['1', 'Needs input', '1', '0', 'Approve'] },
-    { width: 340, visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Approve'] },
+    { width: 250, visibleText: ['1', 'Needs input', '1', '0', '0', 'Approve'] },
+    {
+      width: 340,
+      visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'],
+    },
   ])(
     'runs the counts in a row at width $width and one cell of height',
     ({ width, visibleText }) => {
@@ -305,8 +333,14 @@ describe('renderActiveAgentsWidget', () => {
   // spoken label still says the counts are delayed. The large cell is the one
   // that has a footer to carry the warning.
   it.each([
-    { width: 120, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
-    { width: 250, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
+    {
+      width: 120,
+      visibleText: ['2', 'Needs input', '4', 'Working', '0', 'Scheduled', '3', 'Idle', 'Approve'],
+    },
+    {
+      width: 250,
+      visibleText: ['2', 'Needs input', '4', 'Working', '0', 'Scheduled', '3', 'Idle', 'Approve'],
+    },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',
     ({ width, visibleText }) => {
@@ -370,6 +404,8 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
       'Newest: Fix the flaky test',
     ]);
@@ -415,7 +451,16 @@ describe('renderActiveAgentsWidget', () => {
     const props = buildAndroidWidgetProps(snapshotFor([{ status: 'retry' }]), {}, translate);
     const light = render(props, { width: 250 }).light;
 
-    expect(collectText(light)).toEqual(['1', 'Needs input', '0', 'Working', '0', 'Idle']);
+    expect(collectText(light)).toEqual([
+      '1',
+      'Needs input',
+      '0',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+    ]);
     expect(findElement(light, element => element.props.clickAction === 'approve')).toBeUndefined();
   });
 
@@ -529,6 +574,8 @@ describe('the large widget cell', () => {
       'Needs input',
       '4',
       'Working',
+      '0',
+      'Scheduled',
       '3',
       'Idle',
       'Newest result',
@@ -563,6 +610,8 @@ describe('the large widget cell', () => {
       'Needs input',
       '4',
       'Working',
+      '0',
+      'Scheduled',
       '3',
       'Idle',
       'Newest result',
@@ -651,6 +700,8 @@ describe('the large widget cell', () => {
       '0',
       'Working',
       '1',
+      'Scheduled',
+      '0',
       'Idle',
       '0',
       'Newest result',

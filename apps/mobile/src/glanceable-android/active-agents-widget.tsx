@@ -129,7 +129,10 @@ function dotColor(kind: GlanceableCountKind, palette: Palette): HexColor {
   if (kind === 'needsInput') {
     return palette.needsInput;
   }
-  return kind === 'running' ? palette.running : palette.foreground;
+  if (kind === 'running') {
+    return palette.running;
+  }
+  return kind === 'scheduled' ? palette.muted : palette.foreground;
 }
 
 /**

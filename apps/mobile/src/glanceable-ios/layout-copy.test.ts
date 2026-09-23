@@ -194,6 +194,7 @@ describe('withGlanceableCopy', () => {
       'openAgents',
       'privacy',
       'running',
+      'scheduled',
       'signed_out',
       'stale',
       'starting',

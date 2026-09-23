@@ -69,7 +69,7 @@ export type AndroidWidgetProps = {
    * surface that says the counts are delayed.
    */
   statusLine: string | null;
-  /** Every count line in rank order (needs-input, running, idle), zeros included. */
+  /** Every count line in rank order (needs-input, running, scheduled, idle), zeros included. */
   countLines: AndroidWidgetCount[];
   /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
@@ -249,7 +249,9 @@ function buildExpiredWidgetProps(
       running: 0,
       needsInput: 0,
       idle: 0,
+      scheduled: 0,
       needsInputSince: null,
+      scheduledAt: null,
     },
     {},
     translate,

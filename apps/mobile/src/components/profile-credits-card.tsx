@@ -34,7 +34,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
-  const openPicker = useContextPicker(orgs);
+  const { openPicker, picker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
@@ -151,6 +151,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </Pressable>
         )}
       </View>
+      {picker}
       {error === 'save' && (
         <View>
           <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />

@@ -447,6 +447,26 @@ describe('applyPreferredProvider', () => {
     expect(request.body.provider).toEqual({ order: ['novita'] });
   });
 
+  it.each(['moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast', 'kimi-k3', 'moonshotai/kimi-k2.5'])(
+    'prefers Bedrock then Alibaba for Kimi model %s',
+    model => {
+      const request = makeRequest(model);
+
+      applyPreferredProvider(model, request.body);
+
+      expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'alibaba'] });
+    }
+  );
+
+  it('preserves explicit Kimi provider order and allowed providers', () => {
+    const request = makeRequest('moonshotai/kimi-k3');
+    request.body.provider = { only: ['alibaba'], order: ['alibaba'] };
+
+    applyPreferredProvider('moonshotai/kimi-k3', request.body);
+
+    expect(request.body.provider).toEqual({ only: ['alibaba'], order: ['alibaba'] });
+  });
+
   it('prefers Friendli then Novita for GLM models', () => {
     const request = makeRequest('z-ai/glm-5.2');
 

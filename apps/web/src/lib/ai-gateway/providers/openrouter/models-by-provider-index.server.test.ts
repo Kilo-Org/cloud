@@ -111,10 +111,15 @@ describe('narrowProviderSlugsToVariant', () => {
 });
 
 describe('createModelsByProviderIndexLoader', () => {
-  function loader(models: Record<string, StoredModel> = storedModels) {
+  function loader(
+    models: Record<string, StoredModel> = storedModels,
+    vercelModels: Record<string, StoredModel> = {},
+    snapshot = makeSnapshot()
+  ) {
     return createModelsByProviderIndexLoader({
-      fetchSnapshot: async () => makeSnapshot(),
+      fetchSnapshot: async () => snapshot,
       fetchStoredModels: async () => models,
+      fetchVercelModels: async () => vercelModels,
       ttlMs: 60_000,
       nowMs: () => 0,
     });
@@ -148,5 +153,72 @@ describe('createModelsByProviderIndexLoader', () => {
 
     await expect(getProviderSlugsForModel('unknown/model')).resolves.toEqual(new Set());
     await expect(getProviderSlugsForModel('unknown/model:free')).resolves.toEqual(new Set());
+  });
+
+  it.each(['provider_name', 'tag'] as const)(
+    'retains Vercel-only Bedrock and Alibaba endpoints identified by %s',
+    async providerField => {
+      const modelId = 'moonshotai/kimi-k3';
+      const snapshot = makeSnapshot();
+      snapshot.providers = ['novita', 'amazon-bedrock', 'alibaba', 'deepinfra'].map(slug => ({
+        name: slug,
+        displayName: slug,
+        slug,
+        dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+        models: [snapshotModel(modelId, 'standard')],
+      }));
+      const { getProviderSlugsForModel } = loader(
+        { [modelId]: storedModel(modelId, ['novita/bf16']) },
+        {
+          [modelId]: {
+            id: modelId,
+            name: modelId,
+            endpoints: ['bedrock', 'alibaba', 'fireworks'].map(provider => ({
+              [providerField]: provider,
+            })),
+          },
+        },
+        snapshot
+      );
+
+      await expect(getProviderSlugsForModel(modelId)).resolves.toEqual(
+        new Set(['novita', 'amazon-bedrock', 'alibaba'])
+      );
+    }
+  );
+
+  it('does not retain paid Vercel providers for a free variant', async () => {
+    const { getProviderSlugsForModel } = loader(storedModels, {
+      [MODEL]: { ...storedModel(MODEL, []), endpoints: [{ provider_name: 'deepinfra' }] },
+    });
+
+    await expect(getProviderSlugsForModel(FREE_MODEL)).resolves.toEqual(new Set(['nvidia']));
+  });
+
+  it('maps model and provider IDs when retaining Vercel endpoints', async () => {
+    const modelId = 'anthropic/claude-sonnet-4-6';
+    const vercelModelId = 'anthropic/claude-sonnet-4.6';
+    const snapshot = makeSnapshot();
+    snapshot.providers = ['anthropic', 'google-vertex'].map(slug => ({
+      name: slug,
+      displayName: slug,
+      slug,
+      dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+      models: [snapshotModel(modelId, 'standard')],
+    }));
+    const { getProviderSlugsForModel } = loader(
+      { [modelId]: storedModel(modelId, ['anthropic']) },
+      {
+        [vercelModelId]: {
+          ...storedModel(vercelModelId, []),
+          endpoints: [{ provider_name: 'vertexAnthropic' }],
+        },
+      },
+      snapshot
+    );
+
+    await expect(getProviderSlugsForModel(modelId)).resolves.toEqual(
+      new Set(['anthropic', 'google-vertex'])
+    );
   });
 });

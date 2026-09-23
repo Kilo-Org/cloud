@@ -270,6 +270,14 @@ export const queuedMessageStateSchema = z
      * original scope cannot be recovered from it.
      */
     deliveryRetryScope: z.enum(['message', 'runtime']).optional(),
+    /**
+     * Consecutive delivery-deadline deferrals granted while the control plane
+     * reported a runtime replacement in flight. Bounds a replacement that never
+     * completes so the head still reaches its terminal preparation timeout. The
+     * count resets when the head binds a replacement runtime: that closes the
+     * chain, so a later replacement gets its own budget.
+     */
+    replacementWaits: z.number().int().nonnegative().optional(),
   })
   .strict();
 

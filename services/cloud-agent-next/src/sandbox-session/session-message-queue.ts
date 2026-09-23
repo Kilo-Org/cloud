@@ -59,6 +59,15 @@ export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'fi
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
 
+/**
+ * Deferral budget for a head whose preparation deadline lands while the control
+ * plane reports a runtime replacement in flight. Each deferral grants a fresh
+ * delivery window, so the budget caps the wait inside one replacement cycle and
+ * leaves the existing terminal path to run when a replacement never completes.
+ * Binding the replacement runtime ends the cycle and starts the next budget.
+ */
+export const RUNTIME_REPLACEMENT_WAIT_LIMIT = 6;
+
 // ---------------------------------------------------------------------------
 // Canonical field access. The wire model nests per-state fields under `state`;
 // these helpers keep the one mapping in one place.
@@ -809,6 +818,24 @@ export function streamCloudStatus(
   return messages.length > 0 ? { type: 'ready' } : null;
 }
 
+/**
+ * Mint the next attach epoch. A retired proof keeps its epoch in the pool: the
+ * native-runtime fence rejects an in-place rebind recorded at an epoch it
+ * already holds, and the retired proof's epoch is the one that fence carries, so
+ * re-minting it would make the replacement attach look like a stale result.
+ */
+function nextAttachmentEpoch(messages: readonly SessionMessage[]): number {
+  return (
+    Math.max(
+      0,
+      ...messages.flatMap(message => [
+        message.proofs?.attach?.attachmentEpoch ?? 0,
+        message.proofs?.retiredAttach?.attachmentEpoch ?? 0,
+      ])
+    ) + 1
+  );
+}
+
 export function applySessionOperationResult(
   aggregate: SessionAggregate,
   delivery: SessionOperationDelivery,
@@ -893,10 +920,7 @@ export function applySessionOperationResult(
         : delivery.completedAt,
   };
   const attachmentEpoch =
-    kind === 'attach'
-      ? (proof.attachmentEpoch ??
-        Math.max(0, ...messages.map(item => item.proofs?.attach?.attachmentEpoch ?? 0)) + 1)
-      : undefined;
+    kind === 'attach' ? (proof.attachmentEpoch ?? nextAttachmentEpoch(messages)) : undefined;
   return {
     messages: applied.map(item =>
       item.messageId === message.messageId
@@ -1046,9 +1070,7 @@ export function completeSessionOperationAttachment(
     nextQueuedMessageId(messages) !== message.messageId
   )
     return undefined;
-  const attachmentEpoch =
-    proof.attachmentEpoch ??
-    Math.max(0, ...messages.map(item => item.proofs?.attach?.attachmentEpoch ?? 0)) + 1;
+  const attachmentEpoch = proof.attachmentEpoch ?? nextAttachmentEpoch(messages);
   return messages.map(item =>
     item.messageId === message.messageId
       ? {

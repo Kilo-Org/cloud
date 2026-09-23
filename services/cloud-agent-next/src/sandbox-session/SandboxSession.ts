@@ -244,6 +244,7 @@ import {
   replacePreparationAttemptId,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
+  RUNTIME_REPLACEMENT_WAIT_LIMIT,
   streamCloudStatus,
   streamQueuedSnapshots,
   terminalAtOf,
@@ -2267,6 +2268,7 @@ export class SandboxSession extends DurableObject<Env> {
         authorization: authorization.data,
       })
     );
+    this.clearRuntimeReplacementWaits(epoch);
     logControlDiagnostic('native_fence_transition', {
       sessionId: this.sessionId,
       sandboxId: input.sandboxId,
@@ -3646,12 +3648,12 @@ export class SandboxSession extends DurableObject<Env> {
     const deadlineAt = queuedState?.deadlineAt ?? undefined;
     if (!queued || !queuedState || deadlineAt === undefined) return;
     if (Date.now() >= deadlineAt && !queued.proofs?.prompt?.dispatched) {
-      await this.failDelivery(
+      await this.awaitRuntimeReplacementOrFail({
         messageId,
-        'preparation_timeout',
-        activeWrapperInstanceId(queued),
-        queuedState.deliveryRetryScope
-      );
+        sandboxId,
+        wrapperInstanceId: activeWrapperInstanceId(queued),
+        scope: queuedState.deliveryRetryScope,
+      });
       return;
     }
     if (queuedState.retryNotBefore !== undefined && queuedState.retryNotBefore > Date.now()) {
@@ -3701,6 +3703,16 @@ export class SandboxSession extends DurableObject<Env> {
                     message.state.wrapperInstanceId === runtime.data
                       ? message.state.unresolvedDispatch
                       : undefined,
+                  // A different wrapper incarnation means the replacement the
+                  // head was waiting on has rebound, so the deferral chain that
+                  // spent the previous budget is over. The next replacement
+                  // starts with a fresh budget instead of inheriting the spent
+                  // one. A directory-native replacement keeps the wrapper
+                  // incarnation and is reset where the native runtime is
+                  // recorded instead (`recordNativeRuntime`).
+                  ...(message.state.wrapperInstanceId === runtime.data
+                    ? {}
+                    : { replacementWaits: undefined }),
                 },
               }
             : message
@@ -3861,12 +3873,12 @@ export class SandboxSession extends DurableObject<Env> {
     await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
     if (!isCurrent()) return;
     if (Date.now() >= deadlineAt && !queued.proofs?.prompt?.dispatched) {
-      await this.failDelivery(
+      await this.awaitRuntimeReplacementOrFail({
         messageId,
-        'preparation_timeout',
+        sandboxId,
         wrapperInstanceId,
-        queuedState.deliveryRetryScope
-      );
+        scope: queuedState.deliveryRetryScope,
+      });
       return;
     }
     const intent = queuedState.intent;
@@ -4030,7 +4042,7 @@ export class SandboxSession extends DurableObject<Env> {
             await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
             return;
           }
-          await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+          await this.awaitRuntimeReplacementOrFail({ messageId, sandboxId, wrapperInstanceId });
           return;
         }
         const provision = provisionPreparingStep(observed.physical, allowCreate);
@@ -4382,12 +4394,12 @@ export class SandboxSession extends DurableObject<Env> {
     if (!message) return;
     if (input.hadAcquisition && isSandboxAcquisitionLostError(error)) {
       if (Date.now() >= deadlineAt) {
-        await this.failDelivery(
+        await this.awaitRuntimeReplacementOrFail({
           messageId,
-          'preparation_timeout',
+          sandboxId: this.terminalLifecycle.getStoredMetadata()?.workspace?.sandboxId,
           wrapperInstanceId,
-          message.state.kind === 'queued' ? message.state.deliveryRetryScope : undefined
-        );
+          scope: message.state.kind === 'queued' ? message.state.deliveryRetryScope : undefined,
+        });
         return;
       }
       const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
@@ -4432,7 +4444,13 @@ export class SandboxSession extends DurableObject<Env> {
         : retryableRejection && !unresolvedDispatch;
     const scope: 'message' | 'runtime' = messageRetryScope ? 'message' : 'runtime';
     if (Date.now() >= deadlineAt) {
-      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope, detail);
+      await this.awaitRuntimeReplacementOrFail({
+        messageId,
+        sandboxId: this.terminalLifecycle.getStoredMetadata()?.workspace?.sandboxId,
+        wrapperInstanceId,
+        scope,
+        detail,
+      });
       return;
     }
     const busy = retryableRejection && error.code === 'session_busy';
@@ -4474,6 +4492,134 @@ export class SandboxSession extends DurableObject<Env> {
       wrapperInstanceId,
       scope,
       detail
+    );
+  }
+
+  /**
+   * True while the control plane still reports a runtime replacement in flight
+   * for this workspace: the canonical allocation has not bound a runtime yet and
+   * a replacement is being created. The probe is best-effort: an absent session
+   * id or a transport failure reports "no replacement in flight", so it adds no
+   * failure mode of its own and the existing terminal path runs unchanged.
+   */
+  private async runtimeReplacementInFlight(sandboxId: string): Promise<boolean> {
+    if (this.sessionId === undefined) return false;
+    try {
+      const status = await sandboxControlRpc(this.env, sandboxId).getStatus({
+        sessionId: this.sessionId,
+      });
+      return status.runtimeReplacementInFlight === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * End the deferral chain once the session binds a native runtime, so the next
+   * replacement gets a full budget instead of inheriting a spent one. Keyed on
+   * the native runtime identity because a directory-native replacement recreates
+   * the native runtime in place inside the same wrapper incarnation, which the
+   * wrapper-identity reset in `recordRuntime` cannot observe.
+   */
+  private clearRuntimeReplacementWaits(epoch: number): void {
+    const messages = this.loadMessages();
+    if (
+      !messages.some(
+        message => message.state.kind === 'queued' && message.state.replacementWaits !== undefined
+      )
+    )
+      return;
+    this.saveMessages(
+      messages.map(message =>
+        message.state.kind !== 'queued' || message.state.replacementWaits === undefined
+          ? message
+          : { ...message, state: { ...message.state, replacementWaits: undefined } }
+      ),
+      epoch
+    );
+  }
+
+  /**
+   * A preparation deadline that lands while the control plane reports a
+   * runtime replacement in flight does not terminalize the head. It re-arms the
+   * head's existing durable delivery deadline and the existing 5 s queue-retry
+   * alarm, so the delivery resumes once the replacement rebinds.
+   *
+   * The deferral is re-validated after the probe: `runtimeReplacementInFlight`
+   * is a cross-DO RPC, so another event may deliver the head while it is
+   * outstanding, and `commitSavedMessages` treats an accepted row as mutable.
+   * Only a still-queued head is rewritten.
+   *
+   * The wait is bounded: each deferral spends one unit of
+   * `RUNTIME_REPLACEMENT_WAIT_LIMIT` for the current replacement cycle. A
+   * replacement that never completes exhausts the budget and the existing
+   * terminal path fails the head exactly as before, so a runtime that never
+   * returns still reaches `preparation_timeout`. Binding a replacement runtime
+   * ends the cycle and resets the budget, so a later, unrelated replacement does
+   * not inherit a partially spent one.
+   *
+   * Every re-arm mints a fresh preparation attempt. A preparation attempt is
+   * the acquisition request identity, and `SandboxControl` binds it to its
+   * original deadline and rejects a changed deadline for the same id, so the
+   * re-armed window must be a new acquisition rather than a mutated one. A live
+   * attach proof bound the old attempt identity, so it is retired into the slot
+   * a late result is matched against and the replacement attach can carry the
+   * new identity.
+   */
+  private async awaitRuntimeReplacementOrFail(input: {
+    messageId: string;
+    sandboxId?: string;
+    wrapperInstanceId?: string;
+    scope?: 'message' | 'runtime';
+    detail?: string;
+  }): Promise<void> {
+    if (input.sandboxId !== undefined && (await this.runtimeReplacementInFlight(input.sandboxId))) {
+      const epoch = this.terminalLifecycle.captureEpoch();
+      if (epoch === null) return;
+      const current = this.loadMessages().find(message => message.messageId === input.messageId);
+      if (!current || current.state.kind !== 'queued') return;
+      const waits = current.state.replacementWaits ?? 0;
+      if (waits >= RUNTIME_REPLACEMENT_WAIT_LIMIT) {
+        await this.failDelivery(
+          input.messageId,
+          'preparation_timeout',
+          input.wrapperInstanceId,
+          input.scope,
+          input.detail
+        );
+        return;
+      }
+      const now = Date.now();
+      const extended = this.loadMessages().map(message => {
+        if (message.messageId !== input.messageId || message.state.kind !== 'queued')
+          return message;
+        const proofs = message.proofs ? { ...message.proofs } : undefined;
+        if (proofs?.attach) {
+          proofs.retiredAttach = proofs.attach;
+          delete proofs.attach;
+        }
+        return {
+          ...message,
+          ...(proofs ? { proofs } : {}),
+          state: {
+            ...message.state,
+            preparationAttemptId: crypto.randomUUID(),
+            preparationWait: undefined,
+            deadlineAt: now + SESSION_DELIVERY_TIMEOUT_MS,
+            replacementWaits: waits + 1,
+          },
+        };
+      });
+      if (!this.saveMessages(extended, epoch)) return;
+      await this.armQueueRetry(now + QUEUE_RETRY_MS);
+      return;
+    }
+    await this.failDelivery(
+      input.messageId,
+      'preparation_timeout',
+      input.wrapperInstanceId,
+      input.scope,
+      input.detail
     );
   }
 

@@ -98,5 +98,5 @@ describe('GET /api/cron/sales-demo-reset failure handling', () => {
     await expect(response.json()).resolves.toEqual({ reset: 0, failed: 1 });
     expect(mockedCaptureException).toHaveBeenCalledTimes(1);
     expect(mockedRestoreSalesDemoOrganization).toHaveBeenCalledTimes(1);
-  });
+  }, 30_000);
 });

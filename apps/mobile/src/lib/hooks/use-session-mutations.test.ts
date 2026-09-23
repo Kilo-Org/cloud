@@ -114,12 +114,12 @@ describe('useSessionMutations account publication', () => {
 
   it('retitles and rolls back both caches without accepting manual writes or clearing a fetch failure', async () => {
     const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
-    await client.fetchQuery({
+    await client.query({
       queryKey: QUERY_KEY,
       queryFn: () => ({ sessions: [makeCached({ id: 's1', title: 'Old' })] }),
     });
     await expect(
-      client.fetchQuery({
+      client.query({
         queryKey: QUERY_KEY,
         queryFn: () => {
           throw new Error('offline');

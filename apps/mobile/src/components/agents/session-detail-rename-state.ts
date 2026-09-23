@@ -128,8 +128,10 @@ export function namedSessionTitle(
 
 /**
  * Pure helper that derives the session-detail header display state from the
- * authoritative server title and the reducer state. Pass the session id so a
- * title the user's own rename wrote is not hidden as the backend placeholder.
+ * authoritative server title and the reducer state. A backend default title
+ * (`New session - <ISO>`) is machine output, so it is treated as no title and
+ * the caller's fallback copy shows instead. Pass the session id so a title the
+ * user's own rename wrote is not hidden as the backend placeholder.
  *
  * Both the server title and the cached fallback run through the shared title
  * helpers, so the server's creation-default placeholder (`New session -

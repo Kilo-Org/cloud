@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RemoteSessionRow } from './remote-session-row';
+import { showRenamePrompt } from './session-row-actions';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
@@ -25,6 +26,7 @@ import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/
 const state = vi.hoisted(() => ({
   organizationId: null as string | null,
   exit: undefined as (() => void) | undefined,
+  rename: undefined as (() => void) | undefined,
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
   send: vi.fn(),
 }));
@@ -64,8 +66,9 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
   SessionPlatformIcon: () => null,
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
-  showSessionActionMenu: (options: { onExit?: () => void }) => {
+  showSessionActionMenu: (options: { onExit?: () => void; onRename?: () => void }) => {
     state.exit = options.onExit;
+    state.rename = options.onRename;
   },
   copySessionId: vi.fn(),
   showRenamePrompt: vi.fn(),
@@ -97,12 +100,12 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function render(current: ActiveSession = session) {
+async function render(row: ActiveSession = session) {
   await act(async () => {
     const tree = createElement(
       QueryClientProvider,
       { client },
-      createElement(RemoteSessionRow, { session: current, onPress: vi.fn<() => void>() })
+      createElement(RemoteSessionRow, { session: row, onPress: vi.fn<() => void>() })
     );
     if (renderer) {
       renderer.update(tree);
@@ -140,6 +143,7 @@ beforeEach(() => {
   setSignOutActive(false);
   state.organizationId = null;
   state.exit = undefined;
+  state.rename = undefined;
   state.request.mockReset().mockResolvedValue({ sessions: [] });
   state.send.mockReset().mockResolvedValue(undefined);
   client = createKiloAppQueryClient();
@@ -170,21 +174,19 @@ afterEach(async () => {
 describe('row title', () => {
   it('paints the untitled label for a session that still carries the backend placeholder', async () => {
     // The backend seeds a fresh session with `New session - ${ISO}`; the tray
-    // row shows its own label instead of the machine string.
-    await act(async () => {
-      renderer = TestRenderer.create(
-        createElement(
-          QueryClientProvider,
-          { client },
-          createElement(RemoteSessionRow, {
-            session: { ...session, title: 'New session - 2026-09-22T01:09:45.623Z' },
-            onPress: vi.fn<() => void>(),
-          })
-        )
-      );
-      await flush();
-    });
+    // row shows its own label instead of the machine string. Both merge sides
+    // covered this title, so the assertions live in one test: the row title and
+    // the spoken label never carry the raw timestamp.
+    await render({ ...session, title: 'New session - 2026-09-22T01:09:45.623Z' });
     expect(renderer?.root.findByType('SessionRow').props.title).toBe('Untitled session');
+    const label = renderer?.root.findByType(Pressable).props.accessibilityLabel as string;
+    expect(label).toContain('Untitled session');
+    expect(label).not.toContain('2026-09-22');
+  });
+
+  it('keeps a real title unchanged', async () => {
+    await render({ ...session, title: 'Live work' });
+    expect(renderer?.root.findByType('SessionRow').props.title).toBe('Live work');
   });
 });
 
@@ -286,26 +288,27 @@ describe('row exit refresh caller', () => {
   });
 });
 
-describe('RemoteSessionRow display title', () => {
-  function mountedRow() {
-    if (!renderer) {
-      throw new Error('Missing row');
-    }
-    return renderer.root.findByType('SessionRow');
-  }
-
-  it('renders the generic untitled label for the server creation-default title', async () => {
+describe('RemoteSessionRow rename prefill', () => {
+  it('seeds the rename prompt empty for a session the backend has not named', async () => {
+    // The row hides `New session - ${ISO}` on screen; the rename prompt must
+    // not reopen that machine string, so an unnamed session opens blank.
     await render(
-      makeCached({ createdOnPlatform: 'cli', title: 'New session - 2026-09-21T15:45:00.532Z' })
+      makeCached({
+        id: 'remote-rename',
+        createdOnPlatform: 'cli',
+        title: 'New session - 2026-09-20T08:10:35.172Z',
+      })
     );
-    expect(mountedRow().props.title).toBe('Untitled session');
-    const label = renderer?.root.findByType(Pressable).props.accessibilityLabel as string;
-    expect(label).toContain('Untitled session');
-    expect(label).not.toContain('2026-09-21');
-  });
-
-  it('keeps a real title unchanged', async () => {
-    await render(makeCached({ createdOnPlatform: 'cli', title: 'Live work' }));
-    expect(mountedRow().props.title).toBe('Live work');
+    act(() => {
+      if (!renderer) {
+        throw new Error('Missing row');
+      }
+      const props = renderer.root.findByType(Pressable).props as { onLongPress: () => void };
+      props.onLongPress();
+    });
+    act(() => {
+      state.rename?.();
+    });
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
   });
 });

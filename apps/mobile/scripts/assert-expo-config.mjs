@@ -50,6 +50,12 @@ const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
 // `alert_title_layout.xml` pins the title to `viewStart`; without this plugin
 // the Arabic discard confirm's title sits on the opposite edge from its message.
 const ANDROID_MANIFEST_FIX_PLUGIN = './plugins/withAndroidManifestFix';
+// Android-only by capability: AppCompat's stock button-bar text appearance
+// forces ALL-CAPS, while iOS's `UIAlertController` draws the same shared
+// `Alert.alert` copy as given and exposes no casing transform. The plugin's one
+// platform piece is the AppTheme override; it is registered once for both
+// prebuilds, so the fix behaves the same on iOS and Android.
+const ALERT_DIALOG_BUTTON_CASE_PLUGIN = './plugins/withAndroidAlertDialogButtonCase';
 // The alert dialog theme points AppCompat's DayNight defaults
 // (`colorBackgroundFloating`, `colorAccent`) at the app's surfaces; without it
 // every `Alert.alert()` confirmation renders as a foreign grey/teal panel.
@@ -130,6 +136,26 @@ check(config.orientation === 'default', `orientation must be "default"`);
 check(
   config.ios?.requireFullScreen === true,
   'ios.requireFullScreen must be true (iPad Split View/Slide Over stays out of scope)'
+);
+
+// Platforms contract: the app is iOS and Android only (apps/mobile/AGENTS.md).
+// Expo detects the platform set when the config does not declare one
+// (getSupportedPlatforms): `react-native` resolving adds ios and android, and
+// `react-dom` resolving adds web. The dev server recorded in
+// dev/logs/mobile.log had web in its manifest platforms, so it answered a
+// browser request with the web index.html; that page requests a web bundle of
+// apps/mobile/index.js, where babel-preset-expo rewrites `react-native` to
+// `react-native-web` (not installed), and Metro logs
+// `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the app
+// console — a JavaScript error the app never causes. Declaring the two
+// platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+// browser request falls through to the manifest response instead.
+const PLATFORMS = ['ios', 'android'];
+check(
+  Array.isArray(config.platforms) &&
+    config.platforms.length === PLATFORMS.length &&
+    PLATFORMS.every(platform => config.platforms.includes(platform)),
+  `platforms must be exactly [${PLATFORMS.join(', ')}] (web is not a product target; it bundles an unsupported platform and logs a Metro resolve error into the app console)`
 );
 
 const associatedDomains = config.ios?.associatedDomains ?? [];
@@ -239,6 +265,13 @@ check(
 check(
   pluginNames.includes(ANDROID_MANIFEST_FIX_PLUGIN),
   `plugins must include "${ANDROID_MANIFEST_FIX_PLUGIN}"`
+);
+// Android alert-dialog actions must render in the app's sentence case: the
+// AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy
+// (DESIGN.md:350). The plugin re-cases them from the activity theme.
+check(
+  pluginNames.includes(ALERT_DIALOG_BUTTON_CASE_PLUGIN),
+  `plugins must include "${ALERT_DIALOG_BUTTON_CASE_PLUGIN}"`
 );
 // The alert dialog theme repaints AppCompat's stock dialog surface and accent
 // with the app's own tokens; without it the sign-out confirmation (and every

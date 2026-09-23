@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // the native modules stubbed.
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   clearPersistedLoginDrafts,
   persistLoginDrafts,
@@ -37,6 +37,13 @@ const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const addAppStateListener = vi.hoisted(() =>
   vi.fn((_event: 'change', _listener: (state: AppStateStatus) => void) => ({ remove: vi.fn() }))
 );
+// The session-ended announcement is asserted through this spy, so it must
+// outlive a single render: the mock factory below runs per import, the spy is
+// cleared per test.
+const announcingWarning = vi.hoisted(() => vi.fn());
+// `sessionEnded` is toggled per test to drive the login screen's announcement
+// effect without re-mocking the module.
+const authState = vi.hoisted(() => ({ sessionEnded: false }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -66,9 +73,11 @@ vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Globe: 'Globe', ExternalLink: 'ExternalLink' }));
-vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { warning: vi.fn() } }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { warning: announcingWarning },
+}));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ sessionEnded: false, signIn: vi.fn() }),
+  useAuth: () => ({ sessionEnded: authState.sessionEnded, signIn: vi.fn() }),
 }));
 vi.mock('@/lib/auth/use-device-auth', () => ({
   useDeviceAuth: () => ({
@@ -692,5 +701,44 @@ describe('login-screen bottom-bar clearance', () => {
     }
 
     renderer.unmount();
+  });
+});
+
+describe('login-screen session-ended announcement', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    announcingWarning.mockClear();
+    authState.sessionEnded = false;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+  });
+
+  it('announces the ended session once and stays silent while it is live', async () => {
+    // s2 reaches `signOut(true)` only on a server-confirmed 401, so `sessionEnded`
+    // is the only signal that the stored session is gone. The login screen must
+    // announce it once, keyed so a remount while still signed out does not
+    // repeat the toast.
+    authState.sessionEnded = true;
+    const ended = await mountLoginScreen();
+
+    expect(announcingWarning).toHaveBeenCalledTimes(1);
+    expect(announcingWarning).toHaveBeenCalledWith(i18n.t('login.sessionEnded'), {
+      id: 'session-ended',
+    });
+    ended.unmount();
+
+    announcingWarning.mockClear();
+    authState.sessionEnded = false;
+    const live = await mountLoginScreen();
+
+    expect(announcingWarning).not.toHaveBeenCalled();
+    live.unmount();
   });
 });

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- one cohesive mounted suite: stored row, share list, and remote row share the mock harness; test-renderer mounts the real rows and their native presentation without a DOM. */
 import { createElement, type ReactElement } from 'react';
+import { Platform } from 'react-native';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -365,7 +366,7 @@ describe('StoredSessionRow live speech', () => {
     expect(button?.props.accessibilityLabel).not.toContain('2026-09-21');
   });
 
-  it('passes the resolved label to the rename prompt, never the placeholder', () => {
+  it('seeds the rename prompt blank for the server creation-default title, never the placeholder', () => {
     const renderer = mount(
       row({
         session: { ...session, title: placeholderTitle },
@@ -385,10 +386,10 @@ describe('StoredSessionRow live speech', () => {
       throw new Error('Missing rename action');
     }
     options.onRename();
-    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith(
-      'Untitled session',
-      expect.any(Function)
-    );
+    // The base seeds the field blank for an unnamed session, where the
+    // placeholder copy prompts for a name; the raw server title never reaches
+    // the prompt.
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
   });
 
   it('keeps a real title that merely starts with "New session"', () => {
@@ -396,6 +397,81 @@ describe('StoredSessionRow live speech', () => {
       row({ session: { ...session, title: 'New session plan for the login redirect' } })
     );
     expect(texts(renderer)).toContain('New session plan for the login redirect');
+  });
+});
+
+describe('StoredSessionRow rename prefill', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+    vi.mocked(showSessionActionMenu).mockClear();
+    vi.mocked(showRenamePrompt).mockClear();
+  });
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  function openRename(renderer: TestRenderer.ReactTestRenderer) {
+    const button = hosts(renderer, 'Pressable')[0];
+    const pressable = button?.props as { onLongPress?: () => void } | undefined;
+    act(() => {
+      pressable?.onLongPress?.();
+    });
+    act(() => {
+      vi.mocked(showSessionActionMenu).mock.calls.at(-1)?.[0].onRename?.();
+    });
+  }
+
+  it('seeds the rename prompt empty for a session the backend has not named', () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the field
+    // must not surface that machine string, so an unnamed session opens blank.
+    const renderer = mount(
+      row({
+        session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' },
+        onDelete: vi.fn<() => void>(),
+        onRename: vi.fn<() => void>(),
+      })
+    );
+    openRename(renderer);
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
+  });
+
+  it('seeds the rename prompt with the trimmed stored title for a named session', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: '  Fix login bug  ' },
+        onDelete: vi.fn<() => void>(),
+        onRename: vi.fn<() => void>(),
+      })
+    );
+    openRename(renderer);
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('Fix login bug', expect.any(Function));
+  });
+
+  it('opens the Android rename field empty for a session the backend has not named', () => {
+    (Platform as { OS: string }).OS = 'android';
+    try {
+      const renderer = mount(
+        row({
+          session: { ...session, title: 'New session - 2026-09-20T08:10:35.172Z' },
+          onDelete: vi.fn<() => void>(),
+          onRename: vi.fn<() => void>(),
+        })
+      );
+      openRename(renderer);
+      const modal = hosts(renderer, 'RenameModal')[0];
+      expect(modal?.props.initialValue).toBe('');
+    } finally {
+      (Platform as { OS: string }).OS = 'ios';
+    }
   });
 });
 

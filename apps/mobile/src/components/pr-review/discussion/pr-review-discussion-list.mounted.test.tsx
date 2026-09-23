@@ -29,6 +29,7 @@ const observed = vi.hoisted(() => ({
   mutedLogins: [] as string[],
   deleteMutate: vi.fn(),
   toastError: vi.fn(),
+  alert: vi.fn(),
 }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
@@ -86,7 +87,7 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 // The real `@/i18n` module initializes i18next at import time; the delete
 // mutation only needs `t` for its failure copy, which this suite asserts.
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', Alert: { alert: observed.alert } }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
     data,
@@ -477,6 +478,7 @@ describe('PrReviewDiscussionList optimistic delete (s4, mounted)', () => {
   beforeEach(() => {
     observed.deleteMutate.mockReset();
     observed.toastError.mockReset();
+    observed.alert.mockReset();
   });
 
   it('removes the row optimistically and keeps it gone after the write settles', async () => {
@@ -517,9 +519,15 @@ describe('PrReviewDiscussionList optimistic delete (s4, mounted)', () => {
     });
     await flush();
 
-    // Back in its original position, with the retryable delete copy surfaced.
+    // Back in its original position, with the retryable delete copy surfaced
+    // in the Retry dialog rather than the terminal toast.
     expect(commentRows(renderer)).toHaveLength(1);
-    expect(observed.toastError).toHaveBeenCalledWith('prReview.discussion.commentDeleteFailed');
+    expect(observed.toastError).not.toHaveBeenCalled();
+    expect(observed.alert).toHaveBeenCalledWith(
+      'common.somethingWentWrong',
+      'prReview.discussion.commentDeleteFailed',
+      expect.any(Array)
+    );
 
     renderer.unmount();
   });

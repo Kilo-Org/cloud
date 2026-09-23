@@ -17,9 +17,13 @@ const THREADS_PATH = ['githubPrReview', 'listReviewThreads'];
 
 const hoistedToast = vi.hoisted(() => ({ error: vi.fn() }));
 const hoistedAnnounce = vi.hoisted(() => ({ announceForA11y: vi.fn() }));
+const hoistedAlert = vi.hoisted(() => ({ alert: vi.fn() }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: hoistedToast }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: hoistedAnnounce.announceForA11y }));
+// The pure project cannot load react-native; the hook's retryable delete
+// failure reaches for `Alert.alert`, so capture the call here.
+vi.mock('react-native', () => ({ Alert: hoistedAlert }));
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -30,6 +34,12 @@ type MutationOptions = {
 };
 
 let lastCapturedOptions: MutationOptions | null = null;
+// The mock hands back one result object per `useMutation` call so the test can
+// invoke the same `mutate` the hook's Retry action calls.
+let lastMutationResult: {
+  mutate: ReturnType<typeof vi.fn>;
+  mutateAsync: ReturnType<typeof vi.fn>;
+} | null = null;
 const updateCommentMutateMock = vi.fn();
 const deleteCommentMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
@@ -41,7 +51,8 @@ const setQueryDataMock = vi.fn();
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     lastCapturedOptions = opts;
-    return { mutateAsync: vi.fn(), mutate: vi.fn() };
+    lastMutationResult = { mutateAsync: vi.fn(), mutate: vi.fn() };
+    return lastMutationResult;
   },
   useQueryClient: () => ({
     invalidateQueries: (...args: unknown[]) => invalidateQueriesMock(...args),
@@ -120,6 +131,7 @@ function makeCache(): Cache {
 
 function resetMocks() {
   lastCapturedOptions = null;
+  lastMutationResult = null;
   updateCommentMutateMock.mockReset();
   deleteCommentMutateMock.mockReset();
   invalidateQueriesMock.mockReset();
@@ -129,6 +141,7 @@ function resetMocks() {
   setQueryDataMock.mockReset();
   hoistedToast.error.mockReset();
   hoistedAnnounce.announceForA11y.mockReset();
+  hoistedAlert.alert.mockReset();
 }
 
 describe('useUpdatePrCommentMutation', () => {
@@ -227,18 +240,32 @@ describe('useDeletePrCommentMutation', () => {
     expect(cache.pages[0]?.threads[0]?.comments).toHaveLength(2);
   });
 
-  it('rolls back the snapshot and toasts the retryable delete copy on failure', async () => {
-    useDeletePrCommentMutation();
+  it('rolls back the snapshot and shows a Retry dialog that re-runs the delete on a retryable failure', async () => {
+    const deleteMutation = useDeletePrCommentMutation();
     const cache = makeCache();
     getQueriesDataMock.mockReturnValueOnce([['k1', cache]]);
     const context = await lastCapturedOptions?.onMutate?.(DELETE_INPUT);
 
     lastCapturedOptions?.onError?.(new Error('boom'), DELETE_INPUT, context);
 
+    // The row returns for both failure kinds, before either surface.
     expect(setQueryDataMock).toHaveBeenCalledWith('k1', cache);
-    expect(hoistedToast.error).toHaveBeenCalledWith(
-      "Couldn't delete your comment. Check your connection and try again."
+    // A retryable failure offers the CTA instead of the terminal toast.
+    expect(hoistedToast.error).not.toHaveBeenCalled();
+    expect(hoistedAlert.alert).toHaveBeenCalledWith(
+      'Something went wrong',
+      "Couldn't delete your comment. Check your connection and try again.",
+      expect.any(Array)
     );
+
+    const buttons = hoistedAlert.alert.mock.calls[0]?.[2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    const retry = buttons.find(button => button.text === 'Retry');
+    expect(retry).toBeDefined();
+    retry?.onPress?.();
+    expect(deleteMutation.mutate).toHaveBeenCalledWith(DELETE_INPUT);
   });
 
   it('toasts the terminal delete copy for a forbidden failure', () => {
@@ -249,6 +276,8 @@ describe('useDeletePrCommentMutation', () => {
     lastCapturedOptions?.onError?.(forbidden, DELETE_INPUT, undefined);
 
     expect(hoistedToast.error).toHaveBeenCalledWith("This comment can't be deleted.");
+    // A terminal failure offers no Retry CTA.
+    expect(hoistedAlert.alert).not.toHaveBeenCalled();
   });
 
   it('onSuccess announces the deleted copy for a11y', () => {

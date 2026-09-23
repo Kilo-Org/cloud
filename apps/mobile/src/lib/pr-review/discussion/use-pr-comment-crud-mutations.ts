@@ -24,6 +24,7 @@
 // on the provider arms.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Alert } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
@@ -153,12 +154,17 @@ export function useUpdatePrCommentMutation() {
  * Delete a posted comment the viewer owns. Optimistic: the row (or the whole
  * review thread, when the root comment goes) is removed on `onMutate`, the
  * snapshot restored on `onError`, and the list invalidated on settle.
+ *
+ * A retryable failure keeps the retry affordance the sheet's moderation
+ * actions use: the native alert's Retry re-runs the same mutation. The replay
+ * is safe because the router maps an already-deleted comment (GitHub 404) to
+ * `{ deleted: true }`, so a retry whose first response was lost succeeds.
  */
 export function useDeletePrCommentMutation() {
   const queryClient = useQueryClient();
   const threadsPath = useCommentCrudKeys();
 
-  return useMutation({
+  const deleteComment = useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (input: DeletePrCommentInput) =>
       trpcClient.githubPrReview.deleteComment.mutate(input),
@@ -173,14 +179,29 @@ export function useDeletePrCommentMutation() {
     onSuccess: () => {
       announceForA11y(i18n.t('prReview.announce.commentDeleted'));
     },
-    onError: (error, _input, context) => {
+    onError: (error, input, context) => {
       for (const [key, data] of context?.previous ?? []) {
         queryClient.setQueryData(key, data);
       }
-      announcingToast.error(commentCrudFailure(error, 'delete').message);
+      const failure = commentCrudFailure(error, 'delete');
+      if (failure.kind === 'terminal') {
+        announcingToast.error(failure.message);
+        return;
+      }
+      Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
+        { text: i18n.t('common.cancel'), style: 'cancel' },
+        {
+          text: i18n.t('common.retry'),
+          onPress: () => {
+            deleteComment.mutate(input);
+          },
+        },
+      ]);
     },
     onSettled: () => {
       void queryClient.invalidateQueries(threadsPath);
     },
   });
+
+  return deleteComment;
 }

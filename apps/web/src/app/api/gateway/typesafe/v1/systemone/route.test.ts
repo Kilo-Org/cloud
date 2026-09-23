@@ -165,18 +165,16 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
     jest
       .mocked(extractHeaderAndLimitLength)
       .mockImplementation((request, name) => request.headers.get(name));
-    jest
-      .mocked(modelNotAllowedResponse)
-      .mockImplementation(() =>
-        NextResponse.json(
-          {
-            error: 'Model not allowed',
-            error_type: 'model_not_allowed',
-            message: 'Model not allowed',
-          },
-          { status: 404 }
-        )
-      );
+    jest.mocked(modelNotAllowedResponse).mockImplementation(() =>
+      NextResponse.json(
+        {
+          error: 'Model not allowed',
+          error_type: 'model_not_allowed',
+          message: 'Model not allowed',
+        },
+        { status: 404 }
+      )
+    );
     mockedFetch.mockImplementation(async () => Response.json(upstreamBody));
   });
 

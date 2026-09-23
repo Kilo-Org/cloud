@@ -119,7 +119,8 @@ export type WorktreeKiloRuntimes = {
     canRefreshCredentials?: () => boolean,
     runtimeIsolation?: RuntimeIsolation,
     beforeMutation?: () => void,
-    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
+    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void,
+    home?: string
   ): WorktreeKiloAttachment;
   detach(identity: SessionRequestIdentity): boolean;
   retireForRecovery(
@@ -1452,7 +1453,8 @@ export function createWorktreeKiloRuntimes(options: {
       canRefreshCredentials,
       runtimeIsolation,
       beforeMutation,
-      onCleanupTarget
+      onCleanupTarget,
+      stableHome
     ) {
       if (closed) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);
@@ -1573,10 +1575,9 @@ export function createWorktreeKiloRuntimes(options: {
           .update('\0')
           .update(directory)
           .digest('hex');
-        const home = path.join(
-          options.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees'),
-          homeId
-        );
+        const home =
+          stableHome ??
+          path.join(options.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees'), homeId);
         entry = {
           identity: { ...identity },
           isolation,

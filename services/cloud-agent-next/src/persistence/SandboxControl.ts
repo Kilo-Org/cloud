@@ -547,6 +547,12 @@ export class SandboxControl extends DurableObject<Env> {
     intentId: string;
   } | null = null;
   /**
+   * The warm-base snapshot id offered by the caller for the next launch. In
+   * memory only, like `controlLaunchCredential`: it is never persisted on the
+   * allocation and is dropped with the DO.
+   */
+  private controlWarmSnapshotId: string | null = null;
+  /**
    * The deadline of the acquisition that is driving the in-flight create, if
    * any. The atomic create+launch effect re-checks it immediately before
    * launch so an acquisition that expires while the provider create is
@@ -1464,6 +1470,7 @@ export class SandboxControl extends DurableObject<Env> {
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
     worktreeId?: string;
+    warmSnapshotId?: string;
   }): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
     const operation = this.runEnsureReady(input);
     this.readinessOperations.add(operation);
@@ -1676,6 +1683,7 @@ export class SandboxControl extends DurableObject<Env> {
           result: 'started',
         });
         this.controlAcquisitionDeadline = acquisition?.deadlineAt ?? null;
+        this.controlWarmSnapshotId = input.warmSnapshotId ?? null;
         try {
           await withTimeout(
             this.allocationOrchestrator.run(createCommands),
@@ -1687,6 +1695,7 @@ export class SandboxControl extends DurableObject<Env> {
           );
         } finally {
           this.controlAcquisitionDeadline = null;
+          this.controlWarmSnapshotId = null;
         }
         const after = await this.readCanonicalAllocation();
         this.logDiagnostic('allocation_launch', {
@@ -3211,6 +3220,7 @@ export class SandboxControl extends DurableObject<Env> {
         allocationName,
         instance: this.containersInstance,
         getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
+        warmSnapshotId: () => this.controlWarmSnapshotId ?? undefined,
       });
     }
     return createCloudflareProviderAdapter({

@@ -796,6 +796,30 @@ describe('worktree Kilo runtime registry', () => {
     }
   });
 
+  it('uses a provided stable home instead of the derived hash', async () => {
+    const { rawRegistry } = createRegistry();
+    const directory = path.join(tmpDir, 'stable-home-worktree');
+    const stableHome = path.join(tmpDir, 'warm-homes', 'stable');
+    const attachment = rawRegistry.attach(
+      rootIdentity(directory),
+      auth,
+      undefined,
+      undefined,
+      'per-session',
+      undefined,
+      undefined,
+      stableHome
+    );
+    try {
+      const runtime = await attachment.ready;
+      attachment.commit();
+      expect(runtime.env.HOME).toBe(stableHome);
+      expect(runtime.env.XDG_DATA_HOME).toBe(path.join(stableHome, '.local', 'share'));
+    } finally {
+      attachment.release();
+    }
+  });
+
   it('starts lazily and reuses one server and feed for concurrent same-worktree roots', async () => {
     const { registry, launches } = createRegistry();
     const directory = path.join(tmpDir, 'worktree-a');

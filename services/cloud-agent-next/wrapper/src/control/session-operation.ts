@@ -16,6 +16,7 @@ import {
   sessionMessageOutcomeSchema,
   sessionEventPayloadSchema,
   sessionOperationDeliverySchema,
+  sessionAttachResultSchema,
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
   type SessionOperationAck,
@@ -560,10 +561,12 @@ export class SessionOperation {
     if (!result.ok) return result;
     if (this.native.state === 'pending') this.native = { state: 'completed', result: true };
     work.onAttached();
+    const parsed = sessionAttachResultSchema.safeParse(result.result);
+    const attachResult = parsed.success ? parsed.data : { attached: true as const };
     return {
       ok: true,
       result: {
-        attached: true,
+        ...attachResult,
         ...(work.payload.captureNativeRuntimeId && this.target
           ? { nativeRuntimeId: this.target.runtimeId }
           : {}),

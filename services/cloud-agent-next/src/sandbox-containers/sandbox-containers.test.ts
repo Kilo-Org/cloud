@@ -152,7 +152,7 @@ class FakeContainer {
   }
 }
 
-function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {}) {
+function setup(options: { record?: StoredRecord | null; attachContainer?: boolean } = {}) {
   const container = new FakeContainer();
   let alarm: number | undefined;
   const pendingTasks: Promise<unknown>[] = [];
@@ -177,7 +177,7 @@ function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {
       alarm = undefined;
     },
   };
-  storage.map.set(RECORD_KEY, options.record ?? idleRecord);
+  if (options.record !== null) storage.map.set(RECORD_KEY, options.record ?? idleRecord);
   const ctx = {
     storage,
     id: { toString: () => 'do-id' },
@@ -195,9 +195,15 @@ function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {
 function launch(
   instance: SandboxContainers,
   allocationRef: string,
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  warmSnapshotId?: string
 ) {
-  return instance.launchWrapper({ allocationRef, env, instance: 'standard-2' });
+  return instance.launchWrapper({
+    allocationRef,
+    env,
+    instance: 'standard-2',
+    ...(warmSnapshotId === undefined ? {} : { warmSnapshotId }),
+  });
 }
 
 afterEach(() => {
@@ -775,5 +781,99 @@ describe('SandboxContainers lease and log', () => {
 
     await expect(instance.readLog(REF_A, CONTROL_WRAPPER_LOG_PATH, 100)).resolves.toBe('');
     expect(container.execCalls).toEqual([]);
+  });
+});
+
+describe('SandboxContainers warm base', () => {
+  it('reports image, session snapshot, and record presence in one call', async () => {
+    const fresh = setup({ record: null });
+    await expect(fresh.instance.warmBaseFacts()).resolves.toEqual({
+      image: 'registry.example/kilo/app:test',
+      sessionSnapshotId: null,
+      hasRecord: false,
+    });
+
+    const stored = setup({
+      record: {
+        state: 'idle',
+        allocationRef: null,
+        stopOpId: null,
+        lastSnapshot: { id: 'snap-stored', sourceAllocation: REF_A },
+      },
+    });
+    await expect(stored.instance.warmBaseFacts()).resolves.toEqual({
+      image: 'registry.example/kilo/app:test',
+      sessionSnapshotId: 'snap-stored',
+      hasRecord: true,
+    });
+  });
+
+  it('starts a warm id from containerSnapshot and leaves lastSnapshot null', async () => {
+    const { instance, container, readRecord } = setup();
+
+    const result = await launch(instance, REF_A, {}, 'warm-snap');
+
+    expect(result).toEqual({ started: true });
+    expect(container.startCalls).toEqual([
+      { containerSnapshot: { id: 'warm-snap' }, instance: 'standard-2', enableInternet: true },
+    ]);
+    expect(readRecord().lastSnapshot).toBeNull();
+  });
+
+  it('lets a stored session snapshot win over the warm id', async () => {
+    const { instance, container } = setup({
+      record: {
+        state: 'idle',
+        allocationRef: null,
+        stopOpId: null,
+        lastSnapshot: { id: 'snap-stored', sourceAllocation: REF_A },
+      },
+    });
+
+    await launch(instance, REF_A, {}, 'warm-snap');
+
+    expect(container.startCalls).toEqual([
+      { containerSnapshot: { id: 'snap-stored' }, instance: 'standard-2', enableInternet: true },
+    ]);
+  });
+
+  it('captures a warm base without writing lastSnapshot', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = true;
+
+    await expect(instance.captureWarmBase()).resolves.toEqual({ id: 'snap-1' });
+
+    expect(container.snapshotCalls).toBe(1);
+    expect(container.startCalls).toEqual([]);
+    expect(readRecord().lastSnapshot).toBeNull();
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('never starts the container when capturing', async () => {
+    const { instance, container } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = false;
+
+    await expect(instance.captureWarmBase()).resolves.toEqual({ id: 'snap-1' });
+
+    expect(container.startCalls).toEqual([]);
+    expect(container.running).toBe(false);
+  });
+
+  it('applies the warm id when resuming a launch whose start never took effect', async () => {
+    const { instance, container } = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    const resumed = await launch(instance, REF_A, {}, 'warm-snap');
+
+    expect(resumed).toEqual({ started: true });
+    expect(container.startCalls).toEqual([
+      { containerSnapshot: { id: 'warm-snap' }, instance: 'standard-2', enableInternet: true },
+    ]);
   });
 });

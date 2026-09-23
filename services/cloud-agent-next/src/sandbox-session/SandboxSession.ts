@@ -125,6 +125,11 @@ import {
   runtimeAuthorizationRecoveryLockSchema,
 } from '../session/runtime-authorization-persistence.js';
 import { validateControlSessionOptions } from './attach-payload.js';
+import { resolveWarmBaseLaunch, type WarmBaseContainerFacts } from './warm-base-launch.js';
+import {
+  WARM_BASE_TTL_MS,
+  warmBaseHomeForWorkspace,
+} from '../sandbox-control/warm-base.js';
 import { pendingInputProjection } from './session-input-projection.js';
 import {
   createInteractionRefresh,
@@ -3792,6 +3797,8 @@ export class SandboxSession extends DurableObject<Env> {
     const allowCreate = acquisition === undefined && options?.allowCreate === true;
     let wrapperInstanceId = activeWrapperInstanceId(queued);
     const isCurrent = () => this.queuedMessage(messageId, epoch, wrapperInstanceId) !== undefined;
+    let sessionDirectory = this.directory(metadata);
+    let sessionMetadata = metadata;
     const wait = <T>(operation: () => Promise<T>, timeoutMs?: number) =>
       withDeliveryDeadline(operation, deadlineAt, timeoutMs);
     const recordRuntime = (identity: string | undefined) => {
@@ -3888,7 +3895,7 @@ export class SandboxSession extends DurableObject<Env> {
         operation,
         operationId: operation === 'session.attach' ? attemptId : messageId,
         messageId,
-        session: { sessionId, kiloSessionId, directory: this.directory(metadata) },
+        session: { sessionId, kiloSessionId, directory: sessionDirectory },
         wrapperInstanceId,
         dispatchDeadlineAt: deadlineAt,
       };
@@ -4078,11 +4085,24 @@ export class SandboxSession extends DurableObject<Env> {
     }
     let phase: DispatchPhase = 'preparing';
     let attachInPreparation = false;
+    let attachBootstrapped = false;
     let credentialsPrepared = false;
     const preparationGeneration = this.worktreeChanges.beginPreparation();
     try {
       validateControlSessionOptions(metadata);
-      const session = { sessionId, kiloSessionId, directory: this.directory(metadata) };
+      const warm = await resolveWarmBaseLaunch({
+        metadata,
+        provider,
+        directory: sessionDirectory,
+        readContainerFacts: () => this.readContainerWarmBaseFacts(sandboxId),
+        readWarmRecord: digest => this.env.WARM_BASE.get(digest, 'json'),
+        persistWorkspacePath: (value, workspacePath) =>
+          this.persistWarmWorkspacePath(value, workspacePath),
+      });
+      sessionDirectory = warm.directory;
+      sessionMetadata = warm.metadata;
+      const session = { sessionId, kiloSessionId, directory: sessionDirectory };
+      const warmHome = warmBaseHomeForWorkspace(sessionDirectory);
       const turn = getSessionMessageTurn(queued);
       const attachments =
         turn?.type === 'prompt'
@@ -4111,6 +4131,7 @@ export class SandboxSession extends DurableObject<Env> {
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }
                 : {}),
+              ...(warm.snapshotId === undefined ? {} : { warmSnapshotId: warm.snapshotId }),
               billing: buildSandboxBillingInput(
                 metadata,
                 sandboxId,
@@ -4132,7 +4153,7 @@ export class SandboxSession extends DurableObject<Env> {
       let status = await ensureReady();
       if (!isCurrent()) {
         if (!this.terminalLifecycle.isCurrent(epoch))
-          await this.compensateSessionAttachment(metadata);
+          await this.compensateSessionAttachment(sessionMetadata);
         return;
       }
       recordRuntime(status.wrapperInstanceId);
@@ -4164,7 +4185,7 @@ export class SandboxSession extends DurableObject<Env> {
         status = await ensureReady();
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
-            await this.compensateSessionAttachment(metadata);
+            await this.compensateSessionAttachment(sessionMetadata);
           return;
         }
         recordRuntime(status.wrapperInstanceId);
@@ -4205,6 +4226,7 @@ export class SandboxSession extends DurableObject<Env> {
         attachInPreparation = needsPreparation;
         const attachPayload = {
           ...status.attachment,
+          ...(warmHome === undefined ? {} : { home: warmHome }),
           ...(hasModernRuntimeAuthorization(metadata)
             ? { runtimeIsolation: 'per-session' as const }
             : {}),
@@ -4275,7 +4297,7 @@ export class SandboxSession extends DurableObject<Env> {
         phase = 'preparing';
         if (needsPreparation) {
           this.terminalLifecycle.recordAttachment({
-            metadata,
+            metadata: sessionMetadata,
             sandboxId,
             wrapperInstanceId,
             allocationIncarnation: status.allocationIncarnation,
@@ -4296,31 +4318,30 @@ export class SandboxSession extends DurableObject<Env> {
         );
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
-            await this.compensateSessionAttachment(metadata);
+            await this.compensateSessionAttachment(sessionMetadata);
           return;
         }
         phase = 'attach';
         if (operationResults) {
-          if (
-            (
-              await dispatchAuthorized(
-                'session.attach',
-                proxyKilo
-                  ? {
-                      ...attachPayload,
-                      env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
-                      kilo: proxyKilo,
-                    }
-                  : attachPayload,
-                proxyFence
-              )
-            ).state === 'running'
-          ) {
+          const dispatchedAttach = await dispatchAuthorized(
+            'session.attach',
+            proxyKilo
+              ? {
+                  ...attachPayload,
+                  env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
+                  kilo: proxyKilo,
+                }
+              : attachPayload,
+            proxyFence
+          );
+          if (dispatchedAttach.state === 'running') {
             await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
             return;
           }
+          const attachResult = sessionAttachResultSchema.safeParse(dispatchedAttach.result);
+          attachBootstrapped = attachResult.success && attachResult.data.bootstrapped === true;
         } else {
-          await dispatch('attach', () =>
+          const attachResult = await dispatch('attach', () =>
             wait(
               async () =>
                 sessionAttachResultSchema.parse(
@@ -4344,11 +4365,12 @@ export class SandboxSession extends DurableObject<Env> {
               SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
             )
           );
+          attachBootstrapped = attachResult.bootstrapped === true;
         }
         phase = 'preparing';
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
-            await this.compensateSessionAttachment(metadata);
+            await this.compensateSessionAttachment(sessionMetadata);
           return;
         }
       }
@@ -4366,14 +4388,17 @@ export class SandboxSession extends DurableObject<Env> {
       // "waiting for sandbox" reason.
       this.savePreparationWait(messageId, epoch, undefined);
       this.terminalLifecycle.recordAttachment({
-        metadata,
+        metadata: sessionMetadata,
         sandboxId,
         wrapperInstanceId,
         allocationIncarnation: status.allocationIncarnation,
         epoch,
       });
       recorder.finalize({ status: 'completed' });
-      this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(metadata));
+      this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(sessionMetadata));
+      if (attachBootstrapped && warm.publishDigest !== undefined) {
+        await this.publishWarmBase(sandboxId, warm.publishDigest);
+      }
       phase = 'prompt';
       const promptPayload = {
         messageId,
@@ -4425,7 +4450,7 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (!isCurrent()) {
         if (!this.terminalLifecycle.isCurrent(epoch))
-          await this.compensateSessionAttachment(metadata);
+          await this.compensateSessionAttachment(sessionMetadata);
         return;
       }
       const accepted = acceptQueuedMessage(
@@ -4442,7 +4467,7 @@ export class SandboxSession extends DurableObject<Env> {
           (credentialsPrepared || phase !== 'preparing') &&
           !this.terminalLifecycle.isCurrent(epoch)
         ) {
-          await this.compensateSessionAttachment(metadata);
+          await this.compensateSessionAttachment(sessionMetadata);
         }
         return;
       }
@@ -5671,6 +5696,42 @@ export class SandboxSession extends DurableObject<Env> {
         metadata.identity.sessionId
       )
     );
+  }
+
+  private async readContainerWarmBaseFacts(sandboxId: string): Promise<WarmBaseContainerFacts> {
+    const container = this.env.SANDBOX_CONTAINERS.getByName(sandboxId);
+    return container.warmBaseFacts();
+  }
+
+  private persistWarmWorkspacePath(
+    metadata: SessionMetadata,
+    workspacePath: string
+  ): SessionMetadata {
+    const current = this.terminalLifecycle.getStoredMetadata() ?? metadata;
+    if (current.workspace?.workspacePath !== undefined) return current;
+    const updated = {
+      ...current,
+      workspace: { ...(current.workspace ?? {}), workspacePath },
+    };
+    this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(updated));
+    return updated;
+  }
+
+  private async publishWarmBase(sandboxId: string, digest: string): Promise<void> {
+    try {
+      const container = this.env.SANDBOX_CONTAINERS.getByName(sandboxId);
+      const { id } = await container.captureWarmBase();
+      try {
+        await this.env.WARM_BASE.put(
+          digest,
+          JSON.stringify({ id, expiresAt: Date.now() + WARM_BASE_TTL_MS })
+        );
+      } catch {
+        logControlDiagnostic('warm_base_publish', { result: 'put_failed' }, 'warn');
+      }
+    } catch {
+      logControlDiagnostic('warm_base_publish', { result: 'capture_failed' }, 'warn');
+    }
   }
 
   private broadcastQueuedMessage(messageId: string, content: string): void {

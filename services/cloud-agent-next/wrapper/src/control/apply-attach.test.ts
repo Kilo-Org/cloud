@@ -242,7 +242,7 @@ describe('applySessionAttach', () => {
           },
         }
       );
-      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       expect(await currentBranch()).toBe('session/worktree_a');
       expect(setupBranches).toEqual(['session/worktree_a']);
     });
@@ -255,7 +255,7 @@ describe('applySessionAttach', () => {
         deps
       );
 
-      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       expect(await currentBranch()).toBe(branch);
     });
 
@@ -269,7 +269,7 @@ describe('applySessionAttach', () => {
         deps
       );
 
-      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       expect(await currentBranch()).toBe(branch);
     });
 
@@ -313,7 +313,7 @@ describe('applySessionAttach', () => {
           { ...payload, branch },
           deps
         );
-        expect(result).toEqual({ ok: true, result: { attached: true } });
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
         expect(await currentBranch()).toBe(branch);
       }
     );
@@ -453,7 +453,11 @@ describe('applySessionAttach', () => {
             { kilo, setupCommands: ['true'] },
             deps
           )
-        ).toEqual({ ok: true, result: { attached: true } });
+        ).toEqual(
+          attempt === 0
+            ? { ok: true, result: { attached: true, bootstrapped: true } }
+            : { ok: true, result: { attached: true } }
+        );
       }
       expect(setupRuns).toBe(1);
       expect(fs.readdirSync(directory)).toEqual([]);
@@ -548,7 +552,7 @@ describe('applySessionAttach', () => {
         },
       }
     );
-    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
     expect(mkdirCalls).toEqual(['/workspace/a']);
     expect(gitCalls[0]?.[0]).toBe('clone');
     expect(gitCalls[0]?.includes('--branch')).toBe(false);
@@ -676,7 +680,7 @@ describe('applySessionAttach', () => {
         },
       }
     );
-    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
     expect(gitCalls).toEqual([
       ['clone', authenticatedUrl.href, session.directory],
       ['checkout', '-B', 'topic/shared-worktree', 'origin/topic/shared-worktree'],
@@ -729,7 +733,7 @@ describe('applySessionAttach', () => {
       }
     );
 
-    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
     expect(gitCalls).toEqual([
       { args: ['checkout', '-B', 'feature/retry', 'origin/feature/retry'], cwd: '/workspace/a' },
       { args: ['config', 'user.name', 'Kilo Code Cloud'], cwd: '/workspace/a' },
@@ -801,7 +805,7 @@ describe('applySessionAttach', () => {
 
     const retried = await applySessionAttach(session, payload, deps);
 
-    expect(retried).toEqual({ ok: true, result: { attached: true } });
+    expect(retried).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
     expect(gitCalls).toEqual([
       ['clone', 'https://github.com/acme/demo.git', '/workspace/a'],
       ['checkout', '-B', 'feature/retry', 'origin/feature/retry'],
@@ -818,6 +822,37 @@ describe('applySessionAttach', () => {
       'step_started',
       'step_completed',
     ]);
+  });
+
+  it('reports bootstrapped only when this call wrote the marker', async () => {
+    let marker = false;
+    let writes = 0;
+    const deps: ApplyAttachDeps = {
+      kiloRuntimes: fakeKiloRuntimes(),
+      sessionExists: async () => true,
+      mkdir: async () => undefined,
+      hasGit: async () => false,
+      hasBootstrapMarker: async () => marker,
+      writeBootstrapMarker: async () => {
+        writes += 1;
+        marker = true;
+      },
+      runGit: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
+      runSetup: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
+    };
+    const payload = {
+      kilo,
+      git: { url: 'https://github.com/acme/demo.git' },
+      setupCommands: ['pnpm install'],
+    };
+
+    const first = await applySessionAttach(session, payload, deps);
+    expect(first).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+    expect(writes).toBe(1);
+
+    const second = await applySessionAttach(session, payload, deps);
+    expect(second).toEqual({ ok: true, result: { attached: true } });
+    expect(writes).toBe(1);
   });
 
   it('skips clone, branch checkout, and setup when the bootstrap marker is present', async () => {
@@ -942,7 +977,7 @@ describe('applySessionAttach', () => {
         });
         releaseRestore.resolve();
         expect(await Promise.all(attaches)).toEqual([
-          { ok: true, result: { attached: true } },
+          { ok: true, result: { attached: true, bootstrapped: true } },
           { ok: true, result: { attached: true } },
         ]);
         expect(markerWrites).toBe(1);
@@ -999,7 +1034,7 @@ describe('applySessionAttach', () => {
           ok: false,
           error: { code: 'not_ready', message: 'Setup command 1 failed', retryable: true },
         },
-        { ok: true, result: { attached: true } },
+        { ok: true, result: { attached: true, bootstrapped: true } },
       ]);
       expect(await applySessionAttach(session, payload, deps)).toEqual({
         ok: true,
@@ -1050,7 +1085,7 @@ describe('applySessionAttach', () => {
           timeoutMessage: 'Other worktree was blocked by cold setup',
           abortMessage: 'Other worktree setup cancelled',
         })
-      ).toEqual({ ok: true, result: { attached: true } });
+      ).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       expect(prepared).toEqual(['/workspace/other']);
     } finally {
       release.resolve();
@@ -1088,7 +1123,7 @@ describe('applySessionAttach', () => {
       expect(probed).toEqual([]);
       release.resolve();
       expect(await Promise.all([first, sibling])).toEqual([
-        { ok: true, result: { attached: true } },
+        { ok: true, result: { attached: true, bootstrapped: true } },
         { ok: true, result: { attached: true } },
       ]);
       expect(probed.sort()).toEqual([session.kiloSessionId, siblingSession.kiloSessionId]);
@@ -1174,7 +1209,7 @@ describe('applySessionAttach', () => {
       expect(commands).toEqual(['first']);
       release.resolve();
       expect(await first).toMatchObject({ ok: false });
-      expect(await next).toEqual({ ok: true, result: { attached: true } });
+      expect(await next).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       expect(commands).toEqual(['first', 'next']);
       expect(markerWrites).toBe(1);
     } finally {
@@ -1292,7 +1327,7 @@ describe('applySessionAttach', () => {
             abortMessage: 'Test cancelled',
           }
         )
-      ).toEqual({ ok: true, result: { attached: true } });
+      ).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       await withTimeoutAndAbort(fenceDirectoryOperations(otherSession.directory), {
         timeoutMs: 1_000,
         timeoutMessage: 'Other directory fence waited for unrelated preparation',
@@ -2159,7 +2194,7 @@ describe('applySessionAttach', () => {
       }
     );
 
-    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
     expect(steps).toEqual(['runtime', 'mkdir', 'setup', 'restore']);
   });
 
@@ -2194,7 +2229,7 @@ describe('applySessionAttach', () => {
         },
         { ...noFs, kiloRuntimes: runtimes, sessionExists: async () => true }
       );
-      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
       const home = runtimes.get({ ...session, directory })?.env.HOME;
       expect(home).toStartWith(homeRoot);
       expect(fs.readFileSync(path.join(directory, 'setup-env.txt'), 'utf8')).toBe(

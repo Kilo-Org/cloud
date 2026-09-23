@@ -6,6 +6,7 @@ import {
   CONTROL_WRAPPER_LOG_PATH,
   CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
+import { selectStartSnapshot } from '../sandbox-control/warm-base.js';
 import {
   ContainersBilling,
   ContainersBillingScheduler,
@@ -28,6 +29,7 @@ export type ContainersLaunchInput = {
   allocationRef: string;
   env: Record<string, string>;
   instance: ContainerInstanceSize;
+  warmSnapshotId?: string;
 };
 
 export type ContainersObservation = {
@@ -110,7 +112,7 @@ export class SandboxContainers extends DurableObject<Env> {
         return { started: false };
       }
       if (record.state === 'launching' && record.allocationRef === ref) {
-        return this.resumeLaunch(record, ref, input.env, input.instance);
+        return this.resumeLaunch(record, ref, input.env, input.instance, input.warmSnapshotId);
       }
       const container = this.requiredContainer();
       // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
@@ -118,7 +120,10 @@ export class SandboxContainers extends DurableObject<Env> {
       await this.startContainerAndActivateBilling(
         container,
         record,
-        this.startOptions(input.instance, record.lastSnapshot?.id)
+        this.startOptions(
+          input.instance,
+          selectStartSnapshot(record.lastSnapshot?.id, input.warmSnapshotId)
+        )
       );
       await this.execWrapper(container, input.env);
       await this.writeRecord({
@@ -237,6 +242,31 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.ctx.container?.running === true;
   }
 
+  async warmBaseFacts(): Promise<{
+    image: string;
+    sessionSnapshotId: string | null;
+    hasRecord: boolean;
+  }> {
+    const record = await this.ctx.storage.get<ContainersRecord>(RECORD_KEY);
+    return {
+      image: this.containerImage(),
+      sessionSnapshotId: record?.lastSnapshot?.id ?? null,
+      hasRecord: record !== undefined,
+    };
+  }
+
+  async captureWarmBase(): Promise<{ id: string }> {
+    return this.runExclusive(async () => {
+      const container = this.requiredContainer();
+      const snapshot = await withTimeout(
+        container.snapshotContainer({}),
+        SNAPSHOT_TIMEOUT_MS,
+        'container snapshot timed out'
+      );
+      return { id: snapshot.id };
+    });
+  }
+
   async forceDestroyForControlPlane(): Promise<void> {
     const container = this.ctx.container;
     if (!container || typeof container.destroy !== 'function') {
@@ -322,7 +352,8 @@ export class SandboxContainers extends DurableObject<Env> {
     record: ContainersRecord,
     ref: string,
     env: Record<string, string>,
-    instance: ContainerInstanceSize
+    instance: ContainerInstanceSize,
+    warmSnapshotId: string | undefined
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
     const probe = await this.probeWrapper(container);
@@ -339,7 +370,10 @@ export class SandboxContainers extends DurableObject<Env> {
       await this.startContainerAndActivateBilling(
         container,
         record,
-        this.startOptions(instance, record.lastSnapshot?.id)
+        this.startOptions(
+          instance,
+          selectStartSnapshot(record.lastSnapshot?.id, warmSnapshotId)
+        )
       );
       await this.execWrapper(container, env);
     } else {

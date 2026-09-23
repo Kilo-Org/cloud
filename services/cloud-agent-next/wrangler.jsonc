@@ -400,6 +400,9 @@
     {
       "binding": "SHARED_SANDBOX_OVERRIDES",
     },
+    {
+      "binding": "WARM_BASE",
+    },
   ],
 
   /**
@@ -451,6 +454,9 @@
       "kv_namespaces": [
         {
           "binding": "SHARED_SANDBOX_OVERRIDES",
+        },
+        {
+          "binding": "WARM_BASE",
         },
       ],
       "vars": {

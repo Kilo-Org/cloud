@@ -4273,7 +4273,7 @@ describe('control cancellation and attachments', () => {
         stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
         expect(await cancellingFirst).toMatchObject({ ok: true });
         expect(await firstAttach).toMatchObject({ ok: false });
-        expect(await nextAttach).toEqual({ ok: true, result: { attached: true } });
+        expect(await nextAttach).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
         expect(setupCommands).toEqual(['first', 'next']);
         expect(markerWrites).toBe(1);
       } finally {

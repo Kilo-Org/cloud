@@ -462,6 +462,7 @@ export const sessionAttachPayloadSchema = z
     captureNativeRuntimeId: z.literal(true).optional(),
     snapshotIdentity: z.string().min(1).max(512).optional(),
     directory: z.string().min(1).max(1024).optional(),
+    home: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     kilo: z
@@ -514,6 +515,7 @@ export const sessionAttachResultSchema = z
   .object({
     attached: z.literal(true),
     nativeRuntimeId: z.string().uuid().optional(),
+    bootstrapped: z.boolean().optional(),
   })
   .strict();
 

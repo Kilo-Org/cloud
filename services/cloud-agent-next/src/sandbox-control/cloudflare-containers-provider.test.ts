@@ -93,6 +93,7 @@ function setup(
     logicalSandboxId?: string;
     allocationName?: string;
     instance?: ContainerInstanceSize;
+    warmSnapshotId?: () => string | undefined;
   } = {}
 ) {
   const stub = options.stub ?? createStub();
@@ -101,6 +102,7 @@ function setup(
     logicalSandboxId: options.logicalSandboxId ?? LOGICAL_ID,
     allocationName: options.allocationName ?? ALLOCATION_A,
     ...(options.instance === undefined ? {} : { instance: options.instance }),
+    ...(options.warmSnapshotId === undefined ? {} : { warmSnapshotId: options.warmSnapshotId }),
     getContainer,
   });
   return { adapter, stub, getContainer };
@@ -260,6 +262,23 @@ describe('cloudflare containers provider launch', () => {
 
     expect(stub.launchWrapper).toHaveBeenCalledWith(
       expect.objectContaining({ instance: 'standard-3' })
+    );
+  });
+
+  it('forwards the warm base snapshot id to the launch only when provided', async () => {
+    let warm: string | undefined = 'warm_snap_1';
+    const { adapter, stub } = setup({ warmSnapshotId: () => warm });
+
+    await adapter.launch(REF_A, {});
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({ warmSnapshotId: 'warm_snap_1' })
+    );
+
+    stub.launchWrapper.mockClear();
+    warm = undefined;
+    await adapter.launch(REF_A, {});
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.not.objectContaining({ warmSnapshotId: expect.anything() })
     );
   });
 

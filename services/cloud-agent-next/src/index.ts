@@ -9,6 +9,7 @@ export {
   SandboxCodeReviewContainment,
   ContainerProxy,
 } from './sandbox-outbound.js';
+export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { SandboxControl } from './persistence/SandboxControl.js';
 export { SandboxSession } from './sandbox-session/SandboxSession.js';

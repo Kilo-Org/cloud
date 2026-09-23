@@ -2603,7 +2603,6 @@
       "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。"
     },
     "entry": {
-      "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
       "pastePrLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
       "noRecentPrs": "最近のレビューはありません",
       "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",

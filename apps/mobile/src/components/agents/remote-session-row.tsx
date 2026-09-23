@@ -91,6 +91,8 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
+  // One derivation for the visible label, the spoken label and the rename
+  // prompt: a creation placeholder title reads as "Untitled session".
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;

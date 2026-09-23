@@ -2633,7 +2633,6 @@
       "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}."
     },
     "entry": {
-      "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
       "pastePrLink": "Coller un lien de PR ou de merge request",
       "noRecentPrs": "Aucune revue récente",
       "noRecentPrsDescription": "Collez un lien ci-dessus pour démarrer une revue — elle apparaîtra ici la prochaine fois.",

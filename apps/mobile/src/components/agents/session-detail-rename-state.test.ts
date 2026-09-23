@@ -43,6 +43,39 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('falls back to the caller title when the server title is the creation placeholder', () => {
+    // A session created through cloud-agent-next carries
+    // `New session - <ISO instant>` (or the child variant) until it is named.
+    // The header must never paint that machine string, whether it arrived as
+    // the fetched server title or as a live `session.updated` title (which
+    // reaches the hook as `serverTitle`).
+    const state = getSessionDetailRenameState({
+      fallbackTitle: 'Session',
+      isLoaded: true,
+      serverTitle: 'New session - 2026-09-22T17:26:31.465Z',
+      renameState: { ...initialRenameState(), isModalOpen: true },
+    });
+    expect(state.title).toBe('Session');
+    expect(state.modalInitialValue).toBe('Session');
+    expect(state.title).not.toContain('2026-09-22');
+  });
+
+  it('treats the caller fallback as opaque and never rewrites it', () => {
+    // The helper sanitizes only the server title. The screen pre-sanitizes the
+    // cached list title before it becomes `fallbackTitle`
+    // (session-detail-content.tsx), so re-running `sessionDisplayTitle` on the
+    // fallback here would be an identity call and change nothing.
+    for (const fallback of ['Session', 'New session - 2026-09-22T17:26:31.465Z', '   ']) {
+      const state = getSessionDetailRenameState({
+        fallbackTitle: fallback,
+        isLoaded: true,
+        serverTitle: undefined,
+        renameState: initialRenameState(),
+      });
+      expect(state.title).toBe(fallback);
+    }
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({

@@ -583,7 +583,6 @@
     "reviewPullRequest": "Vaata tõmbetaotlus üle",
     "headLine": "{{counts}} · uusim kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Ava tõmbetaotlus või liitmistaotlus URL-i kaudu",
       "pastePrLink": "Kleebi tõmbetaotluse või liitmistaotluse link",
       "noRecentPrs": "Hiljutisi ülevaatusi pole",
       "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi link ülalpool — järgmisel korral ilmub see siin.",

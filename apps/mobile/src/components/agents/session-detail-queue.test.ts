@@ -15,6 +15,7 @@ import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sd
 import type * as ReactI18next from 'react-i18next';
 
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
+import type * as SessionListHelpers from '@/components/agents/session-list-helpers';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageBubble } from '@/components/agents/message-bubble';
@@ -366,9 +367,15 @@ vi.mock('@/components/agents/context-usage-display', () => ({
 vi.mock('@/components/agents/session-composer-disabled', () => ({
   resolveSessionComposerDisabled: () => false,
 }));
-vi.mock('@/components/agents/session-list-helpers', () => ({
-  selectSessionCostInputs: () => ({ breakdownCostUsd: null, totalMicrodollars: null }),
-}));
+// Keep the real pure helpers (the header derives its fallback title through
+// `sessionDisplayTitle`); only the cost derivation is stubbed for this suite.
+vi.mock('@/components/agents/session-list-helpers', async importOriginal => {
+  const actual = await importOriginal<typeof SessionListHelpers>();
+  return {
+    ...actual,
+    selectSessionCostInputs: () => ({ breakdownCostUsd: null, totalMicrodollars: null }),
+  };
+});
 vi.mock('@/components/agents/mobile-session-manager-helpers', () => ({
   buildRemoteAttachmentParts: vi.fn(),
 }));

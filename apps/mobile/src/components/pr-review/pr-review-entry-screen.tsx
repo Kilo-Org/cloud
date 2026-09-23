@@ -342,7 +342,7 @@ export function PrReviewEntryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.prReview')} eyebrow={t('prReview.entry.eyebrow')} />
+      <ScreenHeader title={t('common.prReview')} />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
     </View>
   );

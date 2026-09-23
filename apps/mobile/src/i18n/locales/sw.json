@@ -583,7 +583,6 @@
     "reviewPullRequest": "Kagua ombi la kuunganisha",
     "headLine": "{{counts}} · rekodi ya mwisho {{sha}}",
     "entry": {
-      "eyebrow": "Fungua ombi la kuunganisha kwa URL",
       "pastePrLink": "Bandika kiungo cha ombi la kuunganisha",
       "noRecentPrs": "Hakuna ukaguzi wa hivi karibuni",
       "noRecentPrsDescription": "Bandika kiungo hapo juu kuanza ukaguzi — kitaonekana hapa mara ijayo.",

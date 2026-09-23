@@ -616,7 +616,6 @@
     "reviewPullRequest": "Athbhreithnigh an t-iarratas tarraingthe",
     "headLine": "{{counts}} · taifead athruithe reatha {{sha}}",
     "entry": {
-      "eyebrow": "Oscail iarratas tarraingthe nó iarratas cumaisc trí URL",
       "pastePrLink": "Greamaigh nasc d’iarratas tarraingthe nó d’iarratas cumaisc",
       "noRecentPrs": "Gan aon athbhreithniú le déanaí",
       "noRecentPrsDescription": "Greamaigh nasc thuas chun athbhreithniú a thosú — taispeánfar é anseo an chéad uair eile.",

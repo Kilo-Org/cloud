@@ -335,6 +335,23 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+
+  it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {
+    const renderer = mount(
+      row({
+        session: {
+          ...session,
+          title: 'New session - 2026-09-22T17:26:31.465Z',
+          git_branch: null,
+          total_cost_microdollars: null,
+        },
+      })
+    );
+    expect(texts(renderer)).toContain(i18n.t('agents.sessionRow.untitled'));
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-22');
+  });
 });
 
 describe('RemoteSessionRow live speech', () => {
@@ -440,5 +457,13 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
+  });
+
+  it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {
+    const renderer = mountRemote({ title: 'New session - 2026-09-22T17:26:31.465Z' });
+    expect(texts(renderer)).toContain(i18n.t('agents.sessionRow.untitled'));
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-22');
   });
 });

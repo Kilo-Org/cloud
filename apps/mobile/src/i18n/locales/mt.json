@@ -616,7 +616,6 @@
     "reviewPullRequest": "Irrevedi t-talba għall-għaqda",
     "headLine": "{{counts}} · l-aħħar reġistrazzjoni {{sha}}",
     "entry": {
-      "eyebrow": "Iftaħ PR jew merge request permezz ta' URL",
       "pastePrLink": "Waħħal ħolqa ta' PR jew merge request",
       "noRecentPrs": "L-ebda reviżjoni riċenti",
       "noRecentPrsDescription": "Waħħal ħolqa hawn fuq biex tibda reviżjoni — id-darba li jmiss tidher hawn.",

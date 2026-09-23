@@ -2603,7 +2603,6 @@
       "moreLinesAbove_other": "… darüber stehen weitere Zeilen: {{displayCount}}."
     },
     "entry": {
-      "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
       "pastePrLink": "Pull-Request- oder Merge-Request-Link einfügen",
       "noRecentPrs": "Noch keine aktuellen Reviews",
       "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",

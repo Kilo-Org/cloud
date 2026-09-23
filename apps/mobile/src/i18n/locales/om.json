@@ -583,7 +583,6 @@
     "reviewPullRequest": "Gaaffii walitti makuu gamaaggami",
     "headLine": "{{counts}} · galmee dhumaa {{sha}}",
     "entry": {
-      "eyebrow": "Gaaffii walitti makuu URL dhaan bani",
       "pastePrLink": "Liinkii gaaffii walitti makuu maxxansi",
       "noRecentPrs": "Gamaaggawwan dhiyeenya kanaa hin jiran",
       "noRecentPrsDescription": "Gamaaggama jalqabuuf liinkii olitti maxxansi — yeroo itti aanu asitti ni mul'ata.",

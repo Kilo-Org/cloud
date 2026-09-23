@@ -2663,7 +2663,6 @@
       "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}"
     },
     "entry": {
-      "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
       "pastePrLink": "Wklej odnośnik do PR lub merge requestu",
       "noRecentPrs": "Brak ostatnich recenzji",
       "noRecentPrsDescription": "Wklej powyżej odnośnik, aby rozpocząć recenzję — następnym razem pojawi się tutaj.",

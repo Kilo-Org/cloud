@@ -187,11 +187,12 @@ describe('shared branded splash', () => {
     // from the app's other plugins (adaptive-icon, notification, app
     // background), and `introspect` merges into the colors a local prebuild
     // already generated, so a worktree with a prebuilt `android/` directory
-    // carries that file's extra entries too. Assert the splash color the plugin
-    // owns is present among them rather than the only one, by containment, the
-    // same way the styles assertion below pins its theme: not the whole array
-    // and not its exact length, so a prebuild's other colors (iconBackground,
-    // colorPrimary, …) surviving here cannot fail the case.
+    // carries that file's extra entries too — for example expo-notifications'
+    // notification_icon_color. Assert the splash color the plugin owns is
+    // present among them rather than the only one, by containment, the same way
+    // the styles assertion below pins its theme: not the whole array and not its
+    // exact length, so a prebuild's other colors (iconBackground, colorPrimary,
+    // …) surviving here cannot fail the case.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

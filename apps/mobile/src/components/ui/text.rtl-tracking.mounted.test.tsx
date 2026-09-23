@@ -103,18 +103,18 @@ describe('Text tracked labels in RTL', () => {
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
     // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
-    // (see `Text`'s eyebrow variant and `SectionHeader`, and the rule
-    // `text.mounted.test.tsx` pins): the variant owns its display classes, so
-    // an RTL eyebrow drops the capitals and the tracked class instead of
-    // carrying a class the interface language never asked for
-    // (`section-header.mounted.test.tsx`) rather than keeping them like a
-    // caller-supplied tracked class. Assert on the class list and on the
-    // rendered string alike: the token list pins the exact classes, the
-    // substring check catches a `tracking` that shows up only inside another
-    // token, and the LTR-only class is pinned by name. No uppercase or tracked
-    // class is left for the shared RTL reset to neutralize on this label — the
-    // reset style is its whole treatment — and the zero letter-spacing reset
-    // still lands.
+    // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
+    // display classes, so an RTL eyebrow drops them — it carries no tracked
+    // class of its own (the rule `text.mounted.test.tsx` pins) — and drops the
+    // capitals and tracked class instead of carrying a class the interface
+    // language never asked for (`section-header.mounted.test.tsx`) rather than
+    // keeping them like a caller-supplied tracked class. Assert on the class
+    // list and on the rendered string alike: the token list pins the exact
+    // classes, the substring check catches a `tracking` that shows up only
+    // inside another token, and the LTR-only class is pinned by name. No
+    // uppercase or tracked class is left for the shared RTL reset to neutralize
+    // on this label — the reset style is its whole treatment — and the zero
+    // letter-spacing reset still lands.
     expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     const className = hostText(root).props.className as string;
     const classes = className.split(' ');

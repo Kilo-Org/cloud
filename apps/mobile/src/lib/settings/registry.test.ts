@@ -6,6 +6,7 @@ import {
   setCondenseToolCalls,
 } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { setLanguagePreferenceAsync } from '@/lib/hooks/use-language-preference';
+import { getLiveActivityEnabled } from '@/lib/hooks/use-live-activity-preference';
 import { setDefaultModelForContext } from '@/lib/hooks/use-persisted-agent-model';
 import { setThemePreference } from '@/lib/hooks/use-theme-preference';
 import { setTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
@@ -92,6 +93,29 @@ describe('settingsService one source of truth', () => {
     expect(Effect.runSync(settingsService().read('condenseToolCalls'))).toBe(false);
   });
 
+  it('lists the live activity toggle as a boolean', () => {
+    expect(settingNamed('liveActivity')?.kind).toBe('boolean');
+  });
+
+  it('writes the live activity toggle into the store the manual screen reads', () => {
+    const report = Effect.runSync(settingsService().write('liveActivity', false));
+    expect(report).toContain('liveActivity');
+    expect(report).toContain('false');
+    expect(getLiveActivityEnabled()).toBe(false);
+    expect(Effect.runSync(settingsService().read('liveActivity'))).toBe(false);
+
+    const on = Effect.runSync(settingsService().write('liveActivity', true));
+    expect(on).toContain('liveActivity');
+    expect(on).toContain('true');
+    expect(getLiveActivityEnabled()).toBe(true);
+    expect(Effect.runSync(settingsService().read('liveActivity'))).toBe(true);
+  });
+
+  it('refuses a non-boolean value for the live activity toggle', () => {
+    const refused = Effect.runSync(Effect.either(settingsService().write('liveActivity', 'yes')));
+    expect(Either.isLeft(refused)).toBe(true);
+  });
+
   it('reads the language a manual setter wrote', async () => {
     await expect(setLanguagePreferenceAsync('fr')).resolves.toBe(true);
     expect(Effect.runSync(settingsService().read('language'))).toBe('fr');
@@ -160,7 +184,7 @@ describe('settingsService one source of truth', () => {
   });
 
   it('reports what changed on every boolean write', () => {
-    for (const name of ['hideThinking', 'keepScreenOn', 'hideBalance']) {
+    for (const name of ['hideThinking', 'keepScreenOn', 'liveActivity', 'hideBalance']) {
       const report = Effect.runSync(settingsService().write(name, false));
       expect(report).toContain(name);
       expect(report).toContain('false');

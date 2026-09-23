@@ -16,6 +16,10 @@ import {
   setLanguagePreferenceAsync,
 } from '@/lib/hooks/use-language-preference';
 import {
+  getLiveActivityEnabled,
+  setLiveActivityEnabled,
+} from '@/lib/hooks/use-live-activity-preference';
+import {
   getStoredModelPreference,
   setDefaultModelForContext,
 } from '@/lib/hooks/use-persisted-agent-model';
@@ -112,6 +116,12 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
     description: 'Keep the screen awake while the app is in the foreground.',
     read: getKeepScreenOn,
     write: setKeepScreenOn,
+  },
+  {
+    name: 'liveActivity',
+    description: 'Show active agents as a Live Activity / Live Update.',
+    read: getLiveActivityEnabled,
+    write: setLiveActivityEnabled,
   },
   {
     name: 'returnSendsMessage',

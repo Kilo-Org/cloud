@@ -22,6 +22,7 @@ import {
   waitForOwnedSandbox,
 } from './lifecycle.js';
 import { captureLogCursor, readWorkerLogSnapshot } from './idle-stop-evidence.js';
+import { deriveSandboxAllocationId } from '../../src/sandbox-id.js';
 import {
   collectReapEvidence,
   emptyReapEvidence,
@@ -239,10 +240,8 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
       const deadline = Date.now() + input.waitMs;
       let evidence = emptyReapEvidence(input.reapedAllocationRef);
       const evidenceEvents = new Set<unknown>([
-        'physical_committed',
-        'provider_stop',
-        'deadline_fired',
-        'recovery_outcome',
+        'allocation_transition',
+        'native_stop',
         'wrapper_ready',
         'heartbeat',
       ]);
@@ -250,14 +249,26 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         const records = await readWorkerLogSnapshot({
           fromByte: input.fromByte,
           match: record =>
+            record.diagnosticEvent === 'native_stop' ||
             (record.sandboxId === input.sandboxId && evidenceEvents.has(record.diagnosticEvent)) ||
             (input.messageId !== undefined &&
               record.diagnosticEvent === 'accepted_reconciliation' &&
               record.messageId === input.messageId),
         });
+        const stop = records.find(
+          record =>
+            record.diagnosticEvent === 'allocation_transition' &&
+            record.sandboxId === input.sandboxId &&
+            typeof record.allocationId === 'string'
+        );
+        const allocationName =
+          stop && typeof stop.allocationId === 'string'
+            ? await deriveSandboxAllocationId(input.sandboxId, stop.allocationId)
+            : undefined;
         evidence = collectReapEvidence(records, {
           reapedAllocationRef: input.reapedAllocationRef,
           sandboxId: input.sandboxId,
+          ...(allocationName ? { allocationName } : {}),
           ...(input.messageId ? { messageId: input.messageId } : {}),
         });
         if (required(evidence)) return evidence;

@@ -9,6 +9,7 @@ import {
   initialRenameState,
   renameStateReducer,
   titleFromSessionUpdatedEvent,
+  useUserSessionTitlesRevision,
 } from './session-detail-rename-state';
 
 type SessionDetailRenameApi = {
@@ -51,6 +52,10 @@ export function useSessionDetailRename({
 }: Readonly<SessionDetailRenameInput>): SessionDetailRenameApi {
   const { renameSessionAsync } = useSessionMutations();
   const connection = useUserWebConnection();
+  // `getSessionDetailRenameState` reads the durable record of the user's own
+  // titles, so repaint the header when that record hydrates after a cold start
+  // or a rename records a new title.
+  useUserSessionTitlesRevision();
   const [renameState, dispatch] = useReducer(renameStateReducer, initialRenameState());
   const [liveTitle, setLiveTitle] = useState<string | undefined>(undefined);
   const lastSeenServerTitleRef = useRef<string | undefined>(serverTitle);
@@ -110,6 +115,7 @@ export function useSessionDetailRename({
       // what the user actually saw, not a stale server title that may lag
       // behind after a prior successful rename.
       const previousTitle = getSessionDetailRenameState({
+        sessionId,
         fallbackTitle,
         isLoaded,
         serverTitle: effectiveServerTitle,
@@ -135,6 +141,7 @@ export function useSessionDetailRename({
   );
 
   const state = getSessionDetailRenameState({
+    sessionId,
     fallbackTitle,
     isLoaded,
     serverTitle: effectiveServerTitle,

@@ -263,7 +263,13 @@ describe('heartbeat version rollout compatibility', () => {
       protocolVersion: 1,
       handshakeComplete: true,
     });
-    expect(previousHelloResultSchema.parse(helloResult({ scopedCleanupResult: true }))).toEqual({
+    expect(
+      previousHelloResultSchema.parse({
+        protocolVersion: 1,
+        handshakeComplete: true,
+        capabilities: { scopedCleanupResult: true },
+      })
+    ).toEqual({
       protocolVersion: 1,
       handshakeComplete: true,
     });
@@ -300,14 +306,14 @@ describe('heartbeat version rollout compatibility', () => {
     }
   );
 
-  it('exposes scoped cleanup results only after the Worker grants the capability', async () => {
+  it('does not grant scoped cleanup when the Worker omits the capability', async () => {
     const fake = new FakeWebSocket();
     const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
     try {
       const connecting = client.connect();
-      await handshake(fake, helloResult({ scopedCleanupResult: true }));
+      await handshake(fake, helloResult());
       await connecting;
-      expect(client.supportsScopedCleanupResult?.()).toBe(true);
+      expect(client.supportsScopedCleanupResult?.()).toBe(false);
     } finally {
       client.close();
     }
@@ -400,6 +406,7 @@ describe('createSandboxControlClient', () => {
           eventBatches?: boolean;
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
+          nativeRuntimeIdCapture?: boolean;
         };
       };
     };
@@ -419,6 +426,7 @@ describe('createSandboxControlClient', () => {
         eventBatches: true,
         scopedCleanupResult: true,
         workingBranches: true,
+        nativeRuntimeIdCapture: true,
       },
     });
     fake.respond(

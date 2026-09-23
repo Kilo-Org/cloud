@@ -1,8 +1,31 @@
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import type { CreateIntent, ObserveResult } from './physical-lifecycle.js';
+import {
+  CLOUDFLARE_CONTAINERS_INSTANCES,
+  vercelSandboxResourcesSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { z } from 'zod';
+import type {
+  CredentialContainmentRequirements,
+  VercelAllocationConfig,
+} from '../sandbox-state/model/allocation.js';
 
-export type { ObserveResult };
+export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
+  z.object({ provider: z.literal('cloudflare') }).strict(),
+  z
+    .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
+    .strict(),
+  z
+    .object({
+      provider: z.literal('cloudflare-containers'),
+      instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).optional(),
+    })
+    .strict(),
+]);
+
+export type SandboxProviderConfiguration = z.infer<typeof sandboxProviderConfigurationSchema>;
+
+export type ObserveResult = 'active' | 'terminal' | 'unknown';
 
 export type StopResult = 'terminal' | 'retryable';
 
@@ -14,7 +37,16 @@ export function observeFromWrapperObservation(status: WrapperObservationStatus):
   return 'active';
 }
 
-export type ProviderCreateIntent = CreateIntent & {
+/** The canonical create intent plus the target identity fields a provider needs. */
+export type ProviderAllocationIntent = {
+  intentId: string;
+  createdAt: number;
+  allocationName?: string;
+  vercel?: VercelAllocationConfig;
+  containment?: CredentialContainmentRequirements;
+};
+
+export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
   networkPolicy?: VercelSandboxNetworkPolicy;
 };
@@ -26,11 +58,18 @@ export type ProviderObservation = {
 
 export type ProviderAdapter = {
   readonly resumable: boolean;
+  /** The workspace survives a stop; a persistent provider is never destroyed. */
+  readonly persistentWorkspace: boolean;
+  /** `stop` destroys the container rather than only stopping it. */
+  readonly destroysOnStop: boolean;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(ref: string, env: Record<string, string>): Promise<void>;
-  observe(ref: string | null, intent?: CreateIntent | null): Promise<ProviderObservation>;
-  stop(ref: string | null, intent?: CreateIntent | null): Promise<StopResult>;
+  observe(
+    ref: string | null,
+    intent?: ProviderAllocationIntent | null
+  ): Promise<ProviderObservation>;
+  stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
   updateNetworkPolicy?(
@@ -53,6 +92,8 @@ export function createMemoryProviderAdapter(options?: {
 
   return {
     resumable: options?.resumable ?? false,
+    persistentWorkspace: false,
+    destroysOnStop: false,
     get lastLeaseMs() {
       return lastLeaseMs;
     },

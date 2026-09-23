@@ -2757,7 +2757,8 @@
     "optionsExpiredDescription": "Go back and reopen this picker from the previous screen."
   },
   "sessionRow": {
-    "needsInput": "NEEDS INPUT"
+    "needsInput": "NEEDS INPUT",
+    "scheduled": "SCHEDULED"
   },
   "voiceInput": {
     "listening": "Listening...",
@@ -3176,7 +3177,8 @@
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
-    "newestResult": "Newest result"
+    "newestResult": "Newest result",
+    "scheduledWakes": "wakes {{time}}"
   },
   "transcriptionModel": {
     "title": "Transcription model",

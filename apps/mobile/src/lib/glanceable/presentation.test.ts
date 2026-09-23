@@ -6,6 +6,8 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  glanceableCountLines,
+  glanceableScheduledAt,
   glanceableSpokenLabel,
   glanceableSpokenLabelKeys,
   glanceableStatusCopyKey,
@@ -16,7 +18,7 @@ import {
 const NOW = 1_750_000_000_000;
 
 function snapshot(overrides: {
-  sessions?: { status: string }[];
+  sessions?: { status: string; scheduledAt?: string }[];
   status?: GlanceableAgentsSnapshot['status'];
 }): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
@@ -109,6 +111,44 @@ describe('primary rank and locked copy keys', () => {
     );
     expect(glanceableStatusCopyKey(snapshot({ status: 'privacy' }))).toBe('glanceable.privacy');
     expect(glanceableStatusCopyKey(snapshot({ status: 'happy' }))).toBeNull();
+  });
+});
+
+describe('scheduled count and wake time', () => {
+  const WAKE = '2026-09-24T09:00:00.000Z';
+
+  it('draws a scheduled count line with the shared Scheduled key', () => {
+    const lines = glanceableCountLines(
+      snapshot({ sessions: [{ status: 'scheduled', scheduledAt: WAKE }] })
+    );
+    expect(lines).toContainEqual({ key: 'common.scheduled', kind: 'scheduled', count: 1 });
+    expect(lines.map(line => line.kind)).toEqual(['needsInput', 'running', 'scheduled', 'idle']);
+  });
+
+  it('returns the snapshot wake while something is scheduled', () => {
+    expect(
+      glanceableScheduledAt(snapshot({ sessions: [{ status: 'scheduled', scheduledAt: WAKE }] }))
+    ).toBe(WAKE);
+  });
+
+  it('returns no wake when nothing is scheduled', () => {
+    expect(glanceableScheduledAt(snapshot({ sessions: [{ status: 'busy' }] }))).toBeNull();
+  });
+
+  it('drops a carried wake time once the scheduled count falls to zero', () => {
+    const woke = {
+      ...snapshot({ sessions: [{ status: 'scheduled', scheduledAt: WAKE }] }),
+      scheduled: 0,
+    };
+    expect(woke.scheduledAt).toBe(WAKE);
+    expect(glanceableScheduledAt(woke)).toBeNull();
+  });
+
+  it('yields no wake time for a scheduled count whose rows carried none', () => {
+    const noWake = snapshot({ sessions: [{ status: 'scheduled' }] });
+    expect(noWake.scheduled).toBe(1);
+    expect(noWake.scheduledAt).toBeNull();
+    expect(glanceableScheduledAt(noWake)).toBeNull();
   });
 });
 

@@ -28,11 +28,16 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * catalog.
  *
  * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs. `common.scheduled` is the scheduled-session status label the
- * glanceable surfaces and the session list show; it is pending the translation
- * slice.
+ * catalogs. `common.scheduled`, `sessionRow.scheduled` and
+ * `glanceable.scheduledWakes` are the scheduled-session labels the count lines,
+ * the session list and the glanceable surfaces show; they are pending the
+ * translation slice.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>(['common.scheduled']);
+const PENDING_TRANSLATION_KEYS = new Set<string>([
+  'common.scheduled',
+  'sessionRow.scheduled',
+  'glanceable.scheduledWakes',
+]);
 
 /**
  * The three copy keys the feature-flag row renders: `<value> · <reason>` under

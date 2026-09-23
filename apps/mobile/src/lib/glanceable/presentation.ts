@@ -68,6 +68,15 @@ export function primaryGlanceableCount(
   return glanceableCountLines(snapshot).find(line => line.count > 0) ?? null;
 }
 
+/**
+ * The soonest wake a surface renders, or null when nothing is scheduled.
+ * A scheduled count with no usable wake time is representable, so a surface
+ * that draws a time reads this rather than `snapshot.scheduledAt` directly.
+ */
+export function glanceableScheduledAt(snapshot: GlanceableAgentsSnapshot): string | null {
+  return snapshot.scheduled > 0 ? snapshot.scheduledAt : null;
+}
+
 export type GlanceableSurfaceFlags = {
   /** Forced by the auth context when signed out. */
   signedOut?: boolean;

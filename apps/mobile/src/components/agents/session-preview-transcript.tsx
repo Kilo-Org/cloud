@@ -72,7 +72,7 @@ export function SessionPreviewTranscript({
       <EmptyState
         icon={MessageCircle}
         title={t('agentChat.session.emptyTitle')}
-        description={t('agentChat.session.emptyDescription')}
+        description={t('agentChat.session.emptyTranscriptDescription')}
         placement="static"
         className="w-full"
       />

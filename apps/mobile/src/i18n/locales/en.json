@@ -2100,6 +2100,7 @@
       "transcriptAccessibility": "Session transcript",
       "readOnly": "This is a read-only session",
       "emptyDescription": "Send a message below to get started.",
+      "emptyTranscriptDescription": "This session has no messages yet.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "renameAccessibility": "Rename session: {{title}}",

@@ -54,7 +54,10 @@ describe('SessionPreviewOverlay', () => {
     openPreview(targetWith({}));
 
     expect(textWith(renderer, i18n.t('agentChat.session.emptyTitle'))).toHaveLength(1);
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyDescription'))).toHaveLength(1);
+    expect(textWith(renderer, i18n.t('agentChat.session.emptyTranscriptDescription'))).toHaveLength(
+      1
+    );
+    expect(textWith(renderer, i18n.t('agentChat.session.emptyDescription'))).toHaveLength(0);
     expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
   });
 

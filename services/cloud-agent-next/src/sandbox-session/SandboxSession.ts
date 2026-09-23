@@ -3391,16 +3391,14 @@ export class SandboxSession extends DurableObject<Env> {
     if (epoch === null || !metadata || this.deletedWorktreeId) {
       return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     }
-    const admissionInput = metadata.workspace?.worktreeId
-      ? {
-          ...input,
-          finalization: {
-            ...metadata.finalization,
-            ...input.finalization,
-            autoCommit: input.finalization?.autoCommit ?? metadata.finalization?.autoCommit ?? true,
-          },
-        }
-      : input;
+    const admissionInput = {
+      ...input,
+      finalization: {
+        ...metadata.finalization,
+        ...input.finalization,
+        autoCommit: input.finalization?.autoCommit ?? metadata.finalization?.autoCommit ?? true,
+      },
+    };
     const messageId = input.turn.messageId;
     const messages = readRawSessionMessages(this.ctx.storage.kv);
     const existing = messages.find(message => message.messageId === messageId);

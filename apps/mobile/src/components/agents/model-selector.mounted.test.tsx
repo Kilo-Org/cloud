@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   BYOK_MODEL_LABEL,
@@ -48,6 +48,14 @@ vi.mock('@/lib/picker-bridge', () => ({
 vi.mock('@/lib/utils', () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
 }));
+
+// Locale cases switch the shared instance; put English back so the remaining
+// rows keep rendering the English catalog.
+afterEach(async () => {
+  if (i18n.language !== 'en') {
+    await i18n.changeLanguage('en');
+  }
+});
 
 function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionModelOption {
   return {
@@ -214,18 +222,26 @@ describe('ModelPickerOptionRow free badge', () => {
     expect(textStrings(renderer.root)).toContain(freeModelFreeLabel());
   });
 
-  it('renders no free badge for the localized Auto Free name', () => {
-    const renderer = renderRow(
-      gatewayCatalogOption({
-        id: 'kilo-auto/free',
-        displayId: 'kilo-auto/free',
-        name: 'backend name',
-      })
-    );
+  // The badge must be suppressed from the model's identity, not from matching
+  // copy: these nine catalogs name the Auto Free model with a free word the
+  // badge label does not literally contain (ru "Авто Бесплатный" vs
+  // "Бесплатно"), which was the localized half of the duplication.
+  it.each(['be', 'bg', 'bs', 'hr', 'mk', 'ru', 'sr', 'ta', 'uk'])(
+    'renders no free badge for the localized Auto Free name (%s)',
+    async locale => {
+      await i18n.changeLanguage(locale);
+      const renderer = renderRow(
+        gatewayCatalogOption({
+          id: 'kilo-auto/free',
+          displayId: 'kilo-auto/free',
+          name: 'backend name',
+        })
+      );
 
-    expect(textStrings(renderer.root)).toContain(i18n.t('models.auto.free'));
-    expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
-  });
+      expect(textStrings(renderer.root)).toContain(i18n.t('models.auto.free'));
+      expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
+    }
+  );
 });
 
 describe('Auto model labels', () => {

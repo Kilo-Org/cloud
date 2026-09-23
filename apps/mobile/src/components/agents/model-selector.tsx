@@ -246,9 +246,11 @@ export function ModelPickerOptionRow({
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
   const name = autoModelLabel(option.displayId, option.name);
-  // The name may already state the fact ("… (free)", "Auto Free"), so the
-  // badge and its accessibility phrase only render when it does not.
-  const showFreeBadge = free && !byok && !modelNameStatesFree(name);
+  // The name may already state the fact ("… (free)", "Auto Free" in every
+  // locale), so the badge and its accessibility phrase only render when it
+  // does not. The free Auto model is decided by id too: nine catalogs name it
+  // with a free word the badge label does not contain.
+  const showFreeBadge = free && !byok && !modelNameStatesFree(name, option.displayId);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,

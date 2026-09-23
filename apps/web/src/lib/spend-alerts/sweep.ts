@@ -912,14 +912,8 @@ export async function runSpendAlertSweep(
     rederived.length === 0 ? 0 : Math.ceil(rederived.length / SKIP_PATH_ROTATION_TICKS),
     required.length === 0 ? MAX_SCOPE_DECISIONS_PER_RUN : MAX_REMAINDER_FLOOR
   );
-  const requiredSlots = Math.min(
-    required.length,
-    MAX_SCOPE_DECISIONS_PER_RUN - remainderFloor
-  );
-  const remainderSlots = Math.min(
-    rederived.length,
-    MAX_SCOPE_DECISIONS_PER_RUN - requiredSlots
-  );
+  const requiredSlots = Math.min(required.length, MAX_SCOPE_DECISIONS_PER_RUN - remainderFloor);
+  const remainderSlots = Math.min(rederived.length, MAX_SCOPE_DECISIONS_PER_RUN - requiredSlots);
   const decided = [
     ...rotatedSlice(required, now, requiredSlots),
     ...rotatedSlice(rederived, now, remainderSlots),

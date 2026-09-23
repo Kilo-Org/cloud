@@ -116,7 +116,9 @@ describe('pruneSpendAlertHourly', () => {
     });
 
     expect(deleted).toBe(0);
-    expect(queries.filter(query => query.includes('DELETE FROM spend_alert_hourly'))).toHaveLength(1);
+    expect(queries.filter(query => query.includes('DELETE FROM spend_alert_hourly'))).toHaveLength(
+      1
+    );
     expect(await readBucketHours(scopeKey)).toHaveLength(3);
   });
 
@@ -136,7 +138,9 @@ describe('pruneSpendAlertHourly', () => {
     });
 
     expect(deleted).toBe(total);
-    expect(queries.filter(query => query.includes('DELETE FROM spend_alert_hourly'))).toHaveLength(2);
+    expect(queries.filter(query => query.includes('DELETE FROM spend_alert_hourly'))).toHaveLength(
+      2
+    );
     expect(await readBucketHours(scopeKey)).toEqual([]);
   }, 30_000);
 

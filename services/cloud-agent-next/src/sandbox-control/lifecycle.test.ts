@@ -870,6 +870,902 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(setAlarm).toHaveBeenCalled();
   });
 
+  it('replays fence-rejected session events after the wrapper reconnects', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const batchItems = (sequence: number) => [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `replay ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const firstItems = batchItems(1);
+    const secondItems = batchItems(2);
+    const firstForward = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    h.session.receiveSandboxControlEventBatch
+      .mockReturnValueOnce(firstForward.promise)
+      .mockImplementation(async ({ items }: { items: Array<{ receiptId: string }> }) => ({
+        outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+      }));
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      const pendingFirst = h.hooks.onSessionEventBatch?.({ items: firstItems }, first);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      const pendingSecond = h.hooks.onSessionEventBatch?.({ items: secondItems }, first);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      const replacement = { ...first, connectionId: crypto.randomUUID() };
+      h.replaceConnection(replacement);
+      await h.hooks.onHandshakeComplete?.(replacement);
+      await h.hooks.onReady?.(replacement);
+      await vi.advanceTimersByTimeAsync(0);
+
+      firstForward.resolve({
+        outcomes: firstItems.map(item => ({ receiptId: item.receiptId, status: 'applied' })),
+      });
+      await pendingFirst;
+      await pendingSecond;
+      await h.flush();
+
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+        items: secondItems,
+        wrapperInstanceId: first.wrapperInstanceId,
+      });
+      // The first frame's RPC already ran before the fence changed, so the session
+      // may have applied it: replaying it would double-apply a non-receipted event.
+      expect(
+        h.session.receiveSandboxControlEventBatch.mock.calls.filter(
+          ([request]) => request.items === firstItems
+        )
+      ).toHaveLength(1);
+      const recovered = withFields.mock.calls
+        .map(([fields]) => fields as Record<string, unknown>)
+        .filter(fields => fields.diagnosticEvent === 'forward_recovered');
+      expect(recovered.length).toBeGreaterThan(0);
+      expect(Math.max(...recovered.map(fields => Number(fields.recovered)))).toBe(1);
+      expect(recovered.at(-1)).toMatchObject({
+        eventType: 'session.event.batch',
+        sessionId: ROUTE.sessionId,
+      });
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
+  it('keeps the remaining queued session events when the fence changes during their replay', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const batchItems = (sequence: number) => [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `replay ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const batches = [batchItems(1), batchItems(2), batchItems(3), batchItems(4)];
+
+    const firstForward = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    // Hold the first replayed frame until the second fence change so the
+    // tail-retention scenario does not depend on replay scheduling.
+    const replayGate = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    const outcomesFor = (items: Array<{ receiptId: string }>) => ({
+      outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+    });
+    h.session.receiveSandboxControlEventBatch
+      .mockReturnValueOnce(firstForward.promise)
+      .mockReturnValueOnce(replayGate.promise)
+      .mockImplementation(async ({ items }: { items: Array<{ receiptId: string }> }) =>
+        outcomesFor(items)
+      );
+
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    const callsFor = (items: Array<{ receiptId: string }>) =>
+      h.session.receiveSandboxControlEventBatch.mock.calls.filter(
+        ([request]) => request.items === items
+      ).length;
+    try {
+      // Four frames for the same session: the first is held in flight and the
+      // other three queue behind it in the forwarding chain.
+      const pending = batches.map(batch => h.hooks.onSessionEventBatch?.({ items: batch }, first));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      // The fence changes while the first frame's RPC is in flight. That frame was
+      // already delivered, so only the three frames still queued behind it are
+      // retained.
+      h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+      firstForward.resolve(outcomesFor(batches[0]));
+      await Promise.all(pending);
+      await h.flush();
+      expect(callsFor(batches[0])).toBe(1);
+
+      // A handshake replays the retained frames; the first replayed frame is held
+      // in flight.
+      const replacementA = { ...first, connectionId: crypto.randomUUID() };
+      h.replaceConnection(replacementA);
+      await h.hooks.onHandshakeComplete?.(replacementA);
+      await h.hooks.onReady?.(replacementA);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(callsFor(batches[1])).toBe(1);
+
+      // The fence changes again while that replay is in flight. The held frame's RPC
+      // already reached the session DO, so it must not be replayed; the two frames
+      // still queued behind it are retained again.
+      const replacementB = { ...first, connectionId: crypto.randomUUID() };
+      h.replaceConnection(replacementB);
+      await h.hooks.onHandshakeComplete?.(replacementB);
+      await h.hooks.onReady?.(replacementB);
+      await vi.advanceTimersByTimeAsync(0);
+      replayGate.resolve(outcomesFor(batches[1]));
+      await h.flush();
+
+      // Every retained frame reaches the connection that is current when the replay
+      // runs, and no frame is delivered twice: the frame whose replay already ran is
+      // not replayed, and the never-forwarded tail is retained and replayed once.
+      expect(callsFor(batches[1])).toBe(1);
+      expect(callsFor(batches[2])).toBe(1);
+      expect(callsFor(batches[3])).toBe(1);
+      for (const batch of batches.slice(1))
+        expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+          items: batch,
+          wrapperInstanceId: first.wrapperInstanceId,
+        });
+      const recovered = withFields.mock.calls
+        .map(([fields]) => fields as Record<string, unknown>)
+        .filter(fields => fields.diagnosticEvent === 'forward_recovered');
+      expect(Math.max(...recovered.map(fields => Number(fields.recovered)))).toBe(2);
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
+  it('delivers a live frame after the frames replayed for its session', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const batchItems = (sequence: number) => [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `order ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const outcomesFor = (items: Array<{ receiptId: string }>) => ({
+      outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+    });
+    const held = batchItems(1);
+    const retained = [batchItems(2), batchItems(3)];
+    const live = batchItems(4);
+
+    const firstForward = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    const replayGate = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    h.session.receiveSandboxControlEventBatch
+      .mockReturnValueOnce(firstForward.promise)
+      .mockReturnValueOnce(replayGate.promise)
+      .mockImplementation(async ({ items }: { items: Array<{ receiptId: string }> }) =>
+        outcomesFor(items)
+      );
+
+    const pending = [held, ...retained].map(batch =>
+      h.hooks.onSessionEventBatch?.({ items: batch }, first)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The fence changes while the first frame is in flight, so the two frames
+    // queued behind it are retained.
+    h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+    firstForward.resolve(outcomesFor(held));
+    await Promise.all(pending);
+    await h.flush();
+
+    // A handshake starts the replay; its first frame is held in flight.
+    const replacement = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacement);
+    await h.hooks.onHandshakeComplete?.(replacement);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // A live frame for the same session arrives while the replay is in flight.
+    const livePending = h.hooks.onSessionEventBatch?.({ items: live }, replacement);
+    await vi.advanceTimersByTimeAsync(0);
+    const titles = () =>
+      h.session.receiveSandboxControlEventBatch.mock.calls.map(
+        ([request]) =>
+          (request.items[0] as { payload: { properties: { info: { title: string } } } }).payload
+            .properties.info.title
+      );
+    expect(titles()).toEqual(['order 1', 'order 2']);
+
+    replayGate.resolve(outcomesFor(retained[0]));
+    await livePending;
+    await h.flush();
+
+    // The replayed prefix stays contiguous and ahead of the newer live frame, so
+    // the older retained frame is never applied after the live one.
+    expect(titles()).toEqual(['order 1', 'order 2', 'order 3', 'order 4']);
+  });
+
+  it("enqueues a later session's retained prefix before replaying an earlier session", async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    // A second session on the same runtime, retained after the first one so its
+    // entries sit behind the first session's in the replay snapshot.
+    const [firstRoute] = await h.control.listRoutes();
+    if (!firstRoute) throw new Error('Missing route');
+    const secondRoute = {
+      ...firstRoute,
+      sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+      directory: '/workspace/b',
+    };
+    h.records.set('session_routes', [firstRoute, secondRoute]);
+
+    const firstSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const secondSession = {
+      directory: secondRoute.directory,
+      kiloSessionId: secondRoute.kiloSessionId,
+      rootKiloSessionId: secondRoute.kiloSessionId,
+      nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+    };
+    const batchItems = (session: typeof firstSession, sequence: number, title: string) => [
+      {
+        event: 'session.event' as const,
+        session,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: session.kiloSessionId, title } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const outcomesFor = (items: Array<{ receiptId: string }>) => ({
+      outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+    });
+
+    const firstHead = batchItems(firstSession, 1, 's1 head');
+    const firstRetained = [
+      batchItems(firstSession, 2, 's1 a'),
+      batchItems(firstSession, 3, 's1 b'),
+    ];
+    const secondHead = batchItems(secondSession, 1, 's2 head');
+    const secondRetained = [
+      batchItems(secondSession, 2, 's2 a'),
+      batchItems(secondSession, 3, 's2 b'),
+    ];
+    const secondLive = batchItems(secondSession, 4, 's2 live');
+
+    const firstHeadGate = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    const secondHeadGate = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    const firstReplayGate = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    h.session.receiveSandboxControlEventBatch.mockImplementation(
+      async ({ items }: { items: Array<{ receiptId: string }> }) => {
+        if (items === firstHead) return firstHeadGate.promise;
+        if (items === secondHead) return secondHeadGate.promise;
+        if (items === firstRetained[0]) return firstReplayGate.promise;
+        return outcomesFor(items);
+      }
+    );
+
+    const pending = [firstHead, secondHead, ...firstRetained, ...secondRetained].map(batch =>
+      h.hooks.onSessionEventBatch?.({ items: batch }, first)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The fence changes while both heads are in flight, so the frames queued behind
+    // them are retained: the first session's first, then the second session's.
+    h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+    firstHeadGate.resolve(outcomesFor(firstHead));
+    secondHeadGate.resolve(outcomesFor(secondHead));
+    await Promise.all(pending);
+    await h.flush();
+
+    // A handshake starts the replay. The snapshot holds the first session's entries
+    // ahead of the second session's, and the first session's first replay is held in
+    // flight.
+    const replacement = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacement);
+    await h.hooks.onHandshakeComplete?.(replacement);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // A live frame for the second session arrives while the replay is still awaiting
+    // the first session's held frame. The second session's retained prefix was
+    // enqueued up front, so the live frame must queue behind it.
+    const livePending = h.hooks.onSessionEventBatch?.({ items: secondLive }, replacement);
+    await vi.advanceTimersByTimeAsync(0);
+
+    firstReplayGate.resolve(outcomesFor(firstRetained[0]));
+    await livePending;
+    await h.flush();
+
+    const titles = () =>
+      h.session.receiveSandboxControlEventBatch.mock.calls.map(
+        ([request]) =>
+          (request.items[0] as { payload: { properties: { info: { title: string } } } }).payload
+            .properties.info.title
+      );
+    expect(titles().filter(title => title.startsWith('s1'))).toEqual(['s1 head', 's1 a', 's1 b']);
+    // The second session's retained prefix stays ahead of its newer live frame even
+    // though the replay was still busy with the first session when it arrived.
+    expect(titles().filter(title => title.startsWith('s2'))).toEqual([
+      's2 head',
+      's2 a',
+      's2 b',
+      's2 live',
+    ]);
+  });
+
+  it('keeps a retained prefix in order when the control connection is handed off mid-replay', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const batchItems = (sequence: number, title: string) => [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const outcomesFor = (items: Array<{ receiptId: string }>) => ({
+      outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+    });
+    const head = batchItems(1, 'head');
+    const older = batchItems(2, 'older');
+    const newer = batchItems(3, 'newer');
+
+    const headGate = deferred<{ outcomes: Array<{ receiptId: string; status: 'applied' }> }>();
+    h.session.receiveSandboxControlEventBatch
+      .mockReturnValueOnce(headGate.promise)
+      .mockImplementation(async ({ items }: { items: Array<{ receiptId: string }> }) =>
+        outcomesFor(items)
+      );
+
+    const pending = [head, older, newer].map(batch =>
+      h.hooks.onSessionEventBatch?.({ items: batch }, first)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The fence changes while the head frame is in flight, so the two frames queued
+    // behind it are retained in order.
+    h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+    headGate.resolve(outcomesFor(head));
+    await Promise.all(pending);
+    await h.flush();
+    expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+    // The replay starts on a replacement connection, but the control plane is handed
+    // off again while the older frame's route read is still in flight. That frame was
+    // never sent, so it must keep its place ahead of the newer frame rather than be
+    // restored behind it.
+    const replayConnection = { ...first, connectionId: crypto.randomUUID() };
+    const handedOff = { ...first, connectionId: crypto.randomUUID() };
+    const storage = h.storage as unknown as { get: (key: string) => Promise<unknown> };
+    const originalGet = storage.get.bind(storage);
+    let handedOffConnection = false;
+    storage.get = async (key: string) => {
+      if (key === 'session_routes' && !handedOffConnection) {
+        handedOffConnection = true;
+        h.replaceConnection(handedOff);
+        await h.hooks.onHandshakeComplete?.(handedOff);
+      }
+      return originalGet(key);
+    };
+    try {
+      h.replaceConnection(replayConnection);
+      await h.hooks.onHandshakeComplete?.(replayConnection);
+      await h.flush();
+
+      const titles = () =>
+        h.session.receiveSandboxControlEventBatch.mock.calls.map(
+          ([request]) =>
+            (request.items[0] as { payload: { properties: { info: { title: string } } } }).payload
+              .properties.info.title
+        );
+      expect(titles()).toEqual(['head', 'older', 'newer']);
+    } finally {
+      storage.get = originalGet;
+    }
+  });
+
+  it('keeps a restored replayed frame ahead of a live frame admitted after the hand-off', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    // Legacy `session.event` frames carry no receipt, so the session DO cannot
+    // deduplicate them: delivery order is the only guard against stale state.
+    const identity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    const payload = (sequence: number) => ({
+      type: 'session.message.outcome' as const,
+      properties: { messageId: `msg_${sequence}`, status: 'completed' as const },
+    });
+    const held = payload(1);
+    const older = payload(2);
+    const middle = payload(3);
+    const live = payload(4);
+
+    const firstForward = deferred<{ applied: boolean }>();
+    const replayGate = deferred<{ applied: boolean }>();
+    h.session.receiveSandboxControlEvent
+      .mockReturnValueOnce(firstForward.promise)
+      .mockReturnValueOnce(replayGate.promise)
+      .mockImplementation(async () => ({ applied: true }));
+
+    const pending = [held, older, middle].map(event =>
+      h.hooks.onSessionEvent?.(identity, event, first)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The connection is gone while the first frame is in flight, so the two frames
+    // queued behind it are retained.
+    h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+    firstForward.resolve({ applied: true });
+    await Promise.all(pending);
+    await h.flush();
+
+    // A handshake starts the replay; the first replayed frame is held in flight.
+    const replacementA = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacementA);
+    await h.hooks.onHandshakeComplete?.(replacementA);
+    await h.hooks.onReady?.(replacementA);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The fence changes again while that replay is in flight, and a newer live frame
+    // is admitted on the replacement connection before the never-sent tail is
+    // re-driven. The older tail must still be delivered before it.
+    const replacementB = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacementB);
+    await h.hooks.onHandshakeComplete?.(replacementB);
+    await h.hooks.onReady?.(replacementB);
+    const livePending = h.hooks.onSessionEvent?.(identity, live, replacementB);
+    await vi.advanceTimersByTimeAsync(0);
+
+    replayGate.resolve({ applied: true });
+    await livePending;
+    await h.flush();
+
+    const delivered = () =>
+      h.session.receiveSandboxControlEvent.mock.calls.map(
+        ([request]) =>
+          (request.payload as { properties: { messageId: string } }).properties.messageId
+      );
+    expect(delivered()).toEqual(['msg_1', 'msg_2', 'msg_3', 'msg_4']);
+    for (const event of [held, older, middle, live])
+      expect(
+        h.session.receiveSandboxControlEvent.mock.calls.filter(
+          ([request]) => request.payload === event
+        )
+      ).toHaveLength(1);
+  });
+
+  it('keeps a replayed session event that already reached the session DO from being replayed again', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    // A legacy `session.event` frame carries no receipt, so the session DO cannot
+    // deduplicate it: it must be forwarded exactly once.
+    const identity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    const payload = {
+      type: 'session.message.outcome' as const,
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    // Hold the replayed frame in flight so the fence can change mid-replay.
+    const replayGate = deferred<{ applied: boolean }>();
+    h.session.receiveSandboxControlEvent
+      .mockReturnValueOnce(replayGate.promise)
+      .mockImplementation(async () => ({ applied: true }));
+
+    // The frame is queued while the connection is current; the fence changes before
+    // the forwarding chain reaches it, so it is retained without being delivered.
+    await h.hooks.onSessionEvent?.(identity, payload, first);
+    const replacementA = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacementA);
+    await h.hooks.onHandshakeComplete?.(replacementA);
+    await h.hooks.onReady?.(replacementA);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+
+    // The fence changes again while that replay is in flight. The frame's RPC
+    // already ran, so it reached the session DO and must not be delivered twice.
+    const replacementB = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacementB);
+    await h.hooks.onHandshakeComplete?.(replacementB);
+    await h.hooks.onReady?.(replacementB);
+    await vi.advanceTimersByTimeAsync(0);
+    replayGate.resolve({ applied: true });
+    await h.flush();
+
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledWith({
+      identity,
+      payload,
+      wrapperInstanceId: first.wrapperInstanceId,
+    });
+  });
+
+  it('does not restore a replayed frame whose forward ran but was reported unapplied', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const identity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    const payload = {
+      type: 'session.message.outcome' as const,
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+
+    // Hold the replayed frame's RPC in flight so the route can change under it.
+    const replayGate = deferred<{ applied: boolean }>();
+    h.session.receiveSandboxControlEvent
+      .mockReturnValueOnce(replayGate.promise)
+      .mockImplementation(async () => ({ applied: true }));
+
+    // The frame is queued while the connection is current; the fence changes before
+    // the forwarding chain reaches it, so it is retained without being delivered.
+    await h.hooks.onSessionEvent?.(identity, payload, first);
+    const replacementA = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacementA);
+    await h.hooks.onHandshakeComplete?.(replacementA);
+    await h.hooks.onReady?.(replacementA);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+
+    // The route changes while that replay's RPC is in flight, so the forward reports
+    // the frame unapplied even though its RPC already reached the session DO. The
+    // connection stays current, so only the attempted marker keeps the frame from
+    // being replayed on the next handshake.
+    h.records.set('session_routes', [
+      { ...route, nativeRuntimeId: '22222222-2222-4222-8222-222222222222' },
+    ]);
+    replayGate.resolve({ applied: true });
+    await h.flush();
+
+    h.records.set('session_routes', [route]);
+    await h.hooks.onHandshakeComplete?.(replacementA);
+    await h.hooks.onReady?.(replacementA);
+    await h.flush();
+
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains a fence-rejected frame whose forward never reached the session DO', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const items = [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: 'never sent' } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence: 1,
+      },
+    ];
+
+    const replacement = { ...first, connectionId: crypto.randomUUID() };
+
+    // The fence changes during the frame's first storage read, so the forward bails
+    // at its stale-before-enqueue guard without ever attempting the session-DO RPC.
+    const storage = h.storage as unknown as { get: (key: string) => Promise<unknown> };
+    const originalGet = storage.get.bind(storage);
+    let fenced = false;
+    storage.get = async (key: string) => {
+      if (!fenced) {
+        fenced = true;
+        h.replaceConnection(replacement);
+      }
+      return originalGet(key);
+    };
+    try {
+      await h.hooks.onSessionEventBatch?.({ items }, first);
+      await h.flush();
+
+      // The forward never reached the destination, so the fence rejection retained
+      // the frame instead of treating it as already applied.
+      expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
+
+      // The retained frame is replayed for the connection that is current when the
+      // handshake settles instead of being silently lost, and it keeps the frame's
+      // original wrapper instance so the session DO's runtime gate stays in charge.
+      await h.hooks.onHandshakeComplete?.(replacement);
+      await h.hooks.onReady?.(replacement);
+      await h.flush();
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+        items,
+        wrapperInstanceId: first.wrapperInstanceId,
+      });
+    } finally {
+      storage.get = originalGet;
+    }
+  });
+
   it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {
     const h = await harness();
     const status = () => h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' });
@@ -4115,7 +5011,9 @@ describe('SandboxControl lifecycle boundaries', () => {
       );
 
       late.resolve({ applied: true });
-      await expect(first).resolves.toEqual({ applied: true });
+      // The frame reached the session DO before the deadline check failed, so it is
+      // reported as already forwarded and must not be retained for replay.
+      await expect(first).resolves.toEqual({ applied: false, retryable: true, forwarded: true });
       expect(withFields).toHaveBeenCalledWith(
         expect.objectContaining({
           diagnosticEvent: 'forward_run',

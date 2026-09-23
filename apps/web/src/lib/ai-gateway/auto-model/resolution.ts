@@ -79,10 +79,10 @@ export async function getAutoFreeCandidates(
   const candidates = new Set<string>();
   for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
-      const exclusiveModel = findKiloExclusiveModel(model);
+      const kiloModel = findKiloExclusiveModel(model);
       if (
-        exclusiveModel &&
-        (apiKind === null || exclusiveModel.provider.supportedChatApis.some(k => k === apiKind))
+        kiloModel &&
+        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
       ) {
         candidates.add(model);
       }

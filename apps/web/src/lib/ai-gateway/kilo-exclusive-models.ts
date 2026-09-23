@@ -1,23 +1,23 @@
 import 'server-only';
 
-import type {
-  KiloExclusiveModel,
-  Pricing,
-  PricingTiers,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   CLAUDE_OPUS_4_8_STEALTH_MODEL_ID,
   CLAUDE_OPUS_STEALTH_MODEL_ID,
   CLAUDE_SONNET_STEALTH_MODEL_ID,
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import {
   GEMMA_4_26B_A4B_IT_ID,
   GEMMA_4_26B_A4B_IT_FREE_ID,
 } from '@/lib/ai-gateway/providers/google';
+import type {
+  KiloExclusiveModel,
+  Pricing,
+  PricingTiers,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { type ProviderId } from '@/lib/ai-gateway/providers/types';
+import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {
@@ -213,16 +213,6 @@ export const stepfun_37_flash_free_model: KiloExclusiveModel = {
   inference_provider_restriction: ['stepfun'],
 };
 
-export const kiloExclusiveModels: KiloExclusiveModel[] = [
-  gemma_4_26b_a4b_it_free_model,
-  qwen36_plus_stealth_model,
-  claude_opus_4_8_stealth_model,
-  claude_opus_4_7_stealth_model,
-  claude_sonnet_4_6_stealth_model,
-  claude_opus_4_6_stealth_model,
-  stepfun_37_flash_free_model,
-];
-
 export function isKiloExclusiveFreeModel(model: string): boolean {
   return kiloExclusiveModels.some(
     m => m.public_id === model && m.status !== 'disabled' && !m.pricing
@@ -238,6 +228,16 @@ export function isKiloExclusiveRateLimitedModel(model: string): boolean {
     m => m.public_id === model && m.status !== 'disabled' && m.flags.includes('rate-limited')
   );
 }
+
+export const kiloExclusiveModels = [
+  gemma_4_26b_a4b_it_free_model,
+  qwen36_plus_stealth_model,
+  claude_opus_4_8_stealth_model,
+  claude_opus_4_7_stealth_model,
+  claude_sonnet_4_6_stealth_model,
+  claude_opus_4_6_stealth_model,
+  stepfun_37_flash_free_model,
+] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));

@@ -4,8 +4,8 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import {
-  isKiloExclusiveModel,
   findKiloExclusiveModel,
+  isKiloExclusiveModel,
 } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
@@ -279,14 +279,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     };
   }
 
-  const exclusiveModel = findKiloExclusiveModel(requestedModel);
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
 
   // Model experiment routing for dedicated preview public ids. Runs before
   // the custom-LLM (`kilo-internal/...`) and the `kiloExclusiveModels` lookup
   // so an experimented public id never falls through to OpenRouter/Vercel.
   const experimented = await isPublicIdExperimented(requestedModel);
   if (experimented === true) {
-    if (exclusiveModel) {
+    if (kiloExclusiveModel) {
       throw new Error(
         `Configuration error: ${requestedModel} cannot be both an experiment and a Kilo-exclusive model`
       );
@@ -330,7 +330,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   const eligibleForVercelRouting =
-    !exclusiveModel || exclusiveModel.flags.includes('vercel-routing');
+    !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
   const resolveRoutingProviderConfig = async () =>
     (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
@@ -353,7 +353,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider: exclusiveModel?.provider ?? OPENROUTER,
+    provider: kiloExclusiveModel?.provider ?? OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };

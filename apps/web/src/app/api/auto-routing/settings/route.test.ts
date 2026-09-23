@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import type { AutoRoutingSettingsResponse } from '@kilocode/auto-routing-contracts';
+import type * as KiloExclusiveModels from '@/lib/ai-gateway/kilo-exclusive-models';
 import { NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
@@ -32,6 +33,9 @@ jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => ({
+  gemma_4_26b_a4b_it_free_model: jest.requireActual<typeof KiloExclusiveModels>(
+    '@/lib/ai-gateway/kilo-exclusive-models'
+  ).gemma_4_26b_a4b_it_free_model,
   kiloExclusiveModels: [
     { public_id: 'kilo/hidden-model', status: 'hidden' },
     { public_id: 'kilo/public-model', status: 'public' },

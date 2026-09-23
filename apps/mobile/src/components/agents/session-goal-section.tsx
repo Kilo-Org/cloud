@@ -28,7 +28,8 @@ type SessionGoalSectionProps = {
   /**
    * Sits at the row end, between the goal pressable and the chevron. The PR
    * link rides here so the goal status and the pull request share one row;
-   * with no goal the row renders the trailing control alone.
+   * with no goal the row renders the trailing control alone, reserving the
+   * chevron's box so the control keeps one right edge across both.
    */
   trailing?: ReactNode;
 };
@@ -54,8 +55,9 @@ type SessionGoalSectionProps = {
  *
  * The row is shared with the pull-request link (`trailing`), which keeps the
  * header to two rows. With no goal it renders the trailing control in the same
- * shell without the chevron or the goal accessibility state, so a PR-only
- * session still reserves the same row height.
+ * shell without the chevron or the goal accessibility state, reserving the
+ * chevron's 24px box so the control's right edge is the same one it has beside
+ * a goal (the row's `gap-2` adds the same 8px in both).
  */
 export function SessionGoalSection({
   goal,
@@ -71,11 +73,17 @@ export function SessionGoalSection({
     <View className="ml-auto shrink-0 self-start pt-0.5">{trailing}</View>
   ) : null;
 
+  // The disclosure chevron is `h-6 w-6`; a PR-only row still reserves that box
+  // so the trailing control's right edge matches the goal+PR row instead of
+  // sliding 24px (plus the row's 8px gap) closer to the row edge.
+  const chevronGutter = trailing ? <View className="h-6 w-6 shrink-0" /> : null;
+
   if (!goal) {
     return (
       <DisclosureLayout>
         <View className="min-h-12 flex-row items-start gap-2 border-b border-hair-soft px-4 pt-0.5 pb-2">
           {trailingSlot}
+          {chevronGutter}
         </View>
       </DisclosureLayout>
     );

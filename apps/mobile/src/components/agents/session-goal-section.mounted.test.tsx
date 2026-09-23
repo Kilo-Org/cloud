@@ -130,6 +130,49 @@ function hostAncestor(node: ReactTestInstance): ReactTestInstance | null {
   return current;
 }
 
+/**
+ * The host box a row child renders to: the child itself when it is already a
+ * host element, otherwise the box a mounted component (the chevron) renders.
+ */
+function rowChildBox(child: ReactTestInstance | string): ReactTestInstance | null {
+  if (typeof child === 'string') {
+    return null;
+  }
+  if (typeof child.type === 'string') {
+    return child;
+  }
+  const inner = child.children.find(
+    (rendered): rendered is ReactTestInstance => typeof rendered !== 'string'
+  );
+  return inner ?? null;
+}
+
+/**
+ * The boxes the row keeps after the trailing control: the disclosure chevron
+ * beside a goal, the reserved gutter on a PR-only row. Both are 24px wide, so
+ * the control ends on one right edge whether or not a goal is shown.
+ */
+function trailingReserve(control: ReactTestInstance): string[] {
+  const slot = hostAncestor(control);
+  if (slot == null) {
+    throw new Error('the trailing control is not inside a row slot');
+  }
+  const row = hostAncestor(slot);
+  if (row == null) {
+    throw new Error('the trailing slot is not inside a row');
+  }
+  const children = row.children;
+  const index = children.indexOf(slot);
+  if (index === -1) {
+    throw new Error('the trailing slot is not a row child');
+  }
+  return children
+    .slice(index + 1)
+    .map(child => rowChildBox(child))
+    .filter((box): box is ReactTestInstance => box != null)
+    .map(box => String(box.props.className));
+}
+
 /** The rotation shared value is the only one the section creates; each render
  *  asks for it again, so the last holder belongs to the newest commit. */
 function rotationValue(): unknown {
@@ -218,8 +261,8 @@ describe('SessionGoalSection disclosure', () => {
     expect(String(slot?.props.className)).toContain('shrink-0');
     expect(String(slot?.props.className)).toContain('self-start');
     expect(String(slot?.props.className)).toContain('pt-0.5');
-    // `ml-auto` keeps the PR link at the row's trailing edge here too, so the
-    // control does not move between a goal session and a PR-only one.
+    // `ml-auto` keeps the PR link at the row's trailing edge, and the chevron
+    // that follows it is the only box left of that edge.
     expect(String(slot?.props.className)).toContain('ml-auto');
     // The goal pressable still owns the tap target for the whole row.
     expect(
@@ -248,6 +291,32 @@ describe('SessionGoalSection disclosure', () => {
     // the control does not jump to the row's leading edge on a PR-only session.
     const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
     expect(String(slot?.props.className)).toContain('ml-auto');
+  });
+
+  it('keeps the trailing control on one right edge with and without a goal', () => {
+    const withGoal = mountSection({ trailing: trailingControl() });
+    // Beside a goal only the 24px disclosure chevron follows the control, so
+    // the control's right edge sits one chevron plus the row's 8px gap from the
+    // row edge.
+    const goalReserve = trailingReserve(
+      withGoal.root.findByProps({ accessibilityLabel: TRAILING_LABEL })
+    );
+    expect(goalReserve).toHaveLength(1);
+    expect(goalReserve[0]).toContain('w-6');
+    expect(goalReserve[0]).toContain('shrink-0');
+
+    act(() => mounted?.unmount());
+    reanimated.sharedValues = [];
+
+    const withoutGoal = mountSection({ goal: null, trailing: trailingControl() });
+    // A PR-only row reserves that same box, so the control's right edge does
+    // not move by the chevron's width plus the row's gap between the two.
+    const prOnlyReserve = trailingReserve(
+      withoutGoal.root.findByProps({ accessibilityLabel: TRAILING_LABEL })
+    );
+    expect(prOnlyReserve).toHaveLength(1);
+    expect(prOnlyReserve[0]).toContain('w-6');
+    expect(prOnlyReserve[0]).toContain('shrink-0');
   });
 
   it('calls onToggleCollapsed from the disclosure pressable', () => {

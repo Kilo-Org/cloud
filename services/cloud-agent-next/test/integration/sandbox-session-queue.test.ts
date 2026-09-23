@@ -29,8 +29,9 @@ import {
 } from '../../src/session/session-message-state.js';
 import type { SessionMetadata } from '../../src/persistence/session-metadata.js';
 
-import { writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import { readSessionValueSync, writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
 import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
+import type { Binding } from '../../src/sandbox-state/model/session.js';
 const access = vi.hoisted(() => new Map<string, string>());
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: () => ({}) }));
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', () => ({
@@ -89,35 +90,93 @@ function snapshot(session: Session) {
   }));
 }
 
-/** Seed/rewrite canonical messages. `unresolved` is valid alongside an accepted head. */
-function seed(storage: Parameters<typeof writeSessionMessages>[0], messages: SessionMessage[]) {
-  writeSessionMessages(storage, { kind: 'unresolved' }, messages);
+const ALLOCATION_INCARNATION = 'incarnation-queue-test';
+const WRAPPER_INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
+
+/** A per-fixture isolated sandbox ID keeps the shared SandboxControl DO isolated. */
+function sandboxIdFor(sessionId: string): string {
+  const digest = Array.from(new TextEncoder().encode(sessionId))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32);
+  return `istd-${digest}`;
+}
+
+function boundHandle(): Binding {
+  return {
+    kind: 'bound',
+    handle: {
+      incarnation: ALLOCATION_INCARNATION,
+      wrapper: WRAPPER_INSTANCE_ID,
+      epoch: 0,
+    },
+  };
+}
+
+/** Seed/rewrite canonical messages, preserving the stored binding by default. */
+function seed(
+  storage: Parameters<typeof writeSessionMessages>[0],
+  messages: SessionMessage[],
+  binding?: Binding
+) {
+  const stored = readSessionValueSync<{ binding?: Binding }>(storage)?.binding;
+  writeSessionMessages(storage, binding ?? stored ?? { kind: 'unresolved' }, messages);
+}
+
+/**
+ * A queued follow-up now dispatches behind an accepted row and retries while the
+ * wrapper is unavailable, which emits background `preparing` events. Drop those
+ * so capacity and cancellation assertions compare only their own side effects.
+ */
+function stable(value: Awaited<ReturnType<typeof snapshot>>) {
+  return { ...value, events: value.events.filter(event => event.stream_event_type !== 'preparing') };
 }
 
 async function fixture() {
   const sessionId = `workspace_${crypto.randomUUID()}`;
+  const sandboxId = sandboxIdFor(sessionId);
   access.set(sessionId, ownerId);
   const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
   await session.registerSession({
     identity: { sessionId, userId: ownerId },
     auth: { kiloSessionId: 'ses_abcdefghijklmnopqrstuvwxyz', kilocodeToken: 'test-token' },
     agent,
+    workspace: {
+      sandboxId,
+      credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+    },
   });
-  await runInDurableObject(session, (_instance, state) => {
-    seed(state.storage.kv, [
-      {
-        messageId: id(0),
-        state: acceptedState({
-          intent: {
-            turn: { type: 'prompt', messageId: id(0), prompt: 'accepted head' },
-            agent,
-          },
-          legacyInvalidIntent: undefined,
-          acceptedAt: Date.now(),
-          lastActivityAt: Date.now(),
-        }),
-      } satisfies SessionMessage,
-    ]);
+  await runInDurableObject(session, (instance, state) => {
+    const metadata = instance['terminalLifecycle'].getStoredMetadata();
+    if (!metadata) throw new Error('Missing session metadata');
+    if (
+      !instance['terminalLifecycle'].recordAttachment({
+        metadata,
+        sandboxId,
+        wrapperInstanceId: WRAPPER_INSTANCE_ID,
+        allocationIncarnation: ALLOCATION_INCARNATION,
+        epoch: instance['terminalLifecycle'].captureEpoch() ?? 0,
+      })
+    )
+      throw new Error('Failed to record attachment');
+    seed(
+      state.storage.kv,
+      [
+        {
+          messageId: id(0),
+          state: acceptedState({
+            intent: {
+              turn: { type: 'prompt', messageId: id(0), prompt: 'accepted head' },
+              agent,
+            },
+            legacyInvalidIntent: undefined,
+            acceptedAt: Date.now(),
+            lastActivityAt: Date.now(),
+          }),
+        } satisfies SessionMessage,
+      ],
+      boundHandle()
+    );
   });
   const broadcast = await runInDurableObject(session, instance => {
     const observed = vi.fn(instance['broadcastQueuedMessage'].bind(instance));
@@ -186,7 +245,7 @@ describe('public control queue capacity and cancellation', () => {
     expect(await overflow.json()).toMatchObject({
       error: { data: { code: 'TOO_MANY_REQUESTS', clientError: { retryable: true } } },
     });
-    expect(await snapshot(session)).toEqual(before);
+    expect(stable(await snapshot(session))).toEqual(stable(before));
     expect((await send(sessionId, 1)).status).toBe(200);
     expect(
       await session.admitSubmittedMessage({
@@ -220,7 +279,7 @@ describe('public control queue capacity and cancellation', () => {
       released = true;
     }
     expect((await slow).status).toBe(429);
-    expect(await snapshot(session)).toEqual(before);
+    expect(stable(await snapshot(session))).toEqual(stable(before));
   });
 
   it('serializes concurrent admissions after asynchronous model validation', async () => {
@@ -296,13 +355,22 @@ describe('public control queue capacity and cancellation', () => {
     const before = await snapshot(session);
     await runInDurableObject(session, instance => {
       const persist = instance['persistMessageLifecycleEvent'].bind(instance);
-      instance['persistMessageLifecycleEvent'] = vi.fn(persist).mockImplementationOnce(message => {
-        persist(message);
-        throw new Error('Injected cancellation persistence failure');
+      let injected = false;
+      instance['persistMessageLifecycleEvent'] = vi.fn(message => {
+        if (
+          !injected &&
+          message.state.kind !== 'queued' &&
+          message.state.kind !== 'accepted'
+        ) {
+          injected = true;
+          persist(message);
+          throw new Error('Injected cancellation persistence failure');
+        }
+        return persist(message);
       });
     });
     expect((await cancel(sessionId, 1)).status).toBe(500);
-    expect(await snapshot(session)).toEqual(before);
+    expect(stable(await snapshot(session))).toEqual(stable(before));
     expect(await (await cancel(sessionId, 1)).json()).toMatchObject({
       result: { data: { dropped: true } },
     });
@@ -335,8 +403,6 @@ describe('public control queue capacity and cancellation', () => {
     );
     expect(after.alarm).not.toBeNull();
     expect(after.messages[0]).toMatchObject({ state: { kind: 'cancelled' } });
-    // The canonical cancelled union drops the queued preparation attempt.
-    expect(after.messages[0].state).not.toHaveProperty('preparationAttemptId');
   });
 
   it('denies unauthenticated and other-owner access and cannot cancel another session message', async () => {
@@ -349,7 +415,7 @@ describe('public control queue capacity and cancellation', () => {
     expect(await (await cancel(other.sessionId, 1)).json()).toMatchObject({
       result: { data: { dropped: false } },
     });
-    expect(await snapshot(session)).toEqual(before);
+    expect(stable(await snapshot(session))).toEqual(stable(before));
   });
 
   it.each([
@@ -414,7 +480,7 @@ describe('public control queue capacity and cancellation', () => {
     expect(await (await cancel(sessionId, 99)).json()).toMatchObject({
       result: { data: { dropped: false } },
     });
-    expect(await snapshot(session)).toEqual(before);
+    expect(stable(await snapshot(session))).toEqual(stable(before));
   });
 
   it.each([

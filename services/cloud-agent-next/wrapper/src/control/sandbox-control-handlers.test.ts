@@ -15,6 +15,7 @@ import {
   type SessionGitSummaryResult,
 } from '../../../src/shared/sandbox-control-protocol';
 import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
+import { STABLE_ROOT_IDLE_MS } from '../lifecycle';
 import { materializeMessageAttachments } from '../session-bootstrap';
 import { runProcess, withTimeoutAndAbort } from '../utils';
 import { applySessionAttach } from './apply-attach';
@@ -120,6 +121,15 @@ const kilo: WorktreeKiloAuth = {
 };
 
 let homeRoot: string;
+
+/** Root idle plus the 3s stable-idle window: the only real seal. */
+async function sealRootIdle(
+  handlerDeps: HandlerDeps,
+  kiloSessionId = session.kiloSessionId
+): Promise<void> {
+  handlerDeps.operations.observeRootEvent({ type: 'session.idle', sessionID: kiloSessionId });
+  await Bun.sleep(STABLE_ROOT_IDLE_MS + 50);
+}
 
 function deps(
   overrides: Partial<HandlerDeps> & { kiloClient?: WrapperKiloClient } = {},
@@ -780,7 +790,7 @@ describe('handleControlRequest', () => {
     ).toEqual({ ok: true, result: { success: true } });
     expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
       ok: true,
-      result: { status: 'already_idle' },
+      result: { status: 'aborted', quiescent: true },
     });
   });
 
@@ -925,7 +935,7 @@ describe('handleControlRequest', () => {
     }
   });
 
-  it('does not send an unfenced abort when the wrapper owns no work', async () => {
+  it('confirms an idle Kilo stop by aborting when the wrapper owns no work', async () => {
     const aborted: string[] = [];
     const kiloClient = fakeKilo({
       abortSession: async opts => {
@@ -935,8 +945,8 @@ describe('handleControlRequest', () => {
     });
 
     const result = await handleControlRequest('session.abort', session, {}, deps({ kiloClient }));
-    expect(result).toEqual({ ok: true, result: { status: 'already_idle' } });
-    expect(aborted).toEqual([]);
+    expect(result).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
+    expect(aborted).toEqual([session.kiloSessionId]);
   });
 
   it('detaches the terminal only when abort cancels the current task', async () => {
@@ -986,12 +996,12 @@ describe('handleControlRequest', () => {
           { messageId: promptPayload.messageId },
           handlerDeps
         )
-      ).toEqual({ ok: true, result: { status: 'aborted' } });
+      ).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
       expect(detached).toEqual([session]);
 
       expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
         ok: true,
-        result: { status: 'already_idle' },
+        result: { status: 'aborted', quiescent: true },
       });
       expect(detached).toEqual([session]);
     } finally {
@@ -1263,7 +1273,7 @@ describe('handleControlRequest', () => {
       }
       expect(await handleControlRequest('session.abort', identity, {}, handlerDeps)).toEqual({
         ok: true,
-        result: { status: 'already_idle' },
+        result: { status: 'aborted', quiescent: true },
       });
       expect(await handleControlRequest('session.sync', identity, {}, handlerDeps)).toEqual({
         ok: true,
@@ -1317,6 +1327,7 @@ describe('handleControlRequest', () => {
           'questions',
           'reject',
         ]),
+        'abort',
         'status',
         'questions',
         'permissions',
@@ -1381,7 +1392,7 @@ describe('handleControlRequest', () => {
         );
         expect(await aborting).toEqual({
           ok: true,
-          result: { status: 'aborted' },
+          result: { status: 'aborted', quiescent: true },
         });
         expect(calls.at(-2)).toEqual({
           directory: identity.directory,
@@ -1585,7 +1596,7 @@ describe('handleControlRequest', () => {
     running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
     expect(await aborting).toEqual({
       ok: true,
-      result: { status: 'aborted' },
+      result: { status: 'aborted', quiescent: true },
     });
     expect(aborted).toEqual([session.kiloSessionId, sibling.kiloSessionId]);
     expect(events).toEqual([
@@ -2515,6 +2526,75 @@ describe('owned control execution', () => {
     expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({ state: 'idle', pendingMessages: 0 });
   });
 
+  it('admits a connected follow-up with promptAsync and keeps one operation', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const asyncPrompts: string[] = [];
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async opts => {
+          asyncPrompts.push(opts.messageId);
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    expect(record?.messageId).toBe('msg_1');
+
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps
+      )
+    ).toEqual({ ok: true, result: { messageId: 'next', status: 'accepted' } });
+    expect(handlerDeps.operations.counts().active).toBe(1);
+    expect(handlerDeps.operations.active(session.kiloSessionId)).toBe(record);
+    expect(asyncPrompts).toEqual(['next']);
+    expect(record?.admittedMessageIds()).toEqual(['msg_1', 'next']);
+
+    // The first prompt returns while the follow-up is unfinished: no outcome.
+    running.resolve(completion());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(events).toEqual([]);
+    expect(record?.locallyComplete).toBe(false);
+
+    // The batch seals on root idle plus stable idle, then completes once.
+    record?.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await waitForTasks(handlerDeps);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ]);
+  });
+
+  it('rejects a follow-up on an aborted active operation', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        abortSession: async () => true,
+      }),
+    });
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    handlerDeps.operations.active(session.kiloSessionId)?.cancel('User stop', 'cancelled');
+
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false, error: { code: 'session_busy', retryable: true } });
+
+    running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    await waitForTasks(handlerDeps);
+  });
+
   it('emits one message-scoped outcome even when completion precedes delivery of the acknowledgement', async () => {
     const releaseAck = Promise.withResolvers<void>();
     const events: SessionEventPayload[] = [];
@@ -2690,7 +2770,7 @@ describe('owned control execution', () => {
       await started.promise;
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'older' }, handlerDeps)
-      ).toEqual({ ok: true, result: { status: 'already_idle' } });
+      ).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
       expect(
         await handleControlRequest(
           'session.abort',
@@ -2720,7 +2800,7 @@ describe('owned control execution', () => {
       expect(handlerDeps.operations.active(session.kiloSessionId)?.messageId).toBe('newer');
       remoteStopped.resolve(true);
       running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
-      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
       expect(events).toEqual([
         {
           type: 'session.message.outcome',
@@ -2749,19 +2829,12 @@ describe('owned control execution', () => {
       expect(replacementTask?.signal.aborted).toBe(false);
       expect(finalized).toEqual([]);
       expect(events).toHaveLength(1);
-      expect(
-        await handleControlRequest(
-          'session.prompt',
-          session,
-          { ...payload, messageId: 'third' },
-          handlerDeps
-        )
-      ).toMatchObject({ ok: false });
       const nextCompletion = completion();
       replacement.resolve({
         ...nextCompletion,
         info: { ...nextCompletion.info, id: 'assistant_next' },
       });
+      await sealRootIdle(handlerDeps);
       await waitForTasks(handlerDeps);
       expect(finalized).toEqual(['assistant_next']);
       expect(events).toHaveLength(2);
@@ -3799,6 +3872,7 @@ describe('control finalization and compact', () => {
             handlerDeps
           )
         ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+        await sealRootIdle(handlerDeps, identity.kiloSessionId);
         await waitForTasks(handlerDeps);
         const committed = events.find(event => event.type === 'autocommit_completed')?.properties;
         const branch = editRepository ? `session/${kilo.scopeId}` : 'work';
@@ -3839,44 +3913,43 @@ describe('control finalization and compact', () => {
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
-    }
+    },
+    20_000
   );
 
-  it('retains ownership and the finalizing heartbeat through auto-commit and condensation', async () => {
-    const committing = Promise.withResolvers<void>();
-    const committed = Promise.withResolvers<{ success: boolean }>();
+  it('finishes an in-flight auto-commit, waits for a new seal, then re-commits the enlarged set', async () => {
+    const commits: Array<PromiseWithResolvers<{ success: boolean }>> = [];
     const condensing = Promise.withResolvers<void>();
     const condensed = Promise.withResolvers<boolean>();
     const events: SessionEventPayload[] = [];
+    let condensingStarted = false;
     const handlerDeps = deps({
-      runAutoCommit: async options => {
-        expect(options.workspacePath).toBe(session.directory);
-        expect(options.messageId).toBe('assistant_1');
-        expect(options.userMessageId).toBe('msg_1');
-        expect(options.signal?.aborted).toBe(false);
+      runAutoCommit: options => {
+        const pending = Promise.withResolvers<{ success: boolean }>();
+        commits.push(pending);
         options.onEvent({
           streamEventType: 'autocommit_started',
           timestamp: new Date().toISOString(),
           data: { message: 'Committing', messageId: options.messageId },
         });
-        committing.resolve();
-        const result = await committed.promise;
-        options.onEvent({
-          streamEventType: 'autocommit_completed',
-          timestamp: new Date().toISOString(),
-          data: { success: result.success, message: 'Committed', messageId: options.messageId },
+        return pending.promise.then(result => {
+          options.onEvent({
+            streamEventType: 'autocommit_completed',
+            timestamp: new Date().toISOString(),
+            data: { success: result.success, message: 'Committed', messageId: options.messageId },
+          });
+          return result;
         });
-        return result;
       },
       kiloClient: fakeKilo({
         summarizeSession: options => {
           expect(options).toMatchObject({
             sessionId: session.kiloSessionId,
             directory: session.directory,
-            model: { providerID: 'kilo', modelID: promptPayload.agent.model },
             auto: true,
             signal: expect.any(AbortSignal),
           });
+          condensingStarted = true;
           condensing.resolve();
           return condensed.promise;
         },
@@ -3890,15 +3963,18 @@ describe('control finalization and compact', () => {
     expect(
       await handleControlRequest('session.prompt', session, payload, handlerDeps)
     ).toMatchObject({ ok: true });
-    await committing.promise;
+    // Auto-commit starts only after a real 3s root-idle seal.
+    await sealRootIdle(handlerDeps);
+    while (commits.length < 1) await new Promise(resolve => setImmediate(resolve));
     expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({
       state: 'finalizing',
       pendingMessages: 1,
-      sessions: [{ state: 'finalizing', waitingOn: 'finalizing' }],
     });
     expect(
       await handleControlRequest('session.prompt', session, payload, handlerDeps)
     ).toMatchObject({ ok: true, result: { status: 'existing' } });
+
+    // A follow-up during auto-commit is admitted, not rejected.
     expect(
       await handleControlRequest(
         'session.prompt',
@@ -3906,14 +3982,25 @@ describe('control finalization and compact', () => {
         { ...payload, messageId: 'next' },
         handlerDeps
       )
-    ).toMatchObject({ ok: false });
-    committed.resolve({ success: true });
-    await condensing.promise;
+    ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'accepted' } });
+
+    // The in-flight commit finishes; condensation and publication wait for a
+    // new stable idle that includes the follow-up.
+    commits[0]?.resolve({ success: true });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(commits).toHaveLength(1);
+    expect(condensingStarted).toBe(false);
     expect(events.some(event => event.type === 'session.message.outcome')).toBe(false);
-    expect(buildHeartbeatPayload(handlerDeps).state).toBe('finalizing');
+
+    await sealRootIdle(handlerDeps);
+    while (commits.length < 2) await new Promise(resolve => setImmediate(resolve));
+    commits[1]?.resolve({ success: true });
+    await condensing.promise;
     condensed.resolve(true);
     await waitForTasks(handlerDeps);
     expect(events.map(event => event.type)).toEqual([
+      'autocommit_started',
+      'autocommit_completed',
       'autocommit_started',
       'autocommit_completed',
       'status',
@@ -3921,6 +4008,370 @@ describe('control finalization and compact', () => {
       'session.message.outcome',
     ]);
     expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+  }, 20_000);
+
+  it('does not start auto-commit before a real 3s root-idle seal', async () => {
+    let finalizations = 0;
+    const handlerDeps = deps({
+      runAutoCommit: async () => {
+        finalizations += 1;
+        return { success: true };
+      },
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    await new Promise(resolve => setImmediate(resolve));
+    expect(finalizations).toBe(0);
+
+    // Root idle alone is not a seal; the 3s stable window must elapse.
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(100);
+    expect(finalizations).toBe(0);
+
+    await Bun.sleep(STABLE_ROOT_IDLE_MS);
+    await waitForTasks(handlerDeps);
+    expect(finalizations).toBe(1);
+  });
+
+  it('seals after root idle even when session.turn.close and other events follow', async () => {
+    let finalizations = 0;
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      runAutoCommit: async () => {
+        finalizations += 1;
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.turn.close',
+      sessionID: session.kiloSessionId,
+    });
+    handlerDeps.operations.observeRootEvent({
+      type: 'message.updated',
+      sessionID: session.kiloSessionId,
+    });
+
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await waitForTasks(handlerDeps);
+    expect(finalizations).toBe(1);
+    expect(events.at(-1)).toEqual({
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    });
+  });
+
+  it('resets the seal timer when the root goes busy again', async () => {
+    let finalizations = 0;
+    const handlerDeps = deps({
+      runAutoCommit: async () => {
+        finalizations += 1;
+        return { success: true };
+      },
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(500);
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.status',
+      sessionID: session.kiloSessionId,
+      properties: { status: { type: 'busy' } },
+    });
+    // The busy event cancelled the idle window: no seal at the original 3s.
+    await Bun.sleep(STABLE_ROOT_IDLE_MS);
+    expect(finalizations).toBe(0);
+
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await waitForTasks(handlerDeps);
+    expect(finalizations).toBe(1);
+  }, 20_000);
+
+  it('resets the seal timer when a follow-up is admitted after root idle', async () => {
+    let finalizations = 0;
+    const handlerDeps = deps({
+      runAutoCommit: async () => {
+        finalizations += 1;
+        return { success: true };
+      },
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(500);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps
+    );
+    // The admission cancelled the idle window: no seal for the earlier set.
+    await Bun.sleep(STABLE_ROOT_IDLE_MS);
+    expect(finalizations).toBe(0);
+
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await waitForTasks(handlerDeps);
+    expect(finalizations).toBe(1);
+  }, 20_000);
+
+  it('finalizes an enlarged set once when a follow-up arrives during the initial seal wait', async () => {
+    let finalizations = 0;
+    const handlerDeps = deps({
+      runAutoCommit: async () => {
+        finalizations += 1;
+        return { success: true };
+      },
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    // The initial batch is still waiting for its seal: the follow-up joins it.
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'accepted' } });
+
+    await sealRootIdle(handlerDeps);
+    await waitForTasks(handlerDeps);
+    expect(finalizations).toBe(1);
+  });
+
+  it('does not publish completed for an ordinary runtime abort of an unsealed follow-up', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const { handlerDeps } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+        abortSession: async () => true,
+      })
+    );
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, authorization);
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+    const followUp = { ...authorization, operationId: 'next', messageId: 'next' };
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      followUp
+    );
+
+    // The first prompt returns while the follow-up is unsealed.
+    running.resolve(completion());
+    await new Promise(resolve => setImmediate(resolve));
+
+    // Ordinary runtime retirement aborts the signal, not a ControlTaskCancellation.
+    handlerDeps.retireRuntime('Runtime retired');
+    await record.done;
+
+    expect(record.deliveryResult(authorization)?.outcome?.status).toBe('failed');
+    expect(record.deliveryResult(followUp)?.outcome?.status).toBe('failed');
+  });
+
+  it('runs native cleanup for an original error with a follow-up still in flight', async () => {
+    const original = Promise.withResolvers<Completion>();
+    const followUpPending = Promise.withResolvers<void>();
+    let aborts = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => original.promise,
+        sendPromptAsync: () => followUpPending.promise,
+        abortSession: async () => {
+          aborts += 1;
+          return true;
+        },
+      }),
+    });
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, authorization);
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      { ...authorization, operationId: 'next', messageId: 'next' }
+    );
+
+    original.resolve(completion({ name: 'UnknownError', data: { message: 'failed' } }));
+    await record.done;
+
+    // The unfinished follow-up forced batch cleanup before release.
+    expect(aborts).toBeGreaterThanOrEqual(1);
+    const aborting = await handleControlRequest(
+      'session.abort',
+      session,
+      { messageId: 'msg_1' },
+      handlerDeps
+    );
+    expect(aborting.ok === false || aborts >= 1).toBe(true);
+  });
+
+  it('retires the runtime when cleanup of an original error stays unconfirmed', async () => {
+    const original = Promise.withResolvers<Completion>();
+    const followUpPending = Promise.withResolvers<void>();
+    const retired: string[] = [];
+    const { handlerDeps } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => original.promise,
+        sendPromptAsync: () => followUpPending.promise,
+        abortSession: async () => false,
+      }),
+      undefined,
+      {
+        retireRuntimeIfUnshared: async () => {
+          retired.push('retired');
+          return 'retired';
+        },
+      }
+    );
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, authorization);
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      { ...authorization, operationId: 'next', messageId: 'next' }
+    );
+
+    original.resolve(completion({ name: 'UnknownError', data: { message: 'failed' } }));
+    await record.done;
+    for (let attempt = 0; attempt < 50 && retired.length === 0; attempt += 1)
+      await Bun.sleep(10);
+
+    // Unconfirmed cleanup must not release the operation as if Kilo stopped.
+    expect(retired).not.toEqual([]);
+  });
+
+  it('aborts a seal wait after the first prompt returns with a follow-up unfinished', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+        abortSession: async () => true,
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps,
+      authorization
+    );
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        { ...authorization, operationId: 'next', messageId: 'next' }
+      )
+    ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'accepted' } });
+
+    // The first prompt returns while the follow-up batch is unsealed.
+    running.resolve(completion());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(events).toEqual([]);
+
+    // Abort must settle the seal wait instead of hanging on it.
+    const settled = await Promise.race([
+      handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps),
+      Bun.sleep(2_000).then(() => 'timeout' as const),
+    ]);
+    expect(settled).not.toBe('timeout');
+    await record.done;
+    expect(record.snapshot().outcome?.status).not.toBe('completed');
+    expect(record.deliveryResult(authorization)?.outcome?.status).not.toBe('completed');
+    expect(
+      record.deliveryResult({ ...authorization, operationId: 'next', messageId: 'next' })?.outcome
+        ?.status
+    ).not.toBe('completed');
   });
 
   it('cancels finalization without admitting a newer message before quiescence', async () => {
@@ -3941,6 +4392,7 @@ describe('control finalization and compact', () => {
       { ...promptPayload, finalization: { autoCommit: true } },
       handlerDeps
     );
+    await sealRootIdle(handlerDeps);
     const signal = await committing.promise;
     const cancelled = handleControlRequest(
       'session.abort',
@@ -3980,6 +4432,7 @@ describe('control finalization and compact', () => {
           handlerDeps
         )
       ).toMatchObject({ ok: true });
+      await sealRootIdle(handlerDeps);
       await waitForTasks(handlerDeps);
       expect(events.at(-1)?.properties).toEqual({
         messageId: 'msg_1',
@@ -4014,6 +4467,7 @@ describe('control finalization and compact', () => {
         { ...promptPayload, finalization: { autoCommit: true } },
         handlerDeps
       );
+      await sealRootIdle(handlerDeps);
       const signal = await committing.promise;
       const deadline = timers.mock.calls.find(
         ([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
@@ -4131,6 +4585,7 @@ describe('control finalization and compact', () => {
         handlerDeps
       )
     ).toMatchObject({ ok: true, result: { status: 'accepted' } });
+    await sealRootIdle(handlerDeps);
     await waitForTasks(handlerDeps);
     const committed = events.find(event => event.type === 'autocommit_completed')?.properties;
     expect(committed).toMatchObject({ messageId: 'msg_1', userMessageId: 'msg_1' });
@@ -5489,6 +5944,7 @@ describe('buildHeartbeatPayload', () => {
         );
         if (phase === 'finalizing') {
           running.resolve(completion());
+          await sealRootIdle(handlerDeps);
           await finalizing.promise;
         }
         const task = handlerDeps.operations.active(session.kiloSessionId);

@@ -140,6 +140,12 @@ function main(
         identity.rootKiloSessionId,
         event.properties
       );
+      deps.operations.observeRootEvent({
+        type: event.type,
+        sessionID: identity.kiloSessionId,
+        rootKiloSessionId: identity.rootKiloSessionId,
+        properties: event.properties,
+      });
       try {
         void Promise.resolve(
           control?.publishSessionEvent?.(

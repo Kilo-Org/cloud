@@ -798,8 +798,8 @@ describe('nextQueuedMessageId', () => {
     ).toBe('b');
   });
 
-  it('returns undefined while a message is accepted', () => {
-    expect(nextQueuedMessageId([msg('a', 'accepted'), msg('b', 'queued')])).toBeUndefined();
+  it('returns the queued follow-up even while another message is accepted', () => {
+    expect(nextQueuedMessageId([msg('a', 'accepted'), msg('b', 'queued')])).toBe('b');
   });
 
   it('returns undefined when the queue is empty', () => {
@@ -1405,10 +1405,15 @@ describe('acceptQueuedMessage', () => {
     ).toBeUndefined();
   });
 
-  it('does not accept while another message is accepted', () => {
-    expect(
-      acceptQueuedMessage(boundAggregate([msg('a', 'accepted'), msg('b', 'queued')]), 'b', 10)
-    ).toBeUndefined();
+  it('accepts a queued follow-up while another message is accepted', () => {
+    const accepted = acceptQueuedMessage(
+      boundAggregate([msg('a', 'accepted'), msg('b', 'queued')]),
+      'b',
+      10
+    );
+    expect(accepted?.messages.find(message => message.messageId === 'b')?.state.kind).toBe(
+      'accepted'
+    );
   });
 });
 
@@ -1793,11 +1798,12 @@ describe('SandboxSession orchestration', () => {
     await fixture.admit('a');
     await fixture.flush();
     await fixture.admit('b');
+    await fixture.flush();
     await fixture.admit('c');
     await fixture.flush();
     expect(fixture.record('a')?.state.kind).toBe('accepted');
-    expect(fixture.record('b')?.state.kind).toBe('queued');
-    expect(fixture.record('c')?.state.kind).toBe('queued');
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
+    expect(fixture.record('c')?.state.kind).toBe('accepted');
 
     await fixture.outcome('a', 'completed');
     await fixture.flush();
@@ -3482,11 +3488,13 @@ describe('SandboxSession orchestration', () => {
           ([input]) => input.operation === 'session.operation.ack'
         )
       ).toHaveLength(state === 'completed' ? 1 : 0);
-      expect(fixture.record('a')?.state.kind).toBe(state === 'completed' ? 'completed' : 'failed');
+      expect(fixture.record('a')?.state.kind).toBe(
+        state === 'completed' ? 'completed' : 'accepted'
+      );
       if (state === 'running') {
-        // An operation receipt is liveness, not progress: the 5-minute
-        // inactivity bound settles the turn instead of refreshing its clock.
-        expect(failedReasonOf(fixture.record('a'))).toBe('accepted_overdue');
+        // A running operation receipt is liveness, not progress: the turn is
+        // kept and the watchdog is rearmed rather than settled on the bound.
+        expect(fixture.alarmAt()).not.toBeNull();
       }
     }
   );
@@ -6042,11 +6050,12 @@ describe('SandboxSession orchestration', () => {
     await fixture.admit('a');
     await fixture.flush();
     await fixture.admit('b');
+    await fixture.flush();
     await fixture.admit('c');
     await fixture.flush();
     expect(fixture.record('a')?.state.kind).toBe('accepted');
-    expect(fixture.record('b')?.state.kind).toBe('queued');
-    expect(fixture.record('c')?.state.kind).toBe('queued');
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
+    expect(fixture.record('c')?.state.kind).toBe('accepted');
 
     const deletion = fixture.session.deleteSession();
     expect(fixture.record('a')?.state.kind).toBe('cancelled');
@@ -6633,7 +6642,7 @@ describe('SandboxSession orchestration', () => {
     ).toBe(true);
   });
 
-  it('fails a retrying prompt at seven minutes without real events', async () => {
+  it('keeps a retrying prompt alive at the inactivity bound without real events', async () => {
     const fixture = sessionFixture();
     const reports: CloudAgentQueueReport[] = [];
     (
@@ -6677,21 +6686,11 @@ describe('SandboxSession orchestration', () => {
     await fixture.fireAlarm();
     await fixture.flush();
 
-    expect(fixture.record('a')).toMatchObject({
-      state: { kind: 'failed', reason: 'accepted_overdue', detail: 'Turn did not complete' },
-    });
-    expect(fixture.record('b')?.state.kind).toBe('queued');
-    const failed = reports.find(
-      report => report.run.messageId === 'a' && report.run.status === 'failed'
-    );
-    expect(failed?.run).toMatchObject({
-      messageId: 'a',
-      status: 'failed',
-      failureStage: 'post_dispatch_no_activity',
-      failureCode: 'wrapper_no_output',
-      failureResponsibility: 'platform',
-      failureReason: 'wrapper_liveness',
-    });
+    // A running operation receipt is liveness: the turn is kept and the
+    // watchdog rearmed, never settled while Kilo may still be working.
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+    expect(reports.filter(report => report.run.status === 'failed')).toHaveLength(0);
   });
 
   it('classifies a live wrapper outcome carrying bounded assistant facts', async () => {
@@ -6937,13 +6936,12 @@ describe('SandboxSession orchestration', () => {
       vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       await fixture.flush();
-      expect(fixture.record('a')).toMatchObject({
-        state: { kind: 'failed', reason: 'accepted_overdue' },
-      });
+      expect(fixture.record('a')?.state.kind).toBe('accepted');
+      expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
     }
   );
 
-  it('keeps the inactivity failure after a late cancelled outcome', async () => {
+  it('keeps the accepted turn alive until a late cancelled outcome', async () => {
     const fixture = sessionFixture();
     delegateRequest(fixture, 'session.sync', async () =>
       controlResponse({ status: { type: 'busy' }, questions: [], permissions: [] })
@@ -6955,15 +6953,11 @@ describe('SandboxSession orchestration', () => {
 
     vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
-    expect(fixture.record('a')).toMatchObject({
-      state: { kind: 'failed', reason: 'accepted_overdue' },
-    });
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
 
     await fixture.outcome('a', 'cancelled');
     await fixture.flush();
-    expect(fixture.record('a')).toMatchObject({
-      state: { kind: 'failed', reason: 'accepted_overdue' },
-    });
+    expect(fixture.record('a')?.state.kind).toBe('cancelled');
     expect(fixture.terminalEvents()).toHaveLength(1);
   });
 
@@ -6982,7 +6976,7 @@ describe('SandboxSession orchestration', () => {
       permissions: [{ id: 'permission_1', sessionID: 'kilo_root' }],
     },
   ])(
-    'treats $name as waiting at 90s but fails at the five-minute inactivity bound',
+    'keeps $name alive at the five-minute inactivity bound',
     async snapshot => {
       const fixture = sessionFixture();
       const result = {
@@ -6999,6 +6993,7 @@ describe('SandboxSession orchestration', () => {
         return controlResponse(result);
       });
       await fixture.admit('a');
+      await fixture.flush();
       await fixture.admit('b');
       await fixture.flush();
       const acceptedAt = acceptedAtOf(fixture.record('a'));
@@ -7009,21 +7004,328 @@ describe('SandboxSession orchestration', () => {
       vi.setSystemTime(acceptedAt + DEADLINE_MS.acceptedOverdue);
       await fixture.fireAlarm();
       expect(fixture.record('a')?.state.kind).toBe('accepted');
-      expect(fixture.record('b')?.state.kind).toBe('queued');
+      expect(fixture.record('b')?.state.kind).toBe('accepted');
       expect(fixture.alarmAt()).toBe(
         Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.kiloInactivity)
       );
 
-      // Seven minutes with no real event: the snapshot cannot keep it alive.
+      // Past the inactivity bound with no real event: the turn is kept and the
+      // watchdog rearmed; an uncertain snapshot is not proof of a dead turn.
       vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
-      expect(fixture.record('a')).toMatchObject({
-        state: { kind: 'failed', reason: 'accepted_overdue', detail: 'Turn did not complete' },
-      });
-      expect(fixture.record('b')?.state.kind).toBe('queued');
-      expect(fixture.terminalEvents()).toHaveLength(1);
+      expect(fixture.record('a')?.state.kind).toBe('accepted');
+      expect(fixture.record('b')?.state.kind).toBe('accepted');
+      expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+      expect(fixture.terminalEvents()).toHaveLength(0);
     }
   );
+
+  it('keeps and rearms an accepted turn when the sandbox is disconnected but still running', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'disconnected',
+      wrapperInstanceId: RUNTIME_ID,
+    });
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+    expect(fixture.terminalEvents()).toHaveLength(0);
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.abort')
+    ).toHaveLength(0);
+  });
+
+  it('keeps and rearms when the health-check sync throws after a ready status', async () => {
+    const fixture = sessionFixture();
+    delegateRequest(fixture, 'session.sync', async () => {
+      throw new Error('sync transport failed');
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+  });
+
+  it('fails the accepted turn and attempts a stop when the sandbox is authoritatively stopped', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const abortRequests: SandboxControlOutboundRequest[] = [];
+    delegateRequest(fixture, 'session.abort', async input => {
+      abortRequests.push(input);
+      return controlResponse({ status: 'unconfirmed' });
+    });
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'stopped',
+      connection: 'disconnected',
+      wrapperInstanceId: RUNTIME_ID,
+    });
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('failed');
+    expect(abortRequests).toHaveLength(1);
+  });
+
+  it.each([
+    { name: 'unknown physical', physical: 'unknown' as const, connection: 'disconnected' as const },
+    { name: 'stopping physical', physical: 'stopping' as const, connection: 'disconnected' as const },
+    {
+      name: 'wrapper mismatch',
+      physical: 'running' as const,
+      connection: 'ready' as const,
+      wrapperInstanceId: NEXT_RUNTIME_ID,
+    },
+  ])('keeps and rearms for $name while the sandbox is not stopped', async status => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      wrapperInstanceId: RUNTIME_ID,
+      ...status,
+    });
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+    expect(fixture.terminalEvents()).toHaveLength(0);
+  });
+
+  it.each(['rejected', 'uncertain'] as const)(
+    'keeps and rearms when the accepted operation lookup is %s at the inactivity bound',
+    async lookup => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        operationResults: true,
+      });
+      await fixture.admit('a');
+      await fixture.flush();
+      delegateRequest(fixture, 'session.operation.get', async () => {
+        if (lookup === 'rejected') return controlFailure(true, 'not_ready');
+        throw new Error('operation transport failed');
+      });
+      const acceptedAt = acceptedAtOf(fixture.record('a'));
+      if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')?.state.kind).toBe('accepted');
+      expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.abort')
+      ).toHaveLength(0);
+    }
+  );
+
+  it('fails the accepted turn when the operation is missing and the wrapper confirms the stop', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    delegateRequest(fixture, 'session.operation.get', async () =>
+      controlResponse({ state: 'missing' })
+    );
+    delegateRequest(fixture, 'session.abort', async () =>
+      controlResponse({ status: 'aborted', quiescent: true })
+    );
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('failed');
+  });
+
+  it('fails a proof-backed accepted row and attempts a stop when the sandbox is physically stopped', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const abortRequests: SandboxControlOutboundRequest[] = [];
+    delegateRequest(fixture, 'session.abort', async input => {
+      abortRequests.push(input);
+      return controlResponse({ status: 'unconfirmed' });
+    });
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'stopped',
+      connection: 'disconnected',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('failed');
+    expect(abortRequests).toHaveLength(1);
+  });
+
+  it('keeps a proof-backed accepted row when the sandbox is disconnected but running', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'disconnected',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+  });
+
+  it.each(['unreachable', 'already_idle'] as const)(
+    'keeps and rearms when the missing-operation stop is %s without confirmation',
+    async stop => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        operationResults: true,
+      });
+      await fixture.admit('a');
+      await fixture.flush();
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({ state: 'missing' })
+      );
+      delegateRequest(fixture, 'session.abort', async () => {
+        if (stop === 'unreachable') throw new Error('abort transport failed');
+        return controlResponse({ status: 'already_idle' });
+      });
+      const acceptedAt = acceptedAtOf(fixture.record('a'));
+      if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')?.state.kind).toBe('accepted');
+      expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+      expect(fixture.terminalEvents()).toHaveLength(0);
+    }
+  );
+
+  it('dispatches a connected follow-up on the running operation without the first outcome', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    await fixture.admit('b');
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
+    const prompts = fixture.control.request.mock.calls.filter(
+      ([input]) => input.operation === 'session.prompt'
+    );
+    expect(
+      prompts.map(([input]) => sessionPromptPayloadSchema.parse(input.payload).messageId)
+    ).toEqual(['a', 'b']);
+    expect(
+      fixture.control.request.mock.calls.filter(
+        ([input]) => input.operation === 'session.operation.get'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('keeps a session_busy follow-up queued and redispatches it on the alarm', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    let busyPrompts = 0;
+    delegateRequest(fixture, 'session.prompt', async input => {
+      const parsed = sessionPromptPayloadSchema.parse(input.payload);
+      if (parsed.messageId === 'a') return controlResponse({ messageId: 'a', status: 'accepted' });
+      busyPrompts += 1;
+      return controlFailure(true, 'session_busy');
+    });
+    await fixture.admit('b');
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+    expect(busyPrompts).toBe(1);
+
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(busyPrompts).toBe(2);
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+  });
 
   it('ignores delayed old-runtime failures during a new runtime handoff and for its followers', async () => {
     const fixture = sessionFixture();
@@ -7431,6 +7733,57 @@ describe('SandboxSession orchestration', () => {
     }
   );
 
+  it('delivers a containment-off follow-up on the attached operation without re-attaching', async () => {
+    const fixture = sessionFixture();
+    const ready = {
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+      attachment: {
+        ...ATTACHMENT,
+        kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+      },
+    } satisfies ControlStatus;
+    fixture.setStatus(ready);
+    fixture.control.ensureReady.mockResolvedValue(ready);
+
+    await fixture.admit('a');
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'accepted', wrapperInstanceId: RUNTIME_ID },
+      proofs: { attach: { dispatched: true }, prompt: { dispatched: true } },
+    });
+    expect(fixture.control.attachSession).toHaveBeenCalledOnce();
+
+    // An accepted row already admitted a prompt on this runtime, so the wrapper
+    // rejects a second attach with `session_busy` while the operation is active.
+    // Reporting it as a not-admitted rejection keeps a re-attaching follow-up
+    // queued, so the assertions below fail instead of accepting it anyway.
+    delegateRequest(fixture, 'session.attach', async () =>
+      controlFailure(true, 'session_busy', 'not-admitted')
+    );
+
+    await fixture.admit('b');
+    await fixture.flush();
+
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+    ).toHaveLength(1);
+    expect(fixture.control.attachSession).toHaveBeenCalledOnce();
+    const prompts = fixture.control.request.mock.calls.filter(
+      ([input]) => input.operation === 'session.prompt'
+    );
+    expect(
+      prompts.map(([input]) => sessionPromptPayloadSchema.parse(input.payload).messageId)
+    ).toEqual(['a', 'b']);
+    expect(fixture.record('b')).toMatchObject({
+      state: { kind: 'accepted', wrapperInstanceId: RUNTIME_ID },
+      proofs: { prompt: { dispatched: true } },
+    });
+  });
+
   it.each(['replacement runtime', 'missing legacy attachment'] as const)(
     'performs real preparation for a %s instead of assuming warmth from prior messages',
     async reason => {
@@ -7736,9 +8089,10 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     await fixture.admit('b');
     await fixture.flush();
-    // The accepted row waits for the abort result; the new submission stays.
+    // The accepted row waits for the abort result; the new submission is
+    // delivered on the same wrapper and must not be cancelled with it.
     expect(fixture.record('a')?.state.kind).toBe('accepted');
-    expect(fixture.record('b')?.state.kind).toBe('queued');
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
     abort.resolve(controlResponse({ status: 'aborted' }));
     await expect(interruption).resolves.toEqual({ success: true });
     await fixture.flush();
@@ -7839,10 +8193,11 @@ describe('SandboxSession orchestration', () => {
     const deadlineAt = fixture.record('a')?.cancellation?.deadlineAt;
     if (deadlineAt === undefined) throw new Error('Missing cancellation deadline');
 
-    // A successor submitted after the interrupt waits behind the live marker.
+    // A successor submitted after the interrupt is delivered on the same
+    // wrapper while the cancellation marker is still live.
     await fixture.admit('b');
     await fixture.flush();
-    expect(fixture.record('b')?.state.kind).toBe('queued');
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
 
     // First alarm before expiry keeps the marker and arms at the deadline.
     await fixture.fireAlarm();

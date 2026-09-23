@@ -5,6 +5,7 @@ import {
   sessionOperationAckSchema,
   sessionOperationExpiresAt,
   type SessionOperationAuthorization,
+  type SessionPromptPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { rejectBeforeAdmission } from './control-handler-result.js';
@@ -681,7 +682,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
           rejectBeforeAdmission('idempotency_conflict', 'Operation identity mismatch', false)
         );
       if (operation === 'session.operation.get') {
-        const delivery = existing.deliveryResult();
+        const delivery = existing.deliveryResult(target);
         return reply(
           ok(
             delivery
@@ -697,7 +698,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         );
       }
       try {
-        if (!existing.matchesIntent(payload))
+        if (!existing.matchesIntent(payload, target))
           return reply(
             rejectBeforeAdmission('idempotency_conflict', 'Operation intent mismatch', false)
           );
@@ -814,8 +815,11 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
           active.delete(identity.kiloSessionId);
           deps.onCompleted(identity);
         }
-        if (authorization && !retain && retained.get(key(authorization)) === operation)
-          retained.delete(key(authorization));
+        if (!retain) {
+          for (const [id, current] of retained) {
+            if (current === operation) retained.delete(id);
+          }
+        }
         removeOrphanedArchivedClaims();
       },
       onCleanupConfirmed: () => undefined,
@@ -830,6 +834,27 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
   return {
     admission,
     acknowledge,
+    admitFollowUp(
+      session: SessionRequestIdentity,
+      authorization: SessionOperationAuthorization | undefined,
+      payload: SessionPromptPayload,
+      runtime: WorktreeKiloRuntime
+    ): ControlHandlerResult {
+      const operation = active.get(session.kiloSessionId);
+      if (!operation || !isDeepStrictEqual(operation.session, session))
+        return fail('not_ready', 'Session has no running operation', true);
+      const result = operation.admitFollowUp(payload, runtime, authorization);
+      if (result.ok && authorization) retained.set(key(authorization), operation);
+      return result;
+    },
+    observeRootEvent(event: {
+      type: string;
+      sessionID?: string;
+      rootKiloSessionId?: string;
+      properties?: unknown;
+    }): void {
+      for (const operation of active.values()) operation.observeRootEvent(event);
+    },
     retireRootPublication,
     escalateRootPublication,
     settleRootPublication,
@@ -843,14 +868,15 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       if (
         current &&
         isDeepStrictEqual(current.session, session) &&
-        (messageId === undefined || current.messageId === messageId)
+        (messageId === undefined || current.admittedMessageIds().includes(messageId))
       ) {
         return current;
       }
       if (messageId === undefined) return undefined;
       const matches = [...retained.values()].filter(
         operation =>
-          operation.messageId === messageId && isDeepStrictEqual(operation.session, session)
+          operation.admittedMessageIds().includes(messageId) &&
+          isDeepStrictEqual(operation.session, session)
       );
       return matches.find(operation => operation.kind !== 'preparation') ?? matches[0];
     },

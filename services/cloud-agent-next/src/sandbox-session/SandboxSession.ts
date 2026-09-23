@@ -201,7 +201,11 @@ import {
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
-import { acceptedAlarmDecision, acceptedInactivityDue } from './accepted-overdue.js';
+import {
+  AcceptedRuntimeLostError,
+  acceptedAlarmDecision,
+  acceptedInactivityDue,
+} from './accepted-overdue.js';
 import { acceptedSnapshotKind, isRealTurnActivity } from './turn-activity.js';
 import { bootPreparingStep, provisionPreparingStep } from './preparing-steps.js';
 import type { PhysicalState } from '../shared/sandbox-status.js';
@@ -314,6 +318,19 @@ const nativeRuntimeFenceSchema = z.object({
 
 type MessageRecord = SessionMessage;
 type DispatchPhase = 'preparing' | 'attach' | 'prompt';
+
+/**
+ * The accepted-operation lookup outcome. `missing` is an explicit wrapper report
+ * that it has no record of the operation; it is distinct from `uncertain`
+ * (transport or unverified lookup), which cannot justify stopping Kilo work.
+ */
+type AcceptedOperationObservation =
+  | 'running'
+  | 'completed'
+  | 'rejected'
+  | 'uncertain'
+  | 'missing'
+  | undefined;
 
 /**
  * Thrown inside a stop-commit transaction when the envelope write is rejected
@@ -2934,7 +2951,7 @@ export class SandboxSession extends DurableObject<Env> {
     message: MessageRecord,
     epoch: number,
     kind: 'attach' | 'prompt' = 'prompt'
-  ): Promise<'running' | 'completed' | 'rejected' | 'uncertain' | undefined> {
+  ): Promise<AcceptedOperationObservation> {
     const proof = kind === 'attach' ? message.proofs?.attach : message.proofs?.prompt;
     const authorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
     if (!authorization.success || !proof?.dispatched) return undefined;
@@ -2984,8 +3001,9 @@ export class SandboxSession extends DurableObject<Env> {
       case 'running':
       case 'completed':
       case 'rejected':
-      case 'uncertain':
         return dispatched.state;
+      case 'uncertain':
+        return dispatched.reason === 'missing' ? 'missing' : 'uncertain';
       default:
         return undefined;
     }
@@ -3007,7 +3025,7 @@ export class SandboxSession extends DurableObject<Env> {
     const authorization = prompt?.authorization;
     if (!prompt?.dispatched || !authorization) return;
     const promptDeadlineAt = prompt.executionDeadlineAt ?? authorization.dispatchDeadlineAt;
-    let observed: 'running' | 'completed' | 'rejected' | 'uncertain' | undefined;
+    let observed: AcceptedOperationObservation;
     try {
       observed = await this.observeAcceptedOperation(queued, epoch, 'prompt');
     } catch (error) {
@@ -3203,95 +3221,125 @@ export class SandboxSession extends DurableObject<Env> {
       );
       if (decision.action === 'rearm') {
         await this.armQueueRetry(decision.at);
-        return;
-      }
-      const scope = this.captureInteractionScope();
-      const startedAt = Date.now();
-      const diagnostic: ControlDiagnosticFields = {
-        sessionId: this.sessionId,
-        messageId: accepted.messageId,
-        expectedWrapperInstanceId: acceptedState.wrapperInstanceId,
-        epoch,
-        acceptedAt: acceptedState.acceptedAt,
-        lastActivityAt: acceptedState.lastActivityAt,
-        stage: 'sync',
-      };
-      const report = (result: 'healthy' | 'superseded' | 'runtime_unhealthy' | 'inactivity') =>
-        logControlDiagnostic(
-          'accepted_reconciliation',
-          { ...diagnostic, phase: 'finished', result, durationMs: Date.now() - startedAt },
-          result === 'runtime_unhealthy' ? 'warn' : 'info'
-        );
-      logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
-      try {
-        if (accepted.proofs?.prompt?.dispatched) {
-          diagnostic.stage = 'operation_receipt';
-          const observed = await this.observeAcceptedOperation(accepted, epoch);
-          if (observed === 'running' || observed === 'completed') {
+      } else {
+        const scope = this.captureInteractionScope();
+        const startedAt = Date.now();
+        const diagnostic: ControlDiagnosticFields = {
+          sessionId: this.sessionId,
+          messageId: accepted.messageId,
+          expectedWrapperInstanceId: acceptedState.wrapperInstanceId,
+          epoch,
+          acceptedAt: acceptedState.acceptedAt,
+          lastActivityAt: acceptedState.lastActivityAt,
+          stage: 'sync',
+        };
+        const report = (result: 'healthy' | 'superseded' | 'runtime_unhealthy' | 'inactivity') =>
+          logControlDiagnostic(
+            'accepted_reconciliation',
+            { ...diagnostic, phase: 'finished', result, durationMs: Date.now() - startedAt },
+            result === 'runtime_unhealthy' ? 'warn' : 'info'
+          );
+        logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
+        try {
+          const activityAt = acceptedState.lastActivityAt ?? acceptedState.acceptedAt;
+          if (accepted.proofs?.prompt?.dispatched) {
+            diagnostic.stage = 'runtime_status';
+            // Authoritative physical loss is reachable for a proof-backed row
+            // too; a rejected or uncertain operation lookup is not loss.
+            await this.assertRuntimeNotLost(diagnostic);
+            diagnostic.stage = 'operation_receipt';
+            const observed = await this.observeAcceptedOperation(accepted, epoch);
             if (!this.isCurrentAcceptedMessage(accepted, epoch)) {
               diagnostic.reason = 'accepted_message_changed';
               report('superseded');
-              return;
+            } else if (observed === 'missing' && acceptedInactivityDue(activityAt, Date.now())) {
+              // The wrapper has no record of the operation and the turn is
+              // inactive: stop remaining Kilo work. Only a confirmed stop fails
+              // the row; an unconfirmed stop keeps it and rechecks.
+              diagnostic.stage = 'inactivity';
+              diagnostic.reason = 'inactivity_missing';
+              diagnostic.lastActivityAt = activityAt;
+              const confirmed = await this.stopWrapperTurn(accepted, epoch, diagnostic);
+              if (confirmed && this.isCurrentAcceptedMessage(accepted, epoch)) {
+                const failed = failAcceptedMessage(
+                  this.sessionAggregate(this.loadMessages()),
+                  accepted.messageId,
+                  'accepted_overdue',
+                  'Turn did not complete'
+                );
+                if (failed && this.saveMessages(failed.messages, epoch)) {
+                  report('inactivity');
+                } else {
+                  diagnostic.reason = 'accepted_message_changed';
+                  report('superseded');
+                }
+              } else {
+                diagnostic.reason = 'stop_unconfirmed';
+                report('healthy');
+                await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
+              }
+            } else {
+              // Running, completed, rejected, transport-uncertain or unobserved:
+              // an uncertain observation is never proof the turn is dead.
+              diagnostic.healthy = observed === 'running' || observed === 'completed';
+              report('healthy');
+              await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
             }
-            if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) {
-              report('inactivity');
-              return;
+          } else {
+            const snapshot = await this.interactionRefresh.refresh(scope, 'accepted_alarm');
+            if (
+              !snapshot ||
+              !scope ||
+              !this.interactionRefresh.isCurrent(scope, (scope.interactionRevision ?? 0) + 1)
+            ) {
+              diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
+              report('superseded');
+              // A pending-input event (question/permission) during the awaited sync
+              // changes the interaction scope, so the sync returns undefined. The
+              // accepted turn is usually still current, so the watchdog must
+              // survive; a superseded original still needs one for the turn that is
+              // now current.
+              await this.rescheduleAcceptedWatchdog(accepted, epoch);
+            } else {
+              diagnostic.stage = 'activity_check';
+              diagnostic.syncStatus = diagnosticSyncStatus(snapshot.status.type);
+              diagnostic.questionCount = snapshot.questions.length;
+              diagnostic.permissionCount = snapshot.permissions.length;
+              diagnostic.healthy = acceptedSnapshotKind(snapshot) === 'waiting';
+              report('healthy');
+              await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
             }
-            diagnostic.healthy = true;
+          }
+        } catch (error) {
+          if (!this.isCurrentAcceptedMessage(accepted, epoch)) {
+            diagnostic.reason = 'accepted_message_changed';
+            report('superseded');
+          } else if (error instanceof AcceptedRuntimeLostError) {
+            // Authoritative loss: best-effort stop, then fail the row.
+            diagnostic.reason ??= 'runtime_stopped';
+            await this.stopWrapperTurn(accepted, epoch, diagnostic);
+            if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+              await this.failDelivery(
+                accepted.messageId,
+                'runtime_unhealthy',
+                acceptedState.wrapperInstanceId
+              );
+              report('runtime_unhealthy');
+            } else {
+              diagnostic.reason = 'accepted_message_changed';
+              report('superseded');
+            }
+          } else {
+            // A transport or sync failure is not proof the turn is dead.
+            diagnostic.reason ??= 'sync_failed';
             report('healthy');
             await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
-            return;
           }
         }
-        const snapshot = await this.interactionRefresh.refresh(scope, 'accepted_alarm');
-        if (
-          !snapshot ||
-          !scope ||
-          !this.interactionRefresh.isCurrent(scope, (scope.interactionRevision ?? 0) + 1)
-        ) {
-          diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
-          report('superseded');
-          // A pending-input event (question/permission) during the awaited sync
-          // changes the interaction scope, so the sync returns undefined. The
-          // accepted turn is usually still current, so the watchdog must
-          // survive; a superseded original still needs one for the turn that is
-          // now current.
-          await this.rescheduleAcceptedWatchdog(accepted, epoch, diagnostic);
-          return;
-        }
-        diagnostic.stage = 'activity_check';
-        diagnostic.syncStatus = diagnosticSyncStatus(snapshot.status.type);
-        diagnostic.questionCount = snapshot.questions.length;
-        diagnostic.permissionCount = snapshot.permissions.length;
-        const waiting = acceptedSnapshotKind(snapshot) === 'waiting';
-        diagnostic.healthy = waiting;
-        if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) {
-          report('inactivity');
-          return;
-        }
-        if (!waiting) {
-          diagnostic.reason = 'inactive_snapshot';
-          throw new Error('Accepted execution is no longer active');
-        }
-        report('healthy');
-        await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
-      } catch {
-        if (this.isCurrentAcceptedMessage(accepted, epoch)) {
-          diagnostic.reason ??= 'sync_failed';
-          report('runtime_unhealthy');
-          await this.failDelivery(
-            accepted.messageId,
-            'runtime_unhealthy',
-            acceptedState.wrapperInstanceId
-          );
-        } else {
-          diagnostic.reason = 'accepted_message_changed';
-          report('superseded');
-        }
       }
-      return;
     }
-    const headId = nextQueuedMessageId(messages);
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    const headId = nextQueuedMessageId(this.loadMessages());
     // A queued head is durable demand: the alarm may realize it by creating a
     // replacement once the allocation is confirmed `stopped` (Vercel has no
     // acquisition path). Cloudflare keeps its acquisition-driven create, and
@@ -3300,73 +3348,113 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   /**
-   * The inactivity fail path. Re-reads the accepted row and re-evaluates the
-   * bound synchronously before persisting, so real progress that landed during
-   * the preceding observe/sync keeps the turn alive. Message-only: no
-   * quarantine and no native-runtime retirement.
+   * Stop remaining Kilo work for an accepted turn whose wrapper has no record of
+   * the operation. The stop is confirmed only by wrapper quiescence or runtime
+   * retirement; a bare `already_idle` is not proof that Kilo stopped. An
+   * unreachable or unconfirmed stop returns false so the caller keeps the row.
    */
-  private async failOverdueAcceptedMessage(
+  private async stopWrapperTurn(
     accepted: MessageRecord,
     epoch: number,
     diagnostic: ControlDiagnosticFields
   ): Promise<boolean> {
-    const current = this.loadMessages().find(item => item.messageId === accepted.messageId);
-    const currentState = current?.state.kind === 'accepted' ? current.state : undefined;
-    const activityAt = currentState?.lastActivityAt ?? currentState?.acceptedAt;
-    if (
-      !current ||
-      !currentState ||
-      activityAt === undefined ||
-      !acceptedInactivityDue(activityAt, Date.now())
-    )
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const sessionId = this.sessionId;
+    const wrapperInstanceId = activeWrapperInstanceId(accepted);
+    if (!metadata || !sandboxId || !kiloSessionId || !sessionId || !wrapperInstanceId) return false;
+    diagnostic.stage = 'stop';
+    try {
+      const response = await sandboxControlRpc(this.env, sandboxId).request({
+        operation: 'session.abort',
+        session: {
+          sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        },
+        payload: {
+          messageId: accepted.messageId,
+          cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
+        },
+        expectedWrapperInstanceId: wrapperInstanceId,
+      });
+      if (!response.ok) return false;
+      const parsed = sessionAbortResultSchema.safeParse(response.result);
+      if (!parsed.success || !this.terminalLifecycle.isCurrent(epoch)) return false;
+      return parsed.data.quiescent === true || parsed.data.runtimeRetired === true;
+    } catch {
       return false;
-    diagnostic.stage = 'inactivity';
-    diagnostic.reason = 'inactivity_due';
-    diagnostic.lastActivityAt = activityAt;
-    const failed = failAcceptedMessage(
-      this.sessionAggregate(this.loadMessages()),
-      current.messageId,
-      'accepted_overdue',
-      'Turn did not complete'
+    }
+  }
+
+  /**
+   * The single physical-loss rule: only an observed `stopped` sandbox is
+   * authoritative loss. A not-ready connection, a non-running physical state or
+   * a transport failure is not and must keep the row.
+   */
+  private assertPhysicalNotLost(
+    status: { physical: PhysicalState },
+    diagnostic: ControlDiagnosticFields
+  ): void {
+    if (status.physical === 'stopped') {
+      diagnostic.reason = 'physical_stopped';
+      throw new AcceptedRuntimeLostError('Accepted runtime is stopped');
+    }
+  }
+
+  /**
+   * Authoritative runtime loss for an accepted row. A transport failure or a
+   * not-ready connection is not loss, so the caller's catch keeps the row.
+   */
+  private async assertRuntimeNotLost(diagnostic: ControlDiagnosticFields): Promise<void> {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !sandboxId) return;
+    diagnostic.stage = 'runtime_status';
+    const status = await withTimeout(
+      sandboxControlRpc(this.env, sandboxId).getStatus(),
+      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+      'Runtime status timed out',
+      () => {
+        diagnostic.timedOut = true;
+      }
     );
-    if (!failed || !this.saveMessages(failed.messages, epoch)) return false;
-    if (nextQueuedMessageId(failed.messages)) await this.armQueueRetry();
-    return true;
+    this.assertPhysicalNotLost(status, diagnostic);
   }
 
   /**
    * Schedule the next non-failing check from the freshly read clock:
-   * `min(now + acceptedAlarmCap, activityAt + kiloInactivity)`. Never rearm at
-   * the already-past 90s threshold.
+   * `min(now + acceptedAlarmCap, activityAt + kiloInactivity)`. The recheck is
+   * always in the future: once inactivity is due, the cap alone is used.
    */
   private async scheduleAcceptedRecheck(epoch: number, messageId: string): Promise<void> {
     const current = this.loadMessages().find(item => item.messageId === messageId);
     const currentState = current?.state.kind === 'accepted' ? current.state : undefined;
     if (!this.terminalLifecycle.isCurrent(epoch) || !currentState) return;
+    const now = Date.now();
+    const capAt = now + DEADLINE_MS.acceptedAlarmCap;
     const activityAt = currentState.lastActivityAt ?? currentState.acceptedAt;
     if (activityAt === undefined) {
-      await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+      await this.armQueueRetry(capAt);
       return;
     }
-    await this.armQueueRetry(
-      Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, activityAt + DEADLINE_MS.kiloInactivity)
-    );
+    const inactivityAt = activityAt + DEADLINE_MS.kiloInactivity;
+    await this.armQueueRetry(inactivityAt > now ? Math.min(capAt, inactivityAt) : capAt);
   }
 
   /**
    * Keep the accepted-turn watchdog alive when the interaction scope changes
-   * during an awaited health-check sync. The original turn is re-checked before
-   * failing; a superseded or terminal original is left alone, and a watchdog is
-   * retained for whichever accepted turn is current.
+   * during an awaited health-check sync. It only rearms: an uncertain
+   * observation never fails the turn. A watchdog is retained for whichever
+   * accepted turn is current.
    */
   private async rescheduleAcceptedWatchdog(
     accepted: MessageRecord,
-    epoch: number,
-    diagnostic: ControlDiagnosticFields
+    epoch: number
   ): Promise<void> {
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
     if (this.isCurrentAcceptedMessage(accepted, epoch)) {
-      if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) return;
       await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
       return;
     }
@@ -4072,7 +4160,14 @@ export class SandboxSession extends DurableObject<Env> {
         });
       const needsPreparation =
         this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId;
-      if (needsPreparation || status.attachment?.kilo?.containmentEnabled === false) {
+      // An accepted row already admitted a prompt on this attached runtime, so a
+      // containment-off follow-up must reuse that operation: attaching again
+      // would hit `session_busy` while the operation is active and never prompt.
+      const hasAcceptedSibling = hasAcceptedMessage(this.loadMessages());
+      if (
+        needsPreparation ||
+        (status.attachment?.kilo?.containmentEnabled === false && !hasAcceptedSibling)
+      ) {
         if (needsPreparation) reportPreparation('workspace_setup', 'Setting up workspace…');
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
@@ -4977,6 +5072,7 @@ export class SandboxSession extends DurableObject<Env> {
             ? observedWrapper.data
             : 'invalid';
       diagnostic.wrapperMatches = observedWrapperId === messageWrapperInstanceId;
+      this.assertPhysicalNotLost(status, diagnostic);
       if (
         status.connection !== 'ready' ||
         status.physical !== 'running' ||
@@ -4988,7 +5084,7 @@ export class SandboxSession extends DurableObject<Env> {
             : status.physical !== 'running'
               ? 'physical_not_running'
               : 'wrapper_mismatch';
-        throw new Error('Accepted runtime is not ready');
+        return undefined;
       }
       diagnostic.interactionRevision = revision;
       diagnostic.stage = 'sync_request';

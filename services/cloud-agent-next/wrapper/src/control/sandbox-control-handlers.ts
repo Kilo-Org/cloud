@@ -1101,6 +1101,13 @@ function handlePrompt(
         ...(authorization ? { executionDeadlineAt: existing.executionDeadlineAt } : {}),
       });
     }
+    if (
+      existing.kind !== 'preparation' &&
+      !existing.signal.aborted &&
+      request.turn.type === 'prompt'
+    ) {
+      return deps.operations.admitFollowUp(session, authorization, request, runtime);
+    }
     return rejectBeforeAdmission('session_busy', 'Session has work in progress', true);
   }
   const operation = deps.operations.start(
@@ -1197,14 +1204,20 @@ async function handleAbort(
     if (!parsed.data.operationId) {
       task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
       const result = await task.done;
-      if (task.cleanup === 'unconfirmed')
+      // An execution batch must show positive cleanup evidence; for a cancelled
+      // preparation there is no owned work to confirm, so keep the prior rule.
+      if (
+        task.kind === 'preparation'
+          ? task.cleanup === 'unconfirmed'
+          : task.cleanup !== 'confirmed'
+      )
         return fail('not_ready', 'Kilo cancellation was not confirmed', false);
       if (ownsCurrentTask) {
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
       if (!result.ok && task.kind !== 'preparation') return result;
-      return ok({ status: 'aborted' });
+      return ok({ status: 'aborted', quiescent: true });
     }
     const deadlineAt = task.captureCleanupDeadline(
       parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
@@ -1377,11 +1390,22 @@ async function handleAbort(
     if (!result.ok && task.kind !== 'preparation') return result;
     return ok({ status: 'aborted' });
   }
-  return ok(
-    parsed.data.operationId
-      ? { status: 'unconfirmed', quiescent: false }
-      : { status: 'already_idle' }
-  );
+  // No operation owns the message id. A bare `already_idle` is not proof Kilo
+  // stopped, so confirm the stop against Kilo itself, as handleDetach does with
+  // no task. That is only safe when the wrapper owns no operation at all; an
+  // active operation for another message id must not be aborted by a stale stop.
+  if (parsed.data.operationId || deps.operations.hasActive(session.kiloSessionId))
+    return ok({ status: 'unconfirmed', quiescent: false });
+  const idleRuntime = sessionKiloRuntime(session, deps);
+  if (idleRuntime) {
+    try {
+      await abortKiloSession(session, idleRuntime.kiloClient);
+      return ok({ status: 'aborted', quiescent: true });
+    } catch {
+      return ok({ status: 'unconfirmed', quiescent: false });
+    }
+  }
+  return ok({ status: 'unconfirmed', quiescent: false });
 }
 
 async function readRootRequests<Request extends { id: string; sessionID: string }>(

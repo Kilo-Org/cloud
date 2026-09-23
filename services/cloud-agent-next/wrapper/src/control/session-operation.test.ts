@@ -19,6 +19,7 @@ import {
   type SessionActivityRegistry,
 } from './sandbox-control-handlers';
 import type { WrapperKiloClient } from '../kilo-api';
+import { STABLE_ROOT_IDLE_MS } from '../lifecycle';
 import {
   acknowledgeOperation,
   completion,
@@ -60,6 +61,15 @@ function onlyOperation(handlerDeps: HandlerDeps) {
   return record;
 }
 
+/** Root idle plus the 3s stable-idle window: the only real seal. */
+async function sealRootIdle(handlerDeps: HandlerDeps): Promise<void> {
+  handlerDeps.operations.observeRootEvent({
+    type: 'session.idle',
+    sessionID: session.kiloSessionId,
+  });
+  await Bun.sleep(STABLE_ROOT_IDLE_MS + 50);
+}
+
 describe('operation results and delivery', () => {
   it('keeps native-tagged live events separate from sealed result delivery after replacement', async () => {
     const releaseDelivery = Promise.withResolvers<void>();
@@ -94,6 +104,7 @@ describe('operation results and delivery', () => {
     );
     const record = onlyOperation(handlerDeps);
     try {
+      await sealRootIdle(handlerDeps);
       await record.done;
       await sending.promise;
       const sealed = record.deliveryResult();
@@ -142,6 +153,7 @@ describe('operation results and delivery', () => {
         operationAuthorization()
       );
       const record = onlyOperation(handlerDeps);
+      await sealRootIdle(handlerDeps);
       await record.done;
       await record.waitForDelivery();
       expect(record.snapshot().finalization.autoCommit).toEqual({
@@ -296,6 +308,7 @@ describe('operation results and delivery', () => {
       handlerDeps,
       authorization
     );
+    await sealRootIdle(handlerDeps);
     await entered.promise;
     const record = onlyOperation(handlerDeps);
     record.cancel('Late work cancellation', 'cancelled');
@@ -660,7 +673,7 @@ describe('operation results and delivery', () => {
       handlerDeps
     );
     await abortAcknowledged.promise;
-    expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
+    expect(await aborting).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
     await record.done;
     await record.waitForDelivery();
 
@@ -670,6 +683,90 @@ describe('operation results and delivery', () => {
       assistantReason: 'rate_limited',
       providerOwnership: 'unknown',
     });
+  });
+
+  it('keeps native abort active while an admitted follow-up is unsealed', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const aborts: string[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+        abortSession: async opts => {
+          aborts.push(opts.sessionId);
+          return true;
+        },
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      operationAuthorization('session.prompt', 'next')
+    );
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+    expect(record.snapshot().cleanupEvidence).toBe('unconfirmed');
+
+    await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'msg_1',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      handlerDeps
+    );
+    expect(aborts).toEqual([session.kiloSessionId]);
+    running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    await record.done;
+  });
+
+  it('treats an admitted batch as finished cleanup evidence once it seals', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      operationAuthorization('session.prompt', 'next')
+    );
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+
+    running.resolve(completion());
+    record.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await record.done;
+    await record.waitForDelivery();
+
+    expect(record.snapshot().cleanupEvidence).toBe('finished');
   });
 
   it('does not attach assistant facts to an auto-commit failure', async () => {
@@ -685,6 +782,7 @@ describe('operation results and delivery', () => {
       operationAuthorization()
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
     const outcome = record.snapshot().outcome;
@@ -760,7 +858,7 @@ describe('operation results and delivery', () => {
       );
       await abortAcknowledged.promise;
       expect(record.locallyComplete).toBe(false);
-      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
       await record.waitForDelivery();
 
       expect(record.snapshot().outcome?.status).toBe(status);
@@ -814,6 +912,7 @@ describe('operation results and delivery', () => {
       authorization
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
     const delivery = record.deliveryResult();
@@ -888,6 +987,7 @@ describe('operation results and delivery', () => {
       operationAuthorization()
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
     const delivery = record.deliveryResult();
@@ -977,6 +1077,7 @@ describe('operation results and delivery', () => {
       operationAuthorization()
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
 

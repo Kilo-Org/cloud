@@ -299,6 +299,26 @@ function allocationWithoutTimeFields(record: AllocationRecord): unknown {
   return comparable;
 }
 
+/**
+ * A queued follow-up now dispatches behind an accepted row, so it gains a
+ * preparation attempt and a delivery deadline while the wrapper is unavailable.
+ * Normalize only those incidental queued fields; the rest of the snapshot keeps
+ * its full equality check.
+ */
+function withoutQueuedDispatch<T extends { messages: SessionMessage[] }>(value: T): T {
+  return {
+    ...value,
+    messages: value.messages.map(message =>
+      message.state.kind === 'queued'
+        ? {
+            ...message,
+            state: { ...message.state, deadlineAt: null, preparationAttemptId: undefined },
+          }
+        : message
+    ),
+  };
+}
+
 const sandboxId = 'sbx__control_smoke';
 const ROOT_ID = 'ses_abcdefghijklmnopqrstuvwxyz';
 const SECOND_ROOT_ID = 'ses_zyxwvutsrqponmlkjihgfedcba';
@@ -10153,6 +10173,10 @@ describe('SandboxSession control-plane regressions', () => {
       },
       auth: { kiloSessionId: ROOT_ID, kilocodeToken: 'stored-test-token' },
       agent,
+      workspace: {
+        sandboxId: fixture.sandboxId,
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+      },
     });
     await runInDurableObject(session, (_instance, state) => {
       seedMessages(state.storage.kv, [
@@ -10620,7 +10644,7 @@ describe('SandboxSession control-plane regressions', () => {
       ).rejects.toThrow('admission reset');
       release.resolve();
       session = env.SANDBOX_SESSION.get(env.SANDBOX_SESSION.idFromString(session.id.toString()));
-      expect(await admissionState(session)).toEqual(before);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(before));
       expect(
         await runInDurableObject(session, (_instance, state) => state.storage.getAlarm())
       ).toBe(alarmAt);
@@ -10735,7 +10759,7 @@ describe('SandboxSession control-plane regressions', () => {
         acceptControlRequest(socket, request);
         held = undefined;
         await dispatch;
-        expect(await admissionState(session)).toEqual(terminal);
+        expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(terminal));
         expect(await lifecycleEvents(session)).toEqual(events);
         await expect(
           session.admitSubmittedMessage({
@@ -11226,7 +11250,7 @@ describe('SandboxSession control-plane regressions', () => {
         session.admitSubmittedMessage({ ...replay, agent: { model: modelB } })
       ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
       await runInDurableObject(session, instance => instance.alarm());
-      expect(await admissionState(session)).toEqual(beforeReplay);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(beforeReplay));
       expect(waitingRequests).toEqual([]);
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 
@@ -11236,7 +11260,7 @@ describe('SandboxSession control-plane regressions', () => {
         cloudflareRef(fixture.sandboxId)
       );
       session = env.SANDBOX_SESSION.get(env.SANDBOX_SESSION.idFromString(session.id.toString()));
-      expect(await admissionState(session)).toEqual(beforeReplay);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(beforeReplay));
       replacement = await connect(credential, fixture.sandboxId);
       await completeHello(replacement, 'hello_frozen_recreated', {
         providerInstanceId: cloudflareRef(fixture.sandboxId),
@@ -11252,7 +11276,7 @@ describe('SandboxSession control-plane regressions', () => {
         success: true,
         compatibilityDelivery: 'sent',
       });
-      expect(await admissionState(session)).toEqual(accepted);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(accepted));
       await completeTurn(session, INITIAL_MESSAGE_ID, fixture.wrapperInstanceId);
       await waitForAccepted(session, 'msg_b');
       await completeTurn(session, 'msg_b', fixture.wrapperInstanceId);
@@ -11286,7 +11310,7 @@ describe('SandboxSession control-plane regressions', () => {
         success: false,
         code: 'BAD_REQUEST',
       });
-      expect(await admissionState(session)).toEqual(terminal);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(terminal));
       expect(terminal.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     } finally {
@@ -11378,28 +11402,30 @@ describe('SandboxSession control-plane regressions', () => {
         { messageId: 'msg_model_less', state: expect.objectContaining({ kind: 'accepted' }) },
         {
           messageId: 'msg_selected',
-          state: { kind: 'queued', intent: { agent: { model: modelB } } },
+          state: { kind: 'accepted', intent: { agent: { model: modelB } } },
         },
       ]);
       expect(delivered.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       await runInDurableObject(session, instance => instance.alarm());
       await runInDurableObject(session, instance => instance.alarm());
-      expect(await admissionState(session)).toEqual(delivered);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(delivered));
       expect(requests.map(request => request.operation)).toEqual([
         'session.attach',
+        'session.prompt',
         'session.prompt',
       ]);
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => request.payload)
-      ).toEqual([
+      ).toMatchObject([
         {
           messageId: 'msg_model_less',
           turn: { type: 'command', command: 'status', arguments: '--all' },
           agent: { mode: 'reviewer' },
           finalization: { autoCommit: true },
         },
+        { messageId: 'msg_selected' },
       ]);
       await runInDurableObject(session, (_instance, state) => {
         const events = createEventQueries(
@@ -11466,7 +11492,7 @@ describe('SandboxSession control-plane regressions', () => {
         agent: { model: modelB, mode: 'reviewer', variant: 'low' },
       });
       expect(result).toEqual({ success: false, code: outcome.code, error: outcome.error });
-      expect(await admissionState(session)).toEqual(before);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(before));
       if (result.success) throw new Error('Expected model admission failure');
       expect(() => throwAdmissionError(result)).toThrowError(
         expect.objectContaining({
@@ -11494,7 +11520,7 @@ describe('SandboxSession control-plane regressions', () => {
         turn: { type: 'prompt', id: 'msg_missing', prompt: 'missing selection' },
       })
     ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
-    expect(await admissionState(session)).toEqual(before);
+    expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(before));
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -11588,7 +11614,7 @@ describe('SandboxSession control-plane regressions', () => {
         const winner = await admissionState(session);
         validation.release();
         await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
-        expect(await admissionState(session)).toEqual(winner);
+        expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(winner));
         expect(
           winner.messages.filter(message => message.messageId === 'msg_concurrent')
         ).toMatchObject([{ state: { intent: { agent: nextAgent } } }]);
@@ -11633,7 +11659,7 @@ describe('SandboxSession control-plane regressions', () => {
         success: true,
         compatibilityDelivery: 'sent',
       });
-      expect(await admissionState(session)).toEqual(winner);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(winner));
       expect(winner.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(requests.filter(request => request.operation === 'session.prompt')).toHaveLength(1);
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
@@ -11660,7 +11686,7 @@ describe('SandboxSession control-plane regressions', () => {
       const terminal = await admissionState(session);
       validation.release();
       await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
-      expect(await admissionState(session)).toEqual(terminal);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(withoutQueuedDispatch(terminal));
       expect(
         terminal.messages.find(message => message.messageId === 'msg_terminal')?.state.kind
       ).toBe('cancelled');
@@ -11732,7 +11758,9 @@ describe('SandboxSession control-plane regressions', () => {
       })
     ).resolves.toMatchObject({ success: true });
     const frozen = await admissionState(session);
-    expect(frozen.messages.slice(0, 2)).toEqual(history);
+    expect(withoutQueuedDispatch(frozen).messages.slice(0, 2)).toEqual(
+      withoutQueuedDispatch({ messages: history }).messages
+    );
     expect(frozen.messages.slice(2).map(message => message.state.intent)).toEqual([
       { turn: { type: 'prompt', messageId: 'msg_old_turn', prompt: 'old turn A' }, agent: agentA },
       {
@@ -11898,7 +11926,7 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForAccepted(session, INITIAL_MESSAGE_ID);
       await runInDurableObject(session, instance => instance.alarm());
       const delivered = requests.filter(request => request.operation === 'session.prompt');
-      expect(delivered).toHaveLength(2);
+      expect(delivered).toHaveLength(3);
       expect(delivered[0]?.payload).toEqual(delivered[1]?.payload);
       expect(delivered[1]?.payload).toEqual({
         messageId: INITIAL_MESSAGE_ID,
@@ -11906,10 +11934,11 @@ describe('SandboxSession control-plane regressions', () => {
         agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
         finalization: { autoCommit: true },
       });
+      expect(delivered[2]?.payload).toMatchObject({ messageId: 'msg_retry_b' });
       const accepted = await admissionState(session);
       expect(accepted.messages).toMatchObject([
         { messageId: INITIAL_MESSAGE_ID, state: { kind: 'accepted', intent: original } },
-        { messageId: 'msg_retry_b', state: expect.objectContaining({ kind: 'queued' }) },
+        { messageId: 'msg_retry_b', state: expect.objectContaining({ kind: 'accepted' }) },
       ]);
       expect(accepted.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -12153,6 +12182,15 @@ describe('SandboxSession control-plane regressions', () => {
           auth: { kiloSessionId: 'kilo_root' },
           agent: { mode: 'code', model: 'test' },
           repository,
+          workspace: {
+            sandboxId: 'istd-636f6e74726f6c636f6d6d616e6473',
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+          },
           message: { initialTurn },
         })
       ).resolves.toMatchObject({ success: true, messageId: initialTurn.messageId });
@@ -12189,8 +12227,12 @@ describe('SandboxSession control-plane regressions', () => {
         finalization: { autoCommit: true },
       });
       expect(
-        ((await readSessionValue(state.storage)) as { messages?: SessionMessage[] } | undefined)
-          ?.messages ?? []
+        withoutQueuedDispatch({
+          messages:
+            ((await readSessionValue(state.storage)) as
+              | { messages?: SessionMessage[] }
+              | undefined)?.messages ?? [],
+        }).messages
       ).toEqual([
         blocker,
         {
@@ -14119,10 +14161,14 @@ describe('SandboxSession worktree admission', () => {
           prompt: 'first grouped turn',
           turn: { type: 'prompt', prompt: 'first grouped turn' },
         });
-        expect(
-          ((await readSessionValue(state.storage)) as { messages?: SessionMessage[] } | undefined)
-            ?.messages ?? []
-        ).toEqual([
+      expect(
+        withoutQueuedDispatch({
+          messages:
+            ((await readSessionValue(state.storage)) as
+              | { messages?: SessionMessage[] }
+              | undefined)?.messages ?? [],
+        }).messages
+      ).toEqual([
           expect.objectContaining({
             messageId: INITIAL_MESSAGE_ID,
             state: expect.objectContaining({
@@ -14583,7 +14629,9 @@ describe('SandboxSession worktree admission', () => {
             // Admission now persists a stable queue timestamp for reporting.
             state: { ...record.state, queuedAt: expect.any(Number) },
           });
-          expect(readRawSessionMessages(state.storage.kv)).toEqual(expectedMessages);
+          expect(
+            withoutQueuedDispatch({ messages: readRawSessionMessages(state.storage.kv) }).messages
+          ).toEqual(expectedMessages);
           expect(await instance.getMetadata()).toEqual(metadata);
         }
       });
@@ -14665,7 +14713,9 @@ describe('SandboxSession worktree admission', () => {
             instance.admitSubmittedMessage({ ...request, finalization })
           ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
         }
-        expect(readRawSessionMessages(state.storage.kv)).toEqual(messages);
+        expect(
+          withoutQueuedDispatch({ messages: readRawSessionMessages(state.storage.kv) }).messages
+        ).toEqual(withoutQueuedDispatch({ messages }).messages);
         expect(await instance.getMetadata()).toEqual(metadata);
         expect(globalThis.fetch).not.toHaveBeenCalled();
       });

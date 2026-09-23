@@ -207,7 +207,7 @@ describe('Session observation wiring', () => {
     }
   );
 
-  it('preserves a shared sync failure for the watchdog runtime_unhealthy path', async () => {
+  it('keeps the accepted row when the watchdog interaction sync fails', async () => {
     const stub = env.SANDBOX_SESSION.getByName(`user_observation:workspace_${crypto.randomUUID()}`);
     await runInDurableObject(stub, async (instance, state) => {
       const f = await fixture(instance, state);
@@ -220,9 +220,10 @@ describe('Session observation wiring', () => {
         f.pending.reject(new Error('native read failed'));
         await alarm;
         expect(f.control.request).toHaveBeenCalledTimes(1);
+        // A transport or sync failure is not proof the turn is dead.
         expect(readRawSessionMessages(state.storage.kv)).toEqual([
           expect.objectContaining({
-            state: expect.objectContaining({ kind: 'failed', reason: 'runtime_unhealthy' }),
+            state: expect.objectContaining({ kind: 'accepted' }),
           }),
         ]);
         expect(f.storedEvents().filter(event => event.stream_event_type === 'kilocode')).toEqual(

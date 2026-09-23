@@ -29,6 +29,7 @@ import {
   type Completion,
 } from './control-test-fixtures';
 import { operationIntent } from './operation-intent';
+import { STABLE_ROOT_IDLE_MS } from '../lifecycle';
 import {
   rememberAttachedRoot,
   rememberChildSession,
@@ -38,6 +39,12 @@ import { createOperationRegistry } from './operation-registry';
 import { resetDirectoryOperationState } from './worktree-operations';
 
 let homeRoot: string;
+
+/** Root idle plus the 3s stable-idle window: the only real seal. */
+async function sealRootIdle(handlerDeps: HandlerDeps, kiloSessionId: string): Promise<void> {
+  handlerDeps.operations.observeRootEvent({ type: 'session.idle', sessionID: kiloSessionId });
+  await Bun.sleep(STABLE_ROOT_IDLE_MS + 50);
+}
 
 beforeEach(() => {
   resetSessionDirectoryState();
@@ -955,7 +962,7 @@ describe('operation admission and lookup', () => {
       nativeRuntimeId: runtime.runtimeId,
       target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
       reason: 'repeated publication cleanup',
-      deadlineAt: base + 5_000,
+      deadlineAt: base + 120_000,
     };
     const start = async (index: number) => {
       const messageId = `message_a${index}`;
@@ -973,6 +980,7 @@ describe('operation admission and lookup', () => {
         authorization
       );
       await run.started.promise;
+      await sealRootIdle(handlerDeps, sessionA.kiloSessionId);
       await run.finalizerStarted.promise;
       expect(await request).toMatchObject({ ok: true, result: { status: 'accepted' } });
       const operation = integratedDeps.operations.active(sessionA.kiloSessionId);
@@ -1052,7 +1060,7 @@ describe('operation admission and lookup', () => {
         integratedDeps.operations.activeOperations().map(operation => operation.done)
       );
     }
-  });
+  }, 60_000);
 
   it('does not let a retained A1 Stop reselect fresh active A2 after root invalidation', async () => {
     const runningA1 = Promise.withResolvers<Completion>();
@@ -1450,6 +1458,87 @@ describe('operation admission and lookup', () => {
     await prompt.done;
     await prompt.waitForDelivery();
     expect(handlerDeps.operations.abortTarget(session, 'msg_1')).toBe(prompt);
+  });
+
+  it('finds the operation by an admitted follow-up message id', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    const followUp = await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      operationAuthorization('session.prompt', 'next')
+    );
+    expect(followUp).toMatchObject({ ok: true });
+
+    expect(handlerDeps.operations.abortTarget(session, 'msg_1')).toBe(prompt);
+    expect(handlerDeps.operations.abortTarget(session, 'next')).toBe(prompt);
+
+    running.resolve(completion());
+    prompt.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await prompt.done;
+  });
+
+  it('resolves a follow-up authorization lookup and replay to the running operation', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    const followUp = operationAuthorization('session.prompt', 'next');
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        followUp
+      )
+    ).toMatchObject({ ok: true });
+
+    expect(
+      await handleControlRequest('session.operation.get', session, followUp, handlerDeps)
+    ).toMatchObject({ ok: true, result: { state: 'running' } });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        followUp
+      )
+    ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'existing' } });
+
+    running.resolve(completion());
+    await sealRootIdle(handlerDeps, session.kiloSessionId);
+    await prompt.done;
   });
 
   it('includes working branch mode in attach idempotency intent', () => {

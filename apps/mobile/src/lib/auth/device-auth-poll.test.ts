@@ -89,4 +89,22 @@ describe('startDeviceAuthPoll', () => {
     expect(cleanup).toHaveBeenCalled();
     expect(setState).toHaveBeenCalled();
   });
+
+  it('honours a Retry-After longer than its own backoff on a throttled poll', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json(
+        { error: 'TOO_MANY_ATTEMPTS' },
+        { status: 429, headers: { 'retry-after': '90' } }
+      )
+    );
+    makePoll();
+    // First scheduled tick at 3s is throttled.
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Our own backoff would fire again at 6s; the server asked for 90s.
+    await vi.advanceTimersByTimeAsync(7000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(83_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

@@ -119,7 +119,7 @@ export function startDeviceAuthPoll(params: {
         return;
       }
 
-      const outcome = classifyPollResponse(response.status);
+      const outcome = classifyPollResponse(response.status, response.headers.get('retry-after'));
 
       // eslint-disable-next-line typescript-eslint/switch-exhaustiveness-check
       switch (outcome.status) {
@@ -139,7 +139,10 @@ export function startDeviceAuthPoll(params: {
         }
         case 'retry': {
           retryDelay = Math.min(retryDelay * 2, POLL_MAX_INTERVAL_MS);
-          scheduleNext(retryDelay);
+          // A throttled poll waits as long as the server asked, never less
+          // than our own backoff, and never past the overall poll budget.
+          const wait = Math.max(retryDelay, outcome.retryAfterMs ?? 0);
+          scheduleNext(Math.min(wait, POLL_OVERALL_TIMEOUT_MS));
           return;
         }
         case 'error': {

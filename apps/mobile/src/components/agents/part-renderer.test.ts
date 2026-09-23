@@ -304,8 +304,12 @@ describe('PartRenderer', () => {
 
 describe('PartRenderer patch part summary', () => {
   // `/workspace/<userId>/sessions/<sessionId>` with the repo cloned at that
-  // root (services/cloud-agent-next/src/workspace.ts:208).
+  // root (services/cloud-agent-next/src/workspace.ts:202).
   const WORKSPACE_ROOT = '/workspace/a7e4d40b-c28c-4df1-9a1e-f88e7eb467f1/sessions/W1s2';
+  // `/workspace/<userId>/worktrees/<worktreeId>` is the root a worktree-backed
+  // session clones into instead (services/cloud-agent-next/src/workspace.ts:211).
+  const WORKTREE_ROOT =
+    '/workspace/a7e4d40b-c28c-4df1-9a1e-f88e7eb467f1/worktrees/worktree_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
 
   it('renders the file count and paths for a patch part', () => {
     const part = makePatchPart(['src/a.ts', 'src/b.ts']);
@@ -352,6 +356,28 @@ describe('PartRenderer patch part summary', () => {
     // eslint-disable-next-line new-cap
     const result = PartRenderer({ part });
     expect(findText(result, 'src/a.ts')).toHaveLength(1);
+  });
+
+  it('strips a worktree workspace prefix', () => {
+    const part = makePatchPart([`${WORKTREE_ROOT}/README.md`]);
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part });
+    expect(result).not.toBeNull();
+    expect(findText(result, 'README.md')).toHaveLength(1);
+    expect(
+      findAll(
+        result,
+        el =>
+          el.type === 'Text' &&
+          String((el.props as { children?: unknown }).children).includes('/workspace/')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('strips an org-scoped worktree workspace prefix from a nested path', () => {
+    expect(
+      patchPartFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d/src/nested/a.ts')
+    ).toBe('src/nested/a.ts');
   });
 
   it('renders each file row as a single middle-ellipsized line', () => {

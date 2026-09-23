@@ -27,14 +27,17 @@ import { ToolPartRenderer } from './tool-part-renderer';
 import { type OpenChildSession } from './child-session-section';
 
 /**
- * The absolute cloud-agent workspace prefix every patch path carries:
- * `/workspace/<userId>/sessions/<sessionId>/` (optionally with an organization
- * segment before the user id) — the repo is cloned at that root, so dropping it
- * leaves the repo-relative path a reader wants instead of the workspace ids.
+ * The absolute cloud-agent workspace prefixes a patch path can carry:
+ * `/workspace/<userId>/sessions/<sessionId>/` for a session workspace and
+ * `/workspace/<userId>/worktrees/<worktreeId>/` for a worktree-backed session
+ * (either optionally with an organization segment before the user id) — the
+ * repo is cloned at that root, so dropping it leaves the repo-relative path a
+ * reader wants instead of the workspace ids.
  *
- * services/cloud-agent-next/src/workspace.ts:208
+ * services/cloud-agent-next/src/workspace.ts:202,211,371
  */
-const CLOUD_AGENT_WORKSPACE_PREFIX = /^\/workspace\/(?:[^/]+\/)?[^/]+\/sessions\/[^/]+\//;
+const CLOUD_AGENT_WORKSPACE_PREFIX =
+  /^\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/[^/]+\//;
 
 export function patchPartFileLabel(path: string): string {
   return path.replace(CLOUD_AGENT_WORKSPACE_PREFIX, '');

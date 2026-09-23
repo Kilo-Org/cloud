@@ -175,6 +175,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // arrayContaining, not an exact array: introspection seeds android.colors
+    // from the checked-out prebuild, which also carries the app's other colors
+    // (colorPrimary, app_background, notification_icon_color). Asserting the
+    // exact length made this pass only on a tree with no prebuilt android/.
     // The shared app config carries the other `colors.xml` entries (icon and
     // notification colors, the app background) through the same mod chain, so
     // assert this plugin's surface is present rather than the array length.

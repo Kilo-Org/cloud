@@ -98,7 +98,9 @@ describe('Text tracked labels in RTL', () => {
     expect(hostText(root).props.style).toBeUndefined();
   });
 
-  it('applies the same reset to the shared Eyebrow label', () => {
+  it('drops the Eyebrow display treatment and still resets letter spacing in RTL', () => {
+    // The eyebrow's tracking class is LTR-only (text.tsx EYEBROW_LATIN_DISPLAY):
+    // an RTL eyebrow drops it and relies on the RTL letter-spacing reset.
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 

@@ -185,6 +185,8 @@ export function SessionContextSheet({
     connectionLabel = t('agentChat.sessionConnection.connectionLost');
   } else if (connectionDisplay === 'reconnecting') {
     connectionLabel = t('agentChat.sessionConnection.reconnecting');
+  } else if (connectionDisplay === 'scheduled') {
+    connectionLabel = t('common.scheduled');
   }
   const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info?.percentage);

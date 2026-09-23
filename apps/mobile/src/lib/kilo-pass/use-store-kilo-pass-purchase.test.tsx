@@ -49,6 +49,7 @@ const mockedReactQuery = vi.hoisted(() => ({
     | { products: { appleProductId: string; googleProductId?: string }[] }
     | undefined,
   removeQueries: vi.fn(),
+  storeProductsData: undefined as readonly AppStoreKiloPassProduct[] | undefined,
   useMutation: vi.fn(),
   useQuery: vi.fn(),
   useQueryClient: vi.fn(),
@@ -97,8 +98,15 @@ vi.mock('@tanstack/react-query', () => ({
     mockedReactQuery.useQuery();
     mockedReactQuery.lastQueryKey = options.queryKey;
     const isMobileStoreProducts = options.queryKey[0] === 'mobile-products';
+    const isStoreProducts = options.queryKey[0] === 'kilo-pass';
+    let data: unknown = undefined;
+    if (isMobileStoreProducts) {
+      data = mockedReactQuery.mobileStoreProductsData;
+    } else if (isStoreProducts) {
+      data = mockedReactQuery.storeProductsData;
+    }
     return {
-      data: isMobileStoreProducts ? mockedReactQuery.mobileStoreProductsData : undefined,
+      data,
       error: null,
       isError: false,
       isLoading: false,
@@ -384,6 +392,7 @@ beforeEach(() => {
   mockedReactQuery.lastQueryKey = null;
   mockedReactQuery.mobileStoreProductsData = undefined;
   mockedReactQuery.removeQueries.mockReturnValue(undefined);
+  mockedReactQuery.storeProductsData = undefined;
 });
 
 describe('createAppStoreKiloPassPurchaseActions', () => {
@@ -1387,6 +1396,73 @@ describe('KiloPassNativeIapOwner', () => {
     await flushPromises();
 
     expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers an owned purchase for a tier the store could not resolve', async () => {
+    mockedPlatform.OS = 'android';
+    mockedIap.connected = true;
+    // The store resolved tier 19 only: tier 49 failed to query, so it is absent
+    // from the paywall's product list but still owned on this Play account.
+    mockedReactQuery.storeProductsData = [product];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [
+        { appleProductId: product.appleProductId, googleProductId: 'kilopass_tier19' },
+        { appleProductId: 'com.kilo.pass.tier49.monthly', googleProductId: 'kilopass_tier49' },
+      ],
+    };
+    const unresolvedTierPurchase = createPurchase({
+      store: 'google',
+      productId: 'kilopass_tier49',
+      purchaseToken: 'tier49-token',
+      transactionId: 'tier49-order',
+    });
+    mockedIap.availablePurchases = [unresolvedTierPurchase];
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
+      purchaseToken: 'tier49-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: unresolvedTierPurchase,
+      isConsumable: false,
+    });
+  });
+
+  it('restores an owned purchase for a tier the store could not resolve', async () => {
+    mockedPlatform.OS = 'android';
+    mockedIap.connected = true;
+    mockedReactQuery.storeProductsData = [product];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [
+        { appleProductId: product.appleProductId, googleProductId: 'kilopass_tier19' },
+        { appleProductId: 'com.kilo.pass.tier49.monthly', googleProductId: 'kilopass_tier49' },
+      ],
+    };
+    mockedIap.getAvailablePurchases.mockResolvedValue([
+      createPurchase({
+        store: 'google',
+        productId: 'kilopass_tier49',
+        purchaseToken: 'tier49-token',
+        transactionId: 'tier49-order',
+      }),
+    ]);
+    const owner = renderKiloPassNativeIapOwner();
+
+    const result = await owner.render().restorePurchases();
+
+    expect(result).toBe('restored');
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
+      purchaseToken: 'tier49-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
   });
 
   it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {

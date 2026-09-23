@@ -58,9 +58,10 @@ type Palette = {
   background: HexColor;
   foreground: HexColor;
   muted: HexColor;
-  /** Three states, three colors — the same vocabulary the iOS surfaces draw. */
+  /** Four states, four colors — the same vocabulary the iOS surfaces draw. */
   needsInput: HexColor;
   running: HexColor;
+  scheduled: HexColor;
 };
 
 // The app's own palette, not a widget-local one: a Home Screen card that does
@@ -71,6 +72,9 @@ const LIGHT: Palette = {
   muted: lightColors.mutedForeground,
   needsInput: lightColors.warn,
   running: lightColors.good,
+  // The muted-soft tone the session list's scheduled clock glyph uses, so the
+  // widget's scheduled marker matches the row the user taps to get here.
+  scheduled: lightColors.mutedSoft,
 };
 
 const DARK: Palette = {
@@ -79,6 +83,7 @@ const DARK: Palette = {
   muted: darkColors.mutedForeground,
   needsInput: darkColors.warn,
   running: darkColors.good,
+  scheduled: darkColors.mutedSoft,
 };
 
 // This function is evaluated only through `renderActiveAgentsWidget` and the
@@ -132,13 +137,16 @@ function dotColor(kind: GlanceableCountKind, palette: Palette): HexColor {
   if (kind === 'running') {
     return palette.running;
   }
-  return kind === 'scheduled' ? palette.muted : palette.foreground;
+  if (kind === 'scheduled') {
+    return palette.scheduled;
+  }
+  return palette.foreground;
 }
 
 /**
- * The state marker. Needs-input and working are filled, idle is an outline —
- * the shapes differ as well as the colors, so the three states stay apart for a
- * user who cannot tell orange from green.
+ * The state marker. Needs-input, working, and scheduled are filled, idle is an
+ * outline — the shapes differ as well as the colors, so the four states stay
+ * apart for a user who cannot tell orange from green or from grey.
  */
 function stateDot(kind: GlanceableCountKind, palette: Palette, size: number) {
   const color = dotColor(kind, palette);
@@ -161,19 +169,54 @@ function logo(size: number) {
 
 /**
  * One count line: marker, count, label. Only the label color ranks the rows,
- * because a second font size in a three-row list reads as a mistake.
+ * because a second font size in a three-row list reads as a mistake. A
+ * scheduled row also carries the wake time in a slot reserved in every state.
  */
 type RowStyle = {
   palette: Palette;
+  size: Size;
   fontSize: number;
   showLabel: boolean;
   rtl: boolean;
+  /** Preformatted wake from the props; only the scheduled row draws it. */
+  scheduledAgo: string | null;
 };
+
+/**
+ * The wake time's slot beside a scheduled count row.
+ *
+ * The box draws on the scheduled row whenever the rows draw — a zero row too —
+ * so a wake the CLI reports for a session that had none earlier fills the slot
+ * without moving the rows above or below it. The text is the preformatted wake
+ * from `props.scheduledAgo`, and it is absent until a wake is known.
+ */
+function wakeSlot(scheduledAgo: string | null, palette: Palette, size: Size) {
+  return (
+    <FlexWidget
+      key="wake"
+      style={{
+        height: WAKE_SLOT_DP[size],
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}
+    >
+      {scheduledAgo === null ? null : (
+        <TextWidget
+          key="wake-text"
+          text={scheduledAgo}
+          maxLines={1}
+          truncate="END"
+          style={{ color: palette.muted, fontSize: WAKE_FONT_DP[size] }}
+        />
+      )}
+    </FlexWidget>
+  );
+}
 
 function countRow(
   line: AndroidWidgetProps['countLines'][number],
   isPrimary: boolean,
-  { palette, fontSize, showLabel, rtl }: RowStyle
+  { palette, size, fontSize, showLabel, rtl, scheduledAgo }: RowStyle
 ) {
   return (
     <FlexWidget key={line.label} style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}>
@@ -199,6 +242,7 @@ function countRow(
               }}
             />
           ) : null,
+          line.kind === 'scheduled' ? wakeSlot(scheduledAgo, palette, size) : null,
         ],
         rtl
       )}
@@ -322,6 +366,13 @@ const NEWEST_FONT_DP = {
   stack: 12,
   large: 12,
 } satisfies Record<Size, number>;
+/**
+ * The wake time beside a scheduled count row: a step down from the count it
+ * annotates, and the height its slot reserves in every state so a wake the CLI
+ * reports later cannot move the rows above or below it.
+ */
+const WAKE_FONT_DP = { compact: 11, row: 11, stack: 12, large: 12 } satisfies Record<Size, number>;
+const WAKE_SLOT_DP = { compact: 14, row: 14, stack: 16, large: 16 } satisfies Record<Size, number>;
 /** One action-row size in every bucket, so the rows themselves never reflow. */
 const ACTION_FONT_DP = 12;
 /**
@@ -344,9 +395,11 @@ function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape)
     const isPrimary = line.label === primaryLabel;
     return countRow(line, isPrimary, {
       palette,
+      size,
       fontSize: size === 'compact' || size === 'row' ? 13 : 15,
       showLabel: size !== 'row' || rowLabels || isPrimary,
       rtl,
+      scheduledAgo: props.scheduledAgo,
     });
   });
   return (

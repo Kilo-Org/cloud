@@ -72,7 +72,7 @@ const formatAgo = (at: string): string => `ago:${at}`;
 const AGO = formatAgo(NEWEST_AT);
 
 function snapshotFor(
-  sessions: { status: string; statusUpdatedAt?: string }[],
+  sessions: { status: string; statusUpdatedAt?: string; scheduledAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -159,6 +159,30 @@ function collectStyles(node: unknown): Record<string, unknown>[] {
 }
 
 type Cell = { width: number; height?: number; rtl?: boolean };
+
+/** The count row whose own label is `label`, found through its direct children. */
+function countRowFor(node: unknown, label: string): MockElement | undefined {
+  return findElement(node, element => {
+    const children = element.props.children;
+    return (
+      Array.isArray(children) &&
+      children.some(child => (child as MockElement | null)?.props.text === label)
+    );
+  });
+}
+
+/**
+ * The scheduled row's wake slot: the child that reserves a numeric height and
+ * lays its own content out in a row. The state dot has a height too, so the
+ * direction is what tells the two apart.
+ */
+function wakeSlotStyle(row: MockElement | undefined): Record<string, unknown> | undefined {
+  return row === undefined
+    ? undefined
+    : collectStyles(row).find(
+        style => typeof style.height === 'number' && style.flexDirection === 'row'
+      );
+}
 
 function render(props: ReturnType<typeof buildAndroidWidgetProps>, cell: Cell) {
   const { width, height = 200, rtl = false } = cell;
@@ -708,5 +732,55 @@ describe('the large widget cell', () => {
       AGO,
       'Working',
     ]);
+  });
+});
+
+// The scheduled count row: the marker takes its own color, the wake rides beside
+// the row, and the slot the wake fills is reserved whether or not it is known.
+describe('the scheduled count row', () => {
+  /** Two hours ahead of the suite's clock, so the stub formatter echoes it. */
+  const WAKE = new Date(NOW + 7_200_000).toISOString();
+
+  function propsFor(scheduledAt?: string) {
+    return buildAndroidWidgetProps(
+      snapshotFor(
+        [{ status: 'scheduled', ...(scheduledAt === undefined ? {} : { scheduledAt }) }],
+        0
+      ),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+  }
+
+  it('gives the scheduled marker its own color instead of the idle outline', () => {
+    const rep = render(propsFor(), { width: 250 });
+    const light = collectStyles(rep.light);
+    const dark = collectStyles(rep.dark);
+
+    // Filled in the muted-soft tone the session list's scheduled clock uses.
+    expect(light.some(style => style.backgroundColor === lightColors.mutedSoft)).toBe(true);
+    expect(dark.some(style => style.backgroundColor === darkColors.mutedSoft)).toBe(true);
+    // The idle marker stays an outline, so the two greys never read alike.
+    expect(light.some(style => style.borderColor === lightColors.foreground)).toBe(true);
+  });
+
+  it('draws the wake time beside the scheduled row', () => {
+    const row = countRowFor(render(propsFor(WAKE), { width: 250 }).light, 'Scheduled');
+
+    expect(collectText(row)).toEqual(['1', 'Scheduled', formatAgo(WAKE)]);
+  });
+
+  it('reserves the wake slot whether or not a wake is known', () => {
+    const withWakeRow = countRowFor(render(propsFor(WAKE), { width: 250 }).light, 'Scheduled');
+    const withoutWakeRow = countRowFor(render(propsFor(), { width: 250 }).light, 'Scheduled');
+    const withWake = wakeSlotStyle(withWakeRow);
+    const withoutWake = wakeSlotStyle(withoutWakeRow);
+
+    expect(withWake?.height).toBeGreaterThan(0);
+    expect(withoutWake?.height).toBe(withWake?.height);
+    // The slot is reserved empty: no time text until the CLI reports one.
+    expect(collectText(withoutWakeRow)).toEqual(['1', 'Scheduled']);
   });
 });

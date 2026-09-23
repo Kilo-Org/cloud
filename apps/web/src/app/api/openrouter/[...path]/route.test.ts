@@ -794,7 +794,6 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it.each([
-    'openai/gpt-5.6-sol-discounted',
     'google/gemma-4-26b-a4b-it:free',
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',

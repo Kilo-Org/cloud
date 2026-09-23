@@ -500,3 +500,33 @@ describe('ModelPickerContent deferred search', () => {
     });
   });
 });
+
+// The composer's current model arrives as the bridge's `currentValue`. The row
+// for that id must carry `selected`, or the picker shows no visible selected
+// state for the model the composer is editing (model-selected finding: the
+// DeepSeek V4.1 Flash row read as star-only). `selected` is what renders the
+// trailing Check (see model-selector.mounted.test.tsx).
+describe('ModelPickerContent selected row', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    slotState.bridge = { ...makeBridge(), currentValue: 'remote-model-17' };
+  });
+
+  it('marks exactly the bridge current model as the selected row', async () => {
+    const renderer = await mount();
+
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    const selectedIds = findByType(renderer.root, 'ModelPickerOptionRow')
+      .filter(node => node.props.selected === true)
+      .map(node => (node.props.option as SessionModelOption).id);
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    expect(selectedIds).toEqual(['remote-model-17']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});

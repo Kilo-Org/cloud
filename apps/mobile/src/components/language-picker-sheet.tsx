@@ -11,7 +11,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
 import { PickerSheet } from '@/components/picker-sheet';
-import { SearchX } from '@/components/ui/icons';
+import { Search, SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { languagePickerItems } from '@/i18n/language-rows';
@@ -215,14 +215,19 @@ export function LanguagePickerSheet({
       disabled={busy}
       scrollable={false}
       headerContent={
-        <View className="px-4 pb-2 pt-3">
+        // Filled pill with a leading magnifier, the one search-field shape the
+        // repository and share pickers use. The outlined box this replaced made
+        // the same control look like two different controls across pickers.
+        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+          <Search size={18} color={colors.mutedForeground} />
           <TextInput
             key={searchEpoch}
             accessibilityLabel={t('language.search')}
             // leading-[normal] so no lineHeight reaches the style: iOS otherwise
-            // draws the placeholder below the typed text and clips it. min-h-*
-            // sets the height without padding, so iOS centres the text rect.
-            className="rounded-md border border-input bg-background px-3 min-h-[44px] text-sm leading-[normal] text-foreground"
+            // draws the placeholder below the typed text and clips it. The fixed
+            // h-* with p-0 sets the height without padding, so iOS centres the
+            // text rect the same way the repository picker's field does.
+            className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // textAlign is applied inline, not via a class: NativeWind maps it

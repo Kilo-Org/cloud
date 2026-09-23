@@ -277,6 +277,7 @@ function fakeStream(events: StreamEvent[], terminal: StreamEvent): FakeStream {
     get isOpen() {
       return true;
     },
+    closeInfo: null,
   };
 }
 

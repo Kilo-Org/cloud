@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Mic, SearchX } from '@/components/ui/icons';
+import { Mic, Search, SearchX } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
@@ -289,13 +289,17 @@ export function VoiceLanguagePickerSheet() {
       }}
       scrollable={false}
       headerContent={
-        <View className="px-4 pb-2 pt-3">
+        // Same filled pill as the account language picker and the repository
+        // and share pickers: one search-field shape for the same control.
+        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+          <Search size={18} color={colors.mutedForeground} />
           <TextInput
             accessibilityLabel={t('language.search')}
             // leading-[normal] so no lineHeight reaches the style: iOS otherwise
-            // draws the placeholder below the typed text and clips it. min-h-*
-            // sets the height without padding, so iOS centres the text rect.
-            className="rounded-md border border-input bg-background px-3 min-h-[44px] text-sm leading-[normal] text-foreground"
+            // draws the placeholder below the typed text and clips it. The fixed
+            // h-* with p-0 sets the height without padding, so iOS centres the
+            // text rect the same way the repository picker's field does.
+            className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // textAlign is applied inline, not via a class: NativeWind maps it

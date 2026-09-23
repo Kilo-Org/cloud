@@ -71,6 +71,14 @@ export function groupWorktreeChangesByDirectory(
   })).sort((a, b) => (a.directory < b.directory ? -1 : a.directory > b.directory ? 1 : 0));
 }
 
+export function resolveWorktreeChangesSelection(
+  selectedPath: string | null,
+  files: readonly WorktreeChangesFile[]
+): string | null {
+  if (selectedPath && files.some(file => file.path === selectedPath)) return selectedPath;
+  return groupWorktreeChangesByDirectory(files)[0]?.files[0]?.path ?? null;
+}
+
 export function formatWorktreeChangesBaseBranch(baseRef: string): string {
   return baseRef.replace(/^refs\/remotes\/[^/]+\//, '');
 }

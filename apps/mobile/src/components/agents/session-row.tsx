@@ -2,7 +2,6 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -11,13 +10,14 @@ import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
+import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
@@ -104,12 +104,18 @@ export function StoredSessionRow({
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  // The server's creation-default title (`New session - <ISO timestamp>`) is
-  // an internal marker, never row copy: resolve it once here so the same
-  // label feeds the row, the accessibility label, and the rename prompt.
-  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // The server's creation-default title (`New session - <ISO timestamp>`) is an
+  // internal marker, never row copy: `namedSessionTitle` resolves it through
+  // the shared `sessionDisplayTitle` helper and additionally keeps a
+  // placeholder-shaped title the user's own rename wrote, so the same label
+  // feeds the row, the accessibility label, and the rename prompt. The
+  // subscription repaints the row once the durable record hydrates after a
+  // cold start.
+  useUserSessionTitlesRevision();
+  const title =
+    namedSessionTitle(session.title, session.session_id) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -130,7 +136,7 @@ export function StoredSessionRow({
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     showSessionActionMenu({
       showActionSheetWithOptions,
-      bottomInset: bottom,
+      themedSheet,
       onCopySessionId: () => {
         void copySessionId(session.session_id);
       },

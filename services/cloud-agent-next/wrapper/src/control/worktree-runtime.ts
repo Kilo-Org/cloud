@@ -311,6 +311,7 @@ export function buildWorktreeKiloEnvironment(
 
   const config = JSON.stringify({
     autoupdate: false,
+    snapshot: false,
     permission: CONTROL_PLANE_SANDBOX_PERMISSION,
     provider: {
       kilo: {

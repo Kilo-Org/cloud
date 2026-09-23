@@ -157,7 +157,7 @@ export function buildReviewFirstPageQueryOptions(
  * simply absent, not duplicated). When the row set changed the caller refetches
  * the retained pages instead, re-requesting every page at its offset.
  */
-export function reviewFirstPageBoundaryMatches(
+function reviewFirstPageBoundaryMatches(
   existing: ReviewListData | undefined,
   page: ReviewListPage | undefined
 ): boolean {

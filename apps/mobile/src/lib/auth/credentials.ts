@@ -2,9 +2,10 @@ import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { classifyAuthResponse, reportAuthTerminalFailure } from '@/lib/auth/auth-response-class';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
-import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
+import { clearActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
@@ -38,10 +39,28 @@ type RefreshSuccess = {
   expiresIn: number;
   sessionVersion: number;
 };
-type RefreshRefused = { ok: false; refused: true; superseded?: false };
-type RefreshTransient = { ok: false; refused: false; superseded?: false };
+type RefreshRefused = {
+  ok: false;
+  refused: true;
+  superseded?: false;
+  /** The session that owned the refusal. A handler must drop the refusal when
+   *  this is no longer the current epoch: the epoch can move while the clear
+   *  awaits, and signing out then would tear down the newer session. */
+  sessionVersion: number;
+};
+type RefreshTransient = {
+  ok: false;
+  refused: false;
+  superseded?: false;
+  /** The server's own back-off from a 429/503 `Retry-After`, when it sent one. */
+  retryAfterMs?: number;
+};
 type RefreshSuperseded = { ok: false; refused: false; superseded: true };
 export type RefreshOutcome = RefreshSuccess | RefreshRefused | RefreshTransient | RefreshSuperseded;
+
+// The one refresh route. Named so the classification fingerprints and the
+// request path can never drift apart.
+const REFRESH_PATH = '/api/auth/native/refresh';
 
 // Proactive refresh window: refresh when the token expires within 5 minutes.
 export const REFRESH_MARGIN_MS = 5 * 60 * 1000;
@@ -50,6 +69,40 @@ export const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 export async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
   const result = await chainSave('credentials', write);
   return result;
+}
+
+/**
+ * Delete the stored bearer pair, and drop the in-memory owner with it.
+ *
+ * Called when a 401 proves the credential is gone: keeping the dead pair is
+ * what makes every later request try again and fail again. The deletes run on
+ * the serialized credential queue, so a sign-in or sign-out that moved the
+ * epoch first wins and this clear is skipped rather than resurrecting a
+ * teardown. `epoch` is the session that owned the refusal, captured before the
+ * request that produced it.
+ */
+async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
+  const superseded = (): boolean => !isCurrentAuthEpoch(epoch) || isSignOutTeardownActive();
+  if (superseded()) {
+    return;
+  }
+  await writeCredentials(async () => {
+    if (superseded()) {
+      return;
+    }
+    // Best effort, like sign-out's credential batch: a keychain rejection must
+    // not escape into doRefresh's catch, which would downgrade this terminal
+    // 401 into a retryable outcome and restart the very loop it must stop. The
+    // refusal is reported and the in-memory owner dropped below regardless.
+    await Promise.allSettled([
+      SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+    ]);
+  });
+  if (!superseded()) {
+    clearActiveToken();
+  }
 }
 
 /**
@@ -153,14 +206,14 @@ async function doRefresh(): Promise<RefreshOutcome> {
     }
     if (!storedRefreshToken) {
       // No refresh token: cannot recover from this 401 — sign out.
-      return { ok: false, refused: true };
+      return { ok: false, refused: true, sessionVersion };
     }
 
     // Bound the refresh network I/O at the control-plane deadline so a hung
     // backend can never leave the refresh (or a sign-out queueing behind its
     // credential write) waiting forever.
     const response = await withDeadline(CONTROL_PLANE_DEADLINE_MS, async signal => {
-      const res = await fetch(`${API_BASE_URL}/api/auth/native/refresh`, {
+      const res = await fetch(`${API_BASE_URL}${REFRESH_PATH}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: storedRefreshToken }),
@@ -173,12 +226,27 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { ok: false, refused: false, superseded: true };
     }
 
-    // 401 means the refresh token is expired or revoked — permanent failure.
-    if (response.status === 401) {
-      return { ok: false, refused: true };
-    }
-
     if (!response.ok) {
+      // Classify before deciding: a 401 is terminal (the stored pair is gone),
+      // a 429/5xx is retryable and carries the server's own back-off, and any
+      // other 4xx is terminal without a retry guidance to honour.
+      const classified = classifyAuthResponse({
+        path: REFRESH_PATH,
+        status: response.status,
+        retryAfterHeader: response.headers.get('retry-after'),
+      });
+      if (classified.kind === 'terminal') {
+        if (classified.clearCredential) {
+          await clearStoredCredentialsAtEpoch(sessionVersion);
+        }
+        reportAuthTerminalFailure(REFRESH_PATH, classified.status);
+        return { ok: false, refused: true, sessionVersion };
+      }
+      if (classified.kind === 'retry') {
+        return { ok: false, refused: false, retryAfterMs: classified.retryAfterMs };
+      }
+      // A 2xx that failed `response.ok` is impossible; fall through to the
+      // retryable answer rather than inventing a fourth outcome.
       return { ok: false, refused: false };
     }
 

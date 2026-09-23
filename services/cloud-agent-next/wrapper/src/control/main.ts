@@ -29,6 +29,7 @@ import {
 } from './worktree-runtime';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { createControlFileLogUploader, type ControlFileLogUploader } from './file-log-uploader';
+import { installInterceptTrustIfEnabled } from './cert';
 import {
   classifyRetirementCause,
   controlLogWrapperIdSchema,
@@ -569,10 +570,10 @@ delete process.env.CONTROL_LOG_UPLOAD_URL;
 delete process.env.CONTROL_LOG_UPLOAD_GRANT;
 delete process.env.CONTROL_WRAPPER_INSTANCE_ID;
 diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
-diagnostics.start();
-fileLogs.start();
-
 try {
+  await installInterceptTrustIfEnabled(logToFile);
+  diagnostics.start();
+  fileLogs.start();
   main(diagnostics, fileLogs, wrapperInstanceId);
 } catch {
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'start_failed' });

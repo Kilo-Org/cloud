@@ -61,12 +61,19 @@ function TabBarBackground() {
 
 /**
  * One tab label, on the lines the bar reserves for it (`tabLabelLineCount`).
- * On the single reserved line a label too wide for its tab (a narrow window, a
- * long translation) shrinks to fit rather than wrapping: a second line has no
- * height reserved, so it renders clipped at the bar's edge ("PROFIL E" at
- * 160 dp, e1, 2026-09-21). Where the bar does reserve a second line (the wrap
- * font scale) the shared `TabBarLabel` renders it: the two-line copy that
- * carries its own break, and one truncated line for every other label.
+ * On the single reserved line a label too wide for its tab would wrap into a
+ * second line the bar has no height for and render clipped at the bar's edge
+ * ("PROFIL E" at 160 dp, e1, 2026-09-21), so the label is pinned to one line and
+ * asks the platform to shrink it to fit (`adjustsFontSizeToFit`, implemented on
+ * both iOS and Android) and to tail-truncate whatever still overflows. That
+ * shrink is a residual guard, not the legibility rule: the window-width rule
+ * (`shouldShowTabLabel`) drops the labels whenever a full-size label would not
+ * fit its tab, so a label that renders never has to shrink that far on either
+ * platform. `minimumFontScale` caps the residual shrink on iOS only — Android's
+ * Fabric autosize floors at RN's own platform minimum. Where the bar does
+ * reserve a second line (the wrap font scale) the shared `TabBarLabel` renders
+ * it: the two-line copy that carries its own break, and one truncated line for
+ * every other label.
  */
 function TabLabel({
   label,

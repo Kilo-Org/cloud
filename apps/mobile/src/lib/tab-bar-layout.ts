@@ -14,10 +14,13 @@ export const TAB_LABEL_WRAP_FONT_SCALE = 1.8;
  */
 export const TAB_ICON_FORWARD_FONT_SCALE = 2;
 /**
- * Floor for a tab label's shrink-to-fit. A label wider than its tab (a narrow
- * window, a long translation) shrinks to fit the one line the bar reserves;
- * below this scale the text stops being legible, so it ellipsizes instead. The
- * widest stock label at 160 dp needs about 0.9, well above this floor.
+ * Floor for a tab label's shrink-to-fit, honoured on iOS only: RN implements
+ * `Text`'s `minimumFontScale` on iOS, while Android's `adjustsFontSizeToFit`
+ * floors at RN's own platform minimum. The cap is a residual guard, not the
+ * legibility rule — `shouldShowTabLabel` drops the labels as soon as one
+ * full-size label would not fit its tab, so a label that renders never needs to
+ * shrink that far on either platform, and the one-line/tail-truncate behaviour
+ * is the same on both.
  */
 export const TAB_LABEL_MINIMUM_FONT_SCALE = 0.75;
 const TAB_ICON_BASE_SIZE = 22;

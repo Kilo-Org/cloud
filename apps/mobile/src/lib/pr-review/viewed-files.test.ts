@@ -148,6 +148,33 @@ describe('viewed-files', () => {
     expect(store.has('pr-review-viewed')).toBe(false);
   });
 
+  it('leaves the stored viewed set intact when the read for a toggle fails', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+    // The toggle stays total and aborts: persisting a map derived from the
+    // unreadable record would have wiped the stored set.
+    await expect(
+      toggleViewedFile({ ...REF, headSha: SHA1, path: 'b.ts' })
+    ).resolves.toBeUndefined();
+
+    expect(JSON.parse(store.get('pr-review-viewed') ?? '{}')).toEqual({
+      'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] },
+    });
+  });
+
+  it('retries a failed read on the next toggle instead of caching an empty map', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+    await toggleViewedFile({ ...REF, headSha: SHA1, path: 'b.ts' });
+
+    // The failed read left the cache empty, so the next toggle re-reads and
+    // builds on the stored set rather than on an empty one.
+    await toggleViewedFile({ ...REF, headSha: SHA1, path: 'b.ts' });
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['a.ts', 'b.ts']);
+  });
+
   it('caches the map so a second read after a toggle does not re-read the store', async () => {
     setStored({});
     await toggleViewedFile({ ...REF, headSha: SHA1, path: 'src/index.ts' });

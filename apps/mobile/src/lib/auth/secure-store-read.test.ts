@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
 const getItemAsync = vi.hoisted(() =>
   vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
 );
@@ -27,13 +29,20 @@ async function loadHelper() {
 }
 
 describe('readStoredValueWithRetry', () => {
+  let events: TelemetryEvent[] = [];
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    events = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    setTelemetrySink(null);
   });
 
   it('returns the value on a healthy first read without waiting', async () => {
@@ -42,7 +51,7 @@ describe('readStoredValueWithRetry', () => {
 
     await expect(readStoredValueWithRetry('auth-token')).resolves.toBe('stored-token');
     expect(getItemAsync).toHaveBeenCalledTimes(1);
-    expect(getItemAsync).toHaveBeenCalledWith('auth-token', undefined);
+    expect(getItemAsync).toHaveBeenCalledWith('auth-token');
   });
 
   it('passes a null resolution straight through and never retries it', async () => {
@@ -90,6 +99,40 @@ describe('readStoredValueWithRetry', () => {
     await settled;
     await vi.advanceTimersByTimeAsync(5000);
     expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('reports the exhausted read exactly once at warning level with the stable fingerprint', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueWithRetry = await loadHelper();
+
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    await settled;
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'secure_store',
+      'error.operation': 'read',
+    });
+    // The key is never attached to the report.
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
+  });
+
+  it('reports nothing when a retry recovers the read', async () => {
+    getItemAsync
+      .mockRejectedValueOnce(new Error('keychain unavailable'))
+      .mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(events).toHaveLength(0);
   });
 
   it('uses the handed-over first attempt and issues fresh reads for the retries', async () => {

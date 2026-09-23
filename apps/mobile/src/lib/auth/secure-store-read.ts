@@ -1,5 +1,6 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
  * Bounded retry for a stored credential read.
@@ -68,6 +69,13 @@ export async function readStoredValueWithRetry(
     }
   }
   // Last attempt: its rejection is the final answer and propagates to the
-  // caller, which owns how the failure is surfaced.
-  return readOnce(key, options, pending);
+  // caller, which owns how the failure is surfaced. Report it once here at
+  // warning level with the stable read fingerprint — reporting per attempt
+  // would multiply one failure into four events.
+  try {
+    return await readOnce(key, options, pending);
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    throw error;
+  }
 }

@@ -1390,13 +1390,17 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlatList')).toHaveLength(0);
     // The fixed tab bar is reserved once, by the surface inset this screen sets
-    // (tab bar + FAB band) and which CenteredState's pending-layout fallback
-    // pads by. Letting the no-match body shrink its own frame by the same band
-    // cleared the band a second time and pushed the centered copy about half
-    // the band above the centre of the area above the bar, so the body must not
-    // carry a clearance of its own.
+    // (the tab bar's band alone here: the no-match body owns the band, so the
+    // FAB yields and its strip never joins the reservation) and which
+    // CenteredState's pending-layout fallback pads by. Letting the no-match
+    // body shrink its own frame by the same band cleared the band a second time
+    // and pushed the centered copy about half the band above the centre of the
+    // area above the bar, so the body must not carry a clearance of its own.
     const body = nodes('CenteredState')[0];
-    expect(body?.props.frameStyle).toBeUndefined();
+    // Assert the reservation the screen actually sets, then that the body adds
+    // none of its own: `EmptyState` hands `CenteredState` only `refreshControl`
+    // and children, so a `style` here would be a duplicate clearance.
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
     expect(body?.props.style).toBeUndefined();
     expect(renderer.root.findByType(EmptyState).props.description).toBe(
       'Try a different search term.'

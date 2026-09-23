@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔",
     "featureFlags": "فیچر فلیگز",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ریموٹ · ≥ {{min}}",
+    "featureFlagApplied": "سرور سے · ≥ {{min}}",
     "featureFlagSkipped": "ڈیفالٹ · < {{min}}",
     "featureFlagNotLoaded": "ڈیفالٹ · لوڈ نہیں ہوا",
     "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
       "linesOf": "کل {{total}} سطروں میں سے {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent کا عمل {{action}} ناکام ہو گیا ({{status}})۔",
-      "failed": "Cloud Agent کا عمل {{action}} ناکام ہو گیا۔"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ان پٹ کو سیریلائز نہیں کیا جا سکتا]",
       "errorPrefix": "خرابی: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "فراہم کنندہ نے درخواست مسترد کر دی۔",
       "assistantStopped": "جواب روک دیا گیا۔",
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
-      "assistantFailed": "جواب تیار نہیں ہو سکا۔",
-      "sendFailed": "پیغام نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔"
+      "assistantFailed": "جواب تیار نہیں ہو سکا۔"
     },
     "filePart": {
       "loadingImage": "تصویر لوڈ ہو رہی ہے",

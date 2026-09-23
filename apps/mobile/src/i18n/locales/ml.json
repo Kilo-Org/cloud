@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം.",
     "featureFlags": "ഫീച്ചർ ഫ്ലാഗുകൾ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "റിമോട്ട് · ≥ {{min}}",
-    "featureFlagSkipped": "ഡിഫോൾട്ട് · < {{min}}",
-    "featureFlagNotLoaded": "ഡിഫോൾട്ട് · ലോഡ് ചെയ്തിട്ടില്ല",
+    "featureFlagApplied": "സെർവറിൽ നിന്ന് · ≥ {{min}}",
+    "featureFlagSkipped": "സ്ഥിരസ്ഥിതി · < {{min}}",
+    "featureFlagNotLoaded": "സ്ഥിരസ്ഥിതി · ലോഡ് ചെയ്തിട്ടില്ല",
     "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
     "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",
       "linesOf": "ആകെ {{total}} വരികളിൽ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} പരാജയപ്പെട്ടു ({{status}}).",
-      "failed": "Cloud Agent {{action}} പരാജയപ്പെട്ടു."
-    },
     "collectCopyableText": {
       "unserializableInput": "[സീരിയലൈസ് ചെയ്യാനാവാത്ത ഇൻപുട്ട്]",
       "errorPrefix": "പിശക്: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "ദാതാവ് അഭ്യർത്ഥന നിരസിച്ചു.",
       "assistantStopped": "മറുപടി നൽകുന്നത് നിർത്തി.",
       "assistantContextOverflow": "ഈ സംഭാഷണത്തിന്റെ നീളം മോഡലിന് കൈകാര്യം ചെയ്യാവുന്ന പരിധിയിലും കൂടുതലാണ്.",
-      "assistantFailed": "മറുപടി നൽകാൻ കഴിഞ്ഞില്ല.",
-      "sendFailed": "സന്ദേശം അയയ്ക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
+      "assistantFailed": "മറുപടി നൽകാൻ കഴിഞ്ഞില്ല."
     },
     "filePart": {
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",

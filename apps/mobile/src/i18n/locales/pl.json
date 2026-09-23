@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle.",
     "featureFlags": "Flagi funkcji",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Zdalne · ≥ {{min}}",
-    "featureFlagSkipped": "Domyślna · < {{min}}",
-    "featureFlagNotLoaded": "Domyślna · nie załadowano",
+    "featureFlagApplied": "zdalne · ≥ {{min}}",
+    "featureFlagSkipped": "domyślne · < {{min}}",
+    "featureFlagNotLoaded": "domyślne · nie załadowano",
     "gatewayTranscription": "Transkrypcja przez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkrybuj dyktowanie modelem Kilo Gateway zamiast rozpoznawania mowy na urządzeniu. Twoje nagranie zostanie wysłane do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1787,10 +1787,6 @@
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",
       "linesOf": "wiersze {{start}}–{{end}} z {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Nie udało się wykonać operacji „{{action}}” w Cloud Agent ({{status}}).",
-      "failed": "Nie udało się wykonać operacji „{{action}}” w Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[dane wejściowe niemożliwe do serializacji]",
       "errorPrefix": "Błąd: {{error}}"
@@ -1886,8 +1882,7 @@
       "assistantProviderRejected": "Dostawca odrzucił żądanie.",
       "assistantStopped": "Generowanie odpowiedzi zostało zatrzymane.",
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
-      "assistantFailed": "Nie udało się wygenerować odpowiedzi.",
-      "sendFailed": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
+      "assistantFailed": "Nie udało się wygenerować odpowiedzi."
     },
     "filePart": {
       "loadingImage": "Wczytywanie obrazu",

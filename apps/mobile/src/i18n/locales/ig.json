@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Wepụ mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ.",
     "featureFlags": "Ọkọ atụmatụ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Dị anya · ≥ {{min}}",
-    "featureFlagSkipped": "Ndabere · < {{min}}",
-    "featureFlagNotLoaded": "Ndabere · ebughị",
+    "featureFlagApplied": "site na sava · ≥ {{min}}",
+    "featureFlagSkipped": "ndabara · < {{min}}",
+    "featureFlagNotLoaded": "ndabara · ebudobeghị",
     "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
       "linesOf": "ahịrị {{start}}–{{end}} n'ime {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} na Cloud Agent agaghị nke ọma ({{status}}).",
-      "failed": "{{action}} na Cloud Agent agaghị nke ọma."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ntinye a na-apụghị ịgbanwe ka ọ bụrụ usoro nchekwa]",
       "errorPrefix": "Njehie: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "Onye na-enye ọrụ jụrụ arịrịọ ahụ.",
       "assistantStopped": "Akwụsịrị nzaghachi ahụ.",
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
-      "assistantFailed": "Nzaghachi ahụ agaghị nke ọma.",
-      "sendFailed": "Enweghị ike iziga ozi. Biko nwaa ọzọ."
+      "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."
     },
     "filePart": {
       "loadingImage": "Na-ebudata onyonyo",

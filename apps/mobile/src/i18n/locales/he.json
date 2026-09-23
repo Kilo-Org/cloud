@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע.",
     "featureFlags": "דגלי תכונות",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "מרוחק · ≥ {{min}}",
+    "featureFlagApplied": "מהשרת · ≥ {{min}}",
     "featureFlagSkipped": "ברירת מחדל · < {{min}}",
     "featureFlagNotLoaded": "ברירת מחדל · לא נטען",
     "gatewayTranscription": "תמלול דרך Kilo Gateway",
@@ -1771,10 +1771,6 @@
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
       "linesOf": "שורות {{start}}–{{end}} מתוך {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "הפעולה {{action}} ב-Cloud Agent נכשלה ({{status}}).",
-      "failed": "הפעולה {{action}} ב-Cloud Agent נכשלה."
-    },
     "collectCopyableText": {
       "unserializableInput": "[קלט שאינו ניתן לסריאליזציה]",
       "errorPrefix": "שגיאה: {{error}}"
@@ -1870,8 +1866,7 @@
       "assistantProviderRejected": "הספק דחה את הבקשה.",
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
-      "assistantFailed": "יצירת התשובה נכשלה.",
-      "sendFailed": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
+      "assistantFailed": "יצירת התשובה נכשלה."
     },
     "filePart": {
       "loadingImage": "טוען תמונה",

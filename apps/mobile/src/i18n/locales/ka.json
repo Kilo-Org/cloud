@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "განბლოკვა საჭიროა აპის გაშვებისას და ფონურ რეჟიმში ხუთი წუთის გასვლის შემდეგ.",
     "featureFlags": "ფუნქციების დროშები",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "დისტანციური · ≥ {{min}}",
-    "featureFlagSkipped": "ნაგულისხმები · < {{min}}",
-    "featureFlagNotLoaded": "ნაგულისხმები · არ არის ჩატვირთული",
+    "featureFlagApplied": "სერვერიდან · ≥ {{min}}",
+    "featureFlagSkipped": "ნაგულისხმევი · < {{min}}",
+    "featureFlagNotLoaded": "ნაგულისხმევი · არ ჩატვირთულა",
     "gatewayTranscription": "ტრანსკრიფცია Kilo Gateway-ით",
     "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
       "linesOf": "სტრიქონები {{start}}–{{end}}, სულ {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent-ის მოქმედება ვერ შესრულდა: {{action}} ({{status}}).",
-      "failed": "Cloud Agent-ის მოქმედება ვერ შესრულდა: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[შეყვანილი მონაცემების სერიალიზაცია შეუძლებელია]",
       "errorPrefix": "შეცდომა: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "პროვაიდერმა უარყო მოთხოვნა.",
       "assistantStopped": "პასუხის შექმნა შეწყდა.",
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
-      "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა.",
-      "sendFailed": "შეტყობინების გაგზავნა ვერ მოხერხდა. სცადეთ ხელახლა."
+      "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."
     },
     "filePart": {
       "loadingImage": "სურათის ჩატვირთვა",

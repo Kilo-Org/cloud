@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина.",
     "featureFlags": "Знаменца на функции",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Далечински · ≥ {{min}}",
-    "featureFlagSkipped": "Основна · < {{min}}",
-    "featureFlagNotLoaded": "Основна · не е вчитано",
+    "featureFlagApplied": "оддалечено · ≥ {{min}}",
+    "featureFlagSkipped": "стандардно · < {{min}}",
+    "featureFlagNotLoaded": "стандардно · не е вчитано",
     "gatewayTranscription": "Транскрипција преку Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Транскрибирај го гласовниот внес со модел на Kilo Gateway наместо со препознавањето на говор на уредот. Снимката се испраќа до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
       "linesOf": "редови {{start}}–{{end}} од {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не успеа дејството {{action}} во Cloud Agent ({{status}}).",
-      "failed": "Не успеа дејството {{action}} во Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[внес што не може да се серијализира]",
       "errorPrefix": "Грешка: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "Давателот го одби барањето.",
       "assistantStopped": "Создавањето на одговорот е запрено.",
       "assistantContextOverflow": "Разговорот е премногу долг за моделот.",
-      "assistantFailed": "Не успеа создавањето на одговорот.",
-      "sendFailed": "Не успеа испраќањето на пораката. Обиди се повторно."
+      "assistantFailed": "Не успеа создавањето на одговорот."
     },
     "filePart": {
       "loadingImage": "Вчитување слика",

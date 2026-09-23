@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges.",
     "featureFlags": "Funkciójelzők",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Távoli · ≥ {{min}}",
-    "featureFlagSkipped": "Alapértelmezett · < {{min}}",
-    "featureFlagNotLoaded": "Alapértelmezett · nincs betöltve",
+    "featureFlagApplied": "távoli · ≥ {{min}}",
+    "featureFlagSkipped": "alapértelmezett · < {{min}}",
+    "featureFlagNotLoaded": "alapértelmezett · nincs betöltve",
     "gatewayTranscription": "Átírás Kilo Gateway-n keresztül",
     "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",
       "linesOf": "{{start}}–{{end}}. sor, összesen {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "A Cloud Agent művelete nem sikerült: {{action}} ({{status}}).",
-      "failed": "A Cloud Agent művelete nem sikerült: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nem szerializálható bemenet]",
       "errorPrefix": "Hiba: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "A szolgáltató elutasította a kérést.",
       "assistantStopped": "A válasz létrehozása leállt.",
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
-      "assistantFailed": "Nem sikerült létrehozni a választ.",
-      "sendFailed": "Nem sikerült elküldeni az üzenetet. Próbáld újra."
+      "assistantFailed": "Nem sikerült létrehozni a választ."
     },
     "filePart": {
       "loadingImage": "Kép betöltése",

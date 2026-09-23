@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir.",
     "featureFlags": "Baneri nodweddion",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Anghysbell · ≥ {{min}}",
-    "featureFlagSkipped": "Rhagosodedig · < {{min}}",
-    "featureFlagNotLoaded": "Rhagosodedig · heb ei lwytho",
+    "featureFlagApplied": "o'r gweinydd · ≥ {{min}}",
+    "featureFlagSkipped": "rhagosodedig · < {{min}}",
+    "featureFlagNotLoaded": "rhagosodedig · heb ei lwytho",
     "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2387,10 +2387,6 @@
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
       "linesOf": "llinellau {{start}}–{{end}} o {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Methodd y weithred {{action}} yn Cloud Agent ({{status}}).",
-      "failed": "Methodd y weithred {{action}} yn Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[mewnbwn na ellir ei gyfresoli]",
       "errorPrefix": "Gwall: {{error}}"
@@ -2486,8 +2482,7 @@
       "assistantProviderRejected": "Gwrthododd y darparwr y cais.",
       "assistantStopped": "Ataliwyd yr ymateb.",
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
-      "assistantFailed": "Methodd yr ymateb.",
-      "sendFailed": "Methu anfon y neges. Ceisiwch eto."
+      "assistantFailed": "Methodd yr ymateb."
     },
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",

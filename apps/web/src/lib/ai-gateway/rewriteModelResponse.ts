@@ -1,5 +1,5 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';

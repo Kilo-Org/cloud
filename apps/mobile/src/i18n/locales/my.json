@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။",
     "featureFlags": "လုပ်ဆောင်ချက်အလံများ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "အဝေး · ≥ {{min}}",
+    "featureFlagApplied": "ဆာဗာမှ · ≥ {{min}}",
     "featureFlagSkipped": "ပုံသေ · < {{min}}",
-    "featureFlagNotLoaded": "ပုံသေ · မတင်ရသေးပါ",
+    "featureFlagNotLoaded": "ပုံသေ · မဖွင့်ရသေး",
     "gatewayTranscription": "Kilo Gateway ဖြင့် အသံမှစာသားပြောင်းခြင်း",
     "gatewayTranscriptionSubtitle": "စက်၏ အသံခွဲခြားသိရှိမှုအစား Kilo Gateway မော်ဒယ်ဖြင့် အသံထည့်သွင်းမှုကို စာသားပြောင်းပါ။ သင့်အသံသွင်းချက်ကို Kilo Gateway သို့ ပို့ပါမည်။",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",
       "linesOf": "စာကြောင်း {{start}}–{{end}} / စုစုပေါင်း {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} မအောင်မြင်ပါ ({{status}})။",
-      "failed": "Cloud Agent {{action}} မအောင်မြင်ပါ။"
-    },
     "collectCopyableText": {
       "unserializableInput": "[သိမ်းဆည်းပို့ဆောင်နိုင်သည့်ပုံစံသို့ ပြောင်း၍မရသော ထည့်သွင်းဒေတာ]",
       "errorPrefix": "အမှား: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "ဝန်ဆောင်မှုပေးသူက တောင်းဆိုမှုကို ငြင်းပယ်ခဲ့ပါသည်။",
       "assistantStopped": "တုံ့ပြန်မှုကို ရပ်တန့်လိုက်ပါသည်။",
       "assistantContextOverflow": "စကားဝိုင်းသည် မော်ဒယ်က လက်ခံနိုင်သည့် အရှည်ထက် ကျော်လွန်နေပါသည်။",
-      "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။",
-      "sendFailed": "မက်ဆေ့ခ်ျကို ပို့၍မရပါ။ ထပ်ကြိုးစားပါ။"
+      "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။"
     },
     "filePart": {
       "loadingImage": "ပုံ ဖွင့်နေသည်",

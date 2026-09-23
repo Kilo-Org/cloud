@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Ṣí títìpa nígbà tí o bá ṣí ohun èlò àti lẹ́yìn ìṣẹ́jú márùn-ún tí kò sí níwájú iboju.",
     "featureFlags": "Àṣì ẹ̀yà",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Jíjìn · ≥ {{min}}",
-    "featureFlagSkipped": "Ìpìlẹ̀ · < {{min}}",
-    "featureFlagNotLoaded": "Ìpìlẹ̀ · kò gbé e",
+    "featureFlagApplied": "láti sèva · ≥ {{min}}",
+    "featureFlagSkipped": "ìpilẹ̀ · < {{min}}",
+    "featureFlagNotLoaded": "ìpilẹ̀ · kò gbé wọlé",
     "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
       "linesOf": "ìlà {{start}}–{{end}} nínú {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Ìṣe {{action}} fún Cloud Agent kùnà ({{status}}).",
-      "failed": "Ìṣe {{action}} fún Cloud Agent kùnà."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ìgbéwọlé tí a kò lè yí sí ọ̀nà ìpamọ́ dátà]",
       "errorPrefix": "Àṣìṣe: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "Olùpèsè náà kọ ìbéèrè náà.",
       "assistantStopped": "A dá ìdáhùn náà dúró.",
       "assistantContextOverflow": "Ìjíròrò náà gùn ju ohun tí àwòṣe náà lè gbà lọ.",
-      "assistantFailed": "Ìdáhùn náà kùnà.",
-      "sendFailed": "A kò lè fi ìfiránṣẹ́ ránṣẹ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+      "assistantFailed": "Ìdáhùn náà kùnà."
     },
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",

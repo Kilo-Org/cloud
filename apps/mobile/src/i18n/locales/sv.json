@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
     "featureFlags": "Funktionsflaggor",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Fjärr · ≥ {{min}}",
-    "featureFlagSkipped": "Standard · < {{min}}",
-    "featureFlagNotLoaded": "Standard · inte laddad",
+    "featureFlagApplied": "fjärr · ≥ {{min}}",
+    "featureFlagSkipped": "standard · < {{min}}",
+    "featureFlagNotLoaded": "standard · inte laddad",
     "gatewayTranscription": "Transkribering via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "rader {{start}}–{{end}} (avkortat)",
       "linesOf": "rader {{start}}–{{end}} av {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Åtgärden {{action}} i Cloud Agent misslyckades ({{status}}).",
-      "failed": "Åtgärden {{action}} i Cloud Agent misslyckades."
-    },
     "collectCopyableText": {
       "unserializableInput": "[indata som inte kan serialiseras]",
       "errorPrefix": "Fel: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "Leverantören avvisade begäran.",
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
-      "assistantFailed": "Det gick inte att generera svaret.",
-      "sendFailed": "Det gick inte att skicka meddelandet. Försök igen."
+      "assistantFailed": "Det gick inte att generera svaret."
     },
     "filePart": {
       "loadingImage": "Läser in bild",

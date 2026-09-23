@@ -54,6 +54,7 @@ import {
   completeSessionOperationAttachment,
   createSessionMessageRecord,
   failAcceptedMessage,
+  failedMessageSnapshot,
   failQueuedMessage,
   failedReasonOf as failedReasonOfMessage,
   freezeLegacyQueuedMessages,
@@ -61,8 +62,10 @@ import {
   hasAcceptedMessage,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
+  noOutputRecoveryAllowed,
   recordAcceptedMessageActivity,
   recordSessionOperationDispatch,
+  redispatchAcceptedMessage,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
   releaseUnconfirmedAttach,
@@ -111,6 +114,7 @@ import {
 
 import {
   readSessionValueSync,
+  writeSessionValueSync,
   writeSessionMessages,
   seedSessionValue,
   isSessionMessagesKey,
@@ -968,6 +972,32 @@ describe('releaseUnconfirmedAttach', () => {
     expect(released?.[0]?.proofs?.attach).toBeUndefined();
   });
 
+  it('keeps the retired attach epoch when the replacement proof has none', () => {
+    const message = queuedMessage({ authorization, dispatched: true });
+    if (!message.proofs) throw new Error('Missing attach proof');
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...message,
+          proofs: {
+            ...message.proofs,
+            retiredAttach: {
+              authorization,
+              dispatched: true,
+              completedAt: 400,
+              attachmentEpoch: 3,
+            },
+          },
+        },
+      ],
+      authorization
+    );
+
+    // The dispatched attach carries no epoch until its result arrives, so the
+    // overwritten slot would drop the watermark the fence holds.
+    expect(released?.[0]?.proofs?.retiredAttach).toMatchObject({ attachmentEpoch: 3 });
+  });
+
   it('refuses a message id that is not in the messages array', () => {
     expect(releaseUnconfirmedAttach([], authorization)).toBeUndefined();
   });
@@ -1101,6 +1131,137 @@ describe('rotateLostPreparationAttempt', () => {
     },
   ])('refuses rotation when there is $name', ({ update }) => {
     expect(rotateLostPreparationAttempt([update(queuedMessage())], 'a', 200)).toBeUndefined();
+  });
+});
+
+describe('noOutputRecoveryAllowed', () => {
+  it('allows exactly one no-output recovery per accepted turn', () => {
+    expect(noOutputRecoveryAllowed(0)).toBe(true);
+    expect(noOutputRecoveryAllowed(1)).toBe(false);
+    expect(noOutputRecoveryAllowed(2)).toBe(false);
+  });
+});
+
+describe('redispatchAcceptedMessage', () => {
+  const promptAuthorization: SessionOperationAuthorization = {
+    operation: 'session.prompt',
+    operationId: 'prompt-a',
+    messageId: promptTurn.messageId,
+    session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+    wrapperInstanceId: RUNTIME_ID,
+    dispatchDeadlineAt: 100,
+  };
+
+  function acceptedMessage(): SessionMessage {
+    return {
+      messageId: promptTurn.messageId,
+      state: acceptedState({
+        intent: { turn: promptTurn, agent: { ...defaultAgent } },
+        legacyInvalidIntent: undefined,
+        acceptedAt: 10,
+        lastActivityAt: 20,
+        wrapperInstanceId: RUNTIME_ID,
+        preparationAttemptId: 'attempt-1',
+        executionDeadlineAt: 900,
+      }),
+      proofs: {
+        attach: {
+          authorization: { ...promptAuthorization, operation: 'session.attach' },
+          dispatched: true,
+        },
+        prompt: { authorization: promptAuthorization, dispatched: true },
+      },
+    };
+  }
+
+  it('re-queues only the accepted turn, spends one recovery, and clears its dispatch state', () => {
+    const accepted = acceptedMessage();
+    const queued = msg('b', 'queued');
+    const messages = [accepted, queued];
+
+    const next = redispatchAcceptedMessage(messages, promptTurn.messageId);
+
+    expect(next?.[0]).toStrictEqual({
+      messageId: promptTurn.messageId,
+      state: {
+        kind: 'queued',
+        intent: { turn: promptTurn, agent: { ...defaultAgent } },
+        deliveryStep: 'waiting',
+        deadlineAt: null,
+        attachFailures: 0,
+        promptFailures: 0,
+        recoveryAttempts: 1,
+      },
+    });
+    // The typed turn survives the recovery under its durable identity, and the
+    // array is rebuilt instead of mutating the caller's records.
+    expect(next?.[0]?.state.intent).toStrictEqual(accepted.state.intent);
+    expect(next?.[1]).toBe(queued);
+    expect(messages[0]).toBe(accepted);
+  });
+
+  it('accumulates the recovery count for the next accepted state', () => {
+    const first = redispatchAcceptedMessage([acceptedMessage()], promptTurn.messageId) ?? [];
+    expect(first[0]?.state.recoveryAttempts).toBe(1);
+    // A queued record is not accepted any more, so a replayed detection cannot
+    // spend a second recovery on it.
+    expect(redispatchAcceptedMessage(first, promptTurn.messageId)).toBeUndefined();
+    const acceptedAgain: SessionMessage = {
+      messageId: promptTurn.messageId,
+      state: acceptedState({
+        intent: { turn: promptTurn, agent: { ...defaultAgent } },
+        legacyInvalidIntent: undefined,
+        acceptedAt: 50,
+        lastActivityAt: 60,
+        wrapperInstanceId: RUNTIME_ID,
+        executionDeadlineAt: 900,
+        recoveryAttempts: 1,
+      }),
+    };
+    expect(
+      redispatchAcceptedMessage([acceptedAgain], promptTurn.messageId)?.[0]?.state.recoveryAttempts
+    ).toBe(2);
+  });
+
+  it('returns undefined for a missing or non-accepted record', () => {
+    expect(redispatchAcceptedMessage([acceptedMessage()], 'missing')).toBeUndefined();
+    expect(redispatchAcceptedMessage([msg('a', 'queued')], 'a')).toBeUndefined();
+    expect(redispatchAcceptedMessage([msg('a', 'failed')], 'a')).toBeUndefined();
+  });
+});
+
+describe('failedMessageSnapshot', () => {
+  it('records the attempt count once a no-output recovery was spent', () => {
+    const record: SessionMessage = {
+      messageId: promptTurn.messageId,
+      state: terminalState('failed', {
+        intent: { turn: promptTurn, agent: { ...defaultAgent } },
+        legacyInvalidIntent: undefined,
+        acceptedAt: 10,
+        recoveryAttempts: 1,
+        reason: 'accepted_overdue',
+        detail: 'Turn did not complete',
+      }),
+    };
+
+    expect(failedMessageSnapshot(record, 99)).toMatchObject({
+      attempts: 2,
+      reason: 'accepted_overdue',
+      status: 'failed',
+    });
+  });
+
+  it('omits the attempt count when the turn never spent a recovery', () => {
+    const record: SessionMessage = {
+      messageId: promptTurn.messageId,
+      state: terminalState('failed', {
+        intent: { turn: promptTurn, agent: { ...defaultAgent } },
+        legacyInvalidIntent: undefined,
+        reason: 'preparation_failed',
+      }),
+    };
+
+    expect(failedMessageSnapshot(record, 99)).not.toHaveProperty('attempts');
   });
 });
 
@@ -1668,6 +1829,54 @@ function sessionFixture(
   callbackQueue?: Pick<Queue<CallbackJob>, 'send'>
 ) {
   return createSessionFixture(fixtureDeps, overrides, sharedControl, callbackQueue);
+}
+
+/** Rebuild the stored canonical envelope with one message replaced (test-only). */
+function updateStoredMessage(
+  fixture: ReturnType<typeof sessionFixture>,
+  messageId: string,
+  update: (message: SessionMessage) => SessionMessage
+): void {
+  const stored = readSessionValueSync<{ messages?: SessionMessage[] }>(fixture.storage.kv);
+  writeSessionValueSync(fixture.storage.kv, {
+    ...stored,
+    messages: (stored?.messages ?? []).map(message =>
+      message.messageId === messageId ? update(message) : message
+    ),
+  });
+}
+
+/** Land a Stop marker on a stored accepted turn without going through the DO. */
+function markStoredCancellation(
+  fixture: ReturnType<typeof sessionFixture>,
+  messageId: string
+): void {
+  updateStoredMessage(fixture, messageId, message => ({
+    ...message,
+    cancellation: { operationId: 'stop_1', deadlineAt: Date.now() + 60_000 },
+  }));
+}
+
+/**
+ * Mark the accepted turn as having already spent its one automatic no-output
+ * recovery, so the next inactivity detection is the second identical detection
+ * and reaches the existing terminal path. The recovery itself is driven by the
+ * accepted-inactivity tests plus `test/integration/sandbox-session-no-output-recovery.test.ts`
+ * and the `redispatchAcceptedMessage` unit tests.
+ */
+function markNoOutputRecoverySpent(
+  fixture: ReturnType<typeof sessionFixture>,
+  messageId: string
+): void {
+  const stored = readSessionValueSync<{ messages?: SessionMessage[] }>(fixture.storage.kv);
+  const accepted = (stored?.messages ?? []).some(
+    message => message.messageId === messageId && message.state.kind === 'accepted'
+  );
+  if (!accepted) throw new Error(`No accepted message ${messageId} to recover`);
+  updateStoredMessage(fixture, messageId, message => ({
+    ...message,
+    state: { ...message.state, recoveryAttempts: 1 },
+  }));
 }
 
 function controlDiagnostics(
@@ -3413,7 +3622,7 @@ describe('SandboxSession orchestration', () => {
   });
 
   it.each(['running', 'completed'] as const)(
-    'settles a late accepted prompt from its original %s operation result without redispatch',
+    'reconciles a late accepted prompt against its original %s operation result',
     async state => {
       const fixture = sessionFixture();
       fixture.setStatus({
@@ -3482,14 +3691,140 @@ describe('SandboxSession orchestration', () => {
           ([input]) => input.operation === 'session.operation.ack'
         )
       ).toHaveLength(state === 'completed' ? 1 : 0);
-      expect(fixture.record('a')?.state.kind).toBe(state === 'completed' ? 'completed' : 'failed');
+      expect(fixture.record('a')?.state.kind).toBe(state === 'completed' ? 'completed' : 'queued');
       if (state === 'running') {
-        // An operation receipt is liveness, not progress: the 5-minute
-        // inactivity bound settles the turn instead of refreshing its clock.
-        expect(failedReasonOf(fixture.record('a'))).toBe('accepted_overdue');
+        // An operation receipt is liveness, not progress: the inactivity bound
+        // spends the turn's one no-output recovery instead of refreshing its
+        // clock. A second identical detection would terminalize.
+        expect(fixture.record('a')?.state.recoveryAttempts).toBe(1);
+        expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
       }
     }
   );
+
+  it('settles an accepted no-output turn from a stored completed reply instead of recovering it', async () => {
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      allocationIncarnation: 'incarnation_1',
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.proofs?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    // The runtime went silent, but the answer already reached the DO over the
+    // ingest channel. Re-dispatching would run the turn and its side effects a
+    // second time.
+    fixture.eventQueries.upsert({
+      executionId: '',
+      sessionId: SESSION_ID,
+      streamEventType: 'kilocode',
+      entityId: 'message/ase_stored_reply',
+      payload: JSON.stringify({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'ase_stored_reply',
+            role: 'assistant',
+            sessionID: 'kilo_root',
+            parentID: 'a',
+            time: { created: 1, completed: 2 },
+          },
+        },
+      }),
+      timestamp: 2,
+    });
+    delegateRequest(fixture, 'session.operation.get', async () =>
+      controlResponse({ state: 'running', authorization })
+    );
+
+    vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+    fixture.reload();
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'completed', source: 'coordinator' },
+    });
+    expect(fixture.record('a')?.state.recoveryAttempts).toBeUndefined();
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+    ).toHaveLength(1);
+    expect(controlDiagnostics(fields, 'accepted_no_output_reconciled')).toHaveLength(1);
+  });
+
+  it('does not recover an accepted turn whose stop was admitted while the alarm observed it', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      allocationIncarnation: 'incarnation_1',
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.proofs?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    // The user's Stop lands while the alarm awaits the observation: the record
+    // stays `accepted` and only gains `cancellation`.
+    delegateRequest(fixture, 'session.operation.get', async () => {
+      markStoredCancellation(fixture, 'a');
+      return controlResponse({ state: 'running', authorization });
+    });
+
+    vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+    fixture.reload();
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    const record = fixture.record('a');
+    expect(record?.state.kind).toBe('accepted');
+    expect(record?.cancellation).toEqual({
+      operationId: 'stop_1',
+      deadlineAt: expect.any(Number),
+    });
+    expect(record?.state.recoveryAttempts).toBeUndefined();
+    expect(failedReasonOf(record)).toBeUndefined();
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+    ).toHaveLength(1);
+  });
+
+  it('releases an accepted turn whose stop was admitted while the alarm awaited its health sync', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+    // The liveness snapshot cannot keep the turn alive, so the inactivity bound
+    // is due. The user's Stop lands while the alarm awaits that snapshot: the
+    // record stays `accepted` and only gains `cancellation`. The stop lifecycle
+    // owns the turn now, so the watchdog must release it instead of treating it
+    // as lost execution and failing it, which would quarantine the wrapper.
+    delegateRequest(fixture, 'session.sync', async () => {
+      markStoredCancellation(fixture, 'a');
+      return controlResponse({ status: { type: 'idle' }, questions: [], permissions: [] });
+    });
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    const record = fixture.record('a');
+    expect(record?.state.kind).toBe('accepted');
+    expect(record?.cancellation).toEqual({
+      operationId: 'stop_1',
+      deadlineAt: expect.any(Number),
+    });
+    expect(failedReasonOf(record)).toBeUndefined();
+    expect(fixture.terminalEvents()).toHaveLength(0);
+  });
 
   describe('native startup attach authority', () => {
     it.each([false, true])(
@@ -5313,7 +5648,10 @@ describe('SandboxSession orchestration', () => {
       expect(input.acquisition).toEqual(acquisition);
       expect(input.allowCreate).toBeUndefined();
     }
-    expect(fixture.control.getStatus).not.toHaveBeenCalled();
+    // The deadline check probes the control plane for an in-flight runtime
+    // replacement before terminalizing. Absent one, it terminalizes without
+    // dispatching or quarantining.
+    expect(fixture.control.getStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID });
     expect(fixture.control.request).not.toHaveBeenCalled();
   });
 
@@ -6633,7 +6971,7 @@ describe('SandboxSession orchestration', () => {
     ).toBe(true);
   });
 
-  it('fails a retrying prompt at seven minutes without real events', async () => {
+  it('fails a retrying prompt at seven minutes without real events on the second no-output detection', async () => {
     const fixture = sessionFixture();
     const reports: CloudAgentQueueReport[] = [];
     (
@@ -6673,6 +7011,9 @@ describe('SandboxSession orchestration', () => {
     // threshold that already elapsed.
     expect(fixture.alarmAt()).toBe(acceptedAt + DEADLINE_MS.kiloInactivity);
 
+    // The turn already spent its one automatic no-output recovery, so this
+    // second identical detection reaches the existing terminal path.
+    markNoOutputRecoverySpent(fixture, 'a');
     vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     await fixture.flush();
@@ -6908,7 +7249,7 @@ describe('SandboxSession orchestration', () => {
       properties: { id: 'permission_1', sessionID: 'kilo_root' },
     },
   ])(
-    'keeps a watchdog when a $name event supersedes the health-check sync',
+    'keeps a watchdog and recovers once when a $name event supersedes the health-check sync',
     async ({ type, properties }) => {
       const fixture = sessionFixture();
       const sync = deferred<ResponseFrame>();
@@ -6934,12 +7275,15 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.alarmAt()).not.toBeNull();
       expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.kiloInactivity);
 
+      // At the bound the surviving watchdog spends the turn's one no-output
+      // recovery instead of terminalizing it.
       vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       await fixture.flush();
       expect(fixture.record('a')).toMatchObject({
-        state: { kind: 'failed', reason: 'accepted_overdue' },
+        state: { kind: 'queued', recoveryAttempts: 1 },
       });
+      expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
     }
   );
 
@@ -6953,6 +7297,9 @@ describe('SandboxSession orchestration', () => {
     const acceptedAt = acceptedAtOf(fixture.record('a'));
     if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
 
+    // Second identical detection: the turn already spent its one no-output
+    // recovery, so the existing terminal path applies.
+    markNoOutputRecoverySpent(fixture, 'a');
     vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     expect(fixture.record('a')).toMatchObject({
@@ -6981,49 +7328,49 @@ describe('SandboxSession orchestration', () => {
       questions: [],
       permissions: [{ id: 'permission_1', sessionID: 'kilo_root' }],
     },
-  ])(
-    'treats $name as waiting at 90s but fails at the five-minute inactivity bound',
-    async snapshot => {
-      const fixture = sessionFixture();
-      const result = {
-        status: snapshot.status,
-        questions: snapshot.questions,
-        permissions: snapshot.permissions,
-      };
-      delegateRequest(fixture, 'session.sync', async input => {
-        expect(input.session).toEqual({
-          sessionId: SESSION_ID,
-          kiloSessionId: 'kilo_root',
-          directory: DIRECTORY,
-        });
-        return controlResponse(result);
+  ])('treats $name as waiting at 90s and recovers once at the inactivity bound', async snapshot => {
+    const fixture = sessionFixture();
+    const result = {
+      status: snapshot.status,
+      questions: snapshot.questions,
+      permissions: snapshot.permissions,
+    };
+    delegateRequest(fixture, 'session.sync', async input => {
+      expect(input.session).toEqual({
+        sessionId: SESSION_ID,
+        kiloSessionId: 'kilo_root',
+        directory: DIRECTORY,
       });
-      await fixture.admit('a');
-      await fixture.admit('b');
-      await fixture.flush();
-      const acceptedAt = acceptedAtOf(fixture.record('a'));
-      if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+      return controlResponse(result);
+    });
+    await fixture.admit('a');
+    await fixture.admit('b');
+    await fixture.flush();
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
 
-      // 90s: a snapshot is liveness, not progress, so the turn is waiting. The
-      // next wake is capped toward the five-minute inactivity bound.
-      vi.setSystemTime(acceptedAt + DEADLINE_MS.acceptedOverdue);
-      await fixture.fireAlarm();
-      expect(fixture.record('a')?.state.kind).toBe('accepted');
-      expect(fixture.record('b')?.state.kind).toBe('queued');
-      expect(fixture.alarmAt()).toBe(
-        Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.kiloInactivity)
-      );
+    // 90s: a snapshot is liveness, not progress, so the turn is waiting. The
+    // next wake is capped toward the five-minute inactivity bound.
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.acceptedOverdue);
+    await fixture.fireAlarm();
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+    expect(fixture.alarmAt()).toBe(
+      Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.kiloInactivity)
+    );
 
-      // Seven minutes with no real event: the snapshot cannot keep it alive.
-      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
-      await fixture.fireAlarm();
-      expect(fixture.record('a')).toMatchObject({
-        state: { kind: 'failed', reason: 'accepted_overdue', detail: 'Turn did not complete' },
-      });
-      expect(fixture.record('b')?.state.kind).toBe('queued');
-      expect(fixture.terminalEvents()).toHaveLength(1);
-    }
-  );
+    // At the inactivity bound the snapshot cannot keep it alive, so the turn
+    // spends its one no-output recovery and is re-queued for a fresh runtime
+    // instead of terminalizing.
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'queued', recoveryAttempts: 1 },
+    });
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+    expect(fixture.terminalEvents()).toHaveLength(0);
+  });
 
   it('ignores delayed old-runtime failures during a new runtime handoff and for its followers', async () => {
     const fixture = sessionFixture();

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме.",
     "featureFlags": "Флаги функций",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Удалённо · ≥ {{min}}",
-    "featureFlagSkipped": "По умолчанию · < {{min}}",
-    "featureFlagNotLoaded": "По умолчанию · не загружено",
+    "featureFlagApplied": "с сервера · ≥ {{min}}",
+    "featureFlagSkipped": "по умолчанию · < {{min}}",
+    "featureFlagNotLoaded": "по умолчанию · не загружено",
     "gatewayTranscription": "Распознавание речи через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1787,10 +1787,6 @@
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
       "linesOf": "строки {{start}}–{{end}} из {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не удалось выполнить действие «{{action}}» в Cloud Agent ({{status}}).",
-      "failed": "Не удалось выполнить действие «{{action}}» в Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[не удалось сериализовать входные данные]",
       "errorPrefix": "Ошибка: {{error}}"
@@ -1886,8 +1882,7 @@
       "assistantProviderRejected": "Провайдер отклонил запрос.",
       "assistantStopped": "Генерация ответа остановлена.",
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
-      "assistantFailed": "Не удалось сформировать ответ.",
-      "sendFailed": "Не удалось отправить сообщение. Попробуйте снова."
+      "assistantFailed": "Не удалось сформировать ответ."
     },
     "filePart": {
       "loadingImage": "Загрузка изображения",

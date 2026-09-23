@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ।",
     "featureFlags": "ବିଶେଷତ୍ୱ ପତାକା",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ଦୂରସ୍ଥ · ≥ {{min}}",
-    "featureFlagSkipped": "ପୂର୍ବନିର୍ଦ୍ଧାରିତ · < {{min}}",
-    "featureFlagNotLoaded": "ପୂର୍ବନିର୍ଦ୍ଧାରିତ · ଲୋଡ୍ ହୋଇନାହିଁ",
+    "featureFlagApplied": "ସର୍ଭରରୁ · ≥ {{min}}",
+    "featureFlagSkipped": "ଡିଫଲ୍ଟ · < {{min}}",
+    "featureFlagNotLoaded": "ଡିଫଲ୍ଟ · ଲୋଡ୍ ହୋଇନାହିଁ",
     "gatewayTranscription": "Kilo Gateway ମାଧ୍ୟମରେ କଥାକୁ ଲେଖାରେ ବଦଳାଇବା",
     "gatewayTranscriptionSubtitle": "ଡିଭାଇସ୍‌ର ସ୍ପିଚ୍ ରେକଗ୍ନିସନ୍ ପରିବର୍ତ୍ତେ Kilo Gateway ମଡେଲ୍ ବ୍ୟବହାର କରି କହି ଲେଖିବାକୁ ଲେଖାରେ ବଦଳାନ୍ତୁ। ଆପଣଙ୍କ ରେକର୍ଡିଂ Kilo Gateway ପଠାଯାଏ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
       "linesOf": "ମୋଟ {{total}} ଧାଡ଼ି ମଧ୍ୟରୁ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent ର {{action}} ବିଫଳ ହେଲା ({{status}})।",
-      "failed": "Cloud Agent ର {{action}} ବିଫଳ ହେଲା।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[କ୍ରମିକ ରୂପରେ ରୂପାନ୍ତର କରିହେଉନଥିବା ଇନପୁଟ୍]",
       "errorPrefix": "ତ୍ରୁଟି: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "ସେବା ପ୍ରଦାନକାରୀ ଅନୁରୋଧକୁ ଅସ୍ୱୀକାର କଲେ।",
       "assistantStopped": "ଉତ୍ତର ଲେଖିବା ବନ୍ଦ ହୋଇଗଲା।",
       "assistantContextOverflow": "ବାର୍ତ୍ତାଳାପ ମଡେଲ୍ ପାଇଁ ଅତ୍ୟଧିକ ଲମ୍ବା ହୋଇଗଲାଣି।",
-      "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।",
-      "sendFailed": "ବାର୍ତ୍ତା ପଠାଇ ହେଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।"
     },
     "filePart": {
       "loadingImage": "ଛବି ଲୋଡ୍ ହେଉଛି",

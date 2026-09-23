@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal.",
     "featureFlags": "Fanioane de funcții",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "La distanță · ≥ {{min}}",
-    "featureFlagSkipped": "Implicit · < {{min}}",
-    "featureFlagNotLoaded": "Implicit · neîncărcat",
+    "featureFlagApplied": "la distanță · ≥ {{min}}",
+    "featureFlagSkipped": "implicit · < {{min}}",
+    "featureFlagNotLoaded": "implicit · neîncărcat",
     "gatewayTranscription": "Transcriere cu Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2291,10 +2291,6 @@
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
       "linesOf": "liniile {{start}}–{{end}} din {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Acțiunea {{action}} pentru Cloud Agent a eșuat ({{status}}).",
-      "failed": "Acțiunea {{action}} pentru Cloud Agent a eșuat."
-    },
     "collectCopyableText": {
       "unserializableInput": "[date de intrare care nu pot fi serializate]",
       "errorPrefix": "Eroare: {{error}}"
@@ -2390,8 +2386,7 @@
       "assistantProviderRejected": "Furnizorul a respins cererea.",
       "assistantStopped": "Generarea răspunsului a fost oprită.",
       "assistantContextOverflow": "Conversația este prea lungă pentru model.",
-      "assistantFailed": "Generarea răspunsului a eșuat.",
-      "sendFailed": "Nu s-a putut trimite mesajul. Încearcă din nou."
+      "assistantFailed": "Generarea răspunsului a eșuat."
     },
     "filePart": {
       "loadingImage": "Se încarcă imaginea",

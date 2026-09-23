@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Ontsluit wanneer die toep begin en nadat dit vyf minute in die agtergrond was.",
     "featureFlags": "Funksie-vlae",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Afgeleë · ≥ {{min}}",
-    "featureFlagSkipped": "Verstek · < {{min}}",
-    "featureFlagNotLoaded": "Verstek · nie gelaai nie",
+    "featureFlagApplied": "afgeleë · ≥ {{min}}",
+    "featureFlagSkipped": "verstek · < {{min}}",
+    "featureFlagNotLoaded": "verstek · nie gelaai nie",
     "gatewayTranscription": "Gateway-transkripsie",
     "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
       "linesOf": "reëls {{start}}–{{end}} van {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent: {{action}} het misluk ({{status}}).",
-      "failed": "Cloud Agent: {{action}} het misluk."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nie-serialiseerbare invoer]",
       "errorPrefix": "Fout: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "Die verskaffer het die versoek verwerp.",
       "assistantStopped": "Die antwoord is gestop.",
       "assistantContextOverflow": "Die gesprek is te lank vir die model.",
-      "assistantFailed": "Die antwoord het misluk.",
-      "sendFailed": "Die boodskap kon nie gestuur word nie. Probeer asseblief weer."
+      "assistantFailed": "Die antwoord het misluk."
     },
     "filePart": {
       "loadingImage": "Laai afbeelding",

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά.",
     "featureFlags": "Σημαίες λειτουργιών",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Απομακρυσμένο · ≥ {{min}}",
-    "featureFlagSkipped": "Προεπιλογή · < {{min}}",
-    "featureFlagNotLoaded": "Προεπιλογή · δεν φορτώθηκε",
+    "featureFlagApplied": "από τον διακομιστή · ≥ {{min}}",
+    "featureFlagSkipped": "προεπιλογή · < {{min}}",
+    "featureFlagNotLoaded": "προεπιλογή · δεν φορτώθηκε",
     "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
       "linesOf": "γραμμές {{start}}–{{end}} από {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Η ενέργεια {{action}} του Cloud Agent απέτυχε ({{status}}).",
-      "failed": "Η ενέργεια {{action}} του Cloud Agent απέτυχε."
-    },
     "collectCopyableText": {
       "unserializableInput": "[μη σειριοποιήσιμη είσοδος]",
       "errorPrefix": "Σφάλμα: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "Ο πάροχος απέρριψε το αίτημα.",
       "assistantStopped": "Η δημιουργία της απάντησης διακόπηκε.",
       "assistantContextOverflow": "Η συνομιλία είναι πολύ μεγάλη για το μοντέλο.",
-      "assistantFailed": "Η δημιουργία της απάντησης απέτυχε.",
-      "sendFailed": "Δεν ήταν δυνατή η αποστολή του μηνύματος. Δοκίμασε ξανά."
+      "assistantFailed": "Η δημιουργία της απάντησης απέτυχε."
     },
     "filePart": {
       "loadingImage": "Φόρτωση εικόνας",

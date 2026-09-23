@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir.",
     "featureFlags": "Özellik bayrakları",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Uzak · ≥ {{min}}",
-    "featureFlagSkipped": "Varsayılan · < {{min}}",
-    "featureFlagNotLoaded": "Varsayılan · yüklenmedi",
+    "featureFlagApplied": "uzaktan · ≥ {{min}}",
+    "featureFlagSkipped": "varsayılan · < {{min}}",
+    "featureFlagNotLoaded": "varsayılan · yüklenmedi",
     "gatewayTranscription": "Kilo Gateway ile sesi metne dönüştürme",
     "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1755,10 +1755,6 @@
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
       "linesOf": "{{start}}–{{end}}. satırlar / toplam {{total}} satır"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent işlemi başarısız oldu: {{action}} ({{status}}).",
-      "failed": "Cloud Agent işlemi başarısız oldu: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[serileştirilemeyen girdi]",
       "errorPrefix": "Hata: {{error}}"
@@ -1854,8 +1850,7 @@
       "assistantProviderRejected": "Sağlayıcı isteği reddetti.",
       "assistantStopped": "Yanıt durduruldu.",
       "assistantContextOverflow": "Konuşma model için çok uzun.",
-      "assistantFailed": "Yanıt oluşturulamadı.",
-      "sendFailed": "Mesaj gönderilemedi. Tekrar dene."
+      "assistantFailed": "Yanıt oluşturulamadı."
     },
     "filePart": {
       "loadingImage": "Görsel yükleniyor",

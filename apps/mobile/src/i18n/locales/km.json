@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។",
     "featureFlags": "ទង់លក្ខណៈពិសេស",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ពីចម្ងាយ · ≥ {{min}}",
+    "featureFlagApplied": "ពីម៉ាស៊ីនបម្រើ · ≥ {{min}}",
     "featureFlagSkipped": "លំនាំដើម · < {{min}}",
     "featureFlagNotLoaded": "លំនាំដើម · មិនបានផ្ទុក",
     "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",
@@ -2259,10 +2259,6 @@
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
       "linesOf": "បន្ទាត់ {{start}}–{{end}} ក្នុងចំណោម {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "សកម្មភាព {{action}} របស់ Cloud Agent បានបរាជ័យ ({{status}})។",
-      "failed": "សកម្មភាព {{action}} របស់ Cloud Agent បានបរាជ័យ។"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ទិន្នន័យបញ្ចូលដែលមិនអាចបម្លែងទៅជាទម្រង់សម្រាប់រក្សាទុកឬបញ្ជូនបាន]",
       "errorPrefix": "កំហុស: {{error}}"
@@ -2358,8 +2354,7 @@
       "assistantProviderRejected": "អ្នកផ្តល់សេវាបានបដិសេធសំណើ។",
       "assistantStopped": "ការបង្កើតចម្លើយត្រូវបានបញ្ឈប់។",
       "assistantContextOverflow": "ការសន្ទនាវែងពេកសម្រាប់ម៉ូដែលនេះ។",
-      "assistantFailed": "មិនអាចបង្កើតចម្លើយបានទេ។",
-      "sendFailed": "មិនអាចផ្ញើសារបានទេ។ សូមព្យាយាមម្តងទៀត។"
+      "assistantFailed": "មិនអាចបង្កើតចម្លើយបានទេ។"
     },
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",

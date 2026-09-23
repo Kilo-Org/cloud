@@ -58,6 +58,30 @@ export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'fi
 
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
+const NO_OUTPUT_RECOVERY_LIMIT = 1;
+
+/**
+ * Whether one more no-output recovery may be spent on an accepted turn.
+ *
+ * Both producers of `wrapper_no_output` share this bound: the accepted-message
+ * inactivity timeout in `SandboxSession.failOverdueAcceptedMessage` here, and
+ * the wrapper no-output watchdog in `src/session/wrapper-supervisor.ts`. Each
+ * plane owns its recovery lifecycle, so the same bound is duplicated on purpose:
+ * a turn gets at most one automatic re-dispatch before a second identical
+ * detection terminalizes with the attempt count recorded.
+ */
+export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
+  return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
+}
+
+/**
+ * Deferral budget for a head whose preparation deadline lands while the control
+ * plane reports a runtime replacement in flight. Each deferral grants a fresh
+ * delivery window, so the budget caps the wait inside one replacement cycle and
+ * leaves the existing terminal path to run when a replacement never completes.
+ * Binding the replacement runtime ends the cycle and starts the next budget.
+ */
+export const RUNTIME_REPLACEMENT_WAIT_LIMIT = 6;
 
 // ---------------------------------------------------------------------------
 // Canonical field access. The wire model nests per-state fields under `state`;
@@ -455,11 +479,60 @@ export function releaseUnadmittedWaitingMessages(
       ]);
       // Preserve intent and deadline: the head keeps its original preparation
       // bound. A released attach proof is retained for late results.
-      const proofs = releaseAttach && attach ? { retiredAttach: attach } : undefined;
+      const proofs =
+        releaseAttach && attach
+          ? { retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach) }
+          : undefined;
       return withProofs({ ...message, state: cleared }, proofs);
     }),
     releasedIds,
   };
+}
+
+/**
+ * Re-queue an accepted turn whose runtime produced no output, so the alarm can
+ * re-dispatch the same durable turn on a fresh runtime. The immutable `intent`
+ * (the user's typed message) is preserved, which is what makes the recovery
+ * lossless. Every ambiguous dispatch proof is dropped: a late operation result
+ * for the retired authorization must not revive it, and the cleared prompt
+ * proof is what lets the delivery start a new acquisition instead of
+ * reconciling the old one. Only the matching record changes; every other record
+ * is returned untouched. Returns `undefined` when no accepted record matches.
+ *
+ * The acceptance, activity and execution bounds are cleared with the dispatch
+ * state: all of them were measured against the runtime that just went silent, so
+ * keeping any would fail the replacement delivery immediately or hand the fresh
+ * prompt a bound that belongs to the retired authorization. The recovery count
+ * is the one piece of the retired lifecycle that survives; it is what bounds
+ * both `wrapper_no_output` producers to a single automatic recovery before a
+ * second identical detection terminalizes.
+ */
+export function redispatchAcceptedMessage(
+  messages: readonly SessionMessage[],
+  messageId: string
+): SessionMessage[] | undefined {
+  const message = messages.find(item => item.messageId === messageId);
+  if (!message || message.state.kind !== 'accepted') return undefined;
+  const accepted = message.state;
+  return messages.map(item =>
+    item.messageId !== messageId
+      ? item
+      : {
+          ...withoutProofs(item),
+          state: {
+            kind: 'queued',
+            intent: accepted.intent,
+            ...(accepted.legacyInvalidIntent ? { legacyInvalidIntent: true as const } : {}),
+            ...(accepted.legacy !== undefined ? { legacy: accepted.legacy } : {}),
+            ...(accepted.queuedAt !== undefined ? { queuedAt: accepted.queuedAt } : {}),
+            deliveryStep: 'waiting',
+            deadlineAt: null,
+            attachFailures: 0,
+            promptFailures: 0,
+            recoveryAttempts: (accepted.recoveryAttempts ?? 0) + 1,
+          },
+        }
+  );
 }
 
 /**
@@ -492,7 +565,10 @@ export function releaseCompletedRetryableAttach(
   return messages.map(message => {
     const attach = message.messageId === messageId ? message.proofs?.attach : undefined;
     if (!attach?.dispatched || attach.result?.ok !== false) return message;
-    const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+    const proofs: MessageProofs = {
+      ...message.proofs,
+      retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+    };
     delete proofs.attach;
     return withProofs(
       {
@@ -506,6 +582,24 @@ export function releaseCompletedRetryableAttach(
       Object.keys(proofs).length > 0 ? proofs : undefined
     );
   });
+}
+
+/**
+ * Retire an attach proof into the single `retiredAttach` slot without letting
+ * the slot's attach epoch drop. A dispatched attach carries no `attachmentEpoch`
+ * until its result arrives, and every other retired proof's epoch was already
+ * counted by `nextAttachmentEpoch`. Replacing the slot with an epoch-less proof
+ * would drop the pool to the epochs of the proofs that remain, so the next attach
+ * is minted at or below the epoch the native-runtime fence holds and looks like a
+ * stale result — refusing the in-place rebind the head is waiting for. Carry the
+ * highest epoch either proof has carried so the pool never falls below the fence.
+ */
+export function retireAttachProof(
+  attach: SessionOperationProof,
+  previous: SessionOperationProof | undefined
+): SessionOperationProof {
+  const attachmentEpoch = Math.max(attach.attachmentEpoch ?? 0, previous?.attachmentEpoch ?? 0);
+  return { ...attach, ...(attachmentEpoch > 0 ? { attachmentEpoch } : {}) };
 }
 
 /**
@@ -527,7 +621,10 @@ export function releaseUnconfirmedAttach(
     !sameSessionOperation(attach.authorization, authorization)
   )
     return undefined;
-  const proofs: MessageProofs = { ...message.proofs, retiredAttach: attach };
+  const proofs: MessageProofs = {
+    ...message.proofs,
+    retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+  };
   delete proofs.attach;
   return messages.map(item =>
     item.messageId !== message.messageId
@@ -767,6 +864,12 @@ export function failedMessageSnapshot(
     delivery: accepted ? 'sent' : 'queued',
     accepted,
     reason: cancelled ? 'interrupted' : reason,
+    // Record the attempt count only once a no-output recovery was spent on this
+    // turn: a first-attempt failure has no recovery to account for, and emitting
+    // `attempts: 1` there would change every other terminal failure payload.
+    ...(message.state.recoveryAttempts !== undefined
+      ? { attempts: message.state.recoveryAttempts + 1 }
+      : {}),
     ...(cancelled
       ? { error: 'The message was interrupted' }
       : detail || reason
@@ -807,6 +910,24 @@ export function streamCloudStatus(
   if (hasAcceptedMessage(messages)) return { type: 'ready' };
   if (messages.some(message => message.state.kind === 'queued')) return { type: 'preparing' };
   return messages.length > 0 ? { type: 'ready' } : null;
+}
+
+/**
+ * Mint the next attach epoch. A retired proof keeps its epoch in the pool: the
+ * native-runtime fence rejects an in-place rebind recorded at an epoch it
+ * already holds, and the retired proof's epoch is the one that fence carries, so
+ * re-minting it would make the replacement attach look like a stale result.
+ */
+function nextAttachmentEpoch(messages: readonly SessionMessage[]): number {
+  return (
+    Math.max(
+      0,
+      ...messages.flatMap(message => [
+        message.proofs?.attach?.attachmentEpoch ?? 0,
+        message.proofs?.retiredAttach?.attachmentEpoch ?? 0,
+      ])
+    ) + 1
+  );
 }
 
 export function applySessionOperationResult(
@@ -893,10 +1014,7 @@ export function applySessionOperationResult(
         : delivery.completedAt,
   };
   const attachmentEpoch =
-    kind === 'attach'
-      ? (proof.attachmentEpoch ??
-        Math.max(0, ...messages.map(item => item.proofs?.attach?.attachmentEpoch ?? 0)) + 1)
-      : undefined;
+    kind === 'attach' ? (proof.attachmentEpoch ?? nextAttachmentEpoch(messages)) : undefined;
   return {
     messages: applied.map(item =>
       item.messageId === message.messageId
@@ -1046,9 +1164,7 @@ export function completeSessionOperationAttachment(
     nextQueuedMessageId(messages) !== message.messageId
   )
     return undefined;
-  const attachmentEpoch =
-    proof.attachmentEpoch ??
-    Math.max(0, ...messages.map(item => item.proofs?.attach?.attachmentEpoch ?? 0)) + 1;
+  const attachmentEpoch = proof.attachmentEpoch ?? nextAttachmentEpoch(messages);
   return messages.map(item =>
     item.messageId === message.messageId
       ? {

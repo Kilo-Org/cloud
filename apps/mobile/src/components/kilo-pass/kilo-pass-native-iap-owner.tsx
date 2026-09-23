@@ -422,6 +422,15 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         // fix anything.
         setOwnershipChecked(true);
         setOwnershipCheckFailed(false);
+        // The restore read the store's current purchases, so refresh the
+        // ownership snapshot from the same source: it is otherwise written only
+        // by the connect-time lookup, which leaves the owned tiles and the
+        // preflight stale for the rest of the session after a manual restore.
+        try {
+          setAvailableStorePurchases(await getAvailableIapPurchases());
+        } catch {
+          // Keep the connect-time snapshot; the next connect refreshes it.
+        }
       }
       return result;
     } finally {

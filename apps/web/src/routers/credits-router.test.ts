@@ -169,10 +169,18 @@ describe('creditsRouter.completeAppStorePurchase', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('maps a store or API failure to a retryable internal error', async () => {
+  it('reports a terminal verification failure as non-retryable', async () => {
     mockVerifyAppleCreditPurchase.mockRejectedValue(
       new Error('Apple transaction is missing identifiers')
     );
+
+    await expect(
+      callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('maps a store or API failure to a retryable internal error', async () => {
+    mockVerifyAppleCreditPurchase.mockRejectedValue(new Error('provider unavailable'));
 
     await expect(
       callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })

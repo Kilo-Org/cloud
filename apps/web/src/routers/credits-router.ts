@@ -55,7 +55,11 @@ const STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
 
 /**
  * A store transaction that belongs to another account is terminal — retrying
- * cannot succeed. Every other failure (a store or API failure, including a
+ * cannot succeed. A receipt the store will never let succeed (a revoked or
+ * wrong-bundle Apple transaction, a Play purchase that is not in a purchased
+ * state, a product that is not a credit pack) is terminal too, and is reported
+ * as such so a caller does not replay it forever — this mirrors the Kilo Pass
+ * completion routers. Every other failure (a store or API failure, including a
  * consume that did not complete) is retryable: the grant is idempotent, so the
  * client can safely replay the purchase.
  */
@@ -83,6 +87,18 @@ function mapCreditCompletionError(
     return new TRPCError({
       code: 'FORBIDDEN',
       message: STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE,
+    });
+  }
+
+  const isVerificationFailure =
+    message.startsWith('Apple ') ||
+    message.startsWith('Google Play ') ||
+    message.includes('transaction') ||
+    message.includes('product');
+  if (isVerificationFailure) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'We could not verify this store purchase. Please try again.',
     });
   }
 

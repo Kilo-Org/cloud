@@ -138,6 +138,14 @@ export async function verifyGooglePlayCreditPurchase(params: {
     amountMicrodollars: product.amountMicrodollars * quantity,
     purchasedAtIso: googlePlayPurchaseTimeIso(apiData),
     // ProductPurchase.purchaseType: 0 test, 1 promo, 2 rewarded.
+    //
+    // A test (license-tester) purchase is credited like a paid one on purpose,
+    // and this is the documented exception: the stores offer no other path to
+    // exercise a real charge end to end, the amount always comes from the
+    // catalog and never from the caller, and the grant is idempotent. It
+    // mirrors the Kilo Pass store flow, which also grants on a Sandbox
+    // purchase. Refusing Sandbox here would make the only testable store path
+    // uncreditable.
     environment: apiData.purchaseType === 0 ? 'Sandbox' : 'Production',
     rawPayload: apiData,
   };

@@ -126,10 +126,16 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const queryErrorMessage = getAuthoredProductsErrorMessageKey(productsQuery.error);
 
   useEffect(() => {
-    if (productsQuery.isSuccess) {
+    // The store-connection bound is a claim about the connection, so a
+    // connected store clears it. Keying only on `isSuccess` never cleared it:
+    // React Query keeps `status: success` across a refetch and while the query
+    // is disabled with cached data, so after the 8s timeout fired the banner
+    // outlived the disconnection until the screen remounted. A completed fetch
+    // answers the bound too, so a successful refetch clears it.
+    if (options.connected || productsQuery.isSuccess) {
       setStoreErrorMessage(null);
     }
-  }, [productsQuery.isSuccess]);
+  }, [options.connected, productsQuery.isSuccess, productsQuery.dataUpdatedAt]);
 
   const productsState = getStoreCreditProductsState({
     data: productsQuery.data,

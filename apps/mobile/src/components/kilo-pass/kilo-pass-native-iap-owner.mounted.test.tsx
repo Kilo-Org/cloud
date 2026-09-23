@@ -261,4 +261,29 @@ describe('KiloPassNativeIapOwner', () => {
     expect(handle.value?.ownedByAnotherAccount).toBe(true);
     expect(handle.value?.ownershipChecked).toBe(true);
   });
+
+  it('refreshes the ownership snapshot after a manual restore', async () => {
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [{ appleProductId: KILO_PASS_PRODUCT_ID, googleProductId: 'kilo_pass_monthly' }],
+    };
+    // The connect-time lookup answers nothing; the restore finds the pass.
+    mockedIap.getAvailablePurchases.mockResolvedValueOnce([]).mockResolvedValue([createPurchase()]);
+
+    const { handle } = await mountOwner();
+    await flushPromises();
+    expect(handle.value?.ownedAppleProductId).toBeNull();
+
+    await act(async () => {
+      await handle.value?.restorePurchases();
+    });
+    await flushPromises();
+
+    // The snapshot is otherwise written only on connect, so without a refresh
+    // the owned tile and the preflight stay stale for the rest of the session.
+    expect(handle.value?.ownedAppleProductId).toBe(KILO_PASS_PRODUCT_ID);
+    expect(handle.value?.ownershipChecked).toBe(true);
+    expect(handle.value?.ownershipCheckFailed).toBe(false);
+  });
 });

@@ -689,10 +689,20 @@ export async function processGooglePlayKiloPassNotification(params: {
     if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
     await db.transaction(async tx => {
-      const reversal = await reverseStoreCreditPurchase(tx, {
+      // The grant is keyed by the order id when Play reported one and by the
+      // purchase token otherwise, while a voided notification always carries an
+      // order id. Try the order id first and fall back to the purchase token so
+      // a grant keyed by the token is still clawed back exactly.
+      let reversal = await reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.GooglePlay,
         providerTransactionId: orderId,
       });
+      if (reversal.creditTransactionId === null) {
+        reversal = await reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId: purchaseToken,
+        });
+      }
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
         result: KiloPassAuditLogResult.Success,

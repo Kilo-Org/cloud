@@ -274,6 +274,43 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.errorMessageKey).toBeNull();
   });
 
+  it('completes a store transaction delivered outside a purchase request in-session', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+
+    // The store re-delivers an unfinished transaction with no request in
+    // flight. The recovery effect only runs when the store connects, so the
+    // owner must complete it here instead of waiting for a remount.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ productId: APPLE_PRODUCT_ID }),
+      isConsumable: true,
+    });
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+  });
+
+  it('ignores a delivered transaction that is not a credit pack', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    await mountOwner();
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ productId: 'other.product' }));
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+  });
+
   it('a store error during a purchase reports the purchase failure', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

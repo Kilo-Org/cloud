@@ -234,19 +234,31 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
             purchaseToken: token,
           })
         : deps.completeAppStorePurchase({ signedTransactionJws: token }));
-      // Only after the backend answered: an interrupted purchase stays in the
-      // store queue and is recovered on the next launch.
-      await deps.finishTransaction({ purchase, isConsumable: true });
-      if (options.invalidateAfterCompletion ?? true) {
-        await deps.invalidateAfterCompletion();
-      }
-      return { completed: true };
     } catch (error) {
       return {
         completed: false,
         errorMessageKey: getStoreCreditPurchaseErrorMessageKey(error, deps.storefront),
       };
     }
+
+    // The backend granted the credits, so the purchase succeeded. Finishing the
+    // store transaction and refreshing the balance are best-effort follow-ups:
+    // if either fails, the store keeps re-delivering the transaction and the
+    // recovery pass finishes it on the next launch. Reporting a failure here
+    // would hide credits the user already owns and skip the success signal.
+    try {
+      await deps.finishTransaction({ purchase, isConsumable: true });
+    } catch {
+      // The store still holds the unfinished transaction; recovery retries it.
+    }
+    if (options.invalidateAfterCompletion ?? true) {
+      try {
+        await deps.invalidateAfterCompletion();
+      } catch {
+        // The balance refresh is cosmetic; the screen refetches on focus.
+      }
+    }
+    return { completed: true };
   }
 
   function reportPurchaseCompletionErrorIfNeeded(

@@ -176,6 +176,26 @@ function tryAgainButton(
   )[0];
 }
 
+/**
+ * Flush effects and microtasks while fake timers are installed: `waitFor` polls
+ * with a real `setTimeout`, which never fires under fake timers, so advance the
+ * fake clock instead.
+ */
+async function settleTimers(predicate: () => boolean, attempts = 20): Promise<void> {
+  for (let i = 0; i < attempts; i += 1) {
+    if (predicate()) {
+      return;
+    }
+    // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+  }
+  if (!predicate()) {
+    throw new Error('settleTimers: condition not met');
+  }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────
 
 describe('CreditPurchaseScreen', () => {
@@ -358,6 +378,54 @@ describe('CreditPurchaseScreen', () => {
     expect(allText(renderer)).not.toContain('App Store products unavailable');
     expect(packRows(renderer)).toHaveLength(4);
     unmount();
+  });
+
+  it('reconnect: a store that reconnects with cached prices clears the connection banner', async () => {
+    vi.useFakeTimers();
+    try {
+      const { renderer, queryClient, unmount } = await renderWithProviders(
+        createElement(CreditPurchaseScreen)
+      );
+      const update = () => {
+        renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(CreditPurchaseScreen)
+          )
+        );
+      };
+      await settleTimers(() => allText(renderer).includes('$10.99'));
+
+      // The store drops while the prices are cached, so the bounded wait fires
+      // and every row reads Price unavailable.
+      owner.connected = false;
+      await act(async () => {
+        update();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8000);
+      });
+      expect(allText(renderer)).toContain('App Store products unavailable');
+      expect(allText(renderer)).toContain('Price unavailable');
+
+      // The store reconnects with the cached prices still fresh, so React Query
+      // keeps `status: success` and never refetches: only the connection itself
+      // can retire the banner, which used to survive until a remount.
+      owner.connected = true;
+      await act(async () => {
+        update();
+        await Promise.resolve();
+      });
+
+      expect(allText(renderer)).not.toContain('App Store products unavailable');
+      expect(allText(renderer)).toContain('$10.99');
+      expect(packRows(renderer)).toHaveLength(4);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders a pack the store did not price as disabled with the price-unavailable note', async () => {

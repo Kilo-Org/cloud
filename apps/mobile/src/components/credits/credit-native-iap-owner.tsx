@@ -30,6 +30,7 @@ import {
   createStoreCreditPurchaseActions,
   getPurchaseCompletionId,
   getStoreCreditPurchaseErrorMessageKey,
+  isRecoverableCreditPurchase,
   showDedupedPurchaseError,
 } from '@/lib/credits/use-store-credit-purchase';
 import { useTRPC } from '@/lib/trpc';
@@ -170,10 +171,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     onPurchaseSuccess: purchase => {
       if (activePurchaseRequestRef.current !== purchase.productId) {
         // The store answered the in-flight request with another product's
-        // transaction (or re-delivered an unfinished one); the recovery effect
-        // completes it if it is a credit pack. Release the request or the row
-        // keeps its "Completing purchase" state forever.
+        // transaction, or re-delivered an unfinished one (possibly after
+        // `onPurchaseError` cleared the request). The recovery effect runs only
+        // when the store connects, so a transaction delivered mid-session must
+        // be completed here: releasing the request and waiting for that effect
+        // leaves the user charged and uncredited until the screen remounts.
         releasePurchaseRequest();
+        void completeStorePurchaseInSession(purchase);
         return;
       }
 
@@ -216,6 +220,46 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       requestPurchase,
       showError,
     ]
+  );
+
+  // Completes one transaction the store delivered outside a request this owner
+  // started (a re-delivered or deferred purchase). Recovery only runs when the
+  // store connects, so the purchase callback must complete it in-session or the
+  // user stays charged and uncredited until the screen remounts.
+  const completeStorePurchaseInSession = useCallback(
+    async (purchase: Purchase) => {
+      if (
+        !isRecoverableCreditPurchase(
+          purchase,
+          creditPackAppleProductIds,
+          creditPackGoogleProductIds
+        )
+      ) {
+        return;
+      }
+      const id = getPurchaseCompletionId(purchase);
+      if (
+        recoveredPurchaseIdsRef.current.has(id) ||
+        recoveryInFlightPurchaseIdsRef.current.has(id)
+      ) {
+        return;
+      }
+      recoveryInFlightPurchaseIdsRef.current.add(id);
+      try {
+        // The store delivered this transaction on its own, so the completion
+        // announces itself; a failure stays silent because the recovery pass
+        // retries it on the next connect.
+        const completed = await actions.handlePurchaseSuccess(purchase, {
+          notifyErrors: false,
+        });
+        if (completed) {
+          recoveredPurchaseIdsRef.current.add(id);
+        }
+      } finally {
+        recoveryInFlightPurchaseIdsRef.current.delete(id);
+      }
+    },
+    [actions, creditPackAppleProductIds, creditPackGoogleProductIds]
   );
 
   const startPurchase = useCallback(

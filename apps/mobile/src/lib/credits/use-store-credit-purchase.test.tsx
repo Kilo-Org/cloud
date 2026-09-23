@@ -206,6 +206,35 @@ describe('createStoreCreditPurchaseActions completion', () => {
     expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
   });
 
+  it('reports a granted purchase as completed when finishing the store transaction fails', async () => {
+    const onPurchaseCompleted = vi.fn();
+    const actions = createActions({
+      finishTransaction: vi.fn().mockRejectedValue(new Error('StoreKit unavailable')),
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    // The backend already granted the credits, so a finish failure must not
+    // read as a failed purchase: the store re-delivers the transaction and
+    // recovery finishes it on the next launch.
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(true);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a granted purchase as completed when the balance refresh fails', async () => {
+    const onPurchaseCompleted = vi.fn();
+    const actions = createActions({
+      invalidateAfterCompletion: vi.fn().mockRejectedValue(new Error('offline')),
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(true);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a missing signed transaction without completing', async () => {
     const completeAppStorePurchase = vi.fn();
     const finishTransaction = vi.fn();

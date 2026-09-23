@@ -18,6 +18,7 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
+import { SESSION_TITLE_MAX_LENGTH } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
@@ -239,6 +240,7 @@ export function StoredSessionRow({
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
           initialValue={title}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

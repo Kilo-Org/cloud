@@ -150,7 +150,7 @@ export async function exitRemoteSessionWithFeedback({
     // `dismissTo` dispatches POP_TO, which finds the existing `(tabs)` route
     // at the stack root and truncates the stack so a back gesture cannot
     // return to the exited `agent-chat` route.
-    router.dismissTo(SESSIONS_ROUTE);
+    router.dismissTo(SESSIONS_ROUTE as Href);
   };
 
   await runExit();

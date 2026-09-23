@@ -185,6 +185,10 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
+  restoreIncompleteLogFields,
+  type WrapperRestoreTelemetry,
+} from '../shared/wrapper-bootstrap.js';
+import {
   SandboxStatusSnapshotSchema,
   getSandboxProviderLabel,
   type SandboxStatusSnapshot,
@@ -326,6 +330,35 @@ class StopCommitRejectedError extends Error {
 }
 
 const MAX_TERMINAL_DETAIL_LENGTH = 4_096;
+
+/**
+ * Name a partial snapshot restore on a runtime replacement. The attach result
+ * carries the wrapper's restore telemetry; without this the skipped diffs would
+ * only exist in the wrapper log the worker never reads.
+ */
+function logRestoreIncomplete(input: {
+  sessionId: string | undefined;
+  kiloSessionId?: string;
+  messageId: string;
+  wrapperInstanceId?: string;
+  restore: WrapperRestoreTelemetry | undefined;
+}): void {
+  const restoreFields = restoreIncompleteLogFields(input.restore);
+  if (!restoreFields) return;
+  logger
+    .withFields({
+      sessionId: input.sessionId,
+      kiloSessionId: input.kiloSessionId,
+      messageId: input.messageId,
+    })
+    .warn('Cloud agent restore incomplete', {
+      metric: 'cloud_agent_restore_incomplete',
+      count: 1,
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.wrapperInstanceId ? { wrapperInstanceId: input.wrapperInstanceId } : {}),
+      ...restoreFields,
+    });
+}
 
 function confirmedControlRejectionDetail(error: unknown): string | undefined {
   if (!(error instanceof ControlRequestError) || !error.rejectionReceived) return undefined;
@@ -3839,6 +3872,13 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (operation === 'session.attach') {
         const attached = sessionAttachResultSchema.parse(dispatched.result);
+        logRestoreIncomplete({
+          sessionId: this.sessionId,
+          kiloSessionId,
+          messageId,
+          wrapperInstanceId,
+          restore: attached.restore,
+        });
         logControlDiagnostic('session_attach_completion', {
           sessionId: this.sessionId,
           messageId,
@@ -4195,7 +4235,7 @@ export class SandboxSession extends DurableObject<Env> {
             return;
           }
         } else {
-          await dispatch('attach', () =>
+          const attached = await dispatch('attach', () =>
             wait(
               async () =>
                 sessionAttachResultSchema.parse(
@@ -4219,6 +4259,13 @@ export class SandboxSession extends DurableObject<Env> {
               SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
             )
           );
+          logRestoreIncomplete({
+            sessionId,
+            kiloSessionId,
+            messageId,
+            wrapperInstanceId,
+            restore: attached.restore,
+          });
         }
         phase = 'preparing';
         if (!isCurrent()) {

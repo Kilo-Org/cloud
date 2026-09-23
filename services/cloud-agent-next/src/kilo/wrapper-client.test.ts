@@ -155,6 +155,50 @@ const createPromptOptions = (
   session: overrides.session ?? defaultPromptSession,
 });
 
+const createReadyRequest = (
+  overrides: Partial<WrapperSessionReadyRequest> = {}
+): WrapperSessionReadyRequest => ({
+  agentSessionId: 'agent_test',
+  userId: 'user_test',
+  sandboxId: 'usr-test',
+  kiloSessionId: 'kilo_sess_1',
+  workspace: {
+    workspacePath: '/workspace/user/sessions/agent_test',
+    sessionHome: '/home/agent_test',
+    branchName: 'main',
+  },
+  repo: {
+    kind: 'github',
+    repo: 'acme/repo',
+    token: 'gh-token',
+  },
+  materialized: {
+    env: { HOME: '/home/agent_test', KILO_PLATFORM: 'github' },
+  },
+  session: {
+    ingestUrl: 'wss://worker.example.com/sessions/user_test/agent_test/ingest',
+    workerAuthToken: 'kilo-token',
+    wrapperRunId: 'wr_test',
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn_test',
+  },
+  ...overrides,
+});
+
+const createReadyResponse = (telemetry?: Record<string, unknown>): Response =>
+  Response.json({
+    status: 'ready',
+    kiloSessionId: 'kilo_sess_1',
+    workspaceReady: {
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sandboxId: 'usr-test',
+      sessionHome: '/home/agent_test',
+      branchName: 'main',
+      kiloSessionId: 'kilo_sess_1',
+    },
+    ...(telemetry ? { telemetry } : {}),
+  });
+
 describe('WrapperClient', () => {
   const defaultPort = 5000;
 
@@ -373,6 +417,75 @@ describe('WrapperClient', () => {
       );
       expect('executeSession' in client).toBe(false);
       expect(session.exec).not.toHaveBeenCalled();
+    });
+
+    it('reports an incomplete restore as a named event with the skipped paths', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          createReadyResponse({
+            workspaceWasWarm: true,
+            restoredFromBackup: true,
+            restore: {
+              path: 'backup',
+              diffs: {
+                applied: 1,
+                skipped: 1,
+                total: 2,
+                skippedDiffs: [{ file: 'src/a.ts', reason: 'patch_apply_failed' }],
+              },
+            },
+          })
+        ),
+      };
+      const client = new WrapperClient({ transport });
+      const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      const response = await client.ensureSessionReady(createReadyRequest());
+
+      expect(response.telemetry?.restore?.diffs?.skipped).toBe(1);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        'Cloud agent restore incomplete',
+        expect.objectContaining({
+          metric: 'cloud_agent_restore_incomplete',
+          count: 1,
+          sessionId: 'agent_test',
+          platform: 'github',
+          wrapperRunId: 'wr_test',
+          wrapperGeneration: 1,
+          restorePath: 'backup',
+          diffsApplied: 1,
+          diffsSkipped: 1,
+          diffsTotal: 2,
+          skippedPaths: ['src/a.ts'],
+          skippedReasons: ['patch_apply_failed'],
+        })
+      );
+      loggerWarn.mockRestore();
+    });
+
+    it('does not report a complete restore', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          createReadyResponse({
+            workspaceWasWarm: true,
+            restoredFromBackup: true,
+            restore: {
+              path: 'backup',
+              diffs: { applied: 2, skipped: 0, total: 2 },
+            },
+          })
+        ),
+      };
+      const client = new WrapperClient({ transport });
+      const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      await client.ensureSessionReady(createReadyRequest());
+
+      expect(loggerWarn).not.toHaveBeenCalledWith(
+        'Cloud agent restore incomplete',
+        expect.anything()
+      );
+      loggerWarn.mockRestore();
     });
 
     it('propagates validated workspace failure diagnostics', async () => {

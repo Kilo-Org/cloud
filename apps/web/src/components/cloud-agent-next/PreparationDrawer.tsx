@@ -19,7 +19,11 @@ import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { cn } from '@/lib/utils';
 import { useManager } from './CloudAgentProvider';
 import { formatAttemptDuration, phaseStatus, phaseStatusLabel } from './preparation-phases';
-import { phaseDisplayText } from './preparation-summary';
+import {
+  phaseDisplayText,
+  preparationSummaryLine,
+  summarizePreparationAttempt,
+} from './preparation-summary';
 import { useStickToBottom } from './hooks/useStickToBottom';
 
 type PreparationDrawerProps = {
@@ -43,6 +47,11 @@ export function PreparationDrawer({
   const manager = useManager();
   const attempts = useAtomValue(manager.atoms.preparationAttempts);
   const attempt = attemptId ? attempts.find(candidate => candidate.id === attemptId) : undefined;
+  // The drawer header must agree with the row it was opened from: both derive
+  // from the same summary, and both read destructive when the attempt failed
+  // or its restore was incomplete.
+  const summary = attempt ? summarizePreparationAttempt(attempt) : undefined;
+  const destructive = summary?.kind === 'failed' || summary?.kind === 'incomplete';
 
   return (
     <Sheet modal={false} open={Boolean(attempt)} onOpenChange={onOpenChange}>
@@ -57,10 +66,8 @@ export function PreparationDrawer({
       >
         <SheetHeader className="shrink-0 border-b pr-14">
           <SheetTitle className="text-base">Environment preparation</SheetTitle>
-          <SheetDescription
-            className={cn(attempt?.status === 'failed' && 'text-status-destructive')}
-          >
-            {attempt && attemptSummaryLine(attempt)}
+          <SheetDescription className={cn(destructive && 'text-status-destructive')}>
+            {attempt && preparationSummaryLine(attempt)}
           </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-xs sm:px-6">
@@ -69,17 +76,6 @@ export function PreparationDrawer({
       </SheetContent>
     </Sheet>
   );
-}
-
-function attemptSummaryLine(attempt: PreparationAttempt): string {
-  const title =
-    attempt.status === 'running'
-      ? 'Preparing environment'
-      : attempt.status === 'completed'
-        ? 'Environment prepared'
-        : 'Preparation failed';
-  const duration = formatAttemptDuration(attempt);
-  return duration ? `${title} · ${duration}` : title;
 }
 
 function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {

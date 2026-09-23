@@ -26,6 +26,7 @@ import { createOutputRedactor, createSecretRedactor, redactSecrets } from './red
 import { restoreSession } from './restore-session.js';
 import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
+import { reportRestoreIncomplete } from './restore-incomplete.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
 
@@ -93,6 +94,7 @@ export type BootstrapProgressStep =
   | 'cloning'
   | 'branch'
   | 'kilo_session'
+  | 'restore_incomplete'
   | 'setup_commands'
   | 'attachments'
   | 'kilo_server';
@@ -1370,13 +1372,36 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         restore,
         restoredFromBackup ? 'backup' : 'cold'
       );
-      if (restoreTelemetry?.diffs) {
+      const incomplete = restoreTelemetry
+        ? await reportRestoreIncomplete({
+            diffs: restoreTelemetry.diffs ?? { applied: 0, skipped: 0, total: 0 },
+            sessionHome: request.workspace.sessionHome,
+            identity: `kiloSessionId=${request.kiloSessionId} wrapperRunId=${request.session.wrapperRunId} wrapperGeneration=${request.session.wrapperGeneration}`,
+            log: logToFile,
+            step: {
+              started: label =>
+                progress?.({
+                  type: 'started',
+                  step: 'restore_incomplete',
+                  stepId: 'phase:restore_incomplete',
+                  kind: 'phase',
+                  label,
+                }),
+              failed: safeError =>
+                progress?.({
+                  type: 'failed',
+                  step: 'restore_incomplete',
+                  stepId: 'phase:restore_incomplete',
+                  safeError,
+                }),
+            },
+          })
+        : undefined;
+      if (!incomplete && restoreTelemetry?.diffs) {
         const restoreLabel = restoreTelemetry.path === 'backup' ? 'Resume restore' : 'Cold restore';
         progress?.(
           'kilo_session',
-          restoreTelemetry.diffs.skipped > 0
-            ? `${restoreLabel} incomplete, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
-            : `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+          `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
         );
       }
 

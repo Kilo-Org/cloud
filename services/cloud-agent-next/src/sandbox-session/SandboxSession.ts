@@ -4591,7 +4591,8 @@ export class SandboxSession extends DurableObject<Env> {
       }
       const now = Date.now();
       const extended = this.loadMessages().map(message => {
-        if (message.messageId !== input.messageId || message.state.kind !== 'queued') return message;
+        if (message.messageId !== input.messageId || message.state.kind !== 'queued')
+          return message;
         const proofs = message.proofs ? { ...message.proofs } : undefined;
         if (proofs?.attach) {
           proofs.retiredAttach = proofs.attach;

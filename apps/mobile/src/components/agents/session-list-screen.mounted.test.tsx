@@ -20,6 +20,11 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
+  // Mutable so a case can put the tree in a short landscape window: the
+  // reserved band the centered bodies clear is the tab bar's alone there (the
+  // FAB's strip would leave a no-match state less room than one line of copy).
+  windowWidth: 390,
+  windowHeight: 844,
   // Mutable so a case can put the tree on Android: the platform decides
   // whether the floating pull-to-refresh indicator is safe (device defect
   // uxs1) or the reserved band carries the in-flight state instead.
@@ -103,7 +108,11 @@ vi.mock('react-native', () => ({
       return { remove: vi.fn() };
     },
   },
-  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
+  useWindowDimensions: () => ({
+    fontScale: state.fontScale,
+    height: state.windowHeight,
+    width: state.windowWidth,
+  }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -390,6 +399,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
+  state.windowWidth = 390;
+  state.windowHeight = 844;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
   state.topInset = 0;
@@ -497,13 +508,13 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    // The band a centered body lays out in ends at the tab bar, on every body.
-    // The FAB is a corner control: its band rides the rows list's own frame
-    // inset (`marginBottom`, asserted below) so no row sits under the button,
-    // and reserving it here as well shrank the band below the tab bar's top
-    // edge in a short landscape window, parking the no-match state's second
-    // line and action behind the bar (landscape spot defect e8).
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
+    // The FAB's own strip is reserved for a centered body only while the window
+    // can spare it: a short landscape window reserves the tab bar's band alone,
+    // so the body still clears the bar instead of shrinking below the state's
+    // height (the FAB is a corner overlay there and the column never reaches it).
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
+      state.tabBarHeight + (test.empty ? 0 : 64)
+    );
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -551,6 +562,50 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
+  });
+
+  it('reserves the tab-bar band alone for a centered body in a short landscape window', async () => {
+    // Device defect e4: in a 411dp-tall landscape window the FAB's own strip is
+    // taller than the band the centered body gets, so reserving it as well left
+    // the no-match state less room than one line of copy — its copy and
+    // Clear-search action sat under the bar, whose overlay swallowed the taps,
+    // and only a scroll brought them back. The FAB is a corner overlay there and
+    // the centered column never reaches it, so the band is the tab bar's alone.
+    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
+    state.windowWidth = 914;
+    state.windowHeight = 411;
+
+    await renderScreen();
+
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
+  });
+
+  it('still reserves the FAB strip on a tablet held sideways', async () => {
+    // Wide but not short: the band there is taller than the whole state, so
+    // the FAB keeps its own strip and the state centers above it.
+    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
+    state.windowWidth = 1024;
+    state.windowHeight = 768;
+
+    await renderScreen();
+
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
+  });
+
+  it('still reserves the FAB strip on a 600dp-short-edge tablet held sideways', async () => {
+    // Android's smallest tablet (the `sw600dp` qualifier, the 1024x600
+    // emulator) is wide and short-edged, but its band is taller than the whole
+    // state, so the FAB keeps its own strip there too.
+    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
+    state.windowWidth = 1024;
+    state.windowHeight = 600;
+
+    await renderScreen();
+
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
   });
 
   it('renders the empty-state New session action as the tab’s primary affordance', async () => {
@@ -1325,13 +1380,31 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
-  it('lifts the no-match body above the keyboard inside the platform container', async () => {
+  it('clears the tab bar for the no-match body through the surface reservation alone', async () => {
     state.live.activeSessions = [row];
-    await renderScreen();
+    const renderer = await renderScreen();
     const searchHeader = requireNode('SessionListSearchHeader');
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(nodes('FlatList')).toHaveLength(0);
+    // The fixed tab bar is reserved once, by the surface inset this screen sets
+    // (the tab bar's band alone here: the no-match body owns the band, so the
+    // FAB yields and its strip never joins the reservation) and which
+    // CenteredState's pending-layout fallback pads by. Letting the no-match
+    // body shrink its own frame by the same band cleared the band a second time
+    // and pushed the centered copy about half the band above the centre of the
+    // area above the bar, so the body must not carry a clearance of its own.
+    const body = nodes('CenteredState')[0];
+    // Assert the reservation the screen actually sets, then that the body adds
+    // none of its own: `EmptyState` hands `CenteredState` only `refreshControl`
+    // and children, so a `style` here would be a duplicate clearance.
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
+    expect(body?.props.style).toBeUndefined();
+    expect(renderer.root.findByType(EmptyState).props.description).toBe(
+      'Try a different search term.'
+    );
 
     // iOS: the native container owns the lift, so the centered no-match body is
     // inside it and re-measures against the viewport it shrinks.

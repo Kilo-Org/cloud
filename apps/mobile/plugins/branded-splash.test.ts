@@ -179,17 +179,15 @@ describe('shared branded splash', () => {
     // The compile root is the throwaway project `createAndroidProject()`
     // returns, whose `res/values` holds no `colors.xml`, and `withBrandedSplash`
     // reads and writes `config.modRequest.platformProjectRoot` under that same
-    // root; a worktree's prebuilt `android/` tree never reaches these
-    // modResults, so the splash color below is the only entry the run produces.
-    // The base `colors` mod resolves its file under `modRequest.projectRoot` —
-    // that throwaway root again — and introspection falls back to empty
-    // `resources` when the file is absent, so the project's own gitignored
-    // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
-    // worktree that prebuilt) cannot add its icon, notification or app-background
-    // entries to the array. Assert the splash color this plugin owns is present
-    // by containment, not by pinning the whole array or its exact length, the
-    // same way the styles assertion below pins its theme: this case speaks only
-    // for the entry this plugin writes.
+    // root, so a worktree's prebuilt `android/` tree never reaches these
+    // modResults and the splash color below is the only entry this run produces.
+    // Assert it by containment, not by pinning the whole array or its exact
+    // length: introspection seeds `android.colors` from the `colors.xml` the
+    // compile root carries, so a root that does hold one (a worktree that ran a
+    // prebuild, or a shared config whose other plugins add icon, notification and
+    // app-background entries down the same mod chain) contributes its entries
+    // beside the splash color this plugin owns. This case speaks only for that
+    // entry, the same way the styles assertion below pins its theme.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

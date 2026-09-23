@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { formatShortModelDisplayName } from '@/lib/model-display-name';
 
 import { ChatToolbar } from './chat-toolbar';
 
@@ -53,9 +54,13 @@ vi.mock('@/lib/utils', () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
 }));
 
-// The model name from the explorer capture: 19 characters, wider than the
-// space one nowrap row leaves after the shrink-0 mode chip and the effort badge.
-const LONG_MODEL_NAME = 'DeepSeek V4.1 Flash';
+// The catalogue name the explorer capture reported, exactly as the gateway
+// sends it: `<Vendor>: <Model>`. The chip truncated it to
+// `DeepSeek: DeepSeek V4.1 F...` once the `Low` effort badge rendered.
+const CATALOGUE_MODEL_NAME = 'DeepSeek: DeepSeek V4.1 Flash';
+// The 19-character label the chip must render in full: wider than the space one
+// nowrap row leaves after the shrink-0 mode chip and the effort badge.
+const LONG_MODEL_NAME = formatShortModelDisplayName(CATALOGUE_MODEL_NAME);
 
 const MODEL_OPTIONS: SessionModelOption[] = [
   {
@@ -68,7 +73,9 @@ const MODEL_OPTIONS: SessionModelOption[] = [
   },
 ];
 
-function renderToolbar(): TestRenderer.ReactTestRenderer {
+function renderToolbar(
+  modelOptions: SessionModelOption[] = MODEL_OPTIONS
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
@@ -77,7 +84,7 @@ function renderToolbar(): TestRenderer.ReactTestRenderer {
         onModeChange: vi.fn<(mode: string) => void>(),
         model: 'deepseek/deepseek-v4.1-flash',
         variant: 'low',
-        modelOptions: MODEL_OPTIONS,
+        modelOptions,
         onModelSelect: vi.fn<(modelId: string, variant: string) => void>(),
         onPaste: vi.fn<() => void>(),
       })
@@ -117,6 +124,56 @@ describe('ChatToolbar long model name', () => {
     );
     expect(label).toHaveLength(1);
     expect(label[0]?.props.numberOfLines).toBe(1);
+  });
+
+  it('renders the reported catalogue name whole beside the low effort badge', () => {
+    // Pins the exact reported input end to end: the gateway's
+    // `DeepSeek: DeepSeek V4.1 Flash` becomes the option name the chip shows.
+    expect(CATALOGUE_MODEL_NAME).toBe('DeepSeek: DeepSeek V4.1 Flash');
+    expect(formatShortModelDisplayName(CATALOGUE_MODEL_NAME)).toBe('DeepSeek V4.1 Flash');
+    const reportedOptions: SessionModelOption[] = [
+      {
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: formatShortModelDisplayName(CATALOGUE_MODEL_NAME),
+        displayId: 'deepseek/deepseek-v4.1-flash',
+        variants: ['low', 'medium'],
+        isPreferred: false,
+        showGatewayMetadata: true,
+      },
+    ];
+    const renderer = renderToolbar(reportedOptions);
+
+    // The whole name, not `DeepSeek V4.1 F...`, and clipped to one line.
+    const modelLabel = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === LONG_MODEL_NAME
+    );
+    expect(modelLabel).toHaveLength(1);
+    expect(modelLabel[0]?.props.numberOfLines).toBe(1);
+    expect(modelLabel[0]?.props.children).toBe('DeepSeek V4.1 Flash');
+
+    // The `Low` effort badge (the trigger for the truncation) is present.
+    const effortLabel = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'low'
+    );
+    expect(effortLabel).toHaveLength(1);
+
+    // The row wraps, so the chip takes its own line instead of shedding
+    // characters under the shrink-0 mode chip and the effort badge.
+    const rows = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('flex-wrap')
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.props.className).toContain('flex-row');
   });
 
   it('packs the paste button into the model chip row so it cannot wrap alone', () => {

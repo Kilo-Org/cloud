@@ -34,13 +34,13 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260514.1
-  '@vitest/coverage-v8': 4.1.6
-  '@vitest/ui': 4.1.6
+  '@vitest/coverage-v8': 4.1.11
+  '@vitest/ui': 4.1.11
   '@workos-inc/node': 8.13.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
-  hono: 4.12.34
+  hono: 4.13.5
   jose: 6.2.3
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
@@ -48,7 +48,7 @@ catalog:
   tsx: 4.21.0
   typescript: 5.9.3
   ulid: 3.0.2
-  vitest: 4.1.6
+  vitest: 4.1.11
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
   zod: 4.4.3
@@ -83,7 +83,7 @@ minimumReleaseAgeExclude:
   - expo-modules-jsi@57.1.0
   - '@expo/cli@57.0.23'
   - '@expo/metro-file-map@57.0.3'
-  - expo-glass-effect@57.0.2
+  - expo-glass-effect@57.0.3
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -120,7 +120,8 @@ overrides:
   storybook: 10.4.6
   next: 16.3.3
   preact: 10.28.4
-  adm-zip: 0.6.0
+  adm-zip: 0.6.1
+  baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
   decode-uri-component: 0.5.0
   glob: '>=13.0.1'
@@ -153,10 +154,10 @@ overrides:
   lodash-es: '>=4.18.1'
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.0
-  smol-toml: 1.6.1
+  smol-toml: 1.7.1
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
-  hono: 4.12.34
+  hono: 4.13.5
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
@@ -180,10 +181,10 @@ overrides:
   toml: 4.2.0
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0
-  js-yaml: 4.3.1
+  js-yaml: 4.3.2
   linkify-it: 5.0.2
   protobufjs: 7.6.5
-  sharp: '>=0.35.0'
+  sharp: 0.35.4
   tar: 7.5.21
   shell-quote: 1.10.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
@@ -214,6 +215,7 @@ packageExtensions:
 patchedDependencies:
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
+  expo-dev-launcher@57.0.19: patches/expo-dev-launcher@57.0.19.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,

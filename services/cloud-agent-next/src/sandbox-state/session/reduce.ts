@@ -227,6 +227,7 @@ function carryFields(state: MessageState): {
   queuedAt?: number;
   wrapperInstanceId?: string;
   preparationAttemptId?: string;
+  recoveryAttempts?: number;
 } {
   return {
     intent: state.intent,
@@ -242,6 +243,10 @@ function carryFields(state: MessageState): {
     ...(state.preparationAttemptId !== undefined
       ? { preparationAttemptId: state.preparationAttemptId }
       : {}),
+    // The no-output recovery count also survives: acceptance must not launder a
+    // spent recovery (the next inactivity detection must see it as the second
+    // identical one), and the terminal failure payload reports the attempt count.
+    ...(state.recoveryAttempts !== undefined ? { recoveryAttempts: state.recoveryAttempts } : {}),
   };
 }
 

@@ -132,7 +132,10 @@ import {
   type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
-import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+} from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -273,6 +276,13 @@ export function SessionDetailContent({
   }, []);
 
   const messages = useAtomValue(manager.atoms.messagesList);
+  // The live list behind a stable identity for the callbacks the transcript
+  // hands to its memoized rows. `renderItem` and `handleRetryMessage` read the
+  // current list through this ref instead of capturing `messages`, so neither
+  // changes identity on a streaming publish. Assigned during render, the same
+  // way `liveModelPickerSelectionScopeRef` below is.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -296,6 +306,18 @@ export function SessionDetailContent({
     totalCost
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  // The accessor handed to the transcript's rows must keep one identity across
+  // streaming publishes: the SDK re-emits `childMessages` on every
+  // `partsRevision` bump, and a changing prop would defeat `MessageBubble`'s
+  // shallow memo for every visible row. The in-transcript subagent card
+  // subscribes to the atom itself (`LiveChildSessionSection`), so it stays live
+  // without this identity changing.
+  const getChildMessagesRef = useRef(getChildMessages);
+  getChildMessagesRef.current = getChildMessages;
+  const getChildMessagesForRows = useCallback(
+    (childSessionId: string) => getChildMessagesRef.current(childSessionId),
+    []
+  );
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -1076,9 +1098,9 @@ export function SessionDetailContent({
           buildRemoteAttachmentParts
         );
         if (!result.ok) {
-          // Retryable presign failure: the manager never reached send(), so
-          // its onSendFailed toast does not fire. Surface the retryable message
-          // through the same toast channel and throw so the composer keeps the
+          // Retryable presign failure: the manager never reached send(), so the
+          // SDK set no error status indicator. Surface the retryable message
+          // through the toast channel and throw so the composer keeps the
           // draft/attachments for a retry.
           toast.error(result.message);
           throw new Error(result.message);
@@ -1101,10 +1123,10 @@ export function SessionDetailContent({
           sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
         );
       }
-      // manager.send() reports failures via its own return value (and toasts
-      // through the manager's onSendFailed hook) rather than rejecting — it
-      // is the single toast owner for send failures. Throw here, without a
-      // second toast, purely so the composer's `await onSend(...)` sees the
+      // manager.send() reports failures via its own return value rather than
+      // rejecting; the SDK sets the translated error status indicator above the
+      // composer, which is the single failed-send surface. Throw here, without
+      // a toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
       takeOverTranscriptPositionForSend();
       const sent = await manager.send({
@@ -1146,7 +1168,7 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
-      const prompt = resolveRetryPrompt(message, messages);
+      const prompt = resolveRetryPrompt(message, messagesRef.current);
       if (prompt === null) {
         return;
       }
@@ -1173,7 +1195,7 @@ export function SessionDetailContent({
         },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(
@@ -1335,7 +1357,9 @@ export function SessionDetailContent({
           ? pendingMessages.get(item.message.info.id)
           : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
-      const retryPrompt = resolveRetryPrompt(item.message, messages);
+      // Read the live list through the ref: capturing `messages` here would
+      // change this callback's identity on every streaming publish.
+      const retryPrompt = resolveRetryPrompt(item.message, messagesRef.current);
       const bubble = (
         <MessageBubble
           message={item.message}
@@ -1347,7 +1371,10 @@ export function SessionDetailContent({
           // so feeding it the stripped list would turn a reasoning stream into a
           // stale activity or "Waiting for activity" instead of "Thinking".
           // The card renders no child rows, so nothing thinking-related leaks.
-          getChildMessages={getChildMessages}
+          // `getChildMessagesForRows` is the ref-backed accessor: a stable
+          // identity here is what lets an unchanged row bail out of the memo.
+          // The card itself subscribes to the atom, so it stays live.
+          getChildMessages={getChildMessagesForRows}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
@@ -1381,13 +1408,12 @@ export function SessionDetailContent({
     [
       lastAssistantMessageId,
       isStreaming,
-      getChildMessages,
+      getChildMessagesForRows,
       modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
-      messages,
       handleRetryMessage,
       handleCopyToComposer,
       handleOpenDetails,
@@ -1586,7 +1612,17 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // A generated placeholder title (`New session - <ISO>` / `Child session -
+  // <ISO>`) is a storage key, not a name: showing it truncates the header to
+  // "New session - 2026-…". Treat it as absent and let the fallback name (or a
+  // live rename) show instead. The judgement lives in `namedSessionTitle`
+  // rather than here so it can also consult the record of titles the app's own
+  // rename wrote: a user-chosen title that happens to match the placeholder
+  // shape is kept, and a genuine placeholder still reaches
+  // `getSessionDetailRenameState` as absent.
+  const serverTitle = isSessionLoaded
+    ? namedSessionTitle(fetchedData.title ?? undefined, sessionId)
+    : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
@@ -1594,14 +1630,13 @@ export function SessionDetailContent({
     // Same seed the route's loading screen used, so the header keeps the
     // title it opened with instead of blinking back to "Session". The route's
     // cached metadata can hold the backend's ISO placeholder, which must not
-    // paint either.
+    // paint either, while a title the user's own rename wrote is kept.
     fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
     <View className="min-w-0 shrink flex-row items-center gap-2">
-      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
@@ -1622,6 +1657,13 @@ export function SessionDetailContent({
       />
     </View>
   );
+  // The PR link shares the goal row so the header stays at two rows. The row
+  // mounts only once it holds data: while the fetch is in flight a no-goal,
+  // no-PR session reserves no row, so the transcript never jumps when the fetch
+  // lands with nothing. The wrapper's FadeIn reveals the PR when it lands.
+  const associatedPr = fetchedData?.associatedPr ?? null;
+  const prBadge = <SessionPrBadge pr={associatedPr} loading={false} />;
+  const hasPrRow = associatedPr !== null;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -1694,10 +1736,11 @@ export function SessionDetailContent({
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
       // Slash commands ride the same manager.send() pipeline. The manager
-      // resolves the active remoteModelOverride from its own store and is
-      // the sole transport-toast owner; we throw a stable error on a
-      // false return purely so the composer preserves the draft, and never
-      // emit a duplicate toast of our own.
+      // resolves the active remoteModelOverride from its own store; a failed
+      // send is stated once by the SDK's translated status indicator above the
+      // composer, so we throw a stable error on a false return purely so the
+      // composer preserves the draft, and never emit a duplicate toast of our
+      // own.
       takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
@@ -1711,11 +1754,11 @@ export function SessionDetailContent({
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
-  // composer's slash commands. The manager is the sole transport-toast owner,
-  // so a failed send surfaces exactly one error toast from `onSendFailed` and
-  // this helper never adds a second. Edit throws instead, so the RenameModal
-  // shows the failure inline and the user can correct the objective. One
-  // helper keeps the `/goal` payload shape in one place.
+  // composer's slash commands. A failed send is stated once by the SDK's
+  // translated status indicator above the composer, so this helper never adds a
+  // toast of its own. Edit throws instead, so the RenameModal shows the failure
+  // inline and the user can correct the objective. One helper keeps the `/goal`
+  // payload shape in one place.
   const sendGoalAction = useCallback(
     async (action: GoalAction, objective = ''): Promise<boolean> => {
       const sent = await manager.send({
@@ -1985,9 +2028,14 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
+            // The loaded header, the route's loading header and its error state
+            // all share one cap (`SESSION_HEADER_TITLE_LINES`), and
+            // `reserveTitleSpace` holds exactly that many lines, so a long title
+            // wraps at a word boundary instead of being cut to one tail-ellipsized
+            // line ("Moving-average empty windo…").
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-            backFallback="/(app)/(tabs)/(2_agents)"
+            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
             className="pb-1"
             {...(rename.isTitleInteractive
@@ -1999,7 +2047,7 @@ export function SessionDetailContent({
                 }
               : {})}
           />
-          {sessionGoal ? (
+          {sessionGoal !== null || hasPrRow ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
@@ -2008,6 +2056,7 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
+                trailing={prBadge}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}
@@ -2129,6 +2178,10 @@ export function SessionDetailContent({
               title={t('agentChat.session.renameSession')}
               placeholder={t('agentChat.session.renamePlaceholder')}
               initialValue={rename.modalInitialValue}
+              // The server accepts a title this long; the modal's 50-character
+              // default would cut a longer title mid-word and the header would
+              // then show the fragment.
+              maxLength={SESSION_TITLE_MAX_LENGTH}
               onSave={handleRenameSave}
               onClose={handleRenameClose}
             />

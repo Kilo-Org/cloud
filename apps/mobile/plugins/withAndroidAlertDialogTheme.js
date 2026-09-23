@@ -41,6 +41,17 @@ const { assignColorValue } = AndroidConfig.Colors;
  * Values mirror src/global.css: the panel is `--popover` (#FFFFFF light,
  * #1F1F24 dark) and the action labels are `--primary` (#4F5A10 light,
  * #E8F27A dark), the same accent the app's own buttons use.
+ *
+ * The action labels also carry the stock ALL-CAPS treatment: AppCompat's alert
+ * button style (`Widget.AppCompat.Button.ButtonBar.AlertDialog`, the value of
+ * the dialog theme's `buttonBarButtonStyle`) sets `android:textAllCaps="true"`,
+ * so `Alert.alert()` rendered "SCARTA" / "CONTINUA A MODIFICARE" through the
+ * Italian catalog's sentence-case "Scarta" / "Continua a modificare" while
+ * every button the app draws itself is sentence case (discard-draft-dialog,
+ * 2026-09-20). The dialog theme points both the AppCompat and the framework
+ * button-bar style attribute at a child style that drops the caps, so the
+ * dialog reads in the same voice as the rest of the app; the child inherits the
+ * alert button style, so its accent-colored label and metrics are unchanged.
  */
 
 /** Mirrors src/global.css `--popover` (light). */
@@ -57,10 +68,15 @@ const ACTION_COLOR_NAME = 'app_dialog_action';
 const THEME_NAME = 'AppTheme';
 const DIALOG_THEME_NAME = 'AppAlertDialogTheme';
 const DIALOG_THEME_PARENT = 'ThemeOverlay.AppCompat.Dialog.Alert';
+const EDIT_BUTTON_STYLE_NAME = 'AppAlertDialogButton';
+const EDIT_BUTTON_STYLE_PARENT = 'Widget.AppCompat.Button.ButtonBar.AlertDialog';
 const ALERT_DIALOG_THEME_ITEM = 'alertDialogTheme';
 const BACKGROUND_ITEM = 'colorBackgroundFloating';
 const FRAMEWORK_BACKGROUND_ITEM = 'android:colorBackgroundFloating';
 const ACTION_ITEM = 'colorAccent';
+const BUTTON_BAR_STYLE_ITEM = 'buttonBarButtonStyle';
+const FRAMEWORK_BUTTON_BAR_STYLE_ITEM = 'android:buttonBarButtonStyle';
+const TEXT_ALL_CAPS_ITEM = 'android:textAllCaps';
 
 function setItem(style, name, value) {
   style.item ??= [];
@@ -110,18 +126,30 @@ function withAlertDialogStyles(config) {
     if (appTheme) {
       setItem(appTheme, ALERT_DIALOG_THEME_ITEM, `@style/${DIALOG_THEME_NAME}`);
     }
-    const dialogTheme = resources.style.find(theme => theme.$?.name === DIALOG_THEME_NAME);
-    if (dialogTheme) {
-      return config;
+    // The dialog's action buttons read their caps from this style, so it must
+    // exist before the theme names it. `setItem` keeps the prebuild idempotent.
+    if (!resources.style.some(style => style.$?.name === EDIT_BUTTON_STYLE_NAME)) {
+      resources.style.push({
+        $: { name: EDIT_BUTTON_STYLE_NAME, parent: EDIT_BUTTON_STYLE_PARENT },
+        item: [{ $: { name: TEXT_ALL_CAPS_ITEM }, _: 'false' }],
+      });
     }
-    resources.style.push({
-      $: { name: DIALOG_THEME_NAME, parent: DIALOG_THEME_PARENT },
-      item: [
-        { $: { name: BACKGROUND_ITEM }, _: `@color/${BACKGROUND_COLOR_NAME}` },
-        { $: { name: FRAMEWORK_BACKGROUND_ITEM }, _: `@color/${BACKGROUND_COLOR_NAME}` },
-        { $: { name: ACTION_ITEM }, _: `@color/${ACTION_COLOR_NAME}` },
-      ],
-    });
+    let dialogTheme = resources.style.find(theme => theme.$?.name === DIALOG_THEME_NAME);
+    if (!dialogTheme) {
+      dialogTheme = { $: { name: DIALOG_THEME_NAME, parent: DIALOG_THEME_PARENT }, item: [] };
+      resources.style.push(dialogTheme);
+    }
+    // The framework and AppCompat attributes both resolve the panel, so both
+    // are pointed at the same color; the accent carries the action labels.
+    setItem(dialogTheme, BACKGROUND_ITEM, `@color/${BACKGROUND_COLOR_NAME}`);
+    setItem(dialogTheme, FRAMEWORK_BACKGROUND_ITEM, `@color/${BACKGROUND_COLOR_NAME}`);
+    setItem(dialogTheme, ACTION_ITEM, `@color/${ACTION_COLOR_NAME}`);
+    // Both spellings of the button-bar style: the AppCompat alert layout reads
+    // the AppCompat attribute and the framework layout reads the framework one,
+    // and either may inflate the bar depending on the platform the dialog
+    // resolves. Both point at the sentence-case button style.
+    setItem(dialogTheme, BUTTON_BAR_STYLE_ITEM, `@style/${EDIT_BUTTON_STYLE_NAME}`);
+    setItem(dialogTheme, FRAMEWORK_BUTTON_BAR_STYLE_ITEM, `@style/${EDIT_BUTTON_STYLE_NAME}`);
     return config;
   });
 }

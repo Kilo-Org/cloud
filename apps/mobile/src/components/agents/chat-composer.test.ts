@@ -28,7 +28,7 @@ const TEXT_DIRECTIONS = [
   {
     direction: 'RTL',
     isRTL: true,
-    style: [{ writingDirection: 'rtl' }, { letterSpacing: 0 }, undefined],
+    style: [{ writingDirection: 'rtl' }, undefined, undefined],
   },
 ];
 

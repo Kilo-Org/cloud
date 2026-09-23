@@ -845,6 +845,42 @@ describe('ContainersBilling launch instance persistence', () => {
       instance: 'standard-4',
     });
   });
+
+  it('clears billingConfigured when a launch switches to a non-billable instance', async () => {
+    const { instance, storage } = setup({
+      record: {
+        state: 'idle',
+        allocationRef: null,
+        stopOpId: null,
+        lastSnapshot: null,
+        instance: 'standard-4',
+        billingConfigured: true,
+      },
+    });
+
+    await launch(instance, REF_A, 'standard-2');
+
+    expect(readRecord(storage)).toMatchObject({ instance: 'standard-2' });
+    expect(readRecord(storage).billingConfigured).toBeUndefined();
+  });
+
+  it('does not introduce billingConfigured when a launch switches to a billable instance', async () => {
+    const { instance, storage } = setup({
+      record: {
+        state: 'idle',
+        allocationRef: null,
+        stopOpId: null,
+        lastSnapshot: null,
+        instance: 'standard-2',
+      },
+    });
+
+    await launch(instance, REF_A, 'standard-4');
+
+    expect(readRecord(storage)).toMatchObject({ instance: 'standard-4' });
+    expect(readRecord(storage).billingConfigured).toBeUndefined();
+    await expect(instance.getBillingRuntimeStatus()).resolves.toBeUndefined();
+  });
 });
 
 describe('ContainersBilling identity replacement', () => {

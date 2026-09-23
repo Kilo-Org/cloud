@@ -84,6 +84,7 @@ async function writeBackDependabotDismissal(params: {
       and(
         eq(platform_integrations.id, params.finding.platform_integration_id),
         eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.github_connection_role, 'workflow'),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
         isNull(platform_integrations.github_disconnected_at),

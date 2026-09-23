@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "នៅពេលបិទ គ្រាប់ចុចបញ្ចូលនឹងបញ្ចូលបន្ទាត់ថ្មីក្នុងប្រអប់សរសេរសារទៅភ្នាក់ងារ។",
     "biometricUnlock": "ដោះសោដោយប្រើជីវមាត្រ",
     "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។",
-    "featureFlags": "ទង់លក្ខណៈពិសេស",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",
     "gatewayTranscriptionSubtitle": "បម្លែងការបញ្ចូលដោយសំឡេងទៅជាអត្ថបទដោយប្រើម៉ូដែល Kilo Gateway ជំនួសឱ្យការចាប់សម្ដីរបស់ឧបករណ៍។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ Kilo Gateway។",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
       "linesOf": "បន្ទាត់ {{start}}–{{end}} ក្នុងចំណោម {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "សកម្មភាព {{action}} របស់ Cloud Agent បានបរាជ័យ ({{status}})។",
-      "failed": "សកម្មភាព {{action}} របស់ Cloud Agent បានបរាជ័យ។"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ទិន្នន័យបញ្ចូលដែលមិនអាចបម្លែងទៅជាទម្រង់សម្រាប់រក្សាទុកឬបញ្ជូនបាន]",
       "errorPrefix": "កំហុស: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "អ្នកផ្តល់សេវាបានបដិសេធសំណើ។",
       "assistantStopped": "ការបង្កើតចម្លើយត្រូវបានបញ្ឈប់។",
       "assistantContextOverflow": "ការសន្ទនាវែងពេកសម្រាប់ម៉ូដែលនេះ។",
-      "assistantFailed": "មិនអាចបង្កើតចម្លើយបានទេ។",
-      "sendFailed": "មិនអាចផ្ញើសារបានទេ។ សូមព្យាយាមម្តងទៀត។"
+      "assistantFailed": "មិនអាចបង្កើតចម្លើយបានទេ។"
     },
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",

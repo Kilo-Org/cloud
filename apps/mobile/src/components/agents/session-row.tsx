@@ -17,7 +17,11 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+  useUserSessionTitlesRevision,
+} from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
@@ -106,16 +110,23 @@ export function StoredSessionRow({
   const { t } = useTranslation();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  // The backend names an unnamed session with a raw ISO placeholder
-  // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
-  // should see, so the row falls back to the localized unnamed name the same
-  // way the session header does. `namedSessionTitle` makes that judgement
-  // through the shared `sessionDisplayTitle` helper and additionally excludes a
-  // placeholder-shaped title the user's own rename wrote; the subscription
-  // repaints the row once the durable record hydrates after a cold start.
+  // The server's creation-default title (`New session - <ISO timestamp>`) is an
+  // internal marker, never row copy: `namedSessionTitle` resolves it through
+  // the shared `sessionDisplayTitle` helper and additionally keeps a
+  // placeholder-shaped title the user's own rename wrote, so the same label
+  // feeds the row, the accessibility label, and the rename prompt. The
+  // subscription repaints the row once the durable record hydrates after a
+  // cold start.
   useUserSessionTitlesRevision();
   const title =
     namedSessionTitle(session.title, session.session_id) ?? t('agents.sessionRow.untitled');
+  // The rename field seeds the name a person wrote, never the backend default
+  // or the display fallback: a session still carrying `New session - <ISO>`
+  // opens an empty field (the "Session name" placeholder prompts for a name)
+  // instead of the machine string the row hides. Both save paths already
+  // refuse an unchanged or blank value, so a no-edit confirm cannot persist
+  // the empty seed. A title the user's own rename wrote is still seeded.
+  const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -143,7 +154,7 @@ export function StoredSessionRow({
       onRename: onRename
         ? () => {
             if (Platform.OS === 'ios') {
-              showRenamePrompt(title, newTitle => {
+              showRenamePrompt(renameInitialValue, newTitle => {
                 onRename(newTitle);
               });
             } else {
@@ -247,7 +258,8 @@ export function StoredSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

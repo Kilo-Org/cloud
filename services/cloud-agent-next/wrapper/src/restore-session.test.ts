@@ -1169,6 +1169,147 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     }
   }, 2_000);
 
+  it('fails as stalled when empty chunks are enqueued without yielding', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(0));
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 40,
+        downloadTimeoutMs: 500,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download stalled',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('times out when a chunk write never settles', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    const originalOpen = fs.promises.open;
+    fs.promises.open = (async (...args: Parameters<typeof originalOpen>) => {
+      const handle = await originalOpen(...args);
+      handle.write = (() => new Promise(() => {})) as typeof handle.write;
+      return handle;
+    }) as typeof originalOpen;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array([1]));
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 500,
+        downloadTimeoutMs: 50,
+      });
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download timed out',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      fs.promises.open = originalOpen;
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
+  it('cancels the body reader when a chunk write throws', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    let cancelCalled = false;
+    const originalOpen = fs.promises.open;
+    fs.promises.open = (async (...args: Parameters<typeof originalOpen>) => {
+      const handle = await originalOpen(...args);
+      handle.write = (() => Promise.reject(new Error('disk full'))) as typeof handle.write;
+      return handle;
+    }) as typeof originalOpen;
+    globalThis.fetch = asFetch(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array([1]));
+            },
+            cancel() {
+              cancelCalled = true;
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        idleTimeoutMs: 500,
+        downloadTimeoutMs: 500,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download failed',
+        code: null,
+        step: 'download',
+      });
+      expect(cancelCalled).toBe(true);
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      fs.promises.open = originalOpen;
+      errorSpy.mockRestore();
+    }
+  }, 2_000);
+
   it('times out when non-empty chunks keep the idle deadline alive until the overall deadline', async () => {
     const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
     globalThis.fetch = asFetch(() =>

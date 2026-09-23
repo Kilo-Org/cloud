@@ -929,7 +929,13 @@ async function downloadSnapshotToFile(
       const chunk = await readSnapshotChunk(reader, signal, aborted);
       if (chunk === 'aborted') return { outcome: 'aborted' };
       if (chunk.done) break;
-      if (!chunk.value) continue;
+      if (!chunk.value || chunk.value.byteLength === 0) {
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 0);
+        });
+        if (signal.aborted) return { outcome: 'aborted' };
+        continue;
+      }
 
       const nextBytes = bytesWritten + chunk.value.byteLength;
       if (nextBytes > maxSnapshotBytes) {
@@ -940,10 +946,16 @@ async function downloadSnapshotToFile(
         return { outcome: 'over-cap' };
       }
 
-      if (chunk.value.byteLength > 0) restartIdle();
+      restartIdle();
       let pending = chunk.value;
       while (pending.byteLength > 0) {
-        const { bytesWritten: written } = await handle.write(pending);
+        const write = handle.write(pending);
+        write.catch(() => {});
+        const written = await Promise.race([
+          write.then(result => result.bytesWritten),
+          aborted.then(() => 'aborted' as const),
+        ]);
+        if (written === 'aborted' || signal.aborted) return { outcome: 'aborted' };
         if (written === 0) throw new Error('snapshot write made no progress');
         pending = pending.subarray(written);
       }
@@ -951,6 +963,7 @@ async function downloadSnapshotToFile(
     }
     return { outcome: 'ok', bytesWritten };
   } finally {
+    void reader.cancel().catch(() => {});
     await handle.close();
   }
 }

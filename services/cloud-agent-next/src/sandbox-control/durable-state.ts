@@ -23,6 +23,7 @@ import type { SyncRecordReader, SyncRecordWriter } from '../sandbox-state/persis
 import {
   loadAllocation as loadCanonicalAllocation,
   loadAllocationSync as loadCanonicalAllocationSync,
+  type LoadResult,
 } from '../sandbox-state/persist/load.js';
 import { storeAllocation as storeCanonicalAllocation } from '../sandbox-state/persist/store.js';
 import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
@@ -98,13 +99,14 @@ export async function loadAllocation(
   storage: ControlStorage,
   resumable = false
 ): Promise<AllocationRecord> {
-  const result = await loadCanonicalAllocation(storage, resumable);
-  if (!result.ok) throw new Error(`Invalid canonical allocation: ${result.reason}`);
-  return result.value;
+  return unwrapAllocation(await loadCanonicalAllocation(storage, resumable));
 }
 
 export function loadAllocationSync(storage: SyncRecordReader, resumable = false): AllocationRecord {
-  const result = loadCanonicalAllocationSync(storage, resumable);
+  return unwrapAllocation(loadCanonicalAllocationSync(storage, resumable));
+}
+
+function unwrapAllocation(result: LoadResult<AllocationRecord>): AllocationRecord {
   if (!result.ok) throw new Error(`Invalid canonical allocation: ${result.reason}`);
   return result.value;
 }

@@ -943,6 +943,7 @@ export class SandboxSession extends DurableObject<Env> {
     wrapperInstanceId?: string;
   }): Promise<SandboxEventBatchResult> {
     const outcomes: SandboxEventBatchItemOutcome[] = [];
+    const startedAt = Date.now();
     for (const [index, item] of input.items.entries()) {
       try {
         let applied = false;
@@ -1003,6 +1004,14 @@ export class SandboxSession extends DurableObject<Env> {
         }
       }
     }
+    logControlDiagnostic('session_event_batch_applied', {
+      sessionId: this.sessionId,
+      wrapperInstanceId: input.wrapperInstanceId,
+      batchSize: input.items.length,
+      applyMs: Date.now() - startedAt,
+      appliedCount: outcomes.filter(outcome => outcome.status === 'applied').length,
+      rejectedCount: outcomes.filter(outcome => outcome.status === 'rejected').length,
+    });
     return { outcomes };
   }
 

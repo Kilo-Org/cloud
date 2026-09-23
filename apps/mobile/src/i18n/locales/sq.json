@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "importo transkriptin e një sesioni OpenAI Codex",
       "reviewDescription": "shqyrto ndryshimet [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Përdor /{{command}}",
+      "useSkillCommand": "Përdor aftësinë /{{command}}",
+      "skillBadge": "Aftësi",
       "insert": "Fut",
       "upgradeRequiredFallback": "Përditëso CLI për të përdorur këtë komandë.",
       "exitCapabilityUnavailable": "Përditëso CLI për të mbyllur seancën.",

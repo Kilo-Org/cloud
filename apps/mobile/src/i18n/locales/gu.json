@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex સત્રની ટ્રાન્સક્રિપ્ટ આયાત કરો",
       "reviewDescription": "ફેરફારો સમીક્ષા કરો [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} વાપરો",
+      "useSkillCommand": "/{{command}} સ્કિલ વાપરો",
+      "skillBadge": "સ્કિલ",
       "insert": "દાખલ કરો",
       "upgradeRequiredFallback": "આ કમાન્ડ વાપરવા માટે તમારું CLI અપગ્રેડ કરો.",
       "exitCapabilityUnavailable": "સત્રમાંથી બહાર નીકળવા માટે તમારું CLI અપડેટ કરો.",

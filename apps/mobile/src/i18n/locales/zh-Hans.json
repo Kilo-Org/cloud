@@ -2068,6 +2068,8 @@
       "resumeCodexDescription": "导入 OpenAI Codex 会话记录",
       "reviewDescription": "查看更改 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
+      "useSkillCommand": "使用技能 /{{command}}",
+      "skillBadge": "技能",
       "insert": "插入",
       "upgradeRequiredFallback": "请升级 CLI 后再使用此命令。",
       "exitCapabilityUnavailable": "请更新 CLI 后再退出会话。",

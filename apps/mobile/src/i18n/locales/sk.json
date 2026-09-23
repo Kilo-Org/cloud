@@ -2648,6 +2648,8 @@
       "resumeCodexDescription": "importuj prepis relácie OpenAI Codex",
       "reviewDescription": "skontroluj zmeny [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Použiť /{{command}}",
+      "useSkillCommand": "Použiť zručnosť /{{command}}",
+      "skillBadge": "Zručnosť",
       "insert": "Vložiť",
       "upgradeRequiredFallback": "Ak chceš použiť tento príkaz, aktualizuj CLI.",
       "exitCapabilityUnavailable": "Ak chceš ukončiť reláciu, aktualizuj CLI.",

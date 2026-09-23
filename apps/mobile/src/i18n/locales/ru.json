@@ -2112,6 +2112,8 @@
       "resumeCodexDescription": "импортировать расшифровку сеанса OpenAI Codex",
       "reviewDescription": "просмотреть изменения [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Использовать /{{command}}",
+      "useSkillCommand": "Использовать навык /{{command}}",
+      "skillBadge": "Навык",
       "insert": "Вставить",
       "upgradeRequiredFallback": "Обновите CLI, чтобы использовать эту команду.",
       "exitCapabilityUnavailable": "Обновите CLI, чтобы выйти из сеанса.",

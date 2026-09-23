@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "importálj egy OpenAI Codex munkamenet-átiratot",
       "reviewDescription": "tekintsd át a változásokat [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} használata",
+      "useSkillCommand": "/{{command}} készség használata",
+      "skillBadge": "Készség",
       "insert": "Beszúrás",
       "upgradeRequiredFallback": "A parancs használatához frissítsd a CLI-t.",
       "exitCapabilityUnavailable": "A munkamenetből való kilépéshez frissítsd a CLI-t.",

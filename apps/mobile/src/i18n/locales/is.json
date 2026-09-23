@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "flytja inn umritun OpenAI Codex-lotu",
       "reviewDescription": "fara yfir breytingar [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Nota /{{command}}",
+      "useSkillCommand": "Nota færni /{{command}}",
+      "skillBadge": "Færni",
       "insert": "Setja inn",
       "upgradeRequiredFallback": "Uppfærðu CLI til að nota þessa skipun.",
       "exitCapabilityUnavailable": "Uppfærðu CLI til að ljúka lotunni.",

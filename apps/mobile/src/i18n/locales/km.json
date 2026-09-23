@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "នាំចូលប្រតិចារិកវគ្គ OpenAI Codex",
       "reviewDescription": "ពិនិត្យការផ្លាស់ប្តូរ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ប្រើ /{{command}}",
+      "useSkillCommand": "ប្រើជំនាញ /{{command}}",
+      "skillBadge": "ជំនាញ",
       "insert": "បញ្ចូល",
       "upgradeRequiredFallback": "សូមធ្វើបច្ចុប្បន្នភាព CLI របស់អ្នកដើម្បីប្រើពាក្យបញ្ជានេះ។",
       "exitCapabilityUnavailable": "ធ្វើបច្ចុប្បន្នភាព CLI របស់អ្នក ដើម្បីចាកចេញពីវគ្គ។",

@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "importer en OpenAI Codex-øktutskrift",
       "reviewDescription": "gjennomgå endringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Bruk /{{command}}",
+      "useSkillCommand": "Bruk ferdigheten /{{command}}",
+      "skillBadge": "Ferdighet",
       "insert": "Sett inn",
       "upgradeRequiredFallback": "Oppgrader CLI-en din for å bruke denne kommandoen.",
       "exitCapabilityUnavailable": "Oppdater CLI-en din for å avslutte økten.",

@@ -2686,6 +2686,8 @@
       "resumeCodexDescription": "importa traskrizzjoni ta' sessjoni OpenAI Codex",
       "reviewDescription": "irrevedi l-bidliet [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Uża /{{command}}",
+      "useSkillCommand": "Uża l-ħila /{{command}}",
+      "skillBadge": "Ħila",
       "insert": "Daħħal",
       "upgradeRequiredFallback": "Aġġorna l-CLI tiegħek biex tuża dan il-kmand.",
       "exitCapabilityUnavailable": "Aġġorna l-CLI tiegħek biex toħroġ mis-sessjoni.",

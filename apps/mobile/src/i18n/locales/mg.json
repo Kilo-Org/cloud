@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "hampiditra ny dikan-tenin'ny sesiona OpenAI Codex",
       "reviewDescription": "hijery ny fiovana [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Ampiasao /{{command}}",
+      "useSkillCommand": "Ampiasao ny fahaiza-manao /{{command}}",
+      "skillBadge": "Fahaiza-manao",
       "insert": "Ampidiro",
       "upgradeRequiredFallback": "Havaozy ny CLI mba hampiasana ity baiko ity.",
       "exitCapabilityUnavailable": "Havaozy ny CLI mba hivoahana amin'ny fotoam-piasana.",

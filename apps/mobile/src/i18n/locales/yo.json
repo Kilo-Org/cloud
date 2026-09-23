@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "kó àkọsílẹ̀ ìgbà iṣẹ́ OpenAI Codex wọlé",
       "reviewDescription": "ṣàyẹ̀wò àwọn ìyípadà [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Lo /{{command}}",
+      "useSkillCommand": "Lo ọgbọ́n /{{command}}",
+      "skillBadge": "Ọgbọ́n",
       "insert": "Fi sí i",
       "upgradeRequiredFallback": "Jọ̀wọ́ ṣe ìgbésókè CLI rẹ láti lo àṣẹ yìí.",
       "exitCapabilityUnavailable": "Ṣe ìmúdójúìwọ̀n CLI rẹ láti jáde kúrò nínú ìgbà iṣẹ́.",

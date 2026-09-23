@@ -2610,6 +2610,8 @@
       "resumeCodexDescription": "importa una transcripció de sessió d'OpenAI Codex",
       "reviewDescription": "revisa els canvis [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Utilitza /{{command}}",
+      "useSkillCommand": "Utilitza l'habilitat /{{command}}",
+      "skillBadge": "Habilitat",
       "insert": "Insereix",
       "upgradeRequiredFallback": "Actualitza el CLI per utilitzar aquesta ordre.",
       "exitCapabilityUnavailable": "Actualitza el CLI per finalitzar la sessió.",

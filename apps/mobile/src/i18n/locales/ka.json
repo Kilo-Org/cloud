@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex-ის სესიის ტრანსკრიპტის იმპორტი",
       "reviewDescription": "ცვლილებების გადახედვა [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ბრძანების გამოყენება",
+      "useSkillCommand": "/{{command}} უნარის გამოყენება",
+      "skillBadge": "უნარი",
       "insert": "ჩასმა",
       "upgradeRequiredFallback": "ამ ბრძანების გამოსაყენებლად განაახლეთ CLI.",
       "exitCapabilityUnavailable": "სესიიდან გასასვლელად განაახლეთ CLI.",

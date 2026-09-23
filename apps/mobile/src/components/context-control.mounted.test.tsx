@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, useEffect, useState } from 'react';
+import { createElement, type ElementType, type ReactNode, useEffect, useState } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,10 +11,10 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
-const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
 // Mutable so a test can prove both platforms receive the one sheet the picker
-// builds: the current-account mark rides the gutter icon, never a label branch.
+// builds: the current-account mark rides the row's checked state, never a
+// per-platform label branch.
 const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
 // not just that the dark values are passed through. Values mirror the real
@@ -25,6 +25,7 @@ const theme = vi.hoisted(() => ({
     foreground: '#F2F0EB',
     mutedForeground: '#8A8680',
     border: 'rgba(255, 255, 255, 0.07)',
+    primary: '#E8F27A',
   },
 }));
 const DARK_COLORS = { ...theme.colors };
@@ -33,6 +34,7 @@ const LIGHT_COLORS = {
   foreground: '#14130F',
   mutedForeground: '#6F6A61',
   border: 'rgba(20, 15, 10, 0.09)',
+  primary: '#4F5A10',
 };
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
@@ -40,9 +42,6 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
   setItemAsync: storage.write,
   deleteItemAsync: storage.remove,
-}));
-vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: showPicker }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -54,9 +53,15 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  // The picker's sheet is a native modal; honored like the real one so the
+  // closed sheet renders nothing.
+  Modal: (props: { visible?: boolean; children?: ReactNode }) =>
+    props.visible ? createElement('Modal', null, props.children) : null,
   Platform: platform,
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -69,6 +74,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 const Text = 'Text' as ElementType;
 const Skeleton = 'Skeleton' as ElementType;
 const Pressable = 'Pressable' as ElementType;
+const Check = 'Check' as ElementType;
 const name = 'An organization with a long name that must remain fully accessible';
 const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }];
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
@@ -114,34 +120,56 @@ async function press(node: ReactTestInstance) {
   });
 }
 
-function nativePicker() {
-  const call = showPicker.mock.lastCall as
-    | [
-        {
-          options: string[];
-          icons?: (unknown | null)[];
-          cancelButtonIndex: number;
-          title: string;
-          containerStyle: { paddingBottom: number; backgroundColor: string };
-          textStyle: { color: string };
-          titleTextStyle: { color: string };
-          showSeparators: boolean;
-          separatorStyle: { backgroundColor: string; height: number };
-        },
-        (index?: number) => void,
-      ]
-    | undefined;
-  if (!call) {
-    throw new Error('native picker did not open');
-  }
-  return { options: call[0], choose: call[1] };
+/** The open sheet's account rows, in option order, with their a11y state. */
+function rows(ui: Mounted) {
+  return ui.renderer.root
+    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
+    .map(node => {
+      const checks = node.findAll(child => child.type === Check);
+      return {
+        label: node.props.accessibilityLabel as string,
+        role: node.props.accessibilityRole as string,
+        checked: (node.props.accessibilityState as { checked: boolean }).checked,
+        divider:
+          typeof node.props.className === 'string' &&
+          node.props.className.includes('border-hair-soft'),
+        check: checks.length > 0,
+        checkColor: checks[0]?.props.color as string | undefined,
+      };
+    });
 }
 
-/** The gutter check per row: its props, or null where the row holds no gutter. */
-function gutter(icons: (unknown | null)[] | undefined) {
-  return (icons ?? []).map(icon =>
-    icon == null ? null : (icon as { props: { color: string; size: number } }).props
+function radioRow(ui: Mounted, label: string) {
+  return ui.renderer.root.findByProps({ accessibilityLabel: label, accessibilityRole: 'radio' });
+}
+
+/** The outer backdrop pressable of the open sheet. */
+function backdrop(ui: Mounted) {
+  return ui.renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessible === false &&
+      String(node.props.className).includes('justify-end')
   );
+}
+
+/** The Cancel row of the open sheet: a plain button with no radio state. */
+function cancelRow(ui: Mounted) {
+  return ui.renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessibilityRole === 'button' &&
+      node.props.accessibilityLabel === 'Cancel' &&
+      node.props.accessibilityHint === undefined
+  );
+}
+
+async function openSheet(ui: Mounted) {
+  await press(picker(ui));
+}
+
+async function chooseRow(ui: Mounted, label: string) {
+  await press(radioRow(ui, label));
 }
 
 beforeEach(() => {
@@ -160,7 +188,6 @@ beforeEach(() => {
     persisted = null;
     await Promise.resolve();
   });
-  showPicker.mockReset();
 });
 afterEach(() => {
   for (const ui of mounted.splice(0)) {
@@ -194,134 +221,100 @@ describe('ContextControl', () => {
   });
 
   it.each([
-    { index: 0, expected: null },
-    { index: 1, expected: 'org-a' },
-    { index: 2, expected: 'org-missing' },
-    { index: undefined, expected: 'org-missing' },
+    { choice: 'Personal', expected: null },
+    { choice: name, expected: 'org-a' },
+    { choice: 'Cancel', expected: 'org-missing' },
   ])(
-    'uses native choices and handles choice $index without an implicit reset',
-    async ({ index, expected }) => {
+    'applies the picked account $choice without an implicit reset',
+    async ({ choice, expected }) => {
       storage.read.mockResolvedValue('org-missing');
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
-      await press(picker(ui));
-      const native = nativePicker();
-      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
-      expect(native.options.cancelButtonIndex).toBe(2);
-      expect(native.options.containerStyle.paddingBottom).toBe(18);
-      await act(() => {
-        native.choose(index);
-      });
+      await openSheet(ui);
+      expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+      expect(texts(ui)).toContain('Cancel');
+      await press(choice === 'Cancel' ? cancelRow(ui) : radioRow(ui, choice));
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
 
-  it.each([
-    { stored: null, current: 0 },
-    { stored: 'org-a', current: 1 },
-    { stored: 'org-missing', current: -1 },
-  ])(
-    'separates the rows and paints the current account in the left gutter (stored=$stored)',
-    async ({ stored, current }) => {
-      storage.read.mockResolvedValue(stored);
-      const ui = await mount();
-      await waitFor(() => !picker(ui).props.disabled);
-      await press(picker(ui));
-      const native = nativePicker();
-      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
-      expect(native.options.showSeparators).toBe(true);
-      expect(native.options.separatorStyle).toEqual({
-        backgroundColor: DARK_COLORS.border,
-        height: 0.5,
-      });
-      // Both account rows hold the shared gutter with a check, so the labels
-      // line up; only the current row's check is painted, and Cancel has none.
-      expect(gutter(native.options.icons)).toEqual([
-        { size: 18, color: current === 0 ? DARK_COLORS.foreground : 'transparent' },
-        { size: 18, color: current === 1 ? DARK_COLORS.foreground : 'transparent' },
-        null,
-      ]);
-    }
-  );
+  it('dismisses the sheet without changing the scope', async () => {
+    storage.read.mockResolvedValue('org-missing');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    // The backdrop, not a row: the scope stays as it was.
+    await press(backdrop(ui));
+    expect(rows(ui)).toHaveLength(0);
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+  });
 
   it.each(['android', 'ios'] as const)(
-    'marks the current account in the shared gutter on %s',
+    'separates the rows and exposes the current account through the radio state on %s',
     async os => {
       platform.OS = os;
       storage.read.mockResolvedValue('org-a');
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
-      await press(picker(ui));
-      const native = nativePicker();
-      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
-      expect(gutter(native.options.icons)).toEqual([
-        { size: 18, color: 'transparent' },
-        { size: 18, color: DARK_COLORS.foreground },
-        null,
-      ]);
+      await openSheet(ui);
+      const opened = rows(ui);
+      expect(opened.map(row => row.label)).toEqual(['Personal', name]);
+      // A screen reader hears the current account through `checked`, the app's
+      // radio convention (`ui/radio-group.tsx`), not through icon colour alone.
+      expect(opened.map(row => row.checked)).toEqual([false, true]);
+      expect(opened.map(row => row.role)).toEqual(['radio', 'radio']);
+      // Each account row draws the shared divider, and only the current row
+      // carries the check; Cancel is a plain button with no radio state.
+      expect(opened.map(row => row.divider)).toEqual([true, true]);
+      expect(opened.map(row => row.check)).toEqual([false, true]);
+      expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
     }
   );
 
-  it('opens one sheet on both platforms, with no per-platform label branch', async () => {
-    storage.read.mockResolvedValue('org-a');
-    const ui = await mount();
-    await waitFor(() => !picker(ui).props.disabled);
-    platform.OS = 'android';
-    await press(picker(ui));
-    const android = nativePicker().options;
-    platform.OS = 'ios';
-    await press(picker(ui));
-    const ios = nativePicker().options;
-    expect(ios.options).toEqual(android.options);
-    expect(ios.icons).toBeDefined();
-    expect(gutter(ios.icons)).toEqual(gutter(android.icons));
-  });
+  it.each([
+    { stored: null, checked: 'Personal' },
+    { stored: 'org-missing', checked: undefined },
+  ])(
+    'marks the account the user is actually on when the stored one is missing (stored=$stored)',
+    async ({ stored, checked }) => {
+      storage.read.mockResolvedValue(stored);
+      const ui = await mount();
+      await waitFor(() => !picker(ui).props.disabled);
+      await openSheet(ui);
+      expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+      expect(
+        rows(ui)
+          .filter(row => row.checked)
+          .map(row => row.label)
+      ).toEqual(checked === undefined ? [] : [checked]);
+    }
+  );
 
   it('checks Personal when the membership list is empty', async () => {
     list.mockResolvedValue([]);
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
-    await press(picker(ui));
-    const native = nativePicker();
-    expect(native.options.options).toEqual(['Personal', 'Cancel']);
-    expect(native.options.showSeparators).toBe(true);
-    expect(native.options.separatorStyle).toEqual({
-      backgroundColor: DARK_COLORS.border,
-      height: 0.5,
-    });
-    expect(gutter(native.options.icons)).toEqual([
-      { size: 18, color: DARK_COLORS.foreground },
-      null,
-    ]);
+    await openSheet(ui);
+    expect(
+      rows(ui).map(row => ({ label: row.label, checked: row.checked, check: row.check }))
+    ).toEqual([{ label: 'Personal', checked: true, check: true }]);
+    expect(texts(ui)).toContain('Cancel');
   });
 
-  it('themes the native picker with the active theme colors', async () => {
+  it('paints the current-account check with the active theme colors', async () => {
+    storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
-    await press(picker(ui));
-    const dark = nativePicker();
-    expect(dark.options.title).toBe('Select account');
-    expect(dark.options.containerStyle).toEqual({
-      paddingBottom: 18,
-      backgroundColor: DARK_COLORS.card,
-    });
-    expect(dark.options.textStyle).toEqual({ color: DARK_COLORS.foreground });
-    expect(dark.options.titleTextStyle).toEqual({ color: DARK_COLORS.mutedForeground });
+    await openSheet(ui);
+    expect(rows(ui)[1]?.checkColor).toBe(DARK_COLORS.primary);
 
     // Switching the active palette and re-rendering must change what the sheet
-    // receives; the picker cannot be hardcoding the dark tokens.
+    // paints; the picker cannot be hardcoding the dark tokens.
     theme.colors = { ...LIGHT_COLORS };
     await act(() => {
       rerender?.();
     });
-    await press(picker(ui));
-    const light = nativePicker();
-    expect(light.options.containerStyle).toEqual({
-      paddingBottom: 18,
-      backgroundColor: LIGHT_COLORS.card,
-    });
-    expect(light.options.textStyle).toEqual({ color: LIGHT_COLORS.foreground });
-    expect(light.options.titleTextStyle).toEqual({ color: LIGHT_COLORS.mutedForeground });
+    expect(rows(ui)[1]?.checkColor).toBe(LIGHT_COLORS.primary);
   });
 
   it('keeps the mocked palettes mirroring the generated theme tokens', () => {
@@ -330,12 +323,14 @@ describe('ContextControl', () => {
       foreground: darkColors.foreground,
       mutedForeground: darkColors.mutedForeground,
       border: darkColors.border,
+      primary: darkColors.primary,
     });
     expect(LIGHT_COLORS).toEqual({
       card: lightColors.card,
       foreground: lightColors.foreground,
       mutedForeground: lightColors.mutedForeground,
       border: lightColors.border,
+      primary: lightColors.primary,
     });
   });
 
@@ -346,12 +341,9 @@ describe('ContextControl', () => {
     await waitFor(() => texts(ui).includes('Organization unavailable'));
     expect(texts(ui)).not.toContain('Retry');
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
-    await press(picker(ui));
-    const native = nativePicker();
-    expect(native.options.options).toEqual(['Personal', 'Cancel']);
-    await act(() => {
-      native.choose(0);
-    });
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal']);
+    await chooseRow(ui, 'Personal');
     expect(texts(ui)).toContain('Personal');
     expect(texts(ui)).not.toContain('Organization unavailable');
   });
@@ -420,10 +412,8 @@ describe('ContextControl', () => {
     storage.write.mockRejectedValueOnce(new Error('write failed'));
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
-    await press(picker(ui));
-    await act(() => {
-      nativePicker().choose(1);
-    });
+    await openSheet(ui);
+    await chooseRow(ui, name);
     await waitFor(() => texts(ui).includes('Could not save setting'));
     expect(texts(ui)).toContain(name);
     expect(persisted).toBeNull();

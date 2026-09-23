@@ -67,16 +67,7 @@ export function AppRootProviders({
               {languageReady ? <AppUnlockAnnouncements /> : null}
               <OrganizationProvider>
                 <ToolSummaryTranslationRuntimeBootstrap />
-                {/*
-                  useCustomActionSheet: the native iOS action sheet
-                  (`ActionSheetIOS`) renders option strings only — no icon API,
-                  no separator style, no palette — so any sheet that marks a row
-                  or draws the app's own theme would need a second, iOS-only
-                  implementation. This mounts the same JS sheet Android already
-                  shows on iOS, which is what the account picker's check gutter
-                  and themed dividers (`context-control.tsx`) rely on.
-                */}
-                <ActionSheetProvider useCustomActionSheet>
+                <ActionSheetProvider>
                   <>
                     {children}
                     <OfflineBanner />

@@ -12,19 +12,19 @@ beforeEach(resetUnlockMocks);
 afterEach(unmountUnlock);
 
 /**
- * The account picker marks the current account with an icon in the option
- * gutter (`context-control.tsx`), and the whole sheet is one implementation for
- * both platforms. Only this library's own JS sheet draws that gutter or the
- * separator and palette props: the native iOS sheet (`ActionSheetIOS`) renders
- * option strings only. Mounting the provider without `useCustomActionSheet`
- * silently hands iOS the native sheet and drops the mark, which is exactly the
- * per-platform second implementation this flag removes.
+ * `useCustomActionSheet` is provider-wide: setting it swaps every iOS action
+ * sheet in the app from `ActionSheetIOS` to the library's JS sheet, which
+ * hardcodes a white surface and black text, so every unrelated sheet would
+ * break in iOS dark mode. The account picker therefore draws its own themed
+ * sheet (`context-control.tsx` / `context-picker-sheet.tsx`) and must not turn
+ * this flag on. Mounting the provider without the flag silently hands iOS the
+ * native sheet — the case every other call site relies on.
  */
-it('mounts the library JS action sheet on every platform', async () => {
+it('leaves the native iOS action sheet mounted for every other sheet', async () => {
   await mount();
 
   const sheets = unlockRoot().findAllByType('ActionSheetProvider' as ElementType);
 
   expect(sheets).toHaveLength(1);
-  expect(sheets[0]?.props.useCustomActionSheet).toBe(true);
+  expect(sheets[0]?.props.useCustomActionSheet).toBeFalsy();
 });

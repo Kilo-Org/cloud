@@ -159,6 +159,14 @@ export function namedSessionTitle(
  * the caller's fallback copy shows instead of the raw ISO string the CLI listed
  * the session under. Pass the session id so a title the user's own rename wrote
  * is not hidden as the backend placeholder.
+ *
+ * The server title — the fetched title, or a live `session.updated` title the
+ * hook folds into `serverTitle` — passes through `namedSessionTitle`, so the
+ * creation placeholder (`New session - <ISO instant>`) can never reach the
+ * header from the server. The fallback title is the caller's to sanitize: the
+ * screen already routes the cached list title through `namedSessionTitle`
+ * before passing it here (`session-detail-content.tsx`), so a placeholder
+ * cached in the list cannot reach the header either.
  */
 export function getSessionDetailRenameState(input: {
   sessionId?: string;

@@ -46,9 +46,10 @@ beforeEach(() => {
   vi.stubGlobal('__DEV__', true);
   posthog.statuses = [];
 });
-afterEach(() => {
+afterEach(async () => {
   view?.unmount();
   view = undefined;
+  await i18n.changeLanguage('en');
   vi.unstubAllGlobals();
 });
 afterAll(async () => {
@@ -119,6 +120,28 @@ describe('FeatureFlagsSection', () => {
     const tree = await mount();
 
     expect(textLines(tree)).toContain('Enabled · default · not loaded');
+  });
+
+  it('reads the reason copy in the selected language and keeps the flag key as an identifier', async () => {
+    // The finding's capture showed the English source/state words ("default ·
+    // not loaded") in an otherwise Arabic row. `preferences.featureFlagNotLoaded`
+    // is prose, not notation: it is deliberately absent from
+    // `ENGLISH_IDENTICAL_ALLOWLIST` in `tools/i18n/check-catalogs.mjs`, and
+    // `i18n/feature-flag-copy.test.ts` fails any catalog that ships the English
+    // string. The flag key stays the ASCII identifier the registry is keyed by.
+    await i18n.changeLanguage('ar');
+    posthog.statuses = [unloaded];
+    const tree = await mount();
+
+    const lines = textLines(tree);
+    const reason = i18n.t('preferences.featureFlagNotLoaded');
+    expect(reason).not.toBe('default · not loaded');
+    expect(lines).toContain(`${i18n.t('common.enabled')} · ${reason}`);
+    // The value word and the reason both follow the selected language…
+    expect(i18n.t('common.enabled')).not.toBe('Enabled');
+    expect(lines).not.toContain(`Enabled · ${reason}`);
+    // …while the flag key remains the technical identifier it is keyed by.
+    expect(lines).toContain('mobile-pr-review');
   });
 
   it('marks a below-minimum flag with the version gate even before remote flags load', async () => {

@@ -419,6 +419,47 @@ describe('authorizedBillingContacts', () => {
     expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
   });
 
+  it('includes a co-owner whose membership role is owner, not only the creator', async () => {
+    const creator = await insertTestUser({
+      google_user_email: `sa-creator-${Date.now()}@example.com`,
+    });
+    const coOwner = await insertTestUser({
+      google_user_email: `sa-co-owner-${Date.now()}@example.com`,
+    });
+
+    // The creator holds no membership row; the co-owner holds the `owner` role.
+    const organization = await createOrganization('Spend alert co-owner', creator.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, coOwner.id, 'owner');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(new Set(contacts.userIds)).toEqual(new Set([creator.id, coOwner.id]));
+  });
+
+  it('includes the owner membership role of an organization with no creator', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-sponsored-owner-${Date.now()}@example.com`,
+    });
+
+    // An OSS-sponsored organization: created_by_kilo_user_id is null and the
+    // sponsor is added with the `owner` membership role
+    // (routers/admin/oss-sponsorship-router.ts).
+    const organization = await createOrganization('Spend alert sponsored owner');
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, owner.id, 'owner');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
+  });
+
   it('never duplicates the owner who is also a billing_manager', async () => {
     const owner = await insertTestUser({
       google_user_email: `sa-owner-billing-${Date.now()}@example.com`,

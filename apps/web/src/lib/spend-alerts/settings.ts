@@ -495,12 +495,13 @@ export async function saveSpendAlertSettings(
 
 /**
  * The users authorized to receive this scope's spend alerts, and their email
- * addresses. Organization scope: the organization's owner plus the members
+ * addresses. Organization scope: the organization's owners and the members
  * holding a recipient role ({@link ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES}) —
- * an `admin` with no billing duty is excluded. The owner is read from
- * `organizations.created_by_kilo_user_id`, not from a membership role, so an
- * owner whose membership is `member` (or who has no membership row) still
- * receives the alert. Personal scope: the owner alone.
+ * an `admin` with no billing duty is excluded. An owner is matched either by
+ * the `owner` membership role or by `organizations.created_by_kilo_user_id`, so
+ * a co-owner, and an owner whose membership is `member` (or who has no
+ * membership row at all), still receives the alert. Personal scope: the owner
+ * alone.
  *
  * The recipient ids come from one `IN (SELECT ... UNION SELECT ...)`: the
  * planner can resolve the union from the organization's own rows, then

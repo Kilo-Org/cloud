@@ -22,17 +22,20 @@ export const ORGANIZATION_BILLING_ROLES = [
 ] satisfies OrganizationRole[];
 
 /**
- * Membership roles that receive an organization-scope spend alert. This is
- * deliberately narrower than {@link ORGANIZATION_BILLING_ROLES}: an `admin`
- * may edit billing settings but carries no billing duty, so it is not a
- * recipient.
+ * Membership roles that receive an organization-scope spend alert: the
+ * organization's owners and its billing managers. This is deliberately
+ * narrower than {@link ORGANIZATION_BILLING_ROLES}: an `admin` may edit
+ * billing settings but carries no billing duty, so it is not a recipient.
  *
- * The organization's owner is resolved from
- * `organizations.created_by_kilo_user_id` by the recipient query, not from
- * this list, so an owner whose membership role is `member` (or who has no
- * membership row at all) still receives the alert.
+ * `owner` is listed so a co-owner — and the owner of an OSS-sponsored
+ * organization whose `created_by_kilo_user_id` is null while the sponsor's
+ * membership role is `owner` — still receives. The recipient query also reads
+ * `organizations.created_by_kilo_user_id`, so an owner whose membership role is
+ * `member` (or who has no membership row at all) receives too; the `UNION`
+ * collapses a user who appears in both sets.
  */
 export const ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES = [
+  'owner',
   'billing_manager',
 ] satisfies OrganizationRole[];
 

@@ -16,8 +16,8 @@ describe('ORGANIZATION_ROLES', () => {
 });
 
 describe('ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES', () => {
-  it('is billing_manager only, narrower than the billing roles', () => {
-    expect(ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES).toEqual(['billing_manager']);
+  it('is owner and billing_manager, narrower than the billing roles', () => {
+    expect(ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES).toEqual(['owner', 'billing_manager']);
     expect(ORGANIZATION_BILLING_ROLES).toContain('admin');
     expect(ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES).not.toContain('admin');
   });

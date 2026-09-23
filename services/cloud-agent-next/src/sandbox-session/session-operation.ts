@@ -101,7 +101,12 @@ function rejectedOrUncertain(
   return error instanceof ControlRequestError
     ? {
         state: 'rejected',
-        error: { code: error.code, message: error.message, retryable: error.retryable },
+        error: {
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
+          ...(error.subtype === undefined ? {} : { subtype: error.subtype }),
+        },
         ...(captureRejection && error.rejectionReceived ? { rejectionReceived: true } : {}),
       }
     : { state: 'uncertain', reason: 'transport', error };

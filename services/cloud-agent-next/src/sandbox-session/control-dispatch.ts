@@ -17,6 +17,7 @@ export class ControlRequestError extends Error {
   readonly code: string;
   readonly retryable: boolean;
   readonly admission: ControlError['admission'];
+  readonly subtype: ControlError['subtype'];
   readonly rejectionReceived?: true;
 
   constructor(error: ControlError, options?: { rejectionReceived?: true }) {
@@ -25,6 +26,7 @@ export class ControlRequestError extends Error {
     this.code = error.code;
     this.retryable = error.retryable;
     this.admission = error.admission;
+    this.subtype = error.subtype;
     if (options?.rejectionReceived) this.rejectionReceived = true;
   }
 }

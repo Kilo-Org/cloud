@@ -11,6 +11,7 @@ import {
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
+  WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
@@ -974,7 +975,8 @@ export function recordSessionOperationDispatch(
 
 export function markSessionOperationRejection(
   messages: readonly SessionMessage[],
-  authorization: SessionOperationAuthorization
+  authorization: SessionOperationAuthorization,
+  subtype?: WorkspaceFailureSubtype
 ): SessionMessage[] | undefined {
   if (authorization.operation !== 'session.attach') return [...messages];
   const message = messages.find(item => item.messageId === authorization.messageId);
@@ -987,12 +989,21 @@ export function markSessionOperationRejection(
     !sameSessionOperation(storedAuthorization.data, authorization)
   )
     return undefined;
-  if (proof.rejectionReceived) return [...messages];
+  if (proof.rejectionReceived && (subtype === undefined || proof.rejectionSubtype === subtype)) {
+    return [...messages];
+  }
   return messages.map(item =>
     item.messageId === message.messageId
       ? {
           ...item,
-          proofs: { ...item.proofs, attach: { ...proof, rejectionReceived: true } },
+          proofs: {
+            ...item.proofs,
+            attach: {
+              ...proof,
+              rejectionReceived: true,
+              ...(subtype === undefined ? {} : { rejectionSubtype: subtype }),
+            },
+          },
         }
       : item
   );

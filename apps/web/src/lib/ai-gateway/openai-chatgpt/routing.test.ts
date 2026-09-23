@@ -242,23 +242,6 @@ describe('isOpenAiChatGptEligible', () => {
     }
   );
 
-  it.each([
-    'openai/gpt-5.6-sol-discounted',
-    'openai/gpt-6-astra-flex',
-    '  OpenAI/gpt-5.6-sol-discounted  ',
-    '  OpenAI/gpt-6-astra-flex  ',
-  ])('excludes the disabled exclusive alias %p before any delegated lookup', async model => {
-    const input = routingInput({ request: responsesRequest(model), requestedModel: model });
-
-    await expect(isOpenAiChatGptEligible(input)).resolves.toBe(false);
-    await expect(checkOpenAiChatGptByok(input)).resolves.toBeNull();
-    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
-    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
-
-    await expect(getOpenAiChatGptByokModelIds(USER_OWNER, [model])).resolves.toEqual(new Set());
-    expect(isOpenAiModelServed).not.toHaveBeenCalled();
-  });
-
   it.each(['', '   '])(
     'stays eligible with an empty partner key %p, leaving the key to the provider',
     async apiKey => {

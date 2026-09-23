@@ -187,6 +187,7 @@ describe('Convoy DAG and Feature Branches', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Serial Tasks',
+        staged: false,
         tasks: [
           { title: 'First Step' },
           { title: 'Second Step', depends_on: [0] },
@@ -222,6 +223,7 @@ describe('Convoy DAG and Feature Branches', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Two Steps',
+        staged: false,
         tasks: [{ title: 'Step 1' }, { title: 'Step 2', depends_on: [0] }],
       });
 
@@ -544,6 +546,7 @@ describe('Convoy DAG and Feature Branches', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Review Queue Mode Test',
+        staged: false,
         tasks: [{ title: 'Task 1' }],
         merge_mode: 'review-then-land',
       });

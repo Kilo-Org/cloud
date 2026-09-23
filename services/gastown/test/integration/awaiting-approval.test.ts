@@ -26,6 +26,7 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     const result = await town.slingConvoy({
       rigId: 'rig-1',
       convoyTitle: 'Landing MR Test',
+      staged: false,
       tasks: [{ title: 'Task 1' }],
       merge_mode: 'review-then-land',
     });
@@ -214,6 +215,7 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
     const result = await town.slingConvoy({
       rigId: 'rig-1',
       convoyTitle: 'Review Required Test',
+      staged: false,
       tasks: [{ title: 'Task 1' }],
     });
 
@@ -266,6 +268,7 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
     const result = await town.slingConvoy({
       rigId: 'rig-1',
       convoyTitle: 'Changes Requested Test',
+      staged: false,
       tasks: [{ title: 'Task 1' }],
     });
 

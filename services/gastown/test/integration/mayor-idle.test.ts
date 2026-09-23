@@ -106,6 +106,7 @@ describe('Mayor idle lifecycle', () => {
       const convoy = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Test',
+        staged: false,
         tasks: [{ title: 'Task 1' }],
       });
 

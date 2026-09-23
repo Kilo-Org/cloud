@@ -914,13 +914,16 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
 );
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
+// Skip /container/* proxy routes: they are protected by Cloudflare Access at
+// the perimeter and must not require a Kilo JWT (see Town Container section).
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
   if (
     path.includes('/container-registry') ||
     path.includes('/db-snapshot') ||
     path.includes('/mayor-id') ||
-    path.includes('/container-events')
+    path.includes('/container-events') ||
+    path.includes('/container/')
   ) {
     return next();
   }

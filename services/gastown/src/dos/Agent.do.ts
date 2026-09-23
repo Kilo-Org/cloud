@@ -141,6 +141,11 @@ export class AgentDO extends DurableObject<Env> {
     console.log(`${AGENT_DO_LOG} destroy: clearing all storage`);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+
+    // deleteAll() drops the SQLite tables but leaves initPromise resolved, so
+    // a later access would query a schema-less database. Reset the latch so it
+    // re-creates the (empty) tables instead of throwing "no such table".
+    this.initPromise = null;
   }
 
   async ping(): Promise<{ ok: true }> {

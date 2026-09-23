@@ -27,6 +27,7 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
     const result = await town.slingConvoy({
       rigId: 'rig-1',
       convoyTitle: 'Review Failure Test',
+      staged: false,
       tasks: [{ title: 'Task 1' }],
     });
 
@@ -120,6 +121,7 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Two-Task Convoy',
+        staged: false,
         tasks: [{ title: 'Task 1' }, { title: 'Task 2' }],
       });
 
@@ -196,6 +198,7 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Agent Done Test',
+        staged: false,
         tasks: [{ title: 'Single Task' }],
       });
 

@@ -46,12 +46,12 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+    it('should serve service metadata at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      expect(res.headers.get('Content-Type')).toContain('application/json');
+      const body = await res.json();
+      expect(body).toMatchObject({ service: 'gastown', status: 'ok' });
     });
   });
 
@@ -473,8 +473,10 @@ describe('HTTP API', () => {
         }
       );
       const agentState = (await agentCheck.json()).data;
+      // agentDone is event-only: the hook is cleared when the alarm drains the
+      // agent_done event, so it is still set right after the HTTP call.
       expect(agentState.status).toBe('idle');
-      expect(agentState.current_hook_bead_id).toBeNull();
+      expect(agentState.current_hook_bead_id).toBe(bead.bead_id);
     });
   });
 
@@ -620,9 +622,9 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      expect(body.data.severity).toBe('critical');
+      expect(body.data.message).toBe('Critical failure');
+      expect(body.data.source_rig_id).toBe(id);
     });
   });
 

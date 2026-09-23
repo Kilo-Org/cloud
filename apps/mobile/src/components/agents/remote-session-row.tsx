@@ -29,6 +29,11 @@ import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
 import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+  useUserSessionTitlesRevision,
+} from './session-detail-rename-state';
+import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
   composeActiveSessionVisibleMeta,
@@ -39,7 +44,6 @@ import {
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
-import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import { type RowVariant } from './session-row';
 import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import {
@@ -274,6 +278,7 @@ export function RemoteSessionRow({
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
           initialValue={renameInitialValue}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

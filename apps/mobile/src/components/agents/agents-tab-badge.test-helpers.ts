@@ -61,6 +61,7 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   View: 'View',
   FlatList: 'FlatList',
   Pressable: 'Pressable',

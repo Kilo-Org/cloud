@@ -277,7 +277,7 @@
     "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。",
     "featureFlags": "功能标志",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "远程 · ≥ {{min}}",
+    "featureFlagApplied": "来自服务器 · ≥ {{min}}",
     "featureFlagSkipped": "默认 · < {{min}}",
     "featureFlagNotLoaded": "默认 · 未加载",
     "gatewayTranscription": "使用 Kilo Gateway 转写",

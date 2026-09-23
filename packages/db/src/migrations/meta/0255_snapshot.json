@@ -1,5 +1,5 @@
 {
-  "id": "d55ffd97-676b-4607-ba74-8eb18ec30ab2",
+  "id": "14eec6e8-09a2-4639-97fa-3dac50634bf3",
   "prevId": "680b9dae-f79b-471c-a110-40bacd3cc776",
   "version": "7",
   "dialect": "postgresql",
@@ -38989,6 +38989,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {

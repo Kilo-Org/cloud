@@ -139,13 +139,13 @@ describe('getInferenceProvider', () => {
   it('reports data collection for a concrete gateway provider', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
-      gateway: 'alibaba',
+      gateway: 'mistral',
       flags: ['requires-data-collection'],
     });
 
     expect(getInferenceProvider(model)).toEqual({
-      slug: 'alibaba',
-      name: 'ALIBABA',
+      slug: 'mistral',
+      name: 'MISTRAL',
       training: true,
       retainsPrompts: true,
     });

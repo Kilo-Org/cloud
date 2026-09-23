@@ -130,7 +130,9 @@ describe('shared branded splash', () => {
     // fold a developer's generated, gitignored `android/` tree into the result —
     // its `colors.xml` is absent in CI — and merge colors this test does not own
     // into the mod results, so the run would no longer describe only this
-    // plugin's output.
+    // plugin's output. The colors array is asserted by containment for the same
+    // reason: the project's own other theme colors (iconBackground, colorPrimary,
+    // …) can ride along without failing this case.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },

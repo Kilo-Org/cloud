@@ -9,10 +9,8 @@ import {
   type OpenCodeSettings,
   type Verbosity,
 } from '@kilocode/db/schema-types';
-import {
-  gemma_4_26b_a4b_it_free_model,
-  GEMMA_4_26B_A4B_IT_ID,
-} from '@/lib/ai-gateway/providers/google';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
 
 export type AutoModelPricing = {
   prompt: string;
@@ -111,7 +109,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   description:
     'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.',
   context_length: 256_000,
-  max_completion_tokens: 10_000,
+  max_completion_tokens: 32768,
   pricing: {
     prompt: '0',
     completion: '0',

@@ -24,11 +24,13 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import {
   autoFreeModels,
-  findKiloExclusiveModel,
-  isKiloExclusiveFreeModel,
   PRIMARY_DEFAULT_MODEL,
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isKiloExclusiveFreeModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';

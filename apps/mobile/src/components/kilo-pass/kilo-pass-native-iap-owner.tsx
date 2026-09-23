@@ -104,6 +104,20 @@ async function fetchAppStoreSubscriptions(productSkus: string[]): Promise<StoreK
   return storeProducts;
 }
 
+/**
+ * Every product identifier recovery, restore, and ownership may act on: the ones
+ * the backend advertises unioned with the ones the store resolved. A store that
+ * cannot query one tier must not drop it from this set — an owned but
+ * uncompleted transaction for that tier would be released instead of completed,
+ * costing the user a purchase they paid for.
+ */
+function getEnabledProductIds(
+  backendProductIds: readonly string[],
+  storeProductIds: readonly string[]
+): string[] {
+  return [...new Set([...backendProductIds, ...storeProductIds])];
+}
+
 export type KiloPassNativeIapContextValue = {
   products: readonly AppStoreKiloPassProduct[];
   productsIsLoading: boolean;
@@ -249,28 +263,32 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
 
-  // Server-backed fallback for the recovery SKU list: when the store fetch
-  // fails or returns no products, recovery still needs the enabled product IDs
-  // so charged-but-uncompleted transactions are completed instead of released.
-  // Shares the store-product cache lifetime, so a re-entered route reads the
-  // catalog instead of paying the request again.
+  // The backend's product identifiers, unioned by the enabled-id sets below with
+  // the store-resolved ones, so a tier the store cannot query still has its
+  // charged-but-uncompleted transactions completed instead of released. Shares
+  // the store-product cache lifetime, so a re-entered route reads the catalog
+  // instead of paying the request again.
   const serverProductsQuery = useQuery(backendStoreKiloPassProductsQueryOptions(trpc));
   const productsQuery = useStoreKiloPassProducts({
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
   });
-  const enabledAppleProductIds = useMemo(() => {
-    if (productsQuery.products.length > 0) {
-      return productsQuery.products.map(product => product.appleProductId);
-    }
-    return serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [];
-  }, [productsQuery.products, serverProductsQuery.data]);
-  const enabledGoogleProductIds = useMemo(() => {
-    if (productsQuery.products.length > 0) {
-      return productsQuery.products.map(product => product.googleProductId);
-    }
-    return serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [];
-  }, [productsQuery.products, serverProductsQuery.data]);
+  const enabledAppleProductIds = useMemo(
+    () =>
+      getEnabledProductIds(
+        serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
+        productsQuery.products.map(product => product.appleProductId)
+      ),
+    [productsQuery.products, serverProductsQuery.data]
+  );
+  const enabledGoogleProductIds = useMemo(
+    () =>
+      getEnabledProductIds(
+        serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [],
+        productsQuery.products.map(product => product.googleProductId)
+      ),
+    [productsQuery.products, serverProductsQuery.data]
+  );
 
   const ownedPurchase = useMemo(() => {
     if (!isIapPlatform) {
@@ -326,13 +344,19 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
           const result = await queryClient.fetchQuery(
             backendStoreKiloPassProductsQueryOptions(trpc)
           );
-          return result.products.map(product => product.appleProductId);
+          return getEnabledProductIds(
+            result.products.map(product => product.appleProductId),
+            enabledAppleProductIds
+          );
         },
         loadEnabledGoogleProductIds: async () => {
           const result = await queryClient.fetchQuery(
             backendStoreKiloPassProductsQueryOptions(trpc)
           );
-          return result.products.map(product => product.googleProductId);
+          return getEnabledProductIds(
+            result.products.map(product => product.googleProductId),
+            enabledGoogleProductIds
+          );
         },
         finishTransaction,
         invalidateAfterCompletion,

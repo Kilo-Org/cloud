@@ -76,12 +76,13 @@ describe('SectionHeader mounted layout', () => {
     expect(label.props.maxFontSizeMultiplier).toBeUndefined();
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(label.children).toEqual(['Live now']);
-    // The tracked class stays for the LTR design; RTL renders it unspaced, so
-    // the Arabic labels keep their joins (see lib/rtl-text.ts).
+    // The tracked class stays for the Latin design; the RTL letter-spacing
+    // reset applies to Arabic-script copy only, so this Latin label keeps its
+    // tracking (see lib/rtl-text.ts and text.rtl-labels.mounted.test.tsx).
     if (isRTL) {
       expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
-      expect(label.props.style).toContainEqual({ letterSpacing: 0 });
-      expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+      expect(label.props.style).not.toContainEqual({ letterSpacing: 0 });
+      expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
     } else {
       expect(label.props.style).toBeUndefined();
       expect(text.props.style).toBeUndefined();
@@ -114,10 +115,10 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
-  // The inline override only has a class to beat in LTR: there the eyebrow
-  // variant and the action keep `tracking-[1.5px]`, and the joined-script
-  // children still get `letterSpacing: 0` on top of it.
-  it('clears the tracked letter-spacing on the Arabic label and action', () => {
+  // The letter-spacing reset belongs to an RTL interface: in this LTR screen
+  // the eyebrow label and the action keep `tracking-[1.5px]`, and no inline
+  // style overrides the class (the RTL case below pins the reset).
+  it('keeps the tracked letter-spacing on the Arabic label and action in LTR', () => {
     const root = mount(
       createElement(SectionHeader, {
         label: 'الجلسات الجارية الآن',
@@ -132,8 +133,33 @@ describe('SectionHeader mounted layout', () => {
     const actionText = action.find(node => Object.is(node.type, 'Text'));
 
     expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
-    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
-    expect(actionText.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(label.props.style).toBeUndefined();
+    expect(actionText.props.style).toBeUndefined();
+  });
+
+  it('renders Arabic labels without the mono family or letter spacing in RTL', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const text = action.find(node => Object.is(node.type, 'Text'));
+
+    for (const node of [label, text]) {
+      const classes = (node.props.className as string).split(' ');
+      expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
+      expect(node.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect(node.props.style).toContainEqual({ letterSpacing: 0 });
+    }
+    expect(label.children).toEqual(['الجلسات الجارية الآن']);
+    expect(text.children).toEqual(['عرض الكل']);
   });
 
   it.each([{ isRTL: false }, { isRTL: true }])(

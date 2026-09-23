@@ -28,6 +28,11 @@ import { useLiveSessionQuery } from '@/components/agents/use-live-session-query'
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import {
+  useAgentsBottomBands,
+  useSessionListInsets,
+} from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
@@ -88,6 +93,26 @@ export function AgentSessionListScreen() {
   // affordance while the list is failing.
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
+  // The screen's bottom bands. Both are keyboard-aware: while the keyboard is up
+  // the IME's occlusion replaces the tab-bar band, because the bar hides with
+  // the keyboard (`tabBarHideOnKeyboard`). Android's edge-to-edge window does
+  // not resize for the IME, so without that reserve the centered empty states
+  // draw their copy and Clear search action behind the keyboard (explorer
+  // finding, agents-list / agents-search-empty) and the last rows of a search
+  // park behind it (review finding, session-list-chrome.ts). The rows list's
+  // total band is floored at the FAB's own overlay band inside the hook, because
+  // the button keeps its screen-bottom-anchored position while the keyboard is
+  // up (device defect uxs1); the frame carries only the part the keyboard
+  // container leaves (`rowsFrameBand`). The chrome hook below supplies the
+  // keyboard-down geometry — the FAB-aware centered reserve and the
+  // short-window frame clamp — so this hook's `surfaceBand` is the IME half of
+  // the centered band while the keyboard is up and the keyboard-down rule is not
+  // re-resolved here (review findings, session-list-chrome.ts:48 and
+  // session-list-screen.tsx:418). This is the screen's only keyboard
+  // subscription beside the container below: calling the occlusion hook here as
+  // well subscribed to the same events a second time (review finding,
+  // session-list-screen.tsx:101).
+  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(tabBarHeight, showFab);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);
@@ -242,12 +267,39 @@ export function AgentSessionListScreen() {
   // soft FAB band so one row stays readable (see `useAgentsListChrome`).
   const {
     onBodyLayout,
-    listInsets,
+    listInsets: chromeListInsets,
     fabStyle,
     sidePadding,
     centeredBottomInset,
     compactEmptyState,
   } = useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+
+  // The rows list's total band, mirroring `useAgentsBottomBands`'s `listBand`
+  // (the hook keeps that value private): while the FAB is admitted its overlay
+  // band joins the surface band, otherwise the surface band stands alone. The
+  // keyboard container's padding is exactly what `rowsFrameBand` falls short of
+  // the total, so `rowsFrameBand < rowsListBand` holds exactly while the IME is
+  // up.
+  const rowsListBand = Math.max(surfaceBand, showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : 0);
+  const keyboardUp = rowsFrameBand < rowsListBand;
+
+  // The centered states' reserve: the FAB-aware band the chrome hook resolves
+  // while the keyboard is down (a centered state's full-width action must not
+  // reach under the corner overlay, device defect e3) and the IME's occlusion
+  // while it is up, so the two never stack (explorer finding,
+  // agents-search-empty).
+  const centeredBand = keyboardUp ? surfaceBand : centeredBottomInset;
+
+  // The rows list's frame and content insets. While the keyboard is down the
+  // shared chrome geometry owns them: it yields the soft FAB band in a short
+  // window so one row stays readable and hands the yielded part to the content.
+  // While the keyboard is up the container already pads the IME's occlusion, so
+  // the frame carries only the remainder of the rows band (`rowsFrameBand`) and
+  // the viewport ends at the band's edge instead of a whole IME height above it
+  // (review finding, session-list-screen.tsx:418). The landscape side insets
+  // keep row text clear of the sensor housing.
+  const keyboardRowsInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
+  const listInsets = keyboardUp ? keyboardRowsInsets : chromeListInsets;
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -356,16 +408,14 @@ export function AgentSessionListScreen() {
   );
 
   return (
-    // The tab bar is the hard surface reserve; while the FAB shows, its band
-    // joins it so a centered state's full-width action (the load failure's
-    // Retry, the boundary's back-to-profile) cannot reach under the corner
-    // overlay (device defect e3, see `useAgentsListChrome`). The no-match body
-    // owns the whole band and hides the FAB (`showFab`), so its reserve is the
-    // bar alone. The tabs layout reserves the bar alone too — its 16dp
-    // scroll-content gap is content-only (`_layout.tsx`) — so raising the
-    // inherited reserve is exactly the bar plus the FAB band and nothing
-    // shrinks the state's clear region.
-    <StateSurfaceInsets bottomInset={centeredBottomInset}>
+    // The band the centered states are laid out in: the chrome hook's FAB-aware
+    // reserve while the keyboard is down — the FAB's band joins the tab bar's so
+    // a centered state's full-width action (the load failure's Retry, the
+    // boundary's back-to-profile) cannot reach under the corner overlay (device
+    // defect e3) — and the IME's occlusion while it is up, because the raised
+    // keyboard hides the tab bar and its band must not stack on the IME's. See
+    // `centeredBand` above.
+    <StateSurfaceInsets bottomInset={centeredBand}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

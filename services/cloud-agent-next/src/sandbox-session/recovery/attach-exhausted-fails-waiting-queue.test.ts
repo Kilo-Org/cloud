@@ -4,21 +4,24 @@ import {
   failWaitingMessages,
   incrementDeliveryFailure,
   nextQueuedMessageId,
-  type SessionMessageRecord,
+  type SessionMessage,
 } from '../session-message-queue.js';
+import { queuedMessage } from '../session-state.test-helpers.js';
 
 describe('attach exhausted', () => {
   it('fails the waiting queue after two attach failures', () => {
     expect(ATTACH_FAILURE_LIMIT).toBe(2);
-    const current: SessionMessageRecord[] = [
-      { messageId: 'a', state: 'queued', promptFailures: 2 },
-      { messageId: 'b', state: 'queued' },
+    const current: SessionMessage[] = [
+      queuedMessage('a', { promptFailures: 2 }),
+      queuedMessage('b'),
     ];
     const first = incrementDeliveryFailure(current, 'a', 'attach');
     expect(first.exhausted).toBe(false);
     const second = incrementDeliveryFailure(first.messages, 'a', 'attach');
     expect(second.exhausted).toBe(true);
-    expect(second.messages[0]).toMatchObject({ attachFailures: 2, promptFailures: 2 });
+    expect(second.messages[0]).toMatchObject({
+      state: { kind: 'queued', attachFailures: 2, promptFailures: 2 },
+    });
 
     const { messages, failedIds } = failWaitingMessages(second.messages, 'attach_exhausted');
     expect(failedIds).toEqual(['a', 'b']);

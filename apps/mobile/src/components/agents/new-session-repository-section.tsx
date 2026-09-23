@@ -189,6 +189,10 @@ export function NewSessionRepositorySection({
               title={t(PROVIDER_COPY[platform].errorTitle)}
               message={t('organization.boundary.loadErrorMessage')}
               onRetry={onRefreshRepos}
+              // The error row's action is the same provider-list refresh the
+              // connect and connected-empty cards offer, so it carries the same
+              // name instead of the generic "Retry".
+              retryLabel={t('agentChat.newSession.refreshRepositories')}
               isRetrying={isRetrying}
             />
           </View>

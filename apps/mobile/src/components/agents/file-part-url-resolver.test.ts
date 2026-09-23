@@ -182,8 +182,9 @@ afterEach(() => {
 });
 
 describe('useResolvedFilePartUrl sweeper', () => {
-  it('starts one shared 30s interval for every subscriber', async () => {
+  it('arms one shared timer for every subscriber', async () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const due = Date.now() + 900_000;
     const parts = [
       { id: 'part-1', uuid: '11111111-1111-4111-8111-111111111111', filename: 'a.png' },
@@ -196,8 +197,77 @@ describe('useResolvedFilePartUrl sweeper', () => {
       await mountProbe(makeFilePart(id, uuid, filename));
     }
 
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
-    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    // One timeout armed at the earliest due renew, and no fixed 30 s interval.
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(1);
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 900_000 - 120_000);
+  });
+
+  it('waits for the trusted far-future expiry instead of sweeping every 30s', async () => {
+    vi.spyOn(globalThis, 'setInterval');
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    const expiresAt = Date.now() + 900_000;
+    cacheRenewableEntry(
+      'part-1',
+      { uuid, filename: 'a.png' },
+      { url: 'https://r2.example/old', urlExpiresAt: expiresAt }
+    );
+    getAttachmentDownloadUrlMutate.mockResolvedValue({
+      signedUrl: 'https://r2.example/fresh',
+      key: 'k',
+      expiresAt: '2040-01-01T00:00:00Z',
+    });
+
+    await mountProbe(makeFilePart('part-1', uuid, 'a.png'));
+
+    advance(30_000);
+
+    // A 900 s URL is nowhere near its 120 s renew window, so nothing sweeps.
+    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+
+    advance(expiresAt - Date.now() - 120_000);
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    await flushMicrotasks();
+
+    expect(getFilePartCacheEntry('part-1')?.url).toBe('https://r2.example/fresh');
+    expect(getFilePartCacheEntry('part-1')?.urlExpiresAt).toBe(Date.parse('2040-01-01T00:00:00Z'));
+  });
+
+  it('caps a far-future expiry at the largest timeout the runtime accepts', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    // A delay above 2^31 - 1 ms overflows and would fire immediately; the
+    // sweep must re-check at the ceiling instead of busy-looping.
+    cacheRenewableEntry(
+      'part-1',
+      { uuid, filename: 'a.png' },
+      { url: 'https://r2.example/old', urlExpiresAt: Date.parse('2099-01-01T00:00:00Z') }
+    );
+
+    await mountProbe(makeFilePart('part-1', uuid, 'a.png'));
+
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 2_147_483_647);
+  });
+
+  it('falls back to the 30 s floor when a cached expiry is not finite', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    // An unparseable server `expiresAt` lands as NaN: parseTimestamp(...).getTime().
+    cacheRenewableEntry('part-1', { uuid, filename: 'a.png' }, { urlExpiresAt: Number.NaN });
+
+    await mountProbe(makeFilePart('part-1', uuid, 'a.png'));
+
+    // A NaN delay makes setTimeout fire after ~1 ms and the sweep re-arm
+    // forever; a non-finite expiry must fall back to the 30 s floor instead.
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
+
+    advance(30_000);
+
+    // The entry is never due (NaN <= threshold is false), so the sweep does no
+    // work and re-arms at the floor rather than spinning.
+    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
   });
 
   it('renews each due entry exactly once per sweep', async () => {

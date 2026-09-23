@@ -1497,6 +1497,55 @@ describe('user router - register activity token', () => {
     expect(rowB?.superseded_at).not.toBeNull();
   });
 
+  it('converges when concurrent registrations race for one scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // A live card already exists, so both concurrent registrations take the
+    // replace path: retire the live row, then insert. Both retire the same row
+    // and the second blocks on its row lock; once the first transaction
+    // commits, the second's insert collides with the first's live row on
+    // `UQ_user_activity_tokens_live_ios_activity` and the whole transaction
+    // rolls back. Registration must converge instead of rejecting.
+    await caller.user.registerActivityToken({
+      token: 'activity-token-race-seed',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const racers = ['a', 'b', 'c', 'd', 'e'].map(suffix =>
+      caller.user.registerActivityToken({
+        token: `activity-token-race-${suffix}`,
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    );
+    const results = await Promise.allSettled(racers);
+
+    expect(results.map(result => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+    ]);
+
+    // Exactly one live card target survived the race.
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live).toHaveLength(1);
+    expect(live[0]?.token.startsWith('activity-token-race-')).toBe(true);
+  });
+
   it('asks the notifications worker to end the replaced card at registration', async () => {
     const caller = await createCallerForUser(tokenUser.id);
 

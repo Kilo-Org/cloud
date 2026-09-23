@@ -295,6 +295,13 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Scope key for the per-(user, organization) activity-token registration lock.
+// The empty organization stands for the personal scope, matching the `coalesce`
+// in `UQ_user_activity_tokens_live_ios_activity`.
+function activityTokenScopeLockKey(userId: string, organizationId: string | null): string {
+  return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
+}
+
 function getDeductionKind(
   creditCategory: string | null
 ): z.infer<typeof CreditDeductionKindSchema> {
@@ -1335,6 +1342,16 @@ export const userRouter = createTRPCRouter({
         // partial unique index cannot reject the replacement.
         let supersededTokens: string[] = [];
         if (input.kind === 'ios_activity') {
+          // Registration is a replace, so two concurrent registrations for one
+          // scope would both retire the same previous row and then both insert;
+          // the second collides on the partial unique index
+          // `UQ_user_activity_tokens_live_ios_activity` and its transaction
+          // rolls back instead of converging. Serialize the replace per scope
+          // with a transaction-scoped advisory lock, so the later registration
+          // sees and supersedes the earlier one's just-inserted row.
+          const scopeKey = activityTokenScopeLockKey(ctx.user.id, input.organizationId);
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`);
+
           const orgPredicate =
             input.organizationId === null
               ? isNull(user_activity_tokens.organization_id)

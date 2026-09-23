@@ -450,7 +450,7 @@ export function useWorktreeReview({
             timers.add(timer);
           });
           if (!retry || !stillCurrent(commentId, signature, source, capture)) {
-            releaseInflight(commentId, signature);
+            if (!cancelled) releaseInflight(commentId, signature);
             return;
           }
         }

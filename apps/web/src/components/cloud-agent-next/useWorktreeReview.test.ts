@@ -577,6 +577,56 @@ describe('useWorktreeReview hydration', () => {
     }
   });
 
+  it('keeps a restarted verification when the snapshot changes during backoff', async () => {
+    mockLoad.mockResolvedValue({
+      version: 1,
+      comments: [{ id: 'saved', anchor, text: 'Saved feedback' }],
+      editor: null,
+      overall: '',
+      destinationKiloSessionId: targetSession.session_id,
+      allowOlderCapture: false,
+    });
+    let fetches = 0;
+    mockFetchQuery = async () => {
+      fetches += 1;
+      throw new Error('temporary');
+    };
+    const originalRevision = snapshot.revision;
+    const originalFiles = snapshot.files;
+    snapshot.revision = 99;
+    snapshot.files = [{ path: 'src/example.ts', revision: 99 }];
+    jest.useFakeTimers();
+    try {
+      const mounted = mount();
+      ({ cleanup } = mounted.dom);
+      root = mounted.root;
+      await flushAsyncWork();
+      act(() => latest?.setOpen(true));
+      await flushAsyncWork();
+      expect(fetches).toBe(1);
+
+      snapshot.files = [
+        { path: 'src/example.ts', revision: 99 },
+        { path: 'src/other.ts', revision: 99 },
+      ];
+      act(() => {
+        root?.render(createElement(Probe, { props: mounted.props }));
+      });
+      await flushAsyncWork();
+      expect(fetches).toBe(2);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1_000);
+      });
+      expect(fetches).toBe(3);
+      expect(latest?.unappliedCommentIds.size).toBe(0);
+    } finally {
+      snapshot.revision = originalRevision;
+      snapshot.files = originalFiles;
+      jest.useRealTimers();
+    }
+  });
+
   it('retries a failed capture after Review is reopened and not while it is closed', async () => {
     mockLoad.mockResolvedValue({
       version: 1,

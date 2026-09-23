@@ -49,6 +49,13 @@ type QueryErrorProps = {
   title?: string;
   message?: string;
   onRetry?: () => void;
+  /**
+   * The retry action's label. A caller whose refresh action has a more precise
+   * name than "Retry" passes it here, so the visible label and the
+   * accessibility label stay the same string; the default is the generic
+   * `common.retry`.
+   */
+  retryLabel?: string;
   isRetrying?: boolean;
   className?: string;
   placement?: 'center' | 'top' | 'static';
@@ -63,6 +70,7 @@ export function QueryError({
   title,
   message,
   onRetry,
+  retryLabel,
   isRetrying = false,
   className,
   placement = 'center',
@@ -72,6 +80,7 @@ export function QueryError({
   const meta = variantMeta(t, variant);
   const titleText = title ?? meta.title;
   const descriptionText = message ?? meta.description;
+  const retryText = retryLabel ?? t('common.retry');
 
   return (
     <EmptyState
@@ -93,9 +102,9 @@ export function QueryError({
             variant="outline"
             onPress={onRetry}
             loading={isRetrying}
-            accessibilityLabel={t('common.retry')}
+            accessibilityLabel={retryText}
           >
-            <Text>{t('common.retry')}</Text>
+            <Text>{retryText}</Text>
           </Button>
         )
       }

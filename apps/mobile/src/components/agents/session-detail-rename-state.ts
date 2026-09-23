@@ -127,10 +127,12 @@ export function namedSessionTitle(
 
 /**
  * Pure helper that derives the session-detail header display state from the
- * authoritative server title and the reducer state. A generated placeholder
- * title is normalised away, so the header shows the fallback name instead of
- * the raw ISO string the CLI listed the session under. Pass the session id so a
- * title the user's own rename wrote is not hidden as the backend placeholder.
+ * authoritative server title and the reducer state. A backend default title
+ * (`New session - <ISO>` or `Child session - <ISO>`) is machine output, so it
+ * is treated as no title: a generated placeholder title is normalised away, so
+ * the caller's fallback copy shows instead of the raw ISO string the CLI listed
+ * the session under. Pass the session id so a title the user's own rename wrote
+ * is not hidden as the backend placeholder.
  */
 export function getSessionDetailRenameState(input: {
   sessionId?: string;

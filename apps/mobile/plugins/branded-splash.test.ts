@@ -179,6 +179,10 @@ describe('shared branded splash', () => {
     // so a checkout with a prebuilt android platform (gitignored) already holds
     // theme colors here. Assert the splash entry the mod owns is present, like
     // the styles assertion below, instead of that the file holds nothing else.
+    // arrayContaining, not an exact array: introspection seeds android.colors
+    // from the checked-out prebuild, which also carries the app's other colors
+    // (colorPrimary, app_background, notification_icon_color). Asserting the
+    // exact length made this pass only on a tree with no prebuilt android/.
     // Introspection runs against the real project root, so `withAndroidColors`
     // also reads whatever the project's own prebuild has already written to
     // `android/app/src/main/res/values/colors.xml` (that directory is

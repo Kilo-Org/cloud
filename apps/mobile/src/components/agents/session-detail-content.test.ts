@@ -641,10 +641,13 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /**
+   * The route's cached list title, seeded before the session record loads, as
+   * `[session-id].tsx` passes it.
+   */
+  cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
-  /** The route's cached list title, seeded before the session record loads. */
-  cachedTitle?: string;
 };
 
 async function mountDetails(
@@ -655,8 +658,8 @@ async function mountDetails(
     metadataReady,
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
-    resumeAt,
     cachedTitle,
+    resumeAt,
   } = options;
   const store = createStore();
   // `null` stalls the root page: the request never resolves, so the open never
@@ -752,8 +755,8 @@ async function mountDetails(
         key: id,
         sessionId: id,
         displayScope,
-        ...(at === undefined ? {} : { resumeAt: at }),
         ...(cachedTitle === undefined ? {} : { cachedTitle }),
+        ...(at === undefined ? {} : { resumeAt: at }),
       })
     );
   const view = await renderWithProviders(element(ROOT_ID));
@@ -932,6 +935,20 @@ describe('SessionDetailContent header title', () => {
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
+    // The route passes its cached metadata title as `cachedTitle`, and that
+    // cache can hold the backend's ISO placeholder. It must not become the
+    // header's identity line while the session metadata is still loading.
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([], {
+      cachedTitle: 'New session - 2026-09-22T02:05:22.778Z',
+      metadataReady: metadata.promise,
+    });
+    expect(renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
   });
 
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default

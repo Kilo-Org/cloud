@@ -396,6 +396,7 @@ vi.mock('@/lib/storage-keys', () => ({
   LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
+  USER_SESSION_TITLES_KEY: 'user-session-titles',
 }));
 
 vi.mock('@/lib/config', () => ({

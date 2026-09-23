@@ -9,6 +9,7 @@ import {
 import type { LogRecord } from '../../e2e/idle-stop-evidence.js';
 
 const SANDBOX = 'workspace_sandbox_a';
+const ALLOCATION_NAME = 'ses-old';
 const REAPED = 'container-old';
 const REPLACEMENT = 'container-new';
 const MESSAGE = 'msg_held';
@@ -17,33 +18,32 @@ function settledRecords(inflight: boolean): LogRecord[] {
   return [
     {
       logTag: 'sandbox_control',
-      diagnosticEvent: 'physical_committed',
+      diagnosticEvent: 'allocation_transition',
+      aggregate: 'allocation',
       sandboxId: SANDBOX,
       allocationId: 'alloc-old',
       wrapperInstanceId: 'wrapper-old',
-      fromState: 'running',
-      toState: 'stopping',
-      cause: 'recovery_settled_reap',
-      stopCause: 'recovery_settled_reap',
+      from: 'allocated.recovering',
+      to: 'stopping.destroying',
+      event: 'deadline',
+      reason: 'recovery_settled_reap',
     },
     {
       logTag: 'sandbox_control',
-      diagnosticEvent: 'provider_stop',
-      sandboxId: SANDBOX,
+      diagnosticEvent: 'native_stop',
+      allocationName: ALLOCATION_NAME,
       result: 'terminal',
     },
     {
       logTag: 'sandbox_control',
-      diagnosticEvent: 'deadline_fired',
+      diagnosticEvent: 'allocation_transition',
+      aggregate: 'allocation',
       sandboxId: SANDBOX,
-      deadlineId: 'heartbeatExpiry',
-    },
-    {
-      logTag: 'sandbox_control',
-      diagnosticEvent: 'recovery_outcome',
-      sandboxId: SANDBOX,
-      cause: 'heartbeat_expired',
-      outcome: 'started',
+      allocationId: 'alloc-old',
+      wrapperInstanceId: 'wrapper-old',
+      from: 'allocated.healthy',
+      to: 'allocated.recovering',
+      event: 'deadline',
     },
     ...(inflight
       ? [
@@ -71,6 +71,7 @@ function collect(records: LogRecord[], inflight = false): SandboxFaultReapEviden
   return collectReapEvidence(records, {
     reapedAllocationRef: REAPED,
     sandboxId: SANDBOX,
+    allocationName: ALLOCATION_NAME,
     ...(inflight ? { messageId: MESSAGE } : {}),
   });
 }
@@ -91,8 +92,8 @@ describe('collectReapEvidence', () => {
     const evidence = collect(settledRecords(false));
     expect(evidence.physicalStopCause).toBe('recovery_settled_reap');
     expect(evidence.physicalStopStopCause).toBe('recovery_settled_reap');
-    expect(evidence.physicalStopFromState).toBe('running');
-    expect(evidence.physicalStopToState).toBe('stopping');
+    expect(evidence.physicalStopFromState).toBe('allocated.recovering');
+    expect(evidence.physicalStopToState).toBe('stopping.destroying');
     expect(evidence.providerStopObserved).toBe(true);
     expect(evidence.heartbeatExpiryDeadline).toBe(true);
     expect(evidence.recoveryCause).toBe('heartbeat_expired');
@@ -222,31 +223,28 @@ describe('assertReapOutcome', () => {
     const idle = collect([
       {
         logTag: 'sandbox_control',
-        diagnosticEvent: 'physical_committed',
+        diagnosticEvent: 'allocation_transition',
+        aggregate: 'allocation',
         sandboxId: SANDBOX,
-        fromState: 'running',
-        toState: 'stopping',
-        cause: 'idle',
-        stopCause: 'idle',
+        from: 'allocated.healthy',
+        to: 'stopping.destroying',
+        event: 'deadline',
+        reason: 'idle',
       },
       {
         logTag: 'sandbox_control',
-        diagnosticEvent: 'provider_stop',
-        sandboxId: SANDBOX,
+        diagnosticEvent: 'native_stop',
+        allocationName: ALLOCATION_NAME,
         result: 'terminal',
       },
       {
         logTag: 'sandbox_control',
-        diagnosticEvent: 'deadline_fired',
+        diagnosticEvent: 'allocation_transition',
+        aggregate: 'allocation',
         sandboxId: SANDBOX,
-        deadlineId: 'idleStop',
-      },
-      {
-        logTag: 'sandbox_control',
-        diagnosticEvent: 'recovery_outcome',
-        sandboxId: SANDBOX,
-        cause: 'idle',
-        outcome: 'started',
+        from: 'allocated.healthy',
+        to: 'allocated.recovering',
+        event: 'health_observed',
       },
     ]);
     expect(() =>

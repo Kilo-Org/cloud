@@ -914,14 +914,7 @@ describe('router sessionId validation', () => {
         const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
         const controlStub = {
           ...mockSessionStub,
-          getControlState: vi.fn().mockResolvedValue({
-            version: 1,
-            scope: { sandboxId: 'sandbox_1' },
-            targets: [{ messageId: 'message_1' }],
-          }),
-          interruptExecution: vi
-            .fn()
-            .mockImplementation(request => Promise.resolve({ ...request, state: 'confirmed' })),
+          interruptExecution: vi.fn().mockResolvedValue({ success: true }),
         };
         const sandboxSession = {
           idFromName: vi.fn((id: string) => ({ id })),
@@ -943,27 +936,17 @@ describe('router sessionId validation', () => {
         expect(result.success).toBe(true);
         expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
-        expect(controlStub.interruptExecution).toHaveBeenCalledWith(
-          expect.objectContaining({ targets: [{ messageId: 'message_1' }] })
-        );
+        expect(controlStub.interruptExecution).toHaveBeenCalled();
       });
 
       it('keeps the interrupt failure reason out of the log message field', async () => {
         const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abd';
         const controlStub = {
           ...mockSessionStub,
-          getControlState: vi.fn().mockResolvedValue({
-            version: 1,
-            scope: { sandboxId: 'sandbox_1' },
-            targets: [{ messageId: 'message_1' }],
+          interruptExecution: vi.fn().mockResolvedValue({
+            success: false,
+            message: 'Stop cleanup deadline is invalid',
           }),
-          interruptExecution: vi.fn().mockImplementation(request =>
-            Promise.resolve({
-              ...request,
-              state: 'rejected',
-              message: 'Stop cleanup deadline is invalid',
-            })
-          ),
         };
         const sandboxSession = {
           idFromName: vi.fn((id: string) => ({ id })),

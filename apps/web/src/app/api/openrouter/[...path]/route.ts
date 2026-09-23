@@ -275,7 +275,8 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
+    request.headers.get(FEATURE_HEADER) ||
+      determineFallbackFeature(requestBodyParsed, request.headers.get('user-agent'))
   );
 
   const balanceAndSettingsPromise = authPromise.then(res =>

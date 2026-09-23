@@ -818,8 +818,9 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 12: kilo remote hint ──
-  it('names both kilo remote and /remote, with no literal markdown, for cloud and remote targets', async () => {
+  it('renders the plain remote-run hint for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const HINT = 'Run kilo remote in a project on your computer to start sessions there.';
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const cloud = NewSessionConfigureForm({
@@ -827,11 +828,12 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
-    // The help draws the commands as prose: the authoring markers must not
-    // reach the screen.
+    expect(findTextContent(cloud, t => t === HINT)).toBe(true);
+    // The help draws the command as prose: the CLI-only entry point, the
+    // internal vocabulary and the authoring markers must not reach the screen.
+    expect(findTextContent(cloud, t => t.includes('/remote'))).toBe(false);
+    expect(findTextContent(cloud, t => t.includes('CLI session'))).toBe(false);
+    expect(findTextContent(cloud, t => t.includes('local kilo process'))).toBe(false);
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -840,9 +842,10 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
+    expect(findTextContent(remote, t => t === HINT)).toBe(true);
+    expect(findTextContent(remote, t => t.includes('/remote'))).toBe(false);
+    expect(findTextContent(remote, t => t.includes('CLI session'))).toBe(false);
+    expect(findTextContent(remote, t => t.includes('local kilo process'))).toBe(false);
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 

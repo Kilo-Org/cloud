@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -39,6 +39,28 @@ function textLines(tree: ReactTestRenderer): string[] {
   return tree.root
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => [node.props.children].flat().join(''));
+}
+
+/** The Text lines rendered inside a node, flattened (composed lines arrive as arrays). */
+function linesOf(node: ReactTestInstance): string[] {
+  return node
+    .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
+    .map(child => [child.props.children].flat().join(''));
+}
+
+/** The View that carries the `Feature flags` group label. */
+function headerRow(tree: ReactTestRenderer): ReactTestInstance {
+  const label = tree.root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      [node.props.children].flat().join('') === 'Feature flags'
+  );
+  const header = label.parent;
+  if (!header) {
+    throw new Error('Feature flags label has no parent View');
+  }
+  return header;
 }
 
 beforeEach(() => {
@@ -95,6 +117,30 @@ describe('FeatureFlagsSection', () => {
     expect(lines).toContain('mobile-quick-chat');
     expect(lines).toContain('Off · default · < 1.0.6');
     expect(lines).toContain('v1.0.5');
+  });
+
+  it('renders the build version on the group header line, not as a stray label', async () => {
+    posthog.statuses = [applied];
+    const tree = await mount();
+
+    // The version rides the group's own label: the View carrying the
+    // `Feature flags` header also carries the `v1.0.5` version Text.
+    const header = headerRow(tree);
+    expect(header.type).toBe('View');
+    expect(linesOf(header)).toEqual(['Feature flags', 'v1.0.5']);
+
+    // The section's last child is the flags list, so no label hangs below it.
+    const section = header.parent;
+    if (!section) {
+      throw new Error('Feature flags header has no parent View');
+    }
+    const last = section.children.at(-1);
+    if (typeof last === 'string' || last === undefined) {
+      throw new Error('Feature flags section has no trailing View');
+    }
+    expect(String(last.type)).toBe('View');
+    expect(linesOf(last)).toContain('mobile-pr-review');
+    expect(linesOf(last)).not.toContain('v1.0.5');
   });
 
   it('marks a flag the build skips as default in use with the minimum version', async () => {

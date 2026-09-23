@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
+import { getCreditStorefront } from './storefront';
 import {
   getStoreCreditProductsState,
   type StoreCreditProduct,
@@ -22,8 +22,6 @@ const STORE_CONNECTION_TIMEOUT_MS = 8000;
 // identical, so reusing its keys keeps `check:i18n` free of a duplicate string.
 const APP_STORE_CONNECTION_TIMEOUT_KEY = 'kiloPass.couldNotConnectToAppStore';
 const PLAY_CONNECTION_TIMEOUT_KEY = 'kiloPass.couldNotConnectToPlay';
-
-const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
 
 export type StoreCreditProductsOptions = {
   /** Whether the store connection (from the IAP owner) is established. */
@@ -59,6 +57,14 @@ function sameSettledView(
   );
 }
 
+/**
+ * Loads the credit-pack catalog for the store this device buys from.
+ *
+ * The app ships on iOS and Android only, and both have in-app purchase, so the
+ * catalog is never gated on an "IAP-capable platform": every platform that runs
+ * this hook has the capability, and the only platform-derived value is the
+ * storefront (`getCreditStorefront`).
+ */
 export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -66,17 +72,17 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
 
-  // Derived per render, from the same `Platform.OS` the screen reads, so the
-  // storefront the loader asks and the store name the banner shows can never
-  // come from two different platform branches.
-  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
+  // One storefront per render, from the same helper the IAP owner and the
+  // screen read, so the storefront the loader asks and the store name the
+  // banner shows can never come from two different platform branches.
+  const storefront = getCreditStorefront();
   const storeConnectionTimeoutKey =
-    Platform.OS === 'ios' ? APP_STORE_CONNECTION_TIMEOUT_KEY : PLAY_CONNECTION_TIMEOUT_KEY;
+    storefront === 'play' ? PLAY_CONNECTION_TIMEOUT_KEY : APP_STORE_CONNECTION_TIMEOUT_KEY;
 
   // Bounded wait for the store connection — without this, a stuck
   // connection leaves the screen showing loading skeletons forever.
   useEffect(() => {
-    if (!isIapPlatform || options.connected) {
+    if (options.connected) {
       return undefined;
     }
     const timer = setTimeout(() => {
@@ -102,7 +108,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
       });
       return loadedProducts;
     },
-    enabled: isIapPlatform && options.connected && userId != null,
+    enabled: options.connected && userId != null,
     staleTime: STORE_CREDIT_PRODUCTS_STALE_TIME_MS,
   });
 
@@ -111,7 +117,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   // cache, so this is a subscription, not a second fetch.
   const backendProductsQuery = useQuery({
     ...trpc.credits.getMobileStoreProducts.queryOptions(),
-    enabled: isIapPlatform && userId != null,
+    enabled: userId != null,
   });
 
   const { refetch: refetchProducts } = productsQuery;
@@ -214,7 +220,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const isLoading =
     settledView === null &&
     storeErrorMessage === null &&
-    (productsQuery.isLoading || (isIapPlatform && !options.connected));
+    (productsQuery.isLoading || !options.connected);
 
   return {
     products: view.products,

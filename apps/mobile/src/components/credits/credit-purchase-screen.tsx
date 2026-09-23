@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -16,6 +16,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
+import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatUsd } from '@/lib/format';
@@ -37,7 +38,7 @@ const PACK_SKELETON_ROWS = 4;
  */
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
-  const isAndroid = Platform.OS === 'android';
+  const storefront = getCreditStorefront();
   const trpc = useTRPC();
   const {
     connected,
@@ -86,7 +87,7 @@ export function CreditPurchaseScreen() {
   // The card's title and its default body come from one per-store source, so
   // an iOS build can never name Google Play (or the reverse) for only one of
   // the two lines.
-  const storeUnavailableCopy = getStoreUnavailableCopyKeys(isAndroid ? 'play' : 'app_store');
+  const storeUnavailableCopy = getStoreUnavailableCopyKeys(storefront);
   const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
 
   const handlePackPress = (pack: StoreCreditProduct) => {

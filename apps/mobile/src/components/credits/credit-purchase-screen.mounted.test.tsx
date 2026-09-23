@@ -319,6 +319,49 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('cross-platform: the same pack rows, prices and enabled state on iOS and Android, each asking its own store', async () => {
+    // The store the platform has is the only difference in the flow. The
+    // backend catalog, the four preset amounts, the store prices, the row
+    // states and the CTAs are one implementation, so both platforms must
+    // render identical rows and differ only in the store they ask.
+    // Both stores' ids are priced, so whichever product ids the platform's
+    // storefront asks for come back priced: the rows below must then be
+    // identical apart from the store they were asked of.
+    const prices = ['$10.99', '$54.99', '$109.99', '$549.99'];
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.flatMap((product, index) => [
+        { id: product.appleProductId, displayPrice: prices[index] },
+        { id: product.googleProductId, displayPrice: prices[index] },
+      ])
+    );
+    const rowState = (renderer: TestRenderer.ReactTestRenderer) =>
+      packRows(renderer).map(row => ({
+        label: (row.props as { accessibilityLabel: string }).accessibilityLabel,
+        disabled: (row.props as { disabled?: boolean }).disabled,
+      }));
+
+    mockedPlatform.OS = 'ios';
+    const ios = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(ios.renderer).length === 4);
+    const iosRows = rowState(ios.renderer);
+    const iosSkus = owner.fetchStoreProducts.mock.calls.at(-1)?.[0];
+    ios.unmount();
+
+    mockedPlatform.OS = 'android';
+    const android = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(android.renderer).length === 4);
+    const androidRows = rowState(android.renderer);
+    const androidSkus = owner.fetchStoreProducts.mock.calls.at(-1)?.[0];
+
+    expect(androidRows).toEqual(iosRows);
+    expect(androidRows.every(row => row.disabled === false)).toBe(true);
+    // The one fork: each platform asks the store it actually has, for that
+    // store's own product ids.
+    expect(iosSkus).toEqual(BACKEND_PRODUCTS.map(product => product.appleProductId));
+    expect(androidSkus).toEqual(BACKEND_PRODUCTS.map(product => product.googleProductId));
+    android.unmount();
+  });
+
   it('retry stays settled: the rows and banner survive while the retry is still pending', async () => {
     // The first store fetch fails, the second never answers: the retry stays in
     // flight, so the screen must keep the settled rows and banner instead of

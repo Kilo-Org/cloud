@@ -11,7 +11,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getAvailablePurchases as fetchAvailablePurchases,
@@ -26,6 +25,7 @@ import {
   type StoreCreditProduct,
   type StoreCreditProductListing,
 } from '@/lib/credits/store-products';
+import { getCreditStorefront } from '@/lib/credits/storefront';
 import {
   createStoreCreditPurchaseActions,
   getPurchaseCompletionId,
@@ -34,9 +34,6 @@ import {
   showDedupedPurchaseError,
 } from '@/lib/credits/use-store-credit-purchase';
 import { useTRPC } from '@/lib/trpc';
-
-const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
-const isAndroid = Platform.OS === 'android';
 
 function toCreditProductListing(product: ProductOrSubscription): StoreCreditProductListing | null {
   if (product.type !== 'in-app') {
@@ -103,6 +100,10 @@ export function useCreditNativeIap(): CreditNativeIapContextValue {
 export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The one platform-derived value in the flow: the store this device can buy
+  // from. Read from the shared helper so the owner, the screen and the catalog
+  // hook can never pick two different storefronts.
+  const storefront = getCreditStorefront();
   const [completingProductId, setCompletingProductId] = useState<string | null>(null);
   const [errorMessageKey, setErrorMessageKey] = useState<string | null>(null);
   const [completedPurchaseCount, setCompletedPurchaseCount] = useState(0);
@@ -163,7 +164,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         return;
       }
       // A null key means the user cancelled — not a failure.
-      const key = getStoreCreditPurchaseErrorMessageKey(error, isAndroid ? 'play' : 'app_store');
+      const key = getStoreCreditPurchaseErrorMessageKey(error, storefront);
       if (key) {
         showError(key);
       }
@@ -194,7 +195,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const actions = useMemo(
     () =>
       createStoreCreditPurchaseActions({
-        storefront: isAndroid ? 'play' : 'app_store',
+        storefront,
         appAccountToken,
         creditPackAppleProductIds,
         creditPackGoogleProductIds,
@@ -219,6 +220,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       invalidateAfterCompletion,
       requestPurchase,
       showError,
+      storefront,
     ]
   );
 
@@ -299,7 +301,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // a raw library message. A store that cannot answer is exactly the state the
   // screen reports inline, so its lookup must fail silently here.
   useEffect(() => {
-    if (!isIapPlatform || !connected) {
+    if (!connected) {
       return undefined;
     }
     if (creditPackAppleProductIds.length === 0 && creditPackGoogleProductIds.length === 0) {

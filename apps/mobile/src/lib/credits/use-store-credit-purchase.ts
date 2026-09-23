@@ -57,8 +57,9 @@ type StoreCreditPurchaseRequest =
   | { google: { obfuscatedAccountId: string; skus: string[] } };
 
 export type StoreCreditPurchaseActionsDeps = {
-  // Which storefront the current device buys from. The owner injects this from
-  // `Platform.OS` so this module never imports `react-native`.
+  // Which storefront this device buys from — the store the platform actually
+  // has (see `storefront.ts`). The owner injects it so this module never
+  // imports `react-native`.
   storefront: 'app_store' | 'play';
   // The account token the app attaches to the store purchase. It comes from the
   // backend catalog response (never from a store-fetched product), so recovery

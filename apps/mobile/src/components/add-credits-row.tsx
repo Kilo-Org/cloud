@@ -17,8 +17,10 @@ type AddCreditsRowProps = Readonly<{
 /**
  * Muted copy + an "Add credits" button. With `onPress` the button is an in-app
  * CTA on every platform. With `url` it opens the external web billing page,
- * which App Store review forbids from an in-app CTA, so that variant stays
- * Android-only — gate it here so no call site can surface it on iOS.
+ * which only Android has: iOS has no in-app link to an external purchase
+ * (App Store review forbids it), so the gate here keeps that variant off iOS
+ * whichever call site renders it. That is the whole platform fork: the row's
+ * copy, layout and in-app CTA are identical on both.
  */
 export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   const { t } = useTranslation();

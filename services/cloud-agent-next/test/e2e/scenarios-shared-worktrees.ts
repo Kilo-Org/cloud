@@ -48,6 +48,7 @@ import {
   sendTurn,
   sessionSandboxObservation,
   trackCreations,
+  waitForBootTerminal,
   waitForPacedProgress,
   waitForPresentAllocation,
   type InFlightCreations,
@@ -65,6 +66,11 @@ const WORKTREE_CHAT_TIMEOUT_MS = 10 * 60_000;
 const WORKTREE_MULTI_CHAT_TIMEOUT_MS = 25 * 60_000;
 /** Generous budget for a real first container cold start. */
 const BOOT_TERMINAL_BUDGET_MS = 240_000;
+/**
+ * Bounded durable-status read used only to enrich a missing-boot-terminal
+ * failure. It must stay small so the diagnostic cannot stretch the scenario.
+ */
+const DURABLE_DIAGNOSTIC_MS = 15_000;
 /**
  * Bound for the first allocation reference of a fresh worktree session. It
  * matches the cold-turn budget: container discovery can be slow while a cold
@@ -114,6 +120,41 @@ function terminalLabel(event: StreamEvent | null): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Fail the boot turn when the reported terminal is not a completion.
+ *
+ * The bounded durable diagnostic exists only to name the status on the failure
+ * line: its failure is swallowed so it cannot replace the close evidence, and
+ * `within` keeps it inside the scenario deadline. `label` names both the
+ * diagnostic phase and the failure line, so the two worktree boot waits cannot
+ * drift.
+ */
+async function throwIfBootIncomplete(input: {
+  deadline: ScenarioDeadline;
+  config: DriverConfig;
+  sessionId: string;
+  messageId: string;
+  terminal: StreamEvent | null;
+  transport: string;
+  label: string;
+}): Promise<void> {
+  const { deadline, config, sessionId, messageId, terminal, transport, label } = input;
+  if (isMessageCompleted(terminal, messageId)) return;
+  let durable = 'unknown';
+  try {
+    durable = await deadline.within(
+      `${label} diagnostic`,
+      signal => awaitDurableTerminal(config, sessionId, messageId, DURABLE_DIAGNOSTIC_MS, signal),
+      DURABLE_DIAGNOSTIC_MS
+    );
+  } catch {
+    /* diagnostic only */
+  }
+  throw new Error(
+    `${label} turn ${messageId} did not complete: ${transport || 'no stream drop observed'}; durable status=${durable}`
+  );
 }
 
 /**
@@ -378,13 +419,25 @@ async function runWorktreeChat(
     bootStream = await deadline.within('boot stream', signal =>
       openConnectedStream(scenarioConfig, cloudAgentSessionId, true, undefined, signal)
     );
-    const bootTerminal = await bootStream.waitForTerminal(
-      Math.max(1, Math.min(BOOT_TERMINAL_BUDGET_MS, deadline.remaining('boot terminal'))),
-      bootMessageId
-    );
-    if (!isMessageCompleted(bootTerminal, bootMessageId)) {
-      throw new Error(`boot turn ${bootMessageId} did not complete`);
-    }
+    const boot = await waitForBootTerminal({
+      deadline,
+      config: scenarioConfig,
+      sessionId: cloudAgentSessionId,
+      messageId: bootMessageId,
+      stream: bootStream,
+      budgetMs: BOOT_TERMINAL_BUDGET_MS,
+      label: 'boot',
+    });
+    bootStream = boot.stream;
+    await throwIfBootIncomplete({
+      deadline,
+      config: scenarioConfig,
+      sessionId: cloudAgentSessionId,
+      messageId: bootMessageId,
+      terminal: boot.terminal,
+      transport: boot.transport,
+      label: 'boot',
+    });
     const bootStatus = await deadline.within('boot durable', signal =>
       awaitDurableTerminal(
         scenarioConfig,
@@ -611,13 +664,25 @@ async function runWorktreeMultiChat(
     rootBootStream = await deadline.within('root boot stream', signal =>
       openConnectedStream(scenarioConfig, rootId, true, undefined, signal)
     );
-    const rootBootTerminal = await rootBootStream.waitForTerminal(
-      Math.max(1, Math.min(BOOT_TERMINAL_BUDGET_MS, deadline.remaining('root boot terminal'))),
-      rootBootMessageId
-    );
-    if (!isMessageCompleted(rootBootTerminal, rootBootMessageId)) {
-      throw new Error(`root boot turn ${rootBootMessageId} did not complete`);
-    }
+    const rootBoot = await waitForBootTerminal({
+      deadline,
+      config: scenarioConfig,
+      sessionId: rootId,
+      messageId: rootBootMessageId,
+      stream: rootBootStream,
+      budgetMs: BOOT_TERMINAL_BUDGET_MS,
+      label: 'root boot',
+    });
+    rootBootStream = rootBoot.stream;
+    await throwIfBootIncomplete({
+      deadline,
+      config: scenarioConfig,
+      sessionId: rootId,
+      messageId: rootBootMessageId,
+      terminal: rootBoot.terminal,
+      transport: rootBoot.transport,
+      label: 'root boot',
+    });
     const rootBootStatus = await deadline.within('root boot durable', signal =>
       awaitDurableTerminal(
         scenarioConfig,

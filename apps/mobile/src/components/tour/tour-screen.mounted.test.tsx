@@ -218,15 +218,18 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('presents the header as a modal with a top-left eyebrow and no back control', async () => {
+  it('presents the header as a modal with a centred eyebrow and no back control', async () => {
     const { renderer, unmount } = await mountTour();
 
     // The tour is presented `modal`, so the header must take the modal
     // clearance rather than re-adding the status-bar inset the native sheet
     // already owns (the dead band above the eyebrow the owner reported). The
-    // eyebrow stays top-left and the fork keeps no back control.
+    // eyebrow is centred because every other element on the screen — the icon,
+    // the title, the cards and the Skip action — is centred, and a top-left
+    // eyebrow read as a stranded label beside that column (home-quick-tour
+    // finding). The fork keeps no back control.
     const header = renderer.root.findByProps({ modal: true });
-    expect(header.props.centerTitle).toBe(false);
+    expect(header.props.centerTitle).toBe(true);
     expect(header.props.showBackButton).toBe(false);
     expect(header.props.onBack).toBeUndefined();
     expect(header.props.eyebrow).toBe('tour.eyebrow');

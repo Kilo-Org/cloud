@@ -83,6 +83,8 @@ export function CloudAgentWorkspaceTabs({
   onSelectTab,
   onCreateTerminal,
   onCloseTerminal,
+  onActivateTab,
+  selectionSuppressed = false,
   className,
 }: {
   activeTabId: WorkspaceTabId;
@@ -107,6 +109,8 @@ export function CloudAgentWorkspaceTabs({
   onSelectTab: (tabId: WorkspaceTabId) => void;
   onCreateTerminal: () => void;
   onCloseTerminal: (terminalId: string) => void;
+  onActivateTab?: () => void;
+  selectionSuppressed?: boolean;
   className?: string;
 }) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -149,6 +153,9 @@ export function CloudAgentWorkspaceTabs({
     activeTabId === CHAT_TAB_ID && selectedWorktreeId && currentSessionId
       ? `chat:${currentSessionId}`
       : activeTabId;
+  const suppressedSelectionProps = selectionSuppressed
+    ? { 'aria-selected': false, 'data-state': 'inactive' }
+    : {};
 
   useEffect(() => {
     if (!editingSessionId) return;
@@ -229,10 +236,15 @@ export function CloudAgentWorkspaceTabs({
         ref={tabListRef}
         aria-label="Cloud Agent workspace"
         className="h-10 min-w-0 flex-1 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-1 [scrollbar-width:none] [@media(any-pointer:coarse)]:h-14 [&::-webkit-scrollbar]:hidden"
+        onClick={event => {
+          const target = event.target as Element | null;
+          if (target?.closest?.('[role="tab"]')) onActivateTab?.();
+        }}
       >
         {selectedWorktreeId ? (
           visibleChatSessions.map(session => {
             const active = activeTabId === CHAT_TAB_ID && session.sessionId === currentSessionId;
+            const selected = active && !selectionSuppressed;
             const isDeleting = deletingSessionIds.includes(session.sessionId);
             const isEditing = editingSessionId === session.sessionId;
             const canRename = Boolean(onRenameChat) && !isDeleting;
@@ -251,13 +263,14 @@ export function CloudAgentWorkspaceTabs({
                 ref={active ? activeTabWrapperRef : undefined}
                 className={cn(
                   tabClassName,
-                  active && activeTabClassName,
+                  selected && activeTabClassName,
                   isDeleting && 'opacity-60'
                 )}
               >
                 <Tooltip delayDuration={400}>
                   <TabsTrigger
                     ref={active ? selectedTabRef : undefined}
+                    {...suppressedSelectionProps}
                     value={`chat:${session.sessionId}`}
                     disabled={isDeleting}
                     aria-description={canRename ? renameHint : undefined}
@@ -427,10 +440,14 @@ export function CloudAgentWorkspaceTabs({
         ) : (
           <div
             ref={activeTabId === CHAT_TAB_ID ? activeTabWrapperRef : undefined}
-            className={cn(tabClassName, activeTabId === CHAT_TAB_ID && activeTabClassName)}
+            className={cn(
+              tabClassName,
+              activeTabId === CHAT_TAB_ID && !selectionSuppressed && activeTabClassName
+            )}
           >
             <TabsTrigger
               ref={activeTabId === CHAT_TAB_ID ? selectedTabRef : undefined}
+              {...suppressedSelectionProps}
               value={CHAT_TAB_ID}
               className={tabTriggerClassName}
             >
@@ -443,6 +460,7 @@ export function CloudAgentWorkspaceTabs({
         {terminals.map(tab => {
           const tabId = terminalTabId(tab.id);
           const active = activeTabId === tabId;
+          const selected = active && !selectionSuppressed;
           const terminalStatus = terminalStatuses[tab.id];
           const status = terminalStatus?.status ?? 'connecting';
           const statusText = terminalStatus?.statusText ?? 'Connecting';
@@ -451,11 +469,12 @@ export function CloudAgentWorkspaceTabs({
             <div
               key={tab.id}
               ref={active ? activeTabWrapperRef : undefined}
-              className={cn(tabClassName, active && activeTabClassName)}
+              className={cn(tabClassName, selected && activeTabClassName)}
             >
               <Tooltip delayDuration={400}>
                 <TabsTrigger
                   ref={active ? selectedTabRef : undefined}
+                  {...suppressedSelectionProps}
                   value={tabId}
                   asChild
                   className={cn(tabTriggerClassName, 'rounded-r-none')}
@@ -494,15 +513,17 @@ export function CloudAgentWorkspaceTabs({
         {files.map(tab => {
           const tabId = fileTabId(tab.path);
           const active = activeTabId === tabId;
+          const selected = active && !selectionSuppressed;
           const name = tab.path.slice(tab.path.lastIndexOf('/') + 1);
           return (
             <div
               key={tabId}
               ref={active ? activeTabWrapperRef : undefined}
-              className={cn(tabClassName, active && activeTabClassName)}
+              className={cn(tabClassName, selected && activeTabClassName)}
             >
               <TabsTrigger
                 ref={active ? selectedTabRef : undefined}
+                {...suppressedSelectionProps}
                 value={tabId}
                 title={tab.path}
                 className={tabTriggerClassName}

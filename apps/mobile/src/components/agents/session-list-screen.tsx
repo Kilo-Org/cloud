@@ -1,6 +1,14 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import {
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +30,7 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -35,9 +44,6 @@ import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
 const SKELETON_ROW_COUNT = 8;
-
-/** The FAB's square box, shared by its layout style. */
-const FAB_BOX = { width: FAB_SIZE, height: FAB_SIZE } as const;
 
 /** The See-all label's uppercase micro type, kept out of the JSX so the long
  * class list does not force the `Text` open tag to wrap. */
@@ -53,6 +59,10 @@ export function AgentSessionListScreen() {
   // The tabs layout's width-aware label decision rides along, so this screen's
   // clearance (list frame, FAB and state-surface insets) tracks the bar height.
   const tabBarHeight = useEffectiveTabBarHeight();
+  // The empty state's own height grows with Dynamic Type, so the list chrome's
+  // presentation decision needs the window's text scale (see
+  // `useAgentsListChrome`).
+  const { fontScale } = useWindowDimensions();
   // Android runs edge-to-edge and never resizes the window for the IME, so the
   // native KeyboardAvoidingView is inert there; the app-aware container follows
   // the keyboard events instead (the repo's one platform fork for this).
@@ -229,6 +239,14 @@ export function AgentSessionListScreen() {
     [navigateToSession, organizationId]
   );
 
+  // The FAB style, the side padding, the body measurement, and the centered
+  // states' reserve and presentation come from the list-chrome owner (see
+  // `useAgentsListChrome`). The rows list's bottom split stays here: the FAB
+  // clearance rides on the list's content, so the frame keeps only the tab bar
+  // (see `listInsets` below).
+  const { onBodyLayout, fabStyle, sidePadding, centeredBottomInset, compactEmptyState } =
+    useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them. The tab bar keeps its viewport inset as the list
   // frame's `marginBottom` — the same viewport inset `TabScreenScrollView` uses
@@ -246,21 +264,6 @@ export function AgentSessionListScreen() {
       content: { paddingTop: 0, paddingBottom: fabPad, paddingLeft: left, paddingRight: right },
     };
   }, [showFab, tabBarHeight, left, right]);
-
-  // The fixed 20pt margin gains the landscape right inset so the FAB clears the
-  // sensor area; portrait insets are 0, keeping the geometry unchanged.
-  const fabStyle = useMemo(
-    () => ({ ...FAB_BOX, bottom: tabBarHeight + FAB_MARGIN, right: 20 + right }),
-    [tabBarHeight, right]
-  );
-
-  // The fixed 22px margins on the skeleton rows and the status wrapper gain
-  // the landscape side insets so they clear the sensor housing too; portrait
-  // insets are 0, keeping the geometry unchanged.
-  const sidePadding = useMemo(
-    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
-    [left, right]
-  );
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -285,6 +288,7 @@ export function AgentSessionListScreen() {
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
+        compact={compactEmptyState}
         refreshControl={rowsControl}
         description={
           isSearching
@@ -294,6 +298,7 @@ export function AgentSessionListScreen() {
         action={
           <Button
             variant="outline"
+            size={compactEmptyState ? 'sm' : 'default'}
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
           >
             <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
@@ -303,7 +308,11 @@ export function AgentSessionListScreen() {
     );
   } else if (content === 'empty') {
     body = (
-      <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
+      <LiveSessionListEmptyState
+        organizationId={organizationId}
+        refreshControl={refreshControl}
+        compact={compactEmptyState}
+      />
     );
   } else if (hasLiveRows) {
     // The tab-bar inset rides on the list frame, so the viewport ends at the tab
@@ -351,19 +360,28 @@ export function AgentSessionListScreen() {
           refreshControl={refreshControl}
         />
       </View>
-      {body}
+      {/* The body's wrapper measures the height the list can use; the error
+          state renders no body (its centered surface owns the space), so the
+          wrapper is skipped there to keep that layout unchanged. */}
+      {body ? (
+        <View className="flex-1" onLayout={onBodyLayout}>
+          {body}
+        </View>
+      ) : null}
     </>
   );
 
   return (
-    // The band the no-match body is laid out in ends at the tab bar. The FAB is
-    // a corner control with its own frame inset on the rows list, and reserving
-    // its band here as well shrank the band to the FAB's top: in a short
-    // landscape window that is below the empty state's height, so the state fell
-    // to the scroll anchor and its second line and action were parked behind the
-    // tab bar (landscape spot defect e8). The no-match body therefore keeps the
-    // whole band and the FAB yields to it (`showFab`).
-    <StateSurfaceInsets bottomInset={tabBarHeight}>
+    // The tab bar is the hard surface reserve; while the FAB shows, its band
+    // joins it so a centered state's full-width action (the load failure's
+    // Retry, the boundary's back-to-profile) cannot reach under the corner
+    // overlay (device defect e3, see `useAgentsListChrome`). The no-match body
+    // owns the whole band and hides the FAB (`showFab`), so its reserve is the
+    // bar alone. The tabs layout reserves the bar alone too — its 16dp
+    // scroll-content gap is content-only (`_layout.tsx`) — so raising the
+    // inherited reserve is exactly the bar plus the FAB band and nothing
+    // shrinks the state's clear region.
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

@@ -4,6 +4,7 @@ import {
   createElement,
   type ElementType,
   Fragment,
+  isValidElement,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -33,6 +34,7 @@ import { ChildSessionSection } from '@/components/agents/child-session-section';
 import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
+import { SessionManagerContext } from '@/components/agents/session-manager-context';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
@@ -425,9 +427,15 @@ vi.mock('@/components/agents/session-transcript', async importOriginal => {
     },
   };
 });
-vi.mock('@/lib/hooks/use-session-model-options', () => ({
-  useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
-}));
+vi.mock('@/lib/hooks/use-session-model-options', () => {
+  // The real hook memoizes its projection, so `options` keeps one identity
+  // between catalog changes. A fresh array per call would churn every
+  // `modelOptions` consumer on any re-render and hide identity regressions.
+  const options: unknown[] = [];
+  return {
+    useSessionModelOptions: () => ({ options, selectedValue: '', selectedVariant: '' }),
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -655,6 +663,8 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /** The route's cached metadata title, as `[session-id].tsx` passes it. */
+  cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
 };
@@ -667,6 +677,7 @@ async function mountDetails(
     metadataReady,
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
+    cachedTitle,
     resumeAt,
   } = options;
   const store = createStore();
@@ -757,14 +768,22 @@ async function mountDetails(
   let currentRootId: KiloSessionId = ROOT_ID;
   const element = (id: KiloSessionId, at: string | null | undefined = resumeAt) =>
     createElement(
-      Provider,
-      { store },
-      createElement(SessionDetailContent, {
-        key: id,
-        sessionId: id,
-        displayScope,
-        ...(at === undefined ? {} : { resumeAt: at }),
-      })
+      // The real screen publishes the manager so the in-transcript subagent
+      // card can subscribe to the child transcript; `session-provider` is mocked
+      // in this suite, so the scope is provided here directly.
+      SessionManagerContext.Provider,
+      { value: manager },
+      createElement(
+        Provider,
+        { store },
+        createElement(SessionDetailContent, {
+          key: id,
+          sessionId: id,
+          displayScope,
+          ...(cachedTitle === undefined ? {} : { cachedTitle }),
+          ...(at === undefined ? {} : { resumeAt: at }),
+        })
+      )
     );
   const view = await renderWithProviders(element(ROOT_ID));
   onTestFinished(view.unmount);
@@ -946,6 +965,20 @@ describe('SessionDetailContent header title', () => {
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 
+  it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
+    // The route passes its cached metadata title as `cachedTitle`, and that
+    // cache can hold the backend's ISO placeholder. It must not become the
+    // header's identity line while the session metadata is still loading.
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([], {
+      cachedTitle: 'New session - 2026-09-22T02:05:22.778Z',
+      metadataReady: metadata.promise,
+    });
+    expect(renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
@@ -1019,7 +1052,7 @@ describe('session detail failed delivery retry', () => {
       );
     });
     expect(renderedText(view.renderer.root)).toContain(
-      i18n.t('agentChat.messageFailure.deliveryTitle')
+      i18n.t('agentChat.messageFailure.assistantTitle')
     );
 
     const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
@@ -2260,6 +2293,69 @@ describe('hide thinking preference', () => {
     expect(renderedText(cardFor(view.renderer, RUNNING_CHILD))).toContain('Thinking');
   });
 
+  it('keeps renderItem and the row callbacks one identity across a streaming publish', async () => {
+    // A user row so the bubble actually carries `onRetryMessage`; the task row
+    // carries `getChildMessages`. Both props are compared by identity below.
+    const retryUserId = 'msg_1761000000000_retry';
+    const retryRow = userMessage(retryUserId);
+    const rootUser: StoredMessage = {
+      info: { ...retryRow.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: `${retryUserId}-text`,
+          sessionID: ROOT_ID,
+          messageID: retryUserId,
+          text: 'retry me',
+        }),
+      ],
+    };
+    const view = await mountDetails([rootUser, taskMessage(ROOT_ID, CHILD_IDS)]);
+    pressCard(view.renderer, RUNNING_CHILD);
+
+    const listProps = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('Missing SessionMessageList');
+      }
+      return list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+    };
+    const bubblePropsFor = (messageId: string) => {
+      const props = listProps();
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+      );
+      if (!item) {
+        throw new Error(`No transcript item for ${messageId}`);
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error(`No bubble for ${messageId}`);
+      }
+      return bubble.props as Record<string, unknown>;
+    };
+
+    const renderItemBefore = listProps().renderItem;
+    const bubbleBefore = bubblePropsFor(retryUserId);
+    expect(typeof bubbleBefore.onRetryMessage).toBe('function');
+    expect(typeof bubbleBefore.getChildMessages).toBe('function');
+
+    // The child's rows arrive through the same storage publication a streaming
+    // token uses: one `partsRevision` bump that re-emits every derived atom.
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    expect(listProps().renderItem).toBe(renderItemBefore);
+    const bubbleAfter = bubblePropsFor(retryUserId);
+    expect(bubbleAfter.onRetryMessage).toBe(bubbleBefore.onRetryMessage);
+    expect(bubbleAfter.getChildMessages).toBe(bubbleBefore.getChildMessages);
+  });
+
   it('renders no empty padded row for a reasoning-only child message', async () => {
     const view = await openRunningChildSheet(true);
     await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
@@ -2868,6 +2964,32 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 });
 
+describe('session detail composer placeholder (explorer session-detail)', () => {
+  // The explorer's `session-detail.png` shows the composer field rendering the
+  // literal developer string 'undefined'. Every placeholder the detail screen
+  // can pass is catalog copy, so the proof is that the mounted composer always
+  // receives a non-empty catalog string — never 'undefined' and never a raw key.
+  it('passes catalog copy to the composer, never the literal undefined', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.placeholder).toBe(i18n.t('common.message'));
+    expect(typeof composer.props.placeholder).toBe('string');
+    expect(composer.props.placeholder).not.toBe('undefined');
+  });
+
+  it('resolves the preparing and finalizing placeholders to catalog copy too', () => {
+    for (const key of [
+      'agentChat.composer.preparingPlaceholder',
+      'agentChat.composer.finalizingPlaceholder',
+    ]) {
+      const copy = i18n.t(key);
+      expect(copy).not.toBe(key);
+      expect(copy).not.toBe('undefined');
+      expect(copy.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('session detail duplicate failure state', () => {
   // Stored messages are ordered by id, which is time-sortable ascending, so the
   // user row must sort before the assistant row for the Retry prompt to resolve.
@@ -2957,6 +3079,23 @@ describe('session detail duplicate failure state', () => {
     expect(nodes[0]?.props).toMatchObject({
       indicator: { message: 'simulated error' },
     });
+  });
+
+  it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
+    // Explorer `session-working` showed the fixed footer line printed over the
+    // scrolling transcript row it covers. The footer must be an opaque
+    // `bg-background` sibling in the column flow, never an `absolute` overlay.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    const footer = nodes[0]?.parent;
+    const className = String(footer?.props.className ?? '');
+    expect(className).toContain('bg-background');
+    expect(className).not.toContain('absolute');
   });
 });
 

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -74,6 +74,18 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
+  // NativeWind merges the `className` style first and this inline `style` last,
+  // so an inline `letterSpacing: 0` overrides a class's `tracking-*` at every
+  // call site. Two rules fill the array: an RTL interface resets the tracking
+  // for every run, with the paragraph direction ahead of the reset as
+  // `RTL_NO_LETTER_SPACING` documents, and outside RTL a joined-script child
+  // still gets the reset so an Arabic label in an LTR screen keeps its joins
+  // (`textLetterSpacing`). A Latin run in LTR keeps the tracking its class asks
+  // for.
+  const ownStyles = [
+    I18nManager.isRTL ? RTL_WRITING_DIRECTION : undefined,
+    textLetterSpacing(props.children) ?? (I18nManager.isRTL ? RTL_NO_LETTER_SPACING : undefined),
+  ].filter(Boolean);
   return (
     <Component
       className={cn(
@@ -85,11 +97,7 @@ function Text({
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={
-        I18nManager.isRTL
-          ? [RTL_WRITING_DIRECTION, RTL_NO_LETTER_SPACING, props.style]
-          : props.style
-      }
+      style={ownStyles.length > 0 ? [...ownStyles, props.style] : props.style}
     />
   );
 }

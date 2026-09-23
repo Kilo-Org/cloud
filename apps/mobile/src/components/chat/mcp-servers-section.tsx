@@ -162,7 +162,7 @@ function McpServerRow({
         </View>
         <Switch
           value={row.enabled}
-          accessibilityLabel={t('modelChat.mcp.enableServer')}
+          accessibilityLabel={t('modelChat.mcp.enableServer', { name: row.name })}
           onValueChange={onToggle}
         />
       </View>
@@ -176,17 +176,37 @@ function McpServerRow({
       {/* Retry joins the controls that are always here, so a row that failed
           grows no taller and a row that recovers shrinks no shorter. It stays
           while this row's ask is in flight, even if discovery has already left
-          failed, so the busy state is this button and not a second spinner. */}
+          failed, so the busy state is this button and not a second spinner.
+          Every control here and above names its server: the row's name is drawn
+          beside them, and a screen reader swiping the list otherwise hears the
+          same "Enable this server", "Edit server", "Delete server" once per
+          server and cannot tell which one it is on. */}
       <View className="flex-row gap-2">
         {row.retry || retrying ? (
-          <Button variant="secondary" size="sm" loading={retrying} onPress={onRetry}>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={retrying}
+            accessibilityLabel={t('modelChat.mcp.retryServerA11y', { name: row.name })}
+            onPress={onRetry}
+          >
             <Text>{t('common.retry')}</Text>
           </Button>
         ) : null}
-        <Button variant="secondary" size="sm" onPress={onEdit}>
+        <Button
+          variant="secondary"
+          size="sm"
+          accessibilityLabel={t('modelChat.mcp.editServerA11y', { name: row.name })}
+          onPress={onEdit}
+        >
           <Text>{t('modelChat.mcp.editServer')}</Text>
         </Button>
-        <Button variant="secondary" size="sm" onPress={onDelete}>
+        <Button
+          variant="secondary"
+          size="sm"
+          accessibilityLabel={t('modelChat.mcp.deleteServerA11y', { name: row.name })}
+          onPress={onDelete}
+        >
           <Text>{t('modelChat.mcp.deleteServer')}</Text>
         </Button>
       </View>

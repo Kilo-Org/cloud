@@ -75,6 +75,17 @@ function buttonFor(label: string): TestRenderer.ReactTestInstance | undefined {
   );
 }
 
+/** The accessible name of every button drawing the given visible label. */
+function namesOfButtons(label: string): (string | undefined)[] {
+  return nodes('Button')
+    .filter(
+      button =>
+        button.findAll(node => (node.type as string) === 'Text' && node.props.children === label)
+          .length > 0
+    )
+    .map(button => button.props.accessibilityLabel as string | undefined);
+}
+
 /** The node, or a failure that says which one the section did not draw. */
 function required<T>(value: T | undefined, what: string): T {
   if (value === undefined) {
@@ -149,5 +160,39 @@ describe('the remote servers section', () => {
     });
 
     expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(true);
+  });
+
+  it('gives every control a name that says which server it acts on', async () => {
+    /* Two rows, because a name only has to identify its target when the
+       control is repeated: with one row every label would do. */
+    await mount({
+      servers: [
+        row({ id: 'alpha', name: 'Alpha' }),
+        row({
+          id: 'beta',
+          name: 'Beta',
+          retry: true,
+          statusKey: 'modelChat.mcp.serverUnreachable',
+        }),
+      ],
+    });
+
+    const switches = nodes('Switch').map(node => node.props.accessibilityLabel);
+    expect(new Set(switches).size).toBe(2);
+    expect(switches).toEqual([
+      i18n.t('modelChat.mcp.enableServer', { name: 'Alpha' }),
+      i18n.t('modelChat.mcp.enableServer', { name: 'Beta' }),
+    ]);
+    expect(namesOfButtons('Edit server')).toEqual([
+      i18n.t('modelChat.mcp.editServerA11y', { name: 'Alpha' }),
+      i18n.t('modelChat.mcp.editServerA11y', { name: 'Beta' }),
+    ]);
+    expect(namesOfButtons('Delete server')).toEqual([
+      i18n.t('modelChat.mcp.deleteServerA11y', { name: 'Alpha' }),
+      i18n.t('modelChat.mcp.deleteServerA11y', { name: 'Beta' }),
+    ]);
+    expect(namesOfButtons('Retry')).toEqual([
+      i18n.t('modelChat.mcp.retryServerA11y', { name: 'Beta' }),
+    ]);
   });
 });

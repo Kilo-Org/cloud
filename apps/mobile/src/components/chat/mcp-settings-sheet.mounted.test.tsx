@@ -438,13 +438,15 @@ describe('the chat-tools sheet', () => {
   it('turns a server off for the chats and tells the registry', async () => {
     h.servers.value = [server('alpha')];
     await mount();
-    expect(switchFor('Enable this server')?.props.value).toBe(true);
+    // The row's switch names its server, so two rows read apart.
+    const label = i18n.t('modelChat.mcp.enableServer', { name: 'Server alpha' });
+    expect(switchFor(label)?.props.value).toBe(true);
 
-    await tapSwitch('Enable this server', false);
+    await tapSwitch(label, false);
 
     expect(h.setRemoteMcpServerEnabled).toHaveBeenCalledWith('alpha', false);
     expect(h.refreshChatTools).toHaveBeenCalled();
-    expect(switchFor('Enable this server')?.props.value).toBe(false);
+    expect(switchFor(label)?.props.value).toBe(false);
   });
 
   it('adds a server through the store and discovers it when the form is saved', async () => {

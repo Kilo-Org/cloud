@@ -4,6 +4,7 @@ import type {
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
+import { wrapperRestoreTelemetrySchema } from './wrapper-bootstrap.js';
 
 // Bounded assistant-failure facts are duplicated locally (type-only import
 // above) so the standalone wrapper bundle never contains worker-utils. The
@@ -483,6 +484,12 @@ export const sessionAttachResultSchema = z
   .object({
     attached: z.literal(true),
     nativeRuntimeId: z.string().uuid().optional(),
+    /**
+     * Present when the attach restored the session from a snapshot. A skipped
+     * diff is reported to the worker from here; without it the runtime
+     * replacement's partial restore would only exist in the wrapper log.
+     */
+    restore: wrapperRestoreTelemetrySchema.optional(),
   })
   .strict();
 

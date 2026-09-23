@@ -25,8 +25,14 @@ export function showRenamePrompt(currentTitle: string, onRename: (newTitle: stri
       {
         text: i18n.t('common.rename'),
         onPress: (newName: string | undefined) => {
-          if (newName?.trim()) {
-            onRename(newName.trim());
+          const trimmed = newName?.trim();
+          // `currentTitle` is the resolved display label (e.g. "Untitled
+          // session"), so confirming the prompt unchanged must not persist UI
+          // copy as the session title. RenameModal disables Save in the same
+          // case (rename-modal.tsx:133); Alert.prompt has no disabled state,
+          // so the guard lives here for both call sites.
+          if (trimmed && trimmed !== currentTitle) {
+            onRename(trimmed);
           }
         },
       },

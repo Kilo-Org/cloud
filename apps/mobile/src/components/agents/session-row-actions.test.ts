@@ -3,7 +3,7 @@ import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
-import { copySessionLink, showSessionActionMenu } from './session-row-actions';
+import { copySessionLink, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -203,6 +203,72 @@ describe('showSessionActionMenu', () => {
     expect(onCopySessionId).not.toHaveBeenCalled();
     expect(onRename).not.toHaveBeenCalled();
     expect(onDelete).not.toHaveBeenCalled();
+  });
+});
+
+type PromptButton = {
+  text: string;
+  style?: string;
+  onPress?: (value?: string) => void;
+};
+
+/** Opens the iOS rename prompt for `currentTitle` and taps Rename with `submitted`. */
+function submitRenamePrompt(args: { currentTitle: string; submitted: string | undefined }) {
+  const onRename = vi.fn(() => undefined);
+  showRenamePrompt(args.currentTitle, onRename);
+  const call = reactNativeMock.prompt.mock.calls.at(-1);
+  if (!call) {
+    throw new Error('Alert.prompt was not called');
+  }
+  const buttons = call[2] as PromptButton[];
+  expect(call[4]).toBe(args.currentTitle);
+  buttons.at(-1)?.onPress?.(args.submitted);
+  return onRename;
+}
+
+describe('showRenamePrompt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('ignores an unchanged resolved label so UI copy is not persisted as the title', () => {
+    const onRename = submitRenamePrompt({
+      currentTitle: 'Untitled session',
+      submitted: 'Untitled session',
+    });
+
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it('ignores an unchanged label wrapped in whitespace', () => {
+    const onRename = submitRenamePrompt({
+      currentTitle: 'Untitled session',
+      submitted: '  Untitled session  ',
+    });
+
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it('submits an edited title trimmed', () => {
+    const onRename = submitRenamePrompt({
+      currentTitle: 'Untitled session',
+      submitted: '  Refactor the parser  ',
+    });
+
+    expect(onRename).toHaveBeenCalledTimes(1);
+    expect(onRename).toHaveBeenCalledWith('Refactor the parser');
+  });
+
+  it('ignores an empty or whitespace-only submission', () => {
+    const onRename = submitRenamePrompt({ currentTitle: 'Untitled session', submitted: '   ' });
+
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it('ignores a cancelled prompt (undefined value)', () => {
+    const onRename = submitRenamePrompt({ currentTitle: 'Untitled session', submitted: undefined });
+
+    expect(onRename).not.toHaveBeenCalled();
   });
 });
 

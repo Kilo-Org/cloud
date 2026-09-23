@@ -10,28 +10,34 @@ import { useTRPC } from '@/lib/trpc';
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /**
- * The current user's role in the active organization. `trpc.organizations.list`
- * requires auth (not an active org selection), so it's gated on the token
- * rather than on `organizationId` — mirrors profile-screen's `orgs` query.
+ * The current user's memberships. `trpc.organizations.list` requires auth (not
+ * an active org selection), so it's gated on the token rather than on
+ * `organizationId` — mirrors profile-screen's `orgs` query.
+ *
+ * One cache entry serves every consumer: role resolution, the boundary and the
+ * organization provider's default-organization resolution all observe this
+ * same query, so no consumer refetches a list another already has.
+ */
+export function useOrganizationsList() {
+  const trpc = useTRPC();
+  const { token } = useAuth();
+  return useQuery({
+    ...trpc.organizations.list.queryOptions(),
+    enabled: token != null,
+  });
+}
+
+/**
+ * The current user's role in the active organization, resolved from the shared
+ * membership list (`useOrganizationsList`).
  *
  * Pass `organizationIdOverride` to resolve role/membership against an explicit
  * org id (e.g. a deep-link `?org=` param) instead of the persisted selection.
  */
 function useOrgRole(organizationIdOverride?: string) {
-  const trpc = useTRPC();
-  const { token } = useAuth();
   const { organizationId: contextOrganizationId } = useOrganization();
   const organizationId = organizationIdOverride ?? contextOrganizationId;
-  const {
-    data: orgs,
-    isLoading,
-    isError,
-    isFetching,
-    refetch,
-  } = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
-  });
+  const { data: orgs, isLoading, isError, isFetching, refetch } = useOrganizationsList();
   const org = orgs?.find(entry => entry.organizationId === organizationId);
   return {
     organizationId,

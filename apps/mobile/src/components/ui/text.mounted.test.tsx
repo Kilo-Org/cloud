@@ -75,6 +75,12 @@ function mountElement(element: ReactElement) {
   return renderer.root;
 }
 
+// Both assertions are kept: `hostText` reaches the host node to read its inline
+// style, `hostClasses` reads the resolved class list.
+function hostText(root: TestRenderer.ReactTestInstance) {
+  return root.find(node => Object.is(node.type, 'Text'));
+}
+
 function hostClasses(root: TestRenderer.ReactTestInstance): string[] {
   const node = root.find(candidate => Object.is(candidate.type, 'Text'));
   return String(node.props.className).split(' ');
@@ -132,6 +138,55 @@ describe('Text joined-script letter spacing', () => {
       tracking
     );
     expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...ownStyles(arabic)])).toBe(0);
+  });
+});
+
+describe('Text mounted letter spacing', () => {
+  it.each([false, true])('clears the tracking for Arabic children with isRTL=%s', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const text = hostText(
+      mountElement(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+    );
+
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  it('leaves Latin children untouched and keeps LTR style undefined', () => {
+    const text = hostText(
+      mountElement(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+    );
+
+    expect(text.props.style).toBeUndefined();
+  });
+
+  it('clears the tracking of the eyebrow variant for Arabic children', () => {
+    const text = hostText(mountElement(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
+
+    expect(text.props.className as string).toContain('tracking-[1.5px]');
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  it('clears the tab label tracking for Arabic children', () => {
+    const text = hostText(
+      mountElement(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
+    );
+
+    expect(text.props.className as string).toContain('tracking-[0.2px]');
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  // The interface direction owns the reset outside joined script: an RTL
+  // interface draws every run unspaced (`RTL_NO_LETTER_SPACING`), so a Latin
+  // label keeps the paragraph direction and loses the tracking its class asks
+  // for. The joined-script rule only adds the override in an LTR interface.
+  it('keeps the RTL paragraph direction and the reset for Latin children', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mountElement(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+    );
+
+    expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
 });
 

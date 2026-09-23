@@ -64,46 +64,6 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
 }
 
 /**
- * Arabic, Arabic Supplement, Arabic Extended-A, and the two Arabic
- * Presentation Forms blocks. The interface's joined-script languages (Arabic,
- * Farsi, Urdu, Kurdish, Pashto) all write in this script, and Arabic text
- * quoted inside any other catalog does too.
- */
-const JOINED_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-
-/**
- * Letter spacing stays at its natural width on a joined script: tracking is an
- * uppercase-Latin affordance, and on Arabic it inserts space between letters
- * that must stay joined, tearing the word apart (seen on the Preferences
- * section labels). The script, not the interface direction, decides — Hebrew
- * is right-to-left but does not join, and an Arabic run in an English
- * interface joins the same way.
- *
- * Only this `Text` node's own string children are read: a nested `Text` is its
- * own run and applies this on its own.
- */
-export const NATURAL_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
-
-/** True when any direct string child of a text node holds a joined-script glyph. */
-export function containsJoinedScript(children: ReactNode): boolean {
-  if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to reach its plain-string leaf
-    typeof children === 'string'
-  ) {
-    return JOINED_SCRIPT.test(children);
-  }
-  if (Array.isArray(children)) {
-    return children.some(child => containsJoinedScript(child as ReactNode));
-  }
-  return false;
-}
-
-/** The letter-spacing override a text run needs, or `undefined` when Latin tracking is safe. */
-export function textLetterSpacing(children: ReactNode): TextStyle | undefined {
-  return containsJoinedScript(children) ? NATURAL_LETTER_SPACING : undefined;
-}
-
-/**
  * Base direction for code content (a diff line, a hunk header): code is written
  * left to right whatever the interface language. Inheriting the interface's
  * direction instead leaves Android resolving the paragraph's `auto` alignment
@@ -117,3 +77,48 @@ export function textLetterSpacing(children: ReactNode): TextStyle | undefined {
  * view's children too (it would move the diff gutter to the left).
  */
 export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };
+
+/**
+ * A joined script's letters connect into one shape, so `letter-spacing` — a
+ * Latin display device — opens every glyph from its neighbour and splits a word
+ * mid-shape («الوكلاء» draws as «الوكلا ء»). This is the script, not the
+ * interface direction: a Latin run inside an Arabic interface (`KiloClaw`,
+ * `PR`) joins nothing and keeps its tracking. Arabic, Arabic Supplement, Arabic
+ * Extended-A and the two Arabic Presentation Forms blocks are the ranges a
+ * joined Arabic run arrives in.
+ */
+export const JOINED_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/** No added advance between glyphs, what a joined script's shaping expects. */
+export const NATURAL_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
+
+/** A `ReactNode` string member, the only child a `Text` lays out as one run. */
+function isStringChild(child: ReactNode): child is string {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode is a closed union; typeof is its string discriminant.
+  return typeof child === 'string';
+}
+
+/** A `ReactNode` array member; `Array.isArray` alone narrows it to `any[]`. */
+function isChildArray(children: ReactNode): children is ReactNode[] {
+  return Array.isArray(children);
+}
+
+/**
+ * Whether a direct string child holds a glyph of a joined script. Array
+ * children recurse; a nested `Text` is its own run and applies the rule itself,
+ * and numbers, functions and elements are not strings.
+ */
+export function containsJoinedScript(children: ReactNode): boolean {
+  if (isStringChild(children)) {
+    return JOINED_SCRIPT.test(children);
+  }
+  if (isChildArray(children)) {
+    return children.some(child => containsJoinedScript(child));
+  }
+  return false;
+}
+
+/** The natural spacing for a joined script, or nothing to override. */
+export function textLetterSpacing(children: ReactNode): TextStyle | undefined {
+  return containsJoinedScript(children) ? NATURAL_LETTER_SPACING : undefined;
+}

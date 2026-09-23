@@ -172,6 +172,7 @@ export function ProfileScreen() {
             icon={GitPullRequest}
             title={t('common.codeReviewer')}
             subtitle={t('profile.codeReviewerSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             onPress={() => {
@@ -184,6 +185,7 @@ export function ProfileScreen() {
             icon={ShieldCheck}
             title={t('common.securityAgent')}
             subtitle={t('profile.securityAgentSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             last
@@ -205,6 +207,7 @@ export function ProfileScreen() {
               icon={GitMerge}
               title={t('common.prReview')}
               subtitle={t('profile.prReviewSubtitle')}
+              hue="gold"
               className="rounded-lg bg-secondary px-3"
               last
               onPress={() => {
@@ -238,6 +241,7 @@ export function ProfileScreen() {
                     : t('profile.manageOrganization')
                 }
                 subtitle={orgName}
+                hue="lime"
                 className="rounded-lg bg-secondary px-3"
                 disabled={!orgRole}
                 last
@@ -258,6 +262,7 @@ export function ProfileScreen() {
             icon={SlidersHorizontal}
             title={t('common.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
@@ -269,6 +274,7 @@ export function ProfileScreen() {
           <ConfigureRow
             icon={BookOpenCheck}
             title={t('tour.tutorialLabel')}
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
@@ -334,6 +340,7 @@ export function ProfileScreen() {
                   title={providerLabel(p.provider)}
                   subtitle={p.email}
                   subtitleNumberOfLines={1}
+                  hue="moss"
                   className="rounded-lg bg-secondary px-3"
                   last={index === data.providers.length - 1}
                 />
@@ -347,6 +354,7 @@ export function ProfileScreen() {
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
+            hue="fern"
             onPress={() => {
               showFeedbackPrompt(userId);
             }}
@@ -354,12 +362,19 @@ export function ProfileScreen() {
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
+            hue="fern"
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={requestSignOut} />
+          <ActionTile
+            icon={LogOut}
+            label={t('common.signOut')}
+            hue="fern"
+            onPress={requestSignOut}
+          />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
+            hue="fern"
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}

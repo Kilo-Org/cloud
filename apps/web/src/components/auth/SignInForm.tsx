@@ -1,6 +1,7 @@
 'use client';
 
 import { MagicLinkSentConfirmation } from '@/components/auth/MagicLinkSentConfirmation';
+import { SsoAccountMismatchNotice } from '@/components/auth/SsoAccountMismatchNotice';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { TurnstileView } from '@/components/auth/sign-in/TurnstileView';
 import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView';
@@ -20,6 +21,7 @@ import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
 import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 
 /**
@@ -44,6 +46,7 @@ type SignInFormProps = {
   subtitle?: string;
   emailOnly?: boolean; // If true, only show email input (for SSO page)
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
+  accountMismatch?: SsoAccountMismatch; // SSO request for a different account than the session
   storybookInitialState?: SignInFormInitialState;
 };
 
@@ -56,6 +59,7 @@ export function SignInForm({
   subtitle,
   emailOnly = false,
   ssoMode = false,
+  accountMismatch,
   storybookInitialState,
 }: SignInFormProps) {
   const flow = useSignInFlow({
@@ -77,6 +81,13 @@ export function SignInForm({
     setSubmittedEmail(flow.email);
     flow.handleEmailSubmit(event);
   };
+
+  // An Enterprise SSO request for a different address than the signed-in
+  // session cannot proceed; offer the one-tap switch before any normal
+  // sign-in UI renders (including the returning-user hint loading state).
+  if (accountMismatch) {
+    return <SsoAccountMismatchNotice mismatch={accountMismatch} searchParams={searchParams} />;
+  }
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI

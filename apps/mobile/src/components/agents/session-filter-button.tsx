@@ -1,5 +1,5 @@
 import { SlidersHorizontal } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { type Insets, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
@@ -13,13 +13,12 @@ type SessionFilterButtonProps = {
   onPress: () => void;
   testID?: string;
   /**
-   * Overrides the control's own per-side slop. The agents header row narrows
-   * this control's two horizontal sides to fit its `gap-4` row gap: the row
-   * mirrors under RTL while `hitSlop` does not, so the cap cannot sit on one
-   * physical side. Callers pass an explicit per-side slop instead of the
-   * control's default.
+   * Per-side reach override. The control's own default is the same slop on
+   * every side; a caller that shares a row with another control needs to state
+   * the facing sides, so the two touch regions can be checked against the row
+   * gap instead of overlapping inside it.
    */
-  hitSlop?: React.ComponentProps<typeof Pressable>['hitSlop'];
+  hitSlop?: number | Insets;
 };
 
 /**
@@ -52,7 +51,7 @@ export function SessionFilterButton({
   activeCount,
   onPress,
   testID,
-  hitSlop,
+  hitSlop = FILTER_HIT_SLOP,
 }: Readonly<SessionFilterButtonProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -61,9 +60,11 @@ export function SessionFilterButton({
   return (
     <Pressable
       onPress={onPress}
-      // The control's own default above; a caller that lays it beside another
-      // control (the agents header row) passes the capped per-side insets.
-      hitSlop={hitSlop ?? FILTER_HIT_SLOP}
+      // The frame is the tap target the size audit measures, not the 20pt
+      // glyph; `FILTER_HIT_SLOP` above carries it past the 44pt minimum. A
+      // caller sharing a row may state the sides it faces, so the two touch
+      // regions can meet inside the row gap instead of overlapping.
+      hitSlop={hitSlop}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".

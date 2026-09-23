@@ -11,10 +11,7 @@ import {
   GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/google';
 import { KIMI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import {
-  GPT_CURRENT_VERCEL_MODEL_ID,
-  GPT_MINI_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/openai';
+import { GPT_MINI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
 import {
@@ -32,7 +29,6 @@ import {
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_PRO_LATEST_MODEL_ALIAS,
   GPT_ASTRA_LATEST_MODEL_ALIAS,
-  GPT_LATEST_MODEL_ALIAS,
   GPT_LUNA_LATEST_MODEL_ALIAS,
   GPT_MINI_LATEST_MODEL_ALIAS,
   GPT_SOL_LATEST_MODEL_ALIAS,
@@ -51,7 +47,6 @@ describe('mapModelIdToVercel', () => {
       [CLAUDE_OPUS_LATEST_MODEL_ALIAS, CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID],
       [CLAUDE_SONNET_LATEST_MODEL_ALIAS, CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID],
       [CLAUDE_HAIKU_LATEST_MODEL_ALIAS, CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],
-      [GPT_LATEST_MODEL_ALIAS, GPT_CURRENT_VERCEL_MODEL_ID],
       [GPT_MINI_LATEST_MODEL_ALIAS, GPT_MINI_CURRENT_VERCEL_MODEL_ID],
       [GPT_ASTRA_LATEST_MODEL_ALIAS, 'openai/gpt-6-astra'],
       [GPT_LUNA_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-luna'],
@@ -76,7 +71,6 @@ describe('mapModelIdToVercel', () => {
         CLAUDE_OPUS_LATEST_MODEL_ALIAS,
         CLAUDE_SONNET_LATEST_MODEL_ALIAS,
         CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
-        GPT_LATEST_MODEL_ALIAS,
         GPT_MINI_LATEST_MODEL_ALIAS,
         GPT_ASTRA_LATEST_MODEL_ALIAS,
         GPT_LUNA_LATEST_MODEL_ALIAS,

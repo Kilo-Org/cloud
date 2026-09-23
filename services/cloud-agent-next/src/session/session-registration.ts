@@ -711,6 +711,7 @@ async function allocateNewSession(
       sandboxProvider = selectSandboxProvider({
         env: ctx.env,
         orgId,
+        userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
         devcontainer: input.runtime?.devcontainer,

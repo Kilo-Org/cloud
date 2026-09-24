@@ -47,9 +47,7 @@ export function candidateModelIdsFromSources(
     );
   return [
     ...new Set(
-      [...fromPoolOrTable, ...CODING_PLAN_DEFAULT_MODEL_IDS, PRIMARY_DEFAULT_MODEL].filter(
-        id => !isVirtualAutoModelId(id)
-      )
+      [...fromPoolOrTable, ...CODING_PLAN_DEFAULT_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
     ),
   ];
 }
@@ -90,21 +88,11 @@ export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promis
 }
 
 export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const [table, poolModelIds] = await Promise.race([
-      Promise.all([getCachedRoutingTable(), loadEffectivePoolModelIds(owner)]),
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(
-          () => reject(new Error('Auto routing candidate lookup timed out')),
-          5000
-        );
-      }),
-    ]);
-    return candidateModelIdsFromSources(table, poolModelIds);
-  } finally {
-    clearTimeout(timeout);
-  }
+  const [table, poolModelIds] = await Promise.all([
+    getCachedRoutingTable(),
+    loadEffectivePoolModelIds(owner),
+  ]);
+  return candidateModelIdsFromSources(table, poolModelIds);
 }
 
 export async function collectDeniedAutoRoutingModelIds(
@@ -126,13 +114,18 @@ export async function collectDeniedAutoRoutingModelIds(
     loadAutoRoutingCandidateModelIds(owner),
     checkPrivacy ? getModelDataPolicies() : undefined,
   ]);
-  const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
+  const accessCandidates = new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)));
+  const uniqueCandidates = [...accessCandidates];
+  if (checkPrivacy && !accessCandidates.has(PRIMARY_DEFAULT_MODEL)) {
+    uniqueCandidates.push(PRIMARY_DEFAULT_MODEL);
+  }
   const allowed = new Set<string>();
   await Promise.all(
     uniqueCandidates.map(async modelId => {
-      const decision = checkAccess
-        ? await getEffectiveModelDecision(policy, modelId)
-        : { allowed: true, eligibleProviderRoutes: undefined };
+      const decision =
+        checkAccess && accessCandidates.has(modelId)
+          ? await getEffectiveModelDecision(policy, modelId)
+          : { allowed: true, eligibleProviderRoutes: undefined };
       if (!decision.allowed) return;
       if (checkPrivacy) {
         if (await hasBestEffortGuessDataCollectionRequirement(modelId)) return;

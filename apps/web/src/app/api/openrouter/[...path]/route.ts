@@ -351,7 +351,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   // auto-routing error instead of the generic model-not-allowed error.
   let isAutoEfficientRequest = false;
   let deniedAutoRoutingModelIds: string[] = [];
-  let autoRoutingPolicyUnavailable = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
@@ -384,11 +383,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
               ...requestBodyParsed.body.provider,
               ...(settings?.data_collection === 'deny' && { data_collection: 'deny' }),
             }
-          ).catch(() => {
-            autoRoutingPolicyUnavailable = true;
-            return [];
-          });
-          if (autoRoutingPolicyUnavailable) return null;
+          );
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
           deniedAutoRoutingModelIds = deniedModelIds;
           const result = await fetchEfficientAutoDecision({
@@ -638,8 +633,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
   if (
     isAutoEfficientRequest &&
-    (autoRoutingPolicyUnavailable ||
-      deniedAutoRoutingModelIds.some(id => id.toLowerCase() === effectiveModelIdLowerCased))
+    deniedAutoRoutingModelIds.some(id => id.toLowerCase() === effectiveModelIdLowerCased)
   ) {
     return efficientPoolBlockedResponse();
   }

@@ -1210,24 +1210,6 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
   });
 
-  it('returns a routing failure without classifying when privacy-policy loading fails', async () => {
-    mockedCollectDeniedAutoRoutingModelIds.mockRejectedValueOnce(new Error('worker unavailable'));
-    const { POST } = await import('./route');
-    const response = await POST(
-      makeRequest({
-        ...makeBody('kilo-auto/efficient'),
-        provider: { data_collection: 'deny' },
-      }) as never
-    );
-
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({
-      error: 'Auto-routing could not select an eligible model for this request.',
-    });
-    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
   it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
     'blocks mixed-case denied model IDs resolved by %s',
     async autoModel => {

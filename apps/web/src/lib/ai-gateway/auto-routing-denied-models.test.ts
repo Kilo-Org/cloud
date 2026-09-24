@@ -178,18 +178,64 @@ describe('collectDeniedAutoRoutingModelIds', () => {
     ).resolves.toEqual([contributor, standard]);
   });
 
-  it('bounds a stalled candidate lookup', async () => {
-    jest.useFakeTimers();
-    try {
-      jest.mocked(getAutoRoutingSettings).mockReturnValue(new Promise(() => {}));
-      const result = expect(
-        collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
-      ).rejects.toThrow('Auto routing candidate lookup timed out');
-      await jest.advanceTimersByTimeAsync(5000);
-      await result;
-    } finally {
-      jest.useRealTimers();
+  it.each([undefined, 'deny'] as const)(
+    'does not add the fallback to access-policy evaluation with data collection %s',
+    async dataCollection => {
+      const accessPolicy = policy({
+        memberGrant: { mode: 'organization_baseline' },
+        dataCollection,
+      });
+      jest.mocked(getEffectiveModelDecision).mockImplementation(async (_policy, id) => ({
+        allowed: id !== PRIMARY_DEFAULT_MODEL,
+      }));
+
+      const denied = await collectDeniedAutoRoutingModelIds(accessPolicy, owner);
+
+      expect(denied).not.toContain(PRIMARY_DEFAULT_MODEL);
+      expect(getEffectiveModelDecision).not.toHaveBeenCalledWith(
+        accessPolicy,
+        PRIMARY_DEFAULT_MODEL
+      );
+      expect(getEffectiveModelDecision).toHaveBeenCalledWith(accessPolicy, contributor);
     }
+  );
+
+  it('checks fallback privacy even when it is not an access-policy candidate', async () => {
+    const accessPolicy = policy({
+      memberGrant: { mode: 'organization_baseline' },
+      dataCollection: 'deny',
+    });
+    jest
+      .mocked(getModelDataPolicies)
+      .mockResolvedValue(
+        new Map([
+          [
+            PRIMARY_DEFAULT_MODEL,
+            [{ providerSlug: 'provider', training: true, retainsPrompts: true }],
+          ],
+        ])
+      );
+
+    await expect(collectDeniedAutoRoutingModelIds(accessPolicy, owner)).resolves.toEqual([
+      PRIMARY_DEFAULT_MODEL,
+    ]);
+    expect(getEffectiveModelDecision).not.toHaveBeenCalledWith(accessPolicy, PRIMARY_DEFAULT_MODEL);
+  });
+
+  it('still evaluates fallback access when the configured pool includes it', async () => {
+    const accessPolicy = policy({ memberGrant: { mode: 'organization_baseline' } });
+    jest.mocked(getAutoRoutingSettings).mockResolvedValue({
+      status: 200,
+      body: { configuredPool: [{ model: PRIMARY_DEFAULT_MODEL }] },
+    } as Awaited<ReturnType<typeof getAutoRoutingSettings>>);
+    jest.mocked(getEffectiveModelDecision).mockImplementation(async (_policy, id) => ({
+      allowed: id !== PRIMARY_DEFAULT_MODEL,
+    }));
+
+    await expect(collectDeniedAutoRoutingModelIds(accessPolicy, owner)).resolves.toEqual([
+      PRIMARY_DEFAULT_MODEL,
+    ]);
+    expect(getEffectiveModelDecision).toHaveBeenCalledWith(accessPolicy, PRIMARY_DEFAULT_MODEL);
   });
 });
 
@@ -271,6 +317,7 @@ describe('candidateModelIdsFromSources', () => {
     );
     expect(ids).toEqual(expect.arrayContaining(['pool/only-model', MINIMAX_CURRENT_MODEL_ID]));
     expect(ids).not.toContain('google/gemini-2.5-flash');
+    expect(ids).not.toContain(PRIMARY_DEFAULT_MODEL);
   });
 
   it('includes routing-table models plus coding-plan default ids', () => {

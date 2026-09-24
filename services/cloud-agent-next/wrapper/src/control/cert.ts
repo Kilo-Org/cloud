@@ -18,8 +18,18 @@ const SYSTEM_CA_BUNDLE_PATHS = [
 const CERT_WAIT_TIMEOUT_MS = 5000;
 const CERT_WAIT_POLL_MS = 100;
 
-function findSystemBundle(): string | undefined {
-  return SYSTEM_CA_BUNDLE_PATHS.find(bundlePath => existsSync(bundlePath));
+export interface RuntimeCertPaths {
+  readonly certPath: string;
+  readonly systemBundlePaths: readonly string[];
+}
+
+const DEFAULT_RUNTIME_CERT_PATHS: RuntimeCertPaths = {
+  certPath: CONTAINERS_INTERCEPT_CA_PATH,
+  systemBundlePaths: SYSTEM_CA_BUNDLE_PATHS,
+};
+
+function findSystemBundle(systemBundlePaths: readonly string[]): string | undefined {
+  return systemBundlePaths.find(bundlePath => existsSync(bundlePath));
 }
 
 async function waitForCertFile(certPath: string): Promise<boolean> {
@@ -33,8 +43,11 @@ async function waitForCertFile(certPath: string): Promise<boolean> {
   return false;
 }
 
-export async function trustRuntimeCert(log: CertLogger = console.error): Promise<void> {
-  const certPath = CONTAINERS_INTERCEPT_CA_PATH;
+export async function trustRuntimeCert(
+  log: CertLogger = console.error,
+  paths: RuntimeCertPaths = DEFAULT_RUNTIME_CERT_PATHS
+): Promise<void> {
+  const { certPath, systemBundlePaths } = paths;
   if (!(await waitForCertFile(certPath))) {
     log('Certificate not found, refusing to start without HTTPS interception enabled');
     process.exit(1);
@@ -48,7 +61,7 @@ export async function trustRuntimeCert(log: CertLogger = console.error): Promise
     process.exit(1);
   }
 
-  const systemBundlePath = findSystemBundle();
+  const systemBundlePath = findSystemBundle(systemBundlePaths);
   if (!systemBundlePath) {
     log('No supported system CA bundle found');
     return;
@@ -72,8 +85,9 @@ export async function trustRuntimeCert(log: CertLogger = console.error): Promise
 }
 
 export async function installInterceptTrustIfEnabled(
-  log: CertLogger = console.error
+  log: CertLogger = console.error,
+  paths: RuntimeCertPaths = DEFAULT_RUNTIME_CERT_PATHS
 ): Promise<void> {
   if (process.env[SANDBOX_INTERCEPT_HTTPS_ENV] !== SANDBOX_INTERCEPT_HTTPS_ENABLED) return;
-  await trustRuntimeCert(log);
+  await trustRuntimeCert(log, paths);
 }

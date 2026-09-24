@@ -79,6 +79,20 @@ describe('migration metadata', () => {
     }
   });
 
+  it('keeps the Live Activity tags at the prefixes main shipped', () => {
+    const entries = readJournal().entries;
+    // Locate by suffix so an unrelated later migration does not hide a rebase
+    // that rewrote 0256_* → 0255_* and 0257_* → 0256_*.
+    const column = entries.find(entry =>
+      entry.tag.endsWith('add_superseded_at_to_user_activity_tokens')
+    );
+    const index = entries.find(entry =>
+      entry.tag.endsWith('user_activity_tokens_live_ios_activity_unique')
+    );
+    expect(column?.tag).toBe('0256_add_superseded_at_to_user_activity_tokens');
+    expect(index?.tag).toBe('0257_user_activity_tokens_live_ios_activity_unique');
+  });
+
   it('keeps the newest snapshot file named for the last journal idx', () => {
     const last = readJournal().entries.at(-1);
     if (!last) throw new Error('journal is empty');

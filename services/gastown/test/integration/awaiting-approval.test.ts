@@ -14,6 +14,9 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     townName = `awaiting-approval-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
+    // New towns default to staged convoys; these tests exercise the lazy
+    // dispatch flow, so opt out explicitly.
+    await town.updateTownConfig({ staged_convoys_default: false });
     await town.addRig({
       rigId: 'rig-1',
       name: 'main-rig',
@@ -202,6 +205,9 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
     townName = `feedback-vs-approval-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
+    // New towns default to staged convoys; these tests exercise the lazy
+    // dispatch flow, so opt out explicitly.
+    await town.updateTownConfig({ staged_convoys_default: false });
     await town.addRig({
       rigId: 'rig-1',
       name: 'main-rig',

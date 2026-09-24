@@ -913,23 +913,29 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
-// Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
-app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
-  const path = c.req.path;
-  if (
-    path.includes('/container-registry') ||
-    path.includes('/db-snapshot') ||
-    path.includes('/mayor-id') ||
-    path.includes('/container-events')
-  ) {
-    return next();
-  }
-  await kiloAuthMiddleware(c, async () => {
-    await adminAuditMiddleware(c, async () => {
-      await townAuthMiddleware(c, next);
-    });
-  });
-});
+// Skip for container-facing routes which carry their own auth: container-registry,
+// db-snapshot, mayor-id and container-events use authMiddleware with container JWT
+// support. The user-facing /container proxy routes deliberately stay on this chain
+// (kilo auth + admin audit + town ownership); see the Town Container route section.
+const skipTownUserAuth = (path: string): boolean =>
+  path.includes('/container-registry') ||
+  path.includes('/db-snapshot') ||
+  path.includes('/mayor-id') ||
+  path.includes('/container-events');
+
+// Compose as sibling `app.use` layers (same as org auth below) so each
+// middleware's 401/403/404 is the handler return value Hono compose
+// assigns to context.res. Nested `await mw(c, next)` without `return`
+// discards that Response and compose throws an invalid-status RangeError.
+app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
+  skipTownUserAuth(c.req.path) ? next() : kiloAuthMiddleware(c, next)
+);
+app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
+  skipTownUserAuth(c.req.path) ? next() : adminAuditMiddleware(c, next)
+);
+app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
+  skipTownUserAuth(c.req.path) ? next() : townAuthMiddleware(c, next)
+);
 
 // ── Org Auth ────────────────────────────────────────────────────────────
 // Kilo user auth + org membership check for all org routes.
@@ -1079,7 +1085,8 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
-// Protected by Cloudflare Access at the perimeter; no additional auth required.
+// User-facing: they run the /api/towns/:townId/* auth chain registered above
+// (kilo auth, admin audit, town ownership) before reaching the handler.
 
 app.post('/api/towns/:townId/container/agents/start', c =>
   instrumented(c, 'POST /api/towns/:townId/container/agents/start', () =>

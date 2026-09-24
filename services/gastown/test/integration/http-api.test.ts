@@ -1,8 +1,19 @@
-import { SELF } from 'cloudflare:test';
+import { env, runDurableObjectAlarm, SELF } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { SignJWT } from 'jose';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
 const JWT_SECRET = 'test-jwt-secret-must-be-at-least-32-chars-long';
+const NEXTAUTH_SECRET = 'test-nextauth-secret-must-be-at-least-32-chars';
+
+async function kiloUserToken(userId: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({ version: 3, kiloUserId: userId })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
+}
 
 /**
  * In the test environment ENVIRONMENT=development, so authMiddleware is skipped.
@@ -46,12 +57,12 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+    it('should serve the service descriptor at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      const body = await res.json();
+      expect(body.service).toBe('gastown');
+      expect(body.status).toBe('ok');
     });
   });
 
@@ -430,6 +441,10 @@ describe('HTTP API', () => {
   describe('agent done', () => {
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
+      // agentDone is event-only: the alarm's Phase 0 drains the event. Store
+      // the town id first so the arm from agentDone succeeds.
+      const town = env.TOWN.get(env.TOWN.idFromName(townId));
+      await town.setTownId(townId);
       const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
@@ -464,6 +479,9 @@ describe('HTTP API', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.done).toBe(true);
+
+      // Drain the agent_done event via the alarm.
+      await runDurableObjectAlarm(town);
 
       // Verify agent is idle
       const agentCheck = await SELF.fetch(
@@ -620,9 +638,9 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      expect(body.data.id).toBeTruthy();
+      expect(body.data.severity).toBe('critical');
+      expect(body.data.message).toBe('Critical failure');
     });
   });
 
@@ -658,6 +676,68 @@ describe('HTTP API', () => {
         headers: headers(),
       });
       expect(res.status).toBe(200);
+    });
+  });
+
+  // Routes registered after the /api/towns/:townId/* kilo+town auth chain.
+  describe('town user auth', () => {
+    it('returns 401 for GET /config without a token', async () => {
+      const id = `auth-${crypto.randomUUID()}`;
+      const res = await SELF.fetch(api(`/api/towns/${id}/config`), {
+        headers: headers(),
+      });
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Authentication required');
+    });
+
+    it('returns 404 for GET /config when the town has no owner', async () => {
+      const id = `auth-${crypto.randomUUID()}`;
+      const token = await kiloUserToken('user-not-owner');
+      const res = await SELF.fetch(api(`/api/towns/${id}/config`), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Town not found');
+    });
+
+    it('returns 403 for GET /config when the caller is not the owner', async () => {
+      const id = `auth-${crypto.randomUUID()}`;
+      const town = env.TOWN.get(env.TOWN.idFromName(id));
+      await town.updateTownConfig({ owner_type: 'user', owner_id: 'owner-user' });
+      const token = await kiloUserToken('other-user');
+      const res = await SELF.fetch(api(`/api/towns/${id}/config`), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Forbidden');
+    });
+
+    it('returns 200 for GET /config when the caller is the owner', async () => {
+      const id = `auth-${crypto.randomUUID()}`;
+      const town = env.TOWN.get(env.TOWN.idFromName(id));
+      await town.updateTownConfig({ owner_type: 'user', owner_id: 'owner-user' });
+      const token = await kiloUserToken('owner-user');
+      const res = await SELF.fetch(api(`/api/towns/${id}/config`), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
     });
   });
 });

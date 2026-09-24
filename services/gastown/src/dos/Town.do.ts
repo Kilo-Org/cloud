@@ -756,20 +756,12 @@ export class TownDO extends DurableObject<Env> {
     await this.initPromise;
   }
 
-  private async initializeDatabase(): Promise<void> {
-    const storedId = await this.ctx.storage.get<string>('town:id');
-    if (storedId) this._townId = storedId;
-
-    const townConfig = await config.getTownConfig(this.ctx.storage);
-    this._ownerUserId = townConfig.owner_user_id;
-
-    this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
-    this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
-    this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
-    this._billingBlocked = (await this.ctx.storage.get<boolean>('billing:blocked')) ?? false;
-    this._containerRunPolicy =
-      (await this.ctx.storage.get<ContainerRunPolicy>('container:runPolicy')) ?? 'automatic';
-
+  /**
+   * Create every SQL table this DO owns. Idempotent (`CREATE TABLE IF NOT
+   * EXISTS` plus ALTER migrations), so it is safe to run against an existing
+   * database — and against the empty database left behind by destroy().
+   */
+  private createSchema(): void {
     beadOps.initBeadTables(this.sql);
 
     // These are no-ops now but kept for clarity
@@ -787,6 +779,23 @@ export class TownDO extends DurableObject<Env> {
     wasteland.initWastelandTables(this.sql);
 
     events.initTownEventsTable(this.sql);
+  }
+
+  private async initializeDatabase(): Promise<void> {
+    const storedId = await this.ctx.storage.get<string>('town:id');
+    if (storedId) this._townId = storedId;
+
+    const townConfig = await config.getTownConfig(this.ctx.storage);
+    this._ownerUserId = townConfig.owner_user_id;
+
+    this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
+    this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
+    this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
+    this._billingBlocked = (await this.ctx.storage.get<boolean>('billing:blocked')) ?? false;
+    this._containerRunPolicy =
+      (await this.ctx.storage.get<ContainerRunPolicy>('container:runPolicy')) ?? 'automatic';
+
+    this.createSchema();
 
     // One-shot cleanup: older versions of this DO stored a separate
     // `mayor:ready_reported_for:<startedAt>` key per container instance,
@@ -5892,6 +5901,12 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+
+    // deleteAll() drops the SQL schema with the data. This instance stays
+    // alive until the runtime evicts it, so recreate the (empty) schema:
+    // a read on a deleted town then returns empty results instead of
+    // throwing "no such table: ..." out of the DO RPC boundary.
+    this.createSchema();
   }
 }
 

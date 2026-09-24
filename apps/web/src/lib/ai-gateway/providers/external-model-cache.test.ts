@@ -13,7 +13,6 @@ jest.mock('@/lib/drizzle', () => ({
 const {
   getCachedOpenAiServedModels,
   getCachedOpenRouterModels,
-  invalidateCachedOpenRouterModels,
   saveOpenAiServedModels,
   saveOpenRouterModels,
 } = jest.requireActual<typeof ExternalModelCache>('./external-model-cache');
@@ -36,7 +35,6 @@ describe('external model cache', () => {
   });
 
   beforeEach(() => {
-    invalidateCachedOpenRouterModels();
     mockRows.length = 0;
     mockWrites.length = 0;
     (readDb.select as jest.Mock).mockClear();
@@ -52,19 +50,18 @@ describe('external model cache', () => {
     }));
   });
 
-  it('stores a validated OpenRouter catalog and removes upstream enkrypt', async () => {
+  it('stores the raw OpenRouter catalog after validating without upstream enkrypt', async () => {
     const data = Array.from({ length: 100 }, (_, index) => ({
       ...catalogModel,
       id: `vendor/model-${index}`,
       enkrypt: { untrusted: true },
     }));
 
-    await expect(saveOpenRouterModels({ data })).resolves.toBe(true);
+    const response = { data, object: 'list' };
+    await expect(saveOpenRouterModels(response)).resolves.toBe(true);
     expect(mockWrites).toHaveLength(1);
     expect(mockWrites[0].source).toContain('openrouter:');
-    expect(mockWrites[0].data).toEqual({
-      data: data.map(model => ({ ...catalogModel, id: model.id })),
-    });
+    expect(mockWrites[0].data).toEqual(response);
   });
 
   it('never replaces a good row with malformed or suspiciously small responses', async () => {
@@ -82,14 +79,13 @@ describe('external model cache', () => {
   });
 
   it('scopes OpenAI served lists to the partner key without storing the key', async () => {
-    await expect(
-      saveOpenAiServedModels('partner-key', { data: [{ id: 'gpt-5-nano' }] })
-    ).resolves.toBe(true);
+    const response = { object: 'list', data: [{ id: 'gpt-5-nano', created: 1 }] };
+    await expect(saveOpenAiServedModels('partner-key', response)).resolves.toBe(true);
     await saveOpenAiServedModels('other-key', { data: [{ id: 'gpt-5-nano' }] });
 
     expect(mockWrites[0].source).not.toBe(mockWrites[1].source);
     expect(JSON.stringify(mockWrites)).not.toContain('partner-key');
-    expect(mockWrites[0].data).toEqual({ data: [{ id: 'gpt-5-nano' }] });
+    expect(mockWrites[0].data).toEqual(response);
   });
 
   it('ignores stale and corrupt rows', async () => {
@@ -108,25 +104,31 @@ describe('external model cache', () => {
     mockRows[0].synced_at = '2026-04-29 01:16:12.945+00';
     mockRows[0].data = { data: [{ id: 123 }] };
     await expect(getCachedOpenAiServedModels('partner-key')).resolves.toBeNull();
-    await expect(getCachedOpenRouterModels()).resolves.toBeNull();
     now.mockRestore();
   });
 
-  it('serves a fresh validated OpenRouter catalog', async () => {
+  it('serves a fresh sanitized OpenRouter catalog without rereading within the in-process TTL', async () => {
+    const current = Date.now();
+    const now = jest.spyOn(Date, 'now').mockReturnValue(current);
     mockRows.push({
       data: {
-        data: Array.from({ length: 100 }, (_, index) => ({ ...catalogModel, id: `${index}` })),
+        data: Array.from({ length: 100 }, (_, index) => ({
+          ...catalogModel,
+          id: `${index}`,
+          enkrypt: { untrusted: true },
+        })),
       },
       synced_at: new Date().toISOString(),
     });
 
     const cached = await getCachedOpenRouterModels();
     expect(cached?.data).toHaveLength(100);
+    expect(cached?.data[0]).not.toHaveProperty('enkrypt');
     await getCachedOpenRouterModels();
     expect(readDb.select).toHaveBeenCalledTimes(1);
 
-    mockRows[0].synced_at = new Date(Date.now() - 16 * 60_000).toISOString();
-    invalidateCachedOpenRouterModels();
+    now.mockReturnValue(current + 16 * 60_000);
     await expect(getCachedOpenRouterModels()).resolves.toBeNull();
+    expect(readDb.select).toHaveBeenCalledTimes(2);
   });
 });

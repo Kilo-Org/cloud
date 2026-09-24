@@ -31,7 +31,7 @@ import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 import { getCachedOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-cache';
-import { sanitizeOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-validation';
+import { removeUpstreamEnkrypt } from '@/lib/ai-gateway/providers/external-model-validation';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -232,7 +232,7 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
     throw new Error('Failed to fetch models from OpenRouter API');
   }
 
-  const data = sanitizeOpenRouterModels(await response.json());
+  const data = removeUpstreamEnkrypt(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 
@@ -301,7 +301,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
     throw new Error('Failed to fetch transcription models from OpenRouter API');
   }
 
-  const data = sanitizeOpenRouterModels(await response.json());
+  const data = removeUpstreamEnkrypt(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 

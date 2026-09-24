@@ -9,7 +9,7 @@ export function parseOpenAiServedModelIds(response: unknown): Set<string> | null
   return parsed.success ? new Set(parsed.data.data.map(model => model.id)) : null;
 }
 
-export function sanitizeOpenRouterModels(response: unknown): unknown {
+export function removeUpstreamEnkrypt(response: unknown): unknown {
   if (
     !response ||
     typeof response !== 'object' ||

@@ -4,7 +4,7 @@ import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';

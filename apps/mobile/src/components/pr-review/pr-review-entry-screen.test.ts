@@ -199,7 +199,7 @@ describe('provider-neutral URL field', () => {
     // the single instruction as its eyebrow; the field keeps its placeholder.
     expect(header.props?.title).toBe('PR Review');
     expect(header.props?.eyebrow).toBe('Open a pull request or merge request by URL');
-    const input = find(tree, 'TextInput', () => true);
+    const input = find(tree, 'Input', () => true);
     expect(input.props?.placeholder).toBe('Pull request or merge request URL');
     // The paste block no longer carries a caption repeating the instruction.
     const list = find(tree, 'PrReviewInboxList', () => true);

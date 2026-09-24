@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 

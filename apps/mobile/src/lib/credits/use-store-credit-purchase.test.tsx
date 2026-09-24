@@ -235,6 +235,89 @@ describe('createStoreCreditPurchaseActions completion', () => {
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
   });
 
+  it('announces a re-delivered transaction once while its completion is in flight', async () => {
+    const purchase = createPurchase();
+    const onPurchaseCompleted = vi.fn();
+    const backendCompletionGate = Promise.withResolvers<undefined>();
+    const completeAppStorePurchase = vi.fn().mockImplementation(async () => {
+      await backendCompletionGate.promise;
+      return { alreadyProcessed: false };
+    });
+    const actions = createActions({
+      completeAppStorePurchase,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    const firstDelivery = actions.handlePurchaseSuccess(purchase);
+    // The store re-delivers the same transaction before the first backend
+    // completion resolves; both deliveries await the same shared completion.
+    const secondDelivery = actions.handlePurchaseSuccess(purchase);
+    backendCompletionGate.resolve(undefined);
+
+    await expect(firstDelivery).resolves.toBe(true);
+    await expect(secondDelivery).resolves.toBe(true);
+
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces a live delivery that coalesces with the silent recovery pass', async () => {
+    const purchase = createPurchase();
+    const onPurchaseCompleted = vi.fn();
+    const backendCompletionGate = Promise.withResolvers<undefined>();
+    const completeAppStorePurchase = vi.fn().mockImplementation(async () => {
+      await backendCompletionGate.promise;
+      return { alreadyProcessed: false };
+    });
+    const actions = createActions({
+      completeAppStorePurchase,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    // The recovery pass starts the shared completion silently; the store then
+    // delivers the same transaction live before it resolves. The live delivery
+    // is that completion's first notifier, so it must still announce once.
+    const recovery = actions.recoverPurchases([purchase]);
+    const liveDelivery = actions.handlePurchaseSuccess(purchase);
+    backendCompletionGate.resolve(undefined);
+
+    await expect(recovery).resolves.toEqual([purchase]);
+    await expect(liveDelivery).resolves.toBe(true);
+
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not announce when the recovery pass joins a live completion', async () => {
+    const purchase = createPurchase();
+    const onPurchaseCompleted = vi.fn();
+    const backendCompletionGate = Promise.withResolvers<undefined>();
+    const completeAppStorePurchase = vi.fn().mockImplementation(async () => {
+      await backendCompletionGate.promise;
+      return { alreadyProcessed: false };
+    });
+    const actions = createActions({
+      completeAppStorePurchase,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    const liveDelivery = actions.handlePurchaseSuccess(purchase);
+    const recovery = actions.recoverPurchases([purchase]);
+    backendCompletionGate.resolve(undefined);
+
+    await expect(liveDelivery).resolves.toBe(true);
+    await expect(recovery).resolves.toEqual([purchase]);
+
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a missing signed transaction without completing', async () => {
     const completeAppStorePurchase = vi.fn();
     const finishTransaction = vi.fn();

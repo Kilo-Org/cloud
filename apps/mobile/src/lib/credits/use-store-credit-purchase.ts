@@ -95,6 +95,18 @@ type PurchaseCompletionResult =
   | { completed: true; errorMessageKey?: never }
   | { completed: false; errorMessageKey: string | null };
 
+type PurchaseCompletionOutcome = {
+  completed: boolean;
+  /**
+   * True when this caller is the one that announces the successful completion.
+   * The store can re-deliver one transaction while its first completion is still
+   * resolving, and the silent recovery pass can start a completion a live
+   * delivery then joins. The announcement is claimed by the first caller that
+   * wants it, so a granted credit is announced exactly once.
+   */
+  shouldNotifyCompletion: boolean;
+};
+
 type PurchaseCompletionOptions = {
   invalidateAfterCompletion?: boolean;
   notifyErrors?: boolean;
@@ -109,7 +121,17 @@ type RecoverPurchasesOptions = PurchaseCompletionOptions & {
   creditPackGoogleProductIds?: readonly string[];
 };
 
-const sharedPurchaseCompletions = new Map<string, Promise<PurchaseCompletionResult>>();
+type SharedPurchaseCompletion = {
+  promise: Promise<PurchaseCompletionResult>;
+  /**
+   * True once a caller awaiting this completion has claimed the success
+   * announcement. The silent recovery pass can start the completion first, so a
+   * live delivery that coalesces with it must still announce the granted credit.
+   */
+  hasNotifier: boolean;
+};
+
+const sharedPurchaseCompletions = new Map<string, SharedPurchaseCompletion>();
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
 export function resetPurchaseErrorToastDedup() {
@@ -273,22 +295,31 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
 
   async function completePurchaseOnce(
     purchase: Purchase,
-    options: PurchaseCompletionOptions = {}
-  ): Promise<boolean> {
+    options: PurchaseSuccessOptions = {}
+  ): Promise<PurchaseCompletionOutcome> {
     const purchaseId = getPurchaseCompletionId(purchase);
+    const notifyCompletion = options.notifyCompletion ?? true;
     const existingCompletion = sharedPurchaseCompletions.get(purchaseId);
     if (existingCompletion) {
-      const result = await existingCompletion;
+      // A joiner announces only when the in-flight completion has no notifying
+      // caller yet: the silent recovery pass can start it, and a live delivery
+      // that coalesces with it must still announce the granted credit once.
+      const shouldNotifyCompletion = notifyCompletion && !existingCompletion.hasNotifier;
+      existingCompletion.hasNotifier = existingCompletion.hasNotifier || notifyCompletion;
+      const result = await existingCompletion.promise;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return result.completed;
+      return { completed: result.completed, shouldNotifyCompletion };
     }
 
-    const completion = completePurchase(purchase, options);
+    const completion: SharedPurchaseCompletion = {
+      promise: completePurchase(purchase, options),
+      hasNotifier: notifyCompletion,
+    };
     sharedPurchaseCompletions.set(purchaseId, completion);
     try {
-      const result = await completion;
+      const result = await completion.promise;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return result.completed;
+      return { completed: result.completed, shouldNotifyCompletion: notifyCompletion };
     } finally {
       sharedPurchaseCompletions.delete(purchaseId);
     }
@@ -298,11 +329,14 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     purchase: Purchase,
     options: PurchaseSuccessOptions = {}
   ): Promise<boolean> {
-    const completed = await completePurchaseOnce(purchase, options);
-    if ((options.notifyCompletion ?? true) && completed) {
+    const outcome = await completePurchaseOnce(purchase, options);
+    // One announcement per granted completion: a re-delivery that joins a
+    // notifying caller stays silent, and a live delivery that coalesces with the
+    // silent recovery pass is that completion's first notifier.
+    if (outcome.shouldNotifyCompletion && outcome.completed) {
       deps.onPurchaseCompleted?.();
     }
-    return completed;
+    return outcome.completed;
   }
 
   async function recoverPurchases(

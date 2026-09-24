@@ -4855,3 +4855,443 @@ describe('SandboxControl worktree reference index', () => {
     expect(ownership).not.toHaveBeenCalled();
   });
 });
+
+function installRetirement(
+  h: Awaited<ReturnType<typeof harness>>,
+  retire: ReturnType<typeof vi.fn>
+) {
+  Object.assign(h.env, { SESSION_INGEST: { retireCloudAgentWorktreeIfSoleMember: retire } });
+}
+
+function stopDiagnostics(fields: { mock: { calls: unknown[][] } }): Array<Record<string, unknown>> {
+  return fields.mock.calls
+    .map(call => call[0] as Record<string, unknown>)
+    .filter(value => value.diagnosticEvent === 'session_deleted_stop');
+}
+
+function seedCheckRequired(records: Map<string, unknown>) {
+  const record: AllocationRecord = {
+    v: 2,
+    resumable: false,
+    state: {
+      kind: 'stopping',
+      target: {
+        provider: 'cloudflare',
+        providerRef: 'instance_check',
+        capabilities: { persistentWorkspace: false, destroysOnStop: true },
+      },
+      createIntent: { intentId: 'intent_check', createdAt: Date.now() - 2_000 },
+      stopIntent: { reason: 'environment_failed', createdAt: Date.now() - 2_000 },
+      attempts: POLICY.stopMaxAttempts,
+      step: 'check_required',
+    },
+  };
+  seedCanonicalAllocationRecord(records, record);
+}
+
+describe('SandboxControl session deletion stop', () => {
+  it('stops an isolated sole-owner allocation with no worktree id without calling session-ingest', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    const stop = installStopProvider(h);
+    stop.confirm();
+    const retire = vi.fn();
+    installRetirement(h, retire);
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    await h.control.forgetSessionReference({ sessionId: ROUTE.sessionId, kiloUserId: OWNER });
+
+    expect(retire).not.toHaveBeenCalled();
+    expect(beginStop).toHaveBeenCalledWith('session_deleted');
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
+  });
+
+  it('stops an isolated sole-owner worktree session and forwards its metadata to the retirement RPC', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    const stop = installStopProvider(h);
+    stop.confirm();
+    const retire = vi.fn(async () => ({ kind: 'exclusive' as const }));
+    installRetirement(h, retire);
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+    await h.control.forgetSessionReference({
+      sessionId: ROUTE.sessionId,
+      kiloUserId: OWNER,
+      worktreeId: WORKTREE_ID,
+      organizationId,
+    });
+
+    expect(retire).toHaveBeenCalledWith({
+      worktreeId: WORKTREE_ID,
+      kiloUserId: OWNER,
+      cloudAgentSessionId: ROUTE.sessionId,
+      organizationId,
+    });
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('stopped');
+  });
+
+  it.each(['shared', 'unresolved'] as const)(
+    'does not stop when the retirement RPC returns %s',
+    async kind => {
+      const h = await harness();
+      seedPhysical(h.records, 'running');
+      installStopProvider(h);
+      const retire = vi.fn(async () => ({ kind }));
+      installRetirement(h, retire);
+      const beginStop = vi.spyOn(h.control, 'beginStop');
+
+      await h.control.forgetSessionReference({
+        sessionId: ROUTE.sessionId,
+        kiloUserId: OWNER,
+        worktreeId: WORKTREE_ID,
+      });
+
+      expect(retire).toHaveBeenCalledWith({
+        worktreeId: WORKTREE_ID,
+        kiloUserId: OWNER,
+        cloudAgentSessionId: ROUTE.sessionId,
+      });
+      expect(beginStop).not.toHaveBeenCalled();
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+    }
+  );
+
+  it('resolves without stopping when the retirement RPC is missing', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    installStopProvider(h);
+    Object.assign(h.env, { SESSION_INGEST: {} });
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    await expect(
+      h.control.forgetSessionReference({
+        sessionId: ROUTE.sessionId,
+        kiloUserId: OWNER,
+        worktreeId: WORKTREE_ID,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(beginStop).not.toHaveBeenCalled();
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+  });
+
+  it('fails closed when the retirement RPC times out after the marker may have committed', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    installStopProvider(h);
+    const retire = vi.fn(() => new Promise(() => {}));
+    installRetirement(h, retire);
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    const forgetting = h.control.forgetSessionReference({
+      sessionId: ROUTE.sessionId,
+      kiloUserId: OWNER,
+      worktreeId: WORKTREE_ID,
+    });
+    await vi.advanceTimersByTimeAsync(RECONCILIATION_CALL_TIMEOUT_MS * 2);
+
+    await expect(forgetting).resolves.toBeUndefined();
+    expect(beginStop).not.toHaveBeenCalled();
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+  });
+
+  it.each([
+    [`usr-${'b'.repeat(48)}`, false],
+    [`usr-${'b'.repeat(48)}`, true],
+    ['org-legacy__shared', false],
+    ['org-legacy__shared', true],
+  ] as const)(
+    'never stops or retires a shared sandbox id (%s, worktree=%s)',
+    async (sandboxId, withWorktree) => {
+      const h = await harness();
+      seedPhysical(h.records, 'running');
+      installStopProvider(h);
+      const retire = vi.fn(async () => ({ kind: 'exclusive' as const }));
+      installRetirement(h, retire);
+      Object.assign(h.control, { sandboxId });
+      const beginStop = vi.spyOn(h.control, 'beginStop');
+
+      await h.control.forgetSessionReference({
+        sessionId: ROUTE.sessionId,
+        kiloUserId: OWNER,
+        ...(withWorktree ? { worktreeId: WORKTREE_ID } : {}),
+      });
+
+      expect(retire).not.toHaveBeenCalled();
+      expect(beginStop).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reports a confirmed stop when the allocation reaches stopped', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    const stop = installStopProvider(h);
+    stop.confirm();
+    installRetirement(
+      h,
+      vi.fn(async () => ({ kind: 'exclusive' as const }))
+    );
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await h.control.forgetSessionReference({
+        sessionId: ROUTE.sessionId,
+        kiloUserId: OWNER,
+        worktreeId: WORKTREE_ID,
+      });
+
+      const stops = stopDiagnostics(fields);
+      expect(stops).toHaveLength(1);
+      expect(stops[0]).toMatchObject({ kind: 'stopped', result: 'stopped' });
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
+  it('reports an unconfirmed stop when the provider stop stays retryable', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    installStopProvider(h);
+    installRetirement(
+      h,
+      vi.fn(async () => ({ kind: 'exclusive' as const }))
+    );
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await h.control.forgetSessionReference({
+        sessionId: ROUTE.sessionId,
+        kiloUserId: OWNER,
+        worktreeId: WORKTREE_ID,
+      });
+
+      expect((await h.control.getAllocationRecord()).state.kind).toBe('stopping');
+      const stops = stopDiagnostics(fields);
+      expect(stops).toHaveLength(1);
+      expect(stops[0]).toMatchObject({ kind: 'stopping', result: 'unconfirmed' });
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
+  it('never reports a check_required allocation as stopped and makes only bounded attempts', async () => {
+    const h = await harness();
+    seedCheckRequired(h.records);
+    installStopProvider(h);
+    installRetirement(
+      h,
+      vi.fn(async () => ({ kind: 'exclusive' as const }))
+    );
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+    const recordStopAttempt = vi.spyOn(h.control, 'recordStopAttempt');
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await h.control.forgetSessionReference({
+        sessionId: ROUTE.sessionId,
+        kiloUserId: OWNER,
+        worktreeId: WORKTREE_ID,
+      });
+
+      const allocation = (await h.control.getAllocationRecord()).state;
+      expect(allocation.kind).toBe('stopping');
+      if (allocation.kind !== 'stopping') throw new Error('Expected a stopping allocation');
+      expect(allocation.step).toBe('check_required');
+      expect(beginStop).toHaveBeenCalledTimes(1);
+      expect(recordStopAttempt).toHaveBeenCalledTimes(1);
+      const stops = stopDiagnostics(fields);
+      expect(stops).toHaveLength(1);
+      expect(stops[0]).toMatchObject({ kind: 'stopping', result: 'unconfirmed' });
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
+  it.each([
+    [
+      'a remaining sibling reference',
+      (h: Awaited<ReturnType<typeof harness>>) => {
+        const state = emptySessionReferenceState();
+        addSessionReference(state, {
+          sessionId: 'workspace_other',
+          kiloSessionId: 'ses_other',
+          directory: '/workspace/other',
+        });
+        h.records.set('session_references', state);
+      },
+    ],
+    [
+      'an overflowed reference state',
+      (h: Awaited<ReturnType<typeof harness>>) => {
+        h.records.set('session_references', {
+          ...emptySessionReferenceState(),
+          overflowed: true,
+        });
+      },
+    ],
+    [
+      'a remaining route',
+      (h: Awaited<ReturnType<typeof harness>>) => {
+        h.records.set('session_routes', [
+          {
+            sessionId: 'workspace_other',
+            kiloSessionId: 'ses_other',
+            directory: '/workspace/other',
+            ownerId: OWNER,
+            lastState: null,
+            lastStateAt: null,
+            idleForMs: null,
+            waitingOn: null,
+          },
+        ]);
+      },
+    ],
+  ] as const)('does not stop when there is %s', async (_name, seed) => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    installStopProvider(h);
+    installRetirement(
+      h,
+      vi.fn(async () => ({ kind: 'exclusive' as const }))
+    );
+    seed(h);
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    await h.control.forgetSessionReference({ sessionId: ROUTE.sessionId, kiloUserId: OWNER });
+
+    expect(beginStop).not.toHaveBeenCalled();
+  });
+
+  it('does not stop when an exclusive worktree deletion fence is set', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    installStopProvider(h);
+    const retire = vi.fn(async () => ({ kind: 'exclusive' as const }));
+    installRetirement(h, retire);
+    Object.assign(h.control, { exclusiveDeletionWorktreeId: WORKTREE_ID });
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    await h.control.forgetSessionReference({
+      sessionId: ROUTE.sessionId,
+      kiloUserId: OWNER,
+      worktreeId: WORKTREE_ID,
+    });
+
+    expect(retire).not.toHaveBeenCalled();
+    expect(beginStop).not.toHaveBeenCalled();
+  });
+
+  it('does not call beginStop for a creating allocation before its deadline', async () => {
+    const h = await harness();
+    const creating = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-c', createdAt: Date.now() },
+    });
+    if (!creating) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, creating);
+    installStopProvider(h);
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    await h.control.forgetSessionReference({ sessionId: ROUTE.sessionId, kiloUserId: OWNER });
+
+    expect(beginStop).not.toHaveBeenCalled();
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('creating');
+  });
+
+  it('does not call beginStop for a creating worktree allocation before its deadline', async () => {
+    const h = await harness();
+    const creating = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-cw', createdAt: Date.now() },
+    });
+    if (!creating) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, creating);
+    installStopProvider(h);
+    const retire = vi.fn(async () => ({ kind: 'exclusive' as const }));
+    installRetirement(h, retire);
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    await h.control.forgetSessionReference({
+      sessionId: ROUTE.sessionId,
+      kiloUserId: OWNER,
+      worktreeId: WORKTREE_ID,
+    });
+
+    expect(retire).toHaveBeenCalledTimes(1);
+    expect(beginStop).not.toHaveBeenCalled();
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('creating');
+  });
+
+  it('reads the allocation after the retirement RPC resolves and skips a replacement creating record', async () => {
+    const h = await harness();
+    seedCanonicalAllocationRecord(
+      h.records,
+      allocationFixture({
+        state: 'running',
+        provider: 'cloudflare',
+        providerRef: encodeCloudflareProviderRef({
+          sandboxId: SANDBOX_ID,
+          containment: true,
+          instanceId: 'instance_legacy',
+        }),
+        createIntent: { intentId: 'instance_legacy', createdAt: Date.now() },
+      })
+    );
+    installStopProvider(h);
+    const called = deferred<void>();
+    const retire = deferred<{ kind: 'exclusive' }>();
+    installRetirement(
+      h,
+      vi.fn(() => {
+        called.resolve();
+        return retire.promise;
+      })
+    );
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    const forgetting = h.control.forgetSessionReference({
+      sessionId: ROUTE.sessionId,
+      kiloUserId: OWNER,
+      worktreeId: WORKTREE_ID,
+    });
+    await called.promise;
+    // A replacement create commits while the retirement RPC is still pending.
+    seedCanonicalAllocationRecord(
+      h.records,
+      allocationFixture({
+        state: 'creating',
+        providerRef: null,
+        createIntent: { intentId: 'intent-replacement', createdAt: Date.now() },
+      })
+    );
+    retire.resolve({ kind: 'exclusive' });
+
+    await expect(forgetting).resolves.toBeUndefined();
+    expect(beginStop).not.toHaveBeenCalled();
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('creating');
+  });
+
+  it('fails closed when the retirement RPC resolves exclusive only after its timeout elapsed', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    installStopProvider(h);
+    const retire = deferred<{ kind: 'exclusive' }>();
+    installRetirement(
+      h,
+      vi.fn(() => retire.promise)
+    );
+    const beginStop = vi.spyOn(h.control, 'beginStop');
+
+    const forgetting = h.control.forgetSessionReference({
+      sessionId: ROUTE.sessionId,
+      kiloUserId: OWNER,
+      worktreeId: WORKTREE_ID,
+    });
+    await vi.advanceTimersByTimeAsync(RECONCILIATION_CALL_TIMEOUT_MS * 2);
+    retire.resolve({ kind: 'exclusive' });
+
+    await expect(forgetting).resolves.toBeUndefined();
+    expect(beginStop).not.toHaveBeenCalled();
+    expect((await h.control.getAllocationRecord()).state.kind).toBe('allocated');
+  });
+});

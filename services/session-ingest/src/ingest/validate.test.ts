@@ -138,8 +138,6 @@ describe('validateAndParseIngestPayload', () => {
     });
   });
 
-
-
   it.each([
     ['at', INGEST_CHUNK_MAX_BYTES],
     ['over', INGEST_CHUNK_MAX_BYTES + 1],

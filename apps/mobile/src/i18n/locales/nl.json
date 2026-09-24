@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "Gespreksverloop van de sessie",
       "readOnly": "Je kunt deze sessie alleen lezen.",
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
+      "emptyTranscriptDescription": "Deze sessie heeft nog geen berichten.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "renameAccessibility": "Sessie hernoemen: {{title}}",

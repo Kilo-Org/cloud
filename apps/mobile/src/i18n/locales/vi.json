@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "Bản ghi phiên",
       "readOnly": "Bạn chỉ có thể xem phiên này.",
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
+      "emptyTranscriptDescription": "Phiên này chưa có tin nhắn.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",

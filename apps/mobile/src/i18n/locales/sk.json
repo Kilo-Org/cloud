@@ -2148,6 +2148,7 @@
       "transcriptAccessibility": "Prepis relácie",
       "readOnly": "Táto relácia je iba na čítanie.",
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
+      "emptyTranscriptDescription": "Táto relácia zatiaľ neobsahuje žiadne správy.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
       "renameAccessibility": "Premenovať reláciu: {{title}}",

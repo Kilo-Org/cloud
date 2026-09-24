@@ -2148,6 +2148,7 @@
       "transcriptAccessibility": "Zapis pogovora v seji",
       "readOnly": "Ta seja je samo za branje.",
       "emptyDescription": "Za začetek pošlji sporočilo v spodnjem polju.",
+      "emptyTranscriptDescription": "Ta seja še nima sporočil.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
       "renameAccessibility": "Preimenuj sejo: {{title}}",

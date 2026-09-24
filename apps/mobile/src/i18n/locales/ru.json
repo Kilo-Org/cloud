@@ -1612,6 +1612,7 @@
       "transcriptAccessibility": "Переписка в сеансе",
       "readOnly": "Этот сеанс доступен только для чтения.",
       "emptyDescription": "Отправьте сообщение ниже, чтобы начать.",
+      "emptyTranscriptDescription": "В этом сеансе пока нет сообщений.",
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
       "renameAccessibility": "Переименовать сеанс: {{title}}",

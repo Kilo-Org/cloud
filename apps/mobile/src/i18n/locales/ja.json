@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "セッションの会話履歴",
       "readOnly": "このセッションは読み取り専用です。",
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
+      "emptyTranscriptDescription": "このセッションにはまだメッセージがありません。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "renameAccessibility": "セッション「{{title}}」の名前を変更",

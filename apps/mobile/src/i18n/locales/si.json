@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "සැසියේ සංවාද පිටපත",
       "readOnly": "මෙම සැසිය කියවීමට පමණි.",
       "emptyDescription": "ආරම්භ කිරීමට පහත කොටුවෙන් පණිවිඩයක් යවන්න.",
+      "emptyTranscriptDescription": "මෙම සැසියේ තවම පණිවිඩ නැත.",
       "scrollToBottom": "අවසානය දක්වා පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
       "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",

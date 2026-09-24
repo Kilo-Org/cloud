@@ -2204,6 +2204,7 @@
       "transcriptAccessibility": "Trawsgrifiad sesiwn",
       "readOnly": "Sesiwn ddarllen yn unig yw hon.",
       "emptyDescription": "Anfonwch neges isod i ddechrau.",
+      "emptyTranscriptDescription": "Nid oes gan y sesiwn hon unrhyw negeseuon eto.",
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",

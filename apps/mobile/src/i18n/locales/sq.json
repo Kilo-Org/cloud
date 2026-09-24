@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Transkripti i seancës",
       "readOnly": "Kjo seancë është vetëm për lexim.",
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
+      "emptyTranscriptDescription": "Kjo seancë ende nuk ka mesazhe.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
       "renameAccessibility": "Riemërto seancën: {{title}}",

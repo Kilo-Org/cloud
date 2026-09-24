@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
       "readOnly": "این نشست فقط خواندنی است.",
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
+      "emptyTranscriptDescription": "این نشست هنوز پیامی ندارد.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",

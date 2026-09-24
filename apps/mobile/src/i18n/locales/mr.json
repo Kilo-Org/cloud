@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "सत्रातील संभाषणाची नोंद",
       "readOnly": "हे सत्र फक्त वाचता येते.",
       "emptyDescription": "सुरुवात करण्यासाठी खाली संदेश पाठवा.",
+      "emptyTranscriptDescription": "या सत्रात अजून संदेश नाहीत.",
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "renameAccessibility": "{{title}} या सत्राचे नाव बदला",

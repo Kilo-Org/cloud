@@ -2148,6 +2148,7 @@
       "transcriptAccessibility": "Přepis relace",
       "readOnly": "Tato relace je pouze pro čtení.",
       "emptyDescription": "Začněte odesláním zprávy v poli níže.",
+      "emptyTranscriptDescription": "Tato relace zatím neobsahuje žádné zprávy.",
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",

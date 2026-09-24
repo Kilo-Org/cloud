@@ -2148,6 +2148,7 @@
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
       "readOnly": "Šią sesiją galima tik skaityti.",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
+      "emptyTranscriptDescription": "Šioje sesijoje dar nėra žinučių.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",

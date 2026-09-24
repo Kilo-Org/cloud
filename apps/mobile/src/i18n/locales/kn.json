@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "ಸೆಶನ್‌ನ ಸಂಭಾಷಣೆಯ ಪಠ್ಯ",
       "readOnly": "ಈ ಸೆಶನ್ ಅನ್ನು ಓದಲು ಮಾತ್ರ ಸಾಧ್ಯ.",
       "emptyDescription": "ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಸಂದೇಶ ಕಳುಹಿಸಿ.",
+      "emptyTranscriptDescription": "ಈ ಸೆಶನ್‌ನಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ.",
       "scrollToBottom": "ಕೊನೆಯವರೆಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
       "renameAccessibility": "{{title}} ಸೆಶನ್‌ನ ಹೆಸರು ಬದಲಾಯಿಸಿ",

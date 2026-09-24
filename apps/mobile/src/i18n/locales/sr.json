@@ -2120,6 +2120,7 @@
       "transcriptAccessibility": "Transkript sesije",
       "readOnly": "Ovu sesiju možeš samo da čitaš.",
       "emptyDescription": "Pošalji poruku u polju ispod da započneš razgovor.",
+      "emptyTranscriptDescription": "Ova sesija još nema poruka.",
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",

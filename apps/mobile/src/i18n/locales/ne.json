@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "सत्रको कुराकानीको अभिलेख",
       "readOnly": "यो सत्र पढ्न मात्र मिल्छ।",
       "emptyDescription": "सुरु गर्न तल सन्देश पठाउनुहोस्।",
+      "emptyTranscriptDescription": "यो सत्रमा अहिलेसम्म कुनै सन्देश छैन।",
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देश छैन",
       "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",

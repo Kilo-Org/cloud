@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Сессийн ярианы бичвэр",
       "readOnly": "Энэ сессийг зөвхөн унших боломжтой.",
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
+      "emptyTranscriptDescription": "Энэ сессэд хараахан мессеж байхгүй.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
       "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",

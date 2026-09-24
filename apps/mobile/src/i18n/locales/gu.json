@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "સત્રની લેખિત વાતચીત",
       "readOnly": "આ સત્ર માત્ર વાંચી શકાય છે.",
       "emptyDescription": "શરૂ કરવા નીચે સંદેશ મોકલો.",
+      "emptyTranscriptDescription": "આ સત્રમાં હજુ કોઈ સંદેશ નથી.",
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",

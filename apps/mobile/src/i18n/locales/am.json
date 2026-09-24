@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "የክፍለ ጊዜው የውይይት ግልባጭ",
       "readOnly": "ይህን ክፍለ ጊዜ ማንበብ ብቻ ይቻላል።",
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
+      "emptyTranscriptDescription": "ይህ ክፍለ ጊዜ እስካሁን ምንም መልእክቶች የሉትም።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Qoraalka kalfadhiga",
       "readOnly": "Kalfadhigan waa la akhrin karaa oo keliya.",
       "emptyDescription": "Farriin ku dir meesha hoose si aad u bilowdo.",
+      "emptyTranscriptDescription": "Kalfadhigan weli ma laha farriimo.",
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",

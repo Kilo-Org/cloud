@@ -2120,6 +2120,7 @@
       "transcriptAccessibility": "Transcrierea sesiunii",
       "readOnly": "Această sesiune poate fi doar citită.",
       "emptyDescription": "Trimite un mesaj mai jos pentru a începe.",
+      "emptyTranscriptDescription": "Această sesiune nu are încă mesaje.",
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",

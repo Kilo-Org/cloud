@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",
       "readOnly": "វគ្គនេះអាចបានត្រឹមតែអានប៉ុណ្ណោះ។",
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
+      "emptyTranscriptDescription": "វគ្គនេះមិនទាន់មានសារទេ។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
       "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Nakala ya mazungumzo ya kikao",
       "readOnly": "Kikao hiki ni cha kusoma tu.",
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
+      "emptyTranscriptDescription": "Kikao hiki hakina ujumbe bado.",
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Saioaren transkripzioa",
       "readOnly": "Saio hau irakurtzeko soilik da.",
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
+      "emptyTranscriptDescription": "Saio honek oraindik ez du mezurik.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",

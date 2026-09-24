@@ -2120,6 +2120,7 @@
       "transcriptAccessibility": "Transcripció de la sessió",
       "readOnly": "Aquesta sessió és només de lectura.",
       "emptyDescription": "Envia un missatge a continuació per començar.",
+      "emptyTranscriptDescription": "Aquesta sessió encara no té missatges.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "renameAccessibility": "Reanomena la sessió: {{title}}",

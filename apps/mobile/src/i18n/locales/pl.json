@@ -1612,6 +1612,7 @@
       "transcriptAccessibility": "Zapis sesji",
       "readOnly": "Ta sesja jest dostępna tylko do odczytu.",
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
+      "emptyTranscriptDescription": "Ta sesja nie ma jeszcze żadnych wiadomości.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",

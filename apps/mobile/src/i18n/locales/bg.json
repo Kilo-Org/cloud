@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Запис на разговора",
       "readOnly": "Тази сесия е само за четене.",
       "emptyDescription": "Изпрати съобщение по-долу, за да започнеш.",
+      "emptyTranscriptDescription": "Тази сесия все още няма съобщения.",
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",

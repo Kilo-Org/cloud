@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "సెషన్ సంభాషణ పాఠ్యం",
       "readOnly": "ఈ సెషన్‌ను చదవడం మాత్రమే సాధ్యం.",
       "emptyDescription": "ప్రారంభించడానికి కింద సందేశం పంపండి.",
+      "emptyTranscriptDescription": "ఈ సెషన్‌లో ఇంకా సందేశాలు లేవు.",
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
       "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",

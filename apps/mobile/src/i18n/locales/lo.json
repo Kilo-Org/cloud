@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "ບັນທຶກການສົນທະນາໃນເຊດຊັນ",
       "readOnly": "ເຊດຊັນນີ້ອ່ານໄດ້ຢ່າງດຽວ.",
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
+      "emptyTranscriptDescription": "ເຊດຊັນນີ້ຍັງບໍ່ມີຂໍ້ຄວາມ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",

@@ -1600,6 +1600,7 @@
       "transcriptAccessibility": "תמליל הסשן",
       "readOnly": "הסשן הזה מיועד לקריאה בלבד.",
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
+      "emptyTranscriptDescription": "בסשן הזה אין עדיין הודעות.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",

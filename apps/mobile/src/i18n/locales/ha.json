@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Tarihin tattaunawar zaman",
       "readOnly": "Ana iya karanta wannan zaman ne kawai.",
       "emptyDescription": "Aika saƙo a ƙasa domin farawa.",
+      "emptyTranscriptDescription": "Wannan zaman ba shi da saƙonni har yanzu.",
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "renameAccessibility": "Canza sunan zaman: {{title}}",

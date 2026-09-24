@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini untuk bacaan sahaja.",
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
+      "emptyTranscriptDescription": "Sesi ini belum mempunyai mesej.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "renameAccessibility": "Namakan semula sesi: {{title}}",

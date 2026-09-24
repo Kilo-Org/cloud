@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Tala ng pag-uusap sa sesyon",
       "readOnly": "Mababasa lang ang sesyong ito.",
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
+      "emptyTranscriptDescription": "Wala pang mensahe ang sesyong ito.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",

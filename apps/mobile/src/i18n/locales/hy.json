@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Նիստի սղագրություն",
       "readOnly": "Այս նիստը հասանելի է միայն կարդալու համար։",
       "emptyDescription": "Սկսելու համար ներքևում հաղորդագրություն ուղարկեք։",
+      "emptyTranscriptDescription": "Այս նիստում դեռևս հաղորդագրություններ չկան։",
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նիստը՝ {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "A munkamenet átirata",
       "readOnly": "Ez a munkamenet csak olvasható.",
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
+      "emptyTranscriptDescription": "Ebben a munkamenetben még nincsenek üzenetek.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",

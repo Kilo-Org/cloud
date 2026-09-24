@@ -1612,6 +1612,7 @@
       "transcriptAccessibility": "Історія повідомлень сеансу",
       "readOnly": "Цей сеанс доступний лише для читання.",
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
+      "emptyTranscriptDescription": "У цьому сеансі ще немає повідомлень.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "renameAccessibility": "Перейменувати сеанс: {{title}}",

@@ -1564,6 +1564,7 @@
       "transcriptAccessibility": "Transcrição da sessão",
       "readOnly": "Esta sessão é somente para leitura.",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
+      "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Rolar para o final",
       "emptyTitle": "Nenhuma mensagem ainda",
       "renameAccessibility": "Renomear sessão: {{title}}",

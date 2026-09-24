@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "Oturum dökümü",
       "readOnly": "Bu oturum salt okunur.",
       "emptyDescription": "Başlamak için aşağıdan bir mesaj gönder.",
+      "emptyTranscriptDescription": "Bu oturumda henüz mesaj yok.",
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",

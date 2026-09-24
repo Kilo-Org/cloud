@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "บันทึกการสนทนาของเซสชัน",
       "readOnly": "เซสชันนี้เปิดให้อ่านได้อย่างเดียว",
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
+      "emptyTranscriptDescription": "เซสชันนี้ยังไม่มีข้อความ",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",

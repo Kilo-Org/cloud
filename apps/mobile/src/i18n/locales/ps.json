@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "د ناستې متن",
       "readOnly": "دا ناسته یوازې لوستلی شئ.",
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
+      "emptyTranscriptDescription": "په دې ناسته کې تر اوسه پیغامونه نشته.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "تۆماری سێشن",
       "readOnly": "ئەم سێشنە تەنها بۆ خوێندنەوەیە.",
       "emptyDescription": "بۆ دەستپێکردن، لە خوارەوە پەیامێک بنێرە.",
+      "emptyTranscriptDescription": "ئەم سێشنە هێشتا هیچ پەیامێک نییە.",
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
       "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "სესიის ჩანაწერი",
       "readOnly": "ეს სესია მხოლოდ სანახავადაა.",
       "emptyDescription": "დასაწყებად ქვემოთ გაგზავნეთ შეტყობინება.",
+      "emptyTranscriptDescription": "ამ სესიას ჯერ არ აქვს შეტყობინებები.",
       "scrollToBottom": "ბოლომდე გადახვევა",
       "emptyTitle": "შეტყობინებები ჯერ არ არის",
       "renameAccessibility": "სესიის სახელის შეცვლა: {{title}}",

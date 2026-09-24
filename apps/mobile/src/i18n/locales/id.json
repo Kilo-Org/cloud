@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini hanya dapat dibaca.",
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
+      "emptyTranscriptDescription": "Sesi ini belum memiliki pesan.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
       "renameAccessibility": "Ganti nama sesi: {{title}}",

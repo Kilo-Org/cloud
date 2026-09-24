@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Seansi vestlusajalugu",
       "readOnly": "Seda seanssi saab ainult lugeda.",
       "emptyDescription": "Alustamiseks kirjuta allolevale väljale sõnum ja saada see.",
+      "emptyTranscriptDescription": "Selles seansis pole veel sõnumeid.",
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",

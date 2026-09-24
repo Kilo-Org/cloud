@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "Sitzungsprotokoll",
       "readOnly": "Diese Sitzung ist schreibgeschützt.",
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
+      "emptyTranscriptDescription": "Diese Sitzung hat noch keine Nachrichten.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "renameAccessibility": "Sitzung umbenennen: {{title}}",

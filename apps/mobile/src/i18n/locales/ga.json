@@ -2176,6 +2176,7 @@
       "transcriptAccessibility": "Athscríbhinn an tseisiúin",
       "readOnly": "Is seisiún inléite amháin é seo.",
       "emptyDescription": "Seol teachtaireacht thíos chun tosú.",
+      "emptyTranscriptDescription": "Níl aon teachtaireacht sa seisiún seo fós.",
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",

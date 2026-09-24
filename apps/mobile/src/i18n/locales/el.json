@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Ιστορικό συνομιλίας της συνεδρίας",
       "readOnly": "Αυτή η συνεδρία είναι μόνο για ανάγνωση.",
       "emptyDescription": "Στείλε ένα μήνυμα παρακάτω για να ξεκινήσεις.",
+      "emptyTranscriptDescription": "Αυτή η συνεδρία δεν έχει ακόμα μηνύματα.",
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
       "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Transkripsyon sesyon an",
       "readOnly": "Ou ka li sesyon sa a sèlman.",
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
+      "emptyTranscriptDescription": "Sesyon sa a pa gen okenn mesaj ankò.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "renameAccessibility": "Chanje non sesyon an: {{title}}",

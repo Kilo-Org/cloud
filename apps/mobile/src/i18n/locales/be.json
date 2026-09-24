@@ -2148,6 +2148,7 @@
       "transcriptAccessibility": "Гісторыя паведамленняў сеанса",
       "readOnly": "Гэты сеанс даступны толькі для чытання.",
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
+      "emptyTranscriptDescription": "У гэтым сеансе яшчэ няма паведамленняў.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",

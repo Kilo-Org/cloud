@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Galmee marii turtii",
       "readOnly": "Turtii kana dubbisuu qofa dandeessa.",
       "emptyDescription": "Jalqabuuf gadiitti ergaa ergi.",
+      "emptyTranscriptDescription": "Turtii kana keessatti hanga ammaatti ergaan hin jiru.",
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
       "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",

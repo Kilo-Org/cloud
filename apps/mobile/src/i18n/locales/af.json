@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Sessietranskripsie",
       "readOnly": "Jy kan hierdie sessie net lees.",
       "emptyDescription": "Stuur 'n boodskap hieronder om te begin.",
+      "emptyTranscriptDescription": "Hierdie sessie het nog geen boodskappe nie.",
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",

@@ -1588,6 +1588,7 @@
       "transcriptAccessibility": "工作階段對話記錄",
       "readOnly": "這是唯讀工作階段。",
       "emptyDescription": "在下方傳送訊息，即可開始。",
+      "emptyTranscriptDescription": "這個工作階段還沒有訊息。",
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",

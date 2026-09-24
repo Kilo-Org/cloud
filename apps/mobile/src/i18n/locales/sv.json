@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Meddelandehistorik",
       "readOnly": "Den här sessionen är skrivskyddad.",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
+      "emptyTranscriptDescription": "Den här sessionen har inga meddelanden ännu.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på sessionen: {{title}}",

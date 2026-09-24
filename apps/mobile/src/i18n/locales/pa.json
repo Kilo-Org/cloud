@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ",
       "readOnly": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਸਿਰਫ਼ ਪੜ੍ਹਿਆ ਜਾ ਸਕਦਾ ਹੈ।",
       "emptyDescription": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਹੇਠਾਂ ਇੱਕ ਸੁਨੇਹਾ ਭੇਜੋ।",
+      "emptyTranscriptDescription": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ।",
       "scrollToBottom": "ਸਭ ਤੋਂ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",

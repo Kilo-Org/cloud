@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "அமர்வின் உரையாடல் பதிவு",
       "readOnly": "இந்த அமர்வைப் படிக்க மட்டுமே முடியும்.",
       "emptyDescription": "தொடங்குவதற்குக் கீழே ஒரு செய்தியை அனுப்பவும்.",
+      "emptyTranscriptDescription": "இந்த அமர்வில் இன்னும் செய்திகள் இல்லை.",
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "renameAccessibility": "{{title}} அமர்வின் பெயரை மாற்றவும்",

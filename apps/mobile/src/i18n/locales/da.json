@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Sessionens samtalehistorik",
       "readOnly": "Denne session er skrivebeskyttet.",
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
+      "emptyTranscriptDescription": "Denne session har endnu ingen beskeder.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
       "renameAccessibility": "Omdøb session: {{title}}",

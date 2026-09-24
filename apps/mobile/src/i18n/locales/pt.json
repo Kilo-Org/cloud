@@ -2120,6 +2120,7 @@
       "transcriptAccessibility": "Transcrição da sessão",
       "readOnly": "Esta sessão é apenas de leitura.",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
+      "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
       "renameAccessibility": "Renomear sessão: {{title}}",

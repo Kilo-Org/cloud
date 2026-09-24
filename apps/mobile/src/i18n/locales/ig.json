@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Ndekọ nnọkọ",
       "readOnly": "Ị nwere ike ịgụ naanị ihe dị na nnọkọ a.",
       "emptyDescription": "Ziga ozi n'okpuru iji bido.",
+      "emptyTranscriptDescription": "Nnọkọ a enwebeghị ozi ọ bụla.",
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Ozi adịbeghị",
       "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",

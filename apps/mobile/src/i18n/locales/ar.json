@@ -1636,6 +1636,7 @@
       "transcriptAccessibility": "سجل المحادثة في الجلسة",
       "readOnly": "هذه الجلسة للقراءة فقط.",
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
+      "emptyTranscriptDescription": "لا تحتوي هذه الجلسة على رسائل بعد.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",

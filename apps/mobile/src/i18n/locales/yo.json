@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Àkọsílẹ̀ ìgbà iṣẹ́",
       "readOnly": "Kíkà nìkan ni o lè ṣe nínú ìgbà iṣẹ́ yìí.",
       "emptyDescription": "Fi ìfiránṣẹ́ ránṣẹ́ ní ìsàlẹ̀ láti bẹ̀rẹ̀.",
+      "emptyTranscriptDescription": "Ìgbà iṣẹ́ yìí kò tíì ní ìfiránṣẹ́ kankan.",
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
       "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",

@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "စက်ရှင်စကားဝိုင်းမှတ်တမ်း",
       "readOnly": "ဤစက်ရှင်ကို ဖတ်ရှုရုံသာ လုပ်နိုင်ပါသည်။",
       "emptyDescription": "စတင်ရန် အောက်တွင် မက်ဆေ့ခ်ျတစ်ခု ပို့ပါ။",
+      "emptyTranscriptDescription": "ဤစက်ရှင်တွင် မက်ဆေ့ခ်ျ မရှိသေးပါ။",
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
       "renameAccessibility": "{{title}} စက်ရှင်ကို အမည်ပြောင်းပါ",

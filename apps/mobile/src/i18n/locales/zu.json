@@ -2092,6 +2092,7 @@
       "transcriptAccessibility": "Umbhalo weseshini",
       "readOnly": "Le seshini ingafundwa kuphela.",
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
+      "emptyTranscriptDescription": "Le seshini ayinawo umilayezo okwamanje.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",

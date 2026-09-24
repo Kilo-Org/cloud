@@ -13,7 +13,15 @@ export type KiloEmbeddingModelCatalog = {
   aliases: Record<string, string>;
 };
 
-export const KILO_DEFAULT_EMBEDDING_MODEL = 'sentence-transformers/all-mpnet-base-v2';
+// Chosen over sentence-transformers/all-mpnet-base-v2 (previous default): OpenAI is
+// served through two independent, high-uptime OpenRouter endpoints (Azure + OpenAI
+// direct, ~100%/99.9% 1-day uptime as of 2026-09-24) versus a single DeepInfra route
+// for the sentence-transformers model, it natively supports variable-dimension
+// (Matryoshka) output so `dimensions` requests are legitimately forwarded rather than
+// silently mismatched, and at $0.02/M tokens it remains inexpensive while offering
+// materially better retrieval quality for code/semantic search than the 2021-era
+// all-mpnet-base-v2 model. See PR discussion for the full model-by-model evaluation.
+export const KILO_DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 
 export const KILO_EMBEDDING_MODELS = [
   {
@@ -73,7 +81,13 @@ export const KILO_EMBEDDING_MODELS = [
     dimension: 1024,
     scoreThreshold: 0.35,
   },
-  { id: 'baai/bge-m3', name: 'BAAI bge-m3', dimension: 1024, scoreThreshold: 0.35 },
+  {
+    id: 'baai/bge-m3',
+    name: 'BAAI bge-m3',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
   {
     id: 'baai/bge-large-en-v1.5',
     name: 'BAAI bge-large-en-v1.5',
@@ -88,17 +102,45 @@ export const KILO_EMBEDDING_MODELS = [
     scoreThreshold: 0.35,
     dimensionMode: 'fixed',
   },
-  { id: 'thenlper/gte-large', name: 'GTE Large', dimension: 1024, scoreThreshold: 0.35 },
-  { id: 'thenlper/gte-base', name: 'GTE Base', dimension: 768, scoreThreshold: 0.35 },
-  { id: 'intfloat/e5-large-v2', name: 'E5 Large v2', dimension: 1024, scoreThreshold: 0.35 },
-  { id: 'intfloat/e5-base-v2', name: 'E5 Base v2', dimension: 768, scoreThreshold: 0.35 },
+  {
+    id: 'thenlper/gte-large',
+    name: 'GTE Large',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
+  {
+    id: 'thenlper/gte-base',
+    name: 'GTE Base',
+    dimension: 768,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
+  {
+    id: 'intfloat/e5-large-v2',
+    name: 'E5 Large v2',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
+  {
+    id: 'intfloat/e5-base-v2',
+    name: 'E5 Base v2',
+    dimension: 768,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
   {
     id: 'intfloat/multilingual-e5-large',
     name: 'Multilingual E5 Large',
     dimension: 1024,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
+    // Previous KILO_DEFAULT_EMBEDDING_MODEL. Not Matryoshka-capable: a stale
+    // `dimensions` value from a client that saved this model must be rejected
+    // (validateEmbeddingDimensions), not silently forwarded upstream.
     id: 'sentence-transformers/all-mpnet-base-v2',
     name: 'all-mpnet-base-v2',
     dimension: 768,
@@ -110,24 +152,28 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'all-MiniLM-L12-v2',
     dimension: 384,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
     id: 'sentence-transformers/all-minilm-l6-v2',
     name: 'all-MiniLM-L6-v2',
     dimension: 384,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
     id: 'sentence-transformers/paraphrase-minilm-l6-v2',
     name: 'paraphrase-MiniLM-L6-v2',
     dimension: 384,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
     id: 'sentence-transformers/multi-qa-mpnet-base-dot-v1',
     name: 'multi-qa-mpnet-base-dot-v1',
     dimension: 768,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
 ] satisfies KiloEmbeddingModel[];
 
@@ -140,6 +186,14 @@ export const KILO_EMBEDDING_MODEL_ALIASES: Record<string, string> = {
 
 // Removed from the catalog after OpenRouter dropped the model; rewrite requests
 // from clients that still have it saved so they keep working on the default.
+//
+// Note: `mistralai/codestral-embed-2505` was suspected dead in a prior
+// investigation, but that check queried `GET /api/v1/models`, which never lists
+// *any* embedding-only model (OpenRouter excludes embeddings entirely from that
+// endpoint). The authoritative source, `GET /api/v1/embeddings/models` (and its
+// per-model `/endpoints` detail), shows `codestral-embed-2505` with three live
+// Mistral-served endpoints and ~100% uptime, so it stays in the catalog as a
+// non-deprecated, working model.
 export const KILO_DEPRECATED_EMBEDDING_MODEL_FALLBACKS: Record<string, string> = {
   'mistralai/mistral-embed-2312': KILO_DEFAULT_EMBEDDING_MODEL,
 };

@@ -47,7 +47,7 @@ export type UserConfig = {
   customSecretMeta?: Record<string, { configPath?: string }> | null;
   /** Whether the builtin vector memory search is enabled. */
   vectorMemoryEnabled?: boolean;
-  /** Embedding model ID for vector memory (e.g. "sentence-transformers/all-mpnet-base-v2"). */
+  /** Embedding model ID for vector memory (e.g. "openai/text-embedding-3-small"). */
   vectorMemoryModel?: string | null;
   /** Whether background dreaming (memory consolidation) is enabled. */
   dreamingEnabled?: boolean;

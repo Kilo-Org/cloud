@@ -18,9 +18,22 @@ export function validateEmbeddingDimensions(
   requestedModel = body.model
 ): string | undefined {
   const model = getKiloEmbeddingModel(requestedModel);
-  if (model?.dimensionMode !== 'fixed' || body.dimensions == null) return undefined;
-  if (body.dimensions === model.dimension) return undefined;
-  return `${model.name} returns fixed ${model.dimension}-dimensional embeddings through Kilo. Remove the custom dimensions setting and re-index.`;
+  if (!model || body.dimensions == null) return undefined;
+
+  if (model.dimensionMode === 'fixed') {
+    if (body.dimensions === model.dimension) return undefined;
+    return `${model.name} returns fixed ${model.dimension}-dimensional embeddings through Kilo. Remove the custom dimensions setting and re-index.`;
+  }
+
+  // Models without dimensionMode: 'fixed' support Matryoshka-style output
+  // truncation up to their catalog dimension. A stale client-supplied value
+  // above that ceiling (e.g. left over from a previously saved model) is
+  // invalid for the resolved model and must be rejected rather than forwarded
+  // upstream, where behavior would be provider-dependent.
+  if (body.dimensions <= 0 || body.dimensions > model.dimension) {
+    return `${model.name} supports up to ${model.dimension}-dimensional embeddings through Kilo. Lower the custom dimensions setting and re-index.`;
+  }
+  return undefined;
 }
 
 /**

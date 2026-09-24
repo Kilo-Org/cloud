@@ -104,7 +104,7 @@ describe('buildUpstreamBody', () => {
     ).toBeUndefined();
   });
 
-  it('should reject a stale custom dimensions value carried over from the removed mistral-embed-2312 model', () => {
+  it('should reject a stale custom dimensions value carried over from the removed mistral-embed-2312 model, against the previous default (all-mpnet-base-v2)', () => {
     expect(
       validateEmbeddingDimensions({
         model: 'sentence-transformers/all-mpnet-base-v2',
@@ -112,6 +112,13 @@ describe('buildUpstreamBody', () => {
         dimensions: 1024,
       })
     ).toContain('fixed 768-dimensional embeddings');
+    expect(
+      validateEmbeddingDimensions({
+        model: 'sentence-transformers/all-mpnet-base-v2',
+        input: 'hello',
+        dimensions: 768,
+      })
+    ).toBeUndefined();
     expect(
       buildUpstreamBody({
         model: 'sentence-transformers/all-mpnet-base-v2',
@@ -129,6 +136,34 @@ describe('buildUpstreamBody', () => {
         dimensions: 3072,
       })
     ).toBeUndefined();
+  });
+
+  it('should reject a stale dimensions value that exceeds the resolved default model max', () => {
+    // A client that saved the removed mistralai/mistral-embed-2312 model
+    // (1024-dimensional) resolves to the new default. text-embedding-3-small
+    // supports truncation up to 1536, so 1024 is valid, but a value above its
+    // max must be rejected rather than blindly forwarded upstream.
+    expect(
+      validateEmbeddingDimensions({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        dimensions: 1024,
+      })
+    ).toBeUndefined();
+    expect(
+      validateEmbeddingDimensions({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        dimensions: 4096,
+      })
+    ).toContain('supports up to 1536-dimensional embeddings');
+    expect(
+      validateEmbeddingDimensions({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        dimensions: 0,
+      })
+    ).toContain('supports up to 1536-dimensional embeddings');
   });
 
   it('should strip output_dtype and output_dimension even when other optional fields are absent', () => {

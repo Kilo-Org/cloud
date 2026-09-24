@@ -330,6 +330,11 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
                 settings.retry();
               }}
               loading={settings.retrying}
+              /* The name is what the platform restores when the spinner stops:
+                 a busy button with none is read as "busy" for the rest of the
+                 screen's life (BaseViewManager, RN 0.86). Every other control in
+                 this sheet names itself the same way. */
+              accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>
             </Button>

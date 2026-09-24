@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { McpSettingsSheet, useMcpSettings } from '@/components/chat/mcp-settings-sheet';
 import { i18n } from '@/i18n';
+import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
 import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
 import {
   type RemoteMcpServerDraft,
@@ -29,7 +30,7 @@ const h = vi.hoisted(() => {
   const servers = { value: [] as StoredRemoteMcpServer[], listeners: new Set<() => void>() };
   const hasLoaded = { value: true };
   const discovered = { value: [] as RemoteMcpServerState[], listeners: new Set<() => void>() };
-  const kilo = { value: { status: 'ready' as const, tools: [{}, {}, {}] } };
+  const kilo: { value: KiloMcpState } = { value: { status: 'ready', tools: [] } };
   const stores = { group, servers, discovered };
   const emit = (which: 'group' | 'servers' | 'discovered') => {
     for (const listener of stores[which].listeners) {
@@ -264,7 +265,7 @@ beforeEach(() => {
   h.servers.value = [];
   h.hasLoaded.value = true;
   h.discovered.value = [];
-  h.kilo.value = { status: 'ready', tools: [{}, {}, {}] };
+  h.kilo.value = { status: 'ready', tools: [] };
   h.mcpEnabledFor.mockResolvedValue(true);
   h.setMcpEnabled.mockResolvedValue(undefined);
   h.retryKiloMcp.mockResolvedValue(undefined);
@@ -361,6 +362,19 @@ describe('the Kilo MCP switch', () => {
     });
 
     expect(h.toastError).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
+  });
+
+  it('names the Kilo Retry, so the platform can drop its busy state when the ask ends', async () => {
+    /* Android writes a busy button's state into the view's content description
+       and only rewrites it when the button has a name to put back, so a Retry
+       with none is read as "busy" for the rest of the screen's life
+       (BaseViewManager.updateViewContentDescription, RN 0.86). */
+    h.kilo.value = { status: 'failed', kind: 'unreachable', retryable: true };
+    await mount();
+
+    expect(required(buttonFor('Retry'), 'Retry').props.accessibilityLabel).toBe(
+      i18n.t('common.retry')
+    );
   });
 });
 

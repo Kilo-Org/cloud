@@ -6424,8 +6424,10 @@ export const cli_sessions_v2 = pgTable(
       table.parent_session_id,
       table.kilo_user_id
     ),
-    // Supports the ON DELETE SET NULL scan when a profile is deleted.
-    index('IDX_cli_sessions_v2_profile_id').on(table.profile_id),
+    // Supports the ON DELETE SET NULL scan when a profile is deleted. Built
+    // concurrently — `cli_sessions_v2` is large, so a plain build blocks writes
+    // for the whole scan, the same reason the `user_*` indexes below do.
+    index('IDX_cli_sessions_v2_profile_id').on(table.profile_id).concurrently(),
     uniqueIndex('UQ_cli_sessions_v2_public_id')
       .on(table.public_id)
       .where(isNotNull(table.public_id)),

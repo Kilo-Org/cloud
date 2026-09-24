@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MIN_AUDITED_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
+import { MIN_TAP_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   COMMENT_ACTIONS_FRAME_DP,
   COMMENT_ACTIONS_HIT_SLOP,
@@ -22,7 +22,7 @@ describe('comment trailing controls tap areas', () => {
   it('keeps the overflow frame at or above the 28dp the size audit measures', () => {
     // h-7 measured 24.5dp on device (NativeWind's rem is 14pt) and was
     // reported as too small to tap.
-    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(MIN_AUDITED_CONTROL_FRAME_DP);
+    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     expect(COMMENT_ACTIONS_VISUAL_DP).toBeLessThan(COMMENT_ACTIONS_FRAME_DP);
   });
 

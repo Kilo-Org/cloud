@@ -271,7 +271,7 @@ describe('session state transitions', () => {
     session.destroy();
   });
 
-  it('unexpected websocket close transitions to idle activity with disconnected status', async () => {
+  it('unexpected websocket close shows reconnecting activity without a terminal error', async () => {
     const { session, states, errors, kilocode } = createSessionWithStateCapture();
 
     session.connect();
@@ -284,9 +284,9 @@ describe('session state transitions', () => {
     const errorMessages = [...errors];
     session.destroy();
 
-    expect(lastState.activity).toEqual({ type: 'idle' });
-    expect(lastState.status).toEqual({ type: 'disconnected' });
-    expect(errorMessages).toContain('Connection to agent lost');
+    expect(lastState.activity).toEqual({ type: 'reconnecting' });
+    expect(lastState.status).toEqual({ type: 'idle' });
+    expect(errorMessages).not.toContain('Connection to agent lost');
   });
 
   it('session.error is suppressed after stopped', async () => {

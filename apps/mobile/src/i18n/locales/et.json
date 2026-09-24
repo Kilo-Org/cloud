@@ -2017,6 +2017,7 @@
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
       "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
+      "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid muuta või eemaldada.",

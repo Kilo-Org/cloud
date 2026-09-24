@@ -2042,6 +2042,7 @@
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives.",
       "couldNotRefresh": "No s'ha pogut actualitzar",
       "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil. Les teves sessions apareixeran aquí.",
+      "viewHistory": "Historial de sessions",
       "noMatches": "Cap sessió coincideix amb la cerca",
       "tryDifferentSearch": "Prova un altre terme de cerca.",
       "tryAdjustFilters": "Prova d'ajustar o esborrar els filtres.",

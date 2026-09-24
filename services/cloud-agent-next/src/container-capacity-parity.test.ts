@@ -116,9 +116,7 @@ describe('production container capacity parity', () => {
           diskBytes: capacity.diskMB * 1_000_000,
         })}',`
       );
-      expect(
-        containerCapacityForService(usageServiceForSandboxClass(identity.className))
-      ).toEqual({
+      expect(containerCapacityForService(usageServiceForSandboxClass(identity.className))).toEqual({
         vcpu: capacity.vcpu,
         memoryBytes: capacity.memoryMiB * 1024 ** 2,
         diskBytes: capacity.diskMB * 1_000_000,

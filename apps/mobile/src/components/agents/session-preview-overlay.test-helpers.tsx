@@ -13,9 +13,9 @@ import {
   type SessionPreviewTarget,
 } from './session-preview-state';
 
-export type TestMessage = { info: { id: string }; parts: readonly never[] };
+type TestMessage = { info: { id: string }; parts: readonly never[] };
 
-export type TranscriptState = {
+type TranscriptState = {
   data: { messages: readonly TestMessage[] } | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -23,7 +23,7 @@ export type TranscriptState = {
   refetch: Mock<() => void>;
 };
 
-export type LiveRowState = {
+type LiveRowState = {
   data:
     | {
         status: string | null;

@@ -20,7 +20,7 @@ import { type SessionPreviewTarget } from './session-preview-state';
  * fields the header shows are named, so the polling query's own result type
  * stays the source.
  */
-export type SessionPreviewLiveRow = {
+type SessionPreviewLiveRow = {
   status: string | null;
   status_updated_at: string | null;
   total_cost_microdollars: number | null;

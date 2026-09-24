@@ -5574,8 +5574,15 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.terminalEvents()).toHaveLength(1);
   });
 
-  it('exhausts a serialized pre-send not_ready prompt refusal at the cap before the head deadline', async () => {
+  it('keeps a persistent serialized pre-send not_ready prompt refusal queued to the head deadline', async () => {
     const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
     let promptAttempts = 0;
     delegateRequest(fixture, 'session.prompt', async () => {
       promptAttempts += 1;
@@ -5586,6 +5593,141 @@ describe('SandboxSession orchestration', () => {
         admission: 'not-admitted',
       });
     });
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const deadlineAt = deadlineAtOf(fixture.record('a'));
+    if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
+    expect(promptFailuresOf(fixture.record('a'))).toBe(0);
+
+    let guard = 0;
+    while (fixture.record('a')?.state.kind === 'queued') {
+      if (++guard > 300) throw new Error('Prompt refusal did not reach the head deadline');
+      expect(promptFailuresOf(fixture.record('a'))).toBe(0);
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+    }
+
+    expect(promptAttempts).toBeGreaterThan(PROMPT_FAILURE_LIMIT);
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'failed', reason: 'preparation_timeout', at: deadlineAt },
+    });
+    expect(fixture.terminalEvents()).toHaveLength(1);
+  });
+
+  it('does not exhaust the cap for unconfirmed not_ready on the first prompt', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    let promptAttempts = 0;
+    delegateRequest(fixture, 'session.prompt', async input => {
+      promptAttempts += 1;
+      if (promptAttempts <= PROMPT_FAILURE_LIMIT) {
+        throw Object.assign(new Error('Sandbox runtime is not ready'), {
+          name: 'ControlRequestError',
+          code: 'not_ready',
+          retryable: true,
+          admission: 'not-admitted',
+        });
+      }
+      const prompt = sessionPromptPayloadSchema.parse(input.payload);
+      return controlResponse({ messageId: prompt.messageId, status: 'accepted' });
+    });
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    for (let attempt = 0; attempt < PROMPT_FAILURE_LIMIT; attempt++) {
+      expect(fixture.record('a')?.state.kind).toBe('queued');
+      expect(promptFailuresOf(fixture.record('a'))).toBe(0);
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+    }
+
+    expect(promptAttempts).toBe(PROMPT_FAILURE_LIMIT + 1);
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+    expect(fixture.terminalEvents()).toHaveLength(0);
+  });
+
+  it('a stuck prompt proof survives an unconfirmed lookup refusal and is accepted when the operation is running', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    let promptAttempts = 0;
+    delegateRequest(fixture, 'session.prompt', async () => {
+      promptAttempts += 1;
+      throw new Error('Wrapper socket closed');
+    });
+    let recovering = false;
+    delegateRequest(fixture, 'session.operation.get', async input => {
+      if (!recovering)
+        throw Object.assign(new Error('Sandbox runtime is not ready'), {
+          name: 'ControlRequestError',
+          code: 'not_ready',
+          retryable: true,
+          admission: 'not-admitted',
+        });
+      return controlResponse({ state: 'running', authorization: input.payload });
+    });
+
+    await fixture.admit('a');
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'queued' } });
+    expect(fixture.record('a')?.proofs?.prompt?.dispatched).toBe(true);
+
+    const firstRetryAt = fixture.alarmAt();
+    if (firstRetryAt === null) throw new Error('Missing queue retry alarm');
+    vi.setSystemTime(firstRetryAt);
+    const firstAlarm = fixture.fireAlarm();
+    await vi.advanceTimersByTimeAsync(1_000);
+    await firstAlarm;
+    await fixture.flush();
+
+    expect(fixture.record('a')?.state.kind).toBe('queued');
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+    expect(fixture.terminalEvents()).toHaveLength(0);
+
+    recovering = true;
+    const secondRetryAt = fixture.alarmAt();
+    if (secondRetryAt === null) throw new Error('Missing queue retry alarm');
+    vi.setSystemTime(secondRetryAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(promptAttempts).toBe(1);
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+    expect(fixture.terminalEvents()).toHaveLength(0);
+  });
+
+  it('exhausts a confirmed pre-send not_ready prompt refusal at the cap before the head deadline', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    delegateRequest(fixture, 'session.prompt', async () =>
+      controlFailure(true, 'not_ready', 'not-admitted')
+    );
 
     await fixture.admit('a');
     await fixture.flush();
@@ -5604,9 +5746,7 @@ describe('SandboxSession orchestration', () => {
         expect(promptFailuresOf(fixture.record('a'))).toBe(attempt);
     }
 
-    expect(promptAttempts).toBe(PROMPT_FAILURE_LIMIT);
     expect(Date.now()).toBeLessThan(deadlineAt);
-    // The terminal union drops the queued prompt failure counter.
     expect(fixture.record('a')).toMatchObject({
       state: { kind: 'failed', reason: 'prompt_exhausted' },
     });
@@ -8159,7 +8299,10 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     const deadlineAt = deadlineAtOf(fixture.record('b'));
     if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
-    expect(promptFailuresOf(fixture.record('b'))).toBe(1);
+    // The refusal never reached the wrapper, so it is a reachability failure,
+    // not a prompt failure: it retries without consuming the budget, and stays
+    // message-scoped so the accepted sibling survives.
+    expect(promptFailuresOf(fixture.record('b'))).toBe(0);
     expect(fixture.record('b')?.state).toMatchObject({
       kind: 'queued',
       deliveryRetryScope: 'message',
@@ -8174,9 +8317,22 @@ describe('SandboxSession orchestration', () => {
     }
 
     expect(promptAttempts).toBe(PROMPT_FAILURE_LIMIT);
-    expect(Date.now()).toBeLessThan(deadlineAt);
+    expect(promptFailuresOf(fixture.record('b'))).toBe(0);
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+
+    let guard = 0;
+    while (fixture.record('b')?.state.kind === 'queued') {
+      if (++guard > 300) throw new Error('Refusal did not reach the head deadline');
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+    }
+
+    expect(Date.now()).toBe(deadlineAt);
     expect(fixture.record('b')).toMatchObject({
-      state: { kind: 'failed', reason: 'prompt_exhausted' },
+      state: { kind: 'failed', reason: 'preparation_timeout' },
     });
     expect(fixture.record('a')?.state.kind).toBe('accepted');
   });

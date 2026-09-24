@@ -16,7 +16,7 @@ cloud-agent-next refactor.
    For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
    The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
    `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
-   `interrupt-then-continue`, `question-idle-resume`, and the four `sandboxFaults`
+   `interrupt-then-continue`, `question-idle-resume`, and the five `sandboxFaults`
    scenarios) additionally
    require `WORKTREE_CREATION_ENABLED_IDS`; use the seeded enrolled user
    (`E2E_USER_EMAIL`) rather than a fresh per-run user.
@@ -146,6 +146,7 @@ tsx services/cloud-agent-next/test/e2e/run.ts hot echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts external-kill echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts kill-mid-flight hang
 tsx services/cloud-agent-next/test/e2e/run.ts wrapper-freeze-settled-reap _
+tsx services/cloud-agent-next/test/e2e/run.ts control-socket-recycle-boot _
 tsx services/cloud-agent-next/test/e2e/run.ts question-idle-resume _
 
 # Queue semantics — the hold is a bounded `slow:60:1000:16` turn (no parked
@@ -184,7 +185,8 @@ Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
 `worktree-multi-chat`, `long-conversation`, `leave-and-return`, `large-stream`,
 `concurrent-chats`, `question-idle-resume`) and the `sandboxFaults` scenarios
 (`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
-`wrapper-freeze-inflight-reap`) are included in `smoke.ts`'s `DEFAULT_MATRIX`:
+`wrapper-freeze-inflight-reap`, `control-socket-recycle-boot`) are included in
+`smoke.ts`'s `DEFAULT_MATRIX`:
 the worktree flows need an enrolled driver user, and the fault flows stop or
 freeze a real container, so they run last. They stay name-runnable
 (`run.ts <name> _`) for focused runs; `smoke-deployed` runs the shared
@@ -351,12 +353,13 @@ Capabilities a scenario declares but a profile does not provide make it
 `unsupported`: the run reports `ok: false, unsupported: true` with the missing
 capability names, and it never runs with the assertion dropped. `auth-reject`
 requires `deployedHttpAuthBoundary`, so it is `unsupported` under the local
-profile; the four `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
-`wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`) are `unsupported`
+profile; the five `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
+`wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`,
+`control-socket-recycle-boot`) are `unsupported`
 deployed, and `kill-mid-flight` also needs the local-only `gates` marker.
 Only `cold-hot` and `unknown-model` declare no capability. Every other scenario
 that runs under both declares `sessionSandbox`, which both profiles provide;
-`auth-reject` and the four `sandboxFaults` scenarios are the exceptions named
+`auth-reject` and the five `sandboxFaults` scenarios are the exceptions named
 above. Container identity stays a capability-gated assertion.
 
 Scenario matrix:
@@ -556,7 +559,7 @@ Honest caveat: `cold-hot` proves the warm dispatch path, not physical
 container identity. The absence of hot-turn preparation events is not proof that
 the same container served the turns; identity stays a local-only assertion.
 
-The four `sandboxFaults` scenarios' deployed statements are inference, not
+The five `sandboxFaults` scenarios' deployed statements are inference, not
 proof: the deployed matrix was not run for this change. The single workflow job's
 `timeout-minutes: 180` is an operational ceiling, not a certified or
 registry-derived bound; the scenarios mix per-turn and overall budgets, so no
@@ -690,6 +693,7 @@ reusable catalog of planned and existing scenarios, see
 | `kill-mid-flight` | Kills the identity-matched owned container while a parked `gate:<tag>` turn runs; requires a durable failure and a follow-up on a distinct allocation. Needs `gates` + `sandboxFaults`. |
 | `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `health_unhealthy_unresponsive` `allocation_transition` into `stopping.destroying`, a terminal `native_stop`, the heartbeat-expiry recovery start, no re-ready wrapper — plus a distinct replacement. |
 | `wrapper-freeze-inflight-reap` | Freezes the identity-matched control-wrapper process while a paced turn is held; requires the held message to terminalise `runtime_unhealthy`, an identity-matched `accepted_reconciliation` and still-active route, the settled-reap stop evidence, and a distinct replacement. |
+| `control-socket-recycle-boot` | Drops the identity-matched control wrapper's control socket during the first attach (`SIGUSR1`) and requires, from a cursor captured immediately before the signal, `socket_closed` (this attach connection, handshake complete) → `handshake_committed` (a new connection) → `wrapper_ready` (that connection) with the same wrapper identity. The initial turn must complete with the echo intact and exactly one prompt dispatch; a no-op signal fails. |
 | `queue-while-busy` | Hold a bounded `slow:60:1000:16` turn, enqueue two echoes, and assert FIFO delivery through `cloud.message.*` events as the hold completes. |
 | `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |
 | `queue-overflow` | Hold a paced turn and fill the pending queue until enqueue fails with HTTP 429, then drain. |

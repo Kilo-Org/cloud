@@ -20,6 +20,9 @@ export type RestoreIncompleteReport = {
 /** Paths listed in `message`/`paths` before the remainder is summarised. */
 const MAX_REPORTED_PATHS = 50;
 
+/** Longest snapshot path rendered into the rules note before it is elided. */
+const MAX_RENDERED_PATH_LENGTH = 200;
+
 const RESTORE_SKIP_REASON_WORDS: Record<string, string> = {
   patch_apply_failed: 'the patch did not apply',
   outside_workspace: 'the path is outside the workspace',
@@ -32,6 +35,39 @@ const RESTORE_SKIP_REASON_WORDS: Record<string, string> = {
 /** Human-readable wording for a skip reason; unknown reasons pass through verbatim. */
 function describeReason(reason: string): string {
   return RESTORE_SKIP_REASON_WORDS[reason] ?? reason;
+}
+
+/** Characters that could open Markdown structure or raw HTML inside the note. */
+const MARKDOWN_SYNTAX_CHARS = new Set(['\\', '`', '*', '_', '[', ']', '<', '>', '&', '~', '|']);
+
+/** True for a control character or Unicode line separator, which must never reach the note. */
+function isControlOrLineSeparator(code: number): boolean {
+  return code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+}
+
+/**
+ * Render one snapshot path as data rather than as Markdown. The rules note is
+ * read as agent instructions and a path arrives from the restored snapshot, so
+ * a path carrying a line break or Markdown syntax must not be able to add a
+ * bullet, a section, or an instruction. Line and control characters become
+ * visible `\uXXXX` escapes (never a line break), Markdown syntax is
+ * backslash-escaped, and the path is capped before insertion.
+ */
+function renderPathAsData(file: string): string {
+  const bounded =
+    file.length > MAX_RENDERED_PATH_LENGTH ? `${file.slice(0, MAX_RENDERED_PATH_LENGTH)}…` : file;
+  let rendered = '';
+  for (const char of bounded) {
+    const code = char.codePointAt(0) ?? 0;
+    if (isControlOrLineSeparator(code)) {
+      rendered += `\\u${code.toString(16).padStart(4, '0')}`;
+    } else if (MARKDOWN_SYNTAX_CHARS.has(char)) {
+      rendered += `\\${char}`;
+    } else {
+      rendered += char;
+    }
+  }
+  return rendered;
 }
 
 /**
@@ -105,7 +141,7 @@ export function buildRestoreIncompleteRules(report: RestoreIncompleteReport): st
     lines.push(
       '',
       'Affected paths:',
-      ...report.paths.map(file => `- ${file}`),
+      ...report.paths.map(file => `- ${renderPathAsData(file)}`),
       // The report caps the list; without the remainder an agent could read the
       // listed paths as the whole set.
       ...(report.omittedPaths > 0 ? [`- and ${report.omittedPaths} more`] : [])

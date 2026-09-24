@@ -18,23 +18,48 @@ import {
  * null) or one organization they belong to. The same person can connect the
  * same ChatGPT subscription to several accounts by connecting each separately,
  * so the owner is the `(kiloUserId, organizationId)` pair.
+ *
+ * One row per organization can also be the organization's shared-services
+ * connection: it is connected by an organization owner, it is what the
+ * platform's own callers use, and it belongs to no member.
  */
 
-/** The account a connection belongs to. */
-export type OpenAiChatGptOwner = {
-  kiloUserId: string;
-  organizationId: string | null;
-};
+/**
+ * The account a connection belongs to. A member connection is the
+ * `(kiloUserId, organizationId)` pair. The organization's shared-services
+ * connection is its own single row, and no read depends on the person who
+ * connected it.
+ */
+export type OpenAiChatGptOwner =
+  | { kiloUserId: string; organizationId: string | null; scope?: undefined }
+  | { kiloUserId?: undefined; organizationId: string; scope: 'shared_services' };
+
+/**
+ * The organization's shared-services connection. It is the connection the
+ * platform's own callers (code reviewer, Slack bot, auto-triage) use instead of
+ * a member's personal connection.
+ */
+export function openAiChatGptSharedServicesOwner(organizationId: string): OpenAiChatGptOwner {
+  return { organizationId, scope: 'shared_services' };
+}
 
 /** Stable identity for per-owner state such as the in-flight refresh map. */
 export function openAiChatGptOwnerKey(owner: OpenAiChatGptOwner): string {
+  if (owner.scope === 'shared_services') return `shared-services:${owner.organizationId}`;
   return `${owner.kiloUserId}:${owner.organizationId ?? 'personal'}`;
 }
 
 /** Matches the owner's row for reads, updates and deletes. */
 export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL | undefined {
+  if (owner.scope === 'shared_services') {
+    return and(
+      eq(openai_chatgpt_connections.organization_id, owner.organizationId),
+      eq(openai_chatgpt_connections.is_shared_services, true)
+    );
+  }
   return and(
     eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId),
+    eq(openai_chatgpt_connections.is_shared_services, false),
     owner.organizationId === null
       ? isNull(openai_chatgpt_connections.organization_id)
       : eq(openai_chatgpt_connections.organization_id, owner.organizationId)
@@ -127,9 +152,12 @@ export async function saveOpenAiChatGptConnection(
     error_at: undefined,
   };
   const encrypted_connection = encryptApiKey(JSON.stringify(stored), BYOK_ENCRYPTION_KEY);
+  // The shared-services row records the connecting person in `kilo_user_id`; its
+  // reads never match on that column.
   const values = {
-    kilo_user_id: owner.kiloUserId,
+    kilo_user_id: owner.scope === 'shared_services' ? createdBy : owner.kiloUserId,
     organization_id: owner.organizationId,
+    is_shared_services: owner.scope === 'shared_services',
     encrypted_connection,
     is_enabled: true,
     created_by: createdBy,
@@ -137,18 +165,31 @@ export async function saveOpenAiChatGptConnection(
     usage_limit_resets_at: null,
   };
 
+  // Each owner shape upserts through its own partial unique index.
+  const conflict =
+    owner.scope === 'shared_services'
+      ? {
+          target: [openai_chatgpt_connections.organization_id],
+          targetWhere: sql`${openai_chatgpt_connections.is_shared_services} = true`,
+        }
+      : owner.organizationId === null
+        ? {
+            target: [openai_chatgpt_connections.kilo_user_id],
+            targetWhere: sql`${openai_chatgpt_connections.organization_id} IS NULL`,
+          }
+        : {
+            target: [
+              openai_chatgpt_connections.kilo_user_id,
+              openai_chatgpt_connections.organization_id,
+            ],
+            targetWhere: sql`${openai_chatgpt_connections.organization_id} IS NOT NULL AND ${openai_chatgpt_connections.is_shared_services} = false`,
+          };
+
   await db
     .insert(openai_chatgpt_connections)
     .values(values)
     .onConflictDoUpdate({
-      target:
-        owner.organizationId === null
-          ? [openai_chatgpt_connections.kilo_user_id]
-          : [openai_chatgpt_connections.kilo_user_id, openai_chatgpt_connections.organization_id],
-      targetWhere:
-        owner.organizationId === null
-          ? sql`${openai_chatgpt_connections.organization_id} IS NULL`
-          : sql`${openai_chatgpt_connections.organization_id} IS NOT NULL`,
+      ...conflict,
       set: {
         encrypted_connection,
         is_enabled: true,
@@ -156,6 +197,20 @@ export async function saveOpenAiChatGptConnection(
         usage_limit_resets_at: null,
       },
     });
+}
+
+/**
+ * True when the organization has a stored shared-services connection. The
+ * usage-limit write uses it to record on the row that served the request.
+ */
+export async function hasOpenAiChatGptSharedServicesConnection(
+  organizationId: string
+): Promise<boolean> {
+  const row = await readOpenAiChatGptConnectionRow(
+    db,
+    openAiChatGptSharedServicesOwner(organizationId)
+  );
+  return row !== null;
 }
 
 /** Deletes the owner's stored connection. */

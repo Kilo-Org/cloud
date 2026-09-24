@@ -7064,6 +7064,13 @@ export const openai_chatgpt_connections = pgTable(
     encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
     is_enabled: boolean().default(true).notNull(),
     /**
+     * True for the organization's shared-services connection: one row per
+     * organization, used by the platform's own callers (code reviewer, Slack
+     * bot, auto-triage) instead of any member's personal connection. The
+     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     */
+    is_shared_services: boolean().default(false).notNull(),
+    /**
      * The last time OpenAI answered a delegated request with a plan usage
      * limit. The gateway writes it and clears it on the next success. It is
      * request state, not credential state, so it stays out of the encrypted
@@ -7085,7 +7092,10 @@ export const openai_chatgpt_connections = pgTable(
       .where(sql`${table.organization_id} IS NULL`),
     uniqueIndex('UQ_openai_chatgpt_connections_org_member')
       .on(table.kilo_user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.is_shared_services} = false`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.is_shared_services} = true`),
     index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
   ]
 );

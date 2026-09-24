@@ -1,5 +1,9 @@
 jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn(),
+  openAiChatGptSharedServicesOwner: (organizationId: string) => ({
+    organizationId,
+    scope: 'shared_services',
+  }),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
@@ -631,5 +635,84 @@ describe('OPENAI_CHATGPT_API_URL', () => {
     process.env.OPENAI_CHATGPT_API_URL = ' http://localhost:8099/v1/ ';
 
     expect(loadApiUrl()).toBe('http://localhost:8099/v1');
+  });
+});
+
+describe('shared-services routing', () => {
+  const SHARED_OWNER: OpenAiChatGptOwner = { organizationId: ORG_ID, scope: 'shared_services' };
+
+  it('serves a service request from the organization shared-services connection', async () => {
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('falls back to the caller own connection when the organization has no shared connection', async () => {
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockImplementation(async owner =>
+        owner.scope === 'shared_services'
+          ? null
+          : { connection: connectedConnection(), isEnabled: true }
+      );
+
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+  });
+
+  it('falls back to the caller own connection when the shared connection is disabled', async () => {
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockImplementation(async owner =>
+        owner.scope === 'shared_services'
+          ? { connection: connectedConnection(), isEnabled: false }
+          : { connection: connectedConnection(), isEnabled: true }
+      );
+
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+  });
+
+  it('fails readably when the shared connection credential is terminally dead', async () => {
+    jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue(
+      { kind: 'terminal' } as Awaited<ReturnType<typeof resolveOpenAiChatGptAccessToken>>
+    );
+
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))
+    ).resolves.toEqual({
+      kind: 'reconnect',
+      message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+    });
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('keeps a member request on the member connection', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }));
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('ignores a bot id without an organization', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput({ botId: 'reviewer' }));
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
   });
 });

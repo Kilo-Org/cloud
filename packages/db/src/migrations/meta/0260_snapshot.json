@@ -1,5 +1,5 @@
 {
-  "id": "6ca47e44-3467-4143-adb7-4c3b86f4a782",
+  "id": "adc73c7e-db5a-4e87-a12a-8f284642467f",
   "prevId": "e57d892c-ce1d-420e-b533-46f38968a755",
   "version": "7",
   "dialect": "postgresql",
@@ -27482,6 +27482,13 @@
           "notNull": true,
           "default": true
         },
+        "is_shared_services": {
+          "name": "is_shared_services",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "usage_limit_reached_at": {
           "name": "usage_limit_reached_at",
           "type": "timestamp with time zone",
@@ -27549,7 +27556,23 @@
             }
           ],
           "isUnique": true,
-          "where": "\"openai_chatgpt_connections\".\"organization_id\" IS NOT NULL",
+          "where": "\"openai_chatgpt_connections\".\"organization_id\" IS NOT NULL AND \"openai_chatgpt_connections\".\"is_shared_services\" = false",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_openai_chatgpt_connections_org_shared_services": {
+          "name": "UQ_openai_chatgpt_connections_org_shared_services",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"openai_chatgpt_connections\".\"is_shared_services\" = true",
           "concurrently": false,
           "method": "btree",
           "with": {}

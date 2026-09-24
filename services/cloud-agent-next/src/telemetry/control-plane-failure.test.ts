@@ -25,6 +25,7 @@ const cases: ReadonlyArray<
   ['prompt_exhausted', 'pre_dispatch', 'failed', 'pre_dispatch', 'invalid_delivery_request'],
   ['environment_failed', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
   ['environment_failed', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
+  ['launch_failed', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   ['provider_unknown', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
   ['provider_unknown', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   ['runtime_unhealthy', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],

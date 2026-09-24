@@ -149,10 +149,11 @@ export type OwnedSessionRegistry = {
    * before delegating to any pre-existing handler, so a create that registers a
    * session and then throws still leaves the id owned by this scenario.
    *
-   * Only `startSession` invokes that hook. `prepareBrowserSession` and
-   * `createWorktreeChat` never do, so a runner that uses either must call
-   * `register()` with the returned session immediately after the create
-   * resolves, before any assertion; dropping it leaks the worktree session.
+   * `startSession` invokes that hook, and so do `prepareBrowserSession` and
+   * `createWorktreeChat` on success. An id from either create helper is
+   * therefore owned even if a later assertion throws; the caller still calls
+   * `register()` to attach the `kiloSessionId` (a repeat registration only fills
+   * an undefined `kiloSessionId`).
    */
   config: DriverConfig;
   /**

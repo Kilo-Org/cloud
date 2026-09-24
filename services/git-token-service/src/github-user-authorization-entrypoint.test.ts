@@ -184,7 +184,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       githubToken: 'user-token',
     });
     expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
-    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params, 'managed');
     expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
       params.expectedIntegrationId,
       'acme'

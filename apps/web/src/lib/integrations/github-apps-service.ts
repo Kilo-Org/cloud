@@ -194,7 +194,8 @@ export async function listRepositories(
     const repos = await fetchGitHubRepositories(
       integration.platform_installation_id,
       appType,
-      integration.id
+      integration.id,
+      'management'
     );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
@@ -256,7 +257,8 @@ export async function cancelPendingInstallation(owner: Owner, integrationId?: st
 export async function listBranches(
   owner: Owner,
   integrationId: string,
-  repositoryFullName: string
+  repositoryFullName: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ) {
   const ownershipCondition =
     owner.type === 'user'
@@ -294,7 +296,8 @@ export async function listBranches(
     integration.platform_installation_id,
     repositoryFullName,
     appType,
-    integration.id
+    integration.id,
+    purpose
   );
 
   return { branches };

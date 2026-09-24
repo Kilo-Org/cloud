@@ -27,6 +27,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
+import { STABLE_ROOT_IDLE_MS } from '../lifecycle.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { runAutoCommit, type AutoCommitResult } from '../auto-commit.js';
 import { withTimeoutAndAbort } from '../utils.js';
@@ -136,8 +137,30 @@ type PublicationScope = Readonly<{
   claim?: symbol;
 }>;
 
+type AdmittedFollowUp = {
+  readonly request: SessionPromptPayload;
+  readonly runtime: WorktreeKiloRuntime;
+  readonly authorization?: SessionOperationAuthorization;
+};
+
+function authorizationKey(authorization: SessionOperationAuthorization): string {
+  return JSON.stringify([
+    authorization.session.sessionId,
+    authorization.operation,
+    authorization.operationId,
+  ]);
+}
+
 function fail(message: string, retryable: boolean): ControlHandlerResult {
   return { ok: false, error: { code: 'not_ready', message, retryable } };
+}
+
+function rootStatusType(properties: unknown): string | undefined {
+  if (typeof properties !== 'object' || properties === null) return undefined;
+  const status = (properties as { status?: unknown }).status;
+  if (typeof status !== 'object' || status === null) return undefined;
+  const type = (status as { type?: unknown }).type;
+  return typeof type === 'string' ? type : undefined;
 }
 
 function kiloFailure(error: unknown): ControlHandlerResult {
@@ -174,7 +197,17 @@ export class SessionOperation {
   private readonly retainedNotifications = createRetainedOperationNotifications();
   private outcome?: SessionMessageOutcome;
   private local?: { result: ControlHandlerResult; completedAt: number };
-  private delivery?: OperationResultDelivery;
+  private readonly deliveries = new Map<string, OperationResultDelivery>();
+  private readonly admitted = new Map<string, AdmittedFollowUp>();
+  private batchRevision = 0;
+  private sealedRevision = -1;
+  private admissionInFlight = 0;
+  private rootIdle = false;
+  private stableIdleTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly sealWaiters: Array<{
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }> = [];
   private readonly cleanupOwner: SessionOperationCleanup;
   private deadlineCleanup?: Promise<boolean>;
   private publicationScoped?: PublicationScope;
@@ -362,46 +395,258 @@ export class SessionOperation {
       local: this.local ? structuredClone(this.local) : undefined,
       cleanup: this.cleanupOwner.cleanupState,
       cleanupDeadlineAt: this.cleanupOwner.cleanupDeadline,
-      delivery: this.delivery?.snapshot(),
+      cleanupEvidence: this.cleanupEvidence(),
+      delivery: this.primaryDelivery()?.snapshot(),
     };
   }
 
-  deliveryResult(): SessionOperationDelivery | undefined {
-    return this.delivery?.result();
+  deliveryResult(
+    authorization?: SessionOperationAuthorization
+  ): SessionOperationDelivery | undefined {
+    if (authorization) return this.deliveries.get(authorizationKey(authorization))?.result();
+    return this.primaryDelivery()?.result();
+  }
+
+  /**
+   * Resolve the delivery for a matched admitted message id, so a follow-up-targeted
+   * abort reports that follow-up's result instead of the primary prompt's. An
+   * unknown id falls back to the primary delivery.
+   */
+  deliveryResultForMessage(messageId: string | undefined): SessionOperationDelivery | undefined {
+    const admitted = messageId === undefined ? undefined : this.admitted.get(messageId);
+    return this.deliveryResult(admitted?.authorization);
+  }
+
+  private primaryDelivery(): OperationResultDelivery | undefined {
+    return this.authorization
+      ? this.deliveries.get(authorizationKey(this.authorization))
+      : this.deliveries.values().next().value;
   }
 
   waitForDelivery(): Promise<void> {
-    return this.delivery?.drain() ?? Promise.resolve();
+    return Promise.all([...this.deliveries.values()].map(delivery => delivery.drain())).then(
+      () => undefined
+    );
   }
 
   releaseProcessOwnership(): boolean {
     return this.processes.dispose();
   }
 
+  /**
+   * Match the authorization of the admitted entry being queried: the original
+   * prompt or any follow-up admitted on this operation. Identity stays strict per
+   * entry, so a follow-up `session.operation.get` or replay resolves here.
+   */
   matchesAuthorization(authorization: SessionOperationAuthorization): boolean {
-    return (
-      this.authorization !== undefined && sameSessionOperation(this.authorization, authorization)
-    );
+    if (this.authorization && sameSessionOperation(this.authorization, authorization)) return true;
+    for (const entry of this.admitted.values()) {
+      if (entry.authorization && sameSessionOperation(entry.authorization, authorization))
+        return true;
+    }
+    return false;
   }
 
-  matchesIntent(payload: unknown): boolean {
-    return isDeepStrictEqual(this.intent, operationIntent(this.work.operation, payload));
+  matchesIntent(payload: unknown, authorization?: SessionOperationAuthorization): boolean {
+    const intent = operationIntent(this.work.operation, payload);
+    if (authorization) {
+      for (const entry of this.admitted.values()) {
+        if (entry.authorization && sameSessionOperation(entry.authorization, authorization))
+          return isDeepStrictEqual(operationIntent('session.prompt', entry.request), intent);
+      }
+    }
+    return isDeepStrictEqual(this.intent, intent);
+  }
+
+  admittedMessageIds(): string[] {
+    return [...(this.messageId === undefined ? [] : [this.messageId]), ...this.admitted.keys()];
+  }
+
+  private lastAdmittedMessageId(): string | undefined {
+    const ids = this.admittedMessageIds();
+    return ids.at(-1);
+  }
+
+  /**
+   * Admit a follow-up on the running operation. The prompt is submitted with
+   * `sendPromptAsync`, so the running turn is never interrupted and no second
+   * operation or blocking `sendPrompt` is created.
+   */
+  admitFollowUp(
+    request: SessionPromptPayload,
+    runtime: WorktreeKiloRuntime,
+    authorization?: SessionOperationAuthorization
+  ): ControlHandlerResult {
+    if (this.local || this.phase === 'preparation')
+      return fail('Operation is not accepting follow-ups', true);
+    if (this.signal.aborted) return fail('Operation is aborted', true);
+    if (this.messageId === request.messageId || this.admitted.has(request.messageId))
+      return { ok: true, result: { messageId: request.messageId, status: 'existing' } };
+    if (this.target?.client !== runtime.kiloClient) return fail('Kilo runtime changed', true);
+    this.admitted.set(request.messageId, { request, runtime, authorization });
+    this.batchRevision += 1;
+    this.rootIdle = false;
+    this.clearStableIdle();
+    this.admissionInFlight += 1;
+    void this.submitFollowUp(request, runtime).finally(() => {
+      this.admissionInFlight -= 1;
+      if (this.admissionInFlight === 0) this.restartStableIdle();
+    });
+    return {
+      ok: true,
+      result: {
+        messageId: request.messageId,
+        status: 'accepted',
+        ...(authorization ? { executionDeadlineAt: this.executionDeadlineAt } : {}),
+      },
+    };
+  }
+
+  observeRootEvent(event: {
+    type: string;
+    sessionID?: string;
+    rootKiloSessionId?: string;
+    properties?: unknown;
+  }): void {
+    if (this.phase === 'preparation' || this.local) return;
+    if (
+      event.rootKiloSessionId !== undefined &&
+      event.rootKiloSessionId !== this.session.kiloSessionId
+    )
+      return;
+    if (event.sessionID !== undefined && event.sessionID !== this.session.kiloSessionId) return;
+    if (event.type === 'session.idle') {
+      this.rootIdle = true;
+      this.restartStableIdle();
+      return;
+    }
+    // Only the root going busy again drops a started seal. `session.turn.close`
+    // and other events follow an idle and must not cancel it, or no later idle
+    // would ever seal the batch.
+    const statusType = rootStatusType(event.properties);
+    if (event.type === 'session.status' && statusType !== undefined && statusType !== 'idle') {
+      this.rootIdle = false;
+      this.clearStableIdle();
+    }
+  }
+
+  private async submitFollowUp(
+    request: SessionPromptPayload,
+    runtime: WorktreeKiloRuntime
+  ): Promise<void> {
+    try {
+      if (request.turn.type !== 'prompt') throw new Error('Unsupported follow-up turn');
+      if (request.agent.model === undefined) throw new Error('Prompt model is required');
+      const materialize =
+        this.work.operation === 'session.prompt'
+          ? (this.work.materializeAttachments ?? materializeMessageAttachments)
+          : materializeMessageAttachments;
+      const message = await materialize(
+        {
+          id: request.messageId,
+          prompt: request.turn.prompt,
+          parts: request.turn.parts,
+          attachments: request.attachments,
+        },
+        { signal: this.signal }
+      );
+      await runtime.kiloClient.sendPromptAsync({
+        sessionId: this.session.kiloSessionId,
+        directory: this.session.directory,
+        signal: this.signal,
+        messageId: request.messageId,
+        agent: request.agent.mode,
+        ...(request.agent.variant ? { variant: request.agent.variant } : {}),
+        prompt: message.prompt,
+        ...(message.parts ? { parts: message.parts } : {}),
+        model: { providerID: 'kilo', modelID: request.agent.model },
+      });
+    } catch (error) {
+      this.recordUncertainty(error);
+      this.cancel('Follow-up prompt submission failed', 'failed');
+    }
+  }
+
+  /**
+   * Arm the 3s stable-idle timer only while root idle holds and no admission is
+   * in flight. A batch starts unsealed, so this is the only path that can seal.
+   */
+  private armStableIdle(): void {
+    if (this.local || this.stableIdleTimer) return;
+    if (!this.rootIdle || this.admissionInFlight > 0) return;
+    if (this.sealedRevision >= this.batchRevision) return;
+    this.stableIdleTimer = setTimeout(() => this.trySeal(), STABLE_ROOT_IDLE_MS);
+    this.stableIdleTimer.unref?.();
+  }
+
+  private restartStableIdle(): void {
+    this.clearStableIdle();
+    this.armStableIdle();
+  }
+
+  private clearStableIdle(): void {
+    if (!this.stableIdleTimer) return;
+    clearTimeout(this.stableIdleTimer);
+    this.stableIdleTimer = null;
+  }
+
+  private trySeal(): void {
+    this.stableIdleTimer = null;
+    if (this.sealedRevision >= this.batchRevision) return;
+    if (!this.rootIdle || this.admissionInFlight > 0) return;
+    this.sealedRevision = this.batchRevision;
+    for (const waiter of this.sealWaiters.splice(0)) waiter.resolve();
+  }
+
+  /**
+   * Wait for a real stable-idle seal. The batch starts unsealed, so the initial
+   * equal revisions are never a seal. Reject on abort or the execution deadline
+   * so a cancelled batch still runs cleanup and terminal delivery.
+   */
+  private waitForSeal(): Promise<void> {
+    if (this.sealedRevision >= this.batchRevision) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const onAbort = () => {
+        this.signal.removeEventListener('abort', onAbort);
+        reject(this.signal.reason);
+      };
+      const waiter = {
+        resolve: () => {
+          this.signal.removeEventListener('abort', onAbort);
+          resolve();
+        },
+        reject: (error: unknown) => {
+          this.signal.removeEventListener('abort', onAbort);
+          reject(error);
+        },
+      };
+      if (this.signal.aborted) {
+        waiter.reject(this.signal.reason);
+        return;
+      }
+      this.signal.addEventListener('abort', onAbort, { once: true });
+      this.sealWaiters.push(waiter);
+    });
   }
 
   canPrune(now: number): boolean {
-    const delivery = this.delivery?.status();
-    return (
-      this.authorization !== undefined &&
-      this.local !== undefined &&
-      this.native.state !== 'pending' &&
-      this.native.state !== 'unknown' &&
-      delivery?.state === 'acknowledged' &&
-      now >= Math.max(this.authorization.dispatchDeadlineAt, delivery.deadlineAt)
-    );
+    if (this.local === undefined) return false;
+    if (this.native.state === 'pending' || this.native.state === 'unknown') return false;
+    if (this.deliveries.size === 0) return false;
+    // A follow-up can retain this operation under its own authorization even when
+    // the primary operation had none; every delivery still carries its deadline.
+    let deadlineAt = this.authorization?.dispatchDeadlineAt ?? 0;
+    for (const delivery of this.deliveries.values()) {
+      const status = delivery.status();
+      if (status.state !== 'acknowledged') return false;
+      deadlineAt = Math.max(deadlineAt, status.deadlineAt);
+    }
+    return now >= deadlineAt;
   }
 
-  acknowledge(ack: SessionOperationAck, isCurrent: () => boolean): Promise<boolean> {
-    return this.delivery?.acknowledge(ack, isCurrent) ?? Promise.resolve(false);
+  async acknowledge(ack: SessionOperationAck, isCurrent: () => boolean): Promise<boolean> {
+    const delivery = this.deliveries.get(authorizationKey(ack.authorization));
+    return delivery ? delivery.acknowledge(ack, isCurrent) : false;
   }
 
   cancel(reason: string, status: 'failed' | 'cancelled', cleanupDeadlineAt?: number): void {
@@ -499,6 +744,13 @@ export class SessionOperation {
   }
 
   private cleanupEvidence(): NativeCleanupEvidence {
+    if (
+      this.admissionInFlight > 0 ||
+      (this.admitted.size > 0 &&
+        this.work.operation !== 'session.attach' &&
+        this.sealedRevision < this.batchRevision)
+    )
+      return 'unconfirmed';
     if (this.native.state === 'not_started')
       return this.local === undefined ? 'unconfirmed' : 'not_issued';
     if (this.native.state !== 'completed') return 'unconfirmed';
@@ -775,46 +1027,78 @@ export class SessionOperation {
       }
       assertCurrent();
       const error = completion?.info.error;
+      if (this.admitted.size > 0 || this.admissionInFlight > 0) {
+        if (error) {
+          // A terminal native error must still stop the unfinished follow-up
+          // work before the operation is released. Unconfirmed cleanup must not
+          // release the operation as if Kilo stopped, so apply the same
+          // retirement policy as the failure path.
+          const cleanupDeadlineAt = this.captureCleanupDeadline();
+          const cleanupConfirmed = await this.cleanupOwnedWork(cleanupDeadlineAt);
+          if (!cleanupConfirmed && !this.deadlineCleanup)
+            this.requestRetirement('Kilo cancellation was not confirmed', cleanupDeadlineAt);
+        } else {
+          // A follow-up admitted while the first prompt ran is part of this
+          // batch: do not finalize until the batch seals on root idle plus
+          // stable idle.
+          await this.waitForSeal();
+          assertCurrent();
+        }
+      }
       if (
         !error &&
         (request.finalization?.autoCommit || request.finalization?.condenseOnComplete)
       ) {
         this.phase = 'finalizing';
         diagnostic('finalization_started');
-        if (request.finalization.autoCommit) {
-          failureReason = 'Auto-commit failed';
-          assertCurrent();
-          diagnostic('autocommit_started');
-          this.finalization.autoCommit = { state: 'running' };
-          const committed = await (work.runAutoCommit ?? runAutoCommit)({
-            workspacePath: session.directory,
-            kiloClient,
-            env,
-            messageId: completion?.info.id ?? messageId,
-            userMessageId: messageId,
-            signal,
-            onEvent: event => this.emitFinalizationEvent(event),
-          });
-          this.finalization.autoCommit = { state: 'completed', result: structuredClone(committed) };
-          assertCurrent();
-          if (!committed.success) throw new Error('Auto-commit failed');
-          diagnostic('autocommit_completed');
-        }
-        if (request.finalization.condenseOnComplete) {
-          failureReason = 'Context condensation failed';
-          const model = agent.model
-            ? { providerID: 'kilo', modelID: agent.model }
-            : completion
-              ? { providerID: completion.info.providerID, modelID: completion.info.modelID }
-              : undefined;
-          if (!model) throw new Error('Model is required for condensation');
-          emitStatus('Condensing context...');
-          assertCurrent();
-          diagnostic('condense_started');
-          await this.summarize(kiloClient, model, true);
-          diagnostic('condense_completed');
-          signal.throwIfAborted();
-          emitStatus('Context condensed successfully');
+        // A sealed set is finalized once. The sealed revision is read after the
+        // wait, so a follow-up admitted during the wait is included in the same
+        // set; a follow-up admitted while a commit runs enlarges the set and
+        // forces one more sealed pass.
+        while (true) {
+          await this.waitForSeal();
+          const revision = this.batchRevision;
+          if (request.finalization?.autoCommit) {
+            failureReason = 'Auto-commit failed';
+            assertCurrent();
+            diagnostic('autocommit_started');
+            this.finalization.autoCommit = { state: 'running' };
+            const committed = await (work.runAutoCommit ?? runAutoCommit)({
+              workspacePath: session.directory,
+              kiloClient,
+              env,
+              messageId: completion?.info.id ?? messageId,
+              userMessageId: this.lastAdmittedMessageId(),
+              signal,
+              onEvent: event => this.emitFinalizationEvent(event),
+            });
+            this.finalization.autoCommit = {
+              state: 'completed',
+              result: structuredClone(committed),
+            };
+            assertCurrent();
+            if (!committed.success) throw new Error('Auto-commit failed');
+            diagnostic('autocommit_completed');
+          }
+          if (this.batchRevision !== revision) continue;
+          if (request.finalization?.condenseOnComplete) {
+            failureReason = 'Context condensation failed';
+            const model = agent.model
+              ? { providerID: 'kilo', modelID: agent.model }
+              : completion
+                ? { providerID: completion.info.providerID, modelID: completion.info.modelID }
+                : undefined;
+            if (!model) throw new Error('Model is required for condensation');
+            emitStatus('Condensing context...');
+            assertCurrent();
+            diagnostic('condense_started');
+            await this.summarize(kiloClient, model, true);
+            diagnostic('condense_completed');
+            signal.throwIfAborted();
+            emitStatus('Context condensed successfully');
+          }
+          if (this.batchRevision !== revision) continue;
+          break;
         }
       }
       outcome = error
@@ -884,6 +1168,8 @@ export class SessionOperation {
           reason: 'Kilo execution ended with MessageAbortedError',
         };
       else if (
+        this.admitted.size === 0 &&
+        this.admissionInFlight === 0 &&
         this.native.state === 'completed' &&
         this.native.result !== false &&
         (!request.finalization?.autoCommit ||
@@ -932,27 +1218,64 @@ export class SessionOperation {
     this.deps.onLocalCompletion(retain);
     this.diagnostic(result.ok ? 'finished' : 'failed');
     this.completion.resolve(result);
-    if (this.authorization && retain) {
-      const retained = this.retainedNotifications.snapshot();
-      const delivery = sessionOperationDeliverySchema.parse({
-        version: 2,
-        authorization: this.authorization,
-        completedAt: this.local.completedAt,
-        result,
-        ...(this.outcome ? { outcome: this.outcome } : {}),
-        ...(this.native.completion ? { assistantMessageId: this.native.completion.id } : {}),
-        events: retained.events,
-        preparing: retained.preparing,
-      });
-      this.delivery = createOperationResultDelivery(
-        delivery,
+    if (!retain) return;
+    const retained = this.retainedNotifications.snapshot();
+    const completedAt = this.local.completedAt;
+    const createDelivery = (
+      authorization: SessionOperationAuthorization,
+      payload: {
+        outcome?: SessionMessageOutcome;
+        assistantMessageId?: string;
+        events?: typeof retained.events;
+        preparing?: typeof retained.preparing;
+      }
+    ): OperationResultDelivery =>
+      createOperationResultDelivery(
+        sessionOperationDeliverySchema.parse({
+          version: 2,
+          authorization,
+          completedAt,
+          result,
+          ...(payload.outcome ? { outcome: payload.outcome } : {}),
+          ...(payload.assistantMessageId ? { assistantMessageId: payload.assistantMessageId } : {}),
+          events: payload.events ?? [],
+          preparing: payload.preparing ?? [],
+        }),
         Math.min(
-          this.local.completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
-          sessionOperationExpiresAt(this.authorization)
+          completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
+          sessionOperationExpiresAt(authorization)
         ),
         this.deps.sendOperationResult
       );
-      void this.delivery.start();
+    if (this.authorization) {
+      this.deliveries.set(
+        authorizationKey(this.authorization),
+        createDelivery(this.authorization, {
+          ...(this.outcome ? { outcome: this.outcome } : {}),
+          ...(this.native.completion ? { assistantMessageId: this.native.completion.id } : {}),
+          events: retained.events,
+          preparing: retained.preparing,
+        })
+      );
     }
+    for (const [messageId, admitted] of this.admitted) {
+      if (!admitted.authorization) continue;
+      this.deliveries.set(
+        authorizationKey(admitted.authorization),
+        createDelivery(admitted.authorization, { outcome: this.followUpOutcome(messageId) })
+      );
+    }
+    for (const delivery of this.deliveries.values()) void delivery.start();
+  }
+
+  private followUpOutcome(messageId: string): SessionMessageOutcome {
+    const outcome = this.outcome;
+    if (!outcome) return { messageId, status: 'failed', reason: 'Kilo execution failed' };
+    if (outcome.status === 'completed') return { messageId, status: 'completed' };
+    return {
+      messageId,
+      status: outcome.status,
+      ...(outcome.reason ? { reason: outcome.reason } : {}),
+    };
   }
 }

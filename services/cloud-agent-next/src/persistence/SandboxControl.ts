@@ -107,7 +107,10 @@ import {
   type SessionRoute,
 } from '../sandbox-control/session-routes.js';
 import { projectStatusSnapshot } from '../sandbox-control/status-snapshot.js';
-import { legacyPhysicalState } from '../sandbox-state/project/physical-label.js';
+import {
+  legacyPhysicalState,
+  isTerminalLaunchFailure,
+} from '../sandbox-state/project/physical-label.js';
 import { projectStatus, type StatusProjection } from '../sandbox-state/project/status.js';
 import {
   type AllocationController,
@@ -512,6 +515,12 @@ export type SandboxControlStatus = StatusProjection & {
   operationResults?: true;
   runtimeRecovery?: true;
   runtimeReplacementInFlight?: true;
+  /**
+   * The canonical allocation is `unknown` because its confirmed launch failed.
+   * A projection of the allocation reason, distinct from a physical `'failed'`
+   * whose environment state is still unresolved.
+   */
+  launchFailed?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -3015,6 +3024,7 @@ export class SandboxControl extends DurableObject<Env> {
         : {}),
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
       ...(runtimeReplacementInFlight ? { runtimeReplacementInFlight: true as const } : {}),
+      ...(isTerminalLaunchFailure(record) ? { launchFailed: true as const } : {}),
     };
   }
 

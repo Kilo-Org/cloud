@@ -145,6 +145,17 @@ function canonicalIdleAt(record: AllocationRecord): number | null {
   return record.state.kind === 'allocated' ? record.state.idleAt : null;
 }
 
+/** A canonical unknown with an explicit reason, for seeded projection coverage. */
+function seededUnknown(reason: string): AllocationRecord {
+  const fixture = allocationFixture({
+    state: 'unknown',
+    providerRef: 'ref',
+    createIntent: { intentId: 'intent_1', createdAt: Date.now() },
+  });
+  if (!fixture || fixture.state.kind !== 'unknown') throw new Error('expected an unknown fixture');
+  return { ...fixture, state: { ...fixture.state, reason } };
+}
+
 /** The canonical scheduling evidence that replaced the legacy deadline table. */
 async function readSchedule(storage: Parameters<typeof loadControlAlarmAnchors>[0]) {
   const [anchors, allocation] = await Promise.all([
@@ -1199,6 +1210,28 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(canonicalProviderRef(unchanged)).toBe(canonicalProviderRef(physical));
     expect(canonicalCreateIntentId(unchanged)).toBe(canonicalCreateIntentId(physical));
     expect(h.containerStub.launchWrapper).toHaveBeenCalledTimes(1);
+  });
+
+  it('projects a seeded terminal launch failure and omits it for an in-budget unknown', async () => {
+    const launchFailed = await harness();
+    seedCanonicalAllocationRecord(launchFailed.records, seededUnknown('launch_failed'));
+    await expect(launchFailed.control.getStatus()).resolves.toMatchObject({
+      physical: 'failed',
+      launchFailed: true,
+    });
+    await expect(
+      launchFailed.control.ensureReady({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        allowCreate: false,
+      })
+    ).resolves.toMatchObject({ physical: 'failed', launchFailed: true });
+
+    const createDeadline = await harness();
+    seedCanonicalAllocationRecord(createDeadline.records, seededUnknown('create_deadline'));
+    const status = await createDeadline.control.getStatus();
+    expect(status).toMatchObject({ physical: 'failed' });
+    expect(status).not.toHaveProperty('launchFailed');
   });
 
   it('redeems contained containers aliases against the containers outbound id', async () => {

@@ -6141,6 +6141,7 @@ describe('SandboxControl acquisition receipts', () => {
     const markers = await runInDurableObject(control, async (_instance, state) => {
       const record = await readCanonicalAllocationRecord(state.storage);
       if (record?.state.kind !== 'stopping') throw new Error('Expected a stopping cleanup');
+      if (record.state.createIntent === null) throw new Error('Expected an intent-backed cleanup');
       const seeded = Array.from({ length: MAX_ACQUISITION_CLEANUP_REOPENS }, (_, index) => ({
         id: `acq-${index}`,
         deadlineAt: now + SESSION_DELIVERY_TIMEOUT_MS,

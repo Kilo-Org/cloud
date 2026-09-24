@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
-import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLink';
+import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
 

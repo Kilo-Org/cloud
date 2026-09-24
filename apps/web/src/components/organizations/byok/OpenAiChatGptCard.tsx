@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
-import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLink';
+import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
 
 /**

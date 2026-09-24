@@ -20,6 +20,8 @@ import {
   LOGOUT_EVENT,
 } from '@/lib/analytics/posthog';
 import { clearChatsForSignOut, releaseChatsForAccountSwitch } from '@/lib/chat/sign-out';
+import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
+import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
@@ -494,6 +496,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
           clearSessionScopedState();
+          // The remote MCP connection and the servers stored behind it (which
+          // hold bearer tokens) belong to the account that is leaving. The
+          // settings-tools group switch is account-scoped and cleared by
+          // `clearSessionScopedState` above, on this path and the switch alike.
+          forgetRemoteMcp();
+          clearRemoteMcpServers();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
         } finally {

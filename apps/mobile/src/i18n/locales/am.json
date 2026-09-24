@@ -3051,7 +3051,38 @@
       "unauthorized": "የKilo መሳሪያዎች ይህን ክፍለ ጊዜ አልተቀበሉም",
       "unauthorizedDescription": "በዚህ ውይይት የKilo መሳሪያዎችን ለመጠቀም እንደገና ይግቡ።",
       "unavailable": "የKilo መሳሪያዎች አይገኙም",
-      "unavailableDescription": "የKilo ሰርቨር ለዚህ መለያ አይገኝም።"
+      "unavailableDescription": "የKilo ሰርቨር ለዚህ መለያ አይገኝም።",
+      "sheetTitle": "የውይይት መሳሪያዎች",
+      "serversSection": "የMCP ሰርቨሮች",
+      "addServer": "MCP ሰርቨር አክል",
+      "addServerTitle": "MCP ሰርቨር ያክሉ",
+      "editServerTitle": "ይህን MCP ሰርቨር ያርትዑ",
+      "fieldName": "የሚታይ ስም",
+      "fieldUrl": "የሰርቨር URL",
+      "fieldUrlInvalid": "ትክክለኛ የሰርቨር URL ያስገቡ።",
+      "fieldToken": "Bearer ቶከን (አማራጭ)",
+      "enableServer": "ይህን ሰርቨር አንቃ: {{name}}",
+      "editServer": "ሰርቨር አርትዕ",
+      "deleteServer": "ሰርቨር ሰርዝ",
+      "editServerA11y": "ሰርቨር አርትዕ: {{name}}",
+      "deleteServerA11y": "ሰርቨር ሰርዝ: {{name}}",
+      "retryServerA11y": "ይህን ሰርቨር እንደገና ሞክር: {{name}}",
+      "deleteTitle": "ይህን ሰርቨር ይሰረዝ?",
+      "deleteMessage": "መሳሪያዎቹ ከሁሉም ውይይት ይወገዳሉ።",
+      "kiloBuiltIn": "አብሮ የተሰራ። ለዚህ ውይይት ያብሩት ወይም ያጥፉት፤ ማርትዕ ወይም መሰረዝ አይቻልም።",
+      "serversEmptyTitle": "እስካሁን የርቀት ሰርቨር የለም",
+      "serversEmptyDescription": "መሳሪያዎቹን በውይይቶችዎ ለማቅረብ አንዱን ያክሉ።",
+      "settingsToolsTitle": "Kilo የመተግበሪያ ቅንብሮችን እንዲቀይር ፍቀድ",
+      "settingsToolsSubtitle": "ለገጽታ፣ ለቋንቋ፣ ለማሳወቂያዎች፣ ለሞዴሎች እና ለተቀሩት ምርጫዎች ይተገበራል።",
+      "settingsToolsOn": "በርቷል — የቅንብር መሳሪያዎቹ ወደ ሞዴሉ ይላካሉ",
+      "settingsToolsOff": "ጠፍቷል — ምንም የቅንብር መሳሪያ ወደ ሞዴሉ አይላክም",
+      "serverChecking": "ይህን ሰርቨር በመፈተሽ ላይ…",
+      "serverToolCount": "{{count}} መሳሪያዎች",
+      "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
+      "serverOff": "ይህ ሰርቨር ተዘግቷል"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
   }
 }

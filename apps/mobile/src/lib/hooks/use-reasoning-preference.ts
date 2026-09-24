@@ -14,12 +14,17 @@ export function clearReasoningPreference() {
   store.clear();
 }
 
-function setDefaultExpanded(value: boolean) {
+/** The stored default-expanded value for callers with no React tree (the settings registry). */
+export function getAutoExpandThinking(): boolean {
+  return store.get();
+}
+
+export function setAutoExpandThinking(value: boolean) {
   store.set(value);
 }
 
 export function useReasoningPreference() {
   const defaultExpanded = useSyncExternalStore(store.subscribe, store.get);
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
-  return { defaultExpanded, hasLoaded, setDefaultExpanded };
+  return { defaultExpanded, hasLoaded, setDefaultExpanded: setAutoExpandThinking };
 }

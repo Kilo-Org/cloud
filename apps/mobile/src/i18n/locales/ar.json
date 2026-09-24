@@ -3139,7 +3139,38 @@
       "unauthorized": "رفضت أدوات Kilo هذه الجلسة",
       "unauthorizedDescription": "سجّل الدخول مرة أخرى لاستخدام أدوات Kilo في هذه المحادثة.",
       "unavailable": "أدوات Kilo غير متاحة",
-      "unavailableDescription": "خادم Kilo غير متاح لهذا الحساب."
+      "unavailableDescription": "خادم Kilo غير متاح لهذا الحساب.",
+      "sheetTitle": "أدوات الدردشة",
+      "serversSection": "خوادم MCP",
+      "addServer": "إضافة خادم MCP",
+      "addServerTitle": "إضافة خادم MCP",
+      "editServerTitle": "تعديل خادم MCP هذا",
+      "fieldName": "الاسم المعروض",
+      "fieldUrl": "عنوان URL للخادم",
+      "fieldUrlInvalid": "أدخل عنوان URL صالحًا للخادم.",
+      "fieldToken": "رمز Bearer (اختياري)",
+      "enableServer": "تفعيل هذا الخادم: {{name}}",
+      "editServer": "تعديل الخادم",
+      "deleteServer": "حذف الخادم",
+      "editServerA11y": "تعديل الخادم: {{name}}",
+      "deleteServerA11y": "حذف الخادم: {{name}}",
+      "retryServerA11y": "إعادة المحاولة لهذا الخادم: {{name}}",
+      "deleteTitle": "حذف هذا الخادم؟",
+      "deleteMessage": "ستُزال أدواته من كل محادثة.",
+      "kiloBuiltIn": "مضمّن. شغّله أو أوقفه لهذه الدردشة؛ لا يمكن تعديله أو حذفه.",
+      "serversEmptyTitle": "لا توجد خوادم بعيدة بعد",
+      "serversEmptyDescription": "أضف واحدًا لتوفير أدواته في محادثاتك.",
+      "settingsToolsTitle": "السماح لـ Kilo بتغيير إعدادات التطبيق",
+      "settingsToolsSubtitle": "ينطبق على المظهر واللغة والإشعارات والنماذج وبقية التفضيلات.",
+      "settingsToolsOn": "مفعّل — تُرسل أدوات الإعدادات إلى النموذج",
+      "settingsToolsOff": "متوقف — لا تُرسل أي أداة إعدادات إلى النموذج",
+      "serverChecking": "جارٍ التحقق من هذا الخادم…",
+      "serverToolCount": "{{count}} أدوات",
+      "serverUnreachable": "تعذّر الوصول إلى هذا الخادم",
+      "serverOff": "هذا الخادم متوقف"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "تأكيد هذا التغيير؟"
   }
 }

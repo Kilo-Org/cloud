@@ -3073,7 +3073,38 @@
       "unauthorized": "As ferramentas do Kilo recusaram esta sessão",
       "unauthorizedDescription": "Entre novamente para usar as ferramentas do Kilo nesta conversa.",
       "unavailable": "As ferramentas do Kilo não estão disponíveis",
-      "unavailableDescription": "O servidor do Kilo não está disponível para esta conta."
+      "unavailableDescription": "O servidor do Kilo não está disponível para esta conta.",
+      "sheetTitle": "Ferramentas de chat",
+      "serversSection": "Servidores MCP",
+      "addServer": "Adicionar servidor MCP",
+      "addServerTitle": "Adicionar um servidor MCP",
+      "editServerTitle": "Editar este servidor MCP",
+      "fieldName": "Nome de exibição",
+      "fieldUrl": "URL do servidor",
+      "fieldUrlInvalid": "Insira uma URL de servidor válida.",
+      "fieldToken": "Token Bearer (opcional)",
+      "enableServer": "Ativar este servidor: {{name}}",
+      "editServer": "Editar servidor",
+      "deleteServer": "Excluir servidor",
+      "editServerA11y": "Editar servidor: {{name}}",
+      "deleteServerA11y": "Excluir servidor: {{name}}",
+      "retryServerA11y": "Tentar novamente este servidor: {{name}}",
+      "deleteTitle": "Excluir este servidor?",
+      "deleteMessage": "As ferramentas dele saem de todos os chats.",
+      "kiloBuiltIn": "Integrado. Ative ou desative para este chat; não pode ser editado nem excluído.",
+      "serversEmptyTitle": "Ainda não há servidores remotos",
+      "serversEmptyDescription": "Adicione um para oferecer as ferramentas dele nos seus chats.",
+      "settingsToolsTitle": "Permitir que o Kilo altere as configurações do app",
+      "settingsToolsSubtitle": "Aplica-se a tema, idioma, notificações, modelos e ao restante das Preferências.",
+      "settingsToolsOn": "Ativado — as ferramentas de configurações são enviadas ao modelo",
+      "settingsToolsOff": "Desativado — nenhuma ferramenta de configurações é enviada ao modelo",
+      "serverChecking": "Verificando este servidor…",
+      "serverToolCount": "{{count}} ferramentas",
+      "serverUnreachable": "Não foi possível alcançar este servidor",
+      "serverOff": "Este servidor está desativado"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Confirmar esta alteração?"
   }
 }

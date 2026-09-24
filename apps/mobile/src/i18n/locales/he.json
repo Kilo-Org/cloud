@@ -3073,7 +3073,38 @@
       "unauthorized": "כלי Kilo דחו את ההפעלה הזו",
       "unauthorizedDescription": "היכנס שוב כדי להשתמש בכלי Kilo בשיחה הזו.",
       "unavailable": "כלי Kilo אינם זמינים",
-      "unavailableDescription": "השרת של Kilo אינו זמין לחשבון הזה."
+      "unavailableDescription": "השרת של Kilo אינו זמין לחשבון הזה.",
+      "sheetTitle": "כלי הצ׳אט",
+      "serversSection": "שרתי MCP",
+      "addServer": "הוספת שרת MCP",
+      "addServerTitle": "הוספת שרת MCP",
+      "editServerTitle": "עריכת שרת ה-MCP הזה",
+      "fieldName": "שם תצוגה",
+      "fieldUrl": "כתובת URL של השרת",
+      "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
+      "fieldToken": "אסימון Bearer (אופציונלי)",
+      "enableServer": "הפעלת השרת הזה: {{name}}",
+      "editServer": "עריכת השרת",
+      "deleteServer": "מחיקת השרת",
+      "editServerA11y": "עריכת השרת: {{name}}",
+      "deleteServerA11y": "מחיקת השרת: {{name}}",
+      "retryServerA11y": "ניסיון חוזר לשרת הזה: {{name}}",
+      "deleteTitle": "למחוק את השרת הזה?",
+      "deleteMessage": "הכלים שלו ייעלמו מכל צ׳אט.",
+      "kiloBuiltIn": "מובנה. הפעילו או כבו אותו לצ׳אט הזה; אין אפשרות לערוך או למחוק אותו.",
+      "serversEmptyTitle": "אין עדיין שרתים מרוחקים",
+      "serversEmptyDescription": "הוסיפו אחד כדי להציע את הכלים שלו בצ׳אטים שלכם.",
+      "settingsToolsTitle": "לאפשר ל-Kilo לשנות את הגדרות האפליקציה",
+      "settingsToolsSubtitle": "חל על ערכת נושא, שפה, התראות, מודלים ושאר ההעדפות.",
+      "settingsToolsOn": "פועל — כלי ההגדרות נשלחים למודל",
+      "settingsToolsOff": "כבוי — שום כלי הגדרות לא נשלח למודל",
+      "serverChecking": "בודק את השרת הזה…",
+      "serverToolCount": "{{count}} כלים",
+      "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
+      "serverOff": "השרת הזה כבוי"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "לאשר את השינוי הזה?"
   }
 }

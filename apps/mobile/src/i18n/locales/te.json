@@ -3051,7 +3051,38 @@
       "unauthorized": "Kilo సాధనాలు ఈ సెషన్‌ను తిరస్కరించాయి",
       "unauthorizedDescription": "ఈ చాట్‌లో Kilo సాధనాలను ఉపయోగించడానికి మళ్లీ సైన్ ఇన్ చేయండి.",
       "unavailable": "Kilo సాధనాలు అందుబాటులో లేవు",
-      "unavailableDescription": "ఈ ఖాతాకు Kilo సర్వర్ అందుబాటులో లేదు."
+      "unavailableDescription": "ఈ ఖాతాకు Kilo సర్వర్ అందుబాటులో లేదు.",
+      "sheetTitle": "చాట్ సాధనాలు",
+      "serversSection": "MCP సర్వర్లు",
+      "addServer": "MCP సర్వర్‌ను జోడించండి",
+      "addServerTitle": "MCP సర్వర్‌ను జోడించండి",
+      "editServerTitle": "ఈ MCP సర్వర్‌ను సవరించండి",
+      "fieldName": "ప్రదర్శించే పేరు",
+      "fieldUrl": "సర్వర్ URL",
+      "fieldUrlInvalid": "చెల్లుబాటు అయ్యే సర్వర్ URL నమోదు చేయండి.",
+      "fieldToken": "Bearer టోకెన్ (ఐచ్ఛికం)",
+      "enableServer": "ఈ సర్వర్‌ను ప్రారంభించండి: {{name}}",
+      "editServer": "సర్వర్‌ను సవరించండి",
+      "deleteServer": "సర్వర్‌ను తొలగించండి",
+      "editServerA11y": "సర్వర్‌ను సవరించండి: {{name}}",
+      "deleteServerA11y": "సర్వర్‌ను తొలగించండి: {{name}}",
+      "retryServerA11y": "ఈ సర్వర్‌ను మళ్లీ ప్రయత్నించండి: {{name}}",
+      "deleteTitle": "ఈ సర్వర్‌ను తొలగించాలా?",
+      "deleteMessage": "దీని సాధనాలు ప్రతి చాట్ నుండి వెళ్లిపోతాయి.",
+      "kiloBuiltIn": "అంతర్నిర్మితం. ఈ చాట్ కోసం దాన్ని ఆన్ లేదా ఆఫ్ చేయండి; సవరించడం లేదా తొలగించడం కుదరదు.",
+      "serversEmptyTitle": "ఇంకా రిమోట్ సర్వర్లు లేవు",
+      "serversEmptyDescription": "మీ చాట్‌లలో దాని సాధనాలను అందించడానికి ఒకటి జోడించండి.",
+      "settingsToolsTitle": "Kilo యాప్ సెట్టింగ్‌లను మార్చడానికి అనుమతించండి",
+      "settingsToolsSubtitle": "థీమ్, భాష, నోటిఫికేషన్‌లు, మోడళ్లు మరియు మిగిలిన ప్రాధాన్యతలకు వర్తిస్తుంది.",
+      "settingsToolsOn": "ఆన్ — సెట్టింగ్‌ల సాధనాలు మోడల్‌కు పంపబడతాయి",
+      "settingsToolsOff": "ఆఫ్ — మోడల్‌కు ఏ సెట్టింగ్‌ల సాధనం పంపబడదు",
+      "serverChecking": "ఈ సర్వర్‌ను తనిఖీ చేస్తోంది…",
+      "serverToolCount": "{{count}} సాధనాలు",
+      "serverUnreachable": "ఈ సర్వర్‌ను చేరుకోలేకపోయింది",
+      "serverOff": "ఈ సర్వర్ ఆఫ్‌లో ఉంది"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?"
   }
 }

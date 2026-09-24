@@ -3095,7 +3095,38 @@
       "unauthorized": "Інструменты Kilo адхілілі гэты сеанс",
       "unauthorizedDescription": "Увайдзіце зноў, каб выкарыстоўваць інструменты Kilo у гэтым чаце.",
       "unavailable": "Інструменты Kilo недаступныя",
-      "unavailableDescription": "Сервер Kilo недаступны для гэтага ўліковага запісу."
+      "unavailableDescription": "Сервер Kilo недаступны для гэтага ўліковага запісу.",
+      "sheetTitle": "Інструменты чата",
+      "serversSection": "Серверы MCP",
+      "addServer": "Дадаць сервер MCP",
+      "addServerTitle": "Дадаць сервер MCP",
+      "editServerTitle": "Рэдагаваць гэты сервер MCP",
+      "fieldName": "Бачная назва",
+      "fieldUrl": "URL сервера",
+      "fieldUrlInvalid": "Увядзіце сапраўдны URL сервера.",
+      "fieldToken": "Токен Bearer (неабавязкова)",
+      "enableServer": "Уключыць гэты сервер: {{name}}",
+      "editServer": "Рэдагаваць сервер",
+      "deleteServer": "Выдаліць сервер",
+      "editServerA11y": "Рэдагаваць сервер: {{name}}",
+      "deleteServerA11y": "Выдаліць сервер: {{name}}",
+      "retryServerA11y": "Паспрабаваць зноў гэты сервер: {{name}}",
+      "deleteTitle": "Выдаліць гэты сервер?",
+      "deleteMessage": "Яго інструменты знікнуць з кожнага чата.",
+      "kiloBuiltIn": "Убудаваны. Уключыце або выключыце яго для гэтага чата; яго нельга рэдагаваць або выдаляць.",
+      "serversEmptyTitle": "Пакуль няма аддаленых сервераў",
+      "serversEmptyDescription": "Дадайце адзін, каб прапанаваць яго інструменты ў вашых чатах.",
+      "settingsToolsTitle": "Дазволіць Kilo змяняць налады праграмы",
+      "settingsToolsSubtitle": "Датычыцца тэмы, мовы, апавяшчэнняў, мадэляў і астатніх Наладак.",
+      "settingsToolsOn": "Уключана — інструменты наладаў адпраўляюцца мадэлі",
+      "settingsToolsOff": "Выключана — ніводзін інструмент наладаў не адпраўляецца мадэлі",
+      "serverChecking": "Праверка гэтага сервера…",
+      "serverToolCount": "{{count}} інструментаў",
+      "serverUnreachable": "Не ўдалося дасягнуць гэтага сервера",
+      "serverOff": "Гэты сервер выключаны"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Пацвердзіць гэта змяненне?"
   }
 }

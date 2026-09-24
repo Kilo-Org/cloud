@@ -3051,7 +3051,38 @@
       "unauthorized": "Mjetet Kilo refuzuan këtë sesion",
       "unauthorizedDescription": "Hyr përsëri për të përdorur mjetet Kilo në këtë bisedë.",
       "unavailable": "Mjetet Kilo nuk janë të disponueshme",
-      "unavailableDescription": "Serveri Kilo nuk është i disponueshëm për këtë llogari."
+      "unavailableDescription": "Serveri Kilo nuk është i disponueshëm për këtë llogari.",
+      "sheetTitle": "Mjetet e bisedës",
+      "serversSection": "Serverët MCP",
+      "addServer": "Shto server MCP",
+      "addServerTitle": "Shto një server MCP",
+      "editServerTitle": "Modifiko këtë server MCP",
+      "fieldName": "Emri i shfaqur",
+      "fieldUrl": "URL-ja e serverit",
+      "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
+      "fieldToken": "Token bartës (opsional)",
+      "enableServer": "Aktivizo këtë server: {{name}}",
+      "editServer": "Modifiko serverin",
+      "deleteServer": "Fshi serverin",
+      "editServerA11y": "Modifiko serverin: {{name}}",
+      "deleteServerA11y": "Fshi serverin: {{name}}",
+      "retryServerA11y": "Riprovo këtë server: {{name}}",
+      "deleteTitle": "Të fshihet ky server?",
+      "deleteMessage": "Mjetet e tij hiqen nga çdo bisedë.",
+      "kiloBuiltIn": "I integruar. Aktivizoje ose çaktivizoje për këtë bisedë; nuk mund të modifikohet ose fshihet.",
+      "serversEmptyTitle": "Nuk ka ende serverë të largët",
+      "serversEmptyDescription": "Shto një të tillë për të ofruar mjetet e tij në bisedat e tua.",
+      "settingsToolsTitle": "Lejo Kilo të ndryshojë cilësimet e aplikacionit",
+      "settingsToolsSubtitle": "Vlen për temën, gjuhën, njoftimet, modelet dhe pjesën tjetër të Preferencave.",
+      "settingsToolsOn": "Aktiv — mjetet e cilësimeve i dërgohen modelit",
+      "settingsToolsOff": "Joaktiv — asnjë mjet cilësimesh nuk i dërgohet modelit",
+      "serverChecking": "Duke kontrolluar këtë server…",
+      "serverToolCount": "{{count}} mjete",
+      "serverUnreachable": "Nuk u arrit ky server",
+      "serverOff": "Ky server është i fikur"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Të konfirmohet ky ndryshim?"
   }
 }

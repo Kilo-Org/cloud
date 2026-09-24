@@ -3051,7 +3051,38 @@
       "unauthorized": "Kilo-verktyg avvisade den här sessionen",
       "unauthorizedDescription": "Logga in igen för att använda Kilo-verktygen i den här chatten.",
       "unavailable": "Kilo-verktyg är inte tillgängliga",
-      "unavailableDescription": "Kilo-servern är inte tillgänglig för det här kontot."
+      "unavailableDescription": "Kilo-servern är inte tillgänglig för det här kontot.",
+      "sheetTitle": "Chattverktyg",
+      "serversSection": "MCP-servrar",
+      "addServer": "Lägg till MCP-server",
+      "addServerTitle": "Lägg till en MCP-server",
+      "editServerTitle": "Redigera denna MCP-server",
+      "fieldName": "Visat namn",
+      "fieldUrl": "Server-URL",
+      "fieldUrlInvalid": "Ange en giltig server-URL.",
+      "fieldToken": "Bearer-token (valfritt)",
+      "enableServer": "Aktivera denna server: {{name}}",
+      "editServer": "Redigera server",
+      "deleteServer": "Ta bort server",
+      "editServerA11y": "Redigera server: {{name}}",
+      "deleteServerA11y": "Ta bort server: {{name}}",
+      "retryServerA11y": "Försök igen med denna server: {{name}}",
+      "deleteTitle": "Ta bort denna server?",
+      "deleteMessage": "Dess verktyg lämnar varje chatt.",
+      "kiloBuiltIn": "Inbyggd. Slå på eller av den för denna chatt; den kan inte redigeras eller tas bort.",
+      "serversEmptyTitle": "Inga fjärrservrar ännu",
+      "serversEmptyDescription": "Lägg till en för att erbjuda dess verktyg i dina chattar.",
+      "settingsToolsTitle": "Låt Kilo ändra appinställningar",
+      "settingsToolsSubtitle": "Gäller tema, språk, aviseringar, modeller och resten av Inställningar.",
+      "settingsToolsOn": "På — inställningsverktygen skickas till modellen",
+      "settingsToolsOff": "Av — inget inställningsverktyg skickas till modellen",
+      "serverChecking": "Kontrollerar denna server…",
+      "serverToolCount": "{{count}} verktyg",
+      "serverUnreachable": "Kunde inte nå denna server",
+      "serverOff": "Denna server är avstängd"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bekräfta denna ändring?"
   }
 }

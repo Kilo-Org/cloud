@@ -3051,7 +3051,38 @@
       "unauthorized": "Алатките на Kilo ја одбија оваа сесија",
       "unauthorizedDescription": "Најави се повторно за да ги користиш алатките на Kilo во овој разговор.",
       "unavailable": "Алатките на Kilo не се достапни",
-      "unavailableDescription": "Серверот на Kilo не е достапен за оваа сметка."
+      "unavailableDescription": "Серверот на Kilo не е достапен за оваа сметка.",
+      "sheetTitle": "Алатки за разговор",
+      "serversSection": "MCP сервери",
+      "addServer": "Додај MCP сервер",
+      "addServerTitle": "Додај MCP сервер",
+      "editServerTitle": "Уреди го овој MCP сервер",
+      "fieldName": "Прикажано име",
+      "fieldUrl": "URL на серверот",
+      "fieldUrlInvalid": "Внеси важечки URL на серверот.",
+      "fieldToken": "Bearer токен (изборно)",
+      "enableServer": "Овозможи го овој сервер: {{name}}",
+      "editServer": "Уреди сервер",
+      "deleteServer": "Избриши сервер",
+      "editServerA11y": "Уреди сервер: {{name}}",
+      "deleteServerA11y": "Избриши сервер: {{name}}",
+      "retryServerA11y": "Обиди се повторно со овој сервер: {{name}}",
+      "deleteTitle": "Да се избрише овој сервер?",
+      "deleteMessage": "Неговите алатки излегуваат од секој разговор.",
+      "kiloBuiltIn": "Вграден. Вклучи го или исклучи го за овој разговор; не може да се уреди или избрише.",
+      "serversEmptyTitle": "Сè уште нема оддалечени сервери",
+      "serversEmptyDescription": "Додај еден за да ги понудиш неговите алатки во твоите разговори.",
+      "settingsToolsTitle": "Дозволи Kilo да ги менува поставките на апликацијата",
+      "settingsToolsSubtitle": "Важи за темата, јазикот, известувањата, моделите и останатите Поставки.",
+      "settingsToolsOn": "Вклучено — алатките за поставки се испраќаат до моделот",
+      "settingsToolsOff": "Исклучено — ниту една алатка за поставки не се испраќа до моделот",
+      "serverChecking": "Проверка на овој сервер…",
+      "serverToolCount": "{{count}} алатки",
+      "serverUnreachable": "Не успеа да се достигне овој сервер",
+      "serverOff": "Овој сервер е исклучен"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Да се потврди оваа промена?"
   }
 }

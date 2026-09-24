@@ -3139,7 +3139,38 @@
       "unauthorized": "Gwrthododd offer Kilo y sesiwn hon",
       "unauthorizedDescription": "Mewngofnodwch eto i ddefnyddio offer Kilo yn y sgwrs hon.",
       "unavailable": "Nid yw offer Kilo ar gael",
-      "unavailableDescription": "Nid yw gweinydd Kilo ar gael ar gyfer y cyfrif hwn."
+      "unavailableDescription": "Nid yw gweinydd Kilo ar gael ar gyfer y cyfrif hwn.",
+      "sheetTitle": "Offer sgwrs",
+      "serversSection": "Gweinyddwyr MCP",
+      "addServer": "Ychwanegu gweinydd MCP",
+      "addServerTitle": "Ychwanegu gweinydd MCP",
+      "editServerTitle": "Golygu'r gweinydd MCP hwn",
+      "fieldName": "Enw dangos",
+      "fieldUrl": "URL gweinydd",
+      "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
+      "fieldToken": "Tocyn Bearer (dewisol)",
+      "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
+      "editServer": "Golygu gweinydd",
+      "deleteServer": "Dileu gweinydd",
+      "editServerA11y": "Golygu gweinydd: {{name}}",
+      "deleteServerA11y": "Dileu gweinydd: {{name}}",
+      "retryServerA11y": "Rhoi cynnig eto ar y gweinydd hwn: {{name}}",
+      "deleteTitle": "Dileu'r gweinydd hwn?",
+      "deleteMessage": "Mae ei offer yn gadael pob sgwrs.",
+      "kiloBuiltIn": "Yn fewnol. Ei droi ymlaen neu i ffwrdd ar gyfer y sgwrs hon; ni ellir ei olygu na'i ddileu.",
+      "serversEmptyTitle": "Dim gweinyddwyr o bell eto",
+      "serversEmptyDescription": "Ychwanegwch un i gynnig ei offer yn eich sgyrsiau.",
+      "settingsToolsTitle": "Gadael i Kilo newid gosodiadau'r ap",
+      "settingsToolsSubtitle": "Yn berthnasol i thema, iaith, hysbysiadau, modelau a gweddill y Dewisiadau.",
+      "settingsToolsOn": "Ymlaen — anfonir offer y gosodiadau at y model",
+      "settingsToolsOff": "I ffwrdd — ni anfonir unrhyw offeryn gosodiadau at y model",
+      "serverChecking": "Yn gwirio'r gweinydd hwn…",
+      "serverToolCount": "{{count}} offeryn",
+      "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
+      "serverOff": "Mae'r gweinydd hwn i ffwrdd"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Cadarnhau'r newid hwn?"
   }
 }

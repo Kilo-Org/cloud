@@ -21,6 +21,47 @@ const state = vi.hoisted(() => ({
   messages: [] as { info: { id: string } }[],
 }));
 
+// One stable sheet model, so a check can prove the screen hands this very model
+// to the sheet rather than a copy of it.
+const mcpModel = vi.hoisted(() => ({
+  view: {
+    enabled: false,
+    statusKey: 'modelChat.mcp.off',
+    descriptionKey: null,
+    toolCount: 0,
+    retry: false,
+    busy: false,
+    tone: 'muted',
+  },
+  setEnabled: () => undefined,
+  retry: () => undefined,
+  retrying: false,
+  settingsTools: {
+    titleKey: 'modelChat.mcp.settingsToolsTitle',
+    subtitleKey: 'modelChat.mcp.settingsToolsSubtitle',
+    statusKey: 'modelChat.mcp.settingsToolsOff',
+    tone: 'muted',
+  },
+  settingsToolsEnabled: false,
+  setSettingsToolsEnabled: () => undefined,
+  servers: [],
+  storedServers: [],
+  setServerEnabled: () => undefined,
+  addServer: async () => {
+    await Promise.resolve();
+    return false;
+  },
+  updateServer: async () => {
+    await Promise.resolve();
+    return false;
+  },
+  deleteServer: async () => {
+    await Promise.resolve();
+    return false;
+  },
+  saving: false,
+}));
+
 vi.mock('@/lib/chat/use-chat', () => ({
   chatPlaceOf: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
   useChat: () => ({
@@ -77,20 +118,7 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
 vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
 vi.mock('@/components/chat/mcp-settings-sheet', () => ({
   McpSettingsSheet: 'McpSettingsSheet',
-  useMcpSettings: () => ({
-    view: {
-      enabled: false,
-      statusKey: 'modelChat.mcp.off',
-      descriptionKey: null,
-      toolCount: 0,
-      retry: false,
-      busy: false,
-      tone: 'muted',
-    },
-    setEnabled: () => undefined,
-    retry: () => undefined,
-    retrying: false,
-  }),
+  useMcpSettings: () => mcpModel,
 }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -148,5 +176,13 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'SessionMessageList')).toBe(1);
     expect(count(tree, 'EmptyState')).toBe(0);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
+  });
+
+  it('hands the sheet the whole chat-tools model', async () => {
+    const tree = await mount();
+    const sheet = tree.root.findAll(node => (node.type as string) === 'McpSettingsSheet')[0];
+
+    expect(sheet?.props.settings).toBe(mcpModel);
+    expect(sheet?.props.visible).toBe(false);
   });
 });

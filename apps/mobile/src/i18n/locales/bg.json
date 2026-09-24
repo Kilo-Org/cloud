@@ -3051,7 +3051,38 @@
       "unauthorized": "Инструментите на Kilo отказаха тази сесия",
       "unauthorizedDescription": "Влез отново, за да използваш инструментите на Kilo в този чат.",
       "unavailable": "Инструментите на Kilo не са налични",
-      "unavailableDescription": "Сървърът на Kilo не е достъпен за този акаунт."
+      "unavailableDescription": "Сървърът на Kilo не е достъпен за този акаунт.",
+      "sheetTitle": "Инструменти за чата",
+      "serversSection": "MCP сървъри",
+      "addServer": "Добавяне на MCP сървър",
+      "addServerTitle": "Добавяне на MCP сървър",
+      "editServerTitle": "Редактиране на този MCP сървър",
+      "fieldName": "Показвано име",
+      "fieldUrl": "URL на сървъра",
+      "fieldUrlInvalid": "Въведете валиден URL на сървъра.",
+      "fieldToken": "Bearer токен (по избор)",
+      "enableServer": "Активиране на този сървър: {{name}}",
+      "editServer": "Редактиране на сървъра",
+      "deleteServer": "Изтриване на сървъра",
+      "editServerA11y": "Редактиране на сървъра: {{name}}",
+      "deleteServerA11y": "Изтриване на сървъра: {{name}}",
+      "retryServerA11y": "Повторен опит с този сървър: {{name}}",
+      "deleteTitle": "Да се изтрие ли този сървър?",
+      "deleteMessage": "Инструментите му напускат всеки чат.",
+      "kiloBuiltIn": "Вградено. Включете или изключете за този чат; не може да се редактира или изтрива.",
+      "serversEmptyTitle": "Още няма отдалечени сървъри",
+      "serversEmptyDescription": "Добавете един, за да предлагате инструментите му в чатовете си.",
+      "settingsToolsTitle": "Разрешаване на Kilo да променя настройките на приложението",
+      "settingsToolsSubtitle": "Отнася се за темата, езика, известията, моделите и останалите Предпочитания.",
+      "settingsToolsOn": "Включено — инструментите за настройки се изпращат на модела",
+      "settingsToolsOff": "Изключено — нито един инструмент за настройки не се изпраща на модела",
+      "serverChecking": "Проверка на този сървър…",
+      "serverToolCount": "{{count}} инструмента",
+      "serverUnreachable": "Неуспешно свързване с този сървър",
+      "serverOff": "Този сървър е изключен"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Да се потвърди ли тази промяна?"
   }
 }

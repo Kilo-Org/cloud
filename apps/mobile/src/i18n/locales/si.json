@@ -3051,7 +3051,38 @@
       "unauthorized": "Kilo මෙවලම් මෙම සැසිය ප්‍රතික්ෂේප කළේය",
       "unauthorizedDescription": "මෙම කතාබහේ Kilo මෙවලම් භාවිත කිරීමට නැවත පිවිසෙන්න.",
       "unavailable": "Kilo මෙවලම් නොමැත",
-      "unavailableDescription": "මෙම ගිණුම සඳහා Kilo සේවාදායකය නොමැත."
+      "unavailableDescription": "මෙම ගිණුම සඳහා Kilo සේවාදායකය නොමැත.",
+      "sheetTitle": "කතාබස් මෙවලම්",
+      "serversSection": "MCP සේවාදායක",
+      "addServer": "MCP සේවාදායකය එක් කරන්න",
+      "addServerTitle": "MCP සේවාදායකය එක් කරන්න",
+      "editServerTitle": "මෙම MCP සේවාදායකය සංස්කරණය කරන්න",
+      "fieldName": "පෙන්වන නම",
+      "fieldUrl": "සේවාදායක URL",
+      "fieldUrlInvalid": "වලංගු සේවාදායක URL එකක් ඇතුළත් කරන්න.",
+      "fieldToken": "Bearer ටෝකනය (විකල්ප)",
+      "enableServer": "මෙම සේවාදායකය සක්‍රීය කරන්න: {{name}}",
+      "editServer": "සේවාදායකය සංස්කරණය කරන්න",
+      "deleteServer": "සේවාදායකය මකන්න",
+      "editServerA11y": "සේවාදායකය සංස්කරණය කරන්න: {{name}}",
+      "deleteServerA11y": "සේවාදායකය මකන්න: {{name}}",
+      "retryServerA11y": "මෙම සේවාදායකය නැවත උත්සාහ කරන්න: {{name}}",
+      "deleteTitle": "මෙම සේවාදායකය මකන්නද?",
+      "deleteMessage": "එහි මෙවලම් සෑම කතාබසකින්ම ඉවත් වේ.",
+      "kiloBuiltIn": "දැනටමත් ඇතුළත් ය. මෙම කතාබස සඳහා එය ක්‍රියාත්මක හෝ අක්‍රීය කරන්න; එය සංස්කරණය හෝ මැකීම කළ නොහැක.",
+      "serversEmptyTitle": "තවම දුරස්ථ සේවාදායක නොමැත",
+      "serversEmptyDescription": "ඔබේ කතාබස්වල එහි මෙවලම් ලබා දීමට එකක් එක් කරන්න.",
+      "settingsToolsTitle": "Kilo ට යෙදුම් සැකසුම් වෙනස් කිරීමට ඉඩ දෙන්න",
+      "settingsToolsSubtitle": "තේමාව, භාෂාව, දැනුම්දීම්, ආකෘති සහ ඉතිරි මනාප සඳහා අදාළ වේ.",
+      "settingsToolsOn": "ක්‍රියාත්මකයි — සැකසුම් මෙවලම් ආකෘතියට යවනු ලැබේ",
+      "settingsToolsOff": "අක්‍රීයයි — කිසිදු සැකසුම් මෙවලමක් ආකෘතියට යවනු නොලැබේ",
+      "serverChecking": "මෙම සේවාදායකය පරීක්ෂා කරමින්…",
+      "serverToolCount": "මෙවලම් {{count}}",
+      "serverUnreachable": "මෙම සේවාදායකය වෙත ළඟා විය නොහැකි විය",
+      "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?"
   }
 }

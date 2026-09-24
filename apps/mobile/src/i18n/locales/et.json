@@ -3051,7 +3051,38 @@
       "unauthorized": "Kilo tööriistad keeldusid sellest seansist",
       "unauthorizedDescription": "Logi uuesti sisse, et selles vestluses Kilo tööriistu kasutada.",
       "unavailable": "Kilo tööriistad pole saadaval",
-      "unavailableDescription": "Kilo server pole selle konto jaoks saadaval."
+      "unavailableDescription": "Kilo server pole selle konto jaoks saadaval.",
+      "sheetTitle": "Vestlusetööriistad",
+      "serversSection": "MCP-serverid",
+      "addServer": "Lisa MCP-server",
+      "addServerTitle": "Lisa MCP-server",
+      "editServerTitle": "Muuda seda MCP-serverit",
+      "fieldName": "Kuvatav nimi",
+      "fieldUrl": "Serveri URL",
+      "fieldUrlInvalid": "Sisesta kehtiv serveri URL.",
+      "fieldToken": "Beareri tunnus (valikuline)",
+      "enableServer": "Luba see server: {{name}}",
+      "editServer": "Muuda serverit",
+      "deleteServer": "Kustuta server",
+      "editServerA11y": "Muuda serverit: {{name}}",
+      "deleteServerA11y": "Kustuta server: {{name}}",
+      "retryServerA11y": "Proovi seda serverit uuesti: {{name}}",
+      "deleteTitle": "Kas kustutada see server?",
+      "deleteMessage": "Selle tööriistad kaovad igast vestlusest.",
+      "kiloBuiltIn": "Sisseehitatud. Lülita see selle vestluse jaoks sisse või välja; seda ei saa muuta ega kustutada.",
+      "serversEmptyTitle": "Kaugservereid veel pole",
+      "serversEmptyDescription": "Lisa üks, et pakkuda selle tööriistu oma vestlustes.",
+      "settingsToolsTitle": "Luba Kilol rakenduse sätteid muuta",
+      "settingsToolsSubtitle": "Kehtib teema, keele, märguannete, mudelite ja ülejäänud eelistuste kohta.",
+      "settingsToolsOn": "Sees — sätete tööriistad saadetakse mudelile",
+      "settingsToolsOff": "Väljas — mudelile ei saadeta ühtegi sätete tööriista",
+      "serverChecking": "Selle serveri kontrollimine…",
+      "serverToolCount": "{{count}} tööriista",
+      "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
+      "serverOff": "See server on välja lülitatud"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Kas kinnitada see muudatus?"
   }
 }

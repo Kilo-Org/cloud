@@ -3051,7 +3051,38 @@
       "unauthorized": "Kilo 도구가 이 세션을 거부했습니다",
       "unauthorizedDescription": "이 채팅에서 Kilo 도구를 사용하려면 다시 로그인하세요.",
       "unavailable": "Kilo 도구를 사용할 수 없습니다",
-      "unavailableDescription": "이 계정에서는 Kilo 서버를 사용할 수 없습니다."
+      "unavailableDescription": "이 계정에서는 Kilo 서버를 사용할 수 없습니다.",
+      "sheetTitle": "채팅 도구",
+      "serversSection": "MCP 서버",
+      "addServer": "MCP 서버 추가",
+      "addServerTitle": "MCP 서버 추가",
+      "editServerTitle": "이 MCP 서버 편집",
+      "fieldName": "표시 이름",
+      "fieldUrl": "서버 URL",
+      "fieldUrlInvalid": "유효한 서버 URL을 입력하세요.",
+      "fieldToken": "Bearer 토큰(선택 사항)",
+      "enableServer": "이 서버 사용: {{name}}",
+      "editServer": "서버 편집",
+      "deleteServer": "서버 삭제",
+      "editServerA11y": "서버 편집: {{name}}",
+      "deleteServerA11y": "서버 삭제: {{name}}",
+      "retryServerA11y": "이 서버 다시 시도: {{name}}",
+      "deleteTitle": "이 서버를 삭제할까요?",
+      "deleteMessage": "이 서버의 도구가 모든 채팅에서 제거됩니다.",
+      "kiloBuiltIn": "내장됨. 이 채팅에서 켜거나 끌 수 있으며 편집하거나 삭제할 수 없습니다.",
+      "serversEmptyTitle": "아직 원격 서버가 없습니다",
+      "serversEmptyDescription": "하나 추가하면 채팅에서 이 서버의 도구를 사용할 수 있습니다.",
+      "settingsToolsTitle": "Kilo가 앱 설정을 변경하도록 허용",
+      "settingsToolsSubtitle": "테마, 언어, 알림, 모델 및 나머지 환경설정에 적용됩니다.",
+      "settingsToolsOn": "켜짐 — 설정 도구가 모델로 전송됩니다",
+      "settingsToolsOff": "꺼짐 — 설정 도구가 모델로 전송되지 않습니다",
+      "serverChecking": "이 서버를 확인하는 중…",
+      "serverToolCount": "도구 {{count}}개",
+      "serverUnreachable": "이 서버에 연결할 수 없습니다",
+      "serverOff": "이 서버는 꺼져 있습니다"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "이 변경 사항을 확인할까요?"
   }
 }

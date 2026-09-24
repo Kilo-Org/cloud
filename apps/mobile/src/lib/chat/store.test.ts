@@ -13,6 +13,7 @@ import {
   moveChat,
   rememberChat,
   scopeOfChat,
+  toolsOfSession,
   wipeChats,
 } from './store';
 
@@ -107,6 +108,35 @@ describe('listChats', () => {
     rememberChat(db, { sessionId: 'fresh', scope: 'me:personal', at: 1 });
 
     expect(listChats(db, 'me:personal')[0]?.title).toBe('');
+  });
+});
+
+describe('toolsOfSession', () => {
+  it('answers the names the session was opened with, in the order they were given', async () => {
+    await write(
+      Effect.gen(function* opening() {
+        const store = yield* SessionStore;
+        yield* store.create({
+          id: 's1',
+          system: 'be brief',
+          model: 'kilo/one',
+          tools: ['time', 'settings_list', 'settings_set'],
+        });
+        yield* store.flush();
+      })
+    );
+
+    expect(toolsOfSession(db, 's1')).toEqual(['time', 'settings_list', 'settings_set']);
+  });
+
+  it('answers nothing for a session stored without tools, so the caller moves', async () => {
+    await write(conversation('s1', 'kilo/one', 'hello'));
+
+    expect(toolsOfSession(db, 's1')).toBeNull();
+  });
+
+  it('answers nothing for a session the store never wrote', () => {
+    expect(toolsOfSession(db, 'missing')).toBeNull();
   });
 });
 

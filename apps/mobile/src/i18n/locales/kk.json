@@ -3051,7 +3051,38 @@
       "unauthorized": "Kilo құралдары бұл сессияны қабылдамады",
       "unauthorizedDescription": "Осы чатта Kilo құралдарын пайдалану үшін қайта кіріңіз.",
       "unavailable": "Kilo құралдары қолжетімсіз",
-      "unavailableDescription": "Kilo сервері бұл тіркелгі үшін қолжетімсіз."
+      "unavailableDescription": "Kilo сервері бұл тіркелгі үшін қолжетімсіз.",
+      "sheetTitle": "Чат құралдары",
+      "serversSection": "MCP серверлері",
+      "addServer": "MCP серверін қосу",
+      "addServerTitle": "MCP серверін қосу",
+      "editServerTitle": "Осы MCP серверін өңдеу",
+      "fieldName": "Көрсетілетін атау",
+      "fieldUrl": "Сервер URL мекенжайы",
+      "fieldUrlInvalid": "Жарамды сервер URL мекенжайын енгізіңіз.",
+      "fieldToken": "Bearer токені (қосымша)",
+      "enableServer": "Осы серверді қосу: {{name}}",
+      "editServer": "Серверді өңдеу",
+      "deleteServer": "Серверді жою",
+      "editServerA11y": "Серверді өңдеу: {{name}}",
+      "deleteServerA11y": "Серверді жою: {{name}}",
+      "retryServerA11y": "Осы серверді қайталап көру: {{name}}",
+      "deleteTitle": "Осы сервер жойылсын ба?",
+      "deleteMessage": "Оның құралдары әр чаттан кетеді.",
+      "kiloBuiltIn": "Кірістірілген. Осы чат үшін қосыңыз немесе өшіріңіз; оны өңдеуге немесе жоюға болмайды.",
+      "serversEmptyTitle": "Әзірге қашықтағы серверлер жоқ",
+      "serversEmptyDescription": "Оның құралдарын чаттарыңызда ұсыну үшін біреуін қосыңыз.",
+      "settingsToolsTitle": "Kilo-ға қолданба параметрлерін өзгертуге рұқсат беру",
+      "settingsToolsSubtitle": "Тақырып, тіл, хабарламалар, модельдер және қалған Теңшелімдерге қатысты.",
+      "settingsToolsOn": "Қосулы — параметр құралдары модельге жіберіледі",
+      "settingsToolsOff": "Өшірулі — модельге ешбір параметр құралы жіберілмейді",
+      "serverChecking": "Осы сервер тексерілуде…",
+      "serverToolCount": "{{count}} құрал",
+      "serverUnreachable": "Осы серверге қосылу мүмкін болмады",
+      "serverOff": "Осы сервер өшірулі"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Осы өзгеріс расталсын ба?"
   }
 }

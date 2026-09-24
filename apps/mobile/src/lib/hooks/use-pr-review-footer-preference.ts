@@ -23,8 +23,13 @@ export function clearPrReviewFooterPreference() {
   store.clear();
 }
 
-function setPrReviewFooter(value: boolean) {
+export function setPrReviewFooter(value: boolean) {
   store.set(value);
+}
+
+/** The stored PR-review footer value for callers with no React tree. */
+export function getPrReviewFooter(): boolean {
+  return store.get();
 }
 
 export function usePrReviewFooterPreference() {

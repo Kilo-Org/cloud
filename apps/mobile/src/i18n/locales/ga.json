@@ -3117,7 +3117,38 @@
       "unauthorized": "Dhiúltaigh uirlisí Kilo don seisiún seo",
       "unauthorizedDescription": "Sínigh isteach arís chun uirlisí Kilo a úsáid sa chomhrá seo.",
       "unavailable": "Níl uirlisí Kilo ar fáil",
-      "unavailableDescription": "Níl freastalaí Kilo ar fáil don chuntas seo."
+      "unavailableDescription": "Níl freastalaí Kilo ar fáil don chuntas seo.",
+      "sheetTitle": "Uirlisí comhrá",
+      "serversSection": "Freastalaithe MCP",
+      "addServer": "Cuir freastalaí MCP leis",
+      "addServerTitle": "Cuir freastalaí MCP leis",
+      "editServerTitle": "Cuir an freastalaí MCP seo in eagar",
+      "fieldName": "Ainm taispeána",
+      "fieldUrl": "URL an fhreastalaí",
+      "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
+      "fieldToken": "Comhartha Bearer (roghnach)",
+      "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
+      "editServer": "Cuir an freastalaí in eagar",
+      "deleteServer": "Scrios an freastalaí",
+      "editServerA11y": "Cuir an freastalaí in eagar: {{name}}",
+      "deleteServerA11y": "Scrios an freastalaí: {{name}}",
+      "retryServerA11y": "Bain triail eile as an bhfreastalaí seo: {{name}}",
+      "deleteTitle": "Scrios an freastalaí seo?",
+      "deleteMessage": "Fágann a uirlisí gach comhrá.",
+      "kiloBuiltIn": "Ionsuite. Cas air nó as é don chomhrá seo; ní féidir é a chur in eagar ná a scriosadh.",
+      "serversEmptyTitle": "Níl aon fhreastalaithe cianda ann fós",
+      "serversEmptyDescription": "Cuir ceann leis chun a uirlisí a thairiscint i do chomhráití.",
+      "settingsToolsTitle": "Lig do Kilo socruithe an aipe a athrú",
+      "settingsToolsSubtitle": "Baineann sé le téama, teanga, fógraí, samhlacha agus an chuid eile de Roghanna.",
+      "settingsToolsOn": "Ar siúl — seoltar na huirlisí socruithe chuig an tsamhail",
+      "settingsToolsOff": "As — ní sheoltar aon uirlis socruithe chuig an tsamhail",
+      "serverChecking": "Ag seiceáil an fhreastalaí seo…",
+      "serverToolCount": "{{count}} uirlis",
+      "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh",
+      "serverOff": "Tá an freastalaí seo múchta"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"
   }
 }

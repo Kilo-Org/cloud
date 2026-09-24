@@ -3073,7 +3073,38 @@
       "unauthorized": "Kilo alati su odbili ovu sesiju",
       "unauthorizedDescription": "Prijavi se ponovo da koristiš Kilo alate u ovom ćaskanju.",
       "unavailable": "Kilo alati nisu dostupni",
-      "unavailableDescription": "Kilo server nije dostupan za ovaj nalog."
+      "unavailableDescription": "Kilo server nije dostupan za ovaj nalog.",
+      "sheetTitle": "Alati za ćaskanje",
+      "serversSection": "MCP serveri",
+      "addServer": "Dodaj MCP server",
+      "addServerTitle": "Dodaj MCP server",
+      "editServerTitle": "Uredi ovaj MCP server",
+      "fieldName": "Prikazano ime",
+      "fieldUrl": "URL servera",
+      "fieldUrlInvalid": "Unesi važeći URL servera.",
+      "fieldToken": "Bearer token (opciono)",
+      "enableServer": "Omogući ovaj server: {{name}}",
+      "editServer": "Uredi server",
+      "deleteServer": "Obriši server",
+      "editServerA11y": "Uredi server: {{name}}",
+      "deleteServerA11y": "Obriši server: {{name}}",
+      "retryServerA11y": "Pokušaj ponovo ovaj server: {{name}}",
+      "deleteTitle": "Obrisati ovaj server?",
+      "deleteMessage": "Njegovi alati napuštaju svako ćaskanje.",
+      "kiloBuiltIn": "Ugrađeno. Uključi ili isključi za ovo ćaskanje; ne može se urediti ni obrisati.",
+      "serversEmptyTitle": "Još nema udaljenih servera",
+      "serversEmptyDescription": "Dodaj jedan da nudiš njegove alate u svojim ćaskanjima.",
+      "settingsToolsTitle": "Dozvoli Kilu da menja postavke aplikacije",
+      "settingsToolsSubtitle": "Odnosi se na temu, jezik, obaveštenja, modele i ostatak Postavki.",
+      "settingsToolsOn": "Uključeno — alati za postavke šalju se modelu",
+      "settingsToolsOff": "Isključeno — nijedan alat za postavke ne šalje se modelu",
+      "serverChecking": "Provera ovog servera…",
+      "serverToolCount": "{{count}} alata",
+      "serverUnreachable": "Nije bilo moguće doći do ovog servera",
+      "serverOff": "Ovaj server je isključen"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Potvrditi ovu promenu?"
   }
 }

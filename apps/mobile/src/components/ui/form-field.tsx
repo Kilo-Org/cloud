@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -50,13 +50,32 @@ function FormField({
   const colors = useThemeColors();
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
+  const nativeInput = useRef<TextInput>(null);
   const displayedError = validate ? validationError : error;
+
+  // defaultValue only applies on first attach. A remounted or reused native
+  // field can keep the previous text, so write this form's default after attach.
+  useLayoutEffect(() => {
+    const next = defaultValue ?? '';
+    valueRef.current = next;
+    nativeInput.current?.setNativeProps({ text: next });
+  }, [defaultValue]);
 
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{label}</Text>
       <TextInput
-        ref={ref}
+        ref={instance => {
+          nativeInput.current = instance;
+          if (ref == null) {
+            return;
+          }
+          if ('current' in ref) {
+            ref.current = instance;
+          } else {
+            ref(instance);
+          }
+        }}
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}

@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 
 import { VoiceInputSettingsScreen } from '@/components/voice-input-settings-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -41,15 +41,25 @@ export function findConfigureRow(renderer: ReactTestRenderer, title: string) {
   return row;
 }
 
-export function findGatewaySwitch(renderer: ReactTestRenderer) {
+function findGatewaySwitch(renderer: ReactTestRenderer) {
   const found = renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityLabel === 'Gateway transcription'
   );
-  const foundSwitch = found.find(sw => sw.props.accessibilityLabel === 'Gateway transcription');
+  const foundSwitch = found[0];
   if (!foundSwitch) {
     throw new Error('Gateway transcription switch not found');
   }
   return foundSwitch;
+}
+
+export function expectGatewaySwitchState(
+  renderer: ReactTestRenderer,
+  state: { readonly checked?: boolean; readonly disabled?: boolean }
+): void {
+  expect(findGatewaySwitch(renderer).props.accessibilityState).toMatchObject(state);
 }
 
 export function findTexts(renderer: ReactTestRenderer): string[] {

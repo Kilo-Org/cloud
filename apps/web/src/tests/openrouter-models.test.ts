@@ -488,6 +488,15 @@ describe('catalog training policies', () => {
         { providerSlug: 'private', training: false, retainsPrompts: false },
         { providerSlug: 'training', training: true, retainsPrompts: true },
       ],
+      expected: false,
+    },
+    {
+      name: 'paid model where all providers train',
+      id: 'provider/all-training',
+      policies: [
+        { providerSlug: 'first', training: true, retainsPrompts: true },
+        { providerSlug: 'second', training: true, retainsPrompts: true },
+      ],
       expected: true,
     },
     {
@@ -496,7 +505,7 @@ describe('catalog training policies', () => {
       policies: [],
       expected: false,
     },
-  ])('marks $name using any matching training policy', async ({ id, policies, expected }) => {
+  ])('marks $name only when all known providers train', async ({ id, policies, expected }) => {
     const original = mockOpenRouterModels.data[0];
     jest.mocked(isFreeModel).mockResolvedValue(false);
     jest.mocked(getModelDataPolicies).mockResolvedValue(new Map([[id, policies]]));
@@ -512,10 +521,10 @@ describe('catalog training policies', () => {
 
   test.each([
     { explicit: false, training: true, expected: true },
-    { explicit: true, training: false, expected: true },
+    { explicit: true, training: false, expected: false },
     { explicit: false, training: false, expected: false },
   ])(
-    'preserves explicit flags unless metadata reports training: %p',
+    'uses known provider policies instead of upstream flags: %p',
     async ({ explicit, training, expected }) => {
       const id = 'provider/explicit';
       jest.mocked(isFreeModel).mockResolvedValue(false);
@@ -537,6 +546,31 @@ describe('catalog training policies', () => {
       expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(expected);
     }
   );
+
+  test('does not mark a free model when a known provider does not train', async () => {
+    const id = 'provider/mixed:free';
+    jest.mocked(isFreeModel).mockResolvedValue(true);
+    jest.mocked(getModelDataPolicies).mockResolvedValue(
+      new Map([
+        [
+          id,
+          [
+            { providerSlug: 'private', training: false, retainsPrompts: false },
+            { providerSlug: 'training', training: true, retainsPrompts: true },
+          ],
+        ],
+      ])
+    );
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      createMockResponse({
+        jsonData: { data: [{ ...mockOpenRouterModels.data[0], id }] },
+      })
+    );
+
+    const catalog = await getEnhancedOpenRouterModels();
+
+    expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(false);
+  });
 
   test('does not inherit training metadata from a free sibling and retains the free fallback', async () => {
     const id = 'provider/variant';

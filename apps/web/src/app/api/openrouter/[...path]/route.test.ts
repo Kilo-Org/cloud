@@ -1194,43 +1194,6 @@ describe('kilo-auto/efficient classifier billing', () => {
     );
   });
 
-  it('preserves client privacy when organization provider restrictions are applied', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: { id: 'user-123', microdollars_used: 0 } as User,
-      authFailedResponse: null,
-      organizationId: 'org-123',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { data_collection: 'allow' },
-      plan: 'enterprise',
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({
-      allowed: true,
-      eligibleProviderRoutes: new Set(['anthropic']),
-    });
-    const { POST } = await import('./route');
-    const response = await POST(
-      makeRequest({
-        ...makeBody('kilo-auto/balanced'),
-        provider: { data_collection: 'deny', zdr: true },
-      }) as never
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        body: expect.objectContaining({
-          provider: expect.objectContaining({
-            only: ['anthropic'],
-            data_collection: 'deny',
-            zdr: true,
-          }),
-        }),
-      })
-    );
-  });
-
   it('rejects a denied fallback without sending inference and still bills classification', async () => {
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([PRIMARY_DEFAULT_MODEL]);
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0.001 });

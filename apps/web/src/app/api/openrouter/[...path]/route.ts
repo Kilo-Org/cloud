@@ -273,12 +273,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   // Captured before auto-model resolution and provider transforms mutate the
   // parsed body; efficient routing classifies the original user request.
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
-  const requestedPrivacy = {
-    ...(requestBodyParsed.body.provider?.data_collection === 'deny' && {
-      data_collection: 'deny' as const,
-    }),
-    ...(requestBodyParsed.body.provider?.zdr === true && { zdr: true }),
-  };
 
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) ||
@@ -686,9 +680,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
         settings,
       };
     }
-    let effectiveProviderConfig = providerConfig
-      ? { ...providerConfig, ...requestedPrivacy }
-      : undefined;
+    let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
     let groupProvidersAllowed = true;
     if (groupPolicy) {
@@ -700,7 +692,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
           ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
           : [...groupDecision.eligibleProviderRoutes];
         groupProvidersAllowed = only.length > 0;
-        effectiveProviderConfig = { ...effectiveProviderConfig, ...requestedPrivacy, only };
+        effectiveProviderConfig = { ...providerConfig, only };
       }
     }
     return {

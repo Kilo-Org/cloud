@@ -143,12 +143,13 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             )?.pricing);
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
+        const policies = dataPolicies.get(model.id);
         return {
           ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
-          ...(dataPolicies.get(model.id)?.some(policy => policy.training) && {
-            mayTrainOnYourPrompts: true,
+          ...(policies?.length && {
+            mayTrainOnYourPrompts: policies.every(policy => policy.training),
           }),
         };
       })

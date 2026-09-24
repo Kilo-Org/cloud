@@ -461,6 +461,36 @@ describe('kiloclawRouter getStatus', () => {
     });
   });
 
+  it('maps an upstream worker failure to BAD_GATEWAY instead of INTERNAL_SERVER_ERROR', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-status-upstream-${Math.random()}@example.com`,
+    });
+    await createActivePersonalInstance(user.id);
+    kiloclawClientMock.__getStatusMock.mockRejectedValue(new Error('upstream 500'));
+    const caller = createCaller({ user });
+
+    await expect(caller.getStatus()).rejects.toMatchObject({
+      code: 'BAD_GATEWAY',
+      message: 'KiloClaw instance status is unavailable',
+    });
+  });
+
+  it('maps a client abort to CLIENT_CLOSED_REQUEST', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-status-abort-${Math.random()}@example.com`,
+    });
+    await createActivePersonalInstance(user.id);
+    kiloclawClientMock.__getStatusMock.mockRejectedValue(
+      Object.assign(new Error('aborted'), { name: 'AbortError' })
+    );
+    const caller = createCaller({ user });
+
+    await expect(caller.getStatus()).rejects.toMatchObject({
+      code: 'CLIENT_CLOSED_REQUEST',
+      message: 'Client disconnected before the KiloClaw status could be read',
+    });
+  });
+
   it('cycles the active inbound email address', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-cycle-test-${Math.random()}@example.com`,

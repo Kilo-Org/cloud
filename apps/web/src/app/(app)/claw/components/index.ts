@@ -8,6 +8,7 @@ export {
 } from './ClawConfigServiceBanner';
 export { ClawHeader } from './ClawHeader';
 export { ClawSettingsPage } from './ClawSettingsPage';
+export { ClawStatusError } from './ClawStatusError';
 export { DetailTile } from './DetailTile';
 export { InstanceTab } from './InstanceTab';
 export { SettingsTab } from './SettingsTab';

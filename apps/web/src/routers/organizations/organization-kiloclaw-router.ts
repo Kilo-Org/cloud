@@ -57,6 +57,13 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  createFakeSeedInstanceStatus,
+  createNoInstanceStatus,
+  isClientAbortError,
+  isFakeSeedInstance,
+  statusUnavailableError,
+} from '@/routers/kiloclaw-instance-status';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import { handleProvisionError } from '@/lib/kiloclaw/provision-error-handler';
 import {
@@ -378,58 +385,29 @@ export const organizationKiloclawRouter = createTRPCRouter({
     // → undefined → the worker queries the personal DO, leaking personal
     // instance status into the org context.
     if (!instance) {
-      return {
-        userId: ctx.user.id,
-        sandboxId: null,
-        provider: null,
-        runtimeId: null,
-        storageId: null,
-        region: null,
-        status: null,
-        provisionedAt: null,
-        lastStartedAt: null,
-        lastStoppedAt: null,
-        envVarCount: 0,
-        secretCount: 0,
-        channelCount: 0,
-        flyAppName: null,
-        flyMachineId: null,
-        flyVolumeId: null,
-        flyRegion: null,
-        machineSize: null,
-        instanceType: null,
-        volumeSizeGb: null,
-        openclawVersion: null,
-        imageVariant: null,
-        trackedImageTag: null,
-        trackedImageDigest: null,
-        googleConnected: false,
-        googleOAuthConnected: false,
-        googleOAuthStatus: 'disconnected',
-        googleOAuthAccountEmail: null,
-        googleOAuthCapabilities: [],
-        gmailNotificationsEnabled: false,
-        execSecurity: null,
-        execAsk: null,
-        botName: null,
-        botNature: null,
-        botVibe: null,
-        botEmoji: null,
-        userLocation: null,
-        userTimezone: null,
-        workerUrl: legacyWorkerUrl,
-        controllerCapabilitiesVersion: null,
-        name: null,
-        instanceId: null,
-        inboundEmailAddress: null,
-        inboundEmailEnabled: false,
-        scheduledAction: null,
-      } satisfies KiloClawDashboardStatus;
+      return createNoInstanceStatus(ctx.user.id, legacyWorkerUrl);
+    }
+
+    // Dev fixture rows (`ki_fake_org_*`) are DB-only: no Durable Object,
+    // container, or provider resource exists, so the worker call below can
+    // never succeed. Serve the same sentinel the personal resolver serves
+    // instead of turning the fixture into an INTERNAL_SERVER_ERROR.
+    if (isFakeSeedInstance(instance)) {
+      return createFakeSeedInstanceStatus(instance, legacyWorkerUrl);
     }
 
     const client = new KiloClawInternalClient();
     const [status, inboundEmailAddress] = await Promise.all([
-      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      client.getStatus(ctx.user.id, workerInstanceId(instance)).catch((error: unknown) => {
+        if (!isClientAbortError(error)) {
+          sentryLogger('organization-kiloclaw-status', 'error')('Failed to fetch KiloClaw status', {
+            error,
+            organizationId: input.organizationId,
+            instanceId: instance.id,
+          });
+        }
+        throw statusUnavailableError(error);
+      }),
       getInboundEmailAddressForInstance(instance.id),
     ]);
 

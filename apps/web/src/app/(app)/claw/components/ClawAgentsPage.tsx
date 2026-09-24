@@ -15,6 +15,7 @@ import { useClawControllerVersion } from '../hooks/useClawHooks';
 import { AgentsSection } from './AgentsSection';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { ClawContextProvider } from './ClawContext';
+import { ClawStatusError } from './ClawStatusError';
 
 /**
  * Polls instance status and handles loading / error / no-instance before
@@ -36,7 +37,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   // Disable the inactive status hook so it doesn't keep polling on the other context.
   const personalStatus = useKiloClawStatus({ enabled: !organizationId });
   const orgStatus = useOrgKiloClawStatus(organizationId);
-  const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
+  const { data: status, isLoading, error, refetch } = organizationId ? orgStatus : personalStatus;
 
   // Agent management is admin-only. Fail CLOSED: proceed only on a confirmed
   // is_admin. A null or errored user query (admin status unknown) bounces to
@@ -77,15 +78,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   }
 
   if (error) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-destructive text-sm">
-            Failed to load status: {error instanceof Error ? error.message : 'Unknown error'}
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return <ClawStatusError error={error} onRetry={() => void refetch()} />;
   }
 
   let content: ReactNode;

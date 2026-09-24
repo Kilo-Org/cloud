@@ -79,6 +79,13 @@ import {
   workerInstanceId,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
+import {
+  createFakeSeedInstanceStatus,
+  createNoInstanceStatus,
+  isClientAbortError,
+  isFakeSeedInstance,
+  statusUnavailableError,
+} from '@/routers/kiloclaw-instance-status';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import { handleProvisionError } from '@/lib/kiloclaw/provision-error-handler';
 import {
@@ -1074,81 +1081,6 @@ async function getUpcomingScheduledActionForInstance(
     targetImageTag: row.target_image_tag ?? null,
     targetOpenclawVersion: row.target_openclaw_version ?? null,
   };
-}
-
-function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
-  return {
-    userId,
-    sandboxId: null,
-    provider: null,
-    runtimeId: null,
-    storageId: null,
-    region: null,
-    status: null,
-    provisionedAt: null,
-    lastStartedAt: null,
-    lastStoppedAt: null,
-    envVarCount: 0,
-    secretCount: 0,
-    channelCount: 0,
-    flyAppName: null,
-    flyMachineId: null,
-    flyVolumeId: null,
-    flyRegion: null,
-    machineSize: null,
-    instanceType: null,
-    volumeSizeGb: null,
-    openclawVersion: null,
-    imageVariant: null,
-    trackedImageTag: null,
-    trackedImageDigest: null,
-    googleConnected: false,
-    googleOAuthConnected: false,
-    googleOAuthStatus: 'disconnected',
-    googleOAuthAccountEmail: null,
-    googleOAuthCapabilities: [],
-    gmailNotificationsEnabled: false,
-    execSecurity: null,
-    execAsk: null,
-    botName: null,
-    botNature: null,
-    botVibe: null,
-    botEmoji: null,
-    userLocation: null,
-    userTimezone: null,
-    workerUrl,
-    controllerCapabilitiesVersion: null,
-    name: null,
-    instanceId: null,
-    inboundEmailAddress: null,
-    inboundEmailEnabled: false,
-    scheduledAction: null,
-  } satisfies KiloClawDashboardStatus;
-}
-
-function isFakeSeedInstance(instance: ActiveKiloClawInstance): boolean {
-  return instance.sandboxId.startsWith('ki_fake_');
-}
-
-function createFakeSeedInstanceStatus(
-  instance: ActiveKiloClawInstance,
-  workerUrl: string
-): KiloClawDashboardStatus {
-  return {
-    ...createNoInstanceStatus(instance.userId, workerUrl),
-    sandboxId: instance.sandboxId,
-    provider: 'docker-local',
-    runtimeId: instance.sandboxId,
-    storageId: instance.sandboxId,
-    region: 'local',
-    status: 'stopped',
-    provisionedAt: Date.now(),
-    trackedImageTag: 'fake-local-instance',
-    workerUrl,
-    name: instance.name ?? null,
-    instanceId: instance.id,
-    inboundEmailEnabled: instance.inboundEmailEnabled,
-  } satisfies KiloClawDashboardStatus;
 }
 
 function sanitizeKiloCodeConfigResponse(
@@ -3148,7 +3080,15 @@ export const kiloclawRouter = createTRPCRouter({
 
     const client = new KiloClawInternalClient();
     const [status, inboundEmailAddress, scheduledAction] = await Promise.all([
-      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      client.getStatus(ctx.user.id, workerInstanceId(instance)).catch((error: unknown) => {
+        if (!isClientAbortError(error)) {
+          sentryLogger('kiloclaw-status', 'error')('Failed to fetch KiloClaw status', {
+            error,
+            instanceId: instance.id,
+          });
+        }
+        throw statusUnavailableError(error);
+      }),
       getInboundEmailAddressForInstance(instance.id),
       getUpcomingScheduledActionForInstance(instance.id),
     ]);

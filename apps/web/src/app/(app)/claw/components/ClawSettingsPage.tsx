@@ -16,6 +16,7 @@ import {
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
+import { ClawStatusError } from './ClawStatusError';
 import { SettingsTab } from './SettingsTab';
 import { UpgradeKiloClawDialog } from './UpgradeKiloClawDialog';
 import { BillingWrapper } from './billing/BillingWrapper';
@@ -165,7 +166,7 @@ function ClawSettingsWithStatus({
   const oauthFeedbackHandledRef = useRef(false);
   const personalStatus = useKiloClawStatus();
   const orgStatus = useOrgKiloClawStatus(organizationId);
-  const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
+  const { data: status, isLoading, error, refetch } = organizationId ? orgStatus : personalStatus;
 
   const clawUrl = organizationId ? `/organizations/${organizationId}/claw/new` : '/claw/new';
 
@@ -219,15 +220,7 @@ function ClawSettingsWithStatus({
   }
 
   if (error) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-destructive text-sm">
-            Failed to load status: {error instanceof Error ? error.message : 'Unknown error'}
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return <ClawStatusError error={error} onRetry={() => void refetch()} />;
   }
 
   // status is guaranteed non-null with a non-null .status after the checks above

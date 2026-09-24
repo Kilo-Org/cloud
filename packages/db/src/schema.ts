@@ -7047,17 +7047,25 @@ export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
  * either that person's personal account (`organization_id` null) or one
  * organization they belong to. The same person can connect the same ChatGPT
  * subscription to several accounts by connecting each one separately, so the
- * owner is the `(kilo_user_id, organization_id)` pair.
+ * owner is the `(kilo_user_id, organization_id)` pair. The one exception is the
+ * organization's shared-services row, which belongs to the organization rather
+ * than to the person who connected it.
  */
 export const openai_chatgpt_connections = pgTable(
   'openai_chatgpt_connections',
   {
     id: idPrimaryKeyColumn,
-    kilo_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, {
-        onDelete: 'cascade',
-      }),
+    /**
+     * The person who connected this row. Only the organization's shared-services
+     * row is nullable here: that row belongs to the organization, so deleting the
+     * connector's account clears the reference instead of taking the connection
+     * with it — the foreign key clears it when the account row is deleted and
+     * `softDeleteUser` clears it on the anonymization path. `created_by` keeps
+     * the record, and every other row names its owner.
+     */
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
@@ -7072,9 +7080,10 @@ export const openai_chatgpt_connections = pgTable(
     is_shared_services: boolean().default(false).notNull(),
     /**
      * The last time OpenAI answered a delegated request with a plan usage
-     * limit. The gateway writes it and clears it on the next success. It is
-     * request state, not credential state, so it stays out of the encrypted
-     * payload.
+     * limit. The gateway writes it and a reconnect clears it. It is request
+     * state, not credential state, so it stays out of the encrypted payload. A
+     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
+     * hides it once the reset time OpenAI reported has passed.
      */
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */

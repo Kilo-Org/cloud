@@ -187,7 +187,14 @@ export async function saveOpenAiChatGptConnection(
     .values(values)
     .onConflictDoUpdate({
       ...conflict,
+      // A reconnect replaces the credential and the connector with it: the
+      // shared-services row is the one place a conflict can change the person
+      // recorded on the row, and it must name the person who connected the
+      // credential it now holds. `created_by` follows the same person, so the
+      // row never names a connector who is no longer responsible for it.
       set: {
+        kilo_user_id: values.kilo_user_id,
+        created_by: values.created_by,
         encrypted_connection,
         is_enabled: true,
         usage_limit_reached_at: null,

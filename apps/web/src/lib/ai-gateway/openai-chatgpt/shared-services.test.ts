@@ -5,7 +5,7 @@ jest.mock('./served-models', () => ({
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
-import { openai_chatgpt_connections, type User } from '@kilocode/db/schema';
+import { kilocode_users, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -71,7 +71,10 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     await saveOpenAiChatGptConnection(memberOwner, connection('member@example.com'), owner.id);
 
     const sharedRows = await db
-      .select({ kilo_user_id: openai_chatgpt_connections.kilo_user_id })
+      .select({
+        kilo_user_id: openai_chatgpt_connections.kilo_user_id,
+        created_by: openai_chatgpt_connections.created_by,
+      })
       .from(openai_chatgpt_connections)
       .where(
         and(
@@ -80,8 +83,10 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
         )
       );
     expect(sharedRows).toHaveLength(1);
-    // Reconnecting replaces the credential, not the connector of record.
-    expect(sharedRows[0].kilo_user_id).toBe(owner.id);
+    // The row names the person who connected the credential it now holds: a
+    // reconnect replaces the previous connector along with the credential.
+    expect(sharedRows[0].kilo_user_id).toBe(member.id);
+    expect(sharedRows[0].created_by).toBe(member.id);
 
     expect((await getOpenAiChatGptStoredConnection(shared))?.connection.email).toBe(
       'shared-again@example.com'
@@ -89,6 +94,49 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     expect((await getOpenAiChatGptStoredConnection(memberOwner))?.connection.email).toBe(
       'member@example.com'
     );
+  });
+
+  it('keeps the organization shared row when the connector account row is deleted', async () => {
+    const connector = await insertTestUser({
+      google_user_email: `shared-services-connector-${randomUUID()}@example.com`,
+    });
+    await saveOpenAiChatGptConnection(
+      openAiChatGptSharedServicesOwner(organization.id),
+      connection('kept@example.com'),
+      connector.id
+    );
+
+    // A person's own rows go first, the way `softDeleteUser` deletes them (it
+    // clears the shared row's connector reference itself, and that path has its
+    // own coverage in `lib/user/index.test.ts`). The account row then goes, so
+    // the foreign key must clear the connector reference instead of removing the
+    // organization's connection along with it.
+    await db
+      .delete(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.kilo_user_id, connector.id),
+          eq(openai_chatgpt_connections.is_shared_services, false)
+        )
+      );
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, connector.id));
+
+    const rows = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.organization_id, organization.id),
+          eq(openai_chatgpt_connections.is_shared_services, true)
+        )
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].is_shared_services).toBe(true);
+    expect(rows[0].kilo_user_id).toBeNull();
+    expect(rows[0].created_by).toBe(connector.id);
+    await expect(
+      getOpenAiChatGptStoredConnection(openAiChatGptSharedServicesOwner(organization.id))
+    ).resolves.toMatchObject({ connection: { email: 'kept@example.com' } });
   });
 
   it('records a plan limit on the shared row only', async () => {

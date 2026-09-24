@@ -62,11 +62,12 @@ describe('external model cache', () => {
       saveOpenRouterModels({ data: Array.from({ length: 100 }, () => ({ id: 'broken' })) })
     ).resolves.toBe(false);
     await expect(saveOpenAiServedModels('partner-key', {})).resolves.toBe(false);
-    await expect(saveOpenAiServedModels('partner-key', { data: [] })).resolves.toBe(false);
+    await expect(saveOpenAiServedModels('partner-key', { data: [] })).resolves.toBe(true);
     await expect(saveOpenAiServedModels('partner-key', { data: [{ id: 123 }] })).resolves.toBe(
       false
     );
-    expect(mockWrites).toHaveLength(0);
+    expect(mockWrites).toHaveLength(1);
+    expect(mockWrites[0].data).toEqual({ data: [] });
   });
 
   it('scopes OpenAI served lists to the partner key without storing the key', async () => {

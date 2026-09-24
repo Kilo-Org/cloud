@@ -2,9 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { isOpenAiModelServed, resetServedModelIdsCache } from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
 import { getCachedOpenAiServedModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import type * as ExternalModelCache from '@/lib/ai-gateway/providers/external-model-cache';
 
 jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
   getCachedOpenAiServedModels: jest.fn(async () => null),
+  parseOpenAiServedModelIds: jest.requireActual<typeof ExternalModelCache>(
+    '@/lib/ai-gateway/providers/external-model-cache'
+  ).parseOpenAiServedModelIds,
 }));
 
 const fetchMock = jest.fn<typeof fetch>();
@@ -75,6 +79,18 @@ describe('isOpenAiModelServed', () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
 
     await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+  });
+
+  it('fails open rather than suppressing all models for a malformed successful list', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: [{ id: 123 }] })));
+
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+  });
+
+  it('respects a valid empty list from the partner project', async () => {
+    fetchMock.mockResolvedValue(modelsResponse([]));
+
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
   });
 
   it('keeps the route when the request throws', async () => {

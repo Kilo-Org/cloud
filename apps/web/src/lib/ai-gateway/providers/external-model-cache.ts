@@ -15,8 +15,13 @@ const OPENROUTER_MAX_AGE_MS = 15 * 60_000;
 const OPENAI_MAX_AGE_MS = 60 * 60_000;
 
 const ServedModelsSchema = z.object({
-  data: z.array(z.object({ id: z.string().min(1) })).min(1),
+  data: z.array(z.object({ id: z.string().min(1) })),
 });
+
+export function parseOpenAiServedModelIds(response: unknown): Set<string> | null {
+  const parsed = ServedModelsSchema.safeParse(response);
+  return parsed.success ? new Set(parsed.data.data.map(model => model.id)) : null;
+}
 
 export function sanitizeOpenRouterModels(response: unknown): unknown {
   if (

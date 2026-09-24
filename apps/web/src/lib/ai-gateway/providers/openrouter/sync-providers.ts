@@ -63,6 +63,15 @@ async function fetchGatewayModels(gateway: Provider) {
   }
   const catalog = await modelsResponse.json();
   const models = ModelsSchema.parse(catalog);
+  if (gateway.id === OPENROUTER.id) {
+    try {
+      if (!(await saveOpenRouterModels(catalog))) {
+        console.warn('[sync-providers] OpenRouter catalog failed cache validation');
+      }
+    } catch (error) {
+      captureException(error, { tags: { component: 'sync-providers-openrouter-cache' } });
+    }
+  }
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
@@ -102,18 +111,10 @@ async function fetchGatewayModels(gateway: Provider) {
   }
   console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
 
-  return { models: result, catalog };
+  return result;
 }
 
-async function refreshExternalModelCaches(openRouterCatalog: unknown): Promise<void> {
-  try {
-    if (!(await saveOpenRouterModels(openRouterCatalog))) {
-      console.warn('[sync-providers] OpenRouter catalog failed cache validation');
-    }
-  } catch (error) {
-    captureException(error, { tags: { component: 'sync-providers-openrouter-cache' } });
-  }
-
+async function refreshOpenAiServedModels(): Promise<void> {
   const apiKey = getEnvVariable('OPENAI_CHATGPT_API_KEY');
   if (!apiKey.trim()) return;
   try {
@@ -399,9 +400,9 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const { models: openrouter_data, catalog: openRouterCatalog } =
-    await fetchGatewayModels(OPENROUTER);
-  const { models: vercel_data } = await fetchGatewayModels(VERCEL_AI_GATEWAY);
+  await refreshOpenAiServedModels();
+  const openrouter_data = await fetchGatewayModels(OPENROUTER);
+  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {
@@ -425,8 +426,6 @@ export async function syncAndStoreProviders() {
     openrouter_data,
     vercel_data,
   });
-
-  await refreshExternalModelCaches(openRouterCatalog);
 
   const direct_byok_model_counts = await syncDirectByokModels();
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);

@@ -1,5 +1,8 @@
 import { OPENAI_CHATGPT_API_URL } from './upstream';
-import { getCachedOpenAiServedModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import {
+  getCachedOpenAiServedModels,
+  parseOpenAiServedModelIds,
+} from '@/lib/ai-gateway/providers/external-model-cache';
 
 /**
  * Which models the partner project can actually serve.
@@ -49,11 +52,7 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
     });
     if (!response.ok) return null;
 
-    const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
-    const ids = (body.data ?? [])
-      .map(model => (typeof model?.id === 'string' ? model.id : null))
-      .filter((id): id is string => id !== null);
-    return new Set(ids);
+    return parseOpenAiServedModelIds(await response.json());
   } catch {
     return null;
   }

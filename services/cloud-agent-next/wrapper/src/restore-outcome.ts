@@ -20,7 +20,7 @@ export type RestoreIncompleteReport = {
 /** Paths listed in `message`/`paths` before the remainder is summarised. */
 const MAX_REPORTED_PATHS = 50;
 
-/** Longest snapshot path rendered into the rules note before it is elided. */
+/** Longest snapshot path rendered into the rules note before it is elided, in code points. */
 const MAX_RENDERED_PATH_LENGTH = 200;
 
 const RESTORE_SKIP_REASON_WORDS: Record<string, string> = {
@@ -54,8 +54,11 @@ function isControlOrLineSeparator(code: number): boolean {
  * backslash-escaped, and the path is capped before insertion.
  */
 function renderPathAsData(file: string): string {
+  const codePoints = [...file];
   const bounded =
-    file.length > MAX_RENDERED_PATH_LENGTH ? `${file.slice(0, MAX_RENDERED_PATH_LENGTH)}…` : file;
+    codePoints.length > MAX_RENDERED_PATH_LENGTH
+      ? `${codePoints.slice(0, MAX_RENDERED_PATH_LENGTH).join('')}…`
+      : file;
   let rendered = '';
   for (const char of bounded) {
     const code = char.codePointAt(0) ?? 0;

@@ -208,4 +208,32 @@ describe('buildRestoreIncompleteRules', () => {
       .find(line => line.startsWith('- src/'));
     expect(longPathLine).toBe(`- src/${'a'.repeat(196)}…`);
   });
+
+  it('cuts a long path by code point so an emoji at the cap is not split', () => {
+    // `src/` plus 195 BMP characters puts the emoji's two UTF-16 code units at
+    // indices 199 and 200, so a code-unit slice at the 200-unit cap keeps only
+    // a lone high surrogate.
+    const loneSurrogates = (value: string): string[] =>
+      [...value].filter(char => {
+        const code = char.codePointAt(0) ?? 0;
+        return code >= 0xd800 && code <= 0xdfff;
+      });
+    const file = `src/${'a'.repeat(195)}🎉${'b'.repeat(20)}`;
+    const report = buildRestoreIncompleteReport({
+      applied: 0,
+      skipped: 1,
+      total: 1,
+      skippedDiffs: [{ file, reason: 'write_failed' }],
+    });
+    if (!report) throw new Error('expected an incomplete report');
+
+    const rules = buildRestoreIncompleteRules(report);
+    const pathLine = rules.split('\n').find(line => line.startsWith('- src/'));
+
+    // The cut must land on a code-point boundary; a code-unit slice at the cap
+    // keeps only the emoji's lone high surrogate.
+    expect(loneSurrogates(rules)).toEqual([]);
+    // The cap keeps exactly 200 code points, emoji included, and elides the rest.
+    expect(pathLine).toBe(`- src/${'a'.repeat(195)}🎉…`);
+  });
 });

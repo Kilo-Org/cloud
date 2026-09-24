@@ -1040,8 +1040,18 @@ async function runControlSocketRecycleBoot(
         )
       );
       if (status !== 'completed') throw new Error(`boot durable status=${status}`);
-      const text = collectChildMessageText(stream.events, messageId);
-      if (!echoPayloadMatches(text, `boot-${runId}`)) {
+      try {
+        await awaitCorrelatedChildText({
+          stream,
+          parentMessageId: messageId,
+          timeoutMs: Math.max(
+            1,
+            Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+          ),
+          label: 'boot turn',
+          ready: text => echoPayloadMatches(text, `boot-${runId}`),
+        });
+      } catch {
         result = fail(`boot turn did not echo boot-${runId}`);
         break;
       }

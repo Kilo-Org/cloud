@@ -184,6 +184,7 @@ function McpServerRow({
       <View className="flex-row gap-2">
         {row.retry || retrying ? (
           <Button
+            key={retrying ? 'retrying' : 'idle'}
             variant="secondary"
             size="sm"
             loading={retrying}

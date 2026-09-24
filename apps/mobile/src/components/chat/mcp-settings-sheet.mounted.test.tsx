@@ -376,6 +376,32 @@ describe('the Kilo MCP switch', () => {
       i18n.t('common.retry')
     );
   });
+
+  it('replaces the Kilo Retry when the ask ends so Android cannot keep a busy name', async () => {
+    h.kilo.value = { status: 'failed', kind: 'unreachable', retryable: true };
+    const pending = Promise.withResolvers<undefined>();
+    h.retryKiloMcp.mockReturnValue(pending.promise);
+    await mount();
+    const idle = required(buttonFor('Retry'), 'Retry');
+
+    await act(async () => {
+      held.settings?.retry();
+      await Promise.resolve();
+    });
+    const busy = required(buttonFor('Retry'), 'Retry');
+    expect(busy.props.loading).toBe(true);
+    expect(busy).not.toBe(idle);
+
+    await act(async () => {
+      pending.resolve(undefined);
+      await Promise.resolve();
+    });
+    await flush();
+    const ready = required(buttonFor('Retry'), 'Retry');
+    expect(ready.props.loading).toBe(false);
+    expect(ready).not.toBe(busy);
+    expect(ready.props.accessibilityLabel).toBe(i18n.t('common.retry'));
+  });
 });
 
 describe('the chat-tools sheet', () => {
@@ -488,6 +514,36 @@ describe('the chat-tools sheet', () => {
     expect(h.addRemoteMcpServer).toHaveBeenCalledWith(draft);
     expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place, { retry: true });
     expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('mounts a new add form after a save so the next add does not keep the last name', async () => {
+    await mount();
+
+    await act(async () => {
+      (required(buttonFor('Add MCP server'), 'Add MCP server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const first = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    const draft: RemoteMcpServerDraft = {
+      name: 'Remote',
+      url: 'https://remote.example/mcp',
+      auth: { type: 'none' },
+      enabled: true,
+    };
+    await act(async () => {
+      (first.props.onSave as (next: RemoteMcpServerDraft) => void)(draft);
+      await Promise.resolve();
+    });
+    await flush();
+    expect(nodes('RemoteMcpServerForm')).toHaveLength(0);
+
+    await act(async () => {
+      (required(buttonFor('Add MCP server'), 'Add MCP server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const second = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    expect(second).not.toBe(first);
+    expect(second.props.server).toBeUndefined();
   });
 
   it('edits the server the row names through the store', async () => {

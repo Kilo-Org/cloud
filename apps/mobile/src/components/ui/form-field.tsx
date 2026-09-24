@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { TextInput, type TextInputProps, View } from 'react-native';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { Platform, TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -50,13 +50,36 @@ function FormField({
   const colors = useThemeColors();
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
+  const nativeInput = useRef<TextInput>(null);
   const displayedError = validate ? validationError : error;
+
+  // Android can recycle an EditText across two mounts of the same field, so a
+  // second "Add" would open with the previous name and URL still in the native
+  // view. defaultValue only applies on first attach; write the text after
+  // attach so a recycled field starts from this form's default, not the last.
+  useLayoutEffect(() => {
+    const next = defaultValue ?? '';
+    valueRef.current = next;
+    if (Platform.OS === 'android') {
+      nativeInput.current?.setNativeProps({ text: next });
+    }
+  }, [defaultValue]);
 
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{label}</Text>
       <TextInput
-        ref={ref}
+        ref={instance => {
+          nativeInput.current = instance;
+          if (ref == null) {
+            return;
+          }
+          if ('current' in ref) {
+            ref.current = instance;
+          } else {
+            ref(instance);
+          }
+        }}
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}

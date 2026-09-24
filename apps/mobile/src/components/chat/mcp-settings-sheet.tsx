@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
@@ -201,6 +201,10 @@ type McpSettingsSheetProps = {
 export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSettingsSheetProps>) {
   const { t } = useTranslation();
   const [form, setForm] = useState<McpServerFormTarget | null>(null);
+  // Each open is a new native form. Android recycles EditTexts across two
+  // mounts of the same add sheet, so the second open would otherwise keep the
+  // previous name and URL and a type-in would concatenate them.
+  const formGeneration = useRef(0);
   const { view, settingsTools } = settings;
   const kilo = kiloServerRow(view);
 
@@ -217,6 +221,7 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
   }, []);
 
   const openAdd = useCallback(() => {
+    formGeneration.current += 1;
     setForm({ kind: 'add' });
   }, []);
 
@@ -224,6 +229,7 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
     (id: string) => {
       const server = settings.storedServers.find(one => one.id === id);
       if (server !== undefined) {
+        formGeneration.current += 1;
         setForm({ kind: 'edit', server });
       }
     },
@@ -325,15 +331,16 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
           </Text>
           {kilo.retry ? (
             <Button
+              /* Replacing the native control when the spinner stops is what
+                 gives the name back: Android writes busy into the content
+                 description and does not restore a label on the same view
+                 (BaseViewManager, RN 0.86). */
+              key={settings.retrying ? 'retrying' : 'idle'}
               variant="secondary"
               onPress={() => {
                 settings.retry();
               }}
               loading={settings.retrying}
-              /* The name is what the platform restores when the spinner stops:
-                 a busy button with none is read as "busy" for the rest of the
-                 screen's life (BaseViewManager, RN 0.86). Every other control in
-                 this sheet names itself the same way. */
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>
@@ -359,6 +366,7 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
       </ScrollView>
       {form === null ? null : (
         <McpServerFormSheet
+          key={formGeneration.current}
           target={form}
           saving={settings.saving}
           onSubmit={submitForm}

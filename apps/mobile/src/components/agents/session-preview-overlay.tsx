@@ -19,6 +19,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -121,6 +122,11 @@ function SessionPreviewContent({
 
   const progress = useSharedValue(0);
   const dragY = useSharedValue(0);
+  const menuFirstItemRef = useRef<View>(null);
+  // Read by the first row's ref callback so the callback can keep a stable
+  // identity across renders (a new identity would re-fire it on every commit).
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const [renameVisible, setRenameVisible] = useState(false);
   const renameVisibleRef = useRef(false);
   const closeCompletedRef = useRef(false);
@@ -151,6 +157,33 @@ function SessionPreviewContent({
       }
     });
   }, [visible, progress, releaseAfterClose]);
+
+  // VoiceOver containment: the container below is `accessibilityViewIsModal`,
+  // so the dimmed list behind the overlay is ignored, and focus has to land on
+  // the first action row the `manage` gesture promised rather than the list.
+  //
+  // The portal renders `null` on its first commit and only mounts the card and
+  // panel on the next one (see `@rn-primitives/portal`), so an effect keyed on
+  // `visible` runs before the row exists and `menuFirstItemRef.current` is
+  // still null. The row's own ref callback fires exactly when the portal has
+  // attached a node; the `visibleRef` guard keeps a later re-render from
+  // stealing focus back after the user has moved on.
+  const setMenuFirstItem = useCallback((node: View | null) => {
+    menuFirstItemRef.current = node;
+    if (node && visibleRef.current) {
+      moveA11yFocus(menuFirstItemRef);
+    }
+  }, []);
+
+  // Reopening the same session while its close animation is still running keeps
+  // the panel mounted, so no ref callback fires; move focus on the transition
+  // instead. The initial open leaves this a no-op because the row is not
+  // mounted yet — the ref callback above owns that case.
+  useEffect(() => {
+    if (visible && menuFirstItemRef.current) {
+      moveA11yFocus(menuFirstItemRef);
+    }
+  }, [visible]);
 
   // Android back dismisses the preview before it can pop the screen.
   useEffect(() => {
@@ -287,6 +320,7 @@ function SessionPreviewContent({
           onPress={closePreview}
         />
         <View
+          accessibilityViewIsModal
           pointerEvents="box-none"
           className="absolute inset-0 justify-center"
           style={containerStyle}
@@ -312,6 +346,7 @@ function SessionPreviewContent({
           </Animated.View>
           <SessionPreviewActionPanel
             menu={menu}
+            firstItemRef={setMenuFirstItem}
             onSelect={item => {
               // Dismiss first, then act: the menu belongs to the preview, and a
               // rename/delete prompt must not stack on top of it.

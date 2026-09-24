@@ -1,3 +1,4 @@
+import { type Ref } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -10,6 +11,12 @@ type SessionPreviewActionPanelProps = {
   /** A row was chosen; the caller closes the preview first, then runs it. */
   onSelect: (item: SessionActionMenuItem) => void;
   onCancel: () => void;
+  /**
+   * Attached to the first action row. The overlay passes a callback ref so
+   * VoiceOver focus moves when the portal actually mounts the row — an effect
+   * on open runs before the portal has rendered it.
+   */
+  firstItemRef?: Ref<View>;
 };
 
 /**
@@ -22,12 +29,14 @@ export function SessionPreviewActionPanel({
   menu,
   onSelect,
   onCancel,
+  firstItemRef,
 }: Readonly<SessionPreviewActionPanelProps>) {
   return (
     <View className="mt-3 overflow-hidden rounded-3xl bg-card">
       {menu.items.map((item, index) => (
         <Pressable
           key={item.key}
+          ref={index === 0 ? firstItemRef : undefined}
           accessibilityRole="button"
           accessibilityLabel={item.label}
           onPress={() => {

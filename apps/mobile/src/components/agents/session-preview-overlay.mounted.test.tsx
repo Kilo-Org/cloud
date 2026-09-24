@@ -177,4 +177,46 @@ describe('SessionPreviewOverlay', () => {
 
     expect(textWith(renderer, i18n.t('agents.sessionRow.needsInput'))).toHaveLength(1);
   });
+
+  it('contains VoiceOver in the card and menu column on open', () => {
+    const renderer = mountOverlay();
+    openPreview(
+      targetWith({
+        onRename: vi.fn<(title: string) => void>(),
+        onDelete: vi.fn<() => void>(),
+      })
+    );
+
+    // One modal surface, and it wraps both the card and the menu panel — the
+    // dimmed list behind the portal is what `accessibilityViewIsModal` hides.
+    const modalSurfaces = renderer.root.findAllByProps({ accessibilityViewIsModal: true });
+    expect(modalSurfaces).toHaveLength(1);
+    const modalSurface = modalSurfaces[0];
+    if (!modalSurface) {
+      throw new Error('missing modal surface');
+    }
+    expect(
+      modalSurface.findAllByProps({ accessibilityLabel: i18n.t('agents.sessionRow.copyId') })
+    ).toHaveLength(1);
+    expect(
+      modalSurface.findAllByProps({ accessibilityLabel: i18n.t('common.cancel') })
+    ).toHaveLength(1);
+  });
+
+  it('moves accessibility focus to the first menu row once the portal mounts it', () => {
+    const renderer = mountOverlay();
+    openPreview(targetWith({}));
+
+    expect(previewState.moveA11yFocus).toHaveBeenCalledTimes(1);
+    // The portal mounts the panel a commit after the overlay, so the move has
+    // to come from the row's ref callback. If it came from the open effect the
+    // recorded node would be absent and VoiceOver would stay on the dimmed
+    // list behind the modal.
+    expect(previewState.focusMoveHadNode).toEqual([true]);
+
+    // Closing re-runs the effect for `visible: false` and must not steal
+    // focus again.
+    pressByLabel(renderer, i18n.t('common.cancel'));
+    expect(previewState.moveA11yFocus).toHaveBeenCalledTimes(1);
+  });
 });

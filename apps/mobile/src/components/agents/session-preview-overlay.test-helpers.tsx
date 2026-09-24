@@ -41,19 +41,37 @@ const holder = vi.hoisted(
     platformOS: 'ios' | 'android';
     alert: ReturnType<typeof vi.fn>;
     prompt: ReturnType<typeof vi.fn>;
-  } => ({
-    transcript: {
-      data: undefined,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn<() => void>(),
-    },
-    row: { data: undefined },
-    platformOS: 'ios',
-    alert: vi.fn(),
-    prompt: vi.fn(),
-  })
+    announceForA11y: ReturnType<typeof vi.fn>;
+    moveA11yFocus: ReturnType<typeof vi.fn>;
+    /**
+     * Whether the focus helper was handed a live node *at call time*. Reading
+     * the `RefObject` after the test would show the node that mounted later,
+     * which is exactly what hid the portal-timing bug.
+     */
+    focusMoveHadNode: boolean[];
+  } => {
+    const focusMoveHadNode: boolean[] = [];
+    return {
+      transcript: {
+        data: undefined,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn<() => void>(),
+      },
+      row: { data: undefined },
+      platformOS: 'ios',
+      alert: vi.fn(),
+      prompt: vi.fn(),
+      announceForA11y: vi.fn(),
+      focusMoveHadNode,
+      moveA11yFocus: vi.fn((ref: { current: unknown } | undefined): boolean => {
+        const hadNode = ref?.current != null;
+        focusMoveHadNode.push(hadNode);
+        return hadNode;
+      }),
+    };
+  }
 );
 
 // A separate binding: vitest refuses to export the `vi.hoisted` declaration
@@ -109,6 +127,15 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+// The overlay moves VoiceOver focus on open; the real helper reaches
+// `AccessibilityInfo`/`findNodeHandle`, which the `react-native` stub above
+// does not carry. `status-announcement` (inside `QueryError`) still needs the
+// announce half of the module.
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: holder.announceForA11y,
+  moveA11yFocus: holder.moveA11yFocus,
+}));
+
 /* eslint-disable promise/prefer-await-to-callbacks -- Reanimated's withTiming
    takes an animation-completion callback, not a promise. */
 vi.mock('react-native-reanimated', () => ({
@@ -142,7 +169,22 @@ vi.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: 'GestureHandlerRootView',
 }));
 
-vi.mock('@rn-primitives/portal', () => ({ Portal: 'Portal' }));
+// The real `Portal` renders `null` on its first commit and only hands the card
+// and panel to the host on the next one, so the overlay's `visible` effect runs
+// while the first menu row's ref is still null. This mock keeps that one-commit
+// indirection: children appear only after the portal's own mount effect, which
+// is what a test must exercise to see the focus land.
+vi.mock('@rn-primitives/portal', async () => {
+  const React = await import('react');
+  function Portal({ children }: { children: ReactNode }) {
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => {
+      setMounted(true);
+    }, []);
+    return mounted ? React.createElement(React.Fragment, null, children) : null;
+  }
+  return { Portal };
+});
 
 vi.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
 
@@ -269,6 +311,9 @@ export function resetPreviewHolder(): void {
   holder.platformOS = 'ios';
   holder.alert.mockClear();
   holder.prompt.mockClear();
+  holder.announceForA11y.mockClear();
+  holder.moveA11yFocus.mockClear();
+  holder.focusMoveHadNode.length = 0;
 }
 
 export function resetPreviewStore(): void {

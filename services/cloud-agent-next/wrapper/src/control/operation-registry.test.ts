@@ -10,6 +10,7 @@ import {
   SANDBOX_CONTROL_OPERATION_LIMIT,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   sessionOperationLookupResultSchema,
+  type SessionPromptPayload,
 } from '../../../src/shared/sandbox-control-protocol';
 import {
   createControlHandlerDeps,
@@ -1437,6 +1438,103 @@ describe('operation admission and lookup', () => {
       )
     ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: false } });
     expect(handlerDeps.operations.counts().active).toBe(0);
+  });
+
+  it('rejects a follow-up receipt at the retention limit instead of exceeding it', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    for (let index = 0; index < 10 && !prompt.nativeTarget(); index += 1) await Promise.resolve();
+    const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    try {
+      for (let index = 1; index < SANDBOX_CONTROL_OPERATION_LIMIT; index += 1) {
+        const messageId = `follow_${index}`;
+        expect(
+          handlerDeps.operations.admitFollowUp(
+            session,
+            operationAuthorization('session.prompt', messageId),
+            { ...promptPayload, messageId } as SessionPromptPayload,
+            runtime
+          )
+        ).toMatchObject({ ok: true });
+      }
+      expect(handlerDeps.operations.counts().retained).toBe(SANDBOX_CONTROL_OPERATION_LIMIT);
+      expect(
+        handlerDeps.operations.admitFollowUp(
+          session,
+          operationAuthorization('session.prompt', 'overflow'),
+          { ...promptPayload, messageId: 'overflow' } as SessionPromptPayload,
+          runtime
+        )
+      ).toMatchObject({ ok: false, error: { code: 'session_busy' } });
+      expect(handlerDeps.operations.counts().retained).toBe(SANDBOX_CONTROL_OPERATION_LIMIT);
+    } finally {
+      running.resolve(completion());
+      prompt.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+      await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+      await prompt.done;
+    }
+  });
+
+  it('prunes a retained follow-up when the operation had no primary authorization', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    // The primary operation starts without an authorization, so it is not retained.
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    const followUp = operationAuthorization('session.prompt', 'next');
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        followUp
+      )
+    ).toMatchObject({ ok: true });
+    expect(handlerDeps.operations.counts().retained).toBe(1);
+
+    running.resolve(completion());
+    prompt.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await prompt.done;
+    await prompt.waitForDelivery();
+    const delivery = prompt.deliveryResult(followUp);
+    if (!delivery) throw new Error('Missing follow-up delivery');
+    expect(
+      await handleControlRequest(
+        'session.operation.ack',
+        session,
+        await acknowledgeOperation(delivery),
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true, result: { acknowledged: true } });
+
+    setSystemTime(followUp.dispatchDeadlineAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS + 1);
+    pruneControlOperations(handlerDeps);
+    expect(handlerDeps.operations.counts().retained).toBe(0);
   });
 
   it('aborts a retained prompt instead of a same-message attach', async () => {

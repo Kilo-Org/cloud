@@ -673,7 +673,7 @@ describe('operation results and delivery', () => {
       handlerDeps
     );
     await abortAcknowledged.promise;
-    expect(await aborting).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
+    expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
     await record.done;
     await record.waitForDelivery();
 
@@ -685,7 +685,7 @@ describe('operation results and delivery', () => {
     });
   });
 
-  it('keeps native abort active while an admitted follow-up is unsealed', async () => {
+  it('keeps native abort active while an admitted follow-up is unsealed after the original returns', async () => {
     const running = Promise.withResolvers<ReturnType<typeof completion>>();
     const aborts: string[] = [];
     const handlerDeps = deps({
@@ -716,6 +716,13 @@ describe('operation results and delivery', () => {
     );
     const record = handlerDeps.operations.active(session.kiloSessionId);
     if (!record) throw new Error('Missing operation');
+
+    // The original prompt returns and its follow-up admission finishes, but the
+    // batch never seals (no root idle). Cleanup evidence must stay unconfirmed
+    // because the batch is unsealed, not because the native turn is still pending.
+    running.resolve(completion());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(record.snapshot().native.state).toBe('completed');
     expect(record.snapshot().cleanupEvidence).toBe('unconfirmed');
 
     await handleControlRequest(
@@ -728,8 +735,8 @@ describe('operation results and delivery', () => {
       },
       handlerDeps
     );
+    // The unconfirmed batch must still issue a native abort.
     expect(aborts).toEqual([session.kiloSessionId]);
-    running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
     await record.done;
   });
 
@@ -767,6 +774,45 @@ describe('operation results and delivery', () => {
     await record.waitForDelivery();
 
     expect(record.snapshot().cleanupEvidence).toBe('finished');
+  });
+
+  it('treats a completed single prompt as finished cleanup evidence', async () => {
+    const aborts: string[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => completion(),
+        abortSession: async opts => {
+          aborts.push(opts.sessionId);
+          return true;
+        },
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+
+    // With no admitted batch the seal gate must not apply: a completed turn is
+    // finished evidence, so Stop cleanup must not issue a native abort.
+    expect(record.snapshot().cleanupEvidence).toBe('finished');
+    await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'msg_1',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() + 500,
+      },
+      handlerDeps
+    );
+    expect(aborts).toEqual([]);
   });
 
   it('does not attach assistant facts to an auto-commit failure', async () => {
@@ -858,7 +904,7 @@ describe('operation results and delivery', () => {
       );
       await abortAcknowledged.promise;
       expect(record.locallyComplete).toBe(false);
-      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
+      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
       await record.waitForDelivery();
 
       expect(record.snapshot().outcome?.status).toBe(status);

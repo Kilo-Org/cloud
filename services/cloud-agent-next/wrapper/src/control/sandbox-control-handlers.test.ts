@@ -790,7 +790,7 @@ describe('handleControlRequest', () => {
     ).toEqual({ ok: true, result: { success: true } });
     expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
       ok: true,
-      result: { status: 'aborted', quiescent: true },
+      result: { status: 'already_idle' },
     });
   });
 
@@ -935,7 +935,7 @@ describe('handleControlRequest', () => {
     }
   });
 
-  it('confirms an idle Kilo stop by aborting when the wrapper owns no work', async () => {
+  it('reports already_idle without aborting Kilo when the wrapper owns no work', async () => {
     const aborted: string[] = [];
     const kiloClient = fakeKilo({
       abortSession: async opts => {
@@ -945,8 +945,8 @@ describe('handleControlRequest', () => {
     });
 
     const result = await handleControlRequest('session.abort', session, {}, deps({ kiloClient }));
-    expect(result).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
-    expect(aborted).toEqual([session.kiloSessionId]);
+    expect(result).toEqual({ ok: true, result: { status: 'already_idle' } });
+    expect(aborted).toEqual([]);
   });
 
   it('detaches the terminal only when abort cancels the current task', async () => {
@@ -996,12 +996,12 @@ describe('handleControlRequest', () => {
           { messageId: promptPayload.messageId },
           handlerDeps
         )
-      ).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
+      ).toEqual({ ok: true, result: { status: 'aborted' } });
       expect(detached).toEqual([session]);
 
       expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
         ok: true,
-        result: { status: 'aborted', quiescent: true },
+        result: { status: 'already_idle' },
       });
       expect(detached).toEqual([session]);
     } finally {
@@ -1273,7 +1273,7 @@ describe('handleControlRequest', () => {
       }
       expect(await handleControlRequest('session.abort', identity, {}, handlerDeps)).toEqual({
         ok: true,
-        result: { status: 'aborted', quiescent: true },
+        result: { status: 'already_idle' },
       });
       expect(await handleControlRequest('session.sync', identity, {}, handlerDeps)).toEqual({
         ok: true,
@@ -1327,7 +1327,6 @@ describe('handleControlRequest', () => {
           'questions',
           'reject',
         ]),
-        'abort',
         'status',
         'questions',
         'permissions',
@@ -1392,7 +1391,7 @@ describe('handleControlRequest', () => {
         );
         expect(await aborting).toEqual({
           ok: true,
-          result: { status: 'aborted', quiescent: true },
+          result: { status: 'aborted' },
         });
         expect(calls.at(-2)).toEqual({
           directory: identity.directory,
@@ -1596,7 +1595,7 @@ describe('handleControlRequest', () => {
     running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
     expect(await aborting).toEqual({
       ok: true,
-      result: { status: 'aborted', quiescent: true },
+      result: { status: 'aborted' },
     });
     expect(aborted).toEqual([session.kiloSessionId, sibling.kiloSessionId]);
     expect(events).toEqual([
@@ -2770,7 +2769,7 @@ describe('owned control execution', () => {
       await started.promise;
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'older' }, handlerDeps)
-      ).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
+      ).toEqual({ ok: true, result: { status: 'already_idle' } });
       expect(
         await handleControlRequest(
           'session.abort',
@@ -2800,7 +2799,7 @@ describe('owned control execution', () => {
       expect(handlerDeps.operations.active(session.kiloSessionId)?.messageId).toBe('newer');
       remoteStopped.resolve(true);
       running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
-      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
+      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
       expect(events).toEqual([
         {
           type: 'session.message.outcome',
@@ -4389,6 +4388,66 @@ describe('control finalization and compact', () => {
       record.deliveryResult({ ...authorization, operationId: 'next', messageId: 'next' })?.outcome
         ?.status
     ).not.toBe('completed');
+  });
+
+  it('reports the follow-up delivery when abort targets the follow-up message id', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+        abortSession: async () => true,
+      }),
+    });
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      { ...authorization, operationId: 'next', messageId: 'next' }
+    );
+
+    running.resolve(completion());
+    await new Promise(resolve => setImmediate(resolve));
+
+    const settled = await Promise.race([
+      handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: 'next',
+          operationId: crypto.randomUUID(),
+          cleanupDeadlineAt: Date.now() + 5_000,
+        },
+        handlerDeps
+      ),
+      Bun.sleep(2_000).then(() => 'timeout' as const),
+    ]);
+    expect(settled).not.toBe('timeout');
+    await record.done;
+    // abortTarget matched the admitted follow-up id, so the operation-scoped
+    // abort must report that follow-up's delivery, not the primary prompt's.
+    expect(settled).toMatchObject({
+      ok: true,
+      result: { delivery: { outcome: { messageId: 'next' } } },
+    });
   });
 
   it('cancels finalization without admitting a newer message before quiescence', async () => {

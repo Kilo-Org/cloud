@@ -368,7 +368,12 @@ describe('Session observation wiring', () => {
         writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [nextMessage]);
         f.pending.resolve(response(busy));
         await alarm;
-        expect(f.control.getStatus).toHaveBeenCalledTimes(1);
+        // Two runtime-status reads: the sync reads readiness before it finds
+        // the scope changed; on `!snapshot` the alarm re-classifies readiness
+        // before choosing blip (rearm) or ready (may recover), because an
+        // `isCurrent` false cannot tell the two apart. The replacement row must
+        // still not be failed.
+        expect(f.control.getStatus).toHaveBeenCalledTimes(2);
         expect(f.control.request).toHaveBeenCalledTimes(1);
         expect(readRawSessionMessages(state.storage.kv)).toEqual([nextMessage]);
       } finally {

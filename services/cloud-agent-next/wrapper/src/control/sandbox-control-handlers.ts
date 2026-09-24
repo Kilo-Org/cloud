@@ -1215,7 +1215,7 @@ async function handleAbort(
         if (terminalError) return terminalError;
       }
       if (!result.ok && task.kind !== 'preparation') return result;
-      return ok({ status: 'aborted', quiescent: true });
+      return ok({ status: 'aborted' });
     }
     const deadlineAt = task.captureCleanupDeadline(
       parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
@@ -1261,7 +1261,7 @@ async function handleAbort(
         disposition,
         target?.runtimeId ?? '',
         scopedCleanupResultGranted,
-        task.deliveryResult()
+        task.deliveryResultForMessage(parsed.data.messageId)
       );
     };
 
@@ -1302,7 +1302,7 @@ async function handleAbort(
           currentDisposition,
           target?.runtimeId ?? '',
           scopedCleanupResultGranted,
-          task.deliveryResult()
+          task.deliveryResultForMessage(parsed.data.messageId)
         );
       }
       const disposition = await escalation.physical;
@@ -1319,7 +1319,7 @@ async function handleAbort(
           disposition,
           target?.runtimeId ?? '',
           scopedCleanupResultGranted,
-          task.deliveryResult()
+          task.deliveryResultForMessage(parsed.data.messageId)
         );
       }
       if (!result.ok && task.kind !== 'preparation') return result;
@@ -1336,7 +1336,7 @@ async function handleAbort(
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
-      const delivery = task.deliveryResult();
+      const delivery = task.deliveryResultForMessage(parsed.data.messageId);
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',
         quiescent: false,
@@ -1376,7 +1376,7 @@ async function handleAbort(
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
-      const delivery = task.deliveryResult();
+      const delivery = task.deliveryResultForMessage(parsed.data.messageId);
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',
         quiescent,
@@ -1388,22 +1388,11 @@ async function handleAbort(
     if (!result.ok && task.kind !== 'preparation') return result;
     return ok({ status: 'aborted' });
   }
-  // No operation owns the message id. A bare `already_idle` is not proof Kilo
-  // stopped, so confirm the stop against Kilo itself, as handleDetach does with
-  // no task. That is only safe when the wrapper owns no operation at all; an
-  // active operation for another message id must not be aborted by a stale stop.
-  if (parsed.data.operationId || deps.operations.hasActive(session.kiloSessionId))
-    return ok({ status: 'unconfirmed', quiescent: false });
-  const idleRuntime = sessionKiloRuntime(session, deps);
-  if (idleRuntime) {
-    try {
-      await abortKiloSession(session, idleRuntime.kiloClient);
-      return ok({ status: 'aborted', quiescent: true });
-    } catch {
-      return ok({ status: 'unconfirmed', quiescent: false });
-    }
-  }
-  return ok({ status: 'unconfirmed', quiescent: false });
+  return ok(
+    parsed.data.operationId
+      ? { status: 'unconfirmed', quiescent: false }
+      : { status: 'already_idle' }
+  );
 }
 
 async function readRootRequests<Request extends { id: string; sessionID: string }>(

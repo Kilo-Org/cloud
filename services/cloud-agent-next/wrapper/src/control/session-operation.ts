@@ -407,6 +407,16 @@ export class SessionOperation {
     return this.primaryDelivery()?.result();
   }
 
+  /**
+   * Resolve the delivery for a matched admitted message id, so a follow-up-targeted
+   * abort reports that follow-up's result instead of the primary prompt's. An
+   * unknown id falls back to the primary delivery.
+   */
+  deliveryResultForMessage(messageId: string | undefined): SessionOperationDelivery | undefined {
+    const admitted = messageId === undefined ? undefined : this.admitted.get(messageId);
+    return this.deliveryResult(admitted?.authorization);
+  }
+
   private primaryDelivery(): OperationResultDelivery | undefined {
     return this.authorization
       ? this.deliveries.get(authorizationKey(this.authorization))
@@ -620,10 +630,12 @@ export class SessionOperation {
   }
 
   canPrune(now: number): boolean {
-    if (this.authorization === undefined || this.local === undefined) return false;
+    if (this.local === undefined) return false;
     if (this.native.state === 'pending' || this.native.state === 'unknown') return false;
     if (this.deliveries.size === 0) return false;
-    let deadlineAt = this.authorization.dispatchDeadlineAt;
+    // A follow-up can retain this operation under its own authorization even when
+    // the primary operation had none; every delivery still carries its deadline.
+    let deadlineAt = this.authorization?.dispatchDeadlineAt ?? 0;
     for (const delivery of this.deliveries.values()) {
       const status = delivery.status();
       if (status.state !== 'acknowledged') return false;
@@ -734,7 +746,9 @@ export class SessionOperation {
   private cleanupEvidence(): NativeCleanupEvidence {
     if (
       this.admissionInFlight > 0 ||
-      (this.work.operation !== 'session.attach' && this.sealedRevision < this.batchRevision)
+      (this.admitted.size > 0 &&
+        this.work.operation !== 'session.attach' &&
+        this.sealedRevision < this.batchRevision)
     )
       return 'unconfirmed';
     if (this.native.state === 'not_started')

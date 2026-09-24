@@ -6114,6 +6114,10 @@ export class SandboxSession extends DurableObject<Env> {
       const before = this.loadMessages();
       const previousById = new Map(before.map(message => [message.messageId, message]));
       const queuedHeadId = nextQueuedMessageId(before);
+      // A queued follow-up can be the head while another turn is accepted. The
+      // session-wide interactions belong to the running turn, so a follow-up's
+      // terminal event must not clear them while an accepted turn remains.
+      const acceptedTurnRemains = hasAcceptedMessage(before);
       const next = messages.map((message): SessionMessage => {
         const previous = previousById.get(message.messageId);
         const previousState = previous?.state;
@@ -6144,7 +6148,10 @@ export class SandboxSession extends DurableObject<Env> {
           }
           return message;
         }
-        if (previousState?.kind === 'accepted' || queuedHeadId === message.messageId) {
+        if (
+          previousState?.kind === 'accepted' ||
+          (!acceptedTurnRemains && queuedHeadId === message.messageId)
+        ) {
           const interactions = this.readPendingInteractions();
           this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
             revision: (interactions?.revision ?? 0) + 1,

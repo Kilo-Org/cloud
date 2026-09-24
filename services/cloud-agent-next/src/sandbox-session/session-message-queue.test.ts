@@ -8468,6 +8468,42 @@ describe('SandboxSession orchestration', () => {
     });
   });
 
+  it('keeps an accepted turn pending interactions when a queued follow-up terminalizes', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+
+    const question = {
+      id: 'question_1',
+      sessionID: 'kilo_root',
+      questions: [{ question: 'Proceed?' }],
+    };
+    await fixture.rawEvent('question.asked', question);
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [question],
+    });
+
+    delegateRequest(fixture, 'session.prompt', async input => {
+      const parsed = sessionPromptPayloadSchema.parse(input.payload);
+      if (parsed.messageId === 'a') return controlResponse({ messageId: 'a', status: 'accepted' });
+      return controlFailure(true, 'session_busy');
+    });
+    await fixture.admit('b');
+    await fixture.flush();
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+
+    await fixture.outcome('b', 'failed');
+    await fixture.flush();
+    expect(fixture.record('b')?.state.kind).toBe('failed');
+    // The running accepted turn still owns the session-wide interactions; the
+    // queued follow-up's terminal event must not clear them.
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [question],
+    });
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+  });
+
   it('persists root-routed descendant interactions and reconciles their original session identities', async () => {
     const fixture = sessionFixture();
     await fixture.admit('a');

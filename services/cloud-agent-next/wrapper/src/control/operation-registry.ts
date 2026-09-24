@@ -843,6 +843,17 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       const operation = active.get(session.kiloSessionId);
       if (!operation || !isDeepStrictEqual(operation.session, session))
         return fail('not_ready', 'Session has no running operation', true);
+      prune();
+      if (
+        authorization &&
+        !retained.has(key(authorization)) &&
+        retained.size >= SANDBOX_CONTROL_OPERATION_LIMIT
+      )
+        return rejectBeforeAdmission(
+          'session_busy',
+          'Operation receipt capacity is unavailable',
+          true
+        );
       const result = operation.admitFollowUp(payload, runtime, authorization);
       if (result.ok && authorization) retained.set(key(authorization), operation);
       return result;

@@ -321,6 +321,16 @@ describe('AdvancedConfigPanel', () => {
     expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
   });
 
+  it('caps a manual env-var value at the 256-character session bound', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    press(buttonByText(renderer, 'Add variable'));
+    // The prepare-session input caps every inline env-var value at 256
+    // characters, so the field cannot hold a value Start would be refused for.
+    expect(field(renderer, 'Value').props.maxLength).toBe(256);
+  });
+
   it('keeps No profile and manual config working with no profiles at all', () => {
     const renderer = mount({ list: { personalProfiles: [] } });
     press(byLabel(renderer, 'Advanced Configuration'));
@@ -346,6 +356,20 @@ describe('AdvancedConfigPanel', () => {
 
     expect(texts(renderer)).toContain('Backend');
     expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+  });
+
+  it('names the effective default in the no-override row when one applies', () => {
+    const renderer = mount({ list: { personalProfiles: [{ ...BACKEND, isDefault: true }] } });
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    // Clearing the pick keeps the default, so neither the closed row nor the
+    // sheet's no-override row may claim there is no profile.
+    expect(texts(renderer)).toContain('Default profile');
+    press(byLabel(renderer, 'Pick a profile'));
+    expect(radio(renderer, 'Default profile')?.props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+    expect(radio(renderer, 'No profile')).toBeUndefined();
   });
 
   it('reports a pick from the sheet through onSelectProfile and shows it', () => {
@@ -422,6 +446,11 @@ describe('AdvancedConfigPanel', () => {
     expect(toast.success).toHaveBeenCalledTimes(1);
     // The saved profile appears in the selector immediately.
     expect(texts(renderer)).toContain('My Setup');
+    // The profile carries the draft now, and the server appends a profile's
+    // setup commands to the inline ones, so a kept draft would run them twice.
+    expect(texts(renderer)).not.toContain('API_KEY');
+    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(texts(renderer)).toContain('1 environment variables · 1 setup commands');
   });
 
   it('keeps the save sheet open and the typed name when the save fails', async () => {

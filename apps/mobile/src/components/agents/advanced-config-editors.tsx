@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { MAX_SESSION_ENV_VAR_VALUE_LENGTH } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +66,7 @@ export function ManualEnvVarsEditor({
             isNew={false}
             initial={{ key: row.key, value: row.value, isSecret: row.isSecret }}
             existingKeys={vars.map(variable => variable.key)}
+            maxValueLength={MAX_SESSION_ENV_VAR_VALUE_LENGTH}
             isSaving={false}
             onCancel={() => {
               setEditingKey(null);
@@ -93,6 +95,7 @@ export function ManualEnvVarsEditor({
           isNew
           initial={{ key: '', value: '', isSecret: false }}
           existingKeys={vars.map(variable => variable.key)}
+          maxValueLength={MAX_SESSION_ENV_VAR_VALUE_LENGTH}
           isSaving={false}
           onCancel={() => {
             setEditingKey(null);

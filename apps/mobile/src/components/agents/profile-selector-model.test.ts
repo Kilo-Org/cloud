@@ -63,6 +63,7 @@ describe('buildProfileSelectorState', () => {
 
     expect(rowKinds(state)).toEqual(['none', 'manage', 'repo-defaults']);
     expect(state.rows[0]).toMatchObject({ kind: 'none', labelKey: K.noProfile });
+    expect(state.noOverrideLabelKey).toBe(K.noProfile);
     expect(state.rows[1]).toMatchObject({ kind: 'manage', labelKey: K.manageProfiles });
     expect(state.rows[2]).toMatchObject({
       kind: 'repo-defaults',
@@ -114,6 +115,37 @@ describe('buildProfileSelectorState', () => {
     expect(state.rows[1]).toMatchObject({ kind: 'header', labelKey: K.yourProfiles });
     expect(state.rows[2]).toMatchObject({ kind: 'profile', isEffectiveDefault: false });
     expect(state.rows[3]).toMatchObject({ kind: 'profile', isEffectiveDefault: true });
+  });
+
+  it('names the effective default in the no-override row instead of No profile', () => {
+    const personal = buildProfileSelectorState({
+      organizationId: undefined,
+      orgProfiles: [],
+      personalProfiles: [PERSONAL_PROFILE, PERSONAL_DEFAULT],
+      effectiveDefaultId: 'user-2',
+      selectedProfileId: null,
+    });
+    const organization = buildProfileSelectorState({
+      organizationId: 'org-1',
+      orgProfiles: [ORG_PROFILE],
+      personalProfiles: [PERSONAL_PROFILE],
+      effectiveDefaultId: 'org-1',
+      selectedProfileId: null,
+    });
+    // Personal context resolves the default from the personal list alone, so an
+    // org profile's own flag never names the default here.
+    const personalWithAnOrgDefaultFlag = buildProfileSelectorState({
+      organizationId: undefined,
+      orgProfiles: [ORG_PROFILE],
+      personalProfiles: [PERSONAL_PROFILE],
+      effectiveDefaultId: 'org-1',
+      selectedProfileId: null,
+    });
+
+    expect(personal.rows[0]).toMatchObject({ kind: 'none', labelKey: K.noOverrideWithDefault });
+    expect(personal.noOverrideLabelKey).toBe(K.noOverrideWithDefault);
+    expect(organization.noOverrideLabelKey).toBe(K.noOverrideWithDefault);
+    expect(personalWithAnOrgDefaultFlag.noOverrideLabelKey).toBe(K.noProfile);
   });
 
   it('resolves the selected profile and its effective-default star', () => {

@@ -24,6 +24,12 @@ export type ProfilePickerSheetProps = {
   hasProfiles: boolean;
   /** The user's explicit pick, or null when the effective default applies. */
   selectedOverrideProfileId: string | null;
+  /**
+   * Whether an effective default applies when no override is picked. The
+   * no-override row then clears the pick and that default is what the session
+   * runs on, so the row names the default instead of claiming no profile.
+   */
+  defaultProfileApplies: boolean;
   isLoading: boolean;
   isError: boolean;
   /** The picked id no longer resolves to a profile. */
@@ -35,7 +41,7 @@ export type ProfilePickerSheetProps = {
 };
 
 /**
- * The session-start profile picker body: a "No profile" row plus one row per
+ * The session-start profile picker body: the no-override row plus one row per
  * candidate, with the manage-profiles entry. Presented by
  * `agent-chat/profile-picker` inside the app's standard native formSheet, so
  * dismissal is the sheet's swipe-down or this header's Cancel.
@@ -43,6 +49,7 @@ export type ProfilePickerSheetProps = {
 export function ProfilePickerSheet({
   candidates,
   hasProfiles,
+  defaultProfileApplies,
   selectedOverrideProfileId,
   isLoading,
   isError,
@@ -55,6 +62,11 @@ export function ProfilePickerSheet({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const title = t('agentChat.newSession.pickProfile');
+  // Clearing the override hands the session to the effective default, so the
+  // row names that default instead of claiming no profile is active.
+  const noOverrideLabelKey = defaultProfileApplies
+    ? 'profiles.defaultSectionTitle'
+    : 'agentChat.newSession.noProfile';
 
   if (isLoading) {
     return (
@@ -122,12 +134,12 @@ export function ProfilePickerSheet({
             onSelect(null);
           }}
           {...radioItemA11y({
-            label: t('agentChat.newSession.noProfile'),
+            label: t(noOverrideLabelKey),
             checked: selectedOverrideProfileId === null && !needsAttention,
           })}
         >
           <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-            {t('agentChat.newSession.noProfile')}
+            {t(noOverrideLabelKey)}
           </Text>
           {selectedOverrideProfileId === null && !needsAttention ? (
             <Check size={18} color={colors.primary} />

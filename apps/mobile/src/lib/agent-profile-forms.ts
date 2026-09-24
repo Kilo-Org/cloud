@@ -13,6 +13,15 @@ const PROFILE_NAME_MAX_LENGTH = 100;
 /** Server bound: `VarSchema`'s `z.string().min(1).max(256)`. */
 export const VARIABLE_KEY_MAX_LENGTH = 256;
 
+/**
+ * Server bound: the inline session layer's env-var values. The prepare-session
+ * input caps each value at 256 characters (`cloud-agent-next-schemas.ts`'s
+ * `envVars` record), which is stricter than a profile's own `VarSchema`
+ * (10000), so the manual editor under Advanced Configuration applies this
+ * bound where the profile editor does not.
+ */
+export const MAX_SESSION_ENV_VAR_VALUE_LENGTH = 256;
+
 /** Server pattern: `profile-skills-service.ts`'s `SKILL_NAME_PATTERN`. */
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 

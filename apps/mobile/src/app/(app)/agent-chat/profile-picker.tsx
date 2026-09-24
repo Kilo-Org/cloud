@@ -58,6 +58,9 @@ export default function ProfilePickerScreen() {
       candidates={picker.candidates}
       hasProfiles={allProfiles.length > 0}
       selectedOverrideProfileId={bridge.selectedOverrideProfileId}
+      // A default exists, so clearing the override is not "no profile": the
+      // server resolves that default on top of any repository binding.
+      defaultProfileApplies={effectiveDefaultId !== null}
       isLoading={isLoading}
       isError={isError}
       needsAttention={picker.overrideNeedsAttention}

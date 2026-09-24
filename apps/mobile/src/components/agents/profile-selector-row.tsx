@@ -166,7 +166,7 @@ export function ProfileSelectorRow({
             <Settings2 size={16} color={colors.mutedForeground} />
           )}
           <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-            {selected?.name ?? t('agentChat.newSession.noProfile')}
+            {selected?.name ?? t(state.noOverrideLabelKey)}
           </Text>
           {selected && state.selectedIsEffectiveDefault ? (
             <Star size={14} color={colors.primary} fill={colors.primary} />

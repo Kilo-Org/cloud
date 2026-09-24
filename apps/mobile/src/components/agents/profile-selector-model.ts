@@ -5,10 +5,12 @@ import { type ProfileCountItem } from '@/lib/profile-count-labels';
  *
  * Ports the web `ProfileSelector` option list (`apps/web/src/components/
  * cloud-agent/ProfileSelector.tsx:84-102,173-222`) to the mobile selector
- * sheet: a `No profile` row, an Organization Profiles group and a Personal
+ * sheet: the no-override row, an Organization Profiles group and a Personal
  * Profiles group (owner icons, effective-default star, per-row var/command
  * counts), then the `Manage profiles...` and `Default Profiles for Repos`
- * entries.
+ * entries. The no-override row drops the override and the effective default
+ * still applies, so it is labeled `Default profile` whenever the context has
+ * one and only says `No profile` when nothing applies at all.
  *
  * No React and no React Native imports: every function here is unit-tested
  * directly in `profile-selector-model.test.ts`. The row owns rendering; this
@@ -16,6 +18,12 @@ import { type ProfileCountItem } from '@/lib/profile-count-labels';
  */
 
 export const PROFILE_SELECTOR_KEYS = {
+  /**
+   * The no-override row when an effective default applies: the row clears the
+   * pick and that default is what the session then runs on.
+   */
+  noOverrideWithDefault: 'profiles.defaultSectionTitle',
+  /** The no-override row when no profile would apply: nothing is selected. */
   noProfile: 'agentChat.newSession.noProfile',
   manageProfiles: 'agentChat.newSession.manageProfiles',
   repoDefaults: 'profiles.repoBindings.title',
@@ -39,7 +47,8 @@ export type ProfileSelectorProfile = Readonly<{
 /**
  * One row of the selector sheet, in render order. A `header` row opens a
  * group; `profile` rows are the choices; `none`, `manage` and `repo-defaults`
- * are the fixed entries.
+ * are the fixed entries. The `none` row is the no-override choice: it clears
+ * the pick, so it names the effective default when the context has one.
  */
 export type ProfileSelectorRow =
   | Readonly<{ kind: 'none'; key: 'none'; labelKey: string }>
@@ -59,6 +68,12 @@ export type ProfileSelectorState = Readonly<{
   selectedProfile: ProfileSelectorProfile | null;
   /** True when the selected profile is the effective default for the context. */
   selectedIsEffectiveDefault: boolean;
+  /**
+   * The label for the `none` row and for the closed selector row while no
+   * override is picked: `Default profile` when an effective default applies,
+   * `No profile` when nothing does.
+   */
+  noOverrideLabelKey: string;
 }>;
 
 /**
@@ -85,7 +100,7 @@ export type BuildProfileSelectorStateInput = Readonly<{
   personalProfiles: readonly ProfileSelectorProfile[];
   /** `listCombined.effectiveDefaultId`, or the personal default's id. */
   effectiveDefaultId: string | null;
-  /** The profile the form currently holds, or null for `No profile`. */
+  /** The profile the form currently holds as an override, or null for none. */
   selectedProfileId: string | null;
   /**
    * Whether to offer the `Default profiles for repos...` entry. The caller
@@ -112,10 +127,15 @@ export function buildProfileSelectorState({
   const selectedProfile = allProfiles.find(profile => profile.id === selectedProfileId) ?? null;
   const isEffectiveDefault = (profile: ProfileSelectorProfile): boolean =>
     isOrganization ? profile.id === effectiveDefaultId : profile.isDefault;
+  // The no-override row hands the session to the effective default, so it only
+  // claims `No profile` when the context resolves none. Personal context reads
+  // the personal list, the same one the star and the selection use.
+  const contextProfiles = isOrganization ? allProfiles : personalProfiles;
+  const noOverrideLabelKey = contextProfiles.some(profile => isEffectiveDefault(profile))
+    ? PROFILE_SELECTOR_KEYS.noOverrideWithDefault
+    : PROFILE_SELECTOR_KEYS.noProfile;
 
-  const rows: ProfileSelectorRow[] = [
-    { kind: 'none', key: 'none', labelKey: PROFILE_SELECTOR_KEYS.noProfile },
-  ];
+  const rows: ProfileSelectorRow[] = [{ kind: 'none', key: 'none', labelKey: noOverrideLabelKey }];
 
   if (isOrganization && orgProfiles.length > 0) {
     rows.push({
@@ -164,5 +184,6 @@ export function buildProfileSelectorState({
     rows,
     selectedProfile,
     selectedIsEffectiveDefault: selectedProfile !== null && isEffectiveDefault(selectedProfile),
+    noOverrideLabelKey,
   };
 }

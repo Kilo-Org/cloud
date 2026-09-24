@@ -153,6 +153,13 @@ type VariableEditFormProps = Readonly<{
    */
   existingKeys?: readonly string[];
   isSaving: boolean;
+  /**
+   * The bound the value must satisfy, when the caller's target is stricter
+   * than the profile's own 10000-character server cap. The manual session
+   * editor passes the prepare-session limit, so an over-long value is not
+   * typeable in the first place.
+   */
+  maxValueLength?: number;
   onCancel: () => void;
   onSave: (edit: VariableEdit) => Promise<boolean>;
 }>;
@@ -168,6 +175,7 @@ export function VariableEditForm({
   initial,
   existingKeys = [],
   isSaving,
+  maxValueLength,
   onCancel,
   onSave,
 }: VariableEditFormProps) {
@@ -221,6 +229,7 @@ export function VariableEditForm({
         label={t('profiles.valueLabel')}
         placeholder={valuePlaceholder}
         defaultValue={initial.value}
+        maxLength={maxValueLength}
         secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"
         autoCorrect={false}

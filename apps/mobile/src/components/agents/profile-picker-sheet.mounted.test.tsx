@@ -68,6 +68,7 @@ function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePick
     candidates: [BACKEND, FRONTEND],
     hasProfiles: true,
     selectedOverrideProfileId: null,
+    defaultProfileApplies: false,
     isLoading: false,
     isError: false,
     needsAttention: false,
@@ -158,6 +159,25 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({ selectedOverrideProfileId: 'backend', onSelect });
 
     press(radio(renderer, 'No profile'));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('names the effective default on the row that clears the override', () => {
+    const onSelect = vi.fn<() => void>();
+    const renderer = mount({
+      selectedOverrideProfileId: 'backend',
+      defaultProfileApplies: true,
+      onSelect,
+    });
+
+    // Clearing the override hands the session to the default, so the row says
+    // which profile that is instead of claiming no profile.
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'Default profile',
+      'Backend',
+      'Frontend',
+    ]);
+    press(radio(renderer, 'Default profile'));
     expect(onSelect).toHaveBeenLastCalledWith(null);
   });
 

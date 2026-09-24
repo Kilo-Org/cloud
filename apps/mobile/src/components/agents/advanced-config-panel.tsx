@@ -55,19 +55,21 @@ type AdvancedConfigPanelProps = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
   organizationId?: string;
   /**
-   * The profile the session currently holds, or null for `No profile`. Owned
-   * by the session body so the Environment row and this selector are one
-   * control driving the submitted `profileId`. Required: a caller cannot
-   * render an inert selector.
+   * The profile the session holds as an override, or null when none is picked
+   * (the selector row then names the effective default, or `No profile` when
+   * the context has none). Owned by the session body so the Environment row
+   * and this selector are one control driving the submitted `profileId`.
+   * Required: a caller cannot render an inert selector.
    */
   selectedProfileId: string | null;
-  /** Reports a pick (or `No profile`) to the session that owns the override. */
+  /** Reports a pick, or clearing it, to the session that owns the override. */
   onSelectProfile: (id: string | null) => void;
   /**
    * The session's manual environment variables and setup commands, owned by the
    * new-session route so the create can carry them. The panel edits them through
    * the callbacks and keeps no draft of its own, so a value entered here is
    * never dropped when the session starts without saving a profile first.
+   * Saving them as a profile clears both, because the profile now carries them.
    */
   manualVars: readonly VariableEdit[];
   manualCommands: readonly string[];
@@ -192,7 +194,7 @@ export function AdvancedConfigPanel({
         await setAsDefault.mutateAsync({ profileId });
       }
       // Show the new profile immediately, before the invalidated list refetch
-      // lands, so the selector never flashes back to "No profile".
+      // lands, so the selector never falls back to its no-override label.
       setCreatedProfile({
         id: profileId,
         name: submission.name,
@@ -202,6 +204,11 @@ export function AdvancedConfigPanel({
         ownerType: organizationId === undefined ? 'user' : 'organization',
       });
       onSelectProfile(profileId);
+      // The saved profile now carries these values, so the draft must not stay
+      // behind: the profile's setup commands are appended to the inline ones,
+      // and leaving the draft populated would run every saved command twice.
+      onManualVarsChange([]);
+      onManualCommandsChange([]);
       toast.success(t('agentChat.newSession.profileSaved', { name: submission.name }));
       return true;
     } catch (error) {

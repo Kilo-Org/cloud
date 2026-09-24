@@ -14,8 +14,8 @@ import type {
   GatewayResponsesRequest,
   GatewayMessagesRequest,
   GatewayRequest,
-  OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
+import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
@@ -339,13 +339,10 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
   const { settings: privacySettings } = await balanceAndSettingsPromise;
   const requestProvider = requestBodyParsed.body.provider;
-  const dataCollection =
-    requestProvider?.data_collection === 'deny' || privacySettings?.data_collection === 'deny'
-      ? 'deny'
-      : (privacySettings?.data_collection ?? requestProvider?.data_collection);
-  const effectivePrivacy: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'> = {};
-  if (dataCollection !== undefined) effectivePrivacy.data_collection = dataCollection;
-  if (requestProvider?.zdr !== undefined) effectivePrivacy.zdr = requestProvider.zdr;
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestProvider,
+    privacySettings?.data_collection
+  );
   if (Object.keys(effectivePrivacy).length > 0) {
     requestBodyParsed.body.provider = { ...requestProvider, ...effectivePrivacy };
   }

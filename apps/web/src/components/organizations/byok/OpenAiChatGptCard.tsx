@@ -96,9 +96,16 @@ const CARD_ACTION_CLASS = 'w-fit';
 
 /** The declined/failed authorization copy, keyed by the returned error code. */
 function openAiChatGptAuthErrorMessage(code: string): string {
-  return code === 'access_denied'
-    ? 'ChatGPT was not connected. Try again.'
-    : "We couldn't connect ChatGPT. Try again.";
+  if (code === 'access_denied') {
+    return 'ChatGPT was not connected. Try again.';
+  }
+  // A `TURNSTILE_REQUIRED` code is the expired linking session: the person took
+  // too long on the OpenAI consent screen and the callback fell back to the
+  // plain sign-in gate. Name the timeout instead of the generic connect failure.
+  if (code === 'TURNSTILE_REQUIRED') {
+    return 'ChatGPT was not connected in time. Try again.';
+  }
+  return "We couldn't connect ChatGPT. Try again.";
 }
 
 /** The email claim, or the issuer-scoped subject when the token has no email. */

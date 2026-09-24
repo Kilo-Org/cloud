@@ -272,6 +272,13 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
 
+  it('names the expired linking session instead of the generic connect failure', () => {
+    const html = render({ status: { state: 'disconnected' }, authErrorCode: 'TURNSTILE_REQUIRED' });
+
+    expect(html).toContain('ChatGPT was not connected in time. Try again.');
+    expect(html.match(/>Try again</g)).toHaveLength(1);
+  });
+
   it('offers the promised Try again retry when the linking session fails', () => {
     const html = render({ status: { state: 'disconnected' }, authErrorCode: 'connect_failed' });
 

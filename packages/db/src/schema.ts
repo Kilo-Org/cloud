@@ -6368,6 +6368,14 @@ export const cli_sessions_v2 = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'set null',
     }),
+    // The profile the session was prepared with, resolved server-side (an
+    // explicit pick, the effective default, or a repository binding). Null on
+    // rows created before this column existed and on sessions whose create
+    // origin resolved no profile. `set null` so deleting a profile keeps the
+    // session history readable.
+    profile_id: uuid().references(() => agent_environment_profiles.id, {
+      onDelete: 'set null',
+    }),
     cloud_agent_session_id: text(),
     cloud_agent_session_scope_id: text(),
     cloud_agent_worktree_id: text(),

@@ -50,6 +50,9 @@ vi.mock('react-native', () => ({
     },
   },
   Dimensions: { get: () => ({ height: 900 }) },
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',

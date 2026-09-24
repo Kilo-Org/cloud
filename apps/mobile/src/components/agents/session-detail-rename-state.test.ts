@@ -45,20 +45,47 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
-  it('treats a machine placeholder server title as absent and shows the fallback label', () => {
-    expect(
-      getSessionDetailRenameState({
-        fallbackTitle,
-        isLoaded: true,
-        serverTitle: 'New session - 2026-09-22T16:37:00.000Z',
-        renameState: initialRenameState(),
-      })
-    ).toEqual({
-      title: fallbackTitle,
-      isTitleInteractive: true,
-      modalInitialValue: null,
-      isModalOpen: false,
+  it('falls back to the caller title when the server title is the creation placeholder', () => {
+    // A session created through cloud-agent-next carries
+    // `New session - <ISO instant>` (or the child variant) until it is named.
+    // The header must never paint that machine string, whether it arrived as
+    // the fetched server title or as a live `session.updated` title (which
+    // reaches the hook as `serverTitle`).
+    const state = getSessionDetailRenameState({
+      fallbackTitle: 'Session',
+      isLoaded: true,
+      serverTitle: 'New session - 2026-09-22T17:26:31.465Z',
+      renameState: { ...initialRenameState(), isModalOpen: true },
     });
+    expect(state.title).toBe('Session');
+    expect(state.modalInitialValue).toBe('Session');
+    expect(state.title).not.toContain('2026-09-22');
+  });
+
+  it('returns a real caller fallback unchanged and normalizes a placeholder one', () => {
+    // The screen pre-sanitizes the cached list title before it becomes
+    // `fallbackTitle` (session-detail-content.tsx), so a real name passes
+    // through untouched. The helper normalizes a placeholder or blank fallback
+    // to the generic label as well, so a machine timestamp can never reach the
+    // header even if one is handed in.
+    for (const fallback of ['Session', 'Fix login bug']) {
+      const state = getSessionDetailRenameState({
+        fallbackTitle: fallback,
+        isLoaded: true,
+        serverTitle: undefined,
+        renameState: initialRenameState(),
+      });
+      expect(state.title).toBe(fallback);
+    }
+    for (const fallback of ['New session - 2026-09-22T17:26:31.465Z', '   ']) {
+      const state = getSessionDetailRenameState({
+        fallbackTitle: fallback,
+        isLoaded: true,
+        serverTitle: undefined,
+        renameState: initialRenameState(),
+      });
+      expect(state.title).toBe(i18n.t('agentChat.session.title'));
+    }
   });
 
   it('falls back to the fallback name when the server title is a generated placeholder', () => {

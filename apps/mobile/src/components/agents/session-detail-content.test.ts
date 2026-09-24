@@ -692,7 +692,10 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
-  /** The route's cached metadata title, as `[session-id].tsx` passes it. */
+  /**
+   * The route's cached list title, seeded before the session record loads, as
+   * `[session-id].tsx` passes it.
+   */
   cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
@@ -1086,6 +1089,21 @@ describe('SessionDetailContent header title', () => {
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
+  // The route seeds the header with the cached list title it opened from. A
+  // session created through cloud-agent-next carries the creation placeholder
+  // `New session - <ISO instant>` there, and the header must fall back to its
+  // own title rather than paint the machine string while the record loads.
+  it('shows the fallback title instead of a placeholder cached title', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], {
+      metadataReady: metadata.promise,
+      cachedTitle: 'New session - 2026-09-22T17:26:31.465Z',
+    });
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(String(header.props.title)).not.toContain('2026-09-22');
+  });
+
   it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
     const { renderer } = await mountDetails();
     const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {

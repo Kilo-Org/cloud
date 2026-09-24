@@ -2,7 +2,7 @@ import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 
 import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@/lib/config';
 import { performRefresh, REFRESH_MARGIN_MS } from '@/lib/auth/credentials';

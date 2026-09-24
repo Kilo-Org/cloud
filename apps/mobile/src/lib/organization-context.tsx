@@ -89,10 +89,13 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // explicit Personal choice. An absent value is 'not chosen yet': the
       // organization list decides the default and the effect below publishes it.
       // A legacy absent value is treated the same way.
-      const [stored, marker] = await Promise.all([
-        SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY),
-        SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY),
-      ]);
+      // The two reads are kept apart: a stored organization stands alone, so a
+      // marker-read failure must not discard it. The marker is only consulted
+      // when no organization is stored, and a failure there stays a restore
+      // error — the selection is then genuinely undetermined.
+      const stored = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+      const marker =
+        stored === null ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY) : null;
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
         if (stored) {
           activeId.current = stored;

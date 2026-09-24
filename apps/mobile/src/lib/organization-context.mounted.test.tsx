@@ -298,6 +298,43 @@ describe('OrganizationProvider restoration fencing', () => {
     expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true, error: null });
   });
 
+  it('honors a saved organization when the Personal marker read fails', async () => {
+    savedMetadata.set(ORG_KEY, 'org-b');
+    storage.read.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === MARKER_KEY) {
+        throw new Error('marker read failed');
+      }
+      return savedMetadata.get(key) ?? null;
+    });
+    list.mockResolvedValue([orgA]);
+
+    await mount();
+    await waitFor(() => scope().isLoaded);
+
+    expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
+    // A stored organization is its own answer, so the marker is never read and
+    // its failure cannot discard the saved selection.
+    expect(storage.read).not.toHaveBeenCalledWith(MARKER_KEY);
+  });
+
+  it('reports a restore error when the marker read fails with no saved organization', async () => {
+    storage.read.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === MARKER_KEY) {
+        throw new Error('marker read failed');
+      }
+      return null;
+    });
+
+    await mount();
+
+    // Neither key is readable, so the required selection state is unknown and
+    // the existing restore error stands.
+    expect(scope()).toMatchObject({ isLoaded: false, error: 'restore' });
+    expect(storage.read).toHaveBeenCalledWith(MARKER_KEY);
+  });
+
   it.each(['resolve', 'reject'])('ignores an obsolete read %s after selection', async outcome => {
     const read = Promise.withResolvers<string | null>();
     storage.read.mockReturnValue(read.promise);

@@ -118,7 +118,7 @@ describe('external model cache', () => {
           enkrypt: { untrusted: true },
         })),
       },
-      synced_at: new Date().toISOString(),
+      synced_at: new Date(current - 1_000).toISOString(),
     });
 
     const cached = await getCachedOpenRouterModels();

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
 import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import type { ConnectionTicketDO } from '../do/connection-ticket-do';
-import { TICKET_MINT_BUDGET_MS } from '../index';
+import { TICKET_MINT_BUDGET_MS } from '../ticket-mint-budget';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const ACCEPTED_PROTOCOL = 'kilo.events.v1';
@@ -171,6 +171,14 @@ describe('event-service WebSocket connection tickets', () => {
   it('keeps the mint budget strictly below the client control-plane deadline', () => {
     expect(TICKET_MINT_BUDGET_MS).toBeGreaterThan(0);
     expect(TICKET_MINT_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  });
+
+  it('does not export the mint budget from the worker entry', async () => {
+    // workerd treats every named export of the Worker entry as a Durable Object
+    // or ExportedHandler. A number there fails boot with
+    // "Incorrect type for map entry 'TICKET_MINT_BUDGET_MS'".
+    const workerEntry = await import('../index');
+    expect(workerEntry).not.toHaveProperty('TICKET_MINT_BUDGET_MS');
   });
 
   it('answers the retryable mint failure when the auth read never settles', async () => {

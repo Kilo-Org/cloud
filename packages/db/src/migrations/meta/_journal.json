@@ -1793,13 +1793,6 @@
       "when": 1790087177194,
       "tag": "0255_drop_repository_customizations",
       "breakpoints": true
-    },
-    {
-      "idx": 256,
-      "version": "7",
-      "when": 1790196108018,
-      "tag": "0256_curved_prima",
-      "breakpoints": true
     }
   ]
 }

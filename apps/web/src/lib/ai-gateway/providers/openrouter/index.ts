@@ -30,6 +30,7 @@ import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/provider
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+import { getModelDataPolicies } from '@/lib/ai-gateway/providers/openrouter/model-data-policy.server';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -117,6 +118,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
+  const dataPolicies = await getModelDataPolicies();
   const enhancedModels = await Promise.all(
     models
       .filter(
@@ -145,6 +147,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
+          ...(dataPolicies.get(model.id)?.some(policy => policy.training) && {
+            mayTrainOnYourPrompts: true,
+          }),
         };
       })
       .concat(

@@ -3,6 +3,14 @@ import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-clie
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { hasBestEffortGuessDataCollectionRequirement } from '@/lib/ai-gateway/is-free-model';
+import { getModelDataPolicies } from '@/lib/ai-gateway/providers/openrouter/model-data-policy.server';
+import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  isDataCollectionExplicitlyDisallowed,
+  type OpenRouterProviderConfig,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
@@ -39,7 +47,9 @@ export function candidateModelIdsFromSources(
     );
   return [
     ...new Set(
-      [...fromPoolOrTable, ...CODING_PLAN_DEFAULT_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
+      [...fromPoolOrTable, ...CODING_PLAN_DEFAULT_MODEL_IDS, PRIMARY_DEFAULT_MODEL].filter(
+        id => !isVirtualAutoModelId(id)
+      )
     ),
   ];
 }
@@ -80,34 +90,76 @@ export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promis
 }
 
 export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
-  const [table, poolModelIds] = await Promise.all([
-    getCachedRoutingTable(),
-    loadEffectivePoolModelIds(owner),
-  ]);
-  return candidateModelIdsFromSources(table, poolModelIds);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const [table, poolModelIds] = await Promise.race([
+      Promise.all([getCachedRoutingTable(), loadEffectivePoolModelIds(owner)]),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('Auto routing candidate lookup timed out')),
+          5000
+        );
+      }),
+    ]);
+    return candidateModelIdsFromSources(table, poolModelIds);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function collectDeniedAutoRoutingModelIds(
-  policy: EffectiveOrganizationModelPolicy,
-  owner: AutoRoutingOwner
+  policy: EffectiveOrganizationModelPolicy | null,
+  owner: AutoRoutingOwner,
+  provider?: OpenRouterProviderConfig
 ): Promise<string[]> {
-  if (!policyNeedsCandidateEvaluation(policy) && policy.organizationModelDenyList.length === 0) {
+  const privacyProvider = {
+    ...provider,
+    ...(policy?.dataCollection === 'deny' && { data_collection: 'deny' as const }),
+  };
+  const checkPrivacy = isDataCollectionExplicitlyDisallowed(privacyProvider);
+  const checkAccess = policy !== null && policyNeedsCandidateEvaluation(policy);
+  if (!checkPrivacy && !checkAccess && !policy?.organizationModelDenyList.length) {
     return [];
   }
 
-  const candidateIds = await loadAutoRoutingCandidateModelIds(owner);
-  if (!policyNeedsCandidateEvaluation(policy)) {
-    return deniedModelIdsForCandidates(policy, candidateIds, () => true);
-  }
-
+  const [candidateIds, dataPolicies] = await Promise.all([
+    loadAutoRoutingCandidateModelIds(owner),
+    checkPrivacy ? getModelDataPolicies() : undefined,
+  ]);
   const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const allowed = new Set<string>();
   await Promise.all(
     uniqueCandidates.map(async modelId => {
-      if ((await getEffectiveModelDecision(policy, modelId)).allowed) {
-        allowed.add(modelId);
+      const decision = checkAccess
+        ? await getEffectiveModelDecision(policy, modelId)
+        : { allowed: true, eligibleProviderRoutes: undefined };
+      if (!decision.allowed) return;
+      if (checkPrivacy) {
+        if (await hasBestEffortGuessDataCollectionRequirement(modelId)) return;
+        const routes = dataPolicies?.get(modelId);
+        if (routes?.length) {
+          const eligible = routes.filter(route => {
+            const slug = normalizeInferenceProviderId(route.providerSlug);
+            return (
+              (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(slug)) &&
+              (!privacyProvider.only ||
+                privacyProvider.only.some(id => normalizeInferenceProviderId(id) === slug)) &&
+              !privacyProvider.ignore?.some(id => normalizeInferenceProviderId(id) === slug)
+            );
+          });
+          if (
+            !eligible.some(
+              route => !route.training && (privacyProvider.zdr !== true || !route.retainsPrompts)
+            )
+          ) {
+            return;
+          }
+        }
       }
+      allowed.add(modelId);
     })
   );
-  return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
+  return policy
+    ? deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId))
+    : uniqueCandidates.filter(modelId => !allowed.has(modelId));
 }

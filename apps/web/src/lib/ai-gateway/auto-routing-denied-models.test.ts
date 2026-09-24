@@ -1,12 +1,24 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effective-model-access.server';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
+import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
+import { hasBestEffortGuessDataCollectionRequirement } from '@/lib/ai-gateway/is-free-model';
+import { getModelDataPolicies } from '@/lib/ai-gateway/providers/openrouter/model-data-policy.server';
+import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import {
   candidateModelIdsFromSources,
   collectDeniedAutoRoutingModelIds,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
+
+jest.mock('@/lib/ai-gateway/auto-routing-admin-client');
+jest.mock('@/lib/ai-gateway/auto-routing-table-cache');
+jest.mock('@/lib/ai-gateway/is-free-model');
+jest.mock('@/lib/ai-gateway/providers/openrouter/model-data-policy.server');
+jest.mock('@/lib/organizations/effective-model-access.server');
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}
@@ -64,8 +76,120 @@ describe('policyNeedsCandidateEvaluation', () => {
 });
 
 describe('collectDeniedAutoRoutingModelIds', () => {
+  const contributor = 'meta/muse-spark-1.3-contributor';
+  const standard = 'meta/muse-spark-1.3';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getCachedRoutingTable).mockResolvedValue(null);
+    jest.mocked(getAutoRoutingSettings).mockResolvedValue({
+      status: 200,
+      body: { configuredPool: [{ model: contributor }, { model: standard }] },
+    } as Awaited<ReturnType<typeof getAutoRoutingSettings>>);
+    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(false);
+    jest.mocked(getEffectiveModelDecision).mockResolvedValue({ allowed: true });
+    jest.mocked(getModelDataPolicies).mockResolvedValue(
+      new Map([
+        [contributor, [{ providerSlug: 'meta', training: true, retainsPrompts: true }]],
+        [standard, [{ providerSlug: 'meta', training: false, retainsPrompts: true }]],
+      ])
+    );
+  });
+
   it('returns no denials without loading when the policy cannot deny anything', async () => {
     await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
+    expect(getModelDataPolicies).not.toHaveBeenCalled();
+    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
+  });
+
+  it('excludes paid training models for personal data-collection deny requests', async () => {
+    await expect(
+      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
+    ).resolves.toEqual([contributor]);
+  });
+
+  it('enforces organization privacy even with unrestricted model access and a client allow', async () => {
+    await expect(
+      collectDeniedAutoRoutingModelIds(policy({ dataCollection: 'deny' }), owner, {
+        data_collection: 'allow',
+      })
+    ).resolves.toEqual([contributor]);
+  });
+
+  it('excludes retained-only models for ZDR but not for training denial', async () => {
+    await expect(collectDeniedAutoRoutingModelIds(null, owner, { zdr: true })).resolves.toEqual([
+      contributor,
+      standard,
+    ]);
+  });
+
+  it('keeps mixed-policy models when a nontraining route is eligible', async () => {
+    jest.mocked(getModelDataPolicies).mockResolvedValue(
+      new Map([
+        [
+          contributor,
+          [
+            { providerSlug: 'meta', training: true, retainsPrompts: true },
+            { providerSlug: 'safe', training: false, retainsPrompts: false },
+          ],
+        ],
+      ])
+    );
+    await expect(
+      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
+    ).resolves.toEqual([]);
+    await expect(
+      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny', only: ['meta'] })
+    ).resolves.toEqual([contributor]);
+    await expect(
+      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny', ignore: ['safe'] })
+    ).resolves.toEqual([contributor]);
+    jest.mocked(getEffectiveModelDecision).mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['meta']),
+    });
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({ memberGrant: { mode: 'organization_baseline' }, dataCollection: 'deny' }),
+        owner
+      )
+    ).resolves.toEqual([contributor]);
+  });
+
+  it('retains known free and exclusive collection requirements when metadata is missing', async () => {
+    jest.mocked(getModelDataPolicies).mockResolvedValue(new Map());
+    jest
+      .mocked(hasBestEffortGuessDataCollectionRequirement)
+      .mockImplementation(async id => id === contributor || id === PRIMARY_DEFAULT_MODEL);
+    await expect(
+      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
+    ).resolves.toEqual([contributor, PRIMARY_DEFAULT_MODEL]);
+  });
+
+  it('combines access-policy and privacy denials', async () => {
+    jest.mocked(getEffectiveModelDecision).mockImplementation(async (_policy, id) => ({
+      allowed: id !== standard,
+    }));
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({ memberGrant: { mode: 'organization_baseline' }, dataCollection: 'deny' }),
+        owner
+      )
+    ).resolves.toEqual([contributor, standard]);
+  });
+
+  it('bounds a stalled candidate lookup', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.mocked(getAutoRoutingSettings).mockReturnValue(new Promise(() => {}));
+      const result = expect(
+        collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
+      ).rejects.toThrow('Auto routing candidate lookup timed out');
+      await jest.advanceTimersByTimeAsync(5000);
+      await result;
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

@@ -38,6 +38,10 @@ import {
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
+import {
+  getModelDataPolicies,
+  type ModelDataPolicy,
+} from '@/lib/ai-gateway/providers/openrouter/model-data-policy.server';
 
 let mockPublicationEnabled = true;
 let mockAuth: { user: { id: string } | null; organizationId: string | null };
@@ -126,6 +130,10 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({})),
   getVercelModelsMetadataFromDatabase: jest.fn(async () => ({})),
+}));
+
+jest.mock('@/lib/ai-gateway/providers/openrouter/model-data-policy.server', () => ({
+  getModelDataPolicies: jest.fn(async () => new Map()),
 }));
 
 jest.mock('@/lib/ai-gateway/byok', () => {
@@ -217,6 +225,7 @@ beforeEach(() => {
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
   jest.mocked(listAvailableExperimentModels).mockReset().mockResolvedValue([]);
+  jest.mocked(getModelDataPolicies).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();
   mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
@@ -461,6 +470,133 @@ describe('GET /api/openrouter/models', () => {
     for (const model of responseData.data) {
       expect(model).not.toHaveProperty('enkrypt');
     }
+  });
+});
+
+describe('catalog training policies', () => {
+  test.each([
+    {
+      name: 'paid Contributor',
+      id: 'meta/muse-spark-1.3-contributor',
+      policies: [{ providerSlug: 'meta', training: true, retainsPrompts: true }],
+      expected: true,
+    },
+    {
+      name: 'retention-only paid model',
+      id: 'meta/muse-spark-1.3',
+      policies: [{ providerSlug: 'meta', training: false, retainsPrompts: true }],
+      expected: false,
+    },
+    {
+      name: 'paid model with mixed providers',
+      id: 'provider/mixed',
+      policies: [
+        { providerSlug: 'private', training: false, retainsPrompts: false },
+        { providerSlug: 'training', training: true, retainsPrompts: true },
+      ],
+      expected: true,
+    },
+    {
+      name: 'paid model without snapshot metadata',
+      id: 'provider/missing',
+      policies: [],
+      expected: false,
+    },
+  ])('marks $name using any matching training policy', async ({ id, policies, expected }) => {
+    const original = mockOpenRouterModels.data[0];
+    jest.mocked(isFreeModel).mockResolvedValue(false);
+    jest.mocked(getModelDataPolicies).mockResolvedValue(new Map([[id, policies]]));
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(createMockResponse({ jsonData: { data: [{ ...original, id }] } }));
+
+    const catalog = await getEnhancedOpenRouterModels();
+
+    expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(expected);
+    expect(getModelDataPolicies).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    { explicit: false, training: true, expected: true },
+    { explicit: true, training: false, expected: true },
+    { explicit: false, training: false, expected: false },
+  ])(
+    'preserves explicit flags unless metadata reports training: %p',
+    async ({ explicit, training, expected }) => {
+      const id = 'provider/explicit';
+      jest.mocked(isFreeModel).mockResolvedValue(false);
+      jest
+        .mocked(getModelDataPolicies)
+        .mockResolvedValue(
+          new Map([[id, [{ providerSlug: 'provider', training, retainsPrompts: false }]]])
+        );
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse({
+          jsonData: {
+            data: [{ ...mockOpenRouterModels.data[0], id, mayTrainOnYourPrompts: explicit }],
+          },
+        })
+      );
+
+      const catalog = await getEnhancedOpenRouterModels();
+
+      expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(expected);
+    }
+  );
+
+  test('does not inherit training metadata from a free sibling and retains the free fallback', async () => {
+    const id = 'provider/variant';
+    jest.mocked(isFreeModel).mockImplementation(async modelId => modelId.endsWith(':free'));
+    jest
+      .mocked(getModelDataPolicies)
+      .mockResolvedValue(
+        new Map([
+          [`${id}:free`, [{ providerSlug: 'provider', training: true, retainsPrompts: true }]],
+        ])
+      );
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      createMockResponse({
+        jsonData: {
+          data: [id, `${id}:free`, 'provider/missing:free'].map(modelId => ({
+            ...mockOpenRouterModels.data[0],
+            id: modelId,
+          })),
+        },
+      })
+    );
+
+    const catalog = await getEnhancedOpenRouterModels();
+
+    expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(false);
+    expect(catalog.data.find(model => model.id === `${id}:free`)?.mayTrainOnYourPrompts).toBe(true);
+    expect(
+      catalog.data.find(model => model.id === 'provider/missing:free')?.mayTrainOnYourPrompts
+    ).toBe(true);
+  });
+
+  test('does not overwrite an explicit local Kilo-exclusive false with OpenRouter training metadata', async () => {
+    const exclusive = kiloExclusiveModels.find(
+      model =>
+        model.status === 'public' &&
+        model.pricing &&
+        !model.flags.includes('requires-data-collection')
+    );
+    if (!exclusive) throw new Error('Expected a paid non-training Kilo-exclusive model');
+    const policies: ModelDataPolicy[] = [
+      { providerSlug: 'unrelated-openrouter-provider', training: true, retainsPrompts: true },
+    ];
+    jest.mocked(getModelDataPolicies).mockResolvedValue(new Map([[exclusive.public_id, policies]]));
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      createMockResponse({
+        jsonData: { data: [{ ...mockOpenRouterModels.data[0], id: exclusive.public_id }] },
+      })
+    );
+
+    const catalog = await getEnhancedOpenRouterModels();
+    const models = catalog.data.filter(model => model.id === exclusive.public_id);
+
+    expect(models).toHaveLength(1);
+    expect(models[0].mayTrainOnYourPrompts).toBe(false);
   });
 });
 

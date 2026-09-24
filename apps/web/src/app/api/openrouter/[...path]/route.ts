@@ -273,6 +273,12 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   // Captured before auto-model resolution and provider transforms mutate the
   // parsed body; efficient routing classifies the original user request.
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
+  const requestedPrivacy = {
+    ...(requestBodyParsed.body.provider?.data_collection === 'deny' && {
+      data_collection: 'deny' as const,
+    }),
+    ...(requestBodyParsed.body.provider?.zdr === true && { zdr: true }),
+  };
 
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) ||
@@ -350,6 +356,8 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
   let isAutoEfficientRequest = false;
+  let deniedAutoRoutingModelIds: string[] = [];
+  let autoRoutingPolicyUnavailable = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
@@ -372,13 +380,23 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
             !groupPolicy && plan === 'enterprise'
               ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
               : [];
-          const deniedFromPolicy = groupPolicy
-            ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
-                userId: user.id,
-                organizationId: organizationId ?? null,
-              })
-            : [];
+          const deniedFromPolicy = await collectDeniedAutoRoutingModelIds(
+            groupPolicy,
+            {
+              userId: user.id,
+              organizationId: organizationId ?? null,
+            },
+            {
+              ...requestBodyParsed.body.provider,
+              ...(settings?.data_collection === 'deny' && { data_collection: 'deny' }),
+            }
+          ).catch(() => {
+            autoRoutingPolicyUnavailable = true;
+            return [];
+          });
+          if (autoRoutingPolicyUnavailable) return null;
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
+          deniedAutoRoutingModelIds = deniedModelIds;
           const result = await fetchEfficientAutoDecision({
             apiKind: requestBodyParsed.kind,
             body: requestBodyParsed.body,
@@ -625,6 +643,13 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   }
 
   if (
+    isAutoEfficientRequest &&
+    (autoRoutingPolicyUnavailable || deniedAutoRoutingModelIds.includes(effectiveModelIdLowerCased))
+  ) {
+    return efficientPoolBlockedResponse();
+  }
+
+  if (
     requestBodyParsed.kind === 'responses' &&
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
@@ -660,7 +685,9 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
         settings,
       };
     }
-    let effectiveProviderConfig = providerConfig;
+    let effectiveProviderConfig = providerConfig
+      ? { ...providerConfig, ...requestedPrivacy }
+      : undefined;
     let groupModelAllowed = true;
     let groupProvidersAllowed = true;
     if (groupPolicy) {
@@ -672,7 +699,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
           ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
           : [...groupDecision.eligibleProviderRoutes];
         groupProvidersAllowed = only.length > 0;
-        effectiveProviderConfig = { ...providerConfig, only };
+        effectiveProviderConfig = { ...effectiveProviderConfig, ...requestedPrivacy, only };
       }
     }
     return {

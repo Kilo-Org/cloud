@@ -1,10 +1,16 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  buildModelDataPolicies,
   modelRetainsPrompts,
   modelTrains,
   withWorstProviderDataPolicy,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { OpenRouterSearchResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type {
+  NormalizedOpenRouterResponse,
+  NormalizedProvider,
+  OpenRouterModel,
+} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 const baseModel = {
   slug: 'anthropic/claude-fable-5',
@@ -135,5 +141,114 @@ describe('model data policy', () => {
     const model = response.data.models[0];
     expect(model && modelTrains(model, true)).toBe(true);
     expect(model && modelRetainsPrompts(model, true)).toBe(true);
+  });
+});
+
+describe('buildModelDataPolicies', () => {
+  const provider: NormalizedProvider = {
+    name: 'Meta',
+    displayName: 'Meta',
+    slug: 'meta',
+    dataPolicy: { training: false, retainsPrompts: true, canPublish: false },
+    models: [],
+  };
+  const contributor = {
+    ...baseModel,
+    slug: 'meta/muse-spark-1.3-contributor',
+    endpoint: {
+      provider_display_name: 'Meta',
+      is_free: false,
+      pricing: { prompt: '0.000002', completion: '0.000006' },
+      data_policy: { training: true, retainsPrompts: true },
+    },
+  } satisfies OpenRouterModel;
+
+  function build(providers: NormalizedProvider[]) {
+    const snapshot: NormalizedOpenRouterResponse = {
+      providers,
+      total_providers: providers.length,
+      total_models: providers.reduce((total, item) => total + item.models.length, 0),
+      generated_at: '2026-09-24T00:00:00Z',
+    };
+    return buildModelDataPolicies(snapshot, model => model.slug);
+  }
+
+  test('uses paid Contributor training metadata without treating retention as training', () => {
+    const nonContributor = {
+      ...contributor,
+      slug: 'meta/muse-spark-1.3',
+      endpoint: {
+        ...contributor.endpoint,
+        data_policy: { training: false, retainsPrompts: true },
+      },
+    };
+    const policies = build([{ ...provider, models: [contributor, nonContributor] }]);
+
+    expect(policies.get(contributor.slug)).toEqual([
+      { providerSlug: 'meta', training: true, retainsPrompts: true },
+    ]);
+    expect(policies.get(nonContributor.slug)).toEqual([
+      { providerSlug: 'meta', training: false, retainsPrompts: true },
+    ]);
+  });
+
+  test('keeps policies from every provider serving the same model', () => {
+    const policies = build([
+      {
+        ...provider,
+        slug: 'private',
+        dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+        models: [{ ...contributor, endpoint: null }],
+      },
+      { ...provider, models: [contributor] },
+    ]);
+
+    expect(policies.get(contributor.slug)).toEqual([
+      { providerSlug: 'private', training: false, retainsPrompts: false },
+      { providerSlug: 'meta', training: true, retainsPrompts: true },
+    ]);
+  });
+
+  test.each([null, undefined, {}])(
+    'falls back to provider policy without endpoint policy %p',
+    policy => {
+      const policies = build([
+        {
+          ...provider,
+          dataPolicy: { training: true, retainsPrompts: true, canPublish: false },
+          models: [{ ...contributor, endpoint: { ...contributor.endpoint, data_policy: policy } }],
+        },
+      ]);
+
+      expect(policies.get(contributor.slug)).toEqual([
+        { providerSlug: 'meta', training: true, retainsPrompts: true },
+      ]);
+    }
+  );
+
+  test('preserves conservative provider policies when an endpoint reports no collection', () => {
+    const policies = build([
+      {
+        ...provider,
+        dataPolicy: { training: true, retainsPrompts: true, canPublish: false },
+        models: [
+          {
+            ...contributor,
+            endpoint: {
+              ...contributor.endpoint,
+              data_policy: { training: false, retainsPrompts: false },
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(policies.get(contributor.slug)).toEqual([
+      { providerSlug: 'meta', training: true, retainsPrompts: true },
+    ]);
+  });
+
+  test('returns no policies for a missing snapshot', () => {
+    expect(buildModelDataPolicies(undefined, model => model.slug)).toEqual(new Map());
   });
 });

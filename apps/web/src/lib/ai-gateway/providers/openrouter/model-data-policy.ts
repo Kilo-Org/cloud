@@ -1,4 +1,35 @@
-import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type {
+  NormalizedOpenRouterResponse,
+  OpenRouterModel,
+} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+
+export type ModelDataPolicy = {
+  providerSlug: string;
+  training: boolean;
+  retainsPrompts: boolean;
+};
+
+export function buildModelDataPolicies(
+  snapshot: NormalizedOpenRouterResponse | undefined,
+  getModelVariantId: (model: OpenRouterModel) => string
+): ReadonlyMap<string, readonly ModelDataPolicy[]> {
+  const policies = new Map<string, ModelDataPolicy[]>();
+  for (const provider of snapshot?.providers ?? []) {
+    for (const model of provider.models) {
+      const modelId = getModelVariantId(model);
+      const normalizedModel = withWorstProviderDataPolicy(model, provider.dataPolicy);
+      const policy = {
+        providerSlug: provider.slug,
+        training: modelTrains(normalizedModel, provider.dataPolicy.training),
+        retainsPrompts: modelRetainsPrompts(normalizedModel, provider.dataPolicy.retainsPrompts),
+      };
+      const existing = policies.get(modelId);
+      if (existing) existing.push(policy);
+      else policies.set(modelId, [policy]);
+    }
+  }
+  return policies;
+}
 
 /**
  * OpenRouter returns one route per model even when a provider offers routes with different data

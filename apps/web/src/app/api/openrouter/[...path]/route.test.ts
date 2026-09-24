@@ -38,6 +38,7 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 jest.mock('next/server', () => {
   return {
@@ -1199,6 +1200,138 @@ describe('kilo-auto/efficient classifier billing', () => {
         deniedModelIds: ['openai/gpt-4o'],
       })
     );
+  });
+
+  it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
+    'passes personal privacy restrictions and denials to %s selection',
+    async model => {
+      mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['meta/muse-spark-1.3-contributor']);
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest({
+          ...makeBody(model),
+          provider: { data_collection: 'deny', zdr: true, only: ['anthropic'], ignore: ['meta'] },
+        }) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalledWith(
+        null,
+        { userId: 'user-123', organizationId: null },
+        { data_collection: 'deny', zdr: true, only: ['anthropic'], ignore: ['meta'] }
+      );
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deniedModelIds: ['meta/muse-spark-1.3-contributor'],
+        })
+      );
+      expect(mockedUpstreamRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            provider: {
+              data_collection: 'deny',
+              zdr: true,
+              only: ['anthropic'],
+              ignore: ['meta'],
+            },
+          }),
+        })
+      );
+    }
+  );
+
+  it('applies team data-collection denial before Auto selection', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+      plan: 'teams',
+    });
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        ...makeBody('kilo-auto/efficient'),
+        provider: { data_collection: 'allow' },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalledWith(
+      expect.anything(),
+      { userId: 'user-123', organizationId: 'org-123' },
+      { data_collection: 'deny' }
+    );
+  });
+
+  it('preserves client privacy when organization provider restrictions are applied', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'allow' },
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['anthropic']),
+    });
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        ...makeBody('kilo-auto/balanced'),
+        provider: { data_collection: 'deny', zdr: true },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          provider: { only: ['anthropic'], data_collection: 'deny', zdr: true },
+        }),
+      })
+    );
+  });
+
+  it('rejects a denied fallback without sending inference and still bills classification', async () => {
+    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([PRIMARY_DEFAULT_MODEL]);
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0.001 });
+    mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
+      await opts.efficientDecision?.();
+      request.body.model = PRIMARY_DEFAULT_MODEL;
+      return { kind: 'ok', resolved: { model: PRIMARY_DEFAULT_MODEL } };
+    });
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(503);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a routing failure without classifying when privacy-policy loading fails', async () => {
+    mockedCollectDeniedAutoRoutingModelIds.mockRejectedValueOnce(new Error('worker unavailable'));
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        ...makeBody('kilo-auto/efficient'),
+        provider: { data_collection: 'deny' },
+      }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: 'Auto-routing could not select an eligible model for this request.',
+    });
+    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('passes models forbidden by provider access policy to the efficient decision worker', async () => {

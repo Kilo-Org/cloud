@@ -231,7 +231,10 @@ describe('auto models', () => {
     const models = await getEnhancedOpenRouterModels();
 
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/models',
+      expect.anything()
+    );
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {

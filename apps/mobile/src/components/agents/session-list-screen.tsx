@@ -1,8 +1,8 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import {
   AppState,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -176,7 +176,7 @@ export function AgentSessionListScreen() {
     }, [runForegroundRefresh])
   );
 
-  const listRef = useRef<FlatList<ActiveSession>>(null);
+  const listRef = useRef<FlashListRef<ActiveSession>>(null);
   useScrollToTop(listRef);
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -379,16 +379,21 @@ export function AgentSessionListScreen() {
     // bar; the FAB clearance rides on the content's `paddingBottom`, so the
     // button floats over the list and the last row still scrolls clear of it.
     body = (
-      <FlatList
+      // FlashList v2 recycles rows and keeps scroll position; the rows are
+      // homogeneous, so one item type is enough. `style` stays the frame object
+      // (FlashList's own root already carries `flex: 1`), where a `className`
+      // would be ignored.
+      <FlashList
         ref={listRef}
         data={visibleSessions}
         renderItem={renderItem}
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
+        getItemType={() => 'session'}
         style={rowsInsets.frame}
         contentContainerStyle={rowsInsets.content}
         refreshControl={rowsControl}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
+        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
       />
     );
   }

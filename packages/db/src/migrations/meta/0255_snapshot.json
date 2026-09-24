@@ -1,5 +1,5 @@
 {
-  "id": "efe2acab-3840-4000-baee-04de21dc6374",
+  "id": "14eec6e8-09a2-4639-97fa-3dac50634bf3",
   "prevId": "680b9dae-f79b-471c-a110-40bacd3cc776",
   "version": "7",
   "dialect": "postgresql",
@@ -30608,12 +30608,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "github_connection_role": {
-          "name": "github_connection_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "github_authorized_by_user_id": {
           "name": "github_authorized_by_user_id",
           "type": "text",
@@ -30773,44 +30767,6 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL AND \"platform_integrations\".\"github_installation_id\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_platform_integrations_github_workflow_canonical": {
-          "name": "UQ_platform_integrations_github_workflow_canonical",
-          "columns": [
-            {
-              "expression": "github_installation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"platform_integrations\".\"github_connection_role\" = 'workflow'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_platform_integrations_github_workflow_identity": {
-          "name": "UQ_platform_integrations_github_workflow_identity",
-          "columns": [
-            {
-              "expression": "COALESCE(\"github_app_type\", 'standard')",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform_installation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"platform_integrations\".\"github_connection_role\" = 'workflow'",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -31154,10 +31110,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "platform_integrations_github_connection_role_check": {
-          "name": "platform_integrations_github_connection_role_check",
-          "value": "\"platform_integrations\".\"github_connection_role\" IS NULL OR (\n        \"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_type\" = 'app'\n        AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL\n        AND \"platform_integrations\".\"github_connection_role\" IN ('workflow', 'agent_only')\n        AND (\"platform_integrations\".\"github_connection_role\" <> 'agent_only' OR \"platform_integrations\".\"github_installation_id\" IS NOT NULL)\n      )"
-        },
         "platform_integrations_owner_check": {
           "name": "platform_integrations_owner_check",
           "value": "(\n        (\"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NULL) OR\n        (\"platform_integrations\".\"owned_by_user_id\" IS NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
@@ -39037,12 +38989,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "superseded_at": {
-          "name": "superseded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -39058,28 +39004,6 @@
           ],
           "isUnique": true,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_user_activity_tokens_live_ios_activity": {
-          "name": "UQ_user_activity_tokens_live_ios_activity",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "coalesce(\"organization_id\", '')",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"user_activity_tokens\".\"kind\" = 'ios_activity' AND \"user_activity_tokens\".\"superseded_at\" IS NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

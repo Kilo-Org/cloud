@@ -53,6 +53,25 @@ describe('root layout startup order (text contract)', () => {
     );
   });
 
+  // `isSigningOut` flips at the start of sign-out and only clears when a later
+  // sign-in publishes credentials, so a surface keyed on it alone outlives the
+  // sign-out: the wrapper stayed opacity-0 and the login screen never became
+  // visible (logout.js timed out waiting for "Welcome to Kilo"). The teardown
+  // window must end when the token clears.
+  it('scopes the sign-out wait surface to the teardown, while the token is still published', () => {
+    const codeSource = stripComments(layoutSource);
+    expect(
+      codeSource.includes(
+        'const signingOutWindow = startupFinished && isSigningOut && token != null;'
+      ),
+      'the sign-out wait surface must be bounded by the published token'
+    ).toBe(true);
+    expect(
+      codeSource.includes('signingOut: isSigningOut && token != null,'),
+      'shouldShowBootstrapLoading must receive the bounded sign-out signal'
+    ).toBe(true);
+  });
+
   // The persisted deep-link record is account-bound. Auth bootstrap publishes
   // the signed-in user id before it clears `authLoading`, so a restore that
   // runs on an empty dependency array reads a null user id and deletes the

@@ -490,7 +490,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     }
 
     // No valid auth
-    if (!(await isFreeModel(effectiveModelIdLowerCased))) {
+    if (!isFreeModel(effectiveModelIdLowerCased)) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -767,7 +767,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
     if (
       balance <= 0 &&
-      !(await isFreeModel(effectiveModelIdLowerCased)) &&
+      !isFreeModel(effectiveModelIdLowerCased) &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -831,7 +831,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
+    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

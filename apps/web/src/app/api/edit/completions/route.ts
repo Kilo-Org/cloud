@@ -192,12 +192,7 @@ export async function POST(request: NextRequest) {
   const isInceptionPromoRequest =
     INCEPTION_PROMO_RUNNING && requestBody.model === INCEPTION_PROMO_MODEL;
 
-  if (
-    !isInceptionPromoRequest &&
-    balance <= 0 &&
-    !(await isFreeModel(requestBody.model)) &&
-    !userByok
-  ) {
+  if (!isInceptionPromoRequest && balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

@@ -31,6 +31,11 @@ describe('rate-limited Kilo-exclusive models', () => {
 });
 
 describe('isFreeModel', () => {
+  test('returns a boolean synchronously', () => {
+    expect(isFreeModel('openrouter/free')).toBe(true);
+    expect(isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
+  });
+
   describe('free models', () => {
     test('should return true for models ending with :free', async () => {
       expect(await isFreeModel('gpt-4:free')).toBe(true);

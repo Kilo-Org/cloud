@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 import {
   createContext,
@@ -43,6 +42,11 @@ import {
   setSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  deleteStoredValue,
+  readStoredValue,
+  readStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
 import { type AuthSignOutCause, reportAuthBranch } from '@/lib/auth/sign-out-telemetry';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
@@ -93,9 +97,13 @@ import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
 import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/context-scope';
 
-// Pre-load tokens at module level so they're available before React mounts
-export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+// Pre-load tokens at module level so they're available before React mounts.
+// The raw throwing read is deliberate: a rejection here must reach the
+// bootstrap read below, not settle as "nothing stored", so the retry helper —
+// not this preload — owns the failure outcome (it reports the exhausted read at
+// warning level with the stable read fingerprint).
+export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
+const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -503,13 +511,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // deletion are members of the same always-attempted batch.
           await Promise.allSettled([
             writeCredentials(async () => {
-              await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-              await SecureStore.deleteItemAsync(
-                TOKEN_EXPIRES_AT_KEY,
-                IOS_BEARER_SECURE_STORE_OPTIONS
-              );
-              await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+              await deleteStoredValue(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
@@ -617,7 +622,16 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
-      if (!outcome.ok && outcome.refused && !isSignedOutReference.current) {
+      // A refusal belongs to the session that owned the refresh. The epoch can
+      // move while the refresh awaited — or this call can join an in-flight
+      // refresh from an older session — so re-check before tearing down: a
+      // newer session must not be signed out by an older refusal.
+      if (
+        !outcome.ok &&
+        outcome.refused &&
+        isCurrentAuthEpoch(outcome.sessionVersion) &&
+        !isSignedOutReference.current
+      ) {
         await signOut(true, 'session_ended');
       }
     };
@@ -641,7 +655,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
       void (async () => {
         try {
-          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          const expiresAtStr = await readStoredValueSafe(TOKEN_EXPIRES_AT_KEY);
           if (!expiresAtStr) {
             return;
           }
@@ -661,9 +675,24 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
           if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
             setToken(outcome.token);
+            return;
           }
-          // Transient or refused: do not sign out — the user did not trigger
-          // an authenticated request. Let the next real 401 handle it.
+          // A refused refresh means the stored pair is gone. The proactive path
+          // used to keep the dead token and wait for "the next real 401", which
+          // is exactly the retry the refresh refused: every foreground asked
+          // again. Stop the loop here and send the person to sign in. A
+          // transient failure leaves the session alone. The refusal is scoped
+          // to the session that owned it: the epoch can move while the clear
+          // inside the refresh awaits, so a refusal from a superseded session
+          // must not sign out the newer one.
+          if (
+            !outcome.ok &&
+            outcome.refused &&
+            isCurrentAuthEpoch(outcome.sessionVersion) &&
+            !isSignedOutReference.current
+          ) {
+            await signOut(true, 'session_ended');
+          }
         } catch {
           // A rejected expiry read (or refresh) must not escape as an
           // unhandled rejection. Return silently, exactly as the null-expiry
@@ -675,7 +704,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     return () => {
       subscription.remove();
     };
-  }, [token]);
+  }, [signOut, token]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

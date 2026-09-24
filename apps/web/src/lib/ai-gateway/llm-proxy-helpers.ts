@@ -35,7 +35,10 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactErrorResponse,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -45,7 +48,6 @@ import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
-import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -538,31 +540,7 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(
-    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan).then(
-      async usageIdentity => {
-        // Chain the experiment-attribution write after the microdollar
-        // write. This is best-effort analytics: failures here MUST NOT
-        // roll back the billing write, which has already succeeded by
-        // the time we reach here. `persistExperimentAttribution`
-        // swallows errors internally.
-        if (
-          usageIdentity &&
-          usageContext.modelExperimentVariantVersionId &&
-          usageContext.modelExperimentAllocationSubject
-        ) {
-          await persistExperimentAttribution({
-            usageId: usageIdentity.usageId,
-            createdAt: usageIdentity.createdAt,
-            variantVersionId: usageContext.modelExperimentVariantVersionId,
-            allocationSubject: usageContext.modelExperimentAllocationSubject,
-            clientRequestId: usageContext.clientRequestId ?? null,
-            capture: usageContext.experimentPromptCapture ?? null,
-          });
-        }
-      }
-    )
-  );
+  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
 }
 
 export async function captureProxyError(params: {

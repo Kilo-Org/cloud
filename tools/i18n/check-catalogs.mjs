@@ -79,12 +79,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerAnaconda',
   'profile.providerApple',
   'profile.providerDiscord',
-  // Feature-flag debug surface (Preferences): the `≥`/`<` operators, the
-  // `{{min}}` placeholder and the `v{{version}}` build line are notation and
-  // stay identical to English. The source ("remote", "default") and state
-  // ("not loaded") words are copy like everything else on the screen, so every
-  // catalog carries its own wording and they are not allowlisted here.
-  'preferences.featureFlagsBuild',
   'common.github',
   'common.gitlab',
   'profile.providerGoogle',

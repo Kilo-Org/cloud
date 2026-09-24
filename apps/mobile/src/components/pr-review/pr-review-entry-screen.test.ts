@@ -20,6 +20,7 @@ import {
   renderLoaded,
   resetHookSlots,
   seedRecents,
+  textValues,
 } from './pr-review-entry-screen-test-utils';
 
 // The field draws the visible placeholder with the same one-line overlay on
@@ -185,5 +186,22 @@ describe('provider-neutral URL field', () => {
     (propsOf(input).onChangeText as (value: string) => void)('anything');
     const after = render();
     expect(find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link')).toBeTruthy();
+  });
+
+  it('states the instruction once, in the header eyebrow, not the field caption', async () => {
+    const tree = await renderLoaded();
+    const header = find(tree, 'ScreenHeader', () => true);
+    // Finding: the field's own letter-spaced "Paste a pull request or merge
+    // request link" caption repeated the header instruction. The header keeps
+    // the single instruction as its eyebrow; the field keeps its placeholder.
+    expect(header.props?.title).toBe('PR Review');
+    expect(header.props?.eyebrow).toBe('Open a pull request or merge request by URL');
+    const input = find(tree, 'TextInput', () => true);
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    // The paste block no longer carries a caption repeating the instruction.
+    const list = find(tree, 'PrReviewInboxList', () => true);
+    const pasteBlockTexts = textValues(propsOf(list).header);
+    expect(pasteBlockTexts).not.toContain('Paste a pull request or merge request link');
+    expect(pasteBlockTexts).not.toContain('Open a pull request or merge request by URL');
   });
 });

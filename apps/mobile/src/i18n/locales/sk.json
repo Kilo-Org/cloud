@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do poľa na správu agentovi.",
     "biometricUnlock": "Odomknúť pomocou biometrie",
     "biometricUnlockSubtitle": "Odomknutie sa vyžaduje pri spustení aplikácie a po piatich minútach na pozadí.",
-    "featureFlags": "Príznaky funkcií",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Vzdialené · ≥ {{min}}",
-    "featureFlagSkipped": "Predvolená · < {{min}}",
-    "featureFlagNotLoaded": "Predvolená · nenačítané",
     "gatewayTranscription": "Prepis cez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2297,10 +2292,6 @@
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",
       "linesOf": "riadky {{start}}–{{end}} z {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Akcia {{action}} v službe Cloud Agent zlyhala ({{status}}).",
-      "failed": "Akcia {{action}} v službe Cloud Agent zlyhala."
-    },
     "collectCopyableText": {
       "unserializableInput": "[neserializovateľný vstup]",
       "errorPrefix": "Chyba: {{error}}"
@@ -2396,8 +2387,7 @@
       "assistantProviderRejected": "Poskytovateľ odmietol požiadavku.",
       "assistantStopped": "Generovanie odpovede sa zastavilo.",
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
-      "assistantFailed": "Odpoveď sa nepodarilo vytvoriť.",
-      "sendFailed": "Správu sa nepodarilo odoslať. Skús to znova."
+      "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."
     },
     "filePart": {
       "loadingImage": "Načítava sa obrázok",

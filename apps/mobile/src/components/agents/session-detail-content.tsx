@@ -513,13 +513,15 @@ export function SessionDetailContent({
     isLoading: isSessionProfileLoading,
     isError: isSessionProfileError,
   } = useEffectiveAgentProfile(organizationId);
-  const recordedSessionProfileId = fetchedData?.profileId ?? null;
-  // `fetchSession` is the only source of the session's own profile id, so the
-  // chip stays hidden until it resolves rather than briefly naming the context
+  // `fetchSession` is the only source of the session's own profile id, and the
+  // atom can still hold the previous session's row. Until the CURRENT session's
+  // read resolves, the chip stays hidden rather than briefly naming the context
   // default for a session that recorded a different profile.
-  const sessionDataLoaded = fetchedData !== undefined;
-  const activeSessionProfileId =
-    recordedSessionProfileId ?? (sessionDataLoaded ? effectiveDefaultId : null);
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
+  const activeSessionProfileId = sessionDataLoaded
+    ? (recordedSessionProfileId ?? effectiveDefaultId)
+    : null;
   const sessionProfile =
     activeSessionProfileId === null
       ? null
@@ -531,6 +533,7 @@ export function SessionDetailContent({
     hasManualSetupCommands: false,
     hasSelectedProfileId: sessionProfile !== null,
     isProfilesLoading: isSessionProfileLoading || !sessionDataLoaded,
+    hasProfileError: isSessionProfileError,
   });
   const openSessionProfileEditor = () => {
     if (sessionProfile) {

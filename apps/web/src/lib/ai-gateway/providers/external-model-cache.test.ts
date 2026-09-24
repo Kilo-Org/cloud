@@ -1,11 +1,6 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import {
-  getCachedOpenAiServedModels,
-  getCachedOpenRouterModels,
-  saveOpenAiServedModels,
-  saveOpenRouterModels,
-} from './external-model-cache';
-import { db, readDb } from '@/lib/drizzle';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as ExternalModelCache from './external-model-cache';
+import type * as Drizzle from '@/lib/drizzle';
 
 const mockRows: { data: unknown; synced_at: string }[] = [];
 const mockWrites: { source: string; data: unknown; synced_at: string }[] = [];
@@ -14,6 +9,15 @@ jest.mock('@/lib/drizzle', () => ({
   readDb: { select: jest.fn() },
   db: { insert: jest.fn() },
 }));
+
+const {
+  getCachedOpenAiServedModels,
+  getCachedOpenRouterModels,
+  invalidateCachedOpenRouterModels,
+  saveOpenAiServedModels,
+  saveOpenRouterModels,
+} = jest.requireActual<typeof ExternalModelCache>('./external-model-cache');
+const { db, readDb } = jest.requireMock<typeof Drizzle>('@/lib/drizzle');
 
 const catalogModel = {
   id: 'vendor/model',
@@ -27,9 +31,13 @@ const catalogModel = {
 };
 
 describe('external model cache', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   beforeEach(() => {
+    invalidateCachedOpenRouterModels();
     mockRows.length = 0;
     mockWrites.length = 0;
+    (readDb.select as jest.Mock).mockClear();
     (readDb.select as jest.Mock).mockImplementation(() => ({
       from: () => ({ where: () => ({ limit: async () => mockRows }) }),
     }));
@@ -83,18 +91,23 @@ describe('external model cache', () => {
   });
 
   it('ignores stale and corrupt rows', async () => {
-    mockRows.push({ data: { data: [{ id: 'gpt-5-nano' }] }, synced_at: new Date().toISOString() });
+    const now = jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-04-29T01:20:00Z').getTime());
+    mockRows.push({
+      data: { data: [{ id: 'gpt-5-nano' }] },
+      synced_at: '2026-04-29 01:16:12.945+00',
+    });
     await expect(getCachedOpenAiServedModels('partner-key')).resolves.toEqual(
       new Set(['gpt-5-nano'])
     );
 
-    mockRows[0].synced_at = new Date(Date.now() - 61 * 60_000).toISOString();
+    mockRows[0].synced_at = '2026-04-29 00:16:12.945+00';
     await expect(getCachedOpenAiServedModels('partner-key')).resolves.toBeNull();
 
-    mockRows[0].synced_at = new Date().toISOString();
+    mockRows[0].synced_at = '2026-04-29 01:16:12.945+00';
     mockRows[0].data = { data: [{ id: 123 }] };
     await expect(getCachedOpenAiServedModels('partner-key')).resolves.toBeNull();
     await expect(getCachedOpenRouterModels()).resolves.toBeNull();
+    now.mockRestore();
   });
 
   it('serves a fresh validated OpenRouter catalog', async () => {
@@ -107,8 +120,11 @@ describe('external model cache', () => {
 
     const cached = await getCachedOpenRouterModels();
     expect(cached?.data).toHaveLength(100);
+    await getCachedOpenRouterModels();
+    expect(readDb.select).toHaveBeenCalledTimes(1);
 
     mockRows[0].synced_at = new Date(Date.now() - 16 * 60_000).toISOString();
+    invalidateCachedOpenRouterModels();
     await expect(getCachedOpenRouterModels()).resolves.toBeNull();
   });
 });

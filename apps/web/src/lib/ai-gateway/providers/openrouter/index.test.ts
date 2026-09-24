@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import {
-  formatName,
-  getEnhancedOpenRouterModels,
-  getOpenRouterTranscriptionModels,
-  shouldSuppressOpenRouterModel,
-} from '@/lib/ai-gateway/providers/openrouter';
+import type * as OpenRouterModule from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/kilo-exclusive-models';
@@ -17,7 +12,7 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
-import { getCachedOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import type * as ExternalModelCache from '@/lib/ai-gateway/providers/external-model-cache';
 
 jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
   getCachedOpenRouterModels: jest.fn(async () => null),
@@ -26,6 +21,16 @@ jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
 }));
+
+const {
+  formatName,
+  getEnhancedOpenRouterModels,
+  getOpenRouterTranscriptionModels,
+  shouldSuppressOpenRouterModel,
+} = jest.requireActual<typeof OpenRouterModule>('@/lib/ai-gateway/providers/openrouter');
+const { getCachedOpenRouterModels } = jest.requireMock<typeof ExternalModelCache>(
+  '@/lib/ai-gateway/providers/external-model-cache'
+);
 
 const originalFetch = global.fetch;
 

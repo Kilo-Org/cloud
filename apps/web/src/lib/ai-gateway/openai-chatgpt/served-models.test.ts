@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { isOpenAiModelServed, resetServedModelIdsCache } from './served-models';
+import type * as ServedModels from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
-import { getCachedOpenAiServedModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import type * as ExternalModelCache from '@/lib/ai-gateway/providers/external-model-cache';
 
 jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
   getCachedOpenAiServedModels: jest.fn(async () => null),
 }));
+
+const { isOpenAiModelServed, resetServedModelIdsCache } =
+  jest.requireActual<typeof ServedModels>('./served-models');
+const { getCachedOpenAiServedModels } = jest.requireMock<typeof ExternalModelCache>(
+  '@/lib/ai-gateway/providers/external-model-cache'
+);
 
 const fetchMock = jest.fn<typeof fetch>();
 

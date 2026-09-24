@@ -16,7 +16,13 @@ import {
 
 const OPENROUTER_SOURCE = `openrouter:${OPENROUTER.apiUrl}`;
 const OPENROUTER_MAX_AGE_MS = 15 * 60_000;
+const OPENROUTER_READ_TTL_MS = 60_000;
 const OPENAI_MAX_AGE_MS = 60 * 60_000;
+let openRouterRead: { value: OpenRouterModelsResponse | null; at: number } | null = null;
+
+export function invalidateCachedOpenRouterModels(): void {
+  openRouterRead = null;
+}
 
 function openAiSource(apiKey: string): string {
   const identity = createHash('sha256')
@@ -61,18 +67,24 @@ async function saveCachedModels(source: string, data: unknown): Promise<void> {
 }
 
 export async function getCachedOpenRouterModels(): Promise<OpenRouterModelsResponse | null> {
+  if (openRouterRead && Date.now() - openRouterRead.at < OPENROUTER_READ_TTL_MS) {
+    return openRouterRead.value;
+  }
   const cached = await readCachedModels(
     OPENROUTER_SOURCE,
     OpenRouterModelsResponseSchema,
     OPENROUTER_MAX_AGE_MS
   );
-  return cached && cached.data.length >= 100 ? cached : null;
+  const value = cached && cached.data.length >= 100 ? cached : null;
+  openRouterRead = { value, at: Date.now() };
+  return value;
 }
 
 export async function saveOpenRouterModels(response: unknown): Promise<boolean> {
   const parsed = OpenRouterModelsResponseSchema.safeParse(sanitizeOpenRouterModels(response));
   if (!parsed.success || parsed.data.data.length < 100) return false;
   await saveCachedModels(OPENROUTER_SOURCE, parsed.data);
+  invalidateCachedOpenRouterModels();
   return true;
 }
 

@@ -76,6 +76,10 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # also be isolated by PER_SESSION_SANDBOX_ORG_IDS.
 VERCEL_SANDBOX_ORG_IDS=
 BYOC_VERCEL_ORG_IDS=
+BYOC_E2B_ORG_IDS=
+E2B_SANDBOX_TEMPLATE=
+E2B_SANDBOX_TEMPLATE_ID=
+E2B_SANDBOX_RUNTIME_BUILD_ID=
 
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.

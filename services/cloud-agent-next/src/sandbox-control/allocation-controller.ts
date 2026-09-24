@@ -145,9 +145,16 @@ export function allocationIdentity(record: AllocationRecord): AllocationIdentity
   return providerRef === null ? undefined : { kind: 'provider', id: providerRef };
 }
 
-/** A live allocation accepts reuse: creating or allocated, with no stop tombstone. */
+/**
+ * A live allocation accepts reuse: `allocated`, or `creating` that has not been
+ * cancelled. A `creating` record carrying `stopIntent` is a submitted E2B create
+ * whose result will be destroyed, so a fresh acquisition must wait for that
+ * cleanup rather than bind a receipt to it.
+ */
 export function isLiveAllocation(record: AllocationRecord): boolean {
-  return record.state.kind === 'creating' || record.state.kind === 'allocated';
+  if (record.state.kind === 'allocated') return true;
+  if (record.state.kind !== 'creating') return false;
+  return record.state.stopIntent === undefined;
 }
 
 /** The allocation identity a `stopping` cleanup belongs to. */

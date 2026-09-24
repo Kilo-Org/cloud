@@ -1392,6 +1392,29 @@ export async function getVercelComputeEnrollment(organizationId: string): Promis
   return body.enrolled;
 }
 
+export async function getE2BComputeEnrollment(input: {
+  organizationId: string;
+}): Promise<{ enrolled: boolean }> {
+  try {
+    if (!CLOUD_AGENT_NEXT_API_URL || !INTERNAL_API_SECRET) throw new Error();
+    const organizationId = z.uuid().parse(input.organizationId).toLowerCase();
+    const response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/e2b-enrollment/${encodeURIComponent(organizationId)}`,
+      {
+        headers: { Accept: 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!response.ok || response.redirected) throw new Error();
+    const body: unknown = await response.json();
+    return z.object({ enrolled: z.boolean() }).parse(body);
+  } catch {
+    throw new Error('Cloud Agent E2B compute enrollment could not be verified');
+  }
+}
+
 export type VercelSnapshotBuildCleanupInput = VercelSnapshotBuildStartInput & {
   snapshotId?: string;
 };

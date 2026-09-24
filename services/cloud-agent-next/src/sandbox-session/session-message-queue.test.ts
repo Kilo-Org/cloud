@@ -5461,6 +5461,44 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.request).not.toHaveBeenCalled();
   });
 
+  it('carries an acquisition receipt and no create permission on E2B session delivery', async () => {
+    const fixture = sessionFixture({
+      identity: {
+        sessionId: SESSION_ID,
+        userId: 'user_1',
+        billingOrigin: 'cloud-agent-web',
+        orgId: '11111111-1111-4111-8111-111111111111',
+      },
+      workspace: {
+        sandboxId: SANDBOX_ID,
+        workspacePath: DIRECTORY,
+        sandboxProvider: 'e2b',
+        sandboxProviderBinding: {
+          kind: 'e2b',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+          credentialId: '22222222-2222-4222-8222-222222222222',
+        },
+        credentialContainment: {
+          github: false,
+          gitlab: false,
+          bitbucket: false,
+          kilocode: false,
+        },
+      },
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const [input] = fixture.control.ensureReady.mock.calls.at(-1) ?? [];
+    expect(input?.acquisition).toMatchObject({
+      id: expect.any(String),
+      deadlineAt: expect.any(Number),
+    });
+    // The E2B control plane owns creation; delivery must never pass `allowCreate`.
+    expect(
+      fixture.control.ensureReady.mock.calls.every(([call]) => call.allowCreate === undefined)
+    ).toBe(true);
+  });
+
   it('keeps a stopping Vercel head queued when the startup observation slice expires', async () => {
     const fixture = sessionFixture({
       workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider: 'vercel' },

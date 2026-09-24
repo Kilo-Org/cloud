@@ -54,6 +54,11 @@ export type ControlAlarmAnchorState = {
 export type ControlAlarmAnchors = {
   /** Canonical allocation aggregate, or `null` before first load. */
   allocation: AllocationRecord | null;
+  /**
+   * Call-local replacement for the allocation's own alarm. Used to defer a
+   * create-recovery wake while the create effect is in flight; never persisted.
+   */
+  allocationOverrideAt?: number | null;
   credentialExpiryAt: number | null;
   socketHandshakeAt: number | null;
   byocSnapshotRecoveryAt?: number | null;
@@ -201,7 +206,9 @@ export function dueControlAlarmAnchors(
 /** Earliest eligible anchor; `null` means no alarm should be armed. */
 export function composeControlAlarmAt(anchors: ControlAlarmAnchors): number | null {
   const candidates: number[] = [];
-  if (anchors.allocation !== null) {
+  if (anchors.allocationOverrideAt !== undefined && anchors.allocationOverrideAt !== null) {
+    candidates.push(anchors.allocationOverrideAt);
+  } else if (anchors.allocation !== null) {
     const allocationDeadline = allocationAlarmAt(anchors.allocation);
     if (allocationDeadline !== null) candidates.push(allocationDeadline);
   }

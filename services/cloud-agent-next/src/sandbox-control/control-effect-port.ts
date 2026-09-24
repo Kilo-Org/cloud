@@ -184,7 +184,21 @@ export function createControlEffectPort(deps: ControlEffectPortDeps): ControlEff
       });
       // `unknown` is an inconclusive observation, not absence or presence. The
       // runner drops the thrown failure and the state deadline re-drives it.
-      if (observed.status === 'unknown') throw new Error('observation_inconclusive');
+      // A submitted E2B create that discovery resolved to exactly one paused
+      // sandbox is the one exception: the ref is evidence of presence, so it is
+      // returned as `present` (never `recoverable`) for the reducer to adopt.
+      if (observed.status === 'unknown') {
+        const e2bPausedDiscovery =
+          command.target.provider === 'e2b' &&
+          command.target.providerRef === null &&
+          observed.providerRef !== null;
+        if (!e2bPausedDiscovery) throw new Error('observation_inconclusive');
+        return {
+          outcome: 'present',
+          providerRef: observed.providerRef,
+          incarnation: observed.incarnation,
+        };
+      }
       return {
         outcome: observed.status === 'terminal' ? 'absent' : 'present',
         providerRef: observed.providerRef,

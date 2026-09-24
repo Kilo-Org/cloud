@@ -6,10 +6,16 @@ import { resolveSecret } from '../auth.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
 import {
+  CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import {
+  sameSandboxProviderBinding,
+  SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
 import { type getOutboundContainerId, isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
@@ -187,6 +193,7 @@ export const sessionCredentialGrantSchema = z
     userId: z.string().min(1),
     orgId: organizationIdSchema.optional(),
     provider: agentSandboxProviderSchema,
+    providerBinding: SandboxProviderBindingSchema.optional(),
     outboundContainerId: z.string().min(1).optional(),
     members: z.array(memberSchema).min(1),
     repository: repositorySchema.optional(),
@@ -229,6 +236,19 @@ export const sessionCredentialGrantSchema = z
     ) {
       reject();
     }
+    if (grant.provider === 'e2b') {
+      if (
+        grant.providerBinding?.kind !== 'e2b' ||
+        grant.providerBinding.organizationId !== grant.orgId ||
+        grant.containmentEnabled !== false ||
+        grant.outboundContainerId !== undefined ||
+        !grant.sandboxId.startsWith('ses-')
+      ) {
+        reject();
+      }
+    } else if (grant.providerBinding !== undefined) {
+      reject();
+    }
     if (grant.containmentEnabled === false) {
       if (
         grant.kilo.alias !== undefined ||
@@ -249,7 +269,7 @@ export const sessionCredentialGrantSchema = z
         KILO_SESSION_INGEST_URL: grant.kilo.targets.sessionIngestBaseUrl,
       },
       grant.kilo.token,
-      { requireHttps: grant.provider === 'vercel' }
+      { requireHttps: grant.provider === 'vercel' || grant.provider === 'e2b' }
     );
     if (
       !targets.success ||
@@ -346,6 +366,19 @@ export function isContainedSessionCredentialGrant(
   grant: SessionCredentialGrant
 ): grant is ContainedSessionCredentialGrant {
   return grant.containmentEnabled !== false;
+}
+
+export function credentialGrantMatchesProvider(
+  grant: SessionCredentialGrant,
+  binding: SandboxProviderBinding
+): boolean {
+  return (
+    grant.provider === binding.kind &&
+    (binding.kind !== 'e2b' ||
+      (grant.containmentEnabled === false &&
+        grant.providerBinding !== undefined &&
+        sameSandboxProviderBinding(grant.providerBinding, binding)))
+  );
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
@@ -919,9 +952,16 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
+  if (
+    provider === 'e2b' &&
+    (!CurrentSessionMetadataSchema.safeParse(metadata).success ||
+      input.outboundContainerId !== undefined)
+  ) {
+    invalidCredentials();
+  }
   const containmentEnabled = provider === 'onprem' || requiresContainmentSandbox(metadata);
   const targets = deriveKiloSandboxTargets(env, token.data, {
-    requireHttps: provider === 'vercel',
+    requireHttps: provider === 'vercel' || provider === 'e2b',
   });
   if (!targets.success) invalidCredentials();
   const existing = input.existing === undefined ? undefined : validateGrant(input.existing);
@@ -940,6 +980,9 @@ export async function prepareSessionCredentials(input: {
       existing.userId !== metadata.identity.userId ||
       existing.orgId !== metadata.identity.orgId ||
       existing.provider !== provider ||
+      (provider === 'e2b' &&
+        (!existing.providerBinding ||
+          !sameSandboxProviderBinding(existing.providerBinding, binding))) ||
       existing.outboundContainerId !== input.outboundContainerId ||
       existing.preparedAt > now ||
       JSON.stringify(existing.kilo.targets) !== JSON.stringify(targets.targets) ||
@@ -983,6 +1026,7 @@ export async function prepareSessionCredentials(input: {
     userId: metadata.identity.userId,
     ...(metadata.identity.orgId === undefined ? {} : { orgId: metadata.identity.orgId }),
     provider,
+    ...(binding.kind === 'e2b' ? { providerBinding: binding } : {}),
     ...(input.outboundContainerId ? { outboundContainerId: input.outboundContainerId } : {}),
     members: members.some(current => current.sessionId === member.data.sessionId)
       ? [...members]

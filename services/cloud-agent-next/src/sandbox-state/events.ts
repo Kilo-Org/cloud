@@ -16,6 +16,7 @@ import type {
   AllocationContainment,
   AllocationCreateIntent,
   AllocationTarget,
+  E2BSubmittedAllocationConfig,
   StopProof,
 } from './model/allocation.js';
 import type { HealthRecoveryStep, HealthVerdict } from './model/health.js';
@@ -103,6 +104,18 @@ export type AllocationEvent =
     }
   | { type: 'CREATE_FAILED'; fence: ResultFence; reason: string; at: number }
   | { type: 'CREATE_UNKNOWN'; fence: ResultFence; reason: string; at: number }
+  | {
+      /**
+       * The durable at-most-once create bit. Dispatched inside the same storage
+       * transaction as the create callback, before the provider POSTs. The
+       * `submitted` block is computed once by `e2b-runtime.ts`; the reducer only
+       * copies it after validating the fence and the create bound.
+       */
+      type: 'CREATE_SUBMISSION_RECORDED';
+      fence: ResultFence;
+      submitted: E2BSubmittedAllocationConfig;
+      at: number;
+    }
   | { type: 'LAUNCH_FAILED'; fence: ResultFence; reason: string; at: number }
   | { type: 'HEALTH_UNHEALTHY'; verdict: HealthVerdict }
   | { type: 'DESTROY_CONFIRMED'; fence: ResultFence; proof: StopProof }

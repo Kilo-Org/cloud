@@ -1,4 +1,5 @@
 import { withTimeout } from '@kilocode/worker-utils';
+import { e2bFailureMessage } from '../byoc/e2b-errors.js';
 import type { ConnectionState, PhysicalState } from '../shared/sandbox-status.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import type { SandboxProviderFailureReason } from '../persistence/SandboxControl.js';
@@ -199,6 +200,8 @@ export async function observeControlAfterStopping(
 }
 
 export function safeErrorFromQueueReason(reason: string): string {
+  const e2bMessage = e2bFailureMessage(reason);
+  if (e2bMessage !== undefined) return e2bMessage;
   switch (reason) {
     case 'missing_metadata':
       return 'Session is missing required metadata';

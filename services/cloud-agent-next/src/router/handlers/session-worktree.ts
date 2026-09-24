@@ -37,6 +37,10 @@ import {
   assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
+import {
+  E2BRegistrationPolicySchema,
+  revalidateE2BRegistrationPolicy,
+} from '../../session/e2b-registration-policy.js';
 import type { TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
@@ -83,6 +87,7 @@ const ownershipRowSchema = z
 
 const operationProgressSchema = CreateWorktreeChatOutput.omit({ replayed: true })
   .extend({
+    ...E2BRegistrationPolicySchema.partial().shape,
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: z.string().regex(/^[a-f0-9]{64}$/),
     sandboxAllocation: sandboxAllocationSchema.optional(),
   })
@@ -228,8 +233,9 @@ async function loadWorktreeSource(
   if (!parsedMetadata.success) throw sourceRejected();
 
   const metadata = parsedMetadata.data;
+  const binding = getSandboxProviderBinding(metadata);
   const organizationId =
-    getSandboxProviderBinding(metadata).kind === 'onprem'
+    binding.kind === 'onprem' || binding.kind === 'e2b'
       ? input.kilocodeOrganizationId?.toLowerCase()
       : input.kilocodeOrganizationId;
   const workspace = metadata.workspace;
@@ -302,6 +308,23 @@ function readOperationProgress(
     progress.data[SESSION_CREATE_INTENT_FINGERPRINT_KEY] !== fingerprint
   ) {
     throw operationConflict();
+  }
+  if (
+    source.workspace.sandboxProvider === 'e2b' ||
+    progress.data.sandboxProviderBinding !== undefined
+  ) {
+    const sourcePolicy = E2BRegistrationPolicySchema.safeParse(source.workspace);
+    const recordedPolicy = E2BRegistrationPolicySchema.safeParse(progress.data);
+    if (
+      !sourcePolicy.success ||
+      !recordedPolicy.success ||
+      !sameSandboxProviderBinding(
+        sourcePolicy.data.sandboxProviderBinding,
+        recordedPolicy.data.sandboxProviderBinding
+      )
+    ) {
+      throw operationConflict();
+    }
   }
   return progress.data;
 }
@@ -403,6 +426,9 @@ function buildRegistrationInput(
   const workspace = { ...source.workspace };
   delete workspace.providerRuntime;
   workspace.branchName = sourceWorktreeBranchName(source);
+  if (workspace.sandboxProvider === 'e2b') {
+    Object.assign(workspace, E2BRegistrationPolicySchema.parse(progress));
+  }
 
   return {
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
@@ -827,6 +853,9 @@ async function executeWorktreeCreate(
     cloudAgentSessionId: generateSessionId('control'),
     kiloSessionId: generateKiloSessionId(),
     worktreeId: source.worktreeId,
+    ...(source.workspace.sandboxProvider === 'e2b'
+      ? E2BRegistrationPolicySchema.parse(source.workspace)
+      : {}),
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: fingerprint,
     ...(source.workspace.sandboxAllocation
       ? { sandboxAllocation: source.workspace.sandboxAllocation }
@@ -861,6 +890,9 @@ async function executeWorktreeCreate(
     result: 'recorded',
     durationMs: Date.now() - startedAt,
   });
+  if (progress.sandboxProviderBinding) {
+    await revalidateE2BRegistrationPolicy(ctx.env, E2BRegistrationPolicySchema.parse(progress));
+  }
   await createOwnershipRow(db, row.id, source, ctx, progress);
   await registerWorktreeSession(db, row.id, source, ctx, progress);
   logControlDiagnostic('worktree_chat_result', {
@@ -930,6 +962,9 @@ async function reconcileWorktreeCreate(
     await assertDestinationRuntimeAuthorizationActive(ctx, progress.cloudAgentSessionId);
   } else {
     await assertNewDestinationRuntimeIsolation(ctx);
+  }
+  if (!existingMetadata && progress.sandboxProviderBinding) {
+    await revalidateE2BRegistrationPolicy(ctx.env, E2BRegistrationPolicySchema.parse(progress));
   }
 
   const ownership = await findOwnershipRow(

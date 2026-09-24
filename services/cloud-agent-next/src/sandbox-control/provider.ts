@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import type {
   CredentialContainmentRequirements,
+  E2BAllocationConfig,
   OnPremAllocationConfig,
   VercelAllocationConfig,
 } from '../sandbox-state/model/allocation.js';
@@ -23,6 +24,7 @@ export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider
     })
     .strict(),
   z.object({ provider: z.literal('onprem') }).strict(),
+  z.object({ provider: z.literal('e2b') }).strict(),
 ]);
 
 export type SandboxProviderConfiguration = z.infer<typeof sandboxProviderConfigurationSchema>;
@@ -46,6 +48,7 @@ export type ProviderAllocationIntent = {
   allocationName?: string;
   vercel?: VercelAllocationConfig;
   onprem?: OnPremAllocationConfig;
+  e2b?: E2BAllocationConfig;
   containment?: CredentialContainmentRequirements;
 };
 

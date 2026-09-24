@@ -3885,7 +3885,7 @@ export class SandboxSession extends DurableObject<Env> {
     const provider = getSandboxProvider(metadata);
     const providerBinding = getSandboxProviderBinding(metadata);
     let acquisition =
-      provider === 'cloudflare' || provider === 'onprem'
+      provider === 'cloudflare' || provider === 'onprem' || provider === 'e2b'
         ? { id: attemptId, deadlineAt }
         : undefined;
     const allowCreate = acquisition === undefined && options?.allowCreate === true;

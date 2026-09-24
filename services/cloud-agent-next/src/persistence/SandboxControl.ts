@@ -16,6 +16,17 @@ import {
   worktreeIdFromDirectory,
   type SessionReferenceState,
 } from '../sandbox-control/session-references.js';
+import { E2BProviderError, type E2BFailureCode } from '../byoc/e2b-errors.js';
+import { fetchByocE2BCredential, resolveByocE2BApiKey } from '../byoc/e2b-credential-resolver.js';
+import { authorizeE2BSessionRequest } from '../sandbox-control/e2b-worktree-authorization.js';
+import { createE2BControlAdapter } from '../sandbox-control/e2b-provider.js';
+import {
+  E2B_INITIAL_LEASE_MS,
+  createE2BPendingConfig,
+  e2bCreateDeadline,
+  markE2BConfigSubmitted,
+  parseE2BProviderRef,
+} from '../sandbox-control/e2b-runtime.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cleanWorktreeRuntime,
@@ -108,6 +119,7 @@ import { legacyPhysicalState } from '../sandbox-state/project/physical-label.js'
 import { projectStatus, type StatusProjection } from '../sandbox-state/project/status.js';
 import {
   type AllocationController,
+  type AllocationDecision,
   isLiveAllocation,
 } from '../sandbox-control/allocation-controller.js';
 import {
@@ -140,15 +152,19 @@ import type { NotifyEffectResult } from '../sandbox-control/control-effects.js';
 import { createReconcilePort } from '../sandbox-state/ports/reconcile.js';
 import { loadAllocation as loadAllocationResult } from '../sandbox-state/persist/load.js';
 import { POLICY } from '../sandbox-state/schedule.js';
+import { allocationAlarmAt } from '../sandbox-state/schedule.js';
 import {
   WORKTREE_CREDENTIAL_CONTAINMENT,
   getWorktreeCredentialContainment,
   allocatedConnecting,
+  allocationHardStopAt,
   type AllocatedAllocation,
   type AllocationContainment,
   type AllocationRecord,
   type AllocationTarget,
   type CreatingAllocation,
+  type E2BAllocationConfig,
+  type E2BSubmittedAllocationConfig,
   type OnPremAllocationConfig,
   type StopProof,
   type CredentialContainmentRequirements,
@@ -193,6 +209,7 @@ import {
 } from '../sandbox-control/durable-state.js';
 import {
   buildControlNetworkPolicy,
+  credentialGrantMatchesProvider,
   prepareSessionCredentials as prepareCredentials,
   removeSessionCredentialMembership,
   resolveSessionCredential,
@@ -418,7 +435,13 @@ function canonicalProviderRefOf(record: AllocationRecord): string | null {
 /** The stop-intent a canonical cleanup episode is fenced to, if one is attached. */
 function canonicalStopIntent(record: AllocationRecord) {
   const state = record.state;
-  return state.kind === 'stopping' || state.kind === 'unknown' ? state.stopIntent : null;
+  if (state.kind === 'stopping' || state.kind === 'unknown') return state.stopIntent;
+  // A submitted E2B create cancelled before its result is fenced by the same
+  // stop intent, even though the kind stays `creating`. Readers that mean "a
+  // stop episode is attached" see it; readers that also require `allocated`
+  // stay allocated-only.
+  if (state.kind === 'creating') return state.stopIntent ?? null;
+  return null;
 }
 
 function canonicalStopWrapperInstanceId(record: AllocationRecord): string | undefined {
@@ -479,7 +502,18 @@ function canonicalStopEvent(
       ? { type: 'CHECK' }
       : { type: 'CANCEL', scope: 'allocation', reason: state.stopIntent.reason };
   }
-  if (state.kind === 'creating' || state.kind === 'unknown') return { type: 'DEADLINE' };
+  if (state.kind === 'creating') {
+    // An E2B create is cancelled through the unfenced creating `CANCEL`: it
+    // either releases a never-submitted create or records the stop intent so the
+    // in-flight result destroys instead of launching. Every other provider keeps
+    // the create-bound `DEADLINE`.
+    const e2b = state.target.provider === 'e2b' ? state.target.e2b : undefined;
+    if (e2b !== undefined) {
+      return { type: 'CANCEL', scope: 'allocation', reason: reason ?? 'environment_stopped' };
+    }
+    return { type: 'DEADLINE' };
+  }
+  if (state.kind === 'unknown') return { type: 'DEADLINE' };
   return undefined;
 }
 
@@ -624,6 +658,7 @@ export type SandboxControlStatus = StatusProjection & {
 };
 
 export type SandboxProviderFailureReason =
+  | E2BFailureCode
   | 'byoc_credential_missing'
   | 'byoc_vercel_not_ready'
   | 'byoc_vercel_forbidden'
@@ -636,6 +671,9 @@ function providerFailureReason(
   binding: SandboxProviderBinding,
   error: unknown
 ): SandboxProviderFailureReason | undefined {
+  if (binding.kind === 'e2b') {
+    return error instanceof E2BProviderError ? error.code : 'byoc_e2b_unavailable';
+  }
   if (binding.kind === 'onprem') {
     return error instanceof OnPremLifetimeError
       ? 'onprem_lifetime_exhausted'
@@ -700,13 +738,22 @@ export class SandboxControl extends DurableObject<Env> {
     intentId: string;
   } | null = null;
   /**
-   * The deadline of the acquisition that is driving the in-flight create, if
-   * any. The atomic create+launch effect re-checks it immediately before
-   * launch so an acquisition that expires while the provider create is
-   * outstanding never launches a wrapper (the legacy `assertAcquisitionDeadline`
-   * before `provider.launch`).
+   * The acquisition delivery deadline that bounds each in-flight create, keyed
+   * by create intent id. The atomic create+launch effect re-checks it
+   * immediately before launch, so an acquisition that expires while the provider
+   * create is outstanding never launches a wrapper. An instance-wide field
+   * cannot represent two generations; the create callback reads the deadline for
+   * its own intent.
    */
-  private controlAcquisitionDeadline: number | null = null;
+  private readonly createAcquisitionDeadlines = new Map<string, number>();
+  /**
+   * Intent ids of E2B creates whose provider effect is executing right now. The
+   * guard is a set, not a boolean: an old effect's `finally` must remove only its
+   * own id, and a newer generation must not be suppressed by a stale one. It is
+   * not a submission bit — the reducer cannot see an in-flight effect, so the
+   * alarm only defers the early recovery wake for the current intent.
+   */
+  private readonly createIntentsInFlight = new Set<string>();
   private stopAttemptInFlight: {
     record: AllocationRecord;
     promise: Promise<AllocationRecord>;
@@ -751,6 +798,7 @@ export class SandboxControl extends DurableObject<Env> {
       }),
       resumable: this.provider.resumable,
       shouldDeferRecovery: () => this.shouldDeferRecovery(),
+      wrapDispatch: (event, dispatch) => this.dispatchCanonicalFeedback(event, dispatch),
       onTransition: transition => this.recordAllocationTransition(transition),
     });
     this.healthController = createHealthController({
@@ -768,6 +816,31 @@ export class SandboxControl extends DurableObject<Env> {
     this.logDiagnostic(ALLOCATION_TRANSITION_EVENT, {
       ...allocationTransitionFields(transition),
       ...diagnosticConnection(this.activeConnection),
+    });
+  }
+
+  /**
+   * Bind the E2B lifetime projection to the accepted `CREATE_CONFIRMED` decision.
+   * The reducer alone decides the no-launch branch and its stop reason; the write
+   * runs in the same storage transaction as that accepted decision, so a rejected
+   * or rolled-back confirmation never leaves a durable reason without its
+   * transition, and the effect never writes the reason itself. Every other event
+   * dispatches directly.
+   */
+  private async dispatchCanonicalFeedback(
+    event: AllocationInputEvent,
+    dispatch: () => Promise<AllocationDecision | undefined>
+  ): Promise<AllocationDecision | undefined> {
+    if (event.type !== 'CREATE_CONFIRMED') return dispatch();
+    return this.ctx.storage.transaction(async () => {
+      const decision = await dispatch();
+      if (decision === undefined) return undefined;
+      const state = decision.state.state;
+      if (state.kind !== 'stopping' || state.stopIntent.reason !== 'byoc_e2b_lifetime_exceeded') {
+        return decision;
+      }
+      await this.ctx.storage.put(FAILURE_REASON_KEY, state.stopIntent.reason);
+      return decision;
     });
   }
 
@@ -846,10 +919,10 @@ export class SandboxControl extends DurableObject<Env> {
         configuration?.provider === 'vercel' ? configuration.resources : undefined;
       this.containersInstance =
         configuration?.provider === 'cloudflare-containers' ? configuration.instance : undefined;
-      if (!this.isByocBinding()) {
+      if (!this.isByocBinding() && this.providerKind !== 'e2b') {
         this.provider = this.createProviderAdapter(this.providerKind, record);
       }
-      await this.syncOnPremHardStop(record);
+      await this.syncHardStop(record);
       this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
       this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
         .optional()
@@ -958,22 +1031,49 @@ export class SandboxControl extends DurableObject<Env> {
         }
       });
     }
-    await this.driveCanonicalDeadline(now);
-    await this.scheduleAlarm();
+    const allocationOverrideAt = await this.driveCanonicalDeadline(now);
+    await this.scheduleAlarm(allocationOverrideAt);
   }
 
   /**
    * One canonical `DEADLINE` per alarm. The allocation/health reducers own the
    * transition (idle stop, health expiry, recovery exhaustion, create/stop
    * deadlines); this only dispatches the event, runs its effects and commits.
+   *
+   * While this create intent's effect is in flight the early recovery `DEADLINE`
+   * is suppressed: the reducer cannot see the in-flight effect, so dispatching
+   * would move the record to `unknown` and reject the in-flight
+   * `CREATE_CONFIRMED`, dropping the reference. When the allocation alarm is
+   * already due, the returned override keeps the next wake strictly after `now`,
+   * capped by the list window.
    */
-  private async driveCanonicalDeadline(now: number): Promise<void> {
+  private async driveCanonicalDeadline(now: number): Promise<number | null | undefined> {
     const record = await this.readCanonicalAllocation();
-    if (record.state.kind === 'stopped') return;
+    if (record.state.kind === 'stopped') return undefined;
+    // Suppress the early recovery `DEADLINE` only for the submitted-E2B shape
+    // that needs it. Every other provider's in-flight create keeps the base
+    // dispatch: its `DEADLINE` no-op must still run and the alarm must not be
+    // re-armed to an already-due timestamp.
+    if (record.state.kind === 'creating') {
+      const e2b = record.state.target.provider === 'e2b' ? record.state.target.e2b : undefined;
+      const alarmAt = allocationAlarmAt(record);
+      if (
+        e2b?.submissionState === 'submitted' &&
+        this.createIntentsInFlight.has(record.state.createIntent.intentId)
+      ) {
+        if (alarmAt !== null && alarmAt <= now) {
+          return now >= e2b.reconciliationDeadlineAt
+            ? now + 5_000
+            : Math.min(now + 5_000, e2b.reconciliationDeadlineAt);
+        }
+        return undefined;
+      }
+    }
     const decision = await this.allocationOrchestrator.dispatch({ type: 'DEADLINE' }, now);
-    if (decision === undefined) return;
+    if (decision === undefined) return undefined;
     await this.allocationOrchestrator.run(decision.commands, now);
     await this.afterCanonicalCommit(record, await this.readCanonicalAllocation());
+    return undefined;
   }
 
   async setWrapperCredentialHash(hash: string): Promise<void> {
@@ -1349,7 +1449,7 @@ export class SandboxControl extends DurableObject<Env> {
       (!maintenance && allocation.state.kind !== 'allocated') ||
       (!maintenance && canonicalStopIntent(allocation) !== null) ||
       canonicalProviderRefOf(allocation) !== runtime.providerInstanceId ||
-      !this.matchesLiveOnPremProviderReference(allocation, runtime.providerInstanceId) ||
+      !this.matchesLiveProviderReference(allocation, runtime.providerInstanceId) ||
       !isCurrent()
     ) {
       throw new ControlRequestError({
@@ -1360,6 +1460,11 @@ export class SandboxControl extends DurableObject<Env> {
       });
     }
     if (input.operation === 'session.attach' || input.operation === 'session.prompt') {
+      if (this.providerBinding.kind === 'e2b') {
+        // Fail closed before touching the route table: a missing or invalid E2B
+        // credential must not admit a session operation.
+        await fetchByocE2BCredential(this.env, this.providerBinding);
+      }
       const payload = parseOperationPayload(input.operation, input.payload);
       if (!payload.ok) throw new Error(payload.error.message);
       const attach =
@@ -1382,7 +1487,7 @@ export class SandboxControl extends DurableObject<Env> {
           current.state.kind !== 'allocated' ||
           canonicalStopIntent(current) !== null ||
           canonicalProviderRefOf(current) !== runtime.providerInstanceId ||
-          !this.matchesLiveOnPremProviderReference(current, runtime.providerInstanceId) ||
+          !this.matchesLiveProviderReference(current, runtime.providerInstanceId) ||
           !sameCanonicalAllocation(allocation, current) ||
           !isCurrent()
         ) {
@@ -1398,6 +1503,16 @@ export class SandboxControl extends DurableObject<Env> {
         }
         this.assertWorktreeAdmission(route.worktreeId);
         const now = Date.now();
+        if (this.providerBinding.kind === 'e2b') {
+          authorizeE2BSessionRequest({
+            binding: this.providerBinding,
+            allocation: current,
+            route,
+            grants: await loadSessionCredentialGrants(this.ctx.storage),
+            ...(input.operation === 'session.attach' ? { attachPayload: payload.payload } : {}),
+            now,
+          });
+        }
         if (input.operation === 'session.prompt') {
           const previous = route.lastState;
           applyReportedSessionState(
@@ -1599,6 +1714,11 @@ export class SandboxControl extends DurableObject<Env> {
       instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
     });
     const provider = binding.kind;
+    if (binding.kind === 'e2b') {
+      // A removed or invalid E2B credential fails closed before any grant is
+      // prepared; the containment check below cannot see it.
+      await fetchByocE2BCredential(this.env, binding);
+    }
     const record = await this.readCanonicalAllocation();
     const requiredContainment =
       provider === 'onprem'
@@ -1951,11 +2071,19 @@ export class SandboxControl extends DurableObject<Env> {
       resources: input.resources,
       instance: input.instance,
     });
-    if (acquisition && binding.kind !== 'cloudflare' && binding.kind !== 'onprem') {
-      throw new Error('Sandbox acquisition is only supported for Cloudflare and on-prem');
+    if (
+      acquisition &&
+      binding.kind !== 'cloudflare' &&
+      binding.kind !== 'onprem' &&
+      binding.kind !== 'e2b'
+    ) {
+      throw new Error('Sandbox acquisition is only supported for Cloudflare, on-prem and e2b');
     }
     if (binding.kind === 'onprem' && !acquisition) {
       throw new Error('On-prem sandboxes require an acquisition receipt');
+    }
+    if (binding.kind === 'e2b' && !acquisition) {
+      throw new Error('E2B sandboxes require an acquisition receipt');
     }
     const billing = await this.billingInput(ownerId, input.billing, worktreeId);
     let record: AllocationRecord;
@@ -2040,7 +2168,7 @@ export class SandboxControl extends DurableObject<Env> {
           await this.ctx.storage.put(PROVIDER_LOCATOR_KEY, this.vercelLocator);
         }
       }
-      if (!this.isByocBinding()) {
+      if (!this.isByocBinding() && this.providerKind !== 'e2b') {
         this.provider = this.createProviderAdapter(this.providerKind, record);
       }
     }
@@ -2184,7 +2312,9 @@ export class SandboxControl extends DurableObject<Env> {
           phase: 'create',
           result: 'started',
         });
-        this.controlAcquisitionDeadline = acquisition?.deadlineAt ?? null;
+        if (intentId !== undefined && acquisition !== undefined) {
+          this.createAcquisitionDeadlines.set(intentId, acquisition.deadlineAt);
+        }
         try {
           await withTimeout(
             this.allocationOrchestrator.run(createCommands),
@@ -2195,7 +2325,7 @@ export class SandboxControl extends DurableObject<Env> {
             }
           );
         } finally {
-          this.controlAcquisitionDeadline = null;
+          if (intentId !== undefined) this.createAcquisitionDeadlines.delete(intentId);
         }
         const after = await this.readCanonicalAllocation();
         this.logDiagnostic('allocation_launch', {
@@ -2387,7 +2517,15 @@ export class SandboxControl extends DurableObject<Env> {
               binding: onpremBinding,
               profile: onpremProfile,
               hardStopAt: createdAt + onpremProfile.maxLifetimeMs,
-            }
+            },
+        this.providerBinding.kind === 'e2b'
+          ? createE2BPendingConfig({
+              binding: this.providerBinding,
+              sandboxId: this.sandboxId,
+              env: this.env,
+              createdAt,
+            })
+          : undefined
       );
       const event: AcquireEvent = {
         type: 'ACQUIRE',
@@ -2441,7 +2579,21 @@ export class SandboxControl extends DurableObject<Env> {
       this.assertWorktreeAdmission(worktreeId);
       const intentId = crypto.randomUUID();
       const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
-      const target = this.canonicalTarget(requiredContainment, allocationName, vercel);
+      const createdAt = Date.now();
+      const target = this.canonicalTarget(
+        requiredContainment,
+        allocationName,
+        vercel,
+        undefined,
+        this.providerBinding.kind === 'e2b'
+          ? createE2BPendingConfig({
+              binding: this.providerBinding,
+              sandboxId: this.sandboxId,
+              env: this.env,
+              createdAt,
+            })
+          : undefined
+      );
       const event: DemandEvent = {
         type: 'DEMAND',
         requestId: crypto.randomUUID(),
@@ -2493,6 +2645,72 @@ export class SandboxControl extends DurableObject<Env> {
     const after = await this.readCanonicalAllocation();
     await this.afterCanonicalCommit(record, after);
     return after;
+  }
+
+  /**
+   * The single fixed-lifetime cap handler. It reads the cap through
+   * `allocationHardStopAt` (never a call-site copy) and dispatches the
+   * state-appropriate stop, writing the lifetime failure reason in the same
+   * transaction as the accepted decision, fenced to that allocation.
+   *
+   * On-prem keeps its allocated-only `CANCEL`. E2B routes through the event
+   * chooser, except one case the chooser cannot see: a due hard-stop of a
+   * submitted create whose effect is *not* in flight is expiry, so it dispatches
+   * `DEADLINE` (which exhausts to `check_required`) rather than the creating
+   * `CANCEL` that would leave `creating` with a stop intent.
+   */
+  private async applyHardStop(record: AllocationRecord): Promise<void> {
+    const kind = this.providerBinding.kind;
+    if (kind !== 'onprem' && kind !== 'e2b') return;
+    const state = record.state;
+    if (state.kind === 'stopped' || state.target === null) return;
+    const hardStopAt = allocationHardStopAt(state.target);
+    if (hardStopAt === undefined || Date.now() < hardStopAt) return;
+    if (kind === 'onprem') {
+      if (state.kind !== 'allocated') return;
+      // On-prem keeps its allocated-only path through `beginCanonicalStop`; the
+      // ordinary stop outcome is unchanged.
+      await this.ctx.storage.put(FAILURE_REASON_KEY, 'onprem_lifetime_exhausted');
+      await this.beginCanonicalStop(record, 'onprem_lifetime_exhausted');
+      return;
+    }
+    const reason = 'byoc_e2b_lifetime_exceeded';
+    if (state.kind === 'creating') {
+      const e2b = state.target.provider === 'e2b' ? state.target.e2b : undefined;
+      const inFlight = this.createIntentsInFlight.has(state.createIntent.intentId);
+      if (e2b?.submissionState === 'submitted' && !inFlight) {
+        await this.dispatchHardStop(record, { type: 'DEADLINE' }, reason);
+        return;
+      }
+    }
+    const event = canonicalStopEvent(record, reason);
+    if (event === undefined) return;
+    await this.dispatchHardStop(record, event, reason);
+  }
+
+  /**
+   * Dispatch one hard-stop event and record the lifetime reason only when the
+   * reducer accepted it, in the same storage transaction. The record is
+   * re-read and its identity verified before dispatch: a hard stop decided
+   * against a superseded allocation must not dispatch an unfenced event against
+   * whatever is current. A rejected dispatch writes nothing onto a successor.
+   */
+  private async dispatchHardStop(
+    record: AllocationRecord,
+    event: AllocationInputEvent,
+    reason: SandboxProviderFailureReason
+  ): Promise<void> {
+    const decision = await this.ctx.storage.transaction(async () => {
+      const current = await this.readCanonicalAllocation();
+      if (!sameCanonicalAllocation(record, current)) return undefined;
+      const decided = await this.allocationOrchestrator.dispatch(event);
+      if (decided === undefined) return undefined;
+      await this.ctx.storage.put(FAILURE_REASON_KEY, reason);
+      return decided;
+    });
+    if (decision === undefined) return;
+    await this.allocationOrchestrator.run(decision.commands);
+    await this.afterCanonicalCommit(record, await this.readCanonicalAllocation());
   }
 
   private async beginCanonicalStop(record: AllocationRecord, reason: string): Promise<void> {
@@ -2678,7 +2896,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (to.state.kind === 'allocated' && from.state.kind !== 'allocated') {
       await this.scheduleNextLeaseCheck('initial', Date.now());
     }
-    await this.syncOnPremHardStop(to);
+    await this.syncHardStop(to);
     await this.scheduleAlarm();
   }
 
@@ -2739,6 +2957,8 @@ export class SandboxControl extends DurableObject<Env> {
       const grants = await loadSessionCredentialGrants(this.ctx.storage);
       const grant = grants.find(
         value =>
+          credentialGrantMatchesProvider(value, this.providerBinding) &&
+          value.sandboxId === this.sandboxId &&
           value.userId === ownerId &&
           value.directory === input.directory &&
           value.expiresAt > Date.now() &&
@@ -3258,6 +3478,19 @@ export class SandboxControl extends DurableObject<Env> {
     const runtime = await this.readTerminalRuntime(input, true);
     if (!runtime.allowed) return runtime;
 
+    if (this.providerBinding.kind === 'e2b') {
+      // Resolve the customer credential before granting terminal access, then
+      // re-read the runtime: a credential that disappeared during the await must
+      // fail closed rather than serve a stale grant.
+      await fetchByocE2BCredential(this.env, this.providerBinding);
+      const current = await this.readTerminalRuntime(input, true);
+      if (!current.allowed) return current;
+      if (!this.sameTerminalRuntime(current, runtime)) {
+        return { allowed: false, reason: 'runtime_changed' };
+      }
+      return this.renewTerminalCredentialLease(input, current);
+    }
+
     if (this.providerBinding.kind === 'onprem') {
       return this.renewTerminalCredentialLease(input, runtime);
     }
@@ -3433,10 +3666,17 @@ export class SandboxControl extends DurableObject<Env> {
     requiredContainment: CredentialContainmentRequirements,
     allocationName: string,
     vercel: ProviderAllocationIntent['vercel'],
-    onprem?: OnPremAllocationConfig
+    onprem?: OnPremAllocationConfig,
+    e2b?: E2BAllocationConfig
   ): AllocationTarget {
     const provider =
-      onprem !== undefined ? 'onprem' : this.providerKind === 'vercel' ? 'vercel' : 'cloudflare';
+      e2b !== undefined
+        ? 'e2b'
+        : onprem !== undefined
+          ? 'onprem'
+          : this.providerKind === 'vercel'
+            ? 'vercel'
+            : 'cloudflare';
     const capabilities =
       provider === 'vercel'
         ? { persistentWorkspace: true, destroysOnStop: false }
@@ -3449,6 +3689,7 @@ export class SandboxControl extends DurableObject<Env> {
       containment: requiredContainment,
       ...(vercel === undefined ? {} : { vercel }),
       ...(onprem === undefined ? {} : { onprem }),
+      ...(e2b === undefined ? {} : { e2b }),
     };
   }
 
@@ -3463,13 +3704,28 @@ export class SandboxControl extends DurableObject<Env> {
     const allocationName = state.target.allocationName ?? this.sandboxId;
     if (this.providerBinding.kind === 'onprem') {
       const onprem = state.target.onprem;
+      const hardStopAt = allocationHardStopAt(state.target);
       const ref = decodeOnPremProviderRef(providerRef);
       return (
         ref !== null &&
         onprem !== undefined &&
         ref.installationId === onprem.binding.installationId &&
         ref.allocationId === state.createIntent.intentId &&
-        Date.now() < onprem.hardStopAt
+        hardStopAt !== undefined &&
+        Date.now() < hardStopAt
+      );
+    }
+    if (this.providerBinding.kind === 'e2b') {
+      const e2b = state.target.e2b;
+      const hardStopAt = allocationHardStopAt(state.target);
+      const ref = parseE2BProviderRef(providerRef);
+      return (
+        ref !== null &&
+        e2b !== undefined &&
+        e2b.submissionState === 'submitted' &&
+        ref.intentId === state.createIntent.intentId &&
+        hardStopAt !== undefined &&
+        Date.now() < hardStopAt
       );
     }
     if (this.providerKind === 'vercel') {
@@ -3486,17 +3742,19 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   /**
-   * Request-admission predicate for an on-prem allocation: the live provider
-   * reference must still match the allocation's pinned identity and the fixed
-   * lifetime must not be exhausted. The canonical predicate owns both checks so
-   * admission never re-derives the expiry. Non-on-prem providers admit on the
-   * generic reference check.
+   * Request-admission predicate for a fixed-lifetime allocation (on-prem or
+   * E2B): the live provider reference must still match the allocation's pinned
+   * identity and the fixed lifetime must not be exhausted. The canonical
+   * predicate owns both checks so admission never re-derives the expiry.
+   * Non-fixed-lifetime providers admit on the generic reference check.
    */
-  private matchesLiveOnPremProviderReference(
+  private matchesLiveProviderReference(
     record: AllocationRecord,
     providerRef: string
   ): boolean {
-    if (this.providerBinding.kind !== 'onprem') return true;
+    if (this.providerBinding.kind !== 'onprem' && this.providerBinding.kind !== 'e2b') {
+      return true;
+    }
     const state = record.state;
     if (state.kind !== 'creating' && state.kind !== 'allocated') return false;
     return this.matchesCanonicalProviderReference(state, providerRef);
@@ -3512,18 +3770,28 @@ export class SandboxControl extends DurableObject<Env> {
       // On-prem containment is always the full worktree containment, and a
       // reached fixed-lifetime cap makes the credentials unavailable even before
       // the stop effect runs. Otherwise fall through to the generic checks.
-      const onprem =
+      const hardStopAt =
         state.kind === 'creating' || state.kind === 'allocated' || state.kind === 'stopping'
-          ? state.target.onprem
+          ? allocationHardStopAt(state.target)
           : undefined;
       if (
         !requiredContainment.kilocode ||
         !requiredContainment.github ||
         !requiredContainment.worktreeScoped ||
-        (onprem !== undefined && Date.now() >= onprem.hardStopAt)
+        (hardStopAt !== undefined && Date.now() >= hardStopAt)
       ) {
         return false;
       }
+    }
+    if (this.providerBinding.kind === 'e2b') {
+      // A reached E2B fixed-lifetime cap makes credentials unavailable even
+      // before the stop effect runs, exactly as on-prem's cap does. One reader:
+      // never a call-site copy of the anchor.
+      const hardStopAt =
+        state.kind === 'creating' || state.kind === 'allocated' || state.kind === 'stopping'
+          ? allocationHardStopAt(state.target)
+          : undefined;
+      if (hardStopAt !== undefined && Date.now() >= hardStopAt) return false;
     }
     if (state.kind === 'creating') {
       const containment = state.target.containment;
@@ -3577,11 +3845,10 @@ export class SandboxControl extends DurableObject<Env> {
     const failureReason =
       await this.ctx.storage.get<SandboxProviderFailureReason>(FAILURE_REASON_KEY);
     const hardStopAt =
-      this.providerBinding.kind === 'onprem' &&
-      (record.state.kind === 'creating' ||
-        record.state.kind === 'allocated' ||
-        record.state.kind === 'stopping')
-        ? record.state.target.onprem?.hardStopAt
+      record.state.kind === 'creating' ||
+      record.state.kind === 'allocated' ||
+      record.state.kind === 'stopping'
+        ? allocationHardStopAt(record.state.target)
         : undefined;
     return {
       ...projection,
@@ -3944,6 +4211,26 @@ export class SandboxControl extends DurableObject<Env> {
             : null,
       });
     }
+    if (kind === 'e2b') {
+      if (this.providerBinding.kind !== 'e2b') {
+        throw new E2BProviderError('byoc_e2b_policy_mismatch');
+      }
+      const live =
+        state !== undefined &&
+        (state.kind === 'creating' || state.kind === 'allocated' || state.kind === 'stopping');
+      const target = live && state !== undefined ? state.target : undefined;
+      const createIntent = live && state !== undefined ? state.createIntent : null;
+      if (target?.e2b === undefined || createIntent === null) {
+        throw new E2BProviderError('byoc_e2b_policy_mismatch');
+      }
+      return createE2BControlAdapter({
+        config: target.e2b,
+        binding: this.providerBinding,
+        sandboxId: this.sandboxId,
+        intentId: createIntent.intentId,
+        resolveApiKey: binding => resolveByocE2BApiKey(this.env, binding),
+      });
+    }
     return createCloudflareProviderAdapter({
       sandboxId: allocationName,
       getSandbox: (id, options) =>
@@ -3971,7 +4258,33 @@ export class SandboxControl extends DurableObject<Env> {
    * carries the demand-time Vercel block, so observe/stop/launch target the same
    * build the create bound.
    */
-  private async providerFor(target?: AllocationTarget): Promise<ProviderAdapter> {
+  private async providerFor(
+    target?: AllocationTarget,
+    options?: { submitCreateIntent?: () => Promise<E2BSubmittedAllocationConfig> }
+  ): Promise<ProviderAdapter> {
+    if (this.providerBinding.kind === 'e2b') {
+      // The E2B adapter is rebuilt per operation from the persisted target; the
+      // API key is resolved per provider call and never cached. The create
+      // callback is passed only from `controlCreateEffect`.
+      const record = await this.readCanonicalAllocation();
+      const state = record.state;
+      const liveTarget =
+        target ?? (state.kind !== 'stopped' ? (state.target ?? undefined) : undefined);
+      const createIntent = state.kind !== 'stopped' ? state.createIntent : null;
+      if (liveTarget?.e2b === undefined || createIntent === null) {
+        throw new E2BProviderError('byoc_e2b_policy_mismatch');
+      }
+      return createE2BControlAdapter({
+        config: liveTarget.e2b,
+        binding: this.providerBinding,
+        sandboxId: this.sandboxId,
+        intentId: createIntent.intentId,
+        resolveApiKey: binding => resolveByocE2BApiKey(this.env, binding),
+        ...(options?.submitCreateIntent !== undefined
+          ? { submitCreateIntent: options.submitCreateIntent }
+          : {}),
+      });
+    }
     if (this.providerBinding.kind === 'onprem') {
       // The on-prem adapter is rebuilt per operation from the pinned canonical
       // target, like BYOC: the installation runner is a per-request destination,
@@ -4001,8 +4314,9 @@ export class SandboxControl extends DurableObject<Env> {
     kv.delete(BYOC_SNAPSHOT_RECOVERY_KEY);
   }
 
-  private async recordProviderFailure(error: unknown): Promise<void> {
-    const reason =
+  /** The provider failure reason an error maps to, or `undefined` when none. */
+  private providerFailureReasonFor(error: unknown): SandboxProviderFailureReason | undefined {
+    return (
       providerFailureReason(this.providerBinding, error) ??
       (this.isByocBinding() &&
       ((error instanceof VercelSandboxRestError &&
@@ -4010,24 +4324,63 @@ export class SandboxControl extends DurableObject<Env> {
         error.status >= 500) ||
         error instanceof ByocCredentialResolverError)
         ? 'environment_failed'
-        : undefined);
+        : undefined)
+    );
+  }
+
+  /**
+   * The single owner of the missing-snapshot recovery setup: a missing-snapshot
+   * reason records the identity and arms the retry anchor. The alarm owns every
+   * projection attempt, so a failed projection is retried and eventually cleared
+   * instead of being written and forgotten.
+   */
+  private async armByocSnapshotRecovery(reason: SandboxProviderFailureReason): Promise<void> {
+    if (reason !== 'byoc_vercel_not_ready') return;
+    const snapshot = await this.byocRuntimeSnapshotForRecovery();
+    if (snapshot === undefined) return;
+    await this.ctx.storage.put(BYOC_SNAPSHOT_RECOVERY_KEY, {
+      snapshot,
+      attempts: 0,
+    });
+    await this.armInfrastructureAnchor(
+      'byocSnapshotRecovery',
+      Date.now() + DEADLINE_MS.reconciliation
+    );
+  }
+
+  private async recordProviderFailure(error: unknown): Promise<void> {
+    const reason = this.providerFailureReasonFor(error);
     if (reason === undefined) return;
     await this.ctx.storage.put(FAILURE_REASON_KEY, reason);
-    if (reason === 'byoc_vercel_not_ready') {
-      const snapshot = await this.byocRuntimeSnapshotForRecovery();
-      if (snapshot === undefined) return;
-      // Record the missing snapshot and arm the retry anchor. The alarm owns
-      // every projection attempt, so a failed projection is retried and
-      // eventually cleared instead of being written and forgotten.
-      await this.ctx.storage.put(BYOC_SNAPSHOT_RECOVERY_KEY, {
-        snapshot,
-        attempts: 0,
+    await this.armByocSnapshotRecovery(reason);
+  }
+
+  /**
+   * The create effect's failure writer. The E2B create-origin failure is fenced
+   * to the originating create intent: a stale generation's rejected submission
+   * (or late provider error) must never write its failure key onto a healthy
+   * successor's record. Other providers keep the unfenced create-origin
+   * behaviour their recovery depends on: a late Vercel missing-snapshot error
+   * arrives after the deadline moved the same allocation to `unknown`, so a
+   * `creating`-only fence would discard the reason and the recovery anchor.
+   */
+  private async recordCreateProviderFailure(intentId: string, error: unknown): Promise<void> {
+    const reason = this.providerFailureReasonFor(error);
+    if (reason === undefined) return;
+    if (this.providerBinding.kind === 'e2b') {
+      const fenced = await this.ctx.storage.transaction(async () => {
+        const current = await this.readCanonicalAllocation();
+        if (current.state.kind !== 'creating' || current.state.createIntent.intentId !== intentId) {
+          return false;
+        }
+        await this.ctx.storage.put(FAILURE_REASON_KEY, reason);
+        return true;
       });
-      await this.armInfrastructureAnchor(
-        'byocSnapshotRecovery',
-        Date.now() + DEADLINE_MS.reconciliation
-      );
+      if (!fenced) return;
+    } else {
+      await this.ctx.storage.put(FAILURE_REASON_KEY, reason);
     }
+    await this.armByocSnapshotRecovery(reason);
   }
 
   /**
@@ -4337,7 +4690,7 @@ export class SandboxControl extends DurableObject<Env> {
       committed.next.provider === 'vercel' ? committed.next.resources : undefined;
     this.containersInstance =
       committed.next.provider === 'cloudflare-containers' ? committed.next.instance : undefined;
-    if (!this.isByocBinding()) {
+    if (!this.isByocBinding() && this.providerKind !== 'e2b') {
       this.provider = this.createProviderAdapter(
         committed.next.provider,
         await this.readCanonicalAllocation()
@@ -4431,21 +4784,7 @@ export class SandboxControl extends DurableObject<Env> {
     }
     if (id === 'hardStop') {
       const record = await this.readCanonicalAllocation();
-      const hardStopAt =
-        record.state.kind === 'creating' ||
-        record.state.kind === 'allocated' ||
-        record.state.kind === 'stopping'
-          ? record.state.target.onprem?.hardStopAt
-          : undefined;
-      if (
-        this.providerBinding.kind === 'onprem' &&
-        record.state.kind === 'allocated' &&
-        hardStopAt !== undefined &&
-        hardStopAt <= Date.now()
-      ) {
-        await this.ctx.storage.put(FAILURE_REASON_KEY, 'onprem_lifetime_exhausted');
-        await this.beginCanonicalStop(record, 'onprem_lifetime_exhausted');
-      }
+      await this.applyHardStop(record);
       return;
     }
     if (id === 'credentialExpiry') {
@@ -4465,7 +4804,9 @@ export class SandboxControl extends DurableObject<Env> {
     const state = record.state;
     if (state.kind !== 'creating' && state.kind !== 'allocated') return false;
     if (
-      (this.providerKind === 'vercel' || this.providerBinding.kind === 'onprem') &&
+      (this.providerKind === 'vercel' ||
+        this.providerBinding.kind === 'onprem' ||
+        this.providerBinding.kind === 'e2b') &&
       state.kind !== 'allocated'
     ) {
       return false;
@@ -4487,7 +4828,9 @@ export class SandboxControl extends DurableObject<Env> {
     const state = record.state;
     if (
       (state.kind !== 'creating' && state.kind !== 'allocated') ||
-      ((this.providerKind === 'vercel' || this.providerBinding.kind === 'onprem') &&
+      ((this.providerKind === 'vercel' ||
+        this.providerBinding.kind === 'onprem' ||
+        this.providerBinding.kind === 'e2b') &&
         state.kind !== 'allocated') ||
       !this.matchesCanonicalProviderReference(state, identity.providerInstanceId) ||
       !this.matchesCanonicalWorktreeContainment(record)
@@ -4899,7 +5242,7 @@ export class SandboxControl extends DurableObject<Env> {
       return;
     }
     const providerRef = state.target.providerRef;
-    if (this.providerBinding.kind === 'vercel') {
+    if (this.providerBinding.kind === 'vercel' || this.providerBinding.kind === 'e2b') {
       const nextLeaseCheckAt = await this.ctx.storage.get<number>(NEXT_LEASE_CHECK_AT_KEY);
       if (nextLeaseCheckAt !== undefined && nextLeaseCheckAt > Date.now()) return;
     }
@@ -4943,6 +5286,14 @@ export class SandboxControl extends DurableObject<Env> {
           reason: providerFailureReason(this.providerBinding, error) ?? 'onprem_unavailable',
           identity,
         });
+      } else if (this.providerBinding.kind === 'e2b') {
+        // Record the E2B code, then stop the exact allocation. A lease failure
+        // here is an allocated record, which `beginCanonicalStop` handles.
+        await this.recordProviderFailure(error);
+        await this.beginCanonicalStop(
+          record,
+          providerFailureReason(this.providerBinding, error) ?? 'byoc_e2b_unavailable'
+        );
       }
     }
   }
@@ -4954,6 +5305,17 @@ export class SandboxControl extends DurableObject<Env> {
    * lease and no check.
    */
   private async scheduleNextLeaseCheck(phase: 'initial' | 'renewal', now: number): Promise<void> {
+    if (this.providerBinding.kind === 'e2b') {
+      // The E2B sandbox carries a fixed initial lease; renew it well before it
+      // expires and re-check every minute thereafter. The provider caps the
+      // renewal at `hardStopAt`.
+      const delay =
+        phase === 'initial'
+          ? Math.max(0, E2B_INITIAL_LEASE_MS - leaseAtLeastMs())
+          : 60_000;
+      await this.ctx.storage.put(NEXT_LEASE_CHECK_AT_KEY, now + delay);
+      return;
+    }
     if (this.providerBinding.kind !== 'vercel') return;
     const defaults = parseVercelSandboxRuntimeDefaults(this.env);
     if (!defaults) return;
@@ -6129,6 +6491,7 @@ export class SandboxControl extends DurableObject<Env> {
     }
     const grant = grants.find(
       grant =>
+        credentialGrantMatchesProvider(grant, this.providerBinding) &&
         grant.userId === input.ownerId &&
         grant.orgId === input.organizationId &&
         grant.sandboxId === this.sandboxId &&
@@ -6265,11 +6628,11 @@ export class SandboxControl extends DurableObject<Env> {
    * allocation is running, so the canonical stop ladder (not a re-fired past
    * deadline) owns teardown once the cap is reached.
    */
-  private async syncOnPremHardStop(record: AllocationRecord): Promise<void> {
-    if (this.providerBinding.kind !== 'onprem') return;
+  private async syncHardStop(record: AllocationRecord): Promise<void> {
+    if (this.providerBinding.kind !== 'onprem' && this.providerBinding.kind !== 'e2b') return;
     const state = record.state;
     const live = state.kind === 'creating' || state.kind === 'allocated';
-    const hardStopAt = live ? state.target.onprem?.hardStopAt : undefined;
+    const hardStopAt = live ? allocationHardStopAt(state.target) : undefined;
     const anchors = await loadControlAlarmAnchors(this.ctx.storage);
     const armed = anchors.hardStopAt ?? null;
     if (hardStopAt === undefined || !live) {
@@ -6308,7 +6671,7 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
-  private async scheduleAlarm(): Promise<void> {
+  private async scheduleAlarm(allocationOverrideAt?: number | null): Promise<void> {
     const record = await this.readCanonicalAllocation();
     const anchors = await loadControlAlarmAnchors(this.ctx.storage);
     await scheduleControlAlarm(
@@ -6318,6 +6681,7 @@ export class SandboxControl extends DurableObject<Env> {
       },
       {
         allocation: record,
+        ...(allocationOverrideAt !== undefined ? { allocationOverrideAt } : {}),
         credentialExpiryAt: anchors.credentialExpiryAt,
         socketHandshakeAt: anchors.socketHandshakeAt,
         byocSnapshotRecoveryAt: anchors.byocSnapshotRecoveryAt ?? null,
@@ -6344,10 +6708,92 @@ export class SandboxControl extends DurableObject<Env> {
     };
   }
 
+  /**
+   * Commit the durable at-most-once create bit inside one storage transaction,
+   * before the provider POSTs. The reducer is the only writer; this method only
+   * computes the bounded deadline and dispatches. A rejected dispatch throws, so
+   * the provider never POSTs an uncommitted create.
+   */
+  private async submitE2BCreateIntent(
+    intentId: string,
+    acquisitionDeadlineAt: number | null
+  ): Promise<E2BSubmittedAllocationConfig> {
+    if (this.providerBinding.kind !== 'e2b') {
+      throw new E2BProviderError('byoc_e2b_policy_mismatch');
+    }
+    const binding = this.providerBinding;
+    return this.ctx.storage.transaction(async () => {
+      const current = await this.readCanonicalAllocation();
+      const state = current.state;
+      if (state.kind !== 'creating' || state.createIntent.intentId !== intentId) {
+        throw new E2BProviderError('byoc_e2b_policy_mismatch');
+      }
+      const config = state.target.e2b;
+      if (config === undefined || config.submissionState !== 'pending') {
+        throw new E2BProviderError('byoc_e2b_policy_mismatch');
+      }
+      const now = Date.now();
+      // The bound is the captured per-invocation acquisition deadline, never a
+      // shared field or a map read after an await: a later generation's `finally`
+      // must not widen this create's deadline.
+      const createDeadlineAt = e2bCreateDeadline({
+        acquisitionDeadlineAt,
+        creatingDeadlineAt: state.deadlineAt,
+        hardStopAt: config.hardStopAt,
+      });
+      const submitted = markE2BConfigSubmitted({
+        config,
+        binding,
+        sandboxId: this.sandboxId,
+        now,
+        createDeadlineAt,
+      });
+      const decision = await this.allocationController.dispatch(
+        {
+          type: 'CREATE_SUBMISSION_RECORDED',
+          fence: { operationId: operationId('create', intentId), providerRef: null, incarnation: null },
+          submitted,
+          at: now,
+        },
+        now
+      );
+      if (decision === undefined) throw new E2BProviderError('byoc_e2b_policy_mismatch');
+      // Arm the reconciliation wake in the same transaction as the commit, so a
+      // crash after the commit still wakes at `reconciliationAlarmAt`.
+      await this.scheduleAlarm();
+      return submitted;
+    });
+  }
+
   private async controlCreateEffect(input: {
     target: AllocationTarget;
     intentId: string;
   }): Promise<
+    | { providerRef: string; incarnation: string; resolvedContainment?: AllocationContainment }
+    | { unresolved: true }
+  > {
+    // Capture this invocation's acquisition deadline synchronously, before the
+    // first await, and close over it. A shared field or a late map read cannot
+    // represent two generations: an older `finally` would clear a newer bound.
+    const acquisitionDeadlineAt = this.createAcquisitionDeadlines.get(input.intentId) ?? null;
+    // Register synchronously, before the first await, so a concurrent alarm
+    // cannot dispatch the early recovery `DEADLINE` for this intent. Remove only
+    // this id: an older effect must not clear a newer generation's guard.
+    this.createIntentsInFlight.add(input.intentId);
+    try {
+      return await this.controlCreateEffectInner(input, acquisitionDeadlineAt);
+    } finally {
+      this.createIntentsInFlight.delete(input.intentId);
+    }
+  }
+
+  private async controlCreateEffectInner(
+    input: {
+      target: AllocationTarget;
+      intentId: string;
+    },
+    acquisitionDeadlineAt: number | null
+  ): Promise<
     | { providerRef: string; incarnation: string; resolvedContainment?: AllocationContainment }
     | { unresolved: true }
   > {
@@ -6378,19 +6824,64 @@ export class SandboxControl extends DurableObject<Env> {
       ...(target.allocationName === undefined ? {} : { allocationName: target.allocationName }),
       ...(vercel === undefined ? {} : { vercel }),
       ...(target.onprem === undefined ? {} : { onprem: target.onprem }),
+      ...(target.e2b === undefined ? {} : { e2b: target.e2b }),
       ...(target.containment === undefined ? {} : { containment: target.containment }),
       ...(billing === undefined ? {} : { billing }),
       ...(networkPolicy === undefined ? {} : { networkPolicy }),
     };
     let created: Awaited<ReturnType<ProviderAdapter['create']>>;
     try {
-      created = await (await this.providerFor(target)).create(intent);
+      created = await (
+        await this.providerFor(
+          target,
+          this.providerBinding.kind === 'e2b'
+            ? { submitCreateIntent: () => this.submitE2BCreateIntent(intentId, acquisitionDeadlineAt) }
+            : undefined
+        )
+      ).create(intent);
+      if (!('unresolved' in created) && this.providerBinding.kind === 'e2b') {
+        // A returned reference that does not parse or names a different create is
+        // not this create's evidence. Fail closed inside the fenced error
+        // boundary so the provider-specific failure is recorded: never return it
+        // confirmed and never side-write it onto the record.
+        const reference = parseE2BProviderRef(created.providerRef);
+        if (reference === null || reference.intentId !== intentId) {
+          throw new E2BProviderError('byoc_e2b_policy_mismatch');
+        }
+      }
     } catch (error) {
-      await this.recordProviderFailure(error);
+      await this.recordCreateProviderFailure(intentId, error);
       throw error;
     }
-    if ('unresolved' in created) return { unresolved: true };
-    this.clearObsoleteProviderFailure();
+    if ('unresolved' in created) {
+      // An unresolved create is an uncertain outcome, not a proven failure: the
+      // session must project the E2B-specific code rather than the generic port
+      // reason. The record is still this create, so the fenced write applies.
+      if (this.providerBinding.kind === 'e2b') {
+        await this.recordCreateProviderFailure(
+          intentId,
+          new E2BProviderError('byoc_e2b_create_unknown')
+        );
+      }
+      return { unresolved: true };
+    }
+    // A successful provider response is not evidence that a cancellation or a
+    // lifetime failure is obsolete: when this intent's record carries a stop
+    // intent or has reached the E2B cap, the reason stays for the status read.
+    // The lifetime projection itself is written by the accepted CREATE_CONFIRMED
+    // transition, never here.
+    const settled = await this.readCanonicalAllocation();
+    const settledState = settled.state;
+    const settledThisIntent =
+      settledState.kind === 'creating' && settledState.createIntent.intentId === intentId;
+    const settledHardStopAt =
+      settledState.kind === 'creating' && settledState.target.provider === 'e2b'
+        ? settledState.target.e2b?.hardStopAt
+        : undefined;
+    const atCap =
+      settledThisIntent && settledHardStopAt !== undefined && Date.now() >= settledHardStopAt;
+    const keepFailure = settledThisIntent && (settledState.stopIntent !== undefined || atCap);
+    if (!keepFailure) this.clearObsoleteProviderFailure();
     this.controlLaunchCredential = { providerRef: created.providerRef, credential, intentId };
     return {
       providerRef: created.providerRef,
@@ -6410,7 +6901,8 @@ export class SandboxControl extends DurableObject<Env> {
     if (!pending || pending.providerRef !== input.providerRef) {
       throw new Error('Sandbox launch credential is unavailable');
     }
-    if (this.controlAcquisitionDeadline !== null && Date.now() >= this.controlAcquisitionDeadline) {
+    const acquisitionDeadlineAt = this.createAcquisitionDeadlines.get(pending.intentId);
+    if (acquisitionDeadlineAt !== undefined && Date.now() >= acquisitionDeadlineAt) {
       throw new Error('Sandbox acquisition expired');
     }
     try {
@@ -6465,7 +6957,18 @@ export class SandboxControl extends DurableObject<Env> {
     );
     // Carry the discovered reference in the fence so the reducer can adopt it
     // when the target never bound one (by-name observation of a lost create).
-    const providerRef = observed.providerRef ?? input.target.providerRef;
+    // A discovered E2B reference that does not parse or names a different create
+    // is not proven: drop it so the effect port rejects the observation rather
+    // than binding a foreign id.
+    let discovered = observed.providerRef ?? null;
+    if (
+      discovered !== null &&
+      input.target.provider === 'e2b' &&
+      parseE2BProviderRef(discovered)?.intentId !== intent?.intentId
+    ) {
+      discovered = null;
+    }
+    const providerRef = discovered ?? input.target.providerRef;
     const recoverable = this.isByocBinding() && observed.status === 'active';
     return {
       status: observed.status,
@@ -6502,6 +7005,7 @@ export class SandboxControl extends DurableObject<Env> {
       ...(target.allocationName === undefined ? {} : { allocationName: target.allocationName }),
       ...(vercel === undefined ? {} : { vercel }),
       ...(target.onprem === undefined ? {} : { onprem: target.onprem }),
+      ...(target.e2b === undefined ? {} : { e2b: target.e2b }),
       ...(target.containment === undefined ? {} : { containment: target.containment }),
     };
   }

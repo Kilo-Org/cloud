@@ -21,13 +21,16 @@ import type {
   AllocationCreateIntent,
   AllocationRecord,
   AllocationState,
+  AllocationStopIntent,
   AllocationTarget,
   AllocatedAllocation,
+  CreatingAllocation,
   StopProof,
   StoppingAllocation,
+  StoppingCheckRequired,
   StoppingDestroying,
 } from '../model/allocation.js';
-import { allocatedConnecting, allocationEffect } from '../model/allocation.js';
+import { allocatedConnecting, allocationEffect, allocationHardStopAt } from '../model/allocation.js';
 import type { HealthState } from '../model/health.js';
 import { connectingAt, decideHealth } from '../health/reduce.js';
 import { POLICY, allocationAlarmAt, idleStopEligible } from '../schedule.js';
@@ -54,6 +57,7 @@ export const ALLOCATION_EVENT_TYPES = [
   'DEMAND',
   'ACQUIRE',
   'CREATE_CONFIRMED',
+  'CREATE_SUBMISSION_RECORDED',
   'CREATE_FAILED',
   'CREATE_UNKNOWN',
   'LAUNCH_FAILED',
@@ -90,6 +94,20 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
     commands: ['Launch'],
     deadline: 'connect',
   },
+  {
+    from: 'creating',
+    event: 'CREATE_CONFIRMED',
+    to: 'stopping.destroying',
+    commands: ['Destroy'],
+    deadline: 'destroy',
+  },
+  {
+    from: 'creating',
+    event: 'CREATE_SUBMISSION_RECORDED',
+    to: 'creating',
+    commands: [],
+    deadline: 'create',
+  },
   { from: 'creating', event: 'CREATE_FAILED', to: 'stopped', commands: [], deadline: null },
   {
     from: 'creating',
@@ -97,6 +115,13 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
     to: 'unknown',
     commands: [],
     deadline: 'create',
+  },
+  {
+    from: 'creating',
+    event: 'CREATE_UNKNOWN',
+    to: 'stopping.check_required',
+    commands: [],
+    deadline: null,
   },
   {
     from: 'allocated.connecting',
@@ -113,6 +138,15 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
     deadline: 'observe',
   },
   { from: 'creating', event: 'DEADLINE', to: 'creating', commands: [], deadline: 'create' },
+  {
+    from: 'creating',
+    event: 'DEADLINE',
+    to: 'stopping.check_required',
+    commands: [],
+    deadline: null,
+  },
+  { from: 'creating', event: 'CANCEL', to: 'stopped', commands: [], deadline: null },
+  { from: 'creating', event: 'CANCEL', to: 'creating', commands: [], deadline: 'create' },
 
   {
     from: 'allocated.connecting',
@@ -307,6 +341,13 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
   },
   {
     from: 'stopping.check_required',
+    event: 'CHECK',
+    to: 'stopping.check_required',
+    commands: [],
+    deadline: null,
+  },
+  {
+    from: 'stopping.check_required',
     event: 'DEMAND',
     to: 'stopping.destroying',
     commands: EFFECT_COMMANDS,
@@ -336,6 +377,13 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
     deadline: 'destroy',
   },
   { from: 'unknown', event: 'DEADLINE', to: 'unknown', commands: ['Observe'], deadline: 'observe' },
+  {
+    from: 'unknown',
+    event: 'DEADLINE',
+    to: 'stopping.check_required',
+    commands: [],
+    deadline: null,
+  },
 ];
 
 /** Fields written only by this reducer. */
@@ -602,6 +650,7 @@ export function decideAllocation(
 
     case 'creating': {
       const expected = operationId('create', state.createIntent.intentId);
+      const e2b = state.target.provider === 'e2b' ? state.target.e2b : undefined;
       switch (event.type) {
         case 'CREATE_CONFIRMED': {
           if (!fenceMatches(event.fence, expected, undefined, event.incarnation)) return undefined;
@@ -612,6 +661,33 @@ export function decideAllocation(
               ? { resolvedContainment: event.resolvedContainment }
               : {}),
           };
+          const hardStopAt = allocationHardStopAt(state.target);
+          const atCap =
+            state.target.provider === 'e2b' && hardStopAt !== undefined && now >= hardStopAt;
+          if (state.stopIntent !== undefined || atCap) {
+            // A cancelled or lifetime-exceeded create must never launch. Persist
+            // the returned reference in this same transition, then destroy that
+            // exact id. Discovery has expired by the cap, so this ref is the only
+            // cleanup evidence.
+            const reason = state.stopIntent?.reason ?? 'byoc_e2b_lifetime_exceeded';
+            const stopping = enterStopping(
+              target,
+              state.createIntent,
+              reason,
+              now,
+              event.incarnation
+            );
+            return {
+              state: { v: 2, resumable: record.resumable, state: stopping },
+              commands: effectCommand(
+                target,
+                reason,
+                effectOperationId(stopping),
+                event.incarnation
+              ),
+              deadlineAt: stopping.deadlineAt,
+            };
+          }
           const health = connectingAt(event.incarnation, now);
           const allocated = allocatedConnecting(target, state.createIntent, health);
           return {
@@ -626,6 +702,59 @@ export function decideAllocation(
             ],
             deadlineAt: health.deadlineAt,
           };
+        }
+        case 'CREATE_SUBMISSION_RECORDED': {
+          if (!fenceMatches(event.fence, expected, undefined)) return undefined;
+          if (state.target.provider !== 'e2b' || !e2b) return undefined;
+          if (e2b.submissionState !== 'pending') return undefined;
+          if (state.target.providerRef !== null) return undefined;
+          if (state.stopIntent !== undefined) return undefined;
+          const submitted = event.submitted;
+          if (!(now < submitted.createDeadlineAt)) return undefined;
+          if (submitted.createDeadlineAt > state.deadlineAt) return undefined;
+          if (submitted.createDeadlineAt > e2b.hardStopAt) return undefined;
+          // The reducer copies the block verbatim; `e2b-runtime.ts` computed every
+          // timestamp. No command is emitted: the create effect itself POSTs.
+          const nextState: CreatingAllocation = {
+            ...state,
+            target: { ...state.target, e2b: submitted },
+          };
+          const next: AllocationRecord = { v: 2, resumable: record.resumable, state: nextState };
+          return { state: next, commands: [], deadlineAt: allocationAlarmAt(next) };
+        }
+        case 'CANCEL': {
+          // Only the unfenced creating CANCEL is admissible: the pre-dispatch
+          // guard rejects any fence outside `allocated`, so a fenced event never
+          // reaches here. E2B with a null reference only.
+          if (event.scope !== 'allocation' || event.fence !== undefined) return undefined;
+          if (state.target.provider !== 'e2b' || !e2b) return undefined;
+          if (state.target.providerRef !== null) return undefined;
+          if (e2b.submissionState === 'pending') {
+            // Nothing reached the network: release with no scan and no kill.
+            const next: AllocationRecord = {
+              v: 2,
+              resumable: record.resumable,
+              state: {
+                kind: 'stopped',
+                summary: {
+                  providerRef: state.target.providerRef,
+                  ...(state.target.allocationName !== undefined
+                    ? { allocationName: state.target.allocationName }
+                    : {}),
+                },
+              },
+            };
+            return { state: next, commands: [], deadlineAt: null };
+          }
+          // Submitted: the durable fence. Stay `creating` so the in-flight result
+          // remains admissible; the result event then destroys instead of
+          // launching. The deadline and submitted block are unchanged.
+          const nextState: CreatingAllocation = {
+            ...state,
+            stopIntent: { reason: event.reason ?? 'cancel_allocation', createdAt: now },
+          };
+          const next: AllocationRecord = { v: 2, resumable: record.resumable, state: nextState };
+          return { state: next, commands: [], deadlineAt: allocationAlarmAt(next) };
         }
         case 'CREATE_FAILED': {
           if (!fenceMatches(event.fence, expected)) return undefined;
@@ -646,6 +775,43 @@ export function decideAllocation(
         }
         case 'CREATE_UNKNOWN': {
           if (!fenceMatches(event.fence, expected)) return undefined;
+          if (
+            e2b?.submissionState === 'submitted' &&
+            state.target.providerRef === null &&
+            now >= e2b.reconciliationDeadlineAt
+          ) {
+            // The list window has expired with no reference: exhaust into a
+            // check, with no Observe and no second POST.
+            return exhaustionCheckRequired(
+              record,
+              state.target,
+              state.createIntent,
+              state.stopIntent,
+              state.attempt,
+              'create_expired',
+              now
+            );
+          }
+          if (e2b?.submissionState === 'submitted' && state.target.providerRef === null) {
+            // Stay `unknown` but wake inside the window so a crash after the POST
+            // still lists. Copy the submitted block and the cancellation fence.
+            const deadlineAt = Math.min(
+              e2b.reconciliationAlarmAt ?? e2b.reconciliationDeadlineAt,
+              e2b.reconciliationDeadlineAt
+            );
+            return {
+              state: unknownRecord(
+                record,
+                state.target,
+                state.createIntent,
+                event.reason,
+                deadlineAt,
+                state.stopIntent ?? null
+              ),
+              commands: [],
+              deadlineAt,
+            };
+          }
           // An unresolved create retains the intent and the startup deadline and
           // emits no Observe. The allocation stays identity-stable for the
           // in-flight readiness caller; the observe/resolve ladder runs only at
@@ -662,11 +828,43 @@ export function decideAllocation(
             deadlineAt: state.deadlineAt,
           };
         }
-        case 'DEADLINE':
+        case 'DEADLINE': {
+          if (
+            e2b?.submissionState === 'submitted' &&
+            state.target.providerRef === null &&
+            now >= e2b.reconciliationDeadlineAt
+          ) {
+            // Exhaustion is checked before the not-yet-due return: the list
+            // window, not the 120s create bound, decides.
+            return exhaustionCheckRequired(
+              record,
+              state.target,
+              state.createIntent,
+              state.stopIntent,
+              state.attempt,
+              'create_expired',
+              now
+            );
+          }
+          if (
+            e2b?.submissionState === 'submitted' &&
+            state.target.providerRef === null &&
+            e2b.reconciliationAlarmAt !== undefined &&
+            now >= e2b.reconciliationAlarmAt &&
+            now < state.deadlineAt
+          ) {
+            // Recovery, not cancellation: start listing now rather than waiting
+            // for the 120s create bound.
+            return toUnknown(record, state.target, state.createIntent, 'create_deadline', now);
+          }
           if (now < state.deadlineAt) {
-            return { state: record, commands: [], deadlineAt: state.deadlineAt };
+            // Not yet due: report the aggregate alarm, which for a submitted E2B
+            // create is the earlier of the create bound and the reconciliation
+            // alarm.
+            return { state: record, commands: [], deadlineAt: allocationAlarmAt(record) };
           }
           return toUnknown(record, state.target, state.createIntent, 'create_deadline', now);
+        }
         default:
           return undefined;
       }
@@ -749,6 +947,19 @@ export function decideAllocation(
       if (state.step === 'check_required') {
         if (event.type !== 'CHECK' && event.type !== 'DEMAND' && event.type !== 'ACQUIRE') {
           return undefined;
+        }
+        if (event.type === 'CHECK') {
+          const e2b = state.target.provider === 'e2b' ? state.target.e2b : undefined;
+          if (
+            e2b?.submissionState === 'submitted' &&
+            state.target.providerRef === null &&
+            now >= e2b.reconciliationDeadlineAt
+          ) {
+            // The list window has expired with no reference: observing again
+            // would be a no-op, so the check stays `check_required` and emits
+            // nothing.
+            return { state: record, commands: [], deadlineAt: null };
+          }
         }
         const deadlineAt = now + POLICY.stopDeadlineMs;
         const next: StoppingDestroying = {
@@ -1028,15 +1239,38 @@ export function decideAllocation(
         }
         case 'DEADLINE': {
           if (!state.target) return undefined;
+          const e2b = state.target.provider === 'e2b' ? state.target.e2b : undefined;
+          const submittedNullRef =
+            e2b?.submissionState === 'submitted' && state.target.providerRef === null;
+          if (submittedNullRef && now >= e2b.reconciliationDeadlineAt) {
+            // The list window has expired with no reference. Exhaust before the
+            // generic not-yet-due return, so a deadline stored as `now + 90s`
+            // cannot hide expiry.
+            return exhaustionCheckRequired(
+              record,
+              state.target,
+              state.createIntent,
+              state.stopIntent ?? undefined,
+              state.attempts,
+              state.reason,
+              now
+            );
+          }
+          const pendingNullRef =
+            e2b?.submissionState === 'pending' && state.target.providerRef === null;
           // An unresolved create/launch retains its startup deadline and emits
           // no Observe, so a caller-side poll or infrastructure alarm must not
           // start observing inside that window. The observe/resolve ladder runs
           // only once the retained deadline is due; re-observing after the
           // observe deadline keeps the ladder advancing. A migrated legacy
           // tombstone is resolved eagerly by the readiness caller, not deferred.
-          const eager = state.reason === 'legacy_failed' || state.reason === 'legacy_unknown';
-          if (!eager && now < state.deadlineAt) {
-            return { state: record, commands: [], deadlineAt: state.deadlineAt };
+          // A pending E2B create never reached the network, so it is released
+          // immediately: the provider returns `terminal` before resolving a key.
+          if (!pendingNullRef) {
+            const eager = state.reason === 'legacy_failed' || state.reason === 'legacy_unknown';
+            if (!eager && now < state.deadlineAt) {
+              return { state: record, commands: [], deadlineAt: state.deadlineAt };
+            }
           }
           const anchor = state.stopIntent?.createdAt ?? state.createIntent?.createdAt;
           if (
@@ -1059,7 +1293,7 @@ export function decideAllocation(
             };
             return { state: checkRequired, commands: [], deadlineAt: null };
           }
-          const deadlineAt = now + POLICY.observeDeadlineMs;
+          const deadlineAt = unknownWakeAt(state.target, now);
           const next: AllocationRecord = {
             v: 2,
             resumable: record.resumable,
@@ -1092,7 +1326,8 @@ function unknownRecord(
   target: AllocationTarget | null,
   createIntent: AllocationCreateIntent | null,
   reason: string,
-  deadlineAt: number
+  deadlineAt: number,
+  stopIntent: AllocationStopIntent | null = null
 ): AllocationRecord {
   return {
     v: 2,
@@ -1101,12 +1336,26 @@ function unknownRecord(
       kind: 'unknown',
       target,
       createIntent,
-      stopIntent: null,
+      stopIntent,
       attempts: 0,
       reason,
       deadlineAt,
     },
   };
+}
+
+/**
+ * The next wake for an `unknown` allocation. A submitted E2B create with no
+ * reference must list inside its persisted reconciliation window, so the wake is
+ * capped by `reconciliationDeadlineAt`; every other shape keeps the 90s observe
+ * cadence. `e2b-runtime.ts` owns the window; this reads it.
+ */
+function unknownWakeAt(target: AllocationTarget | null, now: number): number {
+  const e2b = target?.provider === 'e2b' ? target.e2b : undefined;
+  if (e2b?.submissionState === 'submitted' && target?.providerRef === null) {
+    return Math.min(now + POLICY.observeDeadlineMs, e2b.reconciliationDeadlineAt);
+  }
+  return now + POLICY.observeDeadlineMs;
 }
 
 function toUnknown(
@@ -1116,7 +1365,7 @@ function toUnknown(
   reason: string,
   now: number
 ): Decision<AllocationRecord> {
-  const deadlineAt = now + POLICY.observeDeadlineMs;
+  const deadlineAt = unknownWakeAt(target, now);
   const commands: Command[] =
     target === null
       ? []
@@ -1134,6 +1383,37 @@ function toUnknown(
     state: unknownRecord(record, target, createIntent, reason, deadlineAt),
     commands,
     deadlineAt,
+  };
+}
+
+/**
+ * Exhaust an unresolved create into `stopping.check_required` with no command
+ * and no deadline. Reached only when the E2B list window has expired with no
+ * reference: the sandbox, if any, is unreachable, so observing again would be a
+ * no-op. A later `CHECK` stays `check_required` for this shape.
+ */
+function exhaustionCheckRequired(
+  record: AllocationRecord,
+  target: AllocationTarget | null,
+  createIntent: AllocationCreateIntent | null,
+  stopIntent: AllocationStopIntent | undefined,
+  attempts: number,
+  reason: string,
+  now: number
+): Decision<AllocationRecord> | undefined {
+  if (target === null || createIntent === null) return undefined;
+  const next: StoppingCheckRequired = {
+    kind: 'stopping',
+    target,
+    createIntent,
+    stopIntent: stopIntent ?? { reason, createdAt: now },
+    step: 'check_required',
+    attempts,
+  };
+  return {
+    state: { v: 2, resumable: record.resumable, state: next },
+    commands: [],
+    deadlineAt: null,
   };
 }
 

@@ -82,6 +82,34 @@ describe('AgentSandbox provider factory', () => {
     });
   });
 
+  it.each([undefined, 'cloudflare', 'e2b'] as const)(
+    'rejects an E2B binding on the legacy adapter path even with provider %s',
+    sandboxProvider => {
+      const legacy = metadata();
+      legacy.workspace = {
+        ...legacy.workspace,
+        sandboxProvider,
+        sandboxProviderBinding: {
+          kind: 'e2b',
+          organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          credentialId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        },
+      };
+      expect(() => createAgentSandbox({} as Env, legacy)).toThrow(
+        'E2B sandboxes require the current control plane'
+      );
+    }
+  );
+
+  it('rejects a bare legacy E2B provider without using Cloudflare', () => {
+    const legacy = metadata();
+    legacy.workspace = { sandboxProvider: 'e2b', sandboxId: 'ses-abcdef' };
+    expect(() => createAgentSandbox({} as Env, legacy)).toThrow(
+      'E2B sandboxes require the current control plane'
+    );
+    expect(getSandbox).not.toHaveBeenCalled();
+  });
+
   it('requires operational configuration only for Vercel metadata', () => {
     expect(() => createAgentSandbox({} as Env, metadata('vercel'))).toThrow(
       'Vercel sandbox operational configuration is incomplete'

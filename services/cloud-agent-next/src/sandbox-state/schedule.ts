@@ -66,8 +66,17 @@ export function allocationAlarmAt(record: AllocationRecord): number | null {
   switch (state.kind) {
     case 'stopped':
       return null;
-    case 'creating':
+    case 'creating': {
+      // A submitted E2B create carries its reconciliation alarm as a separate
+      // anchor; the create bound stays the acquisition/unknown bound, so the
+      // earlier of the two is the scheduled wake. The reducer reads the stored
+      // value and never recomputes the lead.
+      const e2b = state.target.provider === 'e2b' ? state.target.e2b : undefined;
+      if (e2b?.submissionState === 'submitted' && e2b.reconciliationAlarmAt !== undefined) {
+        return Math.min(state.deadlineAt, e2b.reconciliationAlarmAt);
+      }
       return state.deadlineAt;
+    }
     case 'allocated':
       return allocatedAlarmAt(state.health, state.idleAt);
     case 'stopping':

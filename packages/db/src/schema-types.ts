@@ -1247,6 +1247,20 @@ export type VercelComputeCredentialEnvelope = {
   };
 };
 
+export type E2BComputeCredentialEnvelope = {
+  scheme: 'byoc-e2b-credential-rsa-aes-256-gcm';
+  version: 1;
+  keyId: string;
+  ciphertext: {
+    encryptedData: string;
+    encryptedDEK: string;
+    algorithm: 'rsa-aes-256-gcm';
+    version: 1;
+  };
+};
+
+export type E2BComputeConsentVersion = 'e2b-direct-v1';
+
 export type VercelComputeSetupStatus = 'pending' | 'building' | 'ready' | 'failed';
 
 export type VercelComputeUpgradeStatus = 'pending' | 'building' | 'failed';

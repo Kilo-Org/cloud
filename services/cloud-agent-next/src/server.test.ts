@@ -163,6 +163,7 @@ type MockEnv = {
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
   BYOC_VERCEL_ORG_IDS?: string;
+  BYOC_E2B_ORG_IDS?: string;
   VERCEL_SNAPSHOT_BUILD: {
     getByName: ReturnType<typeof vi.fn>;
   };
@@ -2320,25 +2321,33 @@ describe('server /internal/streams/close', () => {
   });
 });
 
-describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
+describe.each([
+  { path: '/internal/byoc/vercel-enrollment/', variable: 'BYOC_VERCEL_ORG_IDS' },
+  { path: '/internal/byoc/e2b-enrollment/', variable: 'BYOC_E2B_ORG_IDS' },
+] as const)('server $path', ({ path, variable }) => {
   const organizationId = '11111111-1111-4111-8111-111111111111';
 
-  it('rejects enrollment requests without the internal API key', async () => {
-    const env = createEnv();
+  it.each([undefined, 'incorrect-key'])(
+    'rejects enrollment requests with API key %s',
+    async key => {
+      const env = createEnv();
 
-    const response = await fetchWorker(
-      new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`),
-      env
-    );
+      const response = await fetchWorker(
+        new Request(`http://worker.test${path}${organizationId}`, {
+          headers: key ? { 'x-internal-api-key': key } : {},
+        }),
+        env
+      );
 
-    expect(response.status).toBe(401);
-  });
+      expect(response.status).toBe(401);
+    }
+  );
 
   it('rejects invalid organization IDs', async () => {
     const env = createEnv();
 
     const response = await fetchWorker(
-      new Request('http://worker.test/internal/byoc/vercel-enrollment/not-an-organization-id', {
+      new Request(`http://worker.test${path}not-an-organization-id`, {
         headers: { 'x-internal-api-key': 'test-internal-secret' },
       }),
       env
@@ -2354,10 +2363,10 @@ describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
     { enrolledOrganizations: '*', enrolled: true },
   ])('returns Worker-configured enrollment for $enrolledOrganizations', async value => {
     const env = createEnv();
-    env.BYOC_VERCEL_ORG_IDS = value.enrolledOrganizations;
+    env[variable] = value.enrolledOrganizations;
 
     const response = await fetchWorker(
-      new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`, {
+      new Request(`http://worker.test${path}${organizationId}`, {
         headers: { 'x-internal-api-key': 'test-internal-secret' },
       }),
       env
@@ -2367,6 +2376,16 @@ describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({ enrolled: value.enrolled });
   });
+});
+
+it('does not expose E2B enrollment without an organization even with a wildcard', async () => {
+  const response = await fetchWorker(
+    new Request('http://worker.test/internal/byoc/e2b-enrollment/', {
+      headers: { 'x-internal-api-key': 'test-internal-secret' },
+    }),
+    { ...createEnv(), BYOC_E2B_ORG_IDS: '*' }
+  );
+  expect(response.status).toBe(404);
 });
 
 describe('server /internal/byoc/vercel-snapshot-build/start', () => {

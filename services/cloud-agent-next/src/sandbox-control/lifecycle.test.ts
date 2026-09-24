@@ -83,6 +83,8 @@ import {
 } from './onprem-provider.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import type { OnPremCredentialRpcInput } from '../shared/onprem-credential-protocol.js';
+import { encodeE2BProviderRef } from './e2b-runtime.js';
+import type * as E2BCredentialResolver from '../byoc/e2b-credential-resolver.js';
 
 function canonicalProviderRef(record: AllocationRecord): string | null {
   const state = record.state;
@@ -174,6 +176,8 @@ const mocks = vi.hoisted(() => ({
   socket: vi.fn(),
   session: vi.fn(),
   eventQueries: vi.fn(),
+  fetchE2BCredential: vi.fn(),
+  e2bAdapter: vi.fn(),
 }));
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: mocks.getSandbox }));
@@ -212,6 +216,12 @@ vi.mock('drizzle-orm/durable-sqlite', () => ({ drizzle: vi.fn() }));
 vi.mock('drizzle-orm/durable-sqlite/migrator', () => ({ migrate: vi.fn(async () => undefined) }));
 vi.mock('../../drizzle/migrations', () => ({ default: {} }));
 vi.mock('../session/queries/index.js', () => ({ createEventQueries: mocks.eventQueries }));
+vi.mock('../byoc/e2b-credential-resolver.js', async importOriginal => ({
+  ...(await importOriginal<typeof E2BCredentialResolver>()),
+  fetchByocE2BCredential: mocks.fetchE2BCredential,
+  resolveByocE2BApiKey: vi.fn(),
+}));
+vi.mock('./e2b-provider.js', () => ({ createE2BControlAdapter: mocks.e2bAdapter }));
 
 const SANDBOX_ID = `ses-${'a'.repeat(48)}`;
 const OWNER = 'owner_1';
@@ -291,6 +301,7 @@ async function harness(
     containmentEnabled?: boolean;
     env?: Partial<Env>;
     sandboxAllocation?: SandboxAllocation;
+    sandboxProviderBinding?: { kind: 'e2b'; organizationId: string; credentialId: string };
     configureAllocation?: (value: ReturnType<typeof allocation>, id: string) => void;
   } = {}
 ) {
@@ -455,7 +466,13 @@ async function harness(
         identity: {
           sessionId: ROUTE.sessionId,
           userId: OWNER,
-          ...(options.sandboxAllocation ? { orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } : {}),
+          ...(options.sandboxAllocation || options.sandboxProviderBinding
+            ? {
+                orgId:
+                  options.sandboxProviderBinding?.organizationId ??
+                  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              }
+            : {}),
         },
         auth: { kiloSessionId: ROUTE.kiloSessionId, kilocodeToken: 'test-token' },
         workspace: {
@@ -473,6 +490,18 @@ async function harness(
                 },
               }),
           ...(options.sandboxAllocation ? { sandboxAllocation: options.sandboxAllocation } : {}),
+          ...(options.sandboxProviderBinding
+            ? {
+                sandboxProvider: 'e2b' as const,
+                sandboxProviderBinding: options.sandboxProviderBinding,
+                credentialContainment: {
+                  github: false,
+                  gitlab: false,
+                  bitbucket: false,
+                  kilocode: false,
+                },
+              }
+            : {}),
         },
         lifecycle: { version: 1, timestamp: Date.now() },
       })
@@ -604,6 +633,91 @@ async function harness(
       if (!passive) await control.getStatus();
     },
   };
+}
+
+async function e2bHarness() {
+  const binding = {
+    kind: 'e2b' as const,
+    organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    credentialId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  };
+  mocks.e2bAdapter.mockReturnValue({
+    resumable: false,
+    persistentWorkspace: false,
+    destroysOnStop: true,
+    ensureBillingAdmission: vi.fn(async () => undefined),
+    create: vi.fn(async () => ({ providerRef: 'unused' })),
+    launch: vi.fn(async () => undefined),
+    observe: vi.fn(async () => ({ status: 'unknown' as const })),
+    stop: vi.fn(async () => 'terminal' as const),
+    ensureLeaseAtLeast: vi.fn(async () => undefined),
+    logs: vi.fn(async () => ''),
+  });
+  const h = await harness({ sandboxProviderBinding: binding });
+  const intentId = '11111111-1111-4111-8111-111111111111';
+  const hardStopAt = Date.now() + 3_600_000;
+  const providerRef = encodeE2BProviderRef({ physicalId: 'physicale2b', intentId });
+  const record: AllocationRecord = {
+    v: 2,
+    resumable: false,
+    state: {
+      kind: 'allocated',
+      target: {
+        provider: 'e2b',
+        providerRef,
+        capabilities: { persistentWorkspace: false, destroysOnStop: true },
+        e2b: {
+          binding,
+          sandboxId: SANDBOX_ID,
+          templateId: 'templateid',
+          templateReference: 'kilocode/cloud-agent:33333333-3333-4333-8333-333333333333',
+          runtimeBuildId: 'e2b-runtime-build',
+          resourceProfile: { cpuCount: 2, memoryMB: 4096 },
+          hardStopAt,
+          submissionState: 'submitted',
+          submittedAt: Date.now() - 1_000,
+          createDeadlineAt: Date.now() + 60_000,
+          reconciliationDeadlineAt: Date.now() + 60_000,
+          reconciliationAlarmAt: Date.now() + 40_000,
+        },
+        resolvedContainment: {
+          kilocode: false,
+          github: false,
+          worktreeScoped: true,
+          providerRef,
+        },
+      },
+      createIntent: { intentId, createdAt: Date.now() - 5_000 },
+      health: {
+        kind: 'healthy',
+        incarnation: providerRef,
+        lastHeartbeat: { incarnation: providerRef, at: Date.now(), ready: true },
+        deadlineAt: Date.now() + 90_000,
+      },
+      idleAt: null,
+    },
+  };
+  seedCanonicalAllocationRecord(h.records, record);
+  mocks.fetchE2BCredential.mockResolvedValue({
+    organizationId: binding.organizationId,
+    credentialId: binding.credentialId,
+    consentVersion: 'e2b-direct-v1',
+    consentedAt: '2026-09-03T00:00:00.000Z',
+    validatedAt: '2026-09-03T00:00:00.000Z',
+    createdAt: '2026-09-03T00:00:00.000Z',
+    apiKeyEncrypted: {
+      scheme: 'byoc-e2b-credential-rsa-aes-256-gcm',
+      version: 1,
+      keyId: 'agent-env-vars-v1',
+      ciphertext: {
+        encryptedData: 'd',
+        encryptedDEK: 'k',
+        algorithm: 'rsa-aes-256-gcm',
+        version: 1,
+      },
+    },
+  });
+  return { h, binding, hardStopAt, providerRef };
 }
 
 const activeHeartbeat: SandboxHeartbeatPayload = {
@@ -1323,6 +1437,200 @@ describe('SandboxControl on-prem lifecycle', () => {
     expect(h.sendRequest).not.toHaveBeenCalled();
   });
 
+  it('refuses an E2B prompt at the cap while the hard-stop alarm is withheld', async () => {
+    const { h, hardStopAt } = await e2bHarness();
+    await h.acquire({
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    });
+    const identity = await h.ready(false);
+    // The alarm is withheld past the cap: admission must enforce the fixed
+    // lifetime itself. The surface returns the generic not-ready code, never the
+    // lifetime failure code.
+    vi.setSystemTime(hardStopAt + 1);
+    const refusal = await h.control
+      .request({
+        operation: 'session.prompt',
+        session: ROUTE,
+        payload: { prompt: 'expired runtime must not receive this' },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+      .then(
+        value => value,
+        error => error
+      );
+    expect(refusal).toMatchObject({
+      code: 'not_ready',
+      message: 'Sandbox runtime is not ready',
+      retryable: true,
+      admission: 'not-admitted',
+    });
+    expect(h.sendRequest).not.toHaveBeenCalled();
+  });
+
+  it('refuses an E2B attach at the cap while the hard-stop alarm is withheld', async () => {
+    const { h, hardStopAt } = await e2bHarness();
+    await h.acquire({
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    });
+    const identity = await h.ready(false);
+    // The alarm is withheld past the cap: attach admission must enforce the fixed
+    // lifetime itself and return the generic not-ready code.
+    vi.setSystemTime(hardStopAt + 1);
+    const refusal = await h.control
+      .request({
+        operation: 'session.attach',
+        session: ROUTE,
+        payload: {},
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+      .then(
+        value => value,
+        error => error
+      );
+    expect(refusal).toMatchObject({
+      code: 'not_ready',
+      message: 'Sandbox runtime is not ready',
+      retryable: true,
+      admission: 'not-admitted',
+    });
+    expect(h.sendRequest).not.toHaveBeenCalled();
+  });
+
+  it('refuses an E2B prompt that reaches the cap while the credential fetch is held', async () => {
+    const { h, hardStopAt } = await e2bHarness();
+    await h.acquire({
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    });
+    const identity = await h.ready(false);
+    const held = deferred<void>();
+    mocks.fetchE2BCredential.mockClear();
+    mocks.fetchE2BCredential.mockImplementation(async () => {
+      await held.promise;
+      return undefined;
+    });
+    const pending = h.control
+      .request({
+        operation: 'session.prompt',
+        session: ROUTE,
+        payload: PROMPT,
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+      .then(
+        value => value,
+        error => error
+      );
+    await vi.waitFor(() => expect(mocks.fetchE2BCredential).toHaveBeenCalled());
+    // The cap elapses while the credential fetch is in flight, so the
+    // transaction re-read must reject the request before it is sent.
+    vi.setSystemTime(hardStopAt + 1);
+    held.resolve();
+    await expect(pending).resolves.toMatchObject({
+      message: 'Sandbox wrapper runtime changed',
+    });
+    expect(h.sendRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not complete an E2B handshake at the cap and denies terminal access without the lifetime code', async () => {
+    const { h, binding, hardStopAt, providerRef } = await e2bHarness();
+    await h.acquire({
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    });
+    await h.ready(true);
+    const wrapperInstanceId = crypto.randomUUID();
+    vi.setSystemTime(hardStopAt + 1);
+    const identity = {
+      connectionId: crypto.randomUUID(),
+      wrapperInstanceId,
+      providerInstanceId: providerRef,
+    };
+    h.replaceConnection(identity as never);
+    await h.hooks.onHandshakeComplete?.(identity as never, undefined);
+    // The cap handshake never becomes the active runtime.
+    const status = await h.control.getStatus();
+    expect(status.wrapperInstanceId).not.toBe(wrapperInstanceId);
+    await expect(
+      h.control.validateTerminalAccess({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        organizationId: binding.organizationId,
+        wrapperInstanceId,
+      })
+    ).resolves.toEqual({ allowed: false, reason: 'credential_containment_unavailable' });
+  });
+
+  it('matches only the exact E2B reference for the allocation intent', async () => {
+    const { h, binding, providerRef } = await e2bHarness();
+    h.control['providerBinding'] = binding;
+    const allocated = await h.control.getAllocationRecord();
+    if (allocated.state.kind !== 'allocated') throw new Error('Missing allocated record');
+    expect(h.control['matchesCanonicalProviderReference'](allocated.state, providerRef)).toBe(true);
+    // Clear the bound reference so the exact-reference guard cannot short-circuit:
+    // the E2B decoder and the intent comparison must reject these on their own.
+    const unbound = {
+      ...allocated.state,
+      target: { ...allocated.state.target, providerRef: null },
+    };
+    // The `e2b1:` reference is not a Cloudflare reference: an explicit decoder
+    // comparison proves the E2B decode, not the Cloudflare fallthrough, owns it.
+    expect(decodeCloudflareProviderRef(providerRef)).toBeNull();
+    expect(
+      h.control['matchesCanonicalProviderReference'](
+        unbound,
+        encodeCloudflareProviderRef({ sandboxId: 'other', instanceId: 'other', containment: false })
+      )
+    ).toBe(false);
+    expect(
+      h.control['matchesCanonicalProviderReference'](
+        unbound,
+        encodeE2BProviderRef({
+          physicalId: 'physicale2b',
+          intentId: 'ffffffff-1111-4111-8111-111111111111',
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('does not complete an E2B handshake for a creating allocation', async () => {
+    const { h, binding, providerRef } = await e2bHarness();
+    h.control['providerBinding'] = binding;
+    const allocated = await h.control.getAllocationRecord();
+    if (allocated.state.kind !== 'allocated') throw new Error('Missing allocated record');
+    const creating: AllocationRecord = {
+      ...allocated,
+      state: {
+        kind: 'creating',
+        requestId: allocated.state.createIntent.intentId,
+        target: {
+          ...allocated.state.target,
+          // Valid creating containment: without the allocated-only guard the
+          // reference and containment predicates would accept this handshake.
+          containment: { kilocode: false, github: false, worktreeScoped: true },
+        },
+        createIntent: allocated.state.createIntent,
+        attempt: 0,
+        deadlineAt: Date.now() + 60_000,
+      },
+    };
+    seedCanonicalAllocationRecord(h.records, creating);
+    await expect(h.control['validateHandshake'](providerRef)).resolves.toBe(false);
+    const closeAll = vi.spyOn(h.socket, 'closeAll');
+    const identity = {
+      connectionId: crypto.randomUUID(),
+      wrapperInstanceId: crypto.randomUUID(),
+      providerInstanceId: providerRef,
+    };
+    h.replaceConnection(identity as never);
+    await h.hooks.onHandshakeComplete?.(identity as never, undefined);
+    // The creating E2B handshake closes the socket and never becomes the active
+    // runtime.
+    expect(closeAll).toHaveBeenCalled();
+    expect(h.records.has('active_wrapper_runtime')).toBe(false);
+  });
+
   it.each(['startup', 'acquisition', 'stopAttempt'] as const)(
     'bounds first acknowledgement waiting by the original %s deadline across retries',
     async budget => {
@@ -1646,6 +1954,28 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.control.alarm();
     expect(h.records.get('wrapper_credential_hash')).toBe('issued-hash');
     expect(h.records.get('active_wrapper_runtime')).toEqual({ connectionId: 'c1' });
+  });
+
+  it('dispatches the canonical deadline for an in-flight non-E2B create instead of suppressing it', async () => {
+    const h = await harness();
+    const createdAt = Date.now();
+    const record = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-cf-inflight', createdAt },
+    });
+    if (!record) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, record);
+    // This create's effect is outstanding, but the record is not a submitted E2B
+    // create: the early recovery suppression must not swallow the base dispatch.
+    h.control['createIntentsInFlight'].add('intent-cf-inflight');
+    const now = createdAt + POLICY.createDeadlineMs;
+    vi.setSystemTime(now);
+    await h.control['driveCanonicalDeadline'](now);
+    // The base `DEADLINE` advanced the record; a suppressed dispatch would leave
+    // it creating and re-arm the already-due alarm.
+    const after = await h.control.getAllocationRecord();
+    expect(after.state.kind).not.toBe('creating');
   });
 
   it('bounds each never-settling provider stop attempt at one stopAttempt interval', async () => {

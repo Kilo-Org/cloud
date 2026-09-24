@@ -33,6 +33,16 @@ export type ControlOrchestratorDeps = {
   shouldDeferRecovery?: () => boolean;
   /** Bound on dispatch→run cycles; guards a reducer/runner that re-emits forever. */
   maxSteps?: number;
+  /**
+   * Optional wrapper around each feedback dispatch in the drain loop. The DO
+   * uses it to bind a durable projection (the E2B lifetime reason) to the
+   * accepted decision in the same storage transaction. It must return the
+   * dispatch's decision unchanged: swallowing it stalls the loop.
+   */
+  wrapDispatch?: (
+    event: AllocationInputEvent,
+    dispatch: () => Promise<AllocationDecision | undefined>
+  ) => Promise<AllocationDecision | undefined>;
   /** Optional sink for each committed, non-no-op transition the controller reports. */
   onTransition?: (transition: AllocationTransition) => void;
 };
@@ -84,7 +94,9 @@ export function createControlOrchestrator(deps: ControlOrchestratorDeps): Contro
       const feedback = await runCommands(deps.effects, queue, now, deps.shouldDeferRecovery);
       queue = [];
       for (const resultEvent of feedback) {
-        const next = await controller.dispatch(resultEvent, clock());
+        const next = await (deps.wrapDispatch
+          ? deps.wrapDispatch(resultEvent, () => controller.dispatch(resultEvent, clock()))
+          : controller.dispatch(resultEvent, clock()));
         if (next === undefined) continue;
         decision = next;
         queue.push(...next.commands);

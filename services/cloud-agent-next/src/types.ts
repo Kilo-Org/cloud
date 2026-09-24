@@ -144,6 +144,7 @@ export const agentSandboxProviderSchema = z.enum([
   'vercel',
   'cloudflare-containers',
   'onprem',
+  'e2b',
 ]);
 
 export type AgentSandboxProvider = z.infer<typeof agentSandboxProviderSchema>;
@@ -623,6 +624,10 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated organization IDs explicitly enrolled in customer-paid Vercel. */
   BYOC_VERCEL_ORG_IDS?: string;
+  BYOC_E2B_ORG_IDS?: string;
+  E2B_SANDBOX_TEMPLATE?: string;
+  E2B_SANDBOX_TEMPLATE_ID?: string;
+  E2B_SANDBOX_RUNTIME_BUILD_ID?: string;
   /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
   WORKTREE_CREATION_ENABLED_IDS?: string;

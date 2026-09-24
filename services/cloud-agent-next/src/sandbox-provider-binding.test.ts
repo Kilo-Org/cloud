@@ -5,6 +5,7 @@ import {
   providerKindFromBinding,
   sameSandboxProviderBinding,
   SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
 } from './sandbox-provider-binding.js';
 
 describe('SandboxProviderBinding', () => {
@@ -67,6 +68,54 @@ describe('SandboxProviderBinding', () => {
     expect(isManagedContainerBillingExempt(binding)).toBe(true);
     expect(isManagedContainerBillingExempt(bindingFromLegacyProvider('cloudflare'))).toBe(false);
     expect(isManagedContainerBillingExempt(bindingFromLegacyProvider('vercel'))).toBe(false);
+  });
+
+  it('pins and canonicalizes the complete E2B identity without a platform fallback', () => {
+    const binding = {
+      kind: 'e2b',
+      organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      credentialId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    } as const;
+    const mixedCase = {
+      ...binding,
+      organizationId: binding.organizationId.toUpperCase(),
+      credentialId: binding.credentialId.toUpperCase(),
+    };
+    expect(SandboxProviderBindingSchema.parse(mixedCase)).toEqual(binding);
+    expect(providerKindFromBinding(binding)).toBe('e2b');
+    expect(sameSandboxProviderBinding(binding, mixedCase)).toBe(true);
+    expect(isManagedContainerBillingExempt(binding)).toBe(true);
+    expect(() => bindingFromLegacyProvider('e2b')).toThrow('explicit provider binding');
+    for (const changed of [
+      { ...binding, organizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      { ...binding, credentialId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      bindingFromLegacyProvider('cloudflare'),
+      bindingFromLegacyProvider('vercel'),
+    ]) {
+      expect(sameSandboxProviderBinding(binding, changed)).toBe(false);
+    }
+  });
+
+  it.each([
+    { kind: 'e2b' },
+    { kind: 'e2b', organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    { kind: 'e2b', credentialId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+    { kind: 'e2b', organizationId: 'not-a-uuid', credentialId: 'not-a-uuid' },
+    { kind: 'e2b', organizationId: '', credentialId: '' },
+    { kind: 'e2b', source: { kind: 'platform' } },
+    {
+      kind: 'e2b',
+      source: {
+        kind: 'byoc',
+        organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        credentialId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    },
+  ])('rejects incomplete or legacy-shaped E2B identities: %j', value => {
+    expect(SandboxProviderBindingSchema.safeParse(value).success).toBe(false);
+    const malformed = value as SandboxProviderBinding;
+    expect(sameSandboxProviderBinding(malformed, malformed)).toBe(false);
+    expect(isManagedContainerBillingExempt(malformed)).toBe(false);
   });
 
   it('pins BYOC organization and credential identity', () => {

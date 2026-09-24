@@ -152,6 +152,8 @@ import type {
   OrganizationSettings,
   AuditLogAction,
   EncryptedData,
+  E2BComputeConsentVersion,
+  E2BComputeCredentialEnvelope,
   VercelComputeCredentialEnvelope,
   VercelComputeSetupStatus,
   VercelComputeTokenScope,
@@ -3934,6 +3936,33 @@ export type OrganizationVercelComputeCredential =
   typeof organization_vercel_compute_credentials.$inferSelect;
 export type NewOrganizationVercelComputeCredential =
   typeof organization_vercel_compute_credentials.$inferInsert;
+
+export const organization_e2b_compute_credentials = pgTable(
+  'organization_e2b_compute_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    api_key_encrypted: jsonb().$type<E2BComputeCredentialEnvelope>().notNull(),
+    consent_version: text().$type<E2BComputeConsentVersion>().notNull(),
+    consented_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    validated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_organization_e2b_compute_credentials_organization').on(table.organization_id),
+    check(
+      'organization_e2b_compute_credentials_consent_version_check',
+      sql`${table.consent_version} = 'e2b-direct-v1'`
+    ),
+  ]
+);
+
+export type OrganizationE2BComputeCredential =
+  typeof organization_e2b_compute_credentials.$inferSelect;
+export type NewOrganizationE2BComputeCredential =
+  typeof organization_e2b_compute_credentials.$inferInsert;
 
 export const organization_groups = pgTable(
   'organization_groups',

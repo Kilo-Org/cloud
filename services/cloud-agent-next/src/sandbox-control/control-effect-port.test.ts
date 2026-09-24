@@ -442,6 +442,25 @@ describe('control effect port — observe', () => {
     await expect(effectPort.observe(OBSERVE)).rejects.toThrow('observation_inconclusive');
     expect(await executeCommand(effectPort, OBSERVE, NOW)).toBeUndefined();
   });
+
+  it('passes a proven E2B paused discovery through as present without recoverable', async () => {
+    const e2bTarget: AllocationTarget = {
+      provider: 'e2b',
+      providerRef: null,
+      capabilities: CF_CAPS,
+    };
+    const discovery: ObserveCommand = { ...OBSERVE, target: e2bTarget };
+    const providerRef = 'e2b1:physical-1:intent-1';
+    const effect = await port({
+      provider: {
+        observe: async () => ({ status: 'unknown', providerRef, incarnation: INC }),
+      },
+    }).observe(discovery);
+    // The paused-discovery exception is the port's, not the provider's: removing
+    // it makes this observation throw `observation_inconclusive`.
+    expect(effect).toEqual({ outcome: 'present', providerRef, incarnation: INC });
+    expect(effect).not.toHaveProperty('recoverable');
+  });
 });
 
 describe('control effect port — reconcile full attempt', () => {

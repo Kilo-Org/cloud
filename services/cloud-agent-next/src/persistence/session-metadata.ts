@@ -11,6 +11,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
+import { E2BProviderError } from '../byoc/e2b-errors.js';
 import {
   classifySandboxId,
   isGeneratedSharedSandboxId,
@@ -386,7 +387,7 @@ const MetadataCloneSchema = z
   })
   .strip();
 
-export const CurrentSessionMetadataSchema = z
+const GroupedSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
     identity: MetadataIdentitySchema,
@@ -436,6 +437,26 @@ export const CurrentSessionMetadataSchema = z
       sessionPlaneFromId(metadata.identity.sessionId) === 'control',
     'Cloudflare containers sandbox metadata requires a control-plane session'
   )
+  .refine(metadata => {
+    const workspace = metadata.workspace;
+    const binding = workspace?.sandboxProviderBinding;
+    if (workspace?.sandboxProvider !== 'e2b' && binding?.kind !== 'e2b') return true;
+    const containment = workspace?.credentialContainment;
+    return (
+      workspace?.sandboxProvider === 'e2b' &&
+      binding?.kind === 'e2b' &&
+      binding.organizationId === metadata.identity.orgId?.toLowerCase() &&
+      sessionPlaneFromId(metadata.identity.sessionId) === 'control' &&
+      workspace.sandboxId?.startsWith('ses-') === true &&
+      workspace.sandboxRoute === undefined &&
+      workspace.sandboxAllocation === undefined &&
+      workspace.managedScmContainment !== true &&
+      containment?.github === false &&
+      containment.gitlab === false &&
+      containment.bitbucket === false &&
+      containment.kilocode === false
+    );
+  }, 'E2B metadata requires an isolated direct-token control-plane workspace and its organization binding')
   .superRefine((metadata, context) => {
     const workspace = metadata.workspace;
     const binding = workspace?.sandboxProviderBinding;
@@ -463,10 +484,32 @@ export const CurrentSessionMetadataSchema = z
   })
   .transform(metadata => {
     const binding = metadata.workspace?.sandboxProviderBinding;
-    return binding?.kind === 'onprem'
+    return binding?.kind === 'onprem' || binding?.kind === 'e2b'
       ? { ...metadata, identity: { ...metadata.identity, orgId: binding.organizationId } }
       : metadata;
   });
+
+function hasE2BProviderRecord(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null) return false;
+  if ('sandboxProvider' in raw && raw.sandboxProvider === 'e2b') return true;
+  return (
+    'sandboxProviderBinding' in raw &&
+    typeof raw.sandboxProviderBinding === 'object' &&
+    raw.sandboxProviderBinding !== null &&
+    'kind' in raw.sandboxProviderBinding &&
+    raw.sandboxProviderBinding.kind === 'e2b'
+  );
+}
+
+export const CurrentSessionMetadataSchema = z.preprocess((raw, context) => {
+  if (hasE2BProviderRecord(raw)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'E2B sandboxes require grouped workspace metadata',
+    });
+  }
+  return raw;
+}, GroupedSessionMetadataSchema);
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
@@ -486,11 +529,19 @@ export function getControlPlaneCredentialContainment(
   };
 }
 
+function validatedE2BWorkspace(metadata: SessionMetadata): SessionMetadata['workspace'] {
+  if (!hasE2BProviderRecord(metadata.workspace)) return metadata.workspace;
+  const parsed = CurrentSessionMetadataSchema.safeParse(metadata);
+  if (!parsed.success) throw new E2BProviderError('byoc_e2b_policy_mismatch');
+  return parsed.data.workspace;
+}
+
 export function getEffectiveCredentialContainment(
   metadata: SessionMetadata
 ): CredentialContainment {
-  if (metadata.workspace?.credentialContainment) {
-    return metadata.workspace.credentialContainment;
+  const workspace = validatedE2BWorkspace(metadata);
+  if (workspace?.credentialContainment) {
+    return workspace.credentialContainment;
   }
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     metadata.identity.sessionId,
@@ -511,9 +562,10 @@ export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvi
 }
 
 export function getSandboxProviderBinding(metadata: SessionMetadata): SandboxProviderBinding {
+  const workspace = validatedE2BWorkspace(metadata);
   return (
-    metadata.workspace?.sandboxProviderBinding ??
-    bindingFromLegacyProvider(metadata.workspace?.sandboxProvider ?? 'cloudflare')
+    workspace?.sandboxProviderBinding ??
+    bindingFromLegacyProvider(workspace?.sandboxProvider ?? 'cloudflare')
   );
 }
 
@@ -683,6 +735,12 @@ export function parseSessionMetadata(raw: unknown): SessionMetadata {
   const legacyWorkspace = legacyProviderSchema.safeParse(
     legacyProvider.success ? legacyProvider.data.workspace : undefined
   );
+  if (
+    hasE2BProviderRecord(raw) ||
+    (legacyProvider.success && hasE2BProviderRecord(legacyProvider.data.workspace))
+  ) {
+    throw new Error('E2B sandboxes require current session metadata');
+  }
   if (
     [legacyProvider, legacyWorkspace].some(
       value =>

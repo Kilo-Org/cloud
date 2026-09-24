@@ -22,6 +22,15 @@ export function createAgentSandbox(
   metadata: SessionMetadata,
   runtimeContext?: AgentSandboxRuntimeContext
 ): AgentSandbox {
+  if (
+    metadata.workspace?.sandboxProvider === 'e2b' ||
+    metadata.workspace?.sandboxProviderBinding?.kind === 'e2b'
+  ) {
+    throw new AgentSandboxUnavailableError(
+      'E2B sandboxes require the current control plane',
+      'provider_not_configured'
+    );
+  }
   if (getSandboxProvider(metadata) === 'onprem') {
     throw new AgentSandboxUnavailableError(
       'On-prem sandboxes require the current control plane',

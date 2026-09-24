@@ -14,5 +14,7 @@ export function providerSupportsEnforcedBilling(provider: AgentSandboxProvider):
       return false;
     case 'onprem':
       return false;
+    case 'e2b':
+      return false;
   }
 }

@@ -406,6 +406,13 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `BYOC_VERCEL_ORG_IDS` - Comma-separated organization IDs enrolled in customer-paid Vercel compute. Empty is off; unlike `VERCEL_SANDBOX_ORG_IDS`, an enrolled organization fails closed when its ready credential is absent. [SERVER]
+- `BYOC_E2B_ORG_IDS` - Comma-separated organization UUIDs enrolled in customer-paid E2B compute. Defaults to empty/off; `*` includes organizations only, never personal accounts. Requires a valid connection with direct-token consent. Overlapping Vercel/E2B enrollment fails closed. Enable only after authorized cross-project live qualification; disabling admission must retain E2B-aware readers for existing worktrees and cleanup. [SERVER]
+- `E2B_SANDBOX_TEMPLATE` - Exact public `namespace/kilo-cloud-agent:build_uuid` from the approved E2B release manifest, never a mutable tag. Empty disables new allocations. [SERVER]
+- `E2B_SANDBOX_TEMPLATE_ID` - Canonical template ID from the same E2B release manifest. Pinned with each allocation; E2B uses a fixed 2-vCPU/4096-MiB AMD64 profile. [SERVER]
+- `E2B_SANDBOX_RUNTIME_BUILD_ID` - Credential-free runtime artifact identity from the same E2B release manifest. Allocations start with a five-minute kill-on-timeout lease, never pause or resume, and cannot renew beyond a one-hour cap. The renewal safety floor can retire an allocation earlier. [SERVER]
+- `E2B_TEMPLATE_PUBLISH_KEY` - Template-owner credential available only to the protected `e2b-template-publication` GitHub environment, never to the runtime Worker or template. Configure required reviewers before running the manual publishing workflow. `[SECRET]`
+- `E2B_TEMPLATE_NAMESPACE` - Kilo-owned E2B namespace for the fixed `kilo-cloud-agent` template, configured in the protected publishing environment. [CI]
+- `E2B_TEMPLATE_PUBLISH_APPROVED` - Set by the manually confirmed, main-branch-only template publishing workflow. Publication does not qualify a release or enable enrollment. [CI]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown

@@ -40,9 +40,38 @@ const TARGET: AllocationTarget = {
   providerRef: 'provider-ref-1',
   capabilities: CF_CAPS,
 };
-const UNRESOLVED_TARGET: AllocationTarget = { ...TARGET, providerRef: null };
 const INTENT = { intentId: 'intent-1', createdAt: NOW - 5_000 };
 const HANDLE = { incarnation: INC, wrapper: 'w', epoch: 1 };
+
+/** A pending E2B target: the only `creating` shape that accepts a submission. */
+const E2B_PENDING_BLOCK = {
+  binding: {
+    kind: 'e2b' as const,
+    organizationId: 'aaaaaaaa-1111-4111-8111-111111111111',
+    credentialId: 'bbbbbbbb-2222-4222-8222-222222222222',
+  },
+  sandboxId: 'workspace_intent-1',
+  templateId: 'kilotemplate123',
+  templateReference: 'kilocode/cloud-agent:cccccccc-4444-4444-8444-444444444444',
+  runtimeBuildId: 'kilo-runtime-test-build',
+  resourceProfile: { cpuCount: 2, memoryMB: 4096 } as const,
+  hardStopAt: FAR,
+  submissionState: 'pending' as const,
+};
+const E2B_TARGET: AllocationTarget = {
+  provider: 'e2b',
+  providerRef: null,
+  capabilities: CF_CAPS,
+  e2b: E2B_PENDING_BLOCK,
+};
+const E2B_SUBMITTED_BLOCK = {
+  ...E2B_PENDING_BLOCK,
+  submissionState: 'submitted' as const,
+  submittedAt: NOW - 1_000,
+  createDeadlineAt: NOW + 60_000,
+  reconciliationDeadlineAt: NOW + 59_000,
+  reconciliationAlarmAt: NOW + 39_000,
+};
 
 /* ---------------------------------------------------------------- allocation */
 
@@ -91,19 +120,73 @@ function stoppingDestroying(attempts = 0): StoppingDestroying {
   };
 }
 
-function allocationState(key: string): AllocationRecord {
-  switch (key) {
+type E2BBlock = NonNullable<AllocationTarget['e2b']>;
+
+function creatingRecord(input: {
+  e2b: E2BBlock;
+  stopIntent?: { reason: string; createdAt: number };
+  deadlineAt?: number;
+}): AllocationRecord {
+  return {
+    v: 2,
+    resumable: true,
+    state: {
+      kind: 'creating',
+      requestId: 'req',
+      target: { ...E2B_TARGET, e2b: input.e2b },
+      createIntent: INTENT,
+      attempt: 1,
+      deadlineAt: input.deadlineAt ?? NOW + POLICY.createDeadlineMs,
+      ...(input.stopIntent === undefined ? {} : { stopIntent: input.stopIntent }),
+    },
+  };
+}
+
+function unknownE2bRecord(e2b: E2BBlock, deadlineAt = NOW): AllocationRecord {
+  return {
+    v: 2,
+    resumable: true,
+    state: {
+      kind: 'unknown',
+      target: { ...E2B_TARGET, e2b },
+      createIntent: INTENT,
+      stopIntent: null,
+      attempts: 0,
+      reason: 'test',
+      deadlineAt,
+    },
+  };
+}
+
+function checkRequiredE2bRecord(e2b: E2BBlock): AllocationRecord {
+  return {
+    v: 2,
+    resumable: true,
+    state: {
+      kind: 'stopping',
+      target: { ...E2B_TARGET, e2b },
+      createIntent: INTENT,
+      stopIntent: { reason: 'test', createdAt: NOW - 1_000, incarnation: INC },
+      step: 'check_required',
+      attempts: 0,
+    },
+  };
+}
+
+function allocationState(key: string): AllocationRecord {  switch (key) {
     case 'stopped':
       return { v: 2, resumable: true, state: { kind: 'stopped', summary: null } };
     case 'creating':
-      // Unresolved target so CREATE_CONFIRMED can install the reference.
+      // A pending E2B target so the submission bit and the unfenced creating
+      // CANCEL are reachable; its cap is in the future and it carries no stop
+      // intent, so CREATE_CONFIRMED still launches.
       return {
         v: 2,
         resumable: true,
         state: {
           kind: 'creating',
           requestId: 'req',
-          target: UNRESOLVED_TARGET,
+          target: E2B_TARGET,
           createIntent: INTENT,
           attempt: 1,
           deadlineAt: NOW + POLICY.createDeadlineMs,
@@ -210,6 +293,13 @@ function allocationEvent(state: AllocationRecord, event: string): AllocationInpu
         type: 'CREATE_UNKNOWN',
         fence: { operationId: createOp, providerRef: 'provider-ref-1', incarnation: null },
         reason: 'lost',
+        at: NOW,
+      };
+    case 'CREATE_SUBMISSION_RECORDED':
+      return {
+        type: 'CREATE_SUBMISSION_RECORDED',
+        fence: { operationId: createOp, providerRef: null, incarnation: null },
+        submitted: E2B_SUBMITTED_BLOCK,
         at: NOW,
       };
     case 'LAUNCH_FAILED':
@@ -520,6 +610,35 @@ export type Scenario = { state: unknown; event: unknown; now: number };
 
 /** Extra state values for a pair; the default is the single representative. */
 const STATE_VARIANTS: Record<string, unknown[]> = {
+  'allocation:creating:CREATE_CONFIRMED': [
+    allocationState('creating'),
+    creatingRecord({
+      e2b: E2B_SUBMITTED_BLOCK,
+      stopIntent: { reason: 'cancel_allocation', createdAt: NOW - 1_000 },
+    }),
+    creatingRecord({ e2b: { ...E2B_SUBMITTED_BLOCK, hardStopAt: NOW - 1 } }),
+  ],
+  'allocation:creating:CANCEL': [
+    allocationState('creating'),
+    creatingRecord({ e2b: E2B_SUBMITTED_BLOCK }),
+  ],
+  'allocation:creating:DEADLINE': [
+    allocationState('creating'),
+    creatingRecord({ e2b: E2B_SUBMITTED_BLOCK }),
+    creatingRecord({ e2b: { ...E2B_SUBMITTED_BLOCK, reconciliationDeadlineAt: NOW } }),
+  ],
+  'allocation:creating:CREATE_UNKNOWN': [
+    allocationState('creating'),
+    creatingRecord({ e2b: { ...E2B_SUBMITTED_BLOCK, reconciliationDeadlineAt: NOW } }),
+  ],
+  'allocation:unknown:DEADLINE': [
+    allocationState('unknown'),
+    unknownE2bRecord({ ...E2B_SUBMITTED_BLOCK, reconciliationDeadlineAt: NOW }),
+  ],
+  'allocation:stopping.check_required:CHECK': [
+    allocationState('stopping.check_required'),
+    checkRequiredE2bRecord({ ...E2B_SUBMITTED_BLOCK, reconciliationDeadlineAt: NOW }),
+  ],
   'allocation:allocated.connecting:DEADLINE': [
     allocatedRecord(connectingHealth(), NOW - 1),
     allocatedRecord(connectingHealth(), null),

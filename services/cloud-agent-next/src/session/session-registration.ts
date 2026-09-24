@@ -114,6 +114,16 @@ import type {
 } from '../execution/types.js';
 import { throwAdmissionError } from './queue-message.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import {
+  assertE2BRegistrationReplay,
+  isByocE2BEnrolled,
+  readE2BRegistrationPolicy,
+  resolveE2BRegistrationPolicy,
+  revalidateE2BRegistrationPolicy,
+  selectCustomerPaidProvider,
+  usesE2BRegistration,
+  type E2BRegistrationPolicy,
+} from './e2b-registration-policy.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -144,9 +154,9 @@ function sessionPlaneForCreate(
       );
 }
 
-function assertSupportedSandboxAllocation(
+/** Shape and combination rules for a sandbox allocation, independent of current enrollment. */
+function assertValidSandboxAllocationRequest(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
   const allocation = input.runtime?.sandboxAllocation;
@@ -164,19 +174,41 @@ function assertSupportedSandboxAllocation(
       message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
     });
   }
+}
+
+/**
+ * Whether Isolated Standard is rejected by *current* provider enrollment or
+ * plane rules. A same-key retry of an already admitted operation must reach
+ * replay or reconciliation before these rules are applied.
+ */
+function isolatedStandardRejectedByCurrentRules(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): boolean {
+  if (input.runtime?.sandboxAllocation !== 'isolated-standard') return false;
   // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (
-    allocation === 'isolated-standard' &&
-    (sessionPlaneForCreate(input, ctx) === 'control' ||
-      (input.options?.kilocodeOrganizationId !== undefined &&
-        isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, input.options.kilocodeOrganizationId)))
-  ) {
+  return (
+    sessionPlaneForCreate(input, ctx) === 'control' ||
+    (input.options?.kilocodeOrganizationId !== undefined &&
+      isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, input.options.kilocodeOrganizationId)) ||
+    isByocE2BEnrolled(ctx.env, input.options?.kilocodeOrganizationId)
+  );
+}
+
+/** Allocation rules that depend on the organization's current enrollment or plane. */
+function assertSandboxAllocationCurrentRules(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): void {
+  if (isolatedStandardRejectedByCurrentRules(input, ctx)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Isolated Standard allocation is not supported for control-plane sessions',
     });
   }
+  const allocation = input.runtime?.sandboxAllocation;
   if (
+    allocation !== undefined &&
     isByocIncompatibleAllocation(
       ctx.env,
       { orgId: input.options?.kilocodeOrganizationId },
@@ -188,6 +220,15 @@ function assertSupportedSandboxAllocation(
       message: 'Sandbox allocation is not supported for BYOC Vercel organizations',
     });
   }
+}
+
+function assertSupportedSandboxAllocation(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
+): void {
+  assertValidSandboxAllocationRequest(input, options);
+  assertSandboxAllocationCurrentRules(input, ctx);
 }
 
 export type SessionRegistrationContext = {
@@ -672,7 +713,9 @@ async function allocateNewSession(
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const isCodeReviewSession = options?.billingOrigin === 'code-review';
   let onpremBinding: OnPremProviderBinding | null = null;
+  let customerPaidProvider: 'vercel' | 'e2b' | undefined;
   try {
+    assertSupportedSandboxAllocation(input, ctx, options);
     const selectedOnPrem =
       orgId === undefined ? null : await getSelectedOnPremBinding(ctx.env, orgId);
     onpremBinding =
@@ -692,14 +735,13 @@ async function allocateNewSession(
       });
     }
     if (onpremBinding) await resolveOnPremProfile(ctx.env, onpremBinding);
+    if (!onpremBinding && !isCodeReviewSession) {
+      customerPaidProvider = selectCustomerPaidProvider(ctx.env, orgId);
+    }
   } catch (error) {
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
-  const byocEnrolled =
-    !onpremBinding &&
-    !isCodeReviewSession &&
-    orgId !== undefined &&
-    isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, orgId);
+  const byocEnrolled = customerPaidProvider !== undefined;
   const cloudAgentSessionId = generateSessionId(
     byocEnrolled || onpremBinding !== null ? 'control' : sessionPlaneForCreate(input, ctx)
   );
@@ -759,8 +801,12 @@ async function allocateNewSession(
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
   let byocEnrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>> | undefined;
+  let e2bPolicy: E2BRegistrationPolicy | undefined;
   try {
-    if (byocEnrolled) {
+    if (customerPaidProvider === 'e2b' && orgId) {
+      e2bPolicy = await resolveE2BRegistrationPolicy(ctx.env, orgId, input.runtime);
+    }
+    if (customerPaidProvider === 'vercel') {
       if (!orgId || input.runtime?.devcontainer) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -797,6 +843,7 @@ async function allocateNewSession(
     );
     if (target.kind === 'shared') {
       if (onpremBinding) throw new Error('On-prem compute cannot use a shared sandbox route');
+      if (byocEnrolled) throw new Error('Customer-paid compute cannot use a shared sandbox route');
       const assignment = await resolveSharedSandboxAssignment(
         ctx.env.SHARED_SANDBOX_OVERRIDES,
         target.routeKey
@@ -812,6 +859,9 @@ async function allocateNewSession(
       if (onpremBinding) {
         sandboxProvider = 'onprem';
         sandboxProviderBinding = onpremBinding;
+      } else if (e2bPolicy) {
+        sandboxProvider = 'e2b';
+        sandboxProviderBinding = e2bPolicy.sandboxProviderBinding;
       } else if (byocEnrollment) {
         sandboxProvider = 'vercel';
         sandboxProviderBinding = {
@@ -854,18 +904,24 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
 
+  const credentialContainment =
+    e2bPolicy?.credentialContainment ??
+    computeCredentialContainment(cloudAgentSessionId, input, ctx.env, sandboxProvider);
+
   if (ledger) {
     // Record the non-secret sandbox allocation before the ownership row is
     // created so a same-key retry can reconcile the same allocation instead of
     // deriving a second one. A failure here still fails the create at the
     // sandbox stage and settles the admitted row.
     try {
-      await recordOperationProgress(ledger.db, ledger.rowId, {
+      const recorded = await recordOperationProgress(ledger.db, ledger.rowId, {
         sandboxId,
         sandboxProvider,
         sandboxProviderBinding,
+        ...(e2bPolicy ? { credentialContainment } : {}),
         ...(sandboxRoute ? { sandboxRoute } : {}),
       });
+      if (e2bPolicy && !recorded) throw creationInProgressError();
     } catch (error) {
       rethrowAllocationFailure(ledger, 'sandbox', error);
     }
@@ -890,7 +946,9 @@ async function allocateNewSession(
       cloudAgentSessionId,
       ctx.userId,
       ctx.env,
-      onpremBinding?.organizationId ?? input.options?.kilocodeOrganizationId,
+      onpremBinding?.organizationId ??
+        e2bPolicy?.sandboxProviderBinding.organizationId ??
+        input.options?.kilocodeOrganizationId,
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
@@ -974,12 +1032,7 @@ async function allocateNewSession(
     sandboxProviderBinding,
     initialTurn,
     reportingCreatedAt,
-    credentialContainment: computeCredentialContainment(
-      cloudAgentSessionId,
-      input,
-      ctx.env,
-      sandboxProvider
-    ),
+    credentialContainment,
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -1018,6 +1071,11 @@ function rebuildRecordedSessionAllocation(
   row: OperationLedgerRow
 ): NewSessionAllocation {
   const canonical = row.canonical_result ?? {};
+  const e2bPolicy = readE2BRegistrationPolicy(
+    canonical,
+    input.options?.kilocodeOrganizationId,
+    input.runtime
+  );
   const cloudAgentSessionId = canonical.cloudAgentSessionId;
   const kiloSessionId = canonical.kiloSessionId;
   const initialMessageId = canonical.initialMessageId;
@@ -1140,12 +1198,9 @@ function rebuildRecordedSessionAllocation(
       !initialTurn && cloudAgentSessionId.startsWith('agent_')
         ? reportingCreatedAt.data
         : undefined,
-    credentialContainment: computeCredentialContainment(
-      cloudAgentSessionId,
-      input,
-      ctx.env,
-      normalizedBinding.kind
-    ),
+    credentialContainment:
+      e2bPolicy?.credentialContainment ??
+      computeCredentialContainment(cloudAgentSessionId, input, ctx.env, normalizedBinding.kind),
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -1175,7 +1230,8 @@ function buildSessionRegistrationCommand(
   options?: { billingOrigin?: string }
 ) {
   const orgId =
-    allocation.sandboxProviderBinding.kind === 'onprem'
+    allocation.sandboxProviderBinding.kind === 'onprem' ||
+    allocation.sandboxProviderBinding.kind === 'e2b'
       ? allocation.sandboxProviderBinding.organizationId
       : input.options?.kilocodeOrganizationId;
   return {
@@ -1252,7 +1308,6 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
@@ -1509,7 +1564,6 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1723,6 +1777,32 @@ async function assertCreateIntentUnchanged(
 }
 
 /**
+ * Validates that a same-key ledger row still describes this caller's operation
+ * and create intent, so replay or reconciliation may proceed without applying
+ * rules (enrollment, plane) that may have tightened since admission.
+ */
+async function assertReplayableExistingOperation(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  existing: OperationLedgerRow
+): Promise<void> {
+  assertSessionOperationIdentity(existing, {
+    userId: ctx.userId,
+    intent: 'create_cloud',
+    organizationId: input.options?.kilocodeOrganizationId,
+    resourceKey: null,
+  });
+  await assertCreateIntentUnchanged(
+    effectiveSessionRegistrationInput(
+      input,
+      worktreeEnabledForCreate(input, ctx, existing),
+      finalizationVersionForCreate(existing)
+    ),
+    existing
+  );
+}
+
+/**
  * Creates a session under the operation ledger. Call only when the caller (the
  * prepare handler) has already gated on `operationKey` present AND effective
  * `autoInitiate` true. Replay and reconciliation happen only when the retry's
@@ -1733,45 +1813,52 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
-  await assertSandboxAllocationMembership(input, ctx);
+  assertValidSandboxAllocationRequest(input, { billingOrigin: options.billingOrigin });
   const db = getPgDb(ctx.env);
   const allocation = input.runtime?.sandboxAllocation;
+  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
+  const findLedgerRow = () =>
+    db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, ctx.userId),
+          eq(operation_ledgers.domain, 'session'),
+          eq(operation_ledgers.operation_key, options.operationKey)
+        )
+      )
+      .limit(1);
+  // A same-key retry of an admitted operation must survive enrollment or plane
+  // rules that tightened after admission. Only an isolated-standard request
+  // that is still selectable but now rejected can be such a retry; every other
+  // request is judged against current rules before any side effect.
+  if (
+    allocation !== undefined &&
+    isolatedStandardRejectedByCurrentRules(input, ctx) &&
+    isSandboxAllocationAvailable(getSandboxSelectionCapabilities(ctx.env, owner), allocation)
+  ) {
+    const [existing] = await findLedgerRow();
+    if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
+      assertSandboxAllocationCurrentRules(input, ctx);
+    } else {
+      await assertReplayableExistingOperation(input, ctx, existing);
+    }
+  } else {
+    assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
+  }
+  await assertSandboxAllocationMembership(input, ctx);
   if (allocation !== undefined) {
-    const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
     const available = isSandboxAllocationAvailable(
       getSandboxSelectionCapabilities(ctx.env, owner),
       allocation
     );
     if (!available) {
-      const [existing] = await db
-        .select()
-        .from(operation_ledgers)
-        .where(
-          and(
-            eq(operation_ledgers.kilo_user_id, ctx.userId),
-            eq(operation_ledgers.domain, 'session'),
-            eq(operation_ledgers.operation_key, options.operationKey)
-          )
-        )
-        .limit(1);
+      const [existing] = await findLedgerRow();
       if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
         assertSandboxAllocationAvailable(ctx.env, owner, allocation);
       } else {
-        assertSessionOperationIdentity(existing, {
-          userId: ctx.userId,
-          intent: 'create_cloud',
-          organizationId: input.options?.kilocodeOrganizationId,
-          resourceKey: null,
-        });
-        await assertCreateIntentUnchanged(
-          effectiveSessionRegistrationInput(
-            input,
-            worktreeEnabledForCreate(input, ctx, existing),
-            finalizationVersionForCreate(existing)
-          ),
-          existing
-        );
+        await assertReplayableExistingOperation(input, ctx, existing);
       }
     }
   }
@@ -1824,6 +1911,11 @@ async function replaySettledCreate(
   // A changed same-key create intent must never replay the prior session; the
   // typed non-retryable failure lets the client clear the key and start fresh.
   await assertCreateIntentUnchanged(input, row);
+  readE2BRegistrationPolicy(
+    row.canonical_result ?? {},
+    input.options?.kilocodeOrganizationId,
+    input.runtime
+  );
   const ids = canonicalSessionIds(row);
   if (!ids) {
     // A completed settle without canonical IDs has no session to replay. Treat
@@ -2015,6 +2107,9 @@ async function resumeCloneCreate(
   }
 
   const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
+  if (usesE2BRegistration(row.canonical_result ?? {})) {
+    await revalidateE2BRegistrationPolicy(ctx.env, allocation);
+  }
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
   const sessionService = new SessionService();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
@@ -2100,7 +2195,7 @@ async function resumeCloneCreate(
   };
 }
 
-async function resumeFirstWorktreeCreate(
+async function resumeRecordedSessionCreate(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions,
@@ -2110,9 +2205,10 @@ async function resumeFirstWorktreeCreate(
   ownershipExists: boolean
 ): Promise<LedgerSessionCreateResult> {
   const worktreeId = allocation.worktreeId;
-  if (!worktreeId) {
+  if (!worktreeId && allocation.sandboxProviderBinding.kind !== 'e2b') {
     throw creationInProgressError();
   }
+  await revalidateE2BRegistrationPolicy(ctx.env, allocation);
 
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
   if (!ownershipExists) {
@@ -2129,7 +2225,9 @@ async function resumeFirstWorktreeCreate(
         deriveCanonicalRepositoryUrl(input.repository),
         undefined,
         worktreeId,
-        { sandboxId: allocation.sandboxId, provider: allocation.sandboxProvider }
+        worktreeId
+          ? { sandboxId: allocation.sandboxId, provider: allocation.sandboxProvider }
+          : undefined
       );
     } catch (error) {
       await recordPostSetupFailure(() =>
@@ -2161,13 +2259,11 @@ async function resumeFirstWorktreeCreate(
     allocation.cloudAgentSessionId,
     allocation.initialTurn
   );
-  const result = await registerAndAdmitInitialTurn(
-    input,
-    ctx,
-    { billingOrigin: options.billingOrigin },
-    allocation,
-    hooks
-  );
+  const billingOrigin = { billingOrigin: options.billingOrigin };
+  const result =
+    input.initialTurn === undefined
+      ? await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks)
+      : await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
@@ -2239,20 +2335,21 @@ async function reconcileLedgerCreate(
     return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
   }
 
-  const worktreeAllocation = worktreeEnabledForCreate(input, ctx, row)
-    ? rebuildRecordedSessionAllocation(input, ctx, row)
-    : undefined;
+  const recordedAllocation =
+    worktreeEnabledForCreate(input, ctx, row) || usesE2BRegistration(row.canonical_result ?? {})
+      ? rebuildRecordedSessionAllocation(input, ctx, row)
+      : undefined;
 
   // (b) Ownership row lookup by kiloSessionId.
   const ownership = await findCliSessionOwnershipRow(db, ctx.userId, ids.kiloSessionId);
   if (
     ownership &&
-    worktreeAllocation &&
+    recordedAllocation &&
     (ownership.cloudAgentSessionId !== ids.cloudAgentSessionId ||
       ownership.cloudAgentSessionScopeId !== ids.cloudAgentSessionId ||
       ownership.organizationId?.toLowerCase() !==
         input.options?.kilocodeOrganizationId?.toLowerCase() ||
-      ownership.worktreeId !== worktreeAllocation.worktreeId)
+      (ownership.worktreeId ?? undefined) !== recordedAllocation.worktreeId)
   ) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
   }
@@ -2260,6 +2357,9 @@ async function reconcileLedgerCreate(
     // A tombstoned destination must never be resumed: the clone was explicitly
     // rejected and its IDs are dead, so fall through to a fresh allocation.
     if (hasTombstoneForIds(row, ids)) {
+      if (recordedAllocation?.sandboxProviderBinding.kind === 'e2b') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+      }
       return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
     }
     // A clone create with no ownership row resumes the stored destination IDs
@@ -2267,8 +2367,8 @@ async function reconcileLedgerCreate(
     if (input.clone?.cloneFromKiloSessionId) {
       return resumeCloneCreate(input, ctx, options, db, row, ids);
     }
-    if (worktreeAllocation) {
-      return resumeFirstWorktreeCreate(input, ctx, options, db, row, worktreeAllocation, false);
+    if (recordedAllocation) {
+      return resumeRecordedSessionCreate(input, ctx, options, db, row, recordedAllocation, false);
     }
     // Old non-clone create: the ownership row is absent, so the DO never
     // registered. Keep the existing fresh allocation. Remove this path only
@@ -2287,15 +2387,26 @@ async function reconcileLedgerCreate(
       inOrganization: input.options?.kilocodeOrganizationId != null,
     });
 
+  const readRecordedMetadata = async () => {
+    const metadata = await readSessionMetadata(ctx, ids.cloudAgentSessionId);
+    if (metadata) {
+      assertE2BRegistrationReplay(metadata, row.canonical_result ?? {}, {
+        userId: ctx.userId,
+        organizationId: input.options?.kilocodeOrganizationId,
+      });
+    }
+    return metadata;
+  };
+
   // (c) Ownership present → read the DO state.
-  if (!(await readSessionMetadata(ctx, ids.cloudAgentSessionId))) {
-    if (worktreeAllocation) {
-      return resumeFirstWorktreeCreate(input, ctx, options, db, row, worktreeAllocation, true);
+  if (!(await readRecordedMetadata())) {
+    if (recordedAllocation) {
+      return resumeRecordedSessionCreate(input, ctx, options, db, row, recordedAllocation, true);
     }
     // A single null metadata read is NOT proof of no registration (a transient
     // read or a pending deletion intent can hide committed metadata), so read
     // once more before treating the ownership row as stale.
-    if (await readSessionMetadata(ctx, ids.cloudAgentSessionId)) {
+    if (await readRecordedMetadata()) {
       return confirm();
     }
 

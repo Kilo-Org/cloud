@@ -475,6 +475,7 @@ describe('observeControlAfterStopping', () => {
     'byoc_vercel_not_ready',
     'byoc_vercel_forbidden',
     'byoc_vercel_capacity',
+    'byoc_e2b_lifetime_exceeded',
   ] as const)('terminalizes the serialized %s status even while the instance exists', reason => {
     expect(
       controlDispatchDisposition({
@@ -504,6 +505,7 @@ describe('observeControlAfterStopping', () => {
     ['byoc_vercel_not_ready', 'setup is not ready'],
     ['byoc_vercel_forbidden', 'access was denied'],
     ['byoc_vercel_capacity', 'spend limits'],
+    ['byoc_e2b_lifetime_exceeded', 'one-hour allocation limit'],
   ] as const)('exposes a safe actionable message for %s', (reason, expectedMessage) => {
     expect(safeErrorFromQueueReason(reason)).toContain(expectedMessage);
   });

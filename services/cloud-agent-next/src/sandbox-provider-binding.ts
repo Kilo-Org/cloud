@@ -6,7 +6,22 @@ import {
   type OnPremProviderBinding,
 } from './shared/onprem-protocol.js';
 
+export type E2BSandboxProviderBinding = {
+  kind: 'e2b';
+  organizationId: string;
+  credentialId: string;
+};
+
+export const E2BSandboxProviderBindingSchema = z
+  .object({
+    kind: z.literal('e2b'),
+    organizationId: z.uuid().transform(value => value.toLowerCase()),
+    credentialId: z.uuid().transform(value => value.toLowerCase()),
+  })
+  .strict();
+
 export type SandboxProviderBinding =
+  | E2BSandboxProviderBinding
   | OnPremProviderBinding
   | { kind: 'cloudflare' }
   | { kind: 'cloudflare-containers' }
@@ -23,6 +38,7 @@ export type SandboxProviderBinding =
 export const SandboxProviderBindingSchema: z.ZodType<SandboxProviderBinding> = z.discriminatedUnion(
   'kind',
   [
+    E2BSandboxProviderBindingSchema,
     onPremProviderBindingSchema,
     z.object({ kind: z.literal('cloudflare') }).strict(),
     z.object({ kind: z.literal('cloudflare-containers') }).strict(),
@@ -48,13 +64,20 @@ export function bindingFromLegacyProvider(provider: AgentSandboxProvider): Sandb
   if (provider === 'onprem') {
     throw new Error('On-prem sandboxes require an explicit provider binding');
   }
+  if (provider === 'e2b') {
+    throw new Error('E2B sandboxes require an explicit provider binding');
+  }
   return provider === 'vercel'
     ? { kind: 'vercel', source: { kind: 'platform' } }
     : { kind: provider };
 }
 
 export function isManagedContainerBillingExempt(binding: SandboxProviderBinding): boolean {
-  return binding.kind === 'onprem' || (binding.kind === 'vercel' && binding.source.kind === 'byoc');
+  return (
+    binding.kind === 'onprem' ||
+    (binding.kind === 'e2b' && E2BSandboxProviderBindingSchema.safeParse(binding).success) ||
+    (binding.kind === 'vercel' && binding.source.kind === 'byoc')
+  );
 }
 
 export function providerKindFromBinding(binding: SandboxProviderBinding): AgentSandboxProvider {
@@ -66,6 +89,16 @@ export function sameSandboxProviderBinding(
   right: SandboxProviderBinding
 ): boolean {
   if (left.kind !== right.kind) return false;
+  if (left.kind === 'e2b' && right.kind === 'e2b') {
+    const leftBinding = E2BSandboxProviderBindingSchema.safeParse(left);
+    const rightBinding = E2BSandboxProviderBindingSchema.safeParse(right);
+    return (
+      leftBinding.success &&
+      rightBinding.success &&
+      leftBinding.data.organizationId === rightBinding.data.organizationId &&
+      leftBinding.data.credentialId === rightBinding.data.credentialId
+    );
+  }
   if (left.kind === 'onprem' && right.kind === 'onprem') {
     return (
       left.organizationId.toLowerCase() === right.organizationId.toLowerCase() &&

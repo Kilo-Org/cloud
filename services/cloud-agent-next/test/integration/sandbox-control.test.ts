@@ -60,6 +60,7 @@ import type {
 } from '../../src/execution/types.js';
 import { type AttachSessionInput, SandboxControl } from '../../src/persistence/SandboxControl.js';
 import { ByocVercelNotReadyError } from '../../src/byoc/vercel-credential-resolver.js';
+import { VercelSandboxRestError } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { bindingFromLegacyProvider } from '../../src/sandbox-provider-binding.js';
 import {
   serializeSessionMetadata,
@@ -10536,6 +10537,53 @@ describe('SandboxControl BYOC snapshot recovery', () => {
       await instance.alarm();
     });
   }
+
+  it('records a late Vercel create failure after the deadline moved the same allocation to unknown', async () => {
+    const id = `ses-byoc-late-create-${crypto.randomUUID().replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(id);
+    const intentId = crypto.randomUUID();
+    await runInDurableObject(control, async (instance, state) => {
+      Object.assign(instance, { providerBinding: byocBinding, env: recoveryEnv });
+      await writeCanonicalAllocationRecord(state.storage, {
+        v: 2,
+        resumable: false,
+        state: {
+          kind: 'creating',
+          requestId: crypto.randomUUID(),
+          target: {
+            provider: 'vercel',
+            providerRef: null,
+            allocationName: id,
+            capabilities: { persistentWorkspace: true, destroysOnStop: false },
+            vercel: {
+              projectId: 'project-recovery',
+              snapshotId: snapshot.runtimeSnapshotId,
+              runtimeBuildId: 'build-recovery',
+              buildGeneration: snapshot.buildGeneration,
+            },
+          },
+          createIntent: { intentId, createdAt: Date.now() - 60_000 },
+          attempt: 0,
+          deadlineAt: Date.now() + 90_000,
+        },
+      });
+      const creating = await readCanonicalAllocationRecord(state.storage);
+      if (!creating) throw new Error('Expected a canonical allocation');
+      // The held create passes its deadline: the same allocation becomes unknown.
+      await instance['markCanonicalCreateUnknown'](creating, 'create_timed_out');
+      expect((await readCanonicalAllocationRecord(state.storage))?.state.kind).toBe('unknown');
+      // The late provider response then reports the missing snapshot. The fence
+      // must admit the same intent's settlement state, or the reason and the
+      // recovery anchor are both lost.
+      await instance['recordCreateProviderFailure'](
+        intentId,
+        new VercelSandboxRestError('request_failed', 'create', 410)
+      );
+      expect(await state.storage.get('failure_reason')).toBe('byoc_vercel_not_ready');
+      expect(await state.storage.get('byoc_snapshot_recovery')).toEqual({ snapshot, attempts: 0 });
+      expect(await state.storage.getAlarm()).not.toBeNull();
+    });
+  });
 
   it('retries the pending projection from the alarm and clears it on settlement', async () => {
     const credential = {

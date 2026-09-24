@@ -3,6 +3,7 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { signInUrlWithCallbackPath } from '@/lib/user/server';
 import { OnPremComputeSettings } from './OnPremComputeSettings';
+import { E2BComputeSettings } from './E2BComputeSettings';
 import { VercelComputeTrialGate } from './VercelComputeTrialGate';
 
 export default async function OrganizationComputePage({
@@ -22,6 +23,7 @@ export default async function OrganizationComputePage({
     <PageContainer>
       <OnPremComputeSettings key={organization.id} organizationId={organization.id} />
       <VercelComputeTrialGate organizationId={organization.id} />
+      <E2BComputeSettings key={organization.id} organizationId={organization.id} />
     </PageContainer>
   );
 }

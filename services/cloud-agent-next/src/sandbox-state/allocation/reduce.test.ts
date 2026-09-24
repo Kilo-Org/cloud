@@ -5,11 +5,14 @@ import type { AllocationInputEvent, ResultFence } from '../events.js';
 import type {
   AllocationRecord,
   AllocationTarget,
+  E2BSubmittedAllocationConfig,
   ProviderCapabilities,
   StoppingDestroying,
   StopProof,
 } from '../model/allocation.js';
 import { POLICY } from '../schedule.js';
+import { storeAllocation } from '../persist/store.js';
+import { loadAllocation } from '../persist/load.js';
 
 const NOW = 1_000_000;
 const INC = 'inc-1';
@@ -1117,5 +1120,429 @@ describe('allocation reducer — design §5 transitions', () => {
         normalize(declared!.commands)
       );
     }
+  });
+});
+
+describe('allocation reducer — E2B submitted create lifecycle', () => {
+  const E2B_BINDING = {
+    kind: 'e2b' as const,
+    organizationId: 'aaaaaaaa-1111-4111-8111-111111111111',
+    credentialId: 'bbbbbbbb-2222-4222-8222-222222222222',
+  };
+  const E2B_HARD_STOP = NOW + 3_000_000;
+  const E2B_PENDING_BLOCK = {
+    binding: E2B_BINDING,
+    sandboxId: 'workspace_intent-1',
+    templateId: 'kilotemplate123',
+    templateReference: 'kilocode/cloud-agent:cccccccc-4444-4444-8444-444444444444',
+    runtimeBuildId: 'kilo-runtime-test-build',
+    resourceProfile: { cpuCount: 2 as const, memoryMB: 4096 as const },
+    hardStopAt: E2B_HARD_STOP,
+    submissionState: 'pending' as const,
+  };
+  const E2B_TARGET: AllocationTarget = {
+    provider: 'e2b',
+    providerRef: null,
+    capabilities: CF_CAPS,
+    e2b: E2B_PENDING_BLOCK,
+  };
+
+  function submittedBlock(
+    overrides: Partial<E2BSubmittedAllocationConfig> = {}
+  ): E2BSubmittedAllocationConfig {
+    return {
+      ...E2B_PENDING_BLOCK,
+      submissionState: 'submitted',
+      submittedAt: NOW,
+      createDeadlineAt: NOW + 60_000,
+      reconciliationDeadlineAt: NOW + 60_000,
+      reconciliationAlarmAt: NOW + 40_000,
+      ...overrides,
+    };
+  }
+
+  function e2bCreating(
+    block: AllocationTarget['e2b'],
+    options: { stopIntent?: { reason: string; createdAt: number }; deadlineAt?: number } = {}
+  ): AllocationRecord {
+    return {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'creating',
+        requestId: 'req-e2b',
+        target: { ...E2B_TARGET, e2b: block },
+        createIntent: CREATE_INTENT,
+        attempt: 1,
+        deadlineAt: options.deadlineAt ?? NOW + POLICY.createDeadlineMs,
+        ...(options.stopIntent === undefined ? {} : { stopIntent: options.stopIntent }),
+      },
+    };
+  }
+
+  function submissionEvent(
+    submitted: E2BSubmittedAllocationConfig
+  ): AllocationInputEvent {
+    return {
+      type: 'CREATE_SUBMISSION_RECORDED',
+      fence: fence(CREATE_OP, null, null),
+      submitted,
+      at: NOW,
+    };
+  }
+
+  function memoryStorage() {
+    const data = new Map<string, unknown>();
+    return {
+      data,
+      get: async <T>(key: string): Promise<T | undefined> => data.get(key) as T | undefined,
+      put: async <T>(key: string, value: T) => {
+        data.set(key, value);
+      },
+    };
+  }
+
+  it('creating + pending + CREATE_SUBMISSION_RECORDED stays creating, stores the whole block, emits nothing', () => {
+    const submitted = submittedBlock();
+    const decision = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('creating');
+    expect(decision?.commands).toEqual([]);
+    if (decision?.state.state.kind !== 'creating') return;
+    expect(decision.state.state.target.e2b).toEqual(submitted);
+    expect(decision.state.state.createIntent).toEqual(CREATE_INTENT);
+  });
+
+  it('rejects a second CREATE_SUBMISSION_RECORDED after the bit is stored', () => {
+    const first = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submittedBlock()),
+      NOW
+    )!;
+    expect(first.state.state.kind).toBe('creating');
+    expect(
+      decideAllocation(first.state, submissionEvent(submittedBlock()), NOW + 1)
+    ).toBeUndefined();
+  });
+
+  it('rejects CREATE_SUBMISSION_RECORDED for a Cloudflare creating record', () => {
+    expect(
+      decideAllocation(
+        creating(UNRESOLVED_TARGET),
+        submissionEvent(submittedBlock()),
+        NOW
+      )
+    ).toBeUndefined();
+  });
+
+  it('rejects CREATE_SUBMISSION_RECORDED at or after createDeadlineAt and stores nothing', () => {
+    // `now < submitted.createDeadlineAt` is required: a deadline equal to `now`
+    // is already spent.
+    const decision = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submittedBlock({ createDeadlineAt: NOW })),
+      NOW
+    );
+    expect(decision).toBeUndefined();
+  });
+
+  it('rejects CREATE_SUBMISSION_RECORDED whose create bound exceeds state.deadlineAt', () => {
+    expect(
+      decideAllocation(
+        e2bCreating(E2B_PENDING_BLOCK),
+        submissionEvent(submittedBlock({ createDeadlineAt: NOW + POLICY.createDeadlineMs + 1 })),
+        NOW
+      )
+    ).toBeUndefined();
+  });
+
+  it('carries every submitted field onto unknown.target.e2b through CREATE_UNKNOWN', () => {
+    const submitted = submittedBlock();
+    const stored = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    const decision = decideAllocation(
+      stored.state,
+      {
+        type: 'CREATE_UNKNOWN',
+        fence: fence(CREATE_OP),
+        reason: 'create_unresolved',
+        at: NOW + 1,
+      },
+      NOW + 1
+    );
+    expect(decision?.state.state.kind).toBe('unknown');
+    if (decision?.state.state.kind !== 'unknown') return;
+    expect(decision.state.state.target?.e2b).toEqual(submitted);
+    expect(decision.state.state.deadlineAt).toBe(
+      Math.min(submitted.reconciliationAlarmAt!, submitted.reconciliationDeadlineAt)
+    );
+    expect(decision.commands).toEqual([]);
+  });
+
+  it('round-trips the stored submitted block through store and load', async () => {
+    const submitted = submittedBlock();
+    const stored = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    const storage = memoryStorage();
+    await storeAllocation(storage, stored.state);
+    const loaded = await loadAllocation(storage);
+    expect(loaded).toEqual({ ok: true, source: 'canonical', value: stored.state });
+    if (!loaded.ok || loaded.value.state.kind !== 'creating') return;
+    expect(loaded.value.state.target.e2b).toEqual(submitted);
+  });
+
+  it('pending unfenced CANCEL → stopped with no command', () => {
+    const decision = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      { type: 'CANCEL', scope: 'allocation', reason: 'cancel_allocation' },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('stopped');
+    expect(decision?.commands).toEqual([]);
+    expect(decision?.deadlineAt).toBeNull();
+  });
+
+  it('submitted unfenced CANCEL stays creating and stores the stop intent without waiting for the alarm', () => {
+    const submitted = submittedBlock();
+    const stored = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    // `NOW` is well before `reconciliationAlarmAt`; the fence must not depend on it.
+    const decision = decideAllocation(
+      stored.state,
+      { type: 'CANCEL', scope: 'allocation', reason: 'cancel_allocation' },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('creating');
+    expect(decision?.commands).toEqual([]);
+    if (decision?.state.state.kind !== 'creating') return;
+    expect(decision.state.state.stopIntent).toEqual({
+      reason: 'cancel_allocation',
+      createdAt: NOW,
+    });
+    expect(decision.state.state.target.e2b).toEqual(submitted);
+    expect(decision.deadlineAt).toBe(
+      Math.min(NOW + POLICY.createDeadlineMs, submitted.reconciliationAlarmAt!)
+    );
+  });
+
+  it('rejects a fenced CANCEL in creating and does not store a stop intent', () => {
+    const decision = decideAllocation(
+      e2bCreating(submittedBlock()),
+      {
+        type: 'CANCEL',
+        scope: 'allocation',
+        reason: 'stale',
+        fence: { intentId: CREATE_INTENT.intentId, providerRef: null },
+      },
+      NOW
+    );
+    expect(decision).toBeUndefined();
+  });
+
+  it('a following CREATE_CONFIRMED destroys the exact reference instead of launching', () => {
+    const submitted = submittedBlock();
+    const cancelled = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    const fenced = decideAllocation(
+      cancelled.state,
+      { type: 'CANCEL', scope: 'allocation', reason: 'cancel_allocation' },
+      NOW
+    )!;
+    const decision = decideAllocation(
+      fenced.state,
+      {
+        type: 'CREATE_CONFIRMED',
+        fence: fence(CREATE_OP, null, INC),
+        providerRef: 'e2b1:physicalid:intent-1',
+        incarnation: INC,
+        at: NOW,
+      },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('destroying');
+    expect(decision.state.state.target.providerRef).toBe('e2b1:physicalid:intent-1');
+    expect(decision.state.state.stopIntent.reason).toBe('cancel_allocation');
+    expect(commandKinds(decision)).toEqual(['Destroy']);
+  });
+
+  it('a DEADLINE before the alarm keeps the stop intent and never launches', () => {
+    const cancelled = decideAllocation(
+      decideAllocation(
+        e2bCreating(E2B_PENDING_BLOCK),
+        submissionEvent(submittedBlock()),
+        NOW
+      )!.state,
+      { type: 'CANCEL', scope: 'allocation', reason: 'cancel_allocation' },
+      NOW
+    )!;
+    const decision = decideAllocation(cancelled.state, { type: 'DEADLINE' }, NOW);
+    expect(decision?.state.state.kind).toBe('creating');
+    if (decision?.state.state.kind !== 'creating') return;
+    expect(decision.state.state.stopIntent?.reason).toBe('cancel_allocation');
+    expect(commandKinds(decision)).toEqual([]);
+  });
+
+  it('submitted DEADLINE inside the window emits Observe and caps the unknown wake at the expiry', () => {
+    const submitted = submittedBlock();
+    const stored = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    const at = NOW + 40_000;
+    const decision = decideAllocation(stored.state, { type: 'DEADLINE' }, at);
+    expect(decision?.state.state.kind).toBe('unknown');
+    expect(commandKinds(decision)).toEqual(['Observe']);
+    expect(decision?.deadlineAt).toBe(
+      Math.min(at + POLICY.observeDeadlineMs, submitted.reconciliationDeadlineAt)
+    );
+    expect(decision?.deadlineAt).toBe(submitted.reconciliationDeadlineAt);
+  });
+
+  it('submitted DEADLINE at the expiry exhausts before the 120s create bound', () => {
+    const submitted = submittedBlock();
+    const stored = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    // `state.deadlineAt` is still the 120s create bound; expiry is earlier.
+    const decision = decideAllocation(
+      stored.state,
+      { type: 'DEADLINE' },
+      submitted.reconciliationDeadlineAt
+    );
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+  });
+
+  it('submitted CREATE_UNKNOWN at the expiry exhausts instead of arming a 90s wake', () => {
+    const submitted = submittedBlock();
+    const stored = decideAllocation(
+      e2bCreating(E2B_PENDING_BLOCK),
+      submissionEvent(submitted),
+      NOW
+    )!;
+    const decision = decideAllocation(
+      stored.state,
+      {
+        type: 'CREATE_UNKNOWN',
+        fence: fence(CREATE_OP),
+        reason: 'create_unresolved',
+        at: submitted.reconciliationDeadlineAt,
+      },
+      submitted.reconciliationDeadlineAt
+    );
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+  });
+
+  it('unknown + pending + null ref + DEADLINE before the bound emits Observe', () => {
+    const record = unknown();
+    if (record.state.kind !== 'unknown') throw new Error('expected unknown');
+    const pending: AllocationRecord = {
+      ...record,
+      state: { ...record.state, target: { ...E2B_TARGET, e2b: E2B_PENDING_BLOCK } },
+    };
+    const decision = decideAllocation(pending, { type: 'DEADLINE' }, NOW);
+    expect(decision?.state.state.kind).toBe('unknown');
+    expect(commandKinds(decision)).toEqual(['Observe']);
+  });
+
+  it('submitted unknown + DEADLINE at the expiry exhausts with no Observe', () => {
+    const submitted = submittedBlock();
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: { ...E2B_TARGET, e2b: submitted },
+        createIntent: CREATE_INTENT,
+        stopIntent: null,
+        attempts: 0,
+        reason: 'create_deadline',
+        deadlineAt: submitted.reconciliationDeadlineAt,
+      },
+    };
+    const decision = decideAllocation(
+      record,
+      { type: 'DEADLINE' },
+      submitted.reconciliationDeadlineAt
+    );
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+  });
+
+  it('expired null-ref stopping.check_required + CHECK stays check_required with no Observe', () => {
+    const submitted = submittedBlock();
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'stopping',
+        target: { ...E2B_TARGET, e2b: submitted },
+        createIntent: CREATE_INTENT,
+        stopIntent: { reason: 'create_expired', createdAt: NOW },
+        step: 'check_required',
+        attempts: 0,
+      },
+    };
+    const decision = decideAllocation(
+      record,
+      { type: 'CHECK' },
+      submitted.reconciliationDeadlineAt
+    );
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+  });
+
+  it('a non-expired null-ref check_required + CHECK still advances to Observe', () => {
+    const submitted = submittedBlock();
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'stopping',
+        target: { ...E2B_TARGET, e2b: submitted },
+        createIntent: CREATE_INTENT,
+        stopIntent: { reason: 'create_expired', createdAt: NOW },
+        step: 'check_required',
+        attempts: 0,
+      },
+    };
+    const decision = decideAllocation(record, { type: 'CHECK' }, NOW);
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('destroying');
+    expect(commandKinds(decision)).toEqual(['Observe']);
   });
 });

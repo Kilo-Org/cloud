@@ -10,11 +10,12 @@
  */
 import { z } from 'zod';
 import { onPremProviderBindingSchema, onPremProfileSchema } from '../../shared/onprem-protocol.js';
+import { E2BSandboxProviderBindingSchema } from '../../sandbox-provider-binding.js';
 import { healthStateSchema, type ConnectingHealth } from './health.js';
 
 const timestamp = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 
-export const allocationProviderSchema = z.enum(['cloudflare', 'vercel', 'onprem']);
+export const allocationProviderSchema = z.enum(['cloudflare', 'vercel', 'onprem', 'e2b']);
 
 export const vercelAllocationConfigSchema = z
   .object({
@@ -54,6 +55,58 @@ export const onPremAllocationConfigSchema = z
   .strict();
 
 export type OnPremAllocationConfig = z.infer<typeof onPremAllocationConfigSchema>;
+
+const e2bSafeName = z
+  .string()
+  .min(1)
+  .max(256)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/)
+  .refine(value => value === value.trim());
+const e2bTemplateId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
+const e2bTemplateReference = z
+  .string()
+  .regex(
+    /^[a-z0-9][a-z0-9-]{0,62}\/[a-z0-9][a-z0-9-]{0,62}:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+  );
+const e2bRuntimeBuildId = z.string().regex(/^[A-Za-z0-9._-]{1,128}$/);
+
+/**
+ * The E2B allocation block pinned at demand time and copied unchanged through
+ * `unknown`, `allocated` and `stopping`. `submissionState` is the durable
+ * at-most-once create bit; `submittedAt`, `createDeadlineAt`,
+ * `reconciliationDeadlineAt` and `reconciliationAlarmAt` are computed once by
+ * `e2b-runtime.ts` and only ever copied by the reducer.
+ */
+const e2bConfigBase = {
+  binding: E2BSandboxProviderBindingSchema,
+  sandboxId: e2bSafeName,
+  templateId: e2bTemplateId,
+  templateReference: e2bTemplateReference,
+  runtimeBuildId: e2bRuntimeBuildId,
+  resourceProfile: z
+    .object({ cpuCount: z.literal(2), memoryMB: z.literal(4096) })
+    .strict(),
+  hardStopAt: timestamp,
+};
+
+export const e2bAllocationConfigSchema = z.discriminatedUnion('submissionState', [
+  z.object({ ...e2bConfigBase, submissionState: z.literal('pending') }).strict(),
+  z
+    .object({
+      ...e2bConfigBase,
+      submissionState: z.literal('submitted'),
+      submittedAt: timestamp,
+      createDeadlineAt: timestamp,
+      reconciliationDeadlineAt: timestamp,
+      /** Absent when the lead does not fit inside the reconciliation window. */
+      reconciliationAlarmAt: timestamp.optional(),
+    })
+    .strict(),
+]);
+
+export type E2BAllocationConfig = z.infer<typeof e2bAllocationConfigSchema>;
+export type E2BSubmittedAllocationConfig = Extract<E2BAllocationConfig, { submissionState: 'submitted' }>;
+
 
 export const credentialContainmentSchema = z
   .object({
@@ -107,6 +160,7 @@ export const allocationTargetSchema = z
     allocationName: z.string().min(1).optional(),
     vercel: vercelAllocationConfigSchema.optional(),
     onprem: onPremAllocationConfigSchema.optional(),
+    e2b: e2bAllocationConfigSchema.optional(),
     containment: credentialContainmentSchema.optional(),
     resolvedContainment: allocationContainmentSchema.optional(),
     capabilities: providerCapabilitiesSchema,
@@ -114,6 +168,15 @@ export const allocationTargetSchema = z
   .strict();
 
 export type AllocationTarget = z.infer<typeof allocationTargetSchema>;
+
+/**
+ * The fixed-lifetime cap for a provider target, or `undefined` when the provider
+ * has none. On-prem and E2B caps are mutually exclusive; this is the only read
+ * of either anchor.
+ */
+export function allocationHardStopAt(target: AllocationTarget): number | undefined {
+  return target.e2b?.hardStopAt ?? target.onprem?.hardStopAt;
+}
 
 export const allocationCreateIntentSchema = z
   .object({
@@ -174,6 +237,12 @@ export const creatingAllocationStateSchema = z
     createIntent: allocationCreateIntentSchema,
     attempt: z.number().int().nonnegative(),
     deadlineAt: timestamp,
+    /**
+     * Set when a submitted E2B create is cancelled before its result arrives.
+     * Absent on every other creating record. The result event reads it while it
+     * is still admissible, so the returned sandbox is destroyed, not launched.
+     */
+    stopIntent: allocationStopIntentSchema.optional(),
   })
   .strict();
 

@@ -5,3 +5,4 @@ wrapper/dist/
 .dev.vars*
 !.dev.vars.example
 kilocode-cli.tgz
+.e2b-build/

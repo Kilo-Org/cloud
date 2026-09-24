@@ -317,6 +317,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
           cloud_agent_worktree_id: parsed.cloudAgentWorktreeId ?? null,
           organization_id: parsed.organizationId ?? null,
+          profile_id: parsed.profileId ?? null,
           created_on_platform: parsed.createdOnPlatform,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
           ...(inputGitUrl !== undefined ? { git_url: inputGitUrl } : {}),

@@ -27,8 +27,12 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The preview empty-state description landed in all 86 catalogs, so nothing
- * is pending translation today.
+ * No key is pending today, and the set stays as the mechanism for the next
+ * English-first slice. List a key here only while its translation slice is
+ * scheduled; delete the entry once every catalog carries the key. A
+ * feature-specific test below reads its catalog directly rather than through
+ * this set, so re-listing a landed key as pending cannot make an untranslated
+ * catalog pass again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 
@@ -45,6 +49,16 @@ const FEATURE_FLAG_ROW_KEYS = [
   'preferences.featureFlagSkipped',
   'preferences.featureFlagNotLoaded',
 ];
+
+/**
+ * The preview card's empty-state description. English added it for the
+ * composer-less transcript card, and the reader must see it in their own
+ * words rather than the English fallback. Every catalog must carry it, so the
+ * test below reads the catalogs directly and not through
+ * `PENDING_TRANSLATION_KEYS`: re-listing the key as pending cannot turn an
+ * untranslated catalog green.
+ */
+const PREVIEW_EMPTY_DESCRIPTION_KEY = 'agentChat.session.emptyTranscriptDescription';
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
@@ -90,6 +104,17 @@ describe('catalog keys', () => {
           readPath(CATALOG_LOADERS.en(), key)
         );
       }
+    }
+  );
+
+  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
+    '%s translates the preview empty-state description',
+    tag => {
+      const value = readPath(CATALOG_LOADERS[tag](), PREVIEW_EMPTY_DESCRIPTION_KEY);
+      expect(value, `${tag} lacks ${PREVIEW_EMPTY_DESCRIPTION_KEY}`).toBeTypeOf('string');
+      expect(value, `${tag} leaves ${PREVIEW_EMPTY_DESCRIPTION_KEY} in English`).not.toBe(
+        readPath(CATALOG_LOADERS.en(), PREVIEW_EMPTY_DESCRIPTION_KEY)
+      );
     }
   );
 

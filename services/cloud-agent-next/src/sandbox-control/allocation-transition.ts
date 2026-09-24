@@ -33,7 +33,7 @@ function createIntentId(state: AllocationState): string | undefined {
     case 'creating':
     case 'allocated':
     case 'stopping':
-      return state.createIntent.intentId;
+      return state.createIntent?.intentId;
     case 'unknown':
       return state.createIntent?.intentId;
     default:

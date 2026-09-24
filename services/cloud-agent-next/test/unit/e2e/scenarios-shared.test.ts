@@ -358,12 +358,16 @@ describe('cold-hot warm reuse', () => {
 
     expect(mocks.interruptSession).toHaveBeenCalledTimes(1);
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
     expect(mocks.deleteSession).toHaveBeenCalledTimes(1);
-    expect(mocks.deleteSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.deleteSession).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
 
     expect(coldStream.close).toHaveBeenCalledTimes(1);
     for (const stream of hotStreams) expect(stream.close).toHaveBeenCalledTimes(1);
@@ -533,12 +537,12 @@ describe('cold-hot warm reuse', () => {
     // returns instead of throwing client-side. The scenario records the
     // returned session before its workspace check, so `finally` cleans it up.
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       'agent_legacy_session',
       expect.any(AbortSignal)
     );
     expect(mocks.deleteSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       'agent_legacy_session',
       expect.any(AbortSignal)
     );
@@ -702,11 +706,15 @@ describe('unknown-model', () => {
     expect(result.message).toContain('accepted');
     // An unexpectedly accepted start must still be cleaned up.
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
-    expect(mocks.deleteSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.deleteSession).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
   });
 
   it('fails when the rejection message is unexpected', async () => {

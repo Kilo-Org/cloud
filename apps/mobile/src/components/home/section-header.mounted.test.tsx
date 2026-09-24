@@ -77,7 +77,7 @@ describe('SectionHeader mounted layout', () => {
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(label.children).toEqual(['Live now']);
     // The tracked class stays for the Latin design; the RTL letter-spacing
-    // reset applies to Arabic-script copy only, so this Latin label keeps its
+    // reset applies to RTL-script copy only, so this Latin label keeps its
     // tracking (see lib/rtl-text.ts and text.rtl-labels.mounted.test.tsx).
     if (isRTL) {
       expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
@@ -112,6 +112,7 @@ describe('SectionHeader mounted layout', () => {
     expect(text.props.numberOfLines).toBeUndefined();
     expect(text.props.allowFontScaling).not.toBe(false);
     expect(text.props.maxFontSizeMultiplier).toBeUndefined();
+    expect(text.props.adjustsFontSizeToFit).not.toBe(true);
     expect(text.children).toEqual(['See all']);
   });
 

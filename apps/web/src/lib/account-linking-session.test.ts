@@ -36,4 +36,20 @@ describe('account linking session', () => {
     expect(session?.organizationId).toBe(ORGANIZATION_ID);
     expect(session?.chatGptScope).toBeUndefined();
   });
+
+  it('keeps a linking session usable past the previous five-minute window', async () => {
+    const startedAt = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(startedAt);
+    try {
+      await createAccountLinkingSession('user-1', 'openai');
+      nowSpy.mockReturnValue(startedAt + 9 * 60 * 1000);
+
+      await expect(getAccountLinkingSession()).resolves.toMatchObject({
+        existingUserId: 'user-1',
+        targetProvider: 'openai',
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });

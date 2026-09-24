@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 
 const LINKING_COOKIE_NAME = 'account-linking-session';
-const LINKING_COOKIE_MAX_AGE = 60 * 5; // 5 minutes
+const LINKING_COOKIE_MAX_AGE = 60 * 15; // 15 minutes
 const jwtSigningAlgorithm = 'HS256';
 
 export type AccountLinkingSession = {
@@ -74,7 +74,7 @@ export async function getAccountLinkingSession(): Promise<AccountLinkingSession 
     return null;
   }
 
-  // Check if session is expired (5 minutes) - extra check beyond JWT expiry
+  // Check if session is expired (15 minutes) - extra check beyond JWT expiry
   if (Date.now() - session.createdAt > LINKING_COOKIE_MAX_AGE * 1000) {
     return null;
   }

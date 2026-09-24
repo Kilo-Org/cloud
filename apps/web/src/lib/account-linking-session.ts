@@ -83,6 +83,7 @@ export async function getAccountLinkingSession(): Promise<AccountLinkingSession 
     existingUserId: session.existingUserId,
     targetProvider: session.targetProvider,
     ...(session.organizationId ? { organizationId: session.organizationId } : {}),
+    ...(session.chatGptScope ? { chatGptScope: session.chatGptScope } : {}),
     createdAt: session.createdAt,
   };
 }

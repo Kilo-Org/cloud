@@ -10,10 +10,8 @@ import {
   selectWarmBaseWorkspace,
   warmBaseDigest,
   warmBasePaths,
-  warmBasePreparationEnvIdentity,
 } from '../sandbox-control/warm-base.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
-import { readProfileBundle } from '../session-profile.js';
 import type { AgentSandboxProvider } from '../types.js';
 import { buildSessionAttachPayload } from './attach-payload.js';
 
@@ -73,18 +71,10 @@ export async function resolveWarmBaseLaunch(input: {
     );
     return settle(pinLegacy());
   }
-  const profile = readProfileBundle(input.metadata);
-  const preparationEnvIdentity = warmBasePreparationEnvIdentity(
-    profile.envVars,
-    profile.encryptedSecrets !== undefined
-  );
-  if (preparationEnvIdentity === undefined) return settle(pinLegacy());
   const payload = buildSessionAttachPayload(input.metadata);
   const digest = await warmBaseDigest({
     owner: input.metadata.identity.orgId ?? input.metadata.identity.userId,
     repositoryUrl: payload.git?.url ?? '',
-    setupCommands: payload.setupCommands ?? [],
-    preparationEnvIdentity,
     wrapperVersion: WRAPPER_VERSION,
     image: facts.image,
     instance: warmBaseInstance(input.metadata),

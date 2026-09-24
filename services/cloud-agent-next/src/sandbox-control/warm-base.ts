@@ -10,8 +10,6 @@ const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 export type WarmBaseDigestInput = {
   owner: string;
   repositoryUrl: string;
-  setupCommands: readonly string[];
-  preparationEnvIdentity: string;
   wrapperVersion: string;
   image: string;
   instance: string;
@@ -22,8 +20,6 @@ export function warmBaseDigest(input: WarmBaseDigestInput): Promise<string> {
     JSON.stringify([
       input.owner,
       input.repositoryUrl,
-      [...input.setupCommands],
-      input.preparationEnvIdentity,
       input.wrapperVersion,
       input.image,
       input.instance,
@@ -38,17 +34,6 @@ export function warmBaseDigest(input: WarmBaseDigestInput): Promise<string> {
  */
 export function attachRestoredFromBackup(needsPreparation: boolean, pending: boolean): boolean {
   return needsPreparation && pending;
-}
-
-export function warmBasePreparationEnvIdentity(
-  envVars: Record<string, string> | undefined,
-  hasEncryptedSecrets: boolean
-): string | undefined {
-  if (hasEncryptedSecrets) return undefined;
-  const entries = Object.entries(envVars ?? {}).sort(([left], [right]) =>
-    left < right ? -1 : left > right ? 1 : 0
-  );
-  return JSON.stringify(entries);
 }
 
 export const warmBaseRecordSchema = z

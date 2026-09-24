@@ -8,15 +8,14 @@ import {
   warmBaseDigest,
   warmBaseHomeForWorkspace,
   warmBasePaths,
-  warmBasePreparationEnvIdentity,
   type WarmBaseDigestInput,
 } from './warm-base.js';
+
+const HEX64 = /^[0-9a-f]{64}$/;
 
 const base: WarmBaseDigestInput = {
   owner: 'user_1',
   repositoryUrl: 'https://github.com/acme/demo.git',
-  setupCommands: ['pnpm install'],
-  preparationEnvIdentity: '[]',
   wrapperVersion: '1.2.3',
   image: 'registry.example/app@sha256:abc',
   instance: 'standard-3',
@@ -28,25 +27,25 @@ async function digestOf(overrides: Partial<WarmBaseDigestInput>): Promise<string
 
 describe('warmBaseDigest', () => {
   it('is stable for identical inputs', async () => {
-    expect(await warmBaseDigest({ ...base })).toBe(await warmBaseDigest({ ...base }));
+    const first = await warmBaseDigest({ ...base });
+    const second = await warmBaseDigest({ ...base });
+    expect(first).toMatch(HEX64);
+    expect(second).toMatch(HEX64);
+    expect(first).toBe(second);
   });
 
   it.each<[string, Partial<WarmBaseDigestInput>]>([
     ['owner', { owner: 'user_2' }],
     ['repository url', { repositoryUrl: 'https://github.com/acme/other.git' }],
-    ['setup commands', { setupCommands: ['pnpm install', 'pnpm build'] }],
-    ['prep env identity', { preparationEnvIdentity: '[["FOO","bar"]]' }],
     ['wrapper version', { wrapperVersion: '1.2.4' }],
     ['image', { image: 'registry.example/app@sha256:def' }],
     ['instance', { instance: 'standard-4' }],
   ])('changes when %s changes', async (_label, overrides) => {
-    expect(await digestOf(overrides)).not.toBe(await digestOf({}));
-  });
-
-  it('changes with setup command order', async () => {
-    const first = await digestOf({ setupCommands: ['a', 'b'] });
-    const second = await digestOf({ setupCommands: ['b', 'a'] });
-    expect(first).not.toBe(second);
+    const changed = await digestOf(overrides);
+    const baseline = await digestOf({});
+    expect(changed).toMatch(HEX64);
+    expect(baseline).toMatch(HEX64);
+    expect(changed).not.toBe(baseline);
   });
 });
 
@@ -106,21 +105,6 @@ describe('warmBasePaths', () => {
     expect(warmBaseHomeForWorkspace('/workspace/user_1/sessions/workspace_1')).toBeUndefined();
     expect(warmBaseHomeForWorkspace('/workspace/warm/not-a-digest')).toBeUndefined();
     expect(warmBaseHomeForWorkspace(undefined)).toBeUndefined();
-  });
-});
-
-describe('warmBasePreparationEnvIdentity', () => {
-  it('is deterministic and order independent', () => {
-    expect(warmBasePreparationEnvIdentity({ B: '2', A: '1' }, false)).toBe(
-      warmBasePreparationEnvIdentity({ A: '1', B: '2' }, false)
-    );
-  });
-
-  it('changes with values and excludes env-bearing encrypted secrets', () => {
-    expect(warmBasePreparationEnvIdentity({ A: '1' }, false)).not.toBe(
-      warmBasePreparationEnvIdentity({ A: '2' }, false)
-    );
-    expect(warmBasePreparationEnvIdentity({ A: '1' }, true)).toBeUndefined();
   });
 });
 

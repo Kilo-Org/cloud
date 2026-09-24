@@ -153,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return invalidTokenResponse();
     }
 
-    if (!(await isFreeModel(requestedModelLowerCased))) {
+    if (!isFreeModel(requestedModelLowerCased)) {
       return NextResponse.json(
         {
           error: {
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       await getBalanceAndOrgSettings(organizationId, user);
     effectivePrivacy = getEffectiveProviderPrivacy(requestPrivacy.data, settings?.data_collection);
 
-    if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
+    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,

@@ -7,12 +7,7 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import {
-  APP_URL,
-  FIRST_TOPUP_BONUS_AMOUNT,
-  INCEPTION_PROMO_MODEL,
-  INCEPTION_PROMO_RUNNING,
-} from '@/lib/constants';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
@@ -891,10 +886,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      const isInceptionPromoRequest =
-        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
-
-      if (isInceptionPromoRequest || usageContext.user_byok) {
+      if (usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1031,15 +1023,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      // Mirror the canonical chat path in `processOpenRouterUsage`: when the
-      // promotion is running or the request is BYOK we don't bill the user, so
-      // the cache discount we would otherwise have given them must be zeroed
-      // too. Otherwise the usage row would claim a discount on spend that never
-      // happened and distort "money saved by caching" reporting.
-      const isInceptionPromoRequest =
-        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
-
-      if (isInceptionPromoRequest || usageContext.user_byok) {
+      if (usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }

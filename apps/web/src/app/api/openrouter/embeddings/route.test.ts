@@ -253,7 +253,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         authFailedResponse: new Response('Unauthorized', { status: 401 }) as never,
         organizationId: undefined,
       });
-      mockedIsFreeModel.mockResolvedValue(true);
+      mockedIsFreeModel.mockReturnValue(true);
       const { POST } = await import('./route');
       const response = await POST(makeRequest({ provider }));
 

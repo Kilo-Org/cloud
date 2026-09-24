@@ -3442,7 +3442,8 @@ export class SandboxSession extends DurableObject<Env> {
                 // A pending-input event (question/permission) during the awaited
                 // sync changes the interaction scope, so the sync returns
                 // undefined. The accepted turn is usually still current, so the
-                // watchdog must survive and may recover it.
+                // watchdog must survive; `failOverdueAcceptedMessage` still
+                // refuses recovery while the session has unresolved input.
                 await this.rescheduleAcceptedWatchdog(accepted, epoch, diagnostic);
                 const watched = this.loadMessages().find(
                   item => item.messageId === accepted.messageId
@@ -3545,6 +3546,9 @@ export class SandboxSession extends DurableObject<Env> {
    * (message-only: no quarantine and no native-runtime retirement) and records
    * the attempt count. The follow-up abort is best-effort and fenced with the
    * captured wrapper instance.
+   *
+   * A session-scoped unresolved question or permission is not no output: the
+   * turn is left parked and spends no recovery attempt.
    */
   private async failOverdueAcceptedMessage(
     accepted: MessageRecord,
@@ -3588,6 +3592,19 @@ export class SandboxSession extends DurableObject<Env> {
         result: settlement.state,
       });
       return true;
+    }
+    // Unresolved session input is not no output. The stored snapshot carries no
+    // messageId, so a parked question or permission means this session is
+    // waiting on the user (or a sibling accepted turn is), and recovering this
+    // turn would re-run it under a still-open question. The snapshot path has
+    // already refreshed this KV before the call; the proof-backed `running`
+    // path has not, and accepts that a stale snapshot can suppress recovery.
+    const pendingInput = this.readPendingInteractions();
+    if (
+      pendingInput &&
+      (pendingInput.questions.length > 0 || pendingInput.permissions.length > 0)
+    ) {
+      return false;
     }
     const recoveryAttempts = currentState.recoveryAttempts ?? 0;
     if (noOutputRecoveryAllowed(recoveryAttempts)) {

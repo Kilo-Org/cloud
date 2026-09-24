@@ -243,7 +243,7 @@ describe('bootToCompletion', () => {
     mocks.getMessageResult.mockResolvedValue({ status: 'failed' });
 
     const deadline = createScenarioDeadline(Date.now(), 30_000);
-    await expect(bootToCompletion(deadline, CONFIG, SESSION, 'boot')).rejects.toThrow(
+    await expect(bootToCompletion(deadline, CONFIG, SESSION, 'boot', () => true)).rejects.toThrow(
       /boot durable status=failed/
     );
     expect(stream.close).toHaveBeenCalledTimes(1);

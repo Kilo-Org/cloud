@@ -7498,8 +7498,10 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.alarmAt()).not.toBeNull();
       expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.kiloInactivity);
 
-      // At the bound the surviving watchdog spends the turn's one no-output
-      // recovery instead of terminalizing it.
+      // At the bound the same sync resolves empty. The revision is now stable,
+      // so that empty snapshot replaces the pending input in KV before
+      // `failOverdueAcceptedMessage` reads it: the turn spends its one no-output
+      // recovery instead of terminalizing.
       vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       await fixture.flush();
@@ -7538,34 +7540,15 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.terminalEvents()).toHaveLength(1);
   });
 
-  it.each([
-    { name: 'silent tool work', status: { type: 'busy' }, questions: [], permissions: [] },
-    {
-      name: 'question input',
-      status: { type: 'idle' },
-      questions: [{ id: 'question_1', sessionID: 'kilo_root' }],
-      permissions: [],
-    },
-    {
-      name: 'permission input',
-      status: { type: 'idle' },
-      questions: [],
-      permissions: [{ id: 'permission_1', sessionID: 'kilo_root' }],
-    },
-  ])('treats $name as waiting at 90s and recovers once at the inactivity bound', async snapshot => {
+  it('recovers silent tool work once at the inactivity bound', async () => {
     const fixture = sessionFixture();
-    const result = {
-      status: snapshot.status,
-      questions: snapshot.questions,
-      permissions: snapshot.permissions,
-    };
     delegateRequest(fixture, 'session.sync', async input => {
       expect(input.session).toEqual({
         sessionId: SESSION_ID,
         kiloSessionId: 'kilo_root',
         directory: DIRECTORY,
       });
-      return controlResponse(result);
+      return controlResponse({ status: { type: 'busy' }, questions: [], permissions: [] });
     });
     await fixture.admit('a');
     await fixture.admit('b');
@@ -7587,9 +7570,9 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
     expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.kiloInactivity);
 
-    // At the inactivity bound the turn spends its one no-output recovery and is
-    // re-queued for a fresh runtime. This alarm returns, so the accepted
-    // follow-up is left alone.
+    // At the inactivity bound a busy snapshot with no pending input is genuine
+    // no output: the turn spends its one recovery and is re-queued for a fresh
+    // runtime. This alarm returns, so the accepted follow-up is left alone.
     vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     expect(fixture.record('a')).toMatchObject({
@@ -7598,6 +7581,65 @@ describe('SandboxSession orchestration', () => {
     expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
     expect(fixture.record('b')?.state.kind).toBe('accepted');
     expect(fixture.terminalEvents()).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      name: 'question input',
+      status: { type: 'idle' },
+      questions: [{ id: 'question_1', sessionID: 'kilo_root' }],
+      permissions: [],
+    },
+    {
+      name: 'permission input',
+      status: { type: 'idle' },
+      questions: [],
+      permissions: [{ id: 'permission_1', sessionID: 'kilo_root' }],
+    },
+  ])('keeps a turn parked on $name accepted at the inactivity bound', async snapshot => {
+    const fixture = sessionFixture();
+    const result = {
+      status: snapshot.status,
+      questions: snapshot.questions,
+      permissions: snapshot.permissions,
+    };
+    delegateRequest(fixture, 'session.sync', async input => {
+      expect(input.session).toEqual({
+        sessionId: SESSION_ID,
+        kiloSessionId: 'kilo_root',
+        directory: DIRECTORY,
+      });
+      return controlResponse(result);
+    });
+    await fixture.admit('a');
+    await fixture.admit('b');
+    await fixture.flush();
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    // 90s: a pending-input snapshot is liveness, not progress, so the turn is
+    // waiting. The next wake is capped toward the inactivity bound.
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.acceptedOverdue);
+    await fixture.fireAlarm();
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
+    expect(fixture.alarmAt()).not.toBeNull();
+    expect(fixture.alarmAt()!).toBeGreaterThan(Date.now());
+    expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.kiloInactivity);
+
+    // At the bound the authoritative sync still reports the parked input, so
+    // the guard refuses recovery and spends no attempt. The guard is
+    // session-scoped: `b` is also accepted, and unresolved input anywhere in
+    // the session means the watched turn is not proven no-output.
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+    expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
+    expect(fixture.terminalEvents()).toHaveLength(0);
+    // Suppression re-arms a future recheck rather than a tight immediate loop.
+    expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
   });
 
   it('keeps and rearms an accepted turn when the sandbox is disconnected but still running', async () => {
@@ -7950,7 +7992,7 @@ describe('SandboxSession orchestration', () => {
     }
   );
 
-  it('recovers the accepted turn from a validated superseded sync on the bound alarm', async () => {
+  it('keeps the accepted turn when a superseded sync leaves a pending question', async () => {
     const fixture = sessionFixture();
     const sync = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.sync', () => sync.promise);
@@ -7967,8 +8009,227 @@ describe('SandboxSession orchestration', () => {
     await alarm;
     await fixture.flush();
 
-    // The validated frame is superseded, not a blip: the bound alarm re-checks
-    // and spends the turn's one no-output recovery.
+    // The resolved frame is superseded, not applied, so the pending question
+    // stays in KV. `rescheduleAcceptedWatchdog` re-checks on the bound alarm and
+    // `failOverdueAcceptedMessage` refuses recovery while that input is open.
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+    expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: 'question',
+      questions: [{ id: 'question_1', sessionID: 'kilo_root' }],
+      permissions: [],
+    },
+    {
+      name: 'permission',
+      questions: [],
+      permissions: [{ id: 'permission_1', sessionID: 'kilo_root' }],
+    },
+  ])(
+    'keeps an accepted turn parked while the authoritative sync keeps reporting a $name',
+    async snapshot => {
+      const fixture = sessionFixture();
+      delegateRequest(fixture, 'session.sync', async () =>
+        controlResponse({
+          status: { type: 'idle' },
+          questions: snapshot.questions,
+          permissions: snapshot.permissions,
+        })
+      );
+      await fixture.admit('a');
+      await fixture.flush();
+      const acceptedAt = acceptedAtOf(fixture.record('a'));
+      if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+      expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+      expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+    }
+  );
+
+  it.each([
+    {
+      name: 'question',
+      type: 'question.asked',
+      properties: { id: 'question_1', sessionID: 'kilo_root' },
+      questions: [{ id: 'question_1', sessionID: 'kilo_root' }],
+      permissions: [],
+    },
+    {
+      name: 'permission',
+      type: 'permission.asked',
+      properties: { id: 'permission_1', sessionID: 'kilo_root' },
+      questions: [],
+      permissions: [{ id: 'permission_1', sessionID: 'kilo_root' }],
+    },
+  ])(
+    'keeps a turn parked when a $name supersedes the sync and the next sync still reports it',
+    async snapshot => {
+      const fixture = sessionFixture();
+      const sync = deferred<ResponseFrame>();
+      delegateRequest(fixture, 'session.sync', () => sync.promise);
+      await fixture.admit('a');
+      await fixture.flush();
+      const acceptedAt = acceptedAtOf(fixture.record('a'));
+      if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+      const attachRequestsBefore = fixture.control.request.mock.calls.filter(
+        ([input]) => input.operation === 'session.attach'
+      ).length;
+
+      // First alarm: the input event moves the interaction revision while the
+      // sync is awaited, so the resolved frame is superseded and only the KV
+      // snapshot carries the input.
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+      const firstAlarm = fixture.fireAlarm();
+      await vi.advanceTimersByTimeAsync(0);
+      await fixture.rawEvent(snapshot.type, snapshot.properties);
+      sync.resolve(controlResponse({ status: { type: 'busy' }, questions: [], permissions: [] }));
+      await firstAlarm;
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+      expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+      expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+
+      // Second alarm: the authoritative sync still reports the parked input, so
+      // the guard refuses recovery again and re-arms a future recheck.
+      delegateRequest(fixture, 'session.sync', async () =>
+        controlResponse({
+          status: { type: 'idle' },
+          questions: snapshot.questions,
+          permissions: snapshot.permissions,
+        })
+      );
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+      expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+      expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+      expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(attachRequestsBefore);
+    }
+  );
+
+  it('restores recovery when a current empty snapshot clears stale pending input', async () => {
+    const fixture = sessionFixture();
+    delegateRequest(fixture, 'session.sync', async () =>
+      controlResponse({ status: { type: 'idle' }, questions: [], permissions: [] })
+    );
+    await fixture.admit('a');
+    await fixture.flush();
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    // A stale question is in KV, but the current authoritative sync resolves
+    // empty. The revision is stable, so the empty snapshot replaces the question
+    // before the inactivity decision and recovery is allowed again.
+    await fixture.rawEvent('question.asked', { id: 'question_1', sessionID: 'kilo_root' });
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'queued', recoveryAttempts: 1 },
+    });
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+  });
+
+  it('restores recovery after question.replied clears the parked question', async () => {
+    const fixture = sessionFixture();
+    let result: {
+      status: { type: string };
+      questions: Array<{ id: string; sessionID: string }>;
+      permissions: Array<{ id: string; sessionID: string }>;
+    } = {
+      status: { type: 'idle' },
+      questions: [{ id: 'question_1', sessionID: 'kilo_root' }],
+      permissions: [],
+    };
+    delegateRequest(fixture, 'session.sync', async () => controlResponse(result));
+    await fixture.admit('a');
+    await fixture.flush();
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    // The question is parked: the snapshot path refreshes it and the guard
+    // refuses recovery, so no attempt is spent.
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+    expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+
+    // The user answers. The reply drops the id from the snapshot, and the
+    // answered snapshot is empty, so the next inactivity alarm is genuine no
+    // output again and recovers once.
+    await fixture.rawEvent('question.replied', { requestID: 'question_1' });
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [],
+    });
+    result = { status: { type: 'idle' }, questions: [], permissions: [] };
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'queued', recoveryAttempts: 1 },
+    });
+    expect(failedReasonOf(fixture.record('a'))).toBeUndefined();
+  });
+
+  it('keeps a proof-backed accepted turn parked on a question and recovers after the reply', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      allocationIncarnation: 'incarnation_1',
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.proofs?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    delegateRequest(fixture, 'session.operation.get', async () =>
+      controlResponse({ state: 'running', authorization })
+    );
+    const acceptedAt = acceptedAtOf(fixture.record('a'));
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+
+    // A question is parked before the inactivity alarm. The proof-backed
+    // `running` branch does not refresh interactions, so this KV write is the
+    // only pending-input evidence the guard sees.
+    await fixture.rawEvent('question.asked', { id: 'question_1', sessionID: 'kilo_root' });
+    const attachRequestsBefore = fixture.control.request.mock.calls.filter(
+      ([input]) => input.operation === 'session.attach'
+    ).length;
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    // Unresolved input suppresses recovery for the proof-backed turn, and the
+    // `running` branch re-arms without attaching.
+    expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+    expect(recoveryAttemptsOf(fixture.record('a'))).toBeUndefined();
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+    ).toHaveLength(attachRequestsBefore);
+
+    // The reply clears the question. The next inactivity alarm is genuine no
+    // output and recovers once on the proof path.
+    await fixture.rawEvent('question.replied', { requestID: 'question_1' });
+    await fixture.fireAlarm();
+    await fixture.flush();
     expect(fixture.record('a')).toMatchObject({
       state: { kind: 'queued', recoveryAttempts: 1 },
     });
@@ -9893,6 +10154,27 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       expect(result.dropped).toBe(true);
       expect(result.messages?.[0]).toMatchObject({
         state: { kind: 'cancelled', reason: 'queued_message_cancelled' },
+      });
+    });
+
+    it('projects a pre-dispatch cancellation as an interrupted queued failure', () => {
+      const result = cancelPendingMessage(
+        boundAggregate([queuedRecord('a', { state: { wrapperInstanceId: wrapper } })]),
+        'a',
+        1_000
+      );
+
+      expect(result.dropped).toBe(true);
+      const cancelled = result.messages?.find(message => message.messageId === 'a');
+      if (!cancelled) throw new Error('Missing cancelled message');
+      expect(failedMessageSnapshot(cancelled, 99)).toEqual({
+        messageId: 'a',
+        status: 'interrupted',
+        delivery: 'queued',
+        accepted: false,
+        reason: 'interrupted',
+        error: 'The message was interrupted',
+        timestamp: 99,
       });
     });
 

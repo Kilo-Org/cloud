@@ -37,12 +37,8 @@ import {
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
-import type * as ExternalModelCache from '@/lib/ai-gateway/providers/external-model-cache';
 
 jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
-  ...jest.requireActual<typeof ExternalModelCache>(
-    '@/lib/ai-gateway/providers/external-model-cache'
-  ),
   getCachedOpenRouterModels: jest.fn(async () => null),
 }));
 

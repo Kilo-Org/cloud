@@ -30,10 +30,8 @@ import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/provider
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
-import {
-  getCachedOpenRouterModels,
-  sanitizeOpenRouterModels,
-} from '@/lib/ai-gateway/providers/external-model-cache';
+import { getCachedOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import { sanitizeOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-validation';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';

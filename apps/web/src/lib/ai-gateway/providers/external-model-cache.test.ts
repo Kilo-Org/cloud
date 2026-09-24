@@ -5,23 +5,14 @@ import {
   saveOpenAiServedModels,
   saveOpenRouterModels,
 } from './external-model-cache';
+import { db, readDb } from '@/lib/drizzle';
 
 const mockRows: { data: unknown; synced_at: string }[] = [];
 const mockWrites: { source: string; data: unknown; synced_at: string }[] = [];
 
 jest.mock('@/lib/drizzle', () => ({
-  readDb: {
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => mockRows }) }) }),
-  },
-  db: {
-    insert: () => ({
-      values: (row: { source: string; data: unknown; synced_at: string }) => ({
-        onConflictDoUpdate: async () => {
-          mockWrites.push(row);
-        },
-      }),
-    }),
-  },
+  readDb: { select: jest.fn() },
+  db: { insert: jest.fn() },
 }));
 
 const catalogModel = {
@@ -39,6 +30,16 @@ describe('external model cache', () => {
   beforeEach(() => {
     mockRows.length = 0;
     mockWrites.length = 0;
+    (readDb.select as jest.Mock).mockImplementation(() => ({
+      from: () => ({ where: () => ({ limit: async () => mockRows }) }),
+    }));
+    (db.insert as jest.Mock).mockImplementation(() => ({
+      values: (row: { source: string; data: unknown; synced_at: string }) => ({
+        onConflictDoUpdate: async () => {
+          mockWrites.push(row);
+        },
+      }),
+    }));
   });
 
   it('stores a validated OpenRouter catalog and removes upstream enkrypt', async () => {

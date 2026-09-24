@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { ai_gateway_external_model_cache } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import * as z from 'zod';
+import type * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
 import {
   OpenRouterModelsResponseSchema,
@@ -9,39 +9,14 @@ import {
 } from '@/lib/organizations/organization-types';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { OPENAI_CHATGPT_API_URL } from '@/lib/ai-gateway/openai-chatgpt/upstream';
+import {
+  ServedModelsSchema,
+  sanitizeOpenRouterModels,
+} from '@/lib/ai-gateway/providers/external-model-validation';
 
 const OPENROUTER_SOURCE = `openrouter:${OPENROUTER.apiUrl}`;
 const OPENROUTER_MAX_AGE_MS = 15 * 60_000;
 const OPENAI_MAX_AGE_MS = 60 * 60_000;
-
-const ServedModelsSchema = z.object({
-  data: z.array(z.object({ id: z.string().min(1) })),
-});
-
-export function parseOpenAiServedModelIds(response: unknown): Set<string> | null {
-  const parsed = ServedModelsSchema.safeParse(response);
-  return parsed.success ? new Set(parsed.data.data.map(model => model.id)) : null;
-}
-
-export function sanitizeOpenRouterModels(response: unknown): unknown {
-  if (
-    !response ||
-    typeof response !== 'object' ||
-    !('data' in response) ||
-    !Array.isArray(response.data)
-  ) {
-    return response;
-  }
-  return {
-    ...response,
-    data: response.data.map((model: unknown) => {
-      if (!model || typeof model !== 'object' || !('enkrypt' in model)) return model;
-      const sanitized: Record<string, unknown> = { ...model };
-      delete sanitized.enkrypt;
-      return sanitized;
-    }),
-  };
-}
 
 function openAiSource(apiKey: string): string {
   const identity = createHash('sha256')

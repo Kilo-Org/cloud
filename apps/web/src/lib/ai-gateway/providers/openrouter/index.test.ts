@@ -18,12 +18,8 @@ import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusi
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 import { getCachedOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-cache';
-import type * as ExternalModelCache from '@/lib/ai-gateway/providers/external-model-cache';
 
 jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
-  ...jest.requireActual<typeof ExternalModelCache>(
-    '@/lib/ai-gateway/providers/external-model-cache'
-  ),
   getCachedOpenRouterModels: jest.fn(async () => null),
 }));
 

@@ -1,8 +1,6 @@
 import { OPENAI_CHATGPT_API_URL } from './upstream';
-import {
-  getCachedOpenAiServedModels,
-  parseOpenAiServedModelIds,
-} from '@/lib/ai-gateway/providers/external-model-cache';
+import { getCachedOpenAiServedModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import { parseOpenAiServedModelIds } from '@/lib/ai-gateway/providers/external-model-validation';
 
 /**
  * Which models the partner project can actually serve.

@@ -831,6 +831,7 @@ export function createSandboxControlClient(
               scopedCleanupResult: true,
               workingBranches: true,
               gitAuthor: true,
+              restoredWorkspace: true,
               nativeRuntimeIdCapture: true,
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),

@@ -29,6 +29,12 @@ import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-erro
 import { reportRestoreIncomplete } from './restore-incomplete.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
+import {
+  RestoredWorkspaceReconciliationError,
+  reconcileRestoredWorkspaceRef,
+} from './reconcile-restored-workspace.js';
+
+export { RestoredWorkspaceReconciliationError };
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 // Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
@@ -222,13 +228,6 @@ function longGitOptions(
     hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
     onOutput: gitProgressReporter(progress, step, progressPrefix),
   };
-}
-
-export class RestoredWorkspaceReconciliationError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'RestoredWorkspaceReconciliationError';
-  }
 }
 
 export function workspaceBootstrapErrorCode(
@@ -846,21 +845,20 @@ async function reconcileRestoredWorkspace(
     sourceBranch = defaultBranchMatch[1];
   }
 
-  const fetchResult = await runGit(
-    ['fetch', 'origin', sourceBranch],
-    longGitOptions(progress, 'branch', 'Fetching authoritative state...', workspacePath)
-  );
-  if (fetchResult.exitCode !== 0) {
-    throw new Error('Failed to fetch authoritative remote state');
-  }
-
-  const checkoutResult = await runGit(
-    ['checkout', '-B', branchName, 'FETCH_HEAD'],
-    longGitOptions(progress, 'branch', 'Checking out session branch...', workspacePath)
-  );
-  if (checkoutResult.exitCode !== 0) {
-    throw new Error(`Failed to create session branch ${branchName} from origin/${sourceBranch}`);
-  }
+  await reconcileRestoredWorkspaceRef({
+    runGit: (args, step) =>
+      runGit(
+        args,
+        longGitOptions(
+          progress,
+          'branch',
+          step === 'fetch' ? 'Fetching authoritative state...' : 'Checking out session branch...',
+          workspacePath
+        )
+      ),
+    sourceRef: sourceBranch,
+    branchName,
+  });
 }
 
 async function runSetupCommands(

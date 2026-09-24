@@ -309,6 +309,23 @@ describe('sandbox control frames', () => {
     ).toBe(false);
   });
 
+  it('carries the restored-workspace capability from hello onto the socket attachment', () => {
+    const payload = {
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'sandbox_1',
+      capabilities: { restoredWorkspace: true },
+    };
+    const parsed = parseSandboxHelloPayload(payload);
+    expect(parsed?.capabilities?.restoredWorkspace).toBe(true);
+    expect(
+      sandboxControlSocketAttachmentSchema.parse({
+        handshakeComplete: true,
+        acceptedAt: 0,
+        capabilities: parsed?.capabilities,
+      }).capabilities?.restoredWorkspace
+    ).toBe(true);
+  });
+
   it('preserves old socket attachments while validating optional connection identities', () => {
     const legacyAttachment = { handshakeComplete: false, acceptedAt: 0 };
     const currentAttachment = { ...legacyAttachment, connectionId, wrapperInstanceId };

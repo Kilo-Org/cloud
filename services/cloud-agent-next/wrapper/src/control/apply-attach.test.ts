@@ -1,8 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { applySessionAttach, type ApplyAttachDeps } from './apply-attach';
+
+// Real-git fixtures spawn several subprocesses per case; the default 5s test
+// timeout is too tight when the whole file runs.
+setDefaultTimeout(30_000);
+
 import { KILO_CONTROL_REQUEST_TIMEOUT_MS } from './sandbox-control-runtime';
 import { runProcess, withTimeoutAndAbort } from '../utils';
 import type { WrapperKiloClient } from '../kilo-api';
@@ -193,6 +198,128 @@ describe('applySessionAttach', () => {
       });
     const currentBranch = async () =>
       (await runGit(['branch', '--show-current'], directory)).stdout.trim();
+
+    const gitAuthor = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com'];
+
+    // Advance an origin branch tip without a checkout or clone. The tree is
+    // unchanged, so a publisher snapshot keeps its own older ref.
+    const advanceBranch = async (branch: string): Promise<string> => {
+      const tip = (await runGit(['rev-parse', `refs/heads/${branch}`], repository)).stdout.trim();
+      const tree = (await runGit(['rev-parse', `${tip}^{tree}`], repository)).stdout.trim();
+      const commit = (
+        await runGit(
+          [...gitAuthor, 'commit-tree', tree, '-p', tip, '-m', `advance ${branch}`],
+          repository
+        )
+      ).stdout.trim();
+      expect(
+        (await runGit(['update-ref', `refs/heads/${branch}`, commit], repository)).exitCode
+      ).toBe(0);
+      return commit;
+    };
+
+    const createBranchAt = async (branch: string, base: string): Promise<string> => {
+      const tip = (await runGit(['rev-parse', `refs/heads/${base}`], repository)).stdout.trim();
+      const tree = (await runGit(['rev-parse', `${tip}^{tree}`], repository)).stdout.trim();
+      const commit = (
+        await runGit(
+          [...gitAuthor, 'commit-tree', tree, '-p', tip, '-m', `create ${branch}`],
+          repository
+        )
+      ).stdout.trim();
+      expect(
+        (await runGit(['update-ref', `refs/heads/${branch}`, commit], repository)).exitCode
+      ).toBe(0);
+      return commit;
+    };
+
+    const headOf = async () => (await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim();
+
+    const upstreamOf = async () =>
+      (
+        await runGit(
+          ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+          directory
+        )
+      ).stdout.trim();
+
+    const gitOrigin = async (dir: string) =>
+      (await runGit(['remote', 'get-url', 'origin'], dir)).stdout.trim();
+
+    const markerFor = (dir: string) => path.join(dir, '.git', 'kilo-bootstrap-complete');
+
+    const advanceRef = async (ref: string): Promise<string> => {
+      const tip = (await runGit(['rev-parse', ref], repository)).stdout.trim();
+      const tree = (await runGit(['rev-parse', `${tip}^{tree}`], repository)).stdout.trim();
+      const commit = (
+        await runGit(
+          [...gitAuthor, 'commit-tree', tree, '-p', tip, '-m', `advance ${ref}`],
+          repository
+        )
+      ).stdout.trim();
+      expect((await runGit(['update-ref', ref, commit], repository)).exitCode).toBe(0);
+      return commit;
+    };
+
+    // Observe the real-Git attach path: clone calls, the workspace children at
+    // clone time, and the origin URL at the moment of each workspace fetch.
+    // `breakFirstFetch` parks the local origin for the first fetch so it fails
+    // for real, then restores it. Cleanup is the production default unless a
+    // test injects `empty` to simulate a failed/interrupted cleanup.
+    const observeAttach = (
+      options: {
+        empty?: (dir: string) => Promise<boolean>;
+        breakFirstFetch?: boolean;
+        target?: string;
+      } = {}
+    ) => {
+      const target = options.target ?? directory;
+      const cloneCalls: string[][] = [];
+      const originAtFetch: string[] = [];
+      let fetchCalls = 0;
+      let emptyCalls = 0;
+      let childrenAtClone = -1;
+      const baseGit = deps.runGit!;
+      const observed: ApplyAttachDeps = {
+        ...deps,
+        ...(options.empty
+          ? {
+              emptyWorkspaceContents: async dir => {
+                emptyCalls += 1;
+                return options.empty!(dir);
+              },
+            }
+          : {}),
+        runGit: async (args, cwd, signal) => {
+          if (args[0] === 'clone') {
+            cloneCalls.push(args);
+            childrenAtClone = fs.existsSync(target) ? fs.readdirSync(target).length : -1;
+          }
+          if (args[0] === 'fetch' && cwd === target) {
+            fetchCalls += 1;
+            originAtFetch.push(await gitOrigin(target));
+            if (options.breakFirstFetch && fetchCalls === 1) {
+              const parked = `${repository}.unavailable`;
+              fs.renameSync(repository, parked);
+              try {
+                return await baseGit(args, cwd, signal);
+              } finally {
+                fs.renameSync(parked, repository);
+              }
+            }
+          }
+          return baseGit(args, cwd, signal);
+        },
+      };
+      return {
+        observed,
+        cloneCalls,
+        originAtFetch,
+        fetchCalls: () => fetchCalls,
+        emptyCalls: () => emptyCalls,
+        childrenAtClone: () => childrenAtClone,
+      };
+    };
 
     beforeEach(async () => {
       repository = path.join(homeRoot, 'repository');
@@ -430,6 +557,519 @@ describe('applySessionAttach', () => {
       );
       expect(await currentBranch()).toBe('session/worktree_a');
       expect(await currentBranch()).toBe(branch);
+    });
+
+    describe('restoredFromBackup', () => {
+      const localPayload = () => ({ ...payload, git: { url: repository } });
+
+      // A successful warm attach must reconcile in place: no clone and no
+      // workspace emptying (the production cleanup would remove `.git`). The
+      // origin must already be the consumer URL by the first real fetch.
+      const expectReconciledWithoutFallback = (observed: {
+        cloneCalls: string[][];
+        originAtFetch: string[];
+      }) => {
+        expect(observed.cloneCalls).toEqual([]);
+        expect(fs.existsSync(path.join(directory, '.git', 'HEAD'))).toBe(true);
+        expect(observed.originAtFetch.length).toBeGreaterThan(0);
+        expect(observed.originAtFetch.every(url => url === repository)).toBe(true);
+      };
+
+      it('keeps the marker skip and performs no git or setup work without the flag', async () => {
+        const cold = { ...localPayload(), setupCommands: ['true'] };
+        expect((await applySessionAttach({ ...session, directory }, cold, deps)).ok).toBe(true);
+        const headBefore = await headOf();
+        const gitCalls: string[][] = [];
+        let setupCalls = 0;
+        const result = await applySessionAttach({ ...session, directory }, cold, {
+          ...deps,
+          runGit: (args, cwd, signal) => {
+            gitCalls.push(args);
+            return deps.runGit!(args, cwd, signal);
+          },
+          runSetup: async () => {
+            setupCalls += 1;
+            return { stdout: '', stderr: '', exitCode: 0 };
+          },
+        });
+        expect(result).toEqual({ ok: true, result: { attached: true } });
+        expect(gitCalls).toEqual([]);
+        expect(setupCalls).toBe(0);
+        expect(await headOf()).toBe(headBefore);
+      });
+
+      it('re-prepares and lands on the advanced pushed working ref', async () => {
+        const first = await applySessionAttach({ ...session, directory }, localPayload(), deps);
+        expect(first).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(
+          (await runGit(['push', '-u', 'origin', 'session/worktree_a'], directory)).exitCode
+        ).toBe(0);
+        const advanced = await advanceBranch('session/worktree_a');
+        const warm = observeAttach();
+
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await currentBranch()).toBe('session/worktree_a');
+        expect(await headOf()).toBe(advanced);
+        expect(await upstreamOf()).toBe('origin/session/worktree_a');
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('creates a working branch absent on origin from the advanced default', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const advanced = await advanceBranch('main');
+        const warm = observeAttach();
+
+        const result = await applySessionAttach(
+          { ...session, directory },
+          {
+            ...localPayload(),
+            branch: 'feature/new',
+            branchMode: 'working',
+            restoredFromBackup: true,
+          },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await currentBranch()).toBe('feature/new');
+        expect(await headOf()).toBe(advanced);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('does not reset onto a remote branch deleted on origin after capture', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        expect(
+          (await runGit(['push', '-u', 'origin', 'session/worktree_a'], directory)).exitCode
+        ).toBe(0);
+        expect((await runGit(['fetch', 'origin'], directory)).exitCode).toBe(0);
+        const staleTip = (await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim();
+        expect((await runGit(['branch', '-D', 'session/worktree_a'], repository)).exitCode).toBe(0);
+        const advanced = await advanceBranch('main');
+        const warm = observeAttach();
+
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await headOf()).toBe(advanced);
+        expect(await headOf()).not.toBe(staleTip);
+        expect(
+          (
+            await runGit(
+              ['show-ref', '--verify', '--quiet', 'refs/remotes/origin/session/worktree_a'],
+              directory
+            )
+          ).exitCode
+        ).toBe(1);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('resolves a changed default with ls-remote instead of the cached origin/HEAD', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const developTip = await createBranchAt('develop', 'main');
+        expect(
+          (await runGit(['symbolic-ref', 'HEAD', 'refs/heads/develop'], repository)).exitCode
+        ).toBe(0);
+        const warm = observeAttach();
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await currentBranch()).toBe('session/worktree_a');
+        expect(await headOf()).toBe(developTip);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('follows an explicit branch request when the publisher was a working checkout', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const advanced = await advanceBranch('feature/existing');
+        const warm = observeAttach();
+
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), branch: 'feature/existing', restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await currentBranch()).toBe('feature/existing');
+        expect(await headOf()).toBe(advanced);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('follows working-mode rules when the publisher was an explicit checkout', async () => {
+        expect(
+          (
+            await applySessionAttach(
+              { ...session, directory },
+              { ...localPayload(), branch: 'feature/existing' },
+              deps
+            )
+          ).ok
+        ).toBe(true);
+        const mainTip = (await runGit(['rev-parse', 'HEAD'], repository)).stdout.trim();
+        const warm = observeAttach();
+
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await currentBranch()).toBe('session/worktree_a');
+        expect(await headOf()).toBe(mainTip);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('replaces origin before fetching on an explicit warm path', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const advanced = await advanceBranch('feature/existing');
+        expect(
+          (
+            await runGit(
+              [
+                'remote',
+                'set-url',
+                'origin',
+                'https://x-access-token:publisher-token@example.test/acme/demo.git',
+              ],
+              directory
+            )
+          ).exitCode
+        ).toBe(0);
+
+        const warm = observeAttach();
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), branch: 'feature/existing', restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await headOf()).toBe(advanced);
+        expect(await gitOrigin(directory)).toBe(repository);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('replaces origin before fetching on a synthetic warm path', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const branch = 'refs/pull/42/head';
+        expect((await runGit(['update-ref', branch, 'HEAD'], repository)).exitCode).toBe(0);
+        const publisherHead = await headOf();
+        const pullTip = await advanceRef(branch);
+        expect(pullTip).not.toBe(publisherHead);
+        expect(
+          (
+            await runGit(
+              [
+                'remote',
+                'set-url',
+                'origin',
+                'https://x-access-token:publisher-token@example.test/acme/demo.git',
+              ],
+              directory
+            )
+          ).exitCode
+        ).toBe(0);
+
+        const warm = observeAttach();
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), branch, restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(await currentBranch()).toBe(branch);
+        expect(await headOf()).toBe(pullTip);
+        expect(await gitOrigin(directory)).toBe(repository);
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('empties the retained workspace root and clones after a broken-origin failure', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const publisherHead = await headOf();
+        const inodeBefore = fs.statSync(directory).ino;
+        const advanced = await advanceBranch('main');
+        fs.writeFileSync(path.join(directory, 'obstruction.txt'), 'obstructing');
+        const warm = observeAttach({ breakFirstFetch: true });
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(fs.statSync(directory).ino).toBe(inodeBefore);
+        expect(fs.existsSync(path.join(directory, 'obstruction.txt'))).toBe(false);
+        expect(await headOf()).toBe(advanced);
+        expect(await headOf()).not.toBe(publisherHead);
+        expect((await runGit(['config', 'user.name'], directory)).stdout.trim()).toBe(
+          'Kilo Code Cloud'
+        );
+        expect(warm.childrenAtClone()).toBe(0);
+        expect(warm.cloneCalls.length).toBe(1);
+        expect(fs.existsSync(markerFor(directory))).toBe(true);
+      });
+
+      it('does not clone into a non-Git retry state until cleanup removes the leftover child', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const advanced = await advanceBranch('main');
+        let emptyRuns = 0;
+        let cloneSawLeftover: boolean | undefined;
+        const warm = observeAttach({
+          breakFirstFetch: true,
+          empty: async dir => {
+            emptyRuns += 1;
+            if (emptyRuns === 1) {
+              // Interrupted cleanup: git metadata is gone but a child remains.
+              fs.rmSync(path.join(dir, '.git'), { recursive: true, force: true });
+              fs.writeFileSync(path.join(dir, 'leftover.txt'), 'left behind');
+              return false;
+            }
+            for (const entry of fs.readdirSync(dir)) {
+              fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+            }
+            return fs.readdirSync(dir).length === 0;
+          },
+        });
+        const observed: ApplyAttachDeps = {
+          ...warm.observed,
+          runGit: async (args, cwd, signal) => {
+            if (args[0] === 'clone') {
+              cloneSawLeftover = fs.existsSync(path.join(directory, 'leftover.txt'));
+            }
+            return warm.observed.runGit!(args, cwd, signal);
+          },
+        };
+
+        const first = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          observed
+        );
+
+        expect(first).toMatchObject({
+          ok: false,
+          error: { code: 'not_ready', retryable: true },
+        });
+        expect(warm.cloneCalls).toEqual([]);
+        expect(fs.existsSync(path.join(directory, '.git', 'HEAD'))).toBe(false);
+        expect(fs.existsSync(path.join(directory, 'leftover.txt'))).toBe(true);
+        expect(fs.readdirSync(directory).length).toBeGreaterThan(0);
+
+        const second = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), restoredFromBackup: true },
+          observed
+        );
+
+        expect(second).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(cloneSawLeftover).toBe(false);
+        expect(warm.emptyCalls()).toBe(2);
+        expect(warm.cloneCalls.length).toBe(1);
+        expect(await headOf()).toBe(advanced);
+      });
+
+      it('keeps a missing synthetic ref non-retryable without emptying or cloning', async () => {
+        const branch = 'refs/pull/404/head';
+        let emptyCalls = 0;
+        let cloneCalls = 0;
+        const result = await applySessionAttach(
+          session,
+          {
+            kilo,
+            branch,
+            git: { url: 'https://github.com/acme/demo.git' },
+            restoredFromBackup: true,
+          },
+          {
+            kiloRuntimes: fakeKiloRuntimes(),
+            sessionExists: async () => true,
+            mkdir: async () => undefined,
+            hasGit: async () => true,
+            hasBootstrapMarker: async () => true,
+            deleteBootstrapMarker: async () => undefined,
+            writeBootstrapMarker: async () => undefined,
+            emptyWorkspaceContents: async () => {
+              emptyCalls += 1;
+              return true;
+            },
+            runGit: async args => {
+              if (args[0] === 'clone') cloneCalls += 1;
+              if (args[0] === 'fetch') {
+                return {
+                  stdout: '',
+                  stderr: `fatal: couldn't find remote ref ${branch}`,
+                  exitCode: 128,
+                };
+              }
+              return { stdout: '', stderr: '', exitCode: 0 };
+            },
+          }
+        );
+
+        expect(result).toMatchObject({
+          ok: false,
+          error: { code: 'not_ready', retryable: false, subtype: 'git_branch_missing' },
+        });
+        expect(emptyCalls).toBe(0);
+        expect(cloneCalls).toBe(0);
+      });
+
+      it('empties and clones after a real retryable synthetic warm fetch failure', async () => {
+        expect((await applySessionAttach({ ...session, directory }, localPayload(), deps)).ok).toBe(
+          true
+        );
+        const branch = 'refs/pull/9/head';
+        expect((await runGit(['update-ref', branch, 'HEAD'], repository)).exitCode).toBe(0);
+        const pullTip = await advanceRef(branch);
+        const warm = observeAttach({ breakFirstFetch: true });
+
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...localPayload(), branch, restoredFromBackup: true },
+          warm.observed
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(warm.childrenAtClone()).toBe(0);
+        expect(warm.cloneCalls.length).toBe(1);
+        expect(await currentBranch()).toBe(branch);
+        expect(await headOf()).toBe(pullTip);
+      });
+
+      it('clones without fetching on an ordinary cold attach, and fetches a cold synthetic ref', async () => {
+        const plain = observeAttach();
+        const plainResult = await applySessionAttach(
+          { ...session, directory },
+          localPayload(),
+          plain.observed
+        );
+        expect(plainResult).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(plain.cloneCalls.length).toBe(1);
+        expect(plain.fetchCalls()).toBe(0);
+        expect(fs.existsSync(path.join(directory, '.git', 'HEAD'))).toBe(true);
+
+        directory = path.join(homeRoot, 'checkout-synthetic');
+        expect(
+          (await runGit(['update-ref', 'refs/pull/7/head', 'HEAD'], repository)).exitCode
+        ).toBe(0);
+        const synthetic = observeAttach();
+        const syntheticResult = await applySessionAttach(
+          { ...session, sessionId: 'workspace_synth', kiloSessionId: 'kilo_synth', directory },
+          { ...localPayload(), branch: 'refs/pull/7/head' },
+          synthetic.observed
+        );
+        expect(syntheticResult).toEqual({
+          ok: true,
+          result: { attached: true, bootstrapped: true },
+        });
+        expect(synthetic.cloneCalls.length).toBe(1);
+        expect(synthetic.fetchCalls()).toBe(1);
+      });
+
+      it('re-runs setup and rewrites the marker on a warm restore', async () => {
+        const diagnostics: Array<Record<string, unknown>> = [];
+        const markerSeenInSetup: boolean[] = [];
+        const setupFile = path.join(directory, '.kilo-setup-runs');
+        const appendSetup = async (_command: string, cwd: string) => {
+          markerSeenInSetup.push(fs.existsSync(markerFor(cwd)));
+          fs.appendFileSync(path.join(cwd, '.kilo-setup-runs'), 'run\n');
+          return { stdout: '', stderr: '', exitCode: 0 };
+        };
+        const setupPayload = () => ({ ...localPayload(), setupCommands: ['append-run'] });
+
+        expect(
+          (
+            await applySessionAttach({ ...session, directory }, setupPayload(), {
+              ...deps,
+              runSetup: appendSetup,
+            })
+          ).ok
+        ).toBe(true);
+        expect(fs.readFileSync(setupFile, 'utf8').trim().split('\n')).toHaveLength(1);
+
+        const warm = observeAttach();
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...setupPayload(), restoredFromBackup: true },
+          {
+            ...warm.observed,
+            runSetup: appendSetup,
+            onDiagnostic: (_event, fields) => diagnostics.push(fields),
+          }
+        );
+
+        expect(result).toEqual({ ok: true, result: { attached: true, bootstrapped: true } });
+        expect(fs.readFileSync(setupFile, 'utf8').trim().split('\n')).toHaveLength(2);
+        expect(markerSeenInSetup).toEqual([false, false]);
+        expect(fs.existsSync(markerFor(directory))).toBe(true);
+        expect(diagnostics).toContainEqual(
+          expect.objectContaining({ workspaceAction: 'bootstrap' })
+        );
+        expectReconciledWithoutFallback(warm);
+      });
+
+      it('keeps a warm setup failure retryable without emptying or cloning', async () => {
+        const setupPayload = () => ({ ...localPayload(), setupCommands: ['append-run'] });
+        expect(
+          (
+            await applySessionAttach({ ...session, directory }, setupPayload(), {
+              ...deps,
+              runSetup: async (_command, cwd) => {
+                fs.appendFileSync(path.join(cwd, '.kilo-setup-runs'), 'run\n');
+                return { stdout: '', stderr: '', exitCode: 0 };
+              },
+            })
+          ).ok
+        ).toBe(true);
+        expect(fs.existsSync(markerFor(directory))).toBe(true);
+
+        const warm = observeAttach();
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...setupPayload(), restoredFromBackup: true },
+          {
+            ...warm.observed,
+            runSetup: async () => ({ stdout: '', stderr: 'install failed', exitCode: 1 }),
+          }
+        );
+
+        expect(result).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
+        expect(fs.existsSync(markerFor(directory))).toBe(false);
+        expect(fs.existsSync(path.join(directory, '.git', 'HEAD'))).toBe(true);
+        expect(warm.cloneCalls).toEqual([]);
+      });
     });
   });
 

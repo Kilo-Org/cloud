@@ -556,7 +556,7 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
-  /** Warm-base container snapshots keyed by repository/preparation identity digest */
+  /** Warm-base container snapshots keyed by repository/toolchain identity digest */
   WARM_BASE: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;

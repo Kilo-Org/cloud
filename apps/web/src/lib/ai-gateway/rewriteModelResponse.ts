@@ -103,7 +103,6 @@ async function createRequestLogCapture(
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
   if (
-    provider !== 'custom' &&
     !(await isDynamicallyOptedIntoRequestLogging({
       accountId: user?.id ?? null,
       organizationId: organization_id,

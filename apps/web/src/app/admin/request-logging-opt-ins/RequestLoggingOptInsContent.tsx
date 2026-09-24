@@ -139,7 +139,10 @@ export default function RequestLoggingOptInsContent() {
       <Card>
         <CardHeader>
           <CardTitle>Active opt-ins</CardTitle>
-          <CardDescription>Hardcoded email-domain opt-ins are not listed here.</CardDescription>
+          <CardDescription>
+            Requests are logged only when the account or organization is opted in, including custom
+            provider requests.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -164,7 +167,7 @@ export default function RequestLoggingOptInsContent() {
               {!isLoading && optIns?.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-muted-foreground">
-                    No dynamic request logging opt-ins.
+                    No request logging opt-ins.
                   </TableCell>
                 </TableRow>
               )}

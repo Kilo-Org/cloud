@@ -6,12 +6,14 @@ import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { writeTransactionalMigrationsFolder } from '@kilocode/db/transactional-migration-sql';
 import {
   provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
 import { provisionModelExperimentRequestPartitions } from '@/lib/model-experiment-request-partitions';
-import { existsSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join } from 'path';
 import { shutdownPosthog } from '@/lib/posthog';
 
@@ -55,7 +57,11 @@ beforeAll(async () => {
   });
   try {
     const testDb = drizzle(testPool);
-    await migrate(testDb, { migrationsFolder: '../../packages/db/src/migrations' });
+    const migrationsFolder = writeTransactionalMigrationsFolder(
+      '../../packages/db/src/migrations',
+      mkdtempSync(join(tmpdir(), 'drizzle-migrate-'))
+    );
+    await migrate(testDb, { migrationsFolder });
 
     // Production keeps this rolling window current via cron. Each Jest worker
     // starts from the static migration snapshot, so it needs the same window

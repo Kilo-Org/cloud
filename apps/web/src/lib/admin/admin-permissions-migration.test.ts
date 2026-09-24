@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { rewriteMigrationsFolderInPlace } from '@kilocode/db/transactional-migration-sql';
 
 const migrationTag = '0187_modern_colonel_america';
 
@@ -42,6 +43,7 @@ describe('admin permissions migration', () => {
       };
       journal.entries = journal.entries.filter(entry => entry.tag !== migrationTag);
       await writeFile(journalPath, JSON.stringify(journal, null, 2));
+      rewriteMigrationsFolderInPlace(previousMigrations);
 
       testPool = new Pool({ connectionString: databaseUrl.toString() });
       // This pool's own database is dropped with `DROP DATABASE ... WITH (FORCE)`

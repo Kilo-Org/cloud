@@ -293,9 +293,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
+  const providerPolicy = providerPrivacySchema.optional().parse(requestBodyParsed.provider);
   const effectivePrivacy = getEffectiveProviderPrivacy(
     requestPrivacy.data,
-    requestBodyParsed.provider?.data_collection
+    providerPolicy?.data_collection
   );
   const upstreamBody = buildUpstreamBody(
     {

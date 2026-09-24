@@ -17,7 +17,6 @@ export type ProviderId =
   | 'vercel'
   | 'openai-chatgpt'
   | 'custom'
-  | 'experiment'
   | 'dev-tools';
 
 export type BYOKResult = {

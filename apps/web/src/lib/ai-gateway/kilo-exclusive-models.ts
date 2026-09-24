@@ -1,16 +1,23 @@
+import 'server-only';
+
 import {
   CLAUDE_OPUS_4_8_STEALTH_MODEL_ID,
   CLAUDE_OPUS_STEALTH_MODEL_ID,
   CLAUDE_SONNET_STEALTH_MODEL_ID,
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
+import {
+  GEMMA_4_26B_A4B_IT_ID,
+  GEMMA_4_26B_A4B_IT_FREE_ID,
+} from '@/lib/ai-gateway/providers/google';
 import type {
   KiloExclusiveModel,
   Pricing,
   PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
+import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {
@@ -33,7 +40,7 @@ export const claude_opus_4_8_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  gateway: 'martian',
+  provider: MARTIAN,
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -48,7 +55,7 @@ export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  gateway: 'martian',
+  provider: MARTIAN,
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -75,7 +82,7 @@ export const claude_sonnet_4_6_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 64_000,
-  gateway: 'martian',
+  provider: MARTIAN,
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_SONNET_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -90,14 +97,14 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  gateway: 'martian',
+  provider: MARTIAN,
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
 };
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
-  public_id: 'google/gemma-4-26b-a4b-it:free',
+  public_id: GEMMA_4_26B_A4B_IT_FREE_ID,
   display_name: 'Google: Gemma 4 26B A4B (free)',
   description:
     'Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference — delivering near-31B quality at a fraction of the compute cost.',
@@ -105,7 +112,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto
   flags: ['vision', 'vercel-routing', 'rate-limited'],
-  gateway: 'openrouter',
+  provider: OPENROUTER,
   internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
   inference_provider_restriction: [],
@@ -161,7 +168,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 65_536,
   status: 'public',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  gateway: 'martian',
+  provider: MARTIAN,
   internal_id: 'qwen/qwen3.6-plus',
   pricing: {
     tiers: makeTieredPricing(
@@ -200,7 +207,7 @@ export const stepfun_37_flash_free_model: KiloExclusiveModel = {
   max_completion_tokens: 262_144,
   status: 'public',
   flags: ['reasoning', 'vision', 'vercel-routing'],
-  gateway: 'openrouter',
+  provider: OPENROUTER,
   internal_id: 'stepfun/step-3.7-flash',
   pricing: null,
   inference_provider_restriction: ['stepfun'],
@@ -240,11 +247,11 @@ export function shouldRedactModelNameInMicrodollarUsage(
   provider: ProviderId,
   model: string
 ): boolean {
-  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+  return provider === 'custom' || isKiloStealthModel(model);
 }
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return provider === 'experiment' || isKiloStealthModel(model);
+  return isKiloStealthModel(model);
 }
 
 export function isDisabledKiloExclusiveModel(model: string): boolean {

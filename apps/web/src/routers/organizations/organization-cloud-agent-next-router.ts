@@ -376,6 +376,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           ...gitParams,
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
+          githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
@@ -1017,7 +1018,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const result = await fetchAllGitHubRepositoriesForOrganization(
         input.organizationId,
-        input.forceRefresh
+        input.forceRefresh,
+        'agent'
       );
       return {
         repositories: await orderRepositoriesByUsage({

@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyAnthropicThinkingDefault,
@@ -26,7 +27,7 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   status: 'public',
   context_length: 8_192,
   max_completion_tokens: 4_096,
-  gateway: 'openrouter',
+  provider: OPENROUTER,
   flags: [],
   pricing: null,
   inference_provider_restriction: [],

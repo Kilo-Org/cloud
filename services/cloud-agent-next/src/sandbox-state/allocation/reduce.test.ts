@@ -9,7 +9,7 @@ import type {
   StoppingDestroying,
   StopProof,
 } from '../model/allocation.js';
-import { POLICY } from '../schedule.js';
+import { POLICY, allocationAlarmAt } from '../schedule.js';
 
 const NOW = 1_000_000;
 const INC = 'inc-1';
@@ -813,7 +813,7 @@ describe('allocation reducer — design §5 transitions', () => {
     });
   });
 
-  it('cloudflare unknown at the same time still re-arms Observe', () => {
+  it('cloudflare unknown past the reconciliation window settles to check_required', () => {
     const at = NOW - 5_000 + POLICY.reconciliationWindowMs;
     const record: AllocationRecord = {
       v: 2,
@@ -829,9 +829,11 @@ describe('allocation reducer — design §5 transitions', () => {
       },
     };
     const decision = decideAllocation(record, { type: 'DEADLINE' }, at);
-    expect(decision?.state.state.kind).toBe('unknown');
-    expect(commandKinds(decision)).toEqual(['Observe']);
-    expect(decision?.deadlineAt).toBe(at + POLICY.observeDeadlineMs);
+    expect(decision?.state.state.kind === 'stopping' && decision.state.state.step).toBe(
+      'check_required'
+    );
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision?.deadlineAt).toBeNull();
   });
 
   it('vercel unknown inside the reconciliation window still re-arms Observe', () => {
@@ -845,31 +847,59 @@ describe('allocation reducer — design §5 transitions', () => {
     expect(decision?.deadlineAt).toBe(NOW + POLICY.observeDeadlineMs);
   });
 
-  it('vercel unknown with no anchor keeps the observe ladder', () => {
+  it('vercel unknown with no anchor settles to check_required and preserves the ref', () => {
+    const at = NOW + POLICY.reconciliationWindowMs * 2;
     const decision = decideAllocation(
       vercelUnknown({ createdAt: null, deadlineAt: NOW }),
       { type: 'DEADLINE' },
-      NOW + POLICY.reconciliationWindowMs * 2
+      at
     );
-    expect(decision?.state.state.kind).toBe('unknown');
-    expect(commandKinds(decision)).toEqual(['Observe']);
+    expect(decision?.state.state.kind === 'stopping' && decision.state.state.step).toBe(
+      'check_required'
+    );
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.createIntent).toBeNull();
+    expect(decision.state.state.target.providerRef).toBe('vercel-ref-1');
+    expect(decision.commands).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+    expect(decision.state.state.kind).not.toBe('stopped');
+
+    const acquire = decideAllocation(
+      decision.state,
+      {
+        type: 'ACQUIRE',
+        requestId: 'req-9',
+        target: decision.state.state.target,
+        createIntent: CREATE_INTENT,
+        deliveryDeadlineAt: at + 10_000,
+      },
+      at
+    );
+    expect(commandKinds(acquire)).toEqual(['Stop']);
+    expect(commandKinds(acquire)).not.toContain('Create');
   });
 
-  it('vercel unknown with a stop anchor but no createIntent keeps the observe ladder', () => {
+  it('vercel unknown with a recent stop anchor and no create intent settles to check_required', () => {
     const decision = decideAllocation(
       vercelUnknown({
         createdAt: null,
-        stopIntentCreatedAt: NOW - POLICY.reconciliationWindowMs,
+        stopIntentCreatedAt: NOW - 5_000,
         deadlineAt: NOW,
       }),
       { type: 'DEADLINE' },
       NOW
     );
-    expect(decision?.state.state.kind).toBe('unknown');
-    expect(commandKinds(decision)).toEqual(['Observe']);
+    expect(decision?.state.state.kind === 'stopping' && decision.state.state.step).toBe(
+      'check_required'
+    );
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.stopIntent.createdAt).toBe(NOW - 5_000);
+    expect(decision.commands).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+    expect(decision.state.state.kind).not.toBe('stopped');
   });
 
-  it('unbound legacy unknown observes under the same fence OBSERVED accepts', () => {
+  it('unbound legacy unknown settles at a due deadline and still accepts absence', () => {
     const record: AllocationRecord = {
       v: 2,
       resumable: true,
@@ -884,9 +914,14 @@ describe('allocation reducer — design §5 transitions', () => {
       },
     };
     const deadline = decideAllocation(record, { type: 'DEADLINE' }, NOW);
-    const observe = deadline?.commands.find(command => command.kind === 'Observe');
+    expect(deadline?.state.state.kind === 'stopping' && deadline.state.state.step).toBe(
+      'check_required'
+    );
+    if (deadline?.state.state.kind !== 'stopping') return;
+    expect(deadline.state.state.createIntent).toBeNull();
+    expect(deadline.state.state.target.providerRef).toBeNull();
+
     const observeFence = operationId('observe', 'unknown');
-    expect(observe?.kind === 'Observe' ? observe.operationId : undefined).toBe(observeFence);
     expect(
       decideAllocation(
         record,
@@ -894,6 +929,158 @@ describe('allocation reducer — design §5 transitions', () => {
         NOW
       )?.state.state.kind
     ).toBe('stopped');
+  });
+
+  it('cloudflare unknown past the window with a launch failure settles to check_required', () => {
+    const at = NOW + POLICY.observeDeadlineMs;
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: TARGET,
+        createIntent: { intentId: 'intent-1', createdAt: at - POLICY.reconciliationWindowMs },
+        stopIntent: null,
+        attempts: 0,
+        reason: 'launch_failed',
+        deadlineAt: NOW,
+      },
+    };
+    const decision = decideAllocation(record, { type: 'DEADLINE' }, at);
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(decision.commands).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+    expect(allocationAlarmAt(decision.state)).toBeNull();
+
+    const acquire = decideAllocation(
+      decision.state,
+      {
+        type: 'ACQUIRE',
+        requestId: 'req-9',
+        target: decision.state.state.target,
+        createIntent: CREATE_INTENT,
+        deliveryDeadlineAt: at + 10_000,
+      },
+      at
+    );
+    expect(acquire?.state.state.kind === 'stopping' && acquire.state.state.step).toBe('destroying');
+    expect(commandKinds(acquire)).toEqual(['Destroy']);
+    expect(commandKinds(acquire)).not.toContain('Create');
+
+    const check = decideAllocation(decision.state, { type: 'CHECK' }, at);
+    expect(commandKinds(check)).toEqual(['Observe']);
+  });
+
+  it('cloudflare unknown with no create intent settles and preserves the ref', () => {
+    const at = NOW + POLICY.observeDeadlineMs;
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: TARGET,
+        createIntent: null,
+        stopIntent: null,
+        attempts: 2,
+        reason: 'stop_deadline',
+        deadlineAt: NOW,
+      },
+    };
+    const decision = decideAllocation(record, { type: 'DEADLINE' }, at);
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(decision.state.state.createIntent).toBeNull();
+    expect(decision.state.state.target.providerRef).toBe('provider-ref-1');
+    expect(decision.commands).toEqual([]);
+    expect(decision.deadlineAt).toBeNull();
+    expect(allocationAlarmAt(decision.state)).toBeNull();
+
+    const acquire = decideAllocation(
+      decision.state,
+      {
+        type: 'ACQUIRE',
+        requestId: 'req-9',
+        target: decision.state.state.target,
+        createIntent: CREATE_INTENT,
+        deliveryDeadlineAt: at + 10_000,
+      },
+      at
+    );
+    expect(acquire?.state.state.kind === 'stopping' && acquire.state.state.step).toBe('destroying');
+    expect(commandKinds(acquire)).toEqual(['Destroy']);
+    expect(commandKinds(acquire)).not.toContain('Create');
+
+    if (acquire?.state.state.kind !== 'stopping' || acquire.state.state.step !== 'destroying') {
+      throw new Error('expected destroying');
+    }
+    const destroying = acquire.state.state;
+    const confirmed = decideAllocation(
+      acquire.state,
+      {
+        type: 'DESTROY_CONFIRMED',
+        fence: fence(operationId('stop', destroying.stopIntent.createdAt, 0), 'provider-ref-1'),
+        proof: destroyProof(),
+      },
+      at + 1
+    );
+    expect(confirmed?.state.state.kind).toBe('stopped');
+    const stoppedState = confirmed!.state.state;
+    expect(stoppedState.kind === 'stopped' && stoppedState.summary?.providerRef).toBe(
+      'provider-ref-1'
+    );
+
+    const create = decideAllocation(
+      confirmed!.state,
+      {
+        type: 'ACQUIRE',
+        requestId: 'req-10',
+        target: TARGET,
+        createIntent: CREATE_INTENT,
+        deliveryDeadlineAt: at + 20_000,
+      },
+      at + 2
+    );
+    expect(create?.state.state.kind).toBe('creating');
+    expect(commandKinds(create)).toEqual(['Create']);
+  });
+
+  it('unknown with no target settles to stopped at a due deadline', () => {
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: null,
+        createIntent: null,
+        stopIntent: null,
+        attempts: 0,
+        reason: 'create_unknown',
+        deadlineAt: NOW,
+      },
+    };
+    const decision = decideAllocation(record, { type: 'DEADLINE' }, NOW + POLICY.observeDeadlineMs);
+    expect(decision?.state.state.kind).toBe('stopped');
+    expect(decision?.state.state.kind === 'stopped' && decision.state.state.summary).toBeNull();
+    expect(decision?.commands).toEqual([]);
+    expect(decision?.deadlineAt).toBeNull();
+  });
+
+  it('stopped + ACQUIRE with no create intent is rejected', () => {
+    const decision = decideAllocation(
+      stopped(),
+      {
+        type: 'ACQUIRE',
+        requestId: 'req-9',
+        target: TARGET,
+        createIntent: null,
+        deliveryDeadlineAt: NOW + 10_000,
+      },
+      NOW
+    );
+    expect(decision).toBeUndefined();
   });
 
   it('persistent providers take Stop, not Destroy', () => {

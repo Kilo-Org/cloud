@@ -860,6 +860,69 @@ describe.each([
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({ order: ['openai'] });
   });
 
+  it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
+    'rejects invalid provider privacy %j',
+    async privacy => {
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest({ model: 'openai/gpt-4o', ...input, provider: privacy }, undefined, path)
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each<{
+    providerId: Provider['id'];
+    requestProvider?: OpenRouterProviderConfig;
+  }>([
+    { providerId: 'direct-byok' },
+    { providerId: 'custom' },
+    {
+      providerId: 'direct-byok',
+      requestProvider: { data_collection: 'allow', zdr: true, only: ['openai'] },
+    },
+    {
+      providerId: 'custom',
+      requestProvider: { data_collection: 'allow', zdr: true, only: ['openai'] },
+    },
+  ])(
+    'keeps $providerId exempt from organization privacy',
+    async ({ providerId, requestProvider }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'user-123', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { data_collection: 'deny' },
+        plan: 'teams',
+      });
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: { ...provider, id: providerId },
+        userByok: null,
+        bypassAccessCheck: true,
+      });
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest(
+          { model: 'openai/gpt-4o', ...input, provider: requestProvider },
+          undefined,
+          path
+        )
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedGetEffectiveModelDecision).not.toHaveBeenCalled();
+      const upstreamBody = mockedUpstreamRequest.mock.calls[0]?.[0].body;
+      if (requestProvider) expect(upstreamBody?.provider).toEqual(requestProvider);
+      else expect(upstreamBody).not.toHaveProperty('provider');
+    }
+  );
+
   it.each<{
     organizationData: 'allow' | 'deny';
     requestPrivacy: OpenRouterProviderConfig;

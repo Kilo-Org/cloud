@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { getEffectiveProviderPrivacy } from './provider-privacy';
+import { getEffectiveProviderPrivacy, providerPrivacySchema } from './provider-privacy';
 import type { OpenRouterProviderConfig } from './providers/openrouter/types';
 
 describe('getEffectiveProviderPrivacy', () => {
@@ -60,5 +60,29 @@ describe('getEffectiveProviderPrivacy', () => {
       ignore: ['azure'],
       sort: 'latency',
     });
+  });
+});
+
+describe('providerPrivacySchema', () => {
+  it.each([
+    null,
+    [],
+    'deny',
+    { data_collection: true },
+    { data_collection: 'invalid' },
+    { zdr: 'true' },
+  ])('rejects invalid privacy preferences: %j', provider => {
+    expect(providerPrivacySchema.safeParse(provider).success).toBe(false);
+  });
+
+  it('only exposes validated privacy fields', () => {
+    expect(
+      providerPrivacySchema.parse({
+        data_collection: 'deny',
+        zdr: true,
+        only: ['openai'],
+        api_key: 'untrusted-client-key',
+      })
+    ).toEqual({ data_collection: 'deny', zdr: true });
   });
 });

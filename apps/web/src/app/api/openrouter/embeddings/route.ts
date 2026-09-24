@@ -29,6 +29,10 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@/lib/ai-gateway/provider-privacy';
+import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
@@ -102,6 +106,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (requestBodyParsed.input == null) {
     return invalidRequestResponse();
   }
+
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestBodyParsed.provider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+  let effectivePrivacy = getEffectiveProviderPrivacy(requestPrivacy.data);
 
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
@@ -212,6 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan, balanceLimitedByUserAllowance } =
       await getBalanceAndOrgSettings(organizationId, user);
+    effectivePrivacy = getEffectiveProviderPrivacy(requestPrivacy.data, settings?.data_collection);
 
     if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
       return await creditsBlockedResponse({
@@ -249,6 +258,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     } else if (providerConfig) {
       requestBodyParsed.provider = providerConfig;
     }
+  }
+
+  if (Object.keys(effectivePrivacy).length > 0) {
+    requestBodyParsed.provider = { ...requestBodyParsed.provider, ...effectivePrivacy };
   }
 
   sentryRootSpan()?.setAttribute(
@@ -298,6 +311,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       gateway: {
         only: Object.keys(byokProviders),
         byok: byokProviders,
+        zeroDataRetention: effectivePrivacy.zdr,
+        disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
       },
     };
   }

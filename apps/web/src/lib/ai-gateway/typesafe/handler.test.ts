@@ -324,6 +324,129 @@ describe('handleSystemOneRequest', () => {
     );
   });
 
+  it.each([
+    {
+      provider: { data_collection: 'deny' },
+      organizationDataCollection: 'allow',
+      expected: { data_collection: 'deny' },
+    },
+    {
+      provider: { data_collection: 'allow' },
+      organizationDataCollection: 'deny',
+      expected: { data_collection: 'deny' },
+    },
+    {
+      provider: { data_collection: 'allow' },
+      organizationDataCollection: 'allow',
+      expected: { data_collection: 'allow' },
+    },
+    {
+      provider: undefined,
+      organizationDataCollection: 'deny',
+      expected: { data_collection: 'deny' },
+    },
+    {
+      provider: undefined,
+      organizationDataCollection: 'allow',
+      expected: { data_collection: 'allow' },
+    },
+    {
+      provider: { data_collection: 'deny' },
+      organizationDataCollection: undefined,
+      expected: { data_collection: 'deny' },
+    },
+    {
+      provider: { data_collection: 'allow' },
+      organizationDataCollection: undefined,
+      expected: { data_collection: 'allow' },
+    },
+    { provider: { zdr: true }, organizationDataCollection: undefined, expected: { zdr: true } },
+    { provider: { zdr: false }, organizationDataCollection: undefined, expected: { zdr: false } },
+    {
+      provider: { zdr: true },
+      organizationDataCollection: 'allow',
+      expected: { data_collection: 'allow', zdr: true },
+    },
+    {
+      provider: { zdr: false },
+      organizationDataCollection: 'deny',
+      expected: { data_collection: 'deny', zdr: false },
+    },
+  ] as const)(
+    'merges effective privacy without coupling ZDR: %j',
+    async ({ provider, organizationDataCollection, expected }) => {
+      if (organizationDataCollection !== undefined) {
+        setAuth('org-123');
+        jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+          balance: 1000,
+          settings: { data_collection: organizationDataCollection },
+        });
+        jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({
+          error: null,
+          providerConfig: { data_collection: organizationDataCollection },
+        });
+      }
+
+      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
+
+      expect(response.status).toBe(200);
+      expect(upstreamRequest().body.provider).toEqual(expected);
+    }
+  );
+
+  it.each([undefined, {}, { only: ['attacker'], ignore: ['typesafe'], order: ['attacker'] }])(
+    'omits provider without effective settings: %j',
+    async provider => {
+      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
+
+      expect(response.status).toBe(200);
+      expect(upstreamRequest().body).not.toHaveProperty('provider');
+    }
+  );
+
+  it('forwards privacy without exposing client routing, credentials, or identity', async () => {
+    const response = await handleSystemOneRequest(
+      makeRequest({
+        ...requestBody,
+        model: 'jev-1.13',
+        provider: {
+          data_collection: 'deny',
+          zdr: false,
+          only: ['attacker'],
+          ignore: ['typesafe'],
+          order: ['attacker'],
+          sort: 'price',
+          allow_fallbacks: true,
+          api_key: 'test-key',
+          credentials: { api_key: 'test-key' },
+          byok: true,
+          user_byok: [{ providerId: 'typesafe', apiKey: 'test-key' }],
+          base_url: 'https://attacker.invalid',
+          user: 'attacker',
+        },
+        user: 'attacker',
+        api_key: 'test-key',
+        byok: true,
+        base_url: 'https://attacker.invalid',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const upstream = upstreamRequest();
+    expect(upstream.body).toEqual({
+      ...JSON.parse(JSON.stringify(requestBody)),
+      model: TYPESAFE_MODEL,
+      provider: { data_collection: 'deny', zdr: false },
+      user: 'hashed-user',
+    });
+    expect(upstream.headers.get('authorization')).toBe('Bearer test-platform-openrouter-key');
+    await runAfter();
+    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ is_byok: false }),
+      expect.objectContaining({ user_byok: false, requested_model: TYPESAFE_MODEL })
+    );
+  });
+
   it('accepts zero-cost usage and leaves an absent inference provider unknown', async () => {
     mockedFetch.mockResolvedValue(
       Response.json({
@@ -378,6 +501,12 @@ describe('handleSystemOneRequest', () => {
     ['another model', JSON.stringify({ ...requestBody, model: 'openai/gpt-4o' })],
     ['an unpinned alias', JSON.stringify({ ...requestBody, model: 'jev-latest' })],
     ['empty questions', JSON.stringify({ ...requestBody, questions: {} })],
+    [
+      'invalid data collection',
+      JSON.stringify({ ...requestBody, provider: { data_collection: 'invalid' } }),
+    ],
+    ['string ZDR', JSON.stringify({ ...requestBody, provider: { zdr: 'false' } })],
+    ['null provider', JSON.stringify({ ...requestBody, provider: null })],
   ])('rejects %s before balance checks or upstream work', async (_name, body) => {
     const response = await handleSystemOneRequest(
       new NextRequest(routeUrl, {
@@ -496,9 +625,13 @@ describe('handleSystemOneRequest', () => {
     { only: ['typesafe'], eligible: undefined, expected: ['typesafe'] },
   ])('applies the provider policy intersection: %j', async ({ only, eligible, expected }) => {
     setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'allow' },
+    });
     jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({
       error: null,
-      providerConfig: { only, data_collection: 'deny' },
+      providerConfig: { only, data_collection: 'allow' },
     });
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
       ...memberDecision,
@@ -506,12 +639,35 @@ describe('handleSystemOneRequest', () => {
     });
 
     const response = await handleSystemOneRequest(
-      makeRequest({ ...requestBody, provider: { only: ['attacker'] } })
+      makeRequest({
+        ...requestBody,
+        provider: { only: ['attacker'], data_collection: 'deny', zdr: false },
+      })
     );
 
     expect(response.status).toBe(200);
-    expect(upstreamRequest().body.provider).toEqual({ only: expected, data_collection: 'deny' });
+    expect(upstreamRequest().body.provider).toEqual({
+      only: expected,
+      data_collection: 'deny',
+      zdr: false,
+    });
   });
+
+  it.each([undefined, { zdr: true }, { zdr: false }, { data_collection: 'deny' }])(
+    'preserves privacy with a group-only provider restriction: %j',
+    async provider => {
+      setAuth('org-123');
+      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+        ...memberDecision,
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['typesafe']) },
+      });
+
+      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
+
+      expect(response.status).toBe(200);
+      expect(upstreamRequest().body.provider).toEqual({ ...provider, only: ['typesafe'] });
+    }
+  );
 
   it.each([
     { only: ['other'], eligible: ['typesafe'] },
@@ -528,7 +684,13 @@ describe('handleSystemOneRequest', () => {
       decision: { allowed: true, eligibleProviderRoutes: new Set(eligible) },
     });
 
-    expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
+    expect(
+      (
+        await handleSystemOneRequest(
+          makeRequest({ ...requestBody, provider: { data_collection: 'allow', zdr: true } })
+        )
+      ).status
+    ).toBe(404);
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(after).not.toHaveBeenCalled();

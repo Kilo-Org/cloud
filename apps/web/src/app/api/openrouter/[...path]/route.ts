@@ -15,7 +15,10 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
+import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
@@ -339,8 +342,10 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
   const { settings: privacySettings } = await balanceAndSettingsPromise;
   const requestProvider = requestBodyParsed.body.provider;
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
   const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestProvider,
+    requestPrivacy.data,
     privacySettings?.data_collection
   );
   if (Object.keys(effectivePrivacy).length > 0) {
@@ -726,6 +731,11 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     return chatGptReconnectResponse(providerResult.message);
   }
   const effectiveProviderContext = providerResult;
+
+  if (effectiveProviderContext.bypassAccessCheck) {
+    if (requestProvider) requestBodyParsed.body.provider = requestProvider;
+    else delete requestBodyParsed.body.provider;
+  }
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {

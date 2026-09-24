@@ -4230,6 +4230,7 @@ describe('SessionService session-ingest compatibility', () => {
       'user_test',
       env,
       undefined,
+      undefined,
       'cloud-agent'
     );
 
@@ -4250,6 +4251,7 @@ describe('SessionService session-ingest compatibility', () => {
       'oauth/google:1234',
       env,
       undefined,
+      undefined,
       'cloud-agent-web',
       undefined,
       undefined,
@@ -4262,6 +4264,26 @@ describe('SessionService session-ingest compatibility', () => {
         kiloUserId: 'oauth/google:1234',
         cloudAgentWorktreeId: worktreeId,
       })
+    );
+  });
+
+  it('forwards the resolved profileId when creating the ownership row', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'profile-abc123',
+      'cloud-agent'
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'profile-abc123' })
     );
   });
 
@@ -4280,6 +4302,7 @@ describe('SessionService session-ingest compatibility', () => {
       'user_test',
       env,
       undefined,
+      undefined,
       'cloud-agent',
       undefined,
       undefined,
@@ -4293,6 +4316,7 @@ describe('SessionService session-ingest compatibility', () => {
       kiloUserId: 'user_test',
       cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
       organizationId: undefined,
+      profileId: undefined,
       createdOnPlatform: 'cloud-agent',
       title: undefined,
       gitUrl: undefined,
@@ -4309,6 +4333,7 @@ describe('SessionService session-ingest compatibility', () => {
       'agent_12345678-1234-1234-1234-123456789abc',
       'user_test',
       env,
+      undefined,
       undefined,
       'cloud-agent',
       undefined,

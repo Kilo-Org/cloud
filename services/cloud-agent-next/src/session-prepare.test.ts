@@ -774,6 +774,7 @@ describe('prepareSession endpoint', () => {
       'test-user-123',
       expect.any(Object),
       'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      undefined,
       'code-review',
       expect.stringMatching(/^New session - /),
       'https://github.com/acme/repo',
@@ -839,6 +840,34 @@ describe('prepareSession endpoint', () => {
       })
     );
     expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('persists the resolved profile id on the created session, not the requested one', async () => {
+    mergeProfileConfigurationMock.mockResolvedValue({ resolvedProfileId: 'profile-abc123' });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      profileId: 'a1111111-1111-4111-8111-111111111111',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'test-user-123',
+      expect.any(Object),
+      undefined,
+      'profile-abc123',
+      'cloud-agent-web',
+      expect.stringMatching(/^New session - /),
+      'https://github.com/acme/repo',
+      undefined
+    );
   });
 
   it('rejects organization attribution when the internal caller user is not a member', async () => {

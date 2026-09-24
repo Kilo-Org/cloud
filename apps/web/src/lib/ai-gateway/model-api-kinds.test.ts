@@ -1,22 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-api-kinds';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
-import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
-
-jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () => {
-  const actual = jest.requireActual<typeof ProviderDefinitionsModule>(
-    '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id'
-  );
-  return {
-    ...actual,
-    tryGetProviderById: (providerId: ProviderId) =>
-      providerId === 'dev-tools'
-        ? { supportedChatApis: ['chat_completions'] }
-        : actual.tryGetProviderById(providerId),
-  };
-});
+import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
 
 // Stub the catalog so the rejection test doesn't depend on any specific provider file.
 // 'test-exclusive/chat-only' resolves to a synthetic provider that does not support Messages.
@@ -24,6 +10,9 @@ jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () =>
 // disabled catalog models fall back to OpenRouter.
 jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
   const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@/lib/ai-gateway/providers/definitions/openrouter'
+  );
   const stubModels: KiloExclusiveModel[] = [
     {
       public_id: 'test-exclusive/chat-only',
@@ -33,7 +22,7 @@ jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
       max_completion_tokens: 4096,
       status: 'public',
       flags: [],
-      gateway: 'dev-tools',
+      provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
       internal_id: 'stub-internal',
       pricing: null,
       inference_provider_restriction: [],
@@ -46,7 +35,7 @@ jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
       max_completion_tokens: 4096,
       status: 'disabled',
       flags: [],
-      gateway: 'dev-tools',
+      provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
       internal_id: 'stub-internal-disabled',
       pricing: null,
       inference_provider_restriction: [],

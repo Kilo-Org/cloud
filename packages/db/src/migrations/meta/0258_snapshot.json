@@ -1,5 +1,5 @@
 {
-  "id": "dd42816b-0574-4645-adc3-5284feb80b35",
+  "id": "f048cb32-4477-431d-9fe4-bd5d05163f3c",
   "prevId": "6895dcc0-c940-4977-a174-22a6ab734ec8",
   "version": "7",
   "dialect": "postgresql",
@@ -30773,44 +30773,6 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL AND \"platform_integrations\".\"github_installation_id\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_platform_integrations_github_workflow_canonical": {
-          "name": "UQ_platform_integrations_github_workflow_canonical",
-          "columns": [
-            {
-              "expression": "github_installation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"platform_integrations\".\"github_connection_role\" = 'workflow'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_platform_integrations_github_workflow_identity": {
-          "name": "UQ_platform_integrations_github_workflow_identity",
-          "columns": [
-            {
-              "expression": "COALESCE(\"github_app_type\", 'standard')",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform_installation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"platform_integrations\".\"github_connection_role\" = 'workflow'",
           "concurrently": true,
           "method": "btree",
           "with": {}

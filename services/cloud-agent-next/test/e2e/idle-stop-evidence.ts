@@ -66,6 +66,13 @@ const LOG_FIELD_KEYS = [
   'sandboxId',
   'wrapperInstanceId',
   'connectionId',
+  // Control-socket recycle correlation (`socket_request_sent`, `socket_closed`,
+  // `handshake_committed`, `wrapper_ready`) and the attach-window oracle
+  // (`socket_response`): the dispatched operation, the closed socket's handshake
+  // state, and the request the response answers.
+  'operation',
+  'handshakeComplete',
+  'requestId',
   // Accepted-reconciliation identity emitted by the accepted-alarm diagnostic
   // (`SandboxSession` accepted-message watchdog): the emitting `sessionId`,
   // `messageId`, and `expectedWrapperInstanceId`.

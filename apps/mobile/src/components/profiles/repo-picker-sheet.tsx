@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -13,6 +13,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { Check, GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -161,7 +162,7 @@ export function RepoPickerSheet({
       />
       <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
         <Search size={18} color={colors.mutedForeground} />
-        <TextInput
+        <Input
           placeholder={t('profiles.repoBindings.search')}
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="none"
@@ -169,7 +170,7 @@ export function RepoPickerSheet({
           clearButtonMode="while-editing"
           returnKeyType="search"
           accessibilityLabel={t('profiles.repoBindings.search')}
-          className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+          className="flex-1 px-0 text-base text-foreground"
           onChangeText={setSearch}
         />
       </View>

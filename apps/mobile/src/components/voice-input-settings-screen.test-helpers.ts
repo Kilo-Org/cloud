@@ -41,7 +41,7 @@ export function findConfigureRow(renderer: ReactTestRenderer, title: string) {
   return row;
 }
 
-export function findGatewaySwitch(renderer: ReactTestRenderer) {
+function findGatewaySwitch(renderer: ReactTestRenderer) {
   const found = renderer.root.findAll(
     node =>
       typeof node.type === 'string' &&

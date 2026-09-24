@@ -104,6 +104,23 @@ describe('buildUpstreamBody', () => {
     ).toBeUndefined();
   });
 
+  it('should reject a stale custom dimensions value carried over from the removed mistral-embed-2312 model', () => {
+    expect(
+      validateEmbeddingDimensions({
+        model: 'sentence-transformers/all-mpnet-base-v2',
+        input: 'hello',
+        dimensions: 1024,
+      })
+    ).toContain('fixed 768-dimensional embeddings');
+    expect(
+      buildUpstreamBody({
+        model: 'sentence-transformers/all-mpnet-base-v2',
+        input: 'hello',
+        dimensions: 1024,
+      })
+    ).toEqual({ model: 'sentence-transformers/all-mpnet-base-v2', input: 'hello' });
+  });
+
   it('should not reject a catalog dimension for a model without a fixed policy', () => {
     expect(
       validateEmbeddingDimensions({

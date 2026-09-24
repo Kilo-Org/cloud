@@ -57,10 +57,12 @@ import { runSharedScenario } from '../../e2e/scenario-capabilities.js';
 import type {
   CallbackObservation,
   CallbackPayload,
+  SandboxFaultObservation,
   SandboxObservation,
   ScenarioEnvironment,
   SessionSandboxObservation,
 } from '../../e2e/scenario-capabilities.js';
+import { AttachWindowMissedError } from '../../e2e/attach-window-evidence.js';
 import {
   buildAuthRejectProbes,
   classifyAuthProbe,
@@ -1891,6 +1893,7 @@ describe('converted load and fault scenarios', () => {
       'external-kill',
       'wrapper-freeze-settled-reap',
       'wrapper-freeze-inflight-reap',
+      'control-socket-recycle-boot',
     ]) {
       expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox', 'sandboxFaults']);
       expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
@@ -1907,6 +1910,116 @@ describe('converted load and fault scenarios', () => {
     expect(result.ok).toBe(false);
     expect(result.unsupported).toBe(true);
     expect(result.message).toContain('sandboxFaults');
+  });
+
+  it('control-socket-recycle-boot fails a post-signal failure instead of retrying a window miss', async () => {
+    const messageId = 'message_boot';
+    const stream = fakeStream([preparingEvent(messageId)], completedEvent(messageId));
+    mocks.prepareBrowserSession.mockReset();
+    mocks.prepareBrowserSession.mockResolvedValue({
+      cloudAgentSessionId: SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+    mocks.getSessionSnapshot.mockReset();
+    mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: messageId });
+    mocks.openConnectedStream.mockReset();
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    mocks.getMessageResult.mockReset();
+    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+
+    // The capability reports a window miss but the turn has already failed: the
+    // failure must take precedence, so no second session is created.
+    const sandboxFaults = {
+      captureWorkerLogCursor: vi.fn(async () => 0),
+      captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'container_1:4242' })),
+      dropControlSocketDuringAttach: vi.fn(async () => {
+        stream.events.push(streamEvent('cloud.message.failed', { messageId }));
+        throw new AttachWindowMissedError();
+      }),
+      countPromptDispatches: vi.fn(async () => 1),
+    } as unknown as SandboxFaultObservation;
+
+    const env: ScenarioEnvironment = {
+      profile: 'local',
+      requireControlPlaneSession: false,
+      sandbox: {
+        snapshotContainerIds: vi.fn(async () => new Set<string>()),
+        waitForOwnedContainer: vi.fn(async () => 'container_1'),
+        waitForNewContainer: vi.fn(async () => 'container_1'),
+      },
+      sessionSandbox: {
+        waitForContainer: vi.fn(async () => 'container_1'),
+        currentContainer: vi.fn(async () => 'container_1'),
+      },
+      sandboxFaults,
+    };
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['control-socket-recycle-boot'], {
+      config,
+      conversation: SHARED_SCENARIOS['control-socket-recycle-boot'].defaultConversation,
+      api: 'unified',
+      env,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('failed after the attach-window signal');
+    expect(mocks.prepareBrowserSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the discarded attempt to settle before retrying a window miss', async () => {
+    const messageId = 'message_boot';
+    const stream = fakeStream([preparingEvent(messageId)], completedEvent(messageId));
+    mocks.prepareBrowserSession.mockReset();
+    mocks.prepareBrowserSession.mockResolvedValue({
+      cloudAgentSessionId: SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+    mocks.getSessionSnapshot.mockReset();
+    mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: messageId });
+    mocks.openConnectedStream.mockReset();
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    mocks.getMessageResult.mockReset();
+    // The turn is still running when the miss is observed and only fails on the
+    // next durable sample: the wait must catch it instead of retrying it away.
+    mocks.getMessageResult
+      .mockResolvedValueOnce({ status: 'running' })
+      .mockResolvedValue({ status: 'failed' });
+
+    const sandboxFaults = {
+      captureWorkerLogCursor: vi.fn(async () => 0),
+      captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'container_1:4242' })),
+      dropControlSocketDuringAttach: vi.fn(async () => {
+        throw new AttachWindowMissedError();
+      }),
+      countPromptDispatches: vi.fn(async () => 1),
+    } as unknown as SandboxFaultObservation;
+
+    const env: ScenarioEnvironment = {
+      profile: 'local',
+      requireControlPlaneSession: false,
+      sandbox: {
+        snapshotContainerIds: vi.fn(async () => new Set<string>()),
+        waitForOwnedContainer: vi.fn(async () => 'container_1'),
+        waitForNewContainer: vi.fn(async () => 'container_1'),
+      },
+      sessionSandbox: {
+        waitForContainer: vi.fn(async () => 'container_1'),
+        currentContainer: vi.fn(async () => 'container_1'),
+      },
+      sandboxFaults,
+    };
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['control-socket-recycle-boot'], {
+      config,
+      conversation: SHARED_SCENARIOS['control-socket-recycle-boot'].defaultConversation,
+      api: 'unified',
+      env,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('failed after the attach-window signal');
+    expect(mocks.prepareBrowserSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getMessageResult).toHaveBeenCalledTimes(2);
   });
 });
 

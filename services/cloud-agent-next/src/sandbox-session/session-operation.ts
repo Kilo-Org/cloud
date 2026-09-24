@@ -38,6 +38,7 @@ import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
 import {
   ControlRequestError,
   controlRequestResult,
+  isUnconfirmedReachabilityFailure,
   withDeliveryDeadline,
 } from './control-dispatch.js';
 import { persistSessionOperationDelivery } from './session-delivery.js';
@@ -179,6 +180,8 @@ export async function reconcileSessionOperation(
     }
     return lookup;
   } catch (error) {
+    if (isUnconfirmedReachabilityFailure(error))
+      return { state: 'uncertain', reason: 'transport', error };
     return rejectedOrUncertain(error);
   }
 }

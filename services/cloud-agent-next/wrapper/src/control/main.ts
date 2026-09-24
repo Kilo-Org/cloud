@@ -440,6 +440,9 @@ function main(
   process.once('SIGINT', () => shutdown(0, 'Wrapper received SIGINT'));
   process.once('uncaughtException', () => shutdown(1, 'Wrapper uncaught exception'));
   process.once('unhandledRejection', () => shutdown(1, 'Wrapper unhandled rejection'));
+  process.on('SIGUSR1', () => {
+    control?.recycleConnection?.();
+  });
 
   control = maybeStartSandboxControlClient(controlConfig, logToFile, {
     onDiagnostic: diagnostics.onDiagnostic,

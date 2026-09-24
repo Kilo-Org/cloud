@@ -23,7 +23,12 @@ export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'f
 
 export type ConnectionState = 'disconnected' | 'connected' | 'ready';
 
-export const SandboxProviderLabelSchema = z.enum(['Cloudflare', 'Vercel', 'Unknown']);
+export const SandboxProviderLabelSchema = z.enum([
+  'Cloudflare',
+  'Cloudflare Containers',
+  'Vercel',
+  'Unknown',
+]);
 
 export type SandboxProviderLabel = z.infer<typeof SandboxProviderLabelSchema>;
 
@@ -34,7 +39,7 @@ export function getSandboxProviderLabel(provider: unknown): SandboxProviderLabel
     case 'vercel':
       return 'Vercel';
     case 'cloudflare-containers':
-      return 'Cloudflare';
+      return 'Cloudflare Containers';
     default:
       return 'Unknown';
   }

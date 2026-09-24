@@ -1284,7 +1284,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       provider: 'cloudflare-containers',
     });
     expect(snapshot).toMatchObject({
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
       runtime: { sandboxType: 'containers-standard-3' },
     });
     expect([...h.records]).toEqual(before);
@@ -1477,7 +1477,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare-containers' })
     ).resolves.toMatchObject({
       status: 'active',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
       estimatedSleepAt: now + DEADLINE_MS.idleStop,
     });
     await expect(

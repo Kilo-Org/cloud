@@ -38,7 +38,7 @@ export function containerCapacityForService(service: string): ContainerCapacity 
   }
 }
 
-export function formatContainerCapacity(capacity: ContainerCapacity): string {
+export function formatContainerCapacity(capacity: { vcpu: number; memoryBytes: number }): string {
   return `${capacity.vcpu} vCPU / ${capacity.memoryBytes / 1024 ** 3} GiB`;
 }
 

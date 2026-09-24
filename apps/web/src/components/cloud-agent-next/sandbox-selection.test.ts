@@ -46,28 +46,28 @@ describe('formatSandboxDestination', () => {
     [undefined, 'Default'],
     [
       getSandboxAllocationRequest('cloudflare-single'),
-      'Kilo · Cloudflare · 2 vCPU / 6 GiB · Single',
+      'Kilo · Cloudflare · 2 vCPU / 6 GiB · Small',
     ],
     [
       getSandboxAllocationRequest('cloudflare-shared'),
-      'Kilo · Cloudflare · 4 vCPU / 12 GiB · Shared',
+      'Kilo · Cloudflare · 4 vCPU / 12 GiB · Large · Shared',
     ],
     [
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      'Kilo · Cloudflare Containers · 2 vCPU / 8 GiB',
+      'Kilo · Cloudflare Containers · 2 vCPU / 8 GiB · Medium',
     ],
     [
       getSandboxAllocationRequest('cloudflare-containers-standard-4'),
-      'Kilo · Cloudflare Containers · 4 vCPU / 12 GiB',
+      'Kilo · Cloudflare Containers · 4 vCPU / 12 GiB · Large',
     ],
     [
       getSandboxAllocationRequest('isolated-standard'),
-      'Kilo · Cloudflare · 4 vCPU / 12 GiB · Dedicated Standard',
+      'Kilo · Cloudflare · 4 vCPU / 12 GiB · Large',
     ],
-    [getSandboxAllocationRequest('vercel-small'), 'Kilo · Vercel · 2 vCPU / 4 GiB'],
-    [vercelLarge, 'Kilo · Vercel · 4 vCPU / 8 GiB'],
-    [byocLarge, 'BYOC · Vercel · 4 vCPU / 8 GiB'],
-    [{ ...byocLarge, instanceType: 'small' }, 'BYOC · Vercel · 2 vCPU / 4 GiB'],
+    [getSandboxAllocationRequest('vercel-small'), 'Kilo · Vercel · 2 vCPU / 4 GiB · Small'],
+    [vercelLarge, 'Kilo · Vercel · 4 vCPU / 8 GiB · Medium'],
+    [byocLarge, 'BYOC · Vercel · 4 vCPU / 8 GiB · Medium'],
+    [{ ...byocLarge, instanceType: 'small' }, 'BYOC · Vercel · 2 vCPU / 4 GiB · Small'],
     [
       { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
       'Kilo · Cloudflare · 2 vCPU / 6 GiB · Dev container',
@@ -149,12 +149,12 @@ describe('formatSandboxCapacity', () => {
 
 describe('formatSandboxInstance', () => {
   it.each([
-    [getSandboxAllocationRequest('cloudflare-single'), '2 vCPU / 6 GiB · Single'],
-    [getSandboxAllocationRequest('cloudflare-shared'), '4 vCPU / 12 GiB · Shared'],
-    [getSandboxAllocationRequest('cloudflare-containers-standard-3'), '2 vCPU / 8 GiB'],
-    [getSandboxAllocationRequest('cloudflare-containers-standard-4'), '4 vCPU / 12 GiB'],
-    [getSandboxAllocationRequest('vercel-small'), '2 vCPU / 4 GiB'],
-    [byocLarge, '4 vCPU / 8 GiB'],
+    [getSandboxAllocationRequest('cloudflare-single'), '2 vCPU / 6 GiB · Small'],
+    [getSandboxAllocationRequest('cloudflare-shared'), '4 vCPU / 12 GiB · Large · Shared'],
+    [getSandboxAllocationRequest('cloudflare-containers-standard-3'), '2 vCPU / 8 GiB · Medium'],
+    [getSandboxAllocationRequest('cloudflare-containers-standard-4'), '4 vCPU / 12 GiB · Large'],
+    [getSandboxAllocationRequest('vercel-small'), '2 vCPU / 4 GiB · Small'],
+    [byocLarge, '4 vCPU / 8 GiB · Medium'],
     [{ provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' }, 'Provider default'],
   ] satisfies Array<[SandboxDestination, string]>)(
     'formats an instance without repeating its account/provider heading: %j',

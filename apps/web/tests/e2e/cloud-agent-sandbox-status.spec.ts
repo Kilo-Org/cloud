@@ -1254,7 +1254,7 @@ test.describe('control-plane sandbox header', () => {
     ).toBeVisible();
     for (const [label, value] of [
       ['Provider', 'Cloudflare'],
-      ['Sandbox type', 'Standard'],
+      ['Sandbox type', 'Large'],
     ]) {
       await expect(detailValue(details(page), label)).toHaveText(value);
     }
@@ -1420,7 +1420,7 @@ test.describe('control-plane sandbox header', () => {
     ).toBeVisible();
     await expect(details(page).getByRole('heading', { name: 'Timing', exact: true })).toBeVisible();
     await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
-    await expect(detailValue(details(page), 'Sandbox type')).toHaveText('Standard');
+    await expect(detailValue(details(page), 'Sandbox type')).toHaveText('Large');
     await expect(sleepTime(page)).toHaveText('About 3 min if inactive');
     await expectDebugCollapsed(page);
     await expect(details(page)).toHaveCSS('width', '320px');
@@ -1921,7 +1921,7 @@ test.describe('control-plane sandbox header', () => {
       await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
       await indicator(page).click();
       await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
-      await expect(detailValue(details(page), 'Sandbox type')).toHaveText('Standard');
+      await expect(detailValue(details(page), 'Sandbox type')).toHaveText('Large');
       await debugSummary(page).click();
       await expectDebugValues(page, runtimeMetadata.kiloCliVersion, runtimeMetadata.wrapperVersion);
       await expect(detailValue(details(page), 'Started').locator('time')).toHaveAttribute(

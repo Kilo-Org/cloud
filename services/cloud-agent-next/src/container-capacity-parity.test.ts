@@ -7,10 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
 
-import {
-  containerCapacityForService,
-  formatContainerCapacity,
-} from '../../../apps/web/src/lib/cloudflare/container-capacity.js';
+import { containerCapacityForService } from '../../../apps/web/src/lib/cloudflare/container-capacity.js';
 import {
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
@@ -110,11 +107,7 @@ describe('production container capacity parity', () => {
     for (const { instance, identity } of resolved) {
       const { capacity } = identity;
       expect(webSource).toContain(
-        `'${instance}': '${formatContainerCapacity({
-          vcpu: capacity.vcpu,
-          memoryBytes: capacity.memoryMiB * 1024 ** 2,
-          diskBytes: capacity.diskMB * 1_000_000,
-        })}',`
+        `'${instance}': '${usageServiceForSandboxClass(identity.className)}',`
       );
       expect(containerCapacityForService(usageServiceForSandboxClass(identity.className))).toEqual({
         vcpu: capacity.vcpu,
@@ -123,7 +116,7 @@ describe('production container capacity parity', () => {
       });
     }
 
-    // Web labels show vCPU and memory only; disk follows the Cloudflare instance-type table.
+    // Web labels name the memory ladder tier; disk follows the Cloudflare instance-type table.
     expect(CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard3.diskMB).toBe(16_000);
     expect(CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard4.diskMB).toBe(20_000);
   });

@@ -68,13 +68,13 @@ const statusLabels = {
 type SandboxType = NonNullable<NonNullable<SandboxStatusSnapshot['runtime']>['sandboxType']>;
 
 const sandboxTypes = {
-  shared: 'Shared',
+  shared: 'Large · Shared',
   'isolated-small': 'Small',
-  'isolated-standard': 'Standard',
+  'isolated-standard': 'Large',
   'code-review': 'Code review',
   devcontainer: 'Custom environment',
-  'containers-standard-3': '2 vCPU / 8 GiB',
-  'containers-standard-4': '4 vCPU / 12 GiB',
+  'containers-standard-3': 'Medium',
+  'containers-standard-4': 'Large',
   unknown: 'Unknown',
 } satisfies Record<SandboxType, string>;
 

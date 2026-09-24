@@ -251,6 +251,12 @@ packageExtensions:
 patchedDependencies:
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
+  # Narrow Android dev-launcher window fix (Compose broke the app name and tab
+  # labels one character per line). The SDK 57 alignment moves expo-dev-client
+  # to 57.0.19, which resolves expo-dev-launcher ~57.0.20, and 57.0.20 ships
+  # the same sources, so the patch carries onto 57.0.20. The file keeps the
+  # version it was authored against in its name.
+  expo-dev-launcher@57.0.20: patches/expo-dev-launcher@57.0.19.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,

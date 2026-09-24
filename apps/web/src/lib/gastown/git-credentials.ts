@@ -58,10 +58,12 @@ export async function resolveGitCredentialsFromIntegration(
   }
 
   if (integration.platform === 'github' && integration.platform_installation_id) {
+    if (integration.github_connection_role !== 'workflow') return null;
     try {
       const tokenData = await generateGitHubInstallationToken(
         integration.platform_installation_id,
-        integration.github_app_type ?? 'standard'
+        integration.github_app_type ?? 'standard',
+        integration.id
       );
       console.log(
         `${LOG_PREFIX} resolved GitHub token for integration=${platformIntegrationId} expires_at=${tokenData.expires_at}`

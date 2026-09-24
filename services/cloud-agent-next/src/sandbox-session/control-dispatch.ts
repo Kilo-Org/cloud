@@ -134,10 +134,12 @@ export type ControlDispatchDisposition =
 type ControlStatus = {
   connection: ConnectionState;
   physical: PhysicalState;
+  launchFailed?: true;
 };
 
 export type QueueFailureReason =
   | 'environment_failed'
+  | 'launch_failed'
   | 'provider_unknown'
   | 'attach_exhausted'
   | 'prompt_exhausted'
@@ -147,10 +149,13 @@ export type QueueFailureReason =
   | 'missing_metadata';
 
 export function controlDispatchDisposition(status: ControlStatus): ControlDispatchDisposition {
+  // A terminal launch failure fails now: the allocation is already known to
+  // have failed, so waiting cannot recover it. Physical `'failed'` on its own
+  // still waits -- it also covers an unresolved create inside its startup
+  // budget, which may still be realized as a replacement.
+  if (status.launchFailed === true) return { action: 'fail', reason: 'launch_failed' };
   // `unknown` is the only physical state from which creating a replacement is
-  // not a legal next step; observation is the whole budget. Everything else
-  // waits for the applicable head deadline so a stopped/failed allocation can
-  // still be realized as a replacement (chunk 2 owns the create).
+  // not a legal next step; observation is the whole budget.
   if (status.physical === 'unknown') return { action: 'fail', reason: 'provider_unknown' };
   if (status.physical === 'failed' || status.physical === 'stopped') return { action: 'wait' };
   if (status.physical === 'stopping') return { action: 'wait' };
@@ -212,6 +217,8 @@ export function safeErrorFromQueueReason(reason: string): string {
       return 'Environment preparation timed out';
     case 'runtime_unhealthy':
       return 'The session runtime stopped responding';
+    case 'launch_failed':
+      return 'Sandbox launch failed';
     default:
       return 'Environment failed';
   }

@@ -1807,6 +1807,20 @@
       "when": 1790098375222,
       "tag": "0257_user_activity_tokens_live_ios_activity_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 258,
+      "version": "7",
+      "when": 1790187002169,
+      "tag": "0258_github_connection_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 259,
+      "version": "7",
+      "when": 1790187043975,
+      "tag": "0259_github_connection_role_indexes",
+      "breakpoints": true
     }
   ]
 }

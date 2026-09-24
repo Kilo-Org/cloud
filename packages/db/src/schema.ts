@@ -7047,22 +7047,47 @@ export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
  * either that person's personal account (`organization_id` null) or one
  * organization they belong to. The same person can connect the same ChatGPT
  * subscription to several accounts by connecting each one separately, so the
- * owner is the `(kilo_user_id, organization_id)` pair.
+ * owner is the `(kilo_user_id, organization_id)` pair. The one exception is the
+ * organization's shared-services row, which belongs to the organization rather
+ * than to the person who connected it.
  */
 export const openai_chatgpt_connections = pgTable(
   'openai_chatgpt_connections',
   {
     id: idPrimaryKeyColumn,
-    kilo_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, {
-        onDelete: 'cascade',
-      }),
+    /**
+     * The person who connected this row. Only the organization's shared-services
+     * row is nullable here: that row belongs to the organization, so deleting the
+     * connector's account clears the reference instead of taking the connection
+     * with it — the foreign key clears it when the account row is deleted and
+     * `softDeleteUser` clears it on the anonymization path. `created_by` keeps
+     * the record, and every other row names its owner.
+     */
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
     encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
     is_enabled: boolean().default(true).notNull(),
+    /**
+     * True for the organization's shared-services connection: one row per
+     * organization, used by the platform's own callers (code reviewer, Slack
+     * bot, auto-triage) instead of any member's personal connection. The
+     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     */
+    is_shared_services: boolean().default(false).notNull(),
+    /**
+     * The last time OpenAI answered a delegated request with a plan usage
+     * limit. The gateway writes it and a reconnect clears it. It is request
+     * state, not credential state, so it stays out of the encrypted payload. A
+     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
+     * hides it once the reset time OpenAI reported has passed.
+     */
+    usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** The reset time OpenAI reported with the limit, when it reported one. */
+    usage_limit_resets_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -7076,7 +7101,10 @@ export const openai_chatgpt_connections = pgTable(
       .where(sql`${table.organization_id} IS NULL`),
     uniqueIndex('UQ_openai_chatgpt_connections_org_member')
       .on(table.kilo_user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.is_shared_services} = false`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.is_shared_services} = true`),
     index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
   ]
 );

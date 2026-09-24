@@ -704,6 +704,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     request: requestBodyParsed,
     user,
     organizationId,
+    botId,
     taskId,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });

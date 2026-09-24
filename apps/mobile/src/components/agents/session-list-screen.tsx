@@ -226,7 +226,7 @@ export function AgentSessionListScreen() {
   // read as a section header whose label was missing (e2, agents).
   // The See-all is the app's only route to the stored-session history, which
   // exists independently of the live list, so it outlives the live section: the
-  // accepted-empty header keeps the action alone (see `emptyHeaderActions`).
+  // accepted-empty state carries it in the body instead of the header.
   const seeAllAction = (
     <Pressable
       onPress={() => {
@@ -259,18 +259,6 @@ export function AgentSessionListScreen() {
       ) : null}
     </View>
   );
-  // An accepted empty live list has no live section to name, so the `Live now`
-  // label and the filter control are withheld: the section header would
-  // advertise sessions that do not exist. The See-all stays because it targets
-  // the stored history, which is reachable from nowhere else — dropping it left
-  // a user with zero live sessions unable to open history at all (review
-  // finding). The row keeps its `min-h-11` height, so the body below it does not
-  // move.
-  const emptyHeaderActions = (
-    <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
-      {seeAllAction}
-    </View>
-  );
 
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
@@ -289,8 +277,14 @@ export function AgentSessionListScreen() {
   // `useAgentsListChrome`). The rows list's bottom split stays here: the FAB
   // clearance rides on the list's content, so the frame keeps only the tab bar
   // (see `listInsets` below).
-  const { onBodyLayout, fabStyle, sidePadding, centeredBottomInset, compactEmptyState } =
-    useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+  const {
+    onBodyLayout,
+    fabStyle,
+    sidePadding,
+    centeredBottomInset,
+    compactEmptyState,
+    compactLiveEmptyState,
+  } = useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them. The tab bar keeps its viewport inset as the list
@@ -384,7 +378,8 @@ export function AgentSessionListScreen() {
       <LiveSessionListEmptyState
         organizationId={organizationId}
         refreshControl={refreshControl}
-        compact={compactEmptyState}
+        compact={compactLiveEmptyState}
+        historyAction={seeAllAction}
       />
     );
   } else if (hasLiveRows) {
@@ -477,14 +472,14 @@ export function AgentSessionListScreen() {
           showBackButton={false}
           className="px-[22px] pb-1"
           // An accepted empty live list must not advertise a live section: the
-          // `Live now` label names sessions that do not exist. The See-all
-          // stays, because it targets the stored history rather than the empty
-          // live list and is the only route to it, so the empty state swaps in
-          // the label-free action row. Rows, pending, and error keep the full
-          // row byte-identical, and the search/filter no-match body is a `rows`
-          // state (`hasLiveRows && visibleSessions.length === 0`), so its row
-          // stays.
-          inlineActions={content === 'empty' ? emptyHeaderActions : headerActions}
+          // `Live now` label names sessions that do not exist. The whole row is
+          // withheld, so the accepted-empty state renders no live-sessions row
+          // at all, and the body below carries the history route instead
+          // (`LiveSessionListEmptyState`'s `historyAction`). Rows, pending, and
+          // error keep the full row byte-identical, and the search/filter
+          // no-match body is a `rows` state
+          // (`hasLiveRows && visibleSessions.length === 0`), so its row stays.
+          inlineActions={content === 'empty' ? undefined : headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

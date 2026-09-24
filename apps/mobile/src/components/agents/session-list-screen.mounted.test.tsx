@@ -365,9 +365,16 @@ function headerRow() {
     props: { className: string; children: HeaderElement | null | (HeaderElement | null)[] };
   };
 }
-/** The row's children as a list: a row with a single child is not an array. */
+/** The row's children as a list: a row with a single child is not an array, and
+ *  the accepted-empty state withholds the row entirely. */
 function headerRowChildren() {
-  const children = headerRow().props.children;
+  const inlineActions = header().props.inlineActions as
+    | { props: { children: HeaderElement | null | (HeaderElement | null)[] } }
+    | undefined;
+  if (!inlineActions) {
+    return [];
+  }
+  const children = inlineActions.props.children;
   return Array.isArray(children) ? children : [children];
 }
 /** The row's controls, in order: the section label leads the row and is not one. */
@@ -385,12 +392,16 @@ function headerRowLabel() {
   return label as unknown as { props: { className: string; children: string } };
 }
 function headerAction(testID = 'agents-view-history') {
-  const button = headerActions().find(child => child.props.testID === testID);
-  const isMounted = nodes('Pressable').some(node => node.props.testID === testID);
-  if (!button || !isMounted) {
-    throw new Error(`Missing header action: ${testID}`);
+  const fromRow = headerActions().find(child => child.props.testID === testID);
+  const mounted = nodes('Pressable').find(node => node.props.testID === testID);
+  if (!mounted) {
+    throw new Error(`Missing action: ${testID}`);
   }
-  return button;
+  // The controls trail the header's `inlineActions` row while the live section
+  // shows. The accepted-empty state withholds that row and carries the history
+  // control in the body instead, so a control that is not in the row is read
+  // from the mounted node there.
+  return fromRow ?? (mounted as unknown as HeaderElement);
 }
 function filterButtonProps() {
   const button = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
@@ -600,10 +611,11 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     if (test.empty) {
       // An accepted empty live list advertises no live section — the `Live now`
-      // label names sessions that do not exist — but the See-all stays: it
-      // opens the stored history, which is reachable from nowhere else (review
-      // finding).
+      // label names sessions that do not exist — so the whole header row is
+      // withheld and the body carries the history route instead.
       expect(text()).not.toContain(i18n.t('home.agentSessions'));
+      expect(header().props.inlineActions).toBeUndefined();
+      expect(header().props.eyebrow).toBe('0 LIVE');
     }
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -620,11 +632,17 @@ describe('AgentSessionListScreen live presentation', () => {
 
   it('an accepted empty live list withholds the live label but keeps the history route', async () => {
     await renderScreen();
-    // No live section to name, so the `Live now` label is withheld...
+    // No live section to name, so the `Live now` label is withheld and the whole
+    // header row is gone: the empty list advertises no live-sessions row at all.
     expect(text()).not.toContain(i18n.t('home.agentSessions'));
+    expect(header().props.inlineActions).toBeUndefined();
     expect(header().props.eyebrow).toBe('0 LIVE');
-    // ...but the See-all still opens the stored history, which has no other
-    // entry point in the app (review finding).
+    // The body carries exactly one history control — the See-all that opens the
+    // stored history, which has no other entry point in the app (review
+    // finding) — so the header cannot quietly grow a second one.
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-view-history')
+    ).toHaveLength(1);
     expect(headerAction().props.testID).toBe('agents-view-history');
     headerAction().props.onPress();
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
@@ -635,11 +653,11 @@ describe('AgentSessionListScreen live presentation', () => {
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
     // The full controls row exists only over a non-empty live list (the
-    // accepted-empty state keeps the See-all alone), so a populated render
-    // covers it before this case switches to the empty body it tests. The list
-    // controls share the title's row through `inlineActions`; the heading keeps
-    // `flex-1 min-w-0`, so the title keeps its tail ellipsis and nothing stacks
-    // the controls onto a second row.
+    // accepted-empty state withholds the row and carries the history route in
+    // the body), so a populated render covers it before this case switches to
+    // the empty body it tests. The list controls share the title's row through
+    // `inlineActions`; the heading keeps `flex-1 min-w-0`, so the title keeps
+    // its tail ellipsis and nothing stacks the controls onto a second row.
     state.live.activeSessions = [row];
     await renderScreen();
     expect(header().props.inlineActions).toBeDefined();
@@ -2052,6 +2070,19 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
     expect(root().findByType(EmptyState).props.compact).toBe(false);
+
+    // The live empty form is a row taller than the single-action no-match form
+    // (the stacked history link), so a band that holds the shorter form must
+    // still compact it: the decision counts the secondary action.
+    const holdsLiveForm = getEmptyStateFullHeight({ secondaryAction: true }) + state.tabBarHeight;
+    act(() => {
+      layoutBody(holdsLiveForm - 1);
+    });
+    expect(compact()).toBe(true);
+    act(() => {
+      layoutBody(holdsLiveForm);
+    });
+    expect(compact()).toBe(false);
   });
 
   it('compacts the no-match state for the reserve reduced motion adds to the band', async () => {

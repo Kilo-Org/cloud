@@ -107,6 +107,12 @@ import type {
   SessionMessageAdmissionResult,
 } from '../execution/types.js';
 import { throwAdmissionError } from './queue-message.js';
+import {
+  countOpenSmallSandboxContainers,
+  resolveInteractiveSandboxCapacity,
+  type InteractiveSandboxCapacityDependencies,
+  type InteractiveSandboxCapacityInput,
+} from '../interactive-sandbox-capacity.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
@@ -622,6 +628,61 @@ async function assertSandboxAllocationMembership(
   await assertOrganizationMembership(getPgDb(ctx.env), ctx.userId, orgId);
 }
 
+function interactiveSandboxCapacityInput(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
+): InteractiveSandboxCapacityInput {
+  return {
+    ...(input.options?.createdOnPlatform !== undefined
+      ? { createdOnPlatform: input.options.createdOnPlatform }
+      : {}),
+    ...(input.runtime?.devcontainer !== undefined
+      ? { devcontainer: input.runtime.devcontainer }
+      : {}),
+    ...(input.runtime?.sandboxAllocation !== undefined
+      ? { sandboxAllocation: input.runtime.sandboxAllocation }
+      : {}),
+    ...(options?.billingOrigin !== undefined ? { billingOrigin: options.billingOrigin } : {}),
+    ...(ctx.botId !== undefined ? { botId: ctx.botId } : {}),
+  };
+}
+
+function interactiveSandboxCapacityDependencies(
+  ctx: SessionRegistrationContext
+): InteractiveSandboxCapacityDependencies {
+  return {
+    userId: ctx.userId,
+    // The count is read at most once, and only for an eligible create, so the
+    // per-call Drizzle client is created lazily rather than for every create.
+    countOpenSmallSandboxContainers: () =>
+      countOpenSmallSandboxContainers(getPgDb(ctx.env), ctx.userId),
+  };
+}
+
+function singleSandboxLimitReachedError(): TRPCError {
+  return new TRPCError({ code: 'PRECONDITION_FAILED', message: 'single_sandbox_limit_reached' });
+}
+
+/**
+ * True only when the request carries an explicit `cloudflare-single` and the
+ * user's open small-sandbox usage count is at or over the interactive cap.
+ * Ineligible requests (non-interactive, bot, devcontainer, code-review) and
+ * every other explicit allocation never read the count and never reject.
+ */
+async function interactiveSingleSandboxCapReached(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
+): Promise<boolean> {
+  if (input.runtime?.sandboxAllocation !== 'cloudflare-single') return false;
+  const decision = await resolveInteractiveSandboxCapacity(
+    interactiveSandboxCapacityInput(input, ctx, options),
+    interactiveSandboxCapacityDependencies(ctx)
+  );
+  return decision.kind === 'reject';
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -693,6 +754,20 @@ async function allocateNewSession(
   }
 
   const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input, ctx.env);
+  // The interactive web default resolved only when the request omitted an
+  // allocation. It routes the sandbox but is never recorded as the user's
+  // request: progress, the returned allocation, and workspace metadata keep
+  // the user's own value.
+  let routingAllocation = sandboxAllocation;
+  if (routingAllocation === undefined) {
+    const decision = await resolveInteractiveSandboxCapacity(
+      interactiveSandboxCapacityInput(input, ctx, options),
+      interactiveSandboxCapacityDependencies(ctx)
+    );
+    if (decision.kind === 'inject') {
+      routingAllocation = decision.sandboxAllocation;
+    }
+  }
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
@@ -706,7 +781,7 @@ async function allocateNewSession(
       {
         devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
-        sandboxAllocation,
+        sandboxAllocation: routingAllocation,
       }
     );
     if (target.kind === 'shared') {
@@ -729,7 +804,7 @@ async function allocateNewSession(
         sandboxId,
         sessionId: cloudAgentSessionId,
         devcontainer: input.runtime?.devcontainer,
-        sandboxAllocation,
+        sandboxAllocation: routingAllocation,
       });
     }
   } catch (error) {
@@ -1144,6 +1219,9 @@ export async function registerNewSession(
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
   assertSupportedSandboxAllocation(input, ctx, options);
+  if (await interactiveSingleSandboxCapReached(input, ctx, options)) {
+    throw singleSandboxLimitReachedError();
+  }
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: { success: boolean; error?: string };
@@ -1459,6 +1537,9 @@ export async function startNewSession(
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
   assertSupportedSandboxAllocation(input, ctx, options);
+  if (ledger === undefined && (await interactiveSingleSandboxCapReached(input, ctx, options))) {
+    throw singleSandboxLimitReachedError();
+  }
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1724,6 +1805,26 @@ export async function createSessionWithLedger(
           existing
         );
       }
+    }
+  }
+  if (
+    await interactiveSingleSandboxCapReached(input, ctx, { billingOrigin: options.billingOrigin })
+  ) {
+    const [existing] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, ctx.userId),
+          eq(operation_ledgers.domain, 'session'),
+          eq(operation_ledgers.operation_key, options.operationKey)
+        )
+      )
+      .limit(1);
+    if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
+      // Rejected before admission: no ledger row is claimed, so the same
+      // operation key can be retried with `cloudflare-shared` or no allocation.
+      throw singleSandboxLimitReachedError();
     }
   }
   const admission = await admitOperation(db, {

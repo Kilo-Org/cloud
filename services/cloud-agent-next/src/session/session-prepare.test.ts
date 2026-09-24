@@ -42,6 +42,7 @@ import {
   createSessionWithLedger,
   registerNewSession,
   sessionCreateIntentFingerprint,
+  startNewSession,
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
   SESSION_CREATE_FINALIZATION_VERSION_KEY,
@@ -182,6 +183,12 @@ const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+/**
+ * A structurally valid isolated-small sandbox ID. The interactive-web create
+ * default injects `cloudflare-single`, so mocked routing targets used by
+ * interactive creates must match that allocation's `ses-<48 hex>` identity.
+ */
+const ISOLATED_SANDBOX_ID = `ses-${'a'.repeat(48)}` as const;
 
 function makeLedgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedgerRow {
   return {
@@ -208,18 +215,41 @@ function makeLedgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLe
   };
 }
 
-/** Fake Drizzle db: `.limit(1)` returns the next queued result per query. */
-function makeDb(limitResults: (unknown[] | Error)[]): WorkerDb {
+/**
+ * Fake Drizzle db: `.limit(1)` returns the next queued result per query. A
+ * `select({ count })` query is the interactive small-sandbox count read and is
+ * served from `openSmallSandboxCount` without consuming the queued results.
+ * `onCountRead` fires once per count read so tests can assert the count is not
+ * read more than once per create.
+ */
+function makeDb(
+  limitResults: (unknown[] | Error)[],
+  openSmallSandboxCount: number | Error = 0,
+  onCountRead?: () => void
+): WorkerDb {
   const limit = vi.fn(async () => {
     const result = limitResults.shift() ?? [];
     if (result instanceof Error) throw result;
     return result;
   });
-  const select = vi.fn(() => ({
-    from: vi.fn(() => ({
-      where: vi.fn(() => ({ limit })),
-    })),
-  }));
+  const select = vi.fn((selection?: Record<string, unknown>) => {
+    if (selection !== undefined && 'count' in selection) {
+      return {
+        from: vi.fn(() => ({
+          where: vi.fn(async () => {
+            onCountRead?.();
+            if (openSmallSandboxCount instanceof Error) throw openSmallSandboxCount;
+            return [{ count: openSmallSandboxCount }];
+          }),
+        })),
+      };
+    }
+    return {
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({ limit })),
+      })),
+    };
+  });
   return { select } as unknown as WorkerDb;
 }
 
@@ -1206,6 +1236,324 @@ describe('explicit sandbox session creation', () => {
   });
 });
 
+describe('interactive single small sandbox capacity', () => {
+  const vercelRuntime = {
+    VERCEL_TOKEN: 'test-token',
+    VERCEL_TEAM_ID: 'team-id',
+    VERCEL_PROJECT_ID: 'project-id',
+    VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id',
+    VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build-id',
+    VERCEL_SANDBOX_RUNTIME: 'node24',
+    VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+    VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+  };
+
+  /** Interactive web context with every competing route fully enrolled. */
+  function capacityContext(doStub = makeDoStub()): SessionRegistrationContext {
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, vercelRuntime, {
+      CONTROL_PLANE_IDS: '*',
+      SANDBOX_SELECTION_IDS: '*',
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      VERCEL_SANDBOX_ORG_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+    });
+    return ctx;
+  }
+
+  function webRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
+    return makeRequest({
+      options: { operationKey: OPERATION_KEY, createdOnPlatform: 'cloud-agent-web' },
+      ...overrides,
+    });
+  }
+
+  function explicitSingleRequest(): SessionCreateRequest {
+    return webRequest({ runtime: { sandboxAllocation: 'cloudflare-single' } });
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    const routing = await vi.importActual<typeof SandboxIdModule>('../sandbox-id.js');
+    generateSandboxRoutingTargetMock.mockImplementation(routing.generateSandboxRoutingTarget);
+    vi.mocked(resolveSharedSandboxAssignment).mockImplementation(async (_store, routeKey) => ({
+      sandboxId: await routing.deriveSharedSandboxId(routeKey, SHARED_SANDBOX_FAILOVER_SUFFIX),
+      suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+    }));
+    admitOperationMock.mockResolvedValue({ admission: 'admitted', row: makeLedgerRow() });
+    settleOperationMock.mockResolvedValue({ settled: true });
+    recordOperationProgressMock.mockResolvedValue(undefined);
+  });
+
+  it('defaults an interactive web create to an isolated single sandbox below the cap', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 2));
+
+    await createSessionWithLedger(webRequest(), ctx, CREATE_OPTIONS);
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^ses-/);
+    expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(command?.workspace).not.toHaveProperty('sandboxAllocation');
+    // The injected routing allocation is never persisted: no progress payload
+    // and no settlement canonical result carries a sandboxAllocation.
+    expect(recordOperationProgressMock.mock.calls.length).toBeGreaterThan(0);
+    for (const call of recordOperationProgressMock.mock.calls) {
+      expect(call[2]).not.toHaveProperty('sandboxAllocation');
+    }
+    expect(settleOperationMock.mock.calls.length).toBeGreaterThan(0);
+    for (const call of settleOperationMock.mock.calls) {
+      const options = call[1] as {
+        canonicalResult?: Record<string, unknown>;
+      } | null;
+      expect(options).not.toHaveProperty('sandboxAllocation');
+      expect(options?.canonicalResult).not.toHaveProperty('sandboxAllocation');
+    }
+  });
+
+  it.each([
+    ['an omitted-allocation interactive create', () => webRequest()],
+    ['an explicit single interactive create', () => explicitSingleRequest()],
+  ] as const)(
+    'reads the open small sandbox count exactly once for %s',
+    async (_label, makeCreateRequest) => {
+      const doStub = makeDoStub();
+      const ctx = capacityContext(doStub);
+      const countReads = vi.fn();
+      getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 2, countReads));
+
+      await createSessionWithLedger(makeCreateRequest(), ctx, CREATE_OPTIONS);
+
+      // A second read would still route the same way (the mock returns the same
+      // count), so only the read counter can catch a duplicated count query.
+      expect(countReads).toHaveBeenCalledTimes(1);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('defaults an interactive web create to single on the legacy plane too', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '';
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 2));
+
+    await createSessionWithLedger(webRequest(), ctx, CREATE_OPTIONS);
+
+    const command = createdMetadata(doStub);
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(command?.workspace?.sandboxId).toMatch(/^ses-/);
+    expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
+  });
+
+  it('routes at the cap to the shared sandbox even when the org list would force single', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 3));
+
+    await createSessionWithLedger(webRequest(), ctx, CREATE_OPTIONS);
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^usr-/);
+    expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(vi.mocked(resolveSharedSandboxAssignment)).toHaveBeenCalled();
+  });
+
+  it('rejects an explicit single at the cap before ledger admission', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([], 3));
+
+    await expect(
+      createSessionWithLedger(explicitSingleRequest(), ctx, CREATE_OPTIONS)
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'single_sandbox_limit_reached',
+    });
+
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it('leaves the operation key reusable after a pre-admission cap rejection', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([], 3));
+
+    await expect(
+      createSessionWithLedger(explicitSingleRequest(), ctx, CREATE_OPTIONS)
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'single_sandbox_limit_reached',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+
+    // Same operation key, no allocation: the rejected attempt admitted nothing,
+    // so the retry is a fresh admit and takes the below-cap single default.
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 0));
+    await createSessionWithLedger(webRequest(), ctx, CREATE_OPTIONS);
+
+    expect(admitOperationMock).toHaveBeenCalledTimes(1);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^ses-/);
+    expect(command?.workspace).not.toHaveProperty('sandboxAllocation');
+  });
+
+  it('persists an explicit single below the cap', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 2));
+
+    await createSessionWithLedger(explicitSingleRequest(), ctx, CREATE_OPTIONS);
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^ses-/);
+    expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(command?.workspace).toMatchObject({ sandboxAllocation: 'cloudflare-single' });
+  });
+
+  it('keeps an explicit single when the count read fails', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([], new Error('count read failed')));
+
+    await createSessionWithLedger(explicitSingleRequest(), ctx, CREATE_OPTIONS);
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^ses-/);
+    expect(command?.workspace).toMatchObject({ sandboxAllocation: 'cloudflare-single' });
+  });
+
+  it('routes to the shared sandbox when the count read fails and no allocation was requested', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], new Error('nope')));
+
+    await createSessionWithLedger(webRequest(), ctx, CREATE_OPTIONS);
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^usr-/);
+    expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(command?.workspace).not.toHaveProperty('sandboxAllocation');
+  });
+
+  it.each([
+    ['', /^ubt-/],
+    ['*', /^ses-/],
+  ] as const)(
+    'does not apply the interactive default to bot sessions (PER_SESSION=%s)',
+    async (perSessionOrgIds, expectedSandboxId) => {
+      const doStub = makeDoStub();
+      const ctx = capacityContext(doStub);
+      ctx.botId = 'bot_123';
+      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = perSessionOrgIds;
+      getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 0));
+
+      await createSessionWithLedger(webRequest(), ctx, CREATE_OPTIONS);
+
+      const command = createdMetadata(doStub);
+      expect(command?.workspace?.sandboxId).toMatch(expectedSandboxId);
+      expect(command?.workspace).not.toHaveProperty('sandboxAllocation');
+    }
+  );
+
+  it('keeps code-review billing-origin creates on the code-review sandbox', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 0));
+
+    await createSessionWithLedger(webRequest(), ctx, {
+      ...CREATE_OPTIONS,
+      billingOrigin: 'code-review',
+    });
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^crv-/);
+  });
+
+  it('keeps devcontainer creates on the devcontainer sandbox', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]], 0));
+
+    await createSessionWithLedger(webRequest({ runtime: { devcontainer: true } }), ctx, {
+      ...CREATE_OPTIONS,
+      billingOrigin: 'cloud-agent',
+    });
+
+    const command = createdMetadata(doStub);
+    expect(command?.workspace?.sandboxId).toMatch(/^dind-/);
+  });
+
+  it('does not re-reject a same-key retry of an admitted explicit single', async () => {
+    const request = explicitSingleRequest();
+    const row = makeLedgerRow({
+      status: 'completed',
+      canonical_result: {
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        sandboxAllocation: 'cloudflare-single',
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[row]], 9));
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+
+    await expect(createSessionWithLedger(request, ctx, CREATE_OPTIONS)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('rejects an explicit single at the cap on the no-ledger start path before allocation', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([], 3));
+
+    await expect(
+      startNewSession(explicitSingleRequest(), ctx, { billingOrigin: 'cloud-agent' })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'single_sandbox_limit_reached',
+    });
+
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('rejects an explicit single at the cap in registerNewSession before allocateNewSession', async () => {
+    const doStub = makeDoStub();
+    const ctx = capacityContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([], 3));
+
+    await expect(
+      registerNewSession(explicitSingleRequest(), ctx, { billingOrigin: 'cloud-agent' })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'single_sandbox_limit_reached',
+    });
+
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
+});
+
 describe('createSessionWithLedger admission ladder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1214,7 +1562,7 @@ describe('createSessionWithLedger admission ladder', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
+      sandboxId: ISOLATED_SANDBOX_ID,
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
@@ -1249,7 +1597,7 @@ describe('createSessionWithLedger admission ladder', () => {
           sessionId: CLOUD_AGENT_SESSION_ID,
           userId: USER_ID,
         }),
-        workspace: expect.objectContaining({ sandboxId: 'ses-0123456789abcdef' }),
+        workspace: expect.objectContaining({ sandboxId: ISOLATED_SANDBOX_ID }),
         message: expect.objectContaining({
           initialTurn: expect.objectContaining({
             messageId: INITIAL_MESSAGE_ID,
@@ -1587,7 +1935,7 @@ describe('createSessionWithLedger admission ladder', () => {
         'https://github.com/acme/repo',
         undefined,
         WORKTREE_ID,
-        { sandboxId: 'ses-0123456789abcdef', provider: 'cloudflare' }
+        { sandboxId: ISOLATED_SANDBOX_ID, provider: 'cloudflare' }
       );
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
@@ -1596,7 +1944,7 @@ describe('createSessionWithLedger admission ladder', () => {
           workspace: expect.objectContaining({
             worktreeId: WORKTREE_ID,
             workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
-            sandboxId: 'ses-0123456789abcdef',
+            sandboxId: ISOLATED_SANDBOX_ID,
             sandboxProvider: 'cloudflare',
           }),
         })
@@ -2386,7 +2734,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
+      sandboxId: ISOLATED_SANDBOX_ID,
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
@@ -3065,7 +3413,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
 });
 
 describe('createSessionWithLedger worktree rollout and ownership reconciliation', () => {
-  const sandboxId = 'ses-0123456789abcdef';
+  const sandboxId = ISOLATED_SANDBOX_ID;
   const sharedSandboxId = 'usr-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
   beforeEach(() => {
@@ -3780,7 +4128,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
+      sandboxId: ISOLATED_SANDBOX_ID,
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
@@ -4256,7 +4604,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
+      sandboxId: ISOLATED_SANDBOX_ID,
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
@@ -4657,7 +5005,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(recordOperationProgressMock).toHaveBeenCalledTimes(2);
     expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
-      sandboxId: 'ses-0123456789abcdef',
+      sandboxId: ISOLATED_SANDBOX_ID,
       sandboxProvider: 'cloudflare',
     });
   });
@@ -4760,7 +5108,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
+      sandboxId: ISOLATED_SANDBOX_ID,
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
@@ -4786,7 +5134,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       canonical_result: {
         cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
-        sandboxId: 'ses-0123456789abcdef',
+        sandboxId: ISOLATED_SANDBOX_ID,
         sandboxProvider: 'cloudflare',
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
         ...overrides,

@@ -11336,6 +11336,10 @@ export const container_usage_interval = pgTable(
       table.subject_id,
       table.started_at
     ),
+    index('IDX_container_usage_interval_open_actor')
+      .on(table.actor_type, table.actor_id)
+      .where(sql`${table.status} = 'open'`)
+      .concurrently(),
     uniqueIndex('UQ_container_usage_interval_single_open')
       .on(table.service, table.instance_id)
       .where(sql`${table.status} = 'open'`),

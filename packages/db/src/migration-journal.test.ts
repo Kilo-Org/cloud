@@ -92,6 +92,22 @@ describe('migration metadata', () => {
     expect(latestSnapshotName).toBe(`${last.idx.toString().padStart(4, '0')}_snapshot.json`);
   });
 
+  it('keeps a dropped table out of the newest snapshot', () => {
+    const latestSnapshotName = readSnapshotNames().at(-1);
+    if (!latestSnapshotName) throw new Error('no snapshot found in migrations/meta');
+
+    const latestSnapshot = JSON.parse(
+      fs.readFileSync(path.join(migrationsMetaDir, latestSnapshotName), 'utf-8')
+    ) as { tables?: Record<string, unknown> };
+
+    // 0255_drop_repository_customizations drops this table. A newest snapshot
+    // that still carries it makes `drizzle generate` re-emit the destructive
+    // `DROP TABLE "repository_customizations" CASCADE`.
+    expect(Object.keys(latestSnapshot.tables ?? {})).not.toContain(
+      'public.repository_customizations'
+    );
+  });
+
   it('does not emit already-applied DDL from the newest snapshot', async () => {
     const latestSnapshotName = readSnapshotNames().at(-1);
     if (!latestSnapshotName) throw new Error('no snapshot found in migrations/meta');

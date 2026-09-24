@@ -4,7 +4,7 @@ import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,6 +13,7 @@ import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -247,7 +248,7 @@ export function PrReviewEntryScreen() {
           testID="pr-link-input-row"
           collapsable={false}
         >
-          <TextInput
+          <Input
             ref={inputRef}
             defaultValue=""
             placeholder={urlPlaceholder}
@@ -276,11 +277,11 @@ export function PrReviewEntryScreen() {
               inputValueRef.current = value;
               setHasInput(value.length > 0);
             }}
-            // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
-            // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
-            // min-h-14 (not py-*) sizes the single-line field per the mobile
-            // input rules and still lets Dynamic Type grow it past the floor.
-            className="min-h-14 min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground leading-[normal]"
+            // The shared single-line box (`@/components/ui/input`) supplies the
+            // height floor, the one line box for the placeholder and the value,
+            // and the RTL content alignment, so this field keeps only its own
+            // chrome and text size.
+            className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
             accessibilityLabel={t('prReview.entry.urlAccessibility')}
             returnKeyType="go"
             onSubmitEditing={handleSubmit}

@@ -2,7 +2,7 @@ import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Search, Terminal } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextInput, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
@@ -10,6 +10,7 @@ import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { QueryError } from '@/components/query-error';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -40,14 +41,14 @@ function DestinationSearch({ onChange }: { onChange: (next: string) => void }) {
   return (
     <View className="mx-4 mb-3 mt-1 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
       <Search size={18} color={colors.mutedForeground} />
-      <TextInput
+      <Input
         placeholder={t('share.searchPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="while-editing"
         returnKeyType="search"
-        className="h-8 flex-1 p-0 text-base text-foreground"
+        className="flex-1 px-0 text-base text-foreground"
         style={{ color: colors.foreground }}
         onChangeText={onChange}
         accessibilityLabel={t('share.searchPlaceholder')}

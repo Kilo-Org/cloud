@@ -1382,6 +1382,7 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(result).not.toBeNull();
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
   });
 
   test('does not schedule a log insert for non-custom models without opt-in', async () => {
@@ -1397,6 +1398,25 @@ describe('rewriteModelResponse', () => {
     expect(mockedAfter).not.toHaveBeenCalled();
     expect(mockedOptIn).toHaveBeenCalled();
   });
+
+  test.each(['user@anaconda.com', 'user@kilocode.ai'])(
+    'requires an explicit opt-in for %s',
+    async email => {
+      await rewriteModelResponse({
+        response: jsonResponse({ model: 'openai/gpt-5' }),
+        model: 'openai/gpt-5',
+        providerId: 'openrouter',
+        kind: 'chat_completions',
+        logging: makeLogging({
+          user: { id: 'test-user', google_user_email: email } as RequestLoggingParams['user'],
+        }),
+        responseTransforms: null,
+      });
+
+      expect(mockedAfter).not.toHaveBeenCalled();
+      expect(mockedOptIn).toHaveBeenCalledWith({ accountId: 'test-user', organizationId: null });
+    }
+  );
 
   test('always schedules a log insert for custom models', async () => {
     await rewriteModelResponse({

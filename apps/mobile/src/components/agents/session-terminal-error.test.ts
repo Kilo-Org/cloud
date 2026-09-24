@@ -13,6 +13,7 @@ import {
   describeTerminalFailure,
   resolveSessionTerminalError,
   sessionStatusErrorMessage,
+  statusCopyKeyForCode,
   statusIndicatorDuplicatesMessageFailure,
 } from './session-terminal-error';
 
@@ -230,6 +231,30 @@ describe('resolveSessionTerminalError', () => {
     });
   });
 
+  // The reconnecting indicator is progress, not a failure, so it has catalog
+  // copy but no terminal-error class; a connection-lost indicator still offers
+  // Retry, and the real `onError` string ("Connection to agent lost") must not
+  // win over it.
+  it('offers a retryable connection-lost terminal error when reconnecting', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: 'Connection to agent lost',
+        statusIndicator: {
+          type: 'error',
+          message: 'Connection to agent lost',
+          code: 'agent-connection-lost',
+        },
+        messageCount: 0,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: i18n.t('agentChat.sessionConnection.connectionLost'),
+      retryable: true,
+      detail: 'Connection to agent lost',
+    });
+  });
+
   it('classifies a coded session termination as non-retryable', () => {
     expect(
       resolveSessionTerminalError(codedIndicatorFor('Session terminated', 'session-terminated'))
@@ -399,6 +424,15 @@ describe('sessionStatusErrorMessage', () => {
     expect(sessionStatusErrorMessage({ message, code })).toBe(expected);
   });
 
+  it('renders the reconnecting progress copy through the code', () => {
+    expect(
+      sessionStatusErrorMessage({
+        message: 'Reconnecting to agent…',
+        code: 'reconnecting-to-agent',
+      })
+    ).toBe(i18n.t('agentChat.sessionConnection.reconnectingToAgent'));
+  });
+
   // A message the SDK forwards without a code keeps the classifier's answer:
   // the same strings the SDK used to write itself are no longer special-cased.
   it.each([
@@ -437,6 +471,14 @@ describe('sessionStatusErrorMessage', () => {
   it('never returns the raw provider text', () => {
     const raw = 'Service Unavailable: The service is temporarily unavailable.';
     expect(sessionStatusErrorMessage({ message: raw })).not.toContain('Service Unavailable');
+  });
+});
+
+describe('statusCopyKeyForCode', () => {
+  it('maps the reconnecting-to-agent code to its catalog key', () => {
+    expect(statusCopyKeyForCode('reconnecting-to-agent')).toBe(
+      'agentChat.sessionConnection.reconnectingToAgent'
+    );
   });
 });
 

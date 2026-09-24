@@ -25,19 +25,27 @@ vi.mock('@/components/ui/icons', async () => {
   const Icon = (props: Record<string, unknown>) => React.createElement('Icon', props);
   return { AlertCircle: Icon, Check: Icon };
 });
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructive: '#ff0000', warn: '#ffaa00', mutedForeground: '#666666' }),
 }));
 
+/** A Retry press stub; the mounted test only asserts the control renders. */
+const noop = (): void => undefined;
+
 /** Every rendered text node, so an assertion can prove the raw string is absent. */
-async function textNodes(indicator: SessionStatusIndicatorType): Promise<string[]> {
+async function textNodes(
+  indicator: SessionStatusIndicatorType,
+  onRetry?: () => void
+): Promise<string[]> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
   };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(SessionStatusIndicator, { indicator }));
+    rendererRef.current = TestRenderer.create(
+      createElement(SessionStatusIndicator, { indicator, ...(onRetry ? { onRetry } : {}) })
+    );
   });
   const renderer = rendererRef.current;
   if (!renderer) {
@@ -170,5 +178,55 @@ describe('SessionStatusIndicator mounted', () => {
     await expect(
       textNodes({ type: 'info', message: 'Session stopped', timestamp: 0 })
     ).resolves.toEqual(['Session stopped']);
+  });
+
+  it('renders the Retry control for a connection-lost error when onRetry is set', async () => {
+    const texts = await textNodes(
+      {
+        type: 'error',
+        message: 'Agent connection lost',
+        code: 'agent-connection-lost',
+        timestamp: 0,
+      },
+      noop
+    );
+    expect(texts).toContain(en.common.retry);
+  });
+
+  it('renders the Retry control for any error indicator', async () => {
+    const texts = await textNodes(
+      {
+        type: 'error',
+        message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+        code: 'insufficient-credits',
+        timestamp: 0,
+      },
+      noop
+    );
+    expect(texts).toContain(en.common.retry);
+  });
+
+  it('does not render Retry for the reconnecting progress indicator', async () => {
+    const texts = await textNodes(
+      {
+        type: 'progress',
+        message: 'Reconnecting to agent…',
+        code: 'reconnecting-to-agent',
+        timestamp: 0,
+      },
+      noop
+    );
+    expect(texts).not.toContain(en.common.retry);
+    expect(texts).toContain(en.agentChat.sessionConnection.reconnectingToAgent);
+  });
+
+  it('does not render Retry without onRetry', async () => {
+    const texts = await textNodes({
+      type: 'error',
+      message: 'Agent connection lost',
+      code: 'agent-connection-lost',
+      timestamp: 0,
+    });
+    expect(texts).not.toContain(en.common.retry);
   });
 });

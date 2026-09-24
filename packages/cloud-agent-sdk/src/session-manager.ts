@@ -876,6 +876,17 @@ function toModelSelection(model: ModelRef, variant?: string): ModelSelection {
   return { model, ...(variant ? { variant } : {}) };
 }
 
+/**
+ * Whether a session-level error indicator offers a Retry control. The retry is
+ * a reopen (`switchSession`), not an in-place socket retry, so it shows on any
+ * error indicator — the transport exhaustion, a wrapper/CLI connection loss, a
+ * failed reopen, and a classified send error. False for progress (including
+ * `reconnecting-to-agent`) and every non-error indicator.
+ */
+function shouldOfferSessionRetry(indicator: SessionStatusIndicator | null): boolean {
+  return indicator?.type === 'error';
+}
+
 function modelSelectionsEqual(a: ModelSelection | null, b: ModelSelection | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -1905,6 +1916,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         setIndicator(null);
       }
 
+      const leavingReconnecting = prevAct === 'reconnecting' && act.type !== 'reconnecting';
+
       if (
         act.type !== prevAct ||
         (act.type === 'retrying' &&
@@ -1919,6 +1932,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             timestamp: Date.now(),
           };
           setIndicator(retryIndicator);
+        } else if (act.type === 'reconnecting') {
+          // The manager is the single writer of this indicator. Retire the
+          // cloud-ownership bit: reconnecting replaced whatever cloud status
+          // installed, so the later ready/absent branch must not believe it
+          // still owns the indicator and clear a classified send error.
+          setIndicator({
+            type: 'progress',
+            message: 'Reconnecting to agent…',
+            timestamp: Date.now(),
+            code: 'reconnecting-to-agent',
+          });
+          prevCloudStatusHadIndicator = false;
         } else if (act.type === 'idle') {
           // Only replace our own retry warning; a newer error/cloud indicator stays.
           if (retryIndicator !== null && store.get(statusIndicatorAtom) === retryIndicator) {
@@ -1932,35 +1957,54 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (act.type !== 'retrying') retryIndicator = null;
       }
 
-      // Cloud status takes priority over agent status when active
-      const csk = csKey(cs);
-      if (cs && cs.type !== 'ready') {
-        if (csk !== prevCsk) {
-          const cloudInd = indicatorForCloudStatus(cs);
-          if (cloudInd) {
-            setIndicator(cloudInd);
-            prevCloudStatusHadIndicator = true;
-          }
-          prevCsk = csk;
+      if (leavingReconnecting) {
+        // Clear only our own reconnecting indicator; a classified send error
+        // that replaced it must survive a recovery to idle. Reset the status
+        // caches so the branch below reprojects — exhaustion's `processStopped`
+        // sets activity idle and status disconnected in one notify.
+        if (store.get(statusIndicatorAtom)?.code === 'reconnecting-to-agent') {
+          setIndicator(null);
         }
+        prevSk = '';
+        prevCsk = '';
+      }
+
+      if (act.type === 'reconnecting') {
+        // While reconnecting, the cloud-status branch and `indicatorForStatus`
+        // must not overwrite the progress indicator, and the caches must not
+        // move: the leave path above forces reprojection.
       } else {
-        const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
-        if (csk !== prevCsk) prevCsk = csk;
-        prevCloudStatusHadIndicator = false;
-        const sk = sKey(st);
-        if (sk !== prevSk || shouldClearCloudIndicator) {
-          const ind = indicatorForStatus(st);
-          if (
-            ind !== null ||
-            shouldClearCloudIndicator ||
-            (st.type === 'idle' &&
-              (previousStatus.type === 'error' ||
-                previousStatus.type === 'interrupted' ||
-                (previousStatus.type === 'autocommit' && previousStatus.step === 'started')))
-          ) {
-            setIndicator(ind);
+        // Cloud status takes priority over agent status when active
+        const csk = csKey(cs);
+        if (cs && cs.type !== 'ready') {
+          if (csk !== prevCsk) {
+            const cloudInd = indicatorForCloudStatus(cs);
+            if (cloudInd) {
+              setIndicator(cloudInd);
+              prevCloudStatusHadIndicator = true;
+            }
+            prevCsk = csk;
           }
-          prevSk = sk;
+        } else {
+          const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
+          if (csk !== prevCsk) prevCsk = csk;
+          prevCloudStatusHadIndicator = false;
+          // Fall through to existing agent status indicator logic
+          const sk = sKey(st);
+          if (sk !== prevSk || shouldClearCloudIndicator) {
+            const ind = indicatorForStatus(st);
+            if (
+              ind !== null ||
+              shouldClearCloudIndicator ||
+              (st.type === 'idle' &&
+                (previousStatus.type === 'error' ||
+                  previousStatus.type === 'interrupted' ||
+                  (previousStatus.type === 'autocommit' && previousStatus.step === 'started')))
+            ) {
+              setIndicator(ind);
+            }
+            prevSk = sk;
+          }
         }
       }
     });
@@ -2620,6 +2664,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // indicator owns the stale-rows state, so the refresh indicator stops.
         store.set(isRefreshingCachedTranscriptAtom, false);
       },
+      onFatalOpenFailure: () => {
+        // No socket will be established, so nothing will clear loading or
+        // install an indicator the way `session.created` / replay would.
+        // `handleTicketError` already ran synchronously, so `errorAtom` holds
+        // the ticket or page error. Direct `setIndicator`, not `setStatus`:
+        // `subscribeToServiceState` must not become a second writer.
+        if (expectedGeneration !== switchGeneration) return;
+        store.set(isLoadingAtom, false);
+        store.set(isRefreshingCachedTranscriptAtom, false);
+        setIndicator({
+          type: 'error',
+          message: store.get(errorAtom) ?? 'Failed to connect',
+          timestamp: Date.now(),
+          code: 'connection-failed',
+        });
+      },
       onChildSessionError: (childSessionId, message) => {
         const next = new Map(store.get(childSessionErrorsAtom));
         next.set(childSessionId, message);
@@ -2795,7 +2855,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }): Promise<boolean> {
     store.set(errorAtom, null);
     interruptAwaitingIdleSession = null;
-    if (store.get(agentStatusAtom).type !== 'disconnected') {
+    // A send during reconnecting must not erase the progress indicator: a
+    // later notify does not re-fire the activity edge, so it would never
+    // return. Every other non-disconnected indicator still clears.
+    if (
+      store.get(agentStatusAtom).type !== 'disconnected' &&
+      store.get(statusIndicatorAtom)?.code !== 'reconnecting-to-agent'
+    ) {
       setIndicator(null);
     }
 
@@ -3356,7 +3422,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   };
 }
 
-export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError, formatErrorDetail };
+export {
+  CLI_MODEL_ID,
+  cliModelLabel,
+  createSessionManager,
+  formatError,
+  formatErrorDetail,
+  shouldOfferSessionRetry,
+};
 export type {
   ActiveSessionType,
   CloudAgentModelOverride,

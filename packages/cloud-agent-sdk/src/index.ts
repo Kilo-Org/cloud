@@ -2,7 +2,7 @@ export { isStreamError, isValidCloudAgentEvent } from './event-types';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './event-types';
 
 export { formatError as formatSessionError } from './session-manager';
-export { createSessionManager } from './session-manager';
+export { createSessionManager, shouldOfferSessionRetry } from './session-manager';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
 export type { CustomerBillingFailure } from './schemas';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';

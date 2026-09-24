@@ -2139,7 +2139,8 @@
       "connecting": "Connecting…",
       "reconnecting": "Reconnecting…",
       "connectionLost": "Connection lost",
-      "retryConnection": "Retry connection"
+      "retryConnection": "Retry connection",
+      "reconnectingToAgent": "Reconnecting to agent…"
     },
     "goal": {
       "title": "Goal",

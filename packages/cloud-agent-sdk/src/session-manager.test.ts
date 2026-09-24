@@ -24,6 +24,7 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
+import { createServiceState } from './service-state';
 import type {
   AssistantMessage,
   UserMessage,
@@ -340,6 +341,13 @@ function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): Sessio
 function atomValue<T>(store: ReturnType<typeof createStore>, atom: { read: unknown }): T {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return store.get(atom as any) as T;
+}
+
+function indicatorCode(
+  store: ReturnType<typeof createStore>,
+  atom: { read: unknown }
+): string | undefined {
+  return atomValue<{ code?: string } | null>(store, atom)?.code;
 }
 
 function createStoredMessage(
@@ -2375,6 +2383,59 @@ describe('createSessionManager', () => {
       cloudSubscriberRef.current!();
       expect(atomValue<boolean>(cloudConfig.store, cloudMgr.atoms.isLoading)).toBe(false);
     });
+
+    it('settles loading and shows the error when the open fails fatally', async () => {
+      type SessionFactory = (sessionConfig: {
+        kiloSessionId: string;
+        onResolved?: (resolved: ResolvedSession) => void;
+        onError?: (message: string) => void;
+        onFatalOpenFailure?: () => void;
+      }) => MockSession;
+      const defaultFactory = (createCloudAgentSession as jest.Mock).getMockImplementation() as
+        | SessionFactory
+        | undefined;
+      expect(defaultFactory).toBeDefined();
+
+      (createCloudAgentSession as jest.Mock).mockImplementationOnce(
+        (sessionConfig: Parameters<SessionFactory>[0]) => {
+          const session = defaultFactory!(sessionConfig);
+          // A fatal open: onError fires for the ticket failure, then the
+          // transport settles the open. No session.created, no first activity.
+          mockSession.connect.mockImplementation(() => {
+            sessionConfig.onError?.('Failed to get stream ticket');
+            sessionConfig.onFatalOpenFailure?.();
+          });
+          return session;
+        }
+      );
+
+      // Hold activity at connecting so onFirstActivity cannot clear loading; the
+      // fatal-open handler is the only clear.
+      mockSession.state.getActivity.mockReturnValue({ type: 'connecting' as const });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(expect.objectContaining({ type: 'error', message: 'Failed to get stream ticket' }));
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Failed to get stream ticket'
+      );
+
+      // A later switch clears the stuck error; the default factory fires
+      // session.created and ends with loading false and no error indicator.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' as const });
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      expect(
+        atomValue<{ type: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toBeNull();
+    });
   });
 
   describe('updateFetchedAssociatedPr', () => {
@@ -3269,6 +3330,129 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
       ).toBeNull();
+    });
+
+    it('reinstalls the connection-lost indicator on a second exhaustion after reconnecting', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // First exhaustion: disconnected status installs the error.
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      notifyStateChange?.();
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('agent-connection-lost');
+
+      // Recovery to reconnecting with status idle and no further wire frame.
+      mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+      mockSession.state.getActivity.mockReturnValue({ type: 'reconnecting' });
+      notifyStateChange?.();
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('reconnecting-to-agent');
+
+      // Second exhaustion: activity idle and status disconnected in one notify.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      notifyStateChange?.();
+
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('agent-connection-lost');
+    });
+
+    it('keeps the reconnecting indicator across a successful send and a later notify', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'reconnecting' });
+      notifyStateChange?.();
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('reconnecting-to-agent');
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({ payload: { type: 'prompt', prompt: 'Hi', mode: 'code' } });
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('reconnecting-to-agent');
+
+      // A later notify does not re-fire the activity edge, so it stays.
+      notifyStateChange?.();
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('reconnecting-to-agent');
+    });
+
+    it('keeps a classified send error through reconnecting recovery', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.state.getCloudStatus.mockReturnValue({ type: 'preparing' });
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('setting-up-environment');
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'reconnecting' });
+      notifyStateChange?.();
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('reconnecting-to-agent');
+
+      mockSession.send.mockRejectedValue(
+        Object.assign(new Error('Insufficient credits: $1 minimum required'), {
+          data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+        })
+      );
+      await mgr.send({ payload: { type: 'prompt', prompt: 'Hi', mode: 'code' } });
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('insufficient-credits');
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+      mockSession.state.getCloudStatus.mockReturnValue({ type: 'ready' });
+      notifyStateChange?.();
+
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('insufficient-credits');
+    });
+
+    it('shows a connection-lost send failure during reconnecting and keeps it', async () => {
+      // Drive the reconnecting projection through the real service state, not a
+      // hand-written mock status. The pre-change close projected `disconnected`
+      // here, which the send catch suppresses, so this fails on the old design.
+      const serviceState = createServiceState({ rootSessionId: 'ses-1' });
+      mockSession.state.subscribe.mockImplementation(callback => serviceState.subscribe(callback));
+      mockSession.state.getActivity.mockImplementation(() => serviceState.getActivity());
+      mockSession.state.getStatus.mockImplementation(() => serviceState.getStatus());
+      mockSession.state.getCloudStatus.mockImplementation(() => serviceState.getCloudStatus());
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      serviceState.process({ type: 'reconnecting' });
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('reconnecting-to-agent');
+      // The real projection leaves status idle, so the send catch cannot take
+      // its disconnected-suppression branch.
+      expect(atomValue<{ type: string }>(config.store, mgr.atoms.agentStatus)).toEqual({
+        type: 'idle',
+      });
+
+      mockSession.send.mockRejectedValue(new Error('fetch failed'));
+      await mgr.send({ payload: { type: 'prompt', prompt: 'Hi', mode: 'code' } });
+
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('connection-lost');
+
+      // A later reconnecting notify does not replace it.
+      serviceState.process({ type: 'reconnecting' });
+      expect(indicatorCode(config.store, mgr.atoms.statusIndicator)).toBe('connection-lost');
     });
 
     it('passes variant through to session.send', async () => {

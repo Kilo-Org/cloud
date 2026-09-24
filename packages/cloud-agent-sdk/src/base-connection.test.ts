@@ -714,6 +714,47 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
+    it('bounds a rejected auth refresh by the existing retry budget', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const refreshAuth = jest.fn(() => Promise.reject(new Error('refresh failed')));
+      const onReconnectExhaustionChange = jest.fn();
+      const onUnexpectedDisconnect = jest.fn();
+      const { connection } = createTestConnection({
+        refreshAuth,
+        onReconnectExhaustionChange,
+        onUnexpectedDisconnect,
+        maxReconnectAttempts: 2,
+        isAuthFailure: event => event.code === 4001 || event.code === 1008,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      closeSocket(0, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onReconnectExhaustionChange).not.toHaveBeenCalledWith(true);
+
+      jest.advanceTimersByTime(60_000);
+      closeSocket(1, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onReconnectExhaustionChange).not.toHaveBeenCalledWith(true);
+
+      jest.advanceTimersByTime(60_000);
+      closeSocket(2, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onReconnectExhaustionChange).toHaveBeenCalledTimes(1);
+      expect(onReconnectExhaustionChange).toHaveBeenCalledWith(true);
+
+      const socketsAfterExhaustion = sockets.length;
+      jest.advanceTimersByTime(600_000);
+      expect(sockets).toHaveLength(socketsAfterExhaustion);
+      expect(onReconnectExhaustionChange).toHaveBeenCalledTimes(1);
+
+      connection.destroy();
+    });
+
     it('force-replaces an open socket after refreshing auth', async () => {
       const refreshAuth = jest.fn(() => Promise.resolve());
       const onReplacingConnection = jest.fn();

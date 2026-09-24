@@ -147,6 +147,45 @@ describe('resolveSessionFooterRowItem', () => {
     ).toBe('status');
   });
 
+  it('shows the reconnecting indicator while preparing', () => {
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        cloudStatusType: 'preparing',
+        hasInProgressTranscriptPreparation: true,
+        statusIndicatorCode: 'reconnecting-to-agent',
+        statusIndicatorType: 'progress',
+        hasStatusIndicator: true,
+      })
+    ).toBe('status');
+  });
+
+  it('shows a classified error indicator while preparing', () => {
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        cloudStatusType: 'preparing',
+        hasInProgressTranscriptPreparation: true,
+        statusIndicatorCode: 'insufficient-credits',
+        statusIndicatorType: 'error',
+        hasStatusIndicator: true,
+      })
+    ).toBe('status');
+  });
+
+  it('still hides a plain progress indicator while preparing', () => {
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        cloudStatusType: 'preparing',
+        hasInProgressTranscriptPreparation: true,
+        statusIndicatorCode: 'setting-up-environment',
+        statusIndicatorType: 'progress',
+        hasStatusIndicator: true,
+      })
+    ).toBeNull();
+  });
+
   it('suppresses progress items on an empty transcript, where the body states its own', () => {
     expect(
       resolveSessionFooterRowItem({

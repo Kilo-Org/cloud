@@ -208,15 +208,17 @@ function findElementHeight(node: Node): number | null {
   return null;
 }
 
-function findElement(node: Node, typeName: string): Record<string, unknown> | null {
+type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
+
+/** The first node of `typeName`, so a test can inspect its position in the tree. */
+function findElement(node: Node, typeName: string): ElementNode {
   if (node === null || typeof node !== 'object') {
     return null;
   }
-  const props = node.props ?? {};
-  const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type === typeName) {
-    return node;
+  const typed = node as { type?: unknown; props?: Record<string, unknown> };
+  const children = typed.props?.children;
+  if (typed.type === typeName) {
+    return typed;
   }
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findElement(child as Node, typeName);
@@ -235,13 +237,13 @@ function findOnLayoutHandler(
     return null;
   }
   const props = node.props ?? {};
+  const children = props.children;
   const type = (node as { type?: unknown }).type;
   if (type !== 'ScrollView' && typeof props.onLayout === 'function') {
     return props.onLayout as (event: {
       nativeEvent: { layout: { y: number; height: number } };
     }) => void;
   }
-  const children = props.children;
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findOnLayoutHandler(child as Node);
     if (found) {
@@ -422,7 +424,7 @@ describe('NewSessionConfigureForm', () => {
       const footerIndex = rootChildren.findIndex(
         child => findElementByType(child, 'AppAwareKeyboardPaddingView') !== null
       );
-      expect(bodyIndex).toBeGreaterThanOrEqual(0);
+      expect(bodyIndex).toBe(0);
       expect(footerIndex).toBeGreaterThan(bodyIndex);
     } finally {
       insetsState.bottom = 0;
@@ -431,19 +433,32 @@ describe('NewSessionConfigureForm', () => {
 
   it('keeps the cloud-create failure with the Start action it answers', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),
-      cloudCreateError: { retryable: true, message: 'prepare failed' },
+      runOnInstance: null,
+      cloudCreateError,
     }) as Node;
 
+    // A failure the user answers at the pinned Start must not end up scrolled
+    // off screen above it: it lives in the pinned footer, not the scroll body.
     const scrollBody = findElement(element, 'ScrollView');
     expect(scrollBody).not.toBeNull();
-    // A failure the user answers at the pinned Start must not end up scrolled
-    // off screen above it.
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
+    const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+    expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -847,10 +862,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: kilo remote hint ──
-  it('renders the plain remote-run hint for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language ──
+  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-    const HINT = 'Run kilo remote in a project on your computer to start sessions there.';
+
+    const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
+    const cliTerms = ['kilo remote', '/remote', 'CLI session', 'local kilo process'];
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const cloud = NewSessionConfigureForm({
@@ -858,12 +875,15 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t === HINT)).toBe(true);
-    // The help draws the command as prose: the CLI-only entry point, the
-    // internal vocabulary and the authoring markers must not reach the screen.
-    expect(findTextContent(cloud, t => t.includes('/remote'))).toBe(false);
-    expect(findTextContent(cloud, t => t.includes('CLI session'))).toBe(false);
-    expect(findTextContent(cloud, t => t.includes('local kilo process'))).toBe(false);
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(cloud, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    // The help draws the sentence as prose: the authoring markers must not
+    // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -872,14 +892,17 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t === HINT)).toBe(true);
-    expect(findTextContent(remote, t => t.includes('/remote'))).toBe(false);
-    expect(findTextContent(remote, t => t.includes('CLI session'))).toBe(false);
-    expect(findTextContent(remote, t => t.includes('local kilo process'))).toBe(false);
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(remote, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
-  // ── Case 14: bottom navigation-bar clearance ──
+  // ── Case 15: bottom navigation-bar clearance ──
   it('reserves the bottom safe-area inset on the pinned footer so Start clears the navigation bar', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -898,7 +921,7 @@ describe('NewSessionConfigureForm', () => {
     }
   });
 
-  // ── Case 14b: the clearance leaves no dead space in the scroll body ──
+  // ── Case 15b: the clearance leaves no dead space in the scroll body ──
   it('leaves no in-scroll spacer after the last field', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -915,7 +938,7 @@ describe('NewSessionConfigureForm', () => {
     }
   });
 
-  // ── Case 14a: the primary action is pinned outside the scroll body ──
+  // ── Case 15a: the primary action is pinned outside the scroll body ──
   it('pins Start and the cloud-create recovery outside the scroll body, under the keyboard lift', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -984,6 +1007,19 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+
+  // ── Case 15: the scroll frame is measured and handed to the prompt ──
+  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    // The ScrollView reports its height so the prompt can yield its floor to it.
+    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
+    // The mocked useState holds the initial measurement (0) and never setStates.
+    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
   });
 
   // ── Case 16: reveal the composer card's bottom row above the IME ──

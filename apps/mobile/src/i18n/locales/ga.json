@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair aisfhillte líne nua isteach i mboscaí teachtaireachta na ngníomhairí.",
     "biometricUnlock": "Díghlasáil le bithmhéadracht",
     "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra.",
-    "featureFlags": "Bratacha gnéithe",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Cianda · ≥ {{min}}",
-    "featureFlagSkipped": "Réamhshocraithe · < {{min}}",
-    "featureFlagNotLoaded": "Réamhshocraithe · gan lódáil",
     "gatewayTranscription": "Tras-scríobh tríd an Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2329,10 +2324,6 @@
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
       "linesOf": "línte {{start}}–{{end}} de {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Theip ar an ngníomh {{action}} in Cloud Agent ({{status}}).",
-      "failed": "Theip ar an ngníomh {{action}} in Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ionchur nach féidir a shraithiú]",
       "errorPrefix": "Earráid: {{error}}"
@@ -2428,8 +2419,7 @@
       "assistantProviderRejected": "Dhiúltaigh an soláthraí don iarratas.",
       "assistantStopped": "Stopadh an freagra.",
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
-      "assistantFailed": "Theip ar an bhfreagra.",
-      "sendFailed": "Theip ar an teachtaireacht a sheoladh. Bain triail as arís le do thoil."
+      "assistantFailed": "Theip ar an bhfreagra."
     },
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",

@@ -1101,6 +1101,13 @@ function handlePrompt(
         ...(authorization ? { executionDeadlineAt: existing.executionDeadlineAt } : {}),
       });
     }
+    if (
+      existing.kind !== 'preparation' &&
+      !existing.signal.aborted &&
+      request.turn.type === 'prompt'
+    ) {
+      return deps.operations.admitFollowUp(session, authorization, request, runtime);
+    }
     return rejectBeforeAdmission('session_busy', 'Session has work in progress', true);
   }
   const operation = deps.operations.start(
@@ -1197,7 +1204,11 @@ async function handleAbort(
     if (!parsed.data.operationId) {
       task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
       const result = await task.done;
-      if (task.cleanup === 'unconfirmed')
+      // An execution batch must show positive cleanup evidence; for a cancelled
+      // preparation there is no owned work to confirm, so keep the prior rule.
+      if (
+        task.kind === 'preparation' ? task.cleanup === 'unconfirmed' : task.cleanup !== 'confirmed'
+      )
         return fail('not_ready', 'Kilo cancellation was not confirmed', false);
       if (ownsCurrentTask) {
         const terminalError = await detachAbortedTerminal(session, deps);
@@ -1250,7 +1261,7 @@ async function handleAbort(
         disposition,
         target?.runtimeId ?? '',
         scopedCleanupResultGranted,
-        task.deliveryResult()
+        task.deliveryResultForMessage(parsed.data.messageId)
       );
     };
 
@@ -1291,7 +1302,7 @@ async function handleAbort(
           currentDisposition,
           target?.runtimeId ?? '',
           scopedCleanupResultGranted,
-          task.deliveryResult()
+          task.deliveryResultForMessage(parsed.data.messageId)
         );
       }
       const disposition = await escalation.physical;
@@ -1308,7 +1319,7 @@ async function handleAbort(
           disposition,
           target?.runtimeId ?? '',
           scopedCleanupResultGranted,
-          task.deliveryResult()
+          task.deliveryResultForMessage(parsed.data.messageId)
         );
       }
       if (!result.ok && task.kind !== 'preparation') return result;
@@ -1325,7 +1336,7 @@ async function handleAbort(
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
-      const delivery = task.deliveryResult();
+      const delivery = task.deliveryResultForMessage(parsed.data.messageId);
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',
         quiescent: false,
@@ -1365,7 +1376,7 @@ async function handleAbort(
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
-      const delivery = task.deliveryResult();
+      const delivery = task.deliveryResultForMessage(parsed.data.messageId);
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',
         quiescent,

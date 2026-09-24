@@ -189,12 +189,12 @@ function isTerminal(state: MessageState): boolean {
 }
 
 /**
- * The single queue-head rule: no accepted message is a head, otherwise the first
- * queued message is. Exported so the session-message queue helpers reuse it
- * instead of re-deriving the rule.
+ * The single queue-head rule: the oldest queued message is the head, even while
+ * another message is accepted. A connected wrapper accepts a follow-up on the
+ * running operation, so a queued follow-up must still be dispatchable. Exported
+ * so the session-message queue helpers reuse it instead of re-deriving the rule.
  */
 export function headQueuedMessageId(messages: readonly SessionMessage[]): string | undefined {
-  if (messages.some(message => message.state.kind === 'accepted')) return undefined;
   return messages.find(message => message.state.kind === 'queued')?.messageId;
 }
 
@@ -227,6 +227,7 @@ function carryFields(state: MessageState): {
   queuedAt?: number;
   wrapperInstanceId?: string;
   preparationAttemptId?: string;
+  recoveryAttempts?: number;
 } {
   return {
     intent: state.intent,
@@ -242,6 +243,10 @@ function carryFields(state: MessageState): {
     ...(state.preparationAttemptId !== undefined
       ? { preparationAttemptId: state.preparationAttemptId }
       : {}),
+    // The no-output recovery count also survives: acceptance must not launder a
+    // spent recovery (the next inactivity detection must see it as the second
+    // identical one), and the terminal failure payload reports the attempt count.
+    ...(state.recoveryAttempts !== undefined ? { recoveryAttempts: state.recoveryAttempts } : {}),
   };
 }
 

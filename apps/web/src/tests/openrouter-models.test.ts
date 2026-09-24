@@ -31,7 +31,10 @@ import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@/lib/ai-gateway/byok';
 import { getTerminalBenchSummaries } from '@/lib/model-stats/terminal-bench';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import {
+  kiloExclusiveModels,
+  qwen36_plus_stealth_model,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
@@ -221,6 +224,39 @@ beforeEach(() => {
 });
 
 describe('GET /api/openrouter/models', () => {
+  test.each([
+    ['/api/openrouter/models', GET],
+    ['/api/gateway/v1/models', gatewayV1ModelsGET],
+  ] as const)('%s never serializes exclusive provider credentials', async (path, handler) => {
+    mockAuth = { user: null, organizationId: null };
+    jest.replaceProperty(qwen36_plus_stealth_model, 'provider', {
+      ...qwen36_plus_stealth_model.provider,
+      apiKey: 'exclusive-catalog-secret',
+      apiUrl: 'https://private-exclusive-provider.example/v1',
+    });
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+
+    const catalog = await getEnhancedOpenRouterModels();
+    const publicModel = catalog.data.find(
+      model => model.id === qwen36_plus_stealth_model.public_id
+    );
+    expect(publicModel).toBeDefined();
+    expect(publicModel).not.toHaveProperty('provider');
+    expect(publicModel).not.toHaveProperty('apiKey');
+    expect(JSON.stringify(catalog)).not.toContain('exclusive-catalog-secret');
+
+    const response = await handler(createTestRequest(path));
+    expect(response.status).toBe(200);
+    const rawBody = await response.text();
+    expect(rawBody).toContain(qwen36_plus_stealth_model.public_id);
+    expect(rawBody).not.toContain('exclusive-catalog-secret');
+    expect(rawBody).not.toContain('private-exclusive-provider.example');
+    expect(rawBody).not.toContain('"apiKey"');
+    expect(rawBody).not.toContain('"provider"');
+  });
+
   test('should handle OpenRouter API errors', async () => {
     const request = createTestRequest('/api/openrouter/models');
 

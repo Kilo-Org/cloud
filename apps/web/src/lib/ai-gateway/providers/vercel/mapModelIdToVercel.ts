@@ -1,4 +1,4 @@
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
@@ -115,7 +115,7 @@ export function mapModelIdToVercel(modelId: string) {
       m =>
         m.public_id === modelId &&
         m.status !== 'disabled' &&
-        (m.gateway === 'vercel' || m.flags.includes('vercel-routing'))
+        (m.provider.id === 'vercel' || m.flags.includes('vercel-routing'))
     )?.internal_id ?? modelId;
 
   const slashIndex = internalId.indexOf('/');

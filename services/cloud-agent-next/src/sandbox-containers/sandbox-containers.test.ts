@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -87,6 +89,8 @@ class FakeContainer {
   images: Record<string, string> = { app: 'registry.example/kilo/app:test' };
   startCalls: ContainerStartupOptions[] = [];
   execCalls: { cmd: string[]; options?: ContainerExecOptions }[] = [];
+  httpsIntercepts: string[] = [];
+  httpIntercepts: string[] = [];
   snapshotCalls = 0;
   destroyCalls = 0;
   monitorCalls = 0;
@@ -141,6 +145,14 @@ class FakeContainer {
       await new Promise<void>(() => {});
     }
     this.running = false;
+  }
+
+  async interceptOutboundHttps(addr: string, _binding: Fetcher): Promise<void> {
+    this.httpsIntercepts.push(addr);
+  }
+
+  async interceptAllOutboundHttp(_binding: Fetcher): Promise<void> {
+    this.httpIntercepts.push('*');
   }
 
   async setInactivityTimeout(ms: number | bigint): Promise<void> {
@@ -246,6 +258,68 @@ describe('SandboxContainers launch', () => {
       enableInternet: true,
     });
     expect('image' in options).toBe(false);
+  });
+
+  it('installs the Kilo and git outbound proxy before a contained start', async () => {
+    const { instance, container } = setup();
+    const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+    (
+      instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
+    ).ctx.exports = { ContainersOutbound: outbound };
+
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: { FOO: 'bar' },
+      instance: 'standard-2',
+      containment: true,
+    });
+
+    expect(outbound).toHaveBeenCalledWith({ props: { containerId: 'do-id' } });
+    expect(container.httpsIntercepts).toEqual(['*']);
+    expect(container.httpIntercepts).toEqual(['*']);
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.execCalls).toEqual([
+      {
+        cmd: ['bun', 'run', CONTROL_WRAPPER_PATH],
+        options: {
+          cwd: '/',
+          env: {
+            FOO: 'bar',
+            SANDBOX_INTERCEPT_HTTPS: '1',
+            NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('resumes a contained launch into a wrapper that carries the intercept env', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+    (
+      instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
+    ).ctx.exports = { ContainersOutbound: outbound };
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    const resumed = await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: { FOO: 'bar' },
+      instance: 'standard-2',
+      containment: true,
+    });
+
+    expect(resumed).toEqual({ started: true });
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(container.execCalls[1]?.options?.env).toEqual({
+      FOO: 'bar',
+      SANDBOX_INTERCEPT_HTTPS: '1',
+      NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+    });
+    expect(container.httpsIntercepts).toEqual(['*']);
+    expect(container.httpIntercepts).toEqual(['*']);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
   it('leaves launching when the wrapper exec fails, then adopts via pgrep or re-execs once', async () => {
@@ -775,5 +849,27 @@ describe('SandboxContainers lease and log', () => {
 
     await expect(instance.readLog(REF_A, CONTROL_WRAPPER_LOG_PATH, 100)).resolves.toBe('');
     expect(container.execCalls).toEqual([]);
+  });
+});
+
+describe('containment trust ownership', () => {
+  const sandboxContainersSource = readFileSync(
+    fileURLToPath(new URL('./SandboxContainers.ts', import.meta.url).href),
+    'utf8'
+  );
+  const dockerfileSource = readFileSync(
+    fileURLToPath(new URL('../../Dockerfile.containers', import.meta.url).href),
+    'utf8'
+  );
+
+  it('runs no CA trust exec in the Durable Object', () => {
+    expect(sandboxContainersSource).not.toContain('trustInterceptCa');
+    expect(sandboxContainersSource).not.toContain('container CA trust timed out');
+    expect(sandboxContainersSource).not.toContain('update-ca-certificates');
+  });
+
+  it('keeps the container entrypoint to PID 1 only', () => {
+    expect(dockerfileSource).not.toContain('update-ca-certificates');
+    expect(dockerfileSource).toContain('exec sleep infinity');
   });
 });

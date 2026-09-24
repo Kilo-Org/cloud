@@ -3,14 +3,84 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   containsJoinedScript,
+  hasRtlScript,
   JOINED_SCRIPT,
   NATURAL_LETTER_SPACING,
   textLetterSpacing,
+  withoutMonoFamily,
 } from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
 // is Flow-syntax source this node project cannot load.
 vi.mock('react-native', () => ({ I18nManager: { isRTL: false } }));
+
+// U+0870 and U+089F are the first and last characters of Arabic Extended-B,
+// the block between Arabic Supplement (ends U+077F) and Arabic Extended-A
+// (starts U+08A0). A label using only its characters must still get the
+// joining font the Arabic blocks select.
+const FIRST_EXTENDED_B = '\u0870';
+const LAST_EXTENDED_B = '\u089F';
+
+describe('hasRtlScript', () => {
+  it('detects a label written only in Arabic Extended-B characters', () => {
+    expect(hasRtlScript(FIRST_EXTENDED_B + LAST_EXTENDED_B)).toBe(true);
+  });
+
+  it('detects the Arabic blocks around Arabic Extended-B', () => {
+    expect(hasRtlScript('\u06FF')).toBe(true);
+    expect(hasRtlScript('\u077F')).toBe(true);
+    expect(hasRtlScript('\u08A0')).toBe(true);
+    expect(hasRtlScript('\uFB50')).toBe(true);
+    expect(hasRtlScript('\uFE70')).toBe(true);
+  });
+
+  // Hebrew is an RTL locale the app ships (`RTL_LANGUAGES` in
+  // `@/i18n/languages`) and is not Arabic script, so the Arabic-only predicate
+  // this replaced left its copy treated like Latin.
+  it('detects the Hebrew block and its presentation forms', () => {
+    expect(hasRtlScript('\u0590')).toBe(true);
+    expect(hasRtlScript('\u05FF')).toBe(true);
+    expect(hasRtlScript('\uFB1D')).toBe(true);
+    expect(hasRtlScript('\uFB4F')).toBe(true);
+  });
+
+  it('detects a Hebrew label', () => {
+    expect(hasRtlScript('פעילים עכשיו')).toBe(true);
+  });
+
+  it('walks the child tree to reach an Extended-B label', () => {
+    expect(hasRtlScript(createElement('Text', null, FIRST_EXTENDED_B))).toBe(true);
+  });
+
+  it('leaves Latin copy alone', () => {
+    expect(hasRtlScript('Live now')).toBe(false);
+  });
+
+  // The script detection the RTL label treatment was first built on: a plain
+  // string, a mixed array, and a nested element all reach the copy, so a label
+  // that mixes scripts counts as RTL script.
+  it('detects an Arabic string', () => {
+    expect(hasRtlScript('الجلسات الجارية الآن')).toBe(true);
+  });
+
+  it('detects Arabic inside a mixed array of strings', () => {
+    expect(hasRtlScript(['LIVE NOW', 'عرض الكل'])).toBe(true);
+  });
+
+  it('checks every item of an array', () => {
+    expect(hasRtlScript(['LIVE', 'NOW'])).toBe(false);
+  });
+
+  it('recurses into a nested element', () => {
+    expect(hasRtlScript(createElement('Text', null, 'استكشاف'))).toBe(true);
+  });
+
+  it('is false for a number, a boolean and null', () => {
+    expect(hasRtlScript(42)).toBe(false);
+    expect(hasRtlScript(true)).toBe(false);
+    expect(hasRtlScript(null)).toBe(false);
+  });
+});
 
 describe('JOINED_SCRIPT', () => {
   it.each(['\u0600', '\u0750', '\u08A0', '\uFB50', '\uFE70'])(
@@ -63,6 +133,22 @@ describe('containsJoinedScript', () => {
   it('is false for number and element children', () => {
     expect(containsJoinedScript(4)).toBe(false);
     expect(containsJoinedScript(createElement('Text', null, 'الرئيسية'))).toBe(false);
+  });
+});
+
+describe('withoutMonoFamily', () => {
+  it('drops the mono family and preserves the remaining order', () => {
+    expect(withoutMonoFamily('font-mono-medium text-[10px] uppercase text-muted-foreground')).toBe(
+      'text-[10px] uppercase text-muted-foreground'
+    );
+  });
+
+  it('drops a variant-prefixed mono family', () => {
+    expect(withoutMonoFamily('dark:font-mono-semibold text-sm')).toBe('text-sm');
+  });
+
+  it('keeps an unrelated token that merely starts with font-mono', () => {
+    expect(withoutMonoFamily('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
   });
 });
 

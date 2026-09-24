@@ -600,6 +600,56 @@ describe('applySessionAttach', () => {
     expect(JSON.stringify(result.error.message)).not.toContain('\u001b[');
   });
 
+  it.each([
+    {
+      name: 'clone rate limit',
+      operation: 'clone',
+      stderr: 'remote: HTTP 429 Too Many Requests',
+      subtype: 'git_rate_limited',
+    },
+    {
+      name: 'clone network failure',
+      operation: 'clone',
+      stderr: 'fatal: unable to access: Could not resolve host: github.com',
+      subtype: 'git_network_failed',
+    },
+    {
+      name: 'checkout timeout',
+      operation: 'checkout',
+      stderr: '',
+      terminationReason: 'timeout' as const,
+      subtype: 'git_checkout_timeout',
+    },
+  ])('carries the git workspace subtype on a $name attach failure', async testCase => {
+    const result = await applySessionAttach(
+      session,
+      { kilo, git: { url: 'https://github.com/acme/demo.git' } },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => undefined,
+        hasGit: async () => testCase.operation === 'checkout',
+        runGit: async args =>
+          args[0] === testCase.operation
+            ? {
+                stdout: '',
+                stderr: testCase.stderr,
+                exitCode: 128,
+                ...(testCase.terminationReason === undefined
+                  ? {}
+                  : { terminationReason: testCase.terminationReason }),
+              }
+            : { stdout: '', stderr: '', exitCode: 0 },
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true, subtype: testCase.subtype },
+    });
+  });
+
   it('preserves generic repository authentication and checks out only the requested upstream branch', async () => {
     const gitCalls: string[][] = [];
     const repositoryUrl = 'https://git.example.com/acme/demo.git';

@@ -32,6 +32,7 @@ import {
   type DirectProcessObserver,
   type OwnedProcessScope,
 } from './owned-processes.js';
+import { admitControlWorkload, type ControlWorkload } from './workload-cgroup.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import {
   retireWorktreeRuntime,
@@ -183,6 +184,7 @@ type ServerOptions = {
   env: Record<string, string>;
   signal: AbortSignal;
   timeoutMs?: number;
+  workload?: ControlWorkload;
   onProcessScope?: (scope: OwnedProcessScope) => void;
   onProcessObserver?: (observer: DirectProcessObserver) => void;
   claimCleanupDeadline?: (deadlineAt?: number) => number;
@@ -353,7 +355,8 @@ export async function startWorktreeKiloServer(
   options: ServerOptions
 ): Promise<WorktreeKiloServerHandle & { stopped: Promise<void> }> {
   options.signal.throwIfAborted();
-  const processes = createOwnedProcessScope();
+  const placement = admitControlWorkload(options.workload);
+  const processes = createOwnedProcessScope(placement);
   options.onProcessScope?.(processes);
   const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: options.directory,
@@ -558,6 +561,7 @@ function emitWorktreeRuntimeAllocation(
 export function createWorktreeKiloRuntimes(options: {
   homeRoot?: string;
   inheritedEnv?: NodeJS.ProcessEnv;
+  workload?: ControlWorkload;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
   onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => unknown;
   onRootRetirementStarted?: (retirement: RootRuntimeRetirementStarted) => void;
@@ -1211,6 +1215,7 @@ export function createWorktreeKiloRuntimes(options: {
         directory: entry.directory,
         env: entry.env,
         signal: abort.signal,
+        ...(options.workload ? { workload: options.workload } : {}),
         onProcessScope: processes => {
           entry.processes = processes;
           entry.processIssued = true;

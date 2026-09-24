@@ -383,7 +383,7 @@ export async function prepareBrowserSession(
   input: { prompt: string; operationKey?: string; autoCommit?: boolean },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  return prepareSessionCall<WorktreeSessionResult>(
+  const prepared = await prepareSessionCall<WorktreeSessionResult>(
     config,
     {
       prompt: input.prompt,
@@ -402,6 +402,11 @@ export async function prepareBrowserSession(
     },
     signal
   );
+  // Success only: a rejected prepare never produced a session to clean up. The
+  // local `smoke.ts` already supplies this hook, so its cleanup now also
+  // releases browser-created sessions it previously missed.
+  config.onSessionCreated?.(prepared.cloudAgentSessionId);
+  return prepared;
 }
 
 export async function createWorktreeChat(
@@ -413,7 +418,7 @@ export async function createWorktreeChat(
   },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  return trpcCall<WorktreeSessionResult>(
+  const created = await trpcCall<WorktreeSessionResult>(
     config,
     'createWorktreeChat',
     {
@@ -427,6 +432,11 @@ export async function createWorktreeChat(
     },
     { internalApiSecret: config.internalApiSecret, signal }
   );
+  // Success only, matching the legacy/unified start pattern. As with
+  // `prepareBrowserSession`, the local `smoke.ts` cleanup now also captures
+  // worktree-chat sessions it previously missed.
+  config.onSessionCreated?.(created.cloudAgentSessionId);
+  return created;
 }
 
 export type SessionSnapshot = {

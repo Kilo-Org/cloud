@@ -589,13 +589,6 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Missing installation ID' }, { status: 400 });
     }
 
-    if (await isSharedGitHubInstallation(installationId, appType)) {
-      return NextResponse.json(
-        { message: 'Event unavailable for shared installations' },
-        { status: 200 }
-      );
-    }
-
     const integration = await findIntegrationByInstallationId(
       PLATFORM.GITHUB,
       installationId,

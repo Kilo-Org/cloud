@@ -645,16 +645,29 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
 
 /**
  * The move a chat needs before its next question: onto the model on screen, and
- * onto the names the switches name now when one moved while it sat idle.
+ * onto the names the switches name now.
  *
- * One move rather than two, because two would copy the conversation twice and
- * leave two rows for one chat. A chat already on the names keeps its session.
+ * A session freezes its tools, so the list sent to the model is whatever this
+ * chat was opened with until it is copied. When the store still holds those
+ * names, they are compared with the switches as they stand — even if this chat
+ * was not marked when the settings group switch moved — because an unmarked
+ * chat would otherwise keep offering settings_set after the person turned it
+ * off. A session the store has not written yet is left alone unless it was
+ * marked: there are no names to compare, and copying it would churn every
+ * first question. One move rather than two, because two would copy the
+ * conversation twice and leave two rows for one chat. A chat already on the
+ * names keeps its session.
  */
 async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise<string> {
   const marked = chat.pendingTools !== undefined;
   chat.pendingTools = undefined;
-  const names = marked ? await chatToolNames(organizationIdOf(chat.org), sessionId) : undefined;
-  const tools = names === undefined || (await holdsTools(sessionId, names)) ? undefined : names;
+  const names = await chatToolNames(organizationIdOf(chat.org), sessionId);
+  const stored = toolsOfSession(await open(), sessionId);
+  const already =
+    stored !== null &&
+    stored.length === names.length &&
+    stored.every((name, i) => name === names[i]);
+  const tools = already || (stored === null && !marked) ? undefined : names;
   return onto(chat, sessionId, {
     model,
     ...(tools === undefined ? {} : { tools }),

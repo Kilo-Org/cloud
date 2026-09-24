@@ -295,6 +295,20 @@ describe('what a chat is opened with', () => {
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
+  it('drops the settings tools on the next question even if the chat was never marked', async () => {
+    /* A chat that did not exist when the switch moved is not in the map to
+       mark. The store still holds the names it was opened with, so the next
+       question compares those with the switch as it stands now rather than
+       offering a tool the person just took away. */
+    storedTools = ['time', ...SETTINGS];
+    settingsSwitch.enabled = false;
+    await say(opened, 'hello', 'kilo/one');
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
   it('leaves a chat alone when the switch that moved was not its own', async () => {
     /* A server's flag flipping is not this chat's: it names none of that
        server's tools, so its set did not move and its session is not copied. */

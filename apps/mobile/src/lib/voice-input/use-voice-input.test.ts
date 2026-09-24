@@ -134,7 +134,7 @@ const mockController = vi.hoisted(() => {
 const voiceNetworkConsentMock = vi.hoisted(() => ({
   readVoiceNetworkConsent: vi.fn<(userId: string) => Promise<'granted' | 'declined' | 'unset'>>(),
   writeVoiceNetworkConsent:
-    vi.fn<(userId: string, value: 'granted' | 'declined') => Promise<void>>(),
+    vi.fn<(userId: string, value: 'granted' | 'declined') => Promise<boolean>>(),
 }));
 
 vi.mock('./native-voice-input', () => ({
@@ -487,7 +487,7 @@ describe('useVoiceInput integration', () => {
         mockController.setSnapshot(idleSnapshot());
         mockController.supportsOnDevice.mockReturnValue(false);
         voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
-        voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(undefined);
+        voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(true);
 
         await actions.toggle();
 

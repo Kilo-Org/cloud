@@ -239,6 +239,77 @@ describe('bearer credential writes', () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_EXPIRES_AT_KEY, expectedOptions);
   });
+
+  it('clears the keys committed before a later write rejection and rethrows the failure', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '999');
+
+    // The auth-token write commits; the refresh-token write then rejects.
+    vi.mocked(SecureStore.setItemAsync)
+      .mockImplementationOnce(async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error('keychain write failed');
+      });
+
+    await expect(
+      persistSignInCredentialsAtEpoch('new-token', 'new-refresh', { expiresIn: 3600 })
+    ).rejects.toThrow('keychain write failed');
+
+    // The partial set is gone: no half-written session survives the failure.
+    expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
+    expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, expectedOptions);
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_EXPIRES_AT_KEY, expectedOptions);
+  });
+
+  it('rethrows the write failure when the partial-set cleanup also fails', async () => {
+    vi.mocked(SecureStore.setItemAsync)
+      .mockImplementationOnce(async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error('keychain write failed');
+      });
+    // The first cleanup delete rejects too: the original failure must still
+    // surface. A one-shot rejection keeps the shared mock clean for the rest
+    // of the suite (the sequential cleanup stops at the first rejection).
+    vi.mocked(SecureStore.deleteItemAsync).mockRejectedValueOnce(
+      new Error('cleanup delete failed')
+    );
+
+    await expect(
+      persistSignInCredentialsAtEpoch('new-token', 'new-refresh', { expiresIn: 3600 })
+    ).rejects.toThrow('keychain write failed');
+  });
+
+  it('leaves the previous session intact when the first write of an attempt rejects', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '999');
+
+    // The very first operation rejects, so nothing of this attempt committed.
+    vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await expect(
+      persistSignInCredentialsAtEpoch('new-token', 'new-refresh', { expiresIn: 3600 })
+    ).rejects.toThrow('keychain unavailable');
+
+    // No partial set exists, so nothing is cleared: a transient keychain
+    // failure stays retryable instead of destroying the stored session.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+    expect(store.get(TOKEN_EXPIRES_AT_KEY)).toBe('999');
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('refresh rotation', () => {

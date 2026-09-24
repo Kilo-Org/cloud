@@ -7,6 +7,7 @@ import {
   readStoredValueRetryingNull,
   readStoredValueWithRetry,
 } from '@/lib/auth/secure-store-read';
+import { deleteStoredValue, writeStoredValue } from '@/lib/auth/secure-store-value';
 import { getActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
@@ -101,10 +102,16 @@ export async function persistSignInCredentialsAtEpoch(
   // a newer sign-in or sign-out: their own credential write is queued
   // strictly behind this one.
   const clearPartialCredentials = async (): Promise<void> => {
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await deleteStoredValue(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await deleteStoredValue(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
   };
+
+  // Whether any credential key of this attempt reached the keychain. A later
+  // rejection then knows the store may hold a partial set and wipes it; a
+  // failure on the very first operation leaves the previous session untouched,
+  // so a transient keychain failure stays retryable instead of signing out.
+  let committedAny = false;
 
   // Fence one credential operation: skip it when the epoch moved before the
   // op, and clear the partial pair when it moved during the op.
@@ -112,9 +119,13 @@ export async function persistSignInCredentialsAtEpoch(
     if (!isCurrentAuthEpoch(epoch)) {
       return false;
     }
+    // A keychain write/delete that rejects is reported at warning level with
+    // the stable operation fingerprint and then propagates, so sign-in lands
+    // on its persist-error state instead of publishing a half-written pair.
     await (value === undefined
-      ? SecureStore.deleteItemAsync(key, IOS_BEARER_SECURE_STORE_OPTIONS)
-      : SecureStore.setItemAsync(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
+      ? deleteStoredValue(key, IOS_BEARER_SECURE_STORE_OPTIONS)
+      : writeStoredValue(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
+    committedAny = true;
     if (!isCurrentAuthEpoch(epoch)) {
       await clearPartialCredentials();
       return false;
@@ -124,14 +135,30 @@ export async function persistSignInCredentialsAtEpoch(
 
   let published = false;
   await writeCredentials(async () => {
-    if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
-      return;
-    }
-    if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
-      return;
-    }
-    if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
-      return;
+    try {
+      if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
+        return;
+      }
+      if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
+        return;
+      }
+      if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
+        return;
+      }
+    } catch (error) {
+      // A later keychain operation rejected after an earlier one committed:
+      // the store now holds a partial credential set. Wipe it best-effort in
+      // the same serialized slot — so it cannot touch a newer sign-in's keys —
+      // then rethrow the original failure. A cleanup failure is swallowed so
+      // it cannot mask the write failure the caller owns.
+      if (committedAny) {
+        try {
+          await clearPartialCredentials();
+        } catch {
+          // Best effort: the caller must still see the original failure.
+        }
+      }
+      throw error;
     }
     // Every fenced operation passed its post-check and nothing awaited since
     // the last one, so the epoch is still current: publish to the owner.

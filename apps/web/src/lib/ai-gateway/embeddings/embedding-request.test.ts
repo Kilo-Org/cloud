@@ -33,6 +33,7 @@ describe('buildUpstreamBody', () => {
     ['openai/text-embedding-ada-002', 1536],
     ['baai/bge-large-en-v1.5', 1024],
     ['baai/bge-base-en-v1.5', 768],
+    ['sentence-transformers/all-mpnet-base-v2', 768],
   ])('should omit catalog dimensions for fixed model %s', (model, dimensions) => {
     const result = buildUpstreamBody({
       model,

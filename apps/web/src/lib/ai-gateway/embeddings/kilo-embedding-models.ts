@@ -103,6 +103,7 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'all-mpnet-base-v2',
     dimension: 768,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
     id: 'sentence-transformers/all-minilm-l12-v2',

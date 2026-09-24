@@ -1,4 +1,5 @@
 import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { getCachedOpenAiServedModels } from '@/lib/ai-gateway/providers/external-model-cache';
 
 /**
  * Which models the partner project can actually serve.
@@ -36,6 +37,9 @@ let failureExpiresAt = 0;
 let inFlight: Promise<Set<string> | null> | null = null;
 
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
+  const cached = await getCachedOpenAiServedModels(apiKey);
+  if (cached) return cached;
+
   try {
     const response = await fetch(MODELS_URL, {
       cache: 'force-cache',

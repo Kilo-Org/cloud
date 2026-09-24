@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { isOpenAiModelServed, resetServedModelIdsCache } from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { getCachedOpenAiServedModels } from '@/lib/ai-gateway/providers/external-model-cache';
+
+jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
+  getCachedOpenAiServedModels: jest.fn(async () => null),
+}));
 
 const fetchMock = jest.fn<typeof fetch>();
 
@@ -14,6 +19,7 @@ function modelsResponse(ids: string[]): Response {
 describe('isOpenAiModelServed', () => {
   beforeEach(() => {
     resetServedModelIdsCache();
+    jest.mocked(getCachedOpenAiServedModels).mockResolvedValue(null);
     fetchMock.mockReset();
     global.fetch = fetchMock as typeof fetch;
   });
@@ -54,6 +60,15 @@ describe('isOpenAiModelServed', () => {
       'https://api.openai.com/v1/models',
       expect.objectContaining({ cache: 'force-cache', next: { revalidate: 3600 } })
     );
+  });
+
+  it('uses the cached partner-project list without fetching upstream', async () => {
+    jest.mocked(getCachedOpenAiServedModels).mockResolvedValueOnce(new Set(['gpt-5-nano']));
+
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5-nano')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5-nano-pro')).resolves.toBe(false);
+    expect(getCachedOpenAiServedModels).toHaveBeenCalledWith('partner-key');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps the route when the list cannot be read', async () => {

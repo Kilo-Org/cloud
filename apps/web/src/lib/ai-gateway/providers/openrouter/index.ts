@@ -30,6 +30,10 @@ import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/provider
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+import {
+  getCachedOpenRouterModels,
+  sanitizeOpenRouterModels,
+} from '@/lib/ai-gateway/providers/external-model-cache';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -200,31 +204,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   return sortedModels;
 }
 
-function removeUpstreamEnkrypt(response: unknown): unknown {
-  if (
-    !response ||
-    typeof response !== 'object' ||
-    !('data' in response) ||
-    !Array.isArray(response.data)
-  ) {
-    return response;
-  }
-  return {
-    ...response,
-    data: response.data.map((model: unknown) => {
-      if (!model || typeof model !== 'object' || !('enkrypt' in model)) return model;
-      const sanitized: Record<string, unknown> = { ...model };
-      delete sanitized.enkrypt;
-      return sanitized;
-    }),
-  };
-}
-
 /**
  * Fetch raw, unfiltered models from OpenRouter API
  * Use this for syncing model stats where you need complete data including :free variants
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
+  const cached = await getCachedOpenRouterModels();
+  if (cached) return cached;
+
   const response = await fetch(`${OPENROUTER.apiUrl}/models`, {
     cache: 'force-cache',
     method: 'GET',
@@ -247,7 +234,7 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
     throw new Error('Failed to fetch models from OpenRouter API');
   }
 
-  const data = removeUpstreamEnkrypt(await response.json());
+  const data = sanitizeOpenRouterModels(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 
@@ -316,7 +303,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
     throw new Error('Failed to fetch transcription models from OpenRouter API');
   }
 
-  const data = removeUpstreamEnkrypt(await response.json());
+  const data = sanitizeOpenRouterModels(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 

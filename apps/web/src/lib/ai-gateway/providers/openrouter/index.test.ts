@@ -17,6 +17,15 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { getCachedOpenRouterModels } from '@/lib/ai-gateway/providers/external-model-cache';
+import type * as ExternalModelCache from '@/lib/ai-gateway/providers/external-model-cache';
+
+jest.mock('@/lib/ai-gateway/providers/external-model-cache', () => ({
+  ...jest.requireActual<typeof ExternalModelCache>(
+    '@/lib/ai-gateway/providers/external-model-cache'
+  ),
+  getCachedOpenRouterModels: jest.fn(async () => null),
+}));
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -186,6 +195,7 @@ describe('isFableModel', () => {
 
 describe('auto models', () => {
   beforeEach(() => {
+    jest.mocked(getCachedOpenRouterModels).mockResolvedValue(null);
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -212,6 +222,15 @@ describe('auto models', () => {
       'https://openrouter.ai/api/v1/models',
       expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
     );
+  });
+
+  it('uses the validated database catalog without fetching upstream', async () => {
+    jest.mocked(getCachedOpenRouterModels).mockResolvedValueOnce({ data: [buildModel()] });
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {

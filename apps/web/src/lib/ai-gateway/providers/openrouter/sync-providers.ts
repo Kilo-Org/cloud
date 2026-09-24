@@ -33,6 +33,12 @@ import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter
 import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
+import {
+  saveOpenAiServedModels,
+  saveOpenRouterModels,
+} from '@/lib/ai-gateway/providers/external-model-cache';
+import { OPENAI_CHATGPT_API_URL } from '@/lib/ai-gateway/openai-chatgpt/upstream';
+import { getEnvVariable } from '@/lib/dotenvx';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -55,7 +61,8 @@ async function fetchGatewayModels(gateway: Provider) {
   if (!modelsResponse.ok) {
     throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
   }
-  const models = ModelsSchema.parse(await modelsResponse.json());
+  const catalog = await modelsResponse.json();
+  const models = ModelsSchema.parse(catalog);
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
@@ -95,7 +102,35 @@ async function fetchGatewayModels(gateway: Provider) {
   }
   console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
 
-  return result;
+  return { models: result, catalog };
+}
+
+async function refreshExternalModelCaches(openRouterCatalog: unknown): Promise<void> {
+  try {
+    if (!(await saveOpenRouterModels(openRouterCatalog))) {
+      console.warn('[sync-providers] OpenRouter catalog failed cache validation');
+    }
+  } catch (error) {
+    captureException(error, { tags: { component: 'sync-providers-openrouter-cache' } });
+  }
+
+  const apiKey = getEnvVariable('OPENAI_CHATGPT_API_KEY');
+  if (!apiKey.trim()) return;
+  try {
+    const response = await fetch(`${OPENAI_CHATGPT_API_URL}/models`, {
+      headers: { authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(2_000),
+    });
+    if (!response.ok) {
+      console.warn(`[sync-providers] OpenAI served-model refresh failed: ${response.status}`);
+      return;
+    }
+    if (!(await saveOpenAiServedModels(apiKey, await response.json()))) {
+      console.warn('[sync-providers] OpenAI served-model response failed cache validation');
+    }
+  } catch (error) {
+    captureException(error, { tags: { component: 'sync-providers-openai-cache' } });
+  }
 }
 
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
@@ -364,8 +399,9 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(OPENROUTER);
-  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
+  const { models: openrouter_data, catalog: openRouterCatalog } =
+    await fetchGatewayModels(OPENROUTER);
+  const { models: vercel_data } = await fetchGatewayModels(VERCEL_AI_GATEWAY);
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {
@@ -389,6 +425,8 @@ export async function syncAndStoreProviders() {
     openrouter_data,
     vercel_data,
   });
+
+  await refreshExternalModelCaches(openRouterCatalog);
 
   const direct_byok_model_counts = await syncDirectByokModels();
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);

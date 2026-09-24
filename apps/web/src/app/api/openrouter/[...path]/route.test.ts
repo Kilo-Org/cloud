@@ -38,6 +38,7 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
+import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 
 jest.mock('next/server', () => {
   return {
@@ -151,8 +152,8 @@ const provider = {
   transformRequest: jest.fn(),
 } satisfies Provider;
 
-function makeRequest(body: unknown, headers?: HeadersInit) {
-  return new Request('http://localhost:3000/api/openrouter/v1/chat/completions', {
+function makeRequest(body: unknown, headers?: HeadersInit, path = '/chat/completions') {
+  return new Request(`http://localhost:3000/api/openrouter/v1${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -794,6 +795,171 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 });
 
+describe.each([
+  { path: '/chat/completions', kind: 'chat_completions', input: { messages: makeBody().messages } },
+  { path: '/responses', kind: 'responses', input: { input: 'hello' } },
+  {
+    path: '/messages',
+    kind: 'messages',
+    input: { messages: makeBody().messages, max_tokens: 100 },
+  },
+])('effective provider privacy for $kind', ({ path, kind, input }) => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'response-1', model: 'openai/gpt-4o', choices: [] }),
+    });
+  });
+
+  it.each<OpenRouterProviderConfig>([
+    { data_collection: 'deny' },
+    { zdr: true },
+    { data_collection: 'deny', zdr: true },
+    {},
+  ])('preserves personal provider options with privacy %j', async privacy => {
+    const requestProvider: OpenRouterProviderConfig = {
+      only: ['openai'],
+      ignore: ['azure'],
+      order: ['openai'],
+      sort: 'latency',
+      require_parameters: true,
+      ...privacy,
+    };
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({ model: 'openai/gpt-4o', ...input, provider: requestProvider }, undefined, path)
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0]).toMatchObject({ chatApi: kind });
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(requestProvider);
+    const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
+    expect(await getRoutingProviderConfig?.()).toBeUndefined();
+  });
+
+  it('does not introduce a provider object when privacy is absent', async () => {
+    mockedGetProvider.mockImplementationOnce(async ({ request }) => {
+      expect(request.body).not.toHaveProperty('provider');
+      return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+    });
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ model: 'openai/gpt-4o', ...input }, undefined, path));
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({ order: ['openai'] });
+  });
+
+  it.each<{
+    organizationData: 'allow' | 'deny';
+    requestPrivacy: OpenRouterProviderConfig;
+    expectedPrivacy: OpenRouterProviderConfig;
+  }>([
+    {
+      organizationData: 'deny',
+      requestPrivacy: { data_collection: 'allow' },
+      expectedPrivacy: { data_collection: 'deny' },
+    },
+    {
+      organizationData: 'allow',
+      requestPrivacy: { data_collection: 'deny' },
+      expectedPrivacy: { data_collection: 'deny' },
+    },
+    {
+      organizationData: 'allow',
+      requestPrivacy: { zdr: true },
+      expectedPrivacy: { data_collection: 'allow', zdr: true },
+    },
+    {
+      organizationData: 'deny',
+      requestPrivacy: { zdr: true },
+      expectedPrivacy: { data_collection: 'deny', zdr: true },
+    },
+    {
+      organizationData: 'deny',
+      requestPrivacy: {},
+      expectedPrivacy: { data_collection: 'deny' },
+    },
+  ])(
+    'merges organization $organizationData with request $requestPrivacy',
+    async ({ organizationData, requestPrivacy, expectedPrivacy }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'user-123', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { data_collection: organizationData },
+        plan: 'teams',
+      });
+      mockedGetProvider.mockImplementationOnce(async ({ request, getRoutingProviderConfig }) => {
+        expect(request.body.provider).toEqual({ only: ['azure'], ...expectedPrivacy });
+        expect(await getRoutingProviderConfig?.()).toEqual(expectedPrivacy);
+        return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+      });
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest(
+          { model: 'openai/gpt-4o', ...input, provider: { only: ['azure'], ...requestPrivacy } },
+          undefined,
+          path
+        )
+      );
+
+      expect(response.status).toBe(200);
+      const expectedProvider = { ...expectedPrivacy, order: ['openai'] };
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(expectedProvider);
+    }
+  );
+
+  it.each<OpenRouterProviderConfig>([{ data_collection: 'deny', zdr: true }, { zdr: false }, {}])(
+    'retains privacy %j when a group overrides provider routing',
+    async privacy => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'user-123', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { provider_allow_list: ['azure'] },
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({
+        allowed: true,
+        eligibleProviderRoutes: new Set(['openai']),
+      });
+      mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
+        expect(await getRoutingProviderConfig?.()).toEqual({ only: ['openai'], ...privacy });
+        return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+      });
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest(
+          { model: 'openai/gpt-4o', ...input, provider: { only: ['azure'], ...privacy } },
+          undefined,
+          path
+        )
+      );
+
+      expect(response.status).toBe(200);
+      const expectedProvider = { only: ['openai'], order: ['openai'], ...privacy };
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(expectedProvider);
+    }
+  );
+});
+
 describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -832,6 +998,61 @@ describe('kilo-auto/efficient classifier billing', () => {
       // no-op: the promise has already been started when passed to after()
     });
   });
+
+  it.each<{
+    organizationData: 'allow' | 'deny';
+    requestData: 'allow' | 'deny';
+  }>([
+    { organizationData: 'deny', requestData: 'allow' },
+    { organizationData: 'allow', requestData: 'deny' },
+  ])(
+    'normalizes privacy before Auto resolution and decision hints: %j',
+    async ({ organizationData, requestData }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'user-123', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { data_collection: organizationData },
+        plan: 'enterprise',
+      });
+      const expectedPrivacy = { data_collection: 'deny', zdr: true };
+      const expectedEarlyProvider = { only: ['openai'], ...expectedPrivacy };
+      mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
+        expect(request.body.provider).toEqual(expectedEarlyProvider);
+        expect(mockedGetEffectiveModelDecision).not.toHaveBeenCalled();
+        await opts.efficientDecision?.();
+        request.body.model = 'openai/gpt-4o';
+        return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
+      });
+      mockedFetchEfficientAutoDecision.mockImplementationOnce(async ({ body, providerHints }) => {
+        expect(body).toMatchObject({ provider: expectedEarlyProvider });
+        expect(providerHints).toEqual({ provider: expectedEarlyProvider, providerOptions: null });
+        return { decision: null, costUsd: 0 };
+      });
+
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest({
+          ...makeBody('kilo-auto/efficient'),
+          provider: { only: ['openai'], data_collection: requestData, zdr: true },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
+      expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o'
+      );
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+        ...expectedPrivacy,
+        order: ['openai'],
+      });
+    }
+  );
 
   it('rejects Organization Auto direct-BYOK routes when provider selection falls through', async () => {
     mockedGetUserFromAuth.mockResolvedValue({

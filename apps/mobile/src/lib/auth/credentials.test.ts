@@ -171,7 +171,7 @@ vi.mock('@/lib/native-system-search', () => ({
 
 import * as SecureStore from 'expo-secure-store';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
-import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import {
   AUTH_TOKEN_KEY,
@@ -459,7 +459,13 @@ describe('refresh rotation', () => {
     try {
       const outcome = await performRefresh();
 
-      expect(outcome).toEqual({ ok: false, refused: true });
+      // A refusal is scoped to the session that owned the refresh: it carries
+      // that session's epoch so a handler can drop it once the epoch has moved.
+      expect(outcome).toEqual({
+        ok: false,
+        refused: true,
+        sessionVersion: currentAuthEpoch(),
+      });
       expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       vi.unstubAllGlobals();

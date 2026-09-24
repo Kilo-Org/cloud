@@ -362,18 +362,23 @@ type HeaderElement = {
 /** The header's `inlineActions` row, whose children are its section label and controls. */
 function headerRow() {
   return header().props.inlineActions as {
-    props: { className: string; children: (HeaderElement | null)[] };
+    props: { className: string; children: HeaderElement | null | (HeaderElement | null)[] };
   };
+}
+/** The row's children as a list: a row with a single child is not an array. */
+function headerRowChildren() {
+  const children = headerRow().props.children;
+  return Array.isArray(children) ? children : [children];
 }
 /** The row's controls, in order: the section label leads the row and is not one. */
 function headerActions() {
-  return headerRow().props.children.filter(
+  return headerRowChildren().filter(
     (child): child is HeaderElement => child !== null && typeof child.props.testID === 'string'
   );
 }
 /** The section label that owns the row start (see `headerActions`). */
 function headerRowLabel() {
-  const label = headerRow().props.children[0];
+  const label = headerRowChildren()[0];
   if (!label) {
     throw new Error('Missing header row label');
   }
@@ -593,6 +598,13 @@ describe('AgentSessionListScreen live presentation', () => {
     const expectedInset = test.empty ? state.tabBarHeight : state.tabBarHeight + 64;
     expect(surface.props.bottomInset).toBe(expectedInset);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
+    if (test.empty) {
+      // An accepted empty live list advertises no live section — the `Live now`
+      // label names sessions that do not exist — but the See-all stays: it
+      // opens the stored history, which is reachable from nowhere else (review
+      // finding).
+      expect(text()).not.toContain(i18n.t('home.agentSessions'));
+    }
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
     headerAction().props.onPress();
@@ -606,20 +618,40 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
+  it('an accepted empty live list withholds the live label but keeps the history route', async () => {
+    await renderScreen();
+    // No live section to name, so the `Live now` label is withheld...
+    expect(text()).not.toContain(i18n.t('home.agentSessions'));
+    expect(header().props.eyebrow).toBe('0 LIVE');
+    // ...but the See-all still opens the stored history, which has no other
+    // entry point in the app (review finding).
+    expect(headerAction().props.testID).toBe('agents-view-history');
+    headerAction().props.onPress();
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+    expect(text()).toContain('Nothing running right now');
+    expect(action('New session')).toBeDefined();
+  });
+
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
+    // The full controls row exists only over a non-empty live list (the
+    // accepted-empty state keeps the See-all alone), so a populated render
+    // covers it before this case switches to the empty body it tests. The list
+    // controls share the title's row through `inlineActions`; the heading keeps
+    // `flex-1 min-w-0`, so the title keeps its tail ellipsis and nothing stacks
+    // the controls onto a second row.
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(header().props.inlineActions).toBeDefined();
+    state.live.activeSessions = [];
     await renderScreen();
     const viewport = requireNode('CenteredState');
     const emptyState = root().findByType(EmptyState);
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.className).toContain('px-[22px]');
-    // The list controls share the title's row through `inlineActions`; the
-    // heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis and
-    // nothing stacks the controls onto a second row.
     expect(header().props.headerRight).toBeUndefined();
     expect(header().props.context).toBeUndefined();
-    expect(header().props.inlineActions).toBeDefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -1685,6 +1717,7 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('leads the controls row with the section label so section headers share one alignment', async () => {
+    state.live.activeSessions = [row];
     await renderScreen();
 
     const label = headerRowLabel();
@@ -1698,6 +1731,7 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('keeps the header right to See-all alone while nothing is filterable', async () => {
+    state.live.activeSessions = [row];
     await renderScreen();
 
     expect(headerActions()).toHaveLength(1);

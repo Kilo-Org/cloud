@@ -210,8 +210,16 @@ describe('Home live section', () => {
     }
   );
 
-  it('switches to the Agents index and dismisses the history subpage', async () => {
+  it('renders no live-sessions header when the accepted live list is empty', async () => {
     await render();
+    expect(nodes('SectionHeader')).toHaveLength(0);
+    expect(nodes('Text').some(text => text.children.includes('Nothing running right now'))).toBe(
+      true
+    );
+  });
+
+  it('switches to the Agents index and dismisses the history subpage', async () => {
+    await render({ ...settled, activeSessions: [session('a1')] });
     (node('SectionHeader').props.onActionPress as () => void)();
     expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
     expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');

@@ -288,15 +288,21 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
 
   return (
     <View>
-      <SectionHeader
-        label={t('home.agentSessions')}
-        actionLabel={t('home.seeAll')}
-        onActionPress={() => {
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
-        }}
-      />
+      {/* An accepted empty live list renders only the `Nothing running right
+          now` card, so the `Live now` / See-all header would advertise the
+          Agents live index for sessions that do not exist. Rows and the
+          loading skeletons keep the header unchanged. */}
+      {content !== 'empty' && (
+        <SectionHeader
+          label={t('home.agentSessions')}
+          actionLabel={t('home.seeAll')}
+          onActionPress={() => {
+            // Switch tabs, then pop a previously pushed history screen to the live index.
+            router.navigate(AGENTS_INDEX_HREF as Href);
+            router.dismissTo(AGENTS_INDEX_HREF as Href);
+          }}
+        />
+      )}
       <View className="mx-4 gap-2">
         <LiveSessionFeedback
           context={context}

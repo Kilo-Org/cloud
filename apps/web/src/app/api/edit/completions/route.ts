@@ -6,7 +6,6 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { INCEPTION_PROMO_MODEL, INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -189,10 +188,7 @@ export async function POST(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users.
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  const isInceptionPromoRequest =
-    INCEPTION_PROMO_RUNNING && requestBody.model === INCEPTION_PROMO_MODEL;
-
-  if (!isInceptionPromoRequest && balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
+  if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

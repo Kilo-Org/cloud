@@ -697,6 +697,17 @@ describe('generateReviewPrompt (free model output budget)', () => {
     expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
   });
 
+  it('adds the block for openrouter/free', async () => {
+    const { prompt, version } = await generateReviewPrompt(
+      { ...baseConfig, model_slug: 'openrouter/free' },
+      'owner/repo',
+      42
+    );
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
+  });
+
   it('omits the block and keeps the template version for a paid model', async () => {
     const { prompt, version } = await generateReviewPrompt(paidConfig, 'owner/repo', 42);
 

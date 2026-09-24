@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from '@/lib/code-reviews/prompts/default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-prompt-template-gitlab.json';
@@ -101,15 +101,10 @@ function escapeMarkdownTableCell(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 }
 
-function isFreeModelSlug(slug: string): boolean {
-  return slug === KILO_AUTO_FREE_MODEL.id || slug.endsWith(':free');
-}
-
 export const FREE_MODEL_OUTPUT_BUDGET = `# FREE MODEL OUTPUT BUDGET
 
-You are running on a free model with a small output budget (about 10,000 tokens shared
-between reasoning and the response). Long internal analysis can use up that budget and leave
-no room for the review itself.
+You are running on a free model with a limited output budget shared between reasoning and the
+response. Long internal analysis can use up that budget and leave no room for the review itself.
 
 These rules apply alongside the workflow, hard constraints, and output format in this prompt;
 they do not replace them:
@@ -119,12 +114,7 @@ they do not replace them:
   the summary last.
 - Do not deliberate about these instructions, the review policy, or sub-agent tiers.
 - Do not recompute diff line numbers repeatedly; if a line number is uncertain, re-read the diff
-  and apply the existing diff-line rules.
-- If you cannot finish, this is the one exception to "review every changed file" and to the
-  normal/roast summary formats: post only the findings you have verified and de-duplicated in the
-  single inline comment submission, then create or update exactly one final summary that keeps the
-  review marker, states "Incomplete", lists the files you did not finish, and makes no merge
-  recommendation (even if you verified no findings). Every other hard constraint still applies.`;
+  and apply the existing diff-line rules.`;
 
 /**
  * GitLab-specific context for inline comments
@@ -219,7 +209,7 @@ export async function generateReviewPrompt(
   }
 
   const effectiveModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
-  const freeModel = isFreeModelSlug(effectiveModel);
+  const freeModel = await isFreeModel(effectiveModel);
   const applyFreeModelBudget = freeModel && !omitSubAgentGuidance;
 
   // Helper to replace common placeholders

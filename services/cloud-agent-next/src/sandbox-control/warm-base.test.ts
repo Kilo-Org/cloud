@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeWarmBaseId,
+  attachRestoredFromBackup,
   readWarmBaseRecord,
   selectStartSnapshot,
   selectWarmBaseWorkspace,
@@ -14,8 +15,6 @@ import {
 const base: WarmBaseDigestInput = {
   owner: 'user_1',
   repositoryUrl: 'https://github.com/acme/demo.git',
-  ref: 'session/workspace_1',
-  checkoutMode: 'branch',
   setupCommands: ['pnpm install'],
   preparationEnvIdentity: '[]',
   wrapperVersion: '1.2.3',
@@ -35,8 +34,6 @@ describe('warmBaseDigest', () => {
   it.each<[string, Partial<WarmBaseDigestInput>]>([
     ['owner', { owner: 'user_2' }],
     ['repository url', { repositoryUrl: 'https://github.com/acme/other.git' }],
-    ['ref', { ref: 'session/workspace_2' }],
-    ['checkout mode', { checkoutMode: 'working' }],
     ['setup commands', { setupCommands: ['pnpm install', 'pnpm build'] }],
     ['prep env identity', { preparationEnvIdentity: '[["FOO","bar"]]' }],
     ['wrapper version', { wrapperVersion: '1.2.4' }],
@@ -50,6 +47,15 @@ describe('warmBaseDigest', () => {
     const first = await digestOf({ setupCommands: ['a', 'b'] });
     const second = await digestOf({ setupCommands: ['b', 'a'] });
     expect(first).not.toBe(second);
+  });
+});
+
+describe('attachRestoredFromBackup', () => {
+  it('is true only when preparation is needed and a restore is pending', () => {
+    expect(attachRestoredFromBackup(true, true)).toBe(true);
+    expect(attachRestoredFromBackup(true, false)).toBe(false);
+    expect(attachRestoredFromBackup(false, true)).toBe(false);
+    expect(attachRestoredFromBackup(false, false)).toBe(false);
   });
 });
 

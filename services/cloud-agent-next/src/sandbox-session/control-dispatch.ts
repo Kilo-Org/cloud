@@ -34,6 +34,23 @@ export class ControlRequestError extends Error {
 const CONTROL_ERROR_OWN_FIELDS = Object.keys(controlErrorSchema.shape);
 
 /**
+ * A storage or RPC failure while clearing the warm-restore pending bit after a
+ * bootstrapped attach. It is retryable coordination, not a wrapper rejection:
+ * it is not a `ControlRequestError`, so `rejectionReceived` is never set and the
+ * delivery retry counter is the only bound. The bit stays set, so user work is
+ * never started against an unacknowledged restore.
+ */
+export class WarmRestoreAcknowledgementError extends Error {
+  readonly retryable = true;
+
+  constructor(cause?: unknown) {
+    super('Warm restore acknowledgement failed');
+    this.name = 'WarmRestoreAcknowledgementError';
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
  * Rebuild a peer-thrown control rejection into the local `ControlRequestError`.
  * Custom prototypes do not survive Cloudflare RPC, so classify by the
  * serializable fields the class owns. Only own values of the schema's fields

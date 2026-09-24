@@ -38,7 +38,8 @@ type StoredRecord = {
   allocationRef: string | null;
   stopOpId: string | null;
   lastSnapshot: { id: string; sourceAllocation: string } | null;
-  snapshotOutcome?: 'ready' | 'failed';
+  snapshotOutcome?: 'ready' | 'failed' | 'skipped';
+  warmRestorePending?: true;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
 };
@@ -872,6 +873,92 @@ describe('SandboxContainers stop', () => {
     expect(readRecord()).toEqual(settledRecord);
     expect(readRecord().lastSnapshot).toBeNull();
   });
+
+  it('skips capture while a warm restore is pending and records skipped', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: { id: 'trusted', sourceAllocation: REF_A },
+        warmRestorePending: true,
+      },
+    });
+    container.running = true;
+    container.snapshotBehavior = { kind: 'resolve', id: 'new-snap' };
+    const originalDestroy = container.destroy.bind(container);
+    let recordAtDestroy: StoredRecord | undefined;
+    container.destroy = async () => {
+      recordAtDestroy = readRecord();
+      await originalDestroy();
+    };
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+
+    expect(container.snapshotCalls).toBe(0);
+    // The pending bit and the skip survive on the stopping record until the
+    // terminal write drops the bit.
+    expect(recordAtDestroy).toMatchObject({
+      state: 'stopping',
+      snapshotOutcome: 'skipped',
+      warmRestorePending: true,
+    });
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: { id: 'trusted', sourceAllocation: REF_A },
+      snapshotOutcome: 'skipped',
+    });
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Sandbox control diagnostic',
+        diagnosticEvent: 'session_snapshot',
+        result: 'skipped',
+      })
+    );
+    log.mockRestore();
+  });
+
+  it('skips capture on every stop retry while pending and keeps the previous snapshot', async () => {
+    const trusted = { id: 'trusted', sourceAllocation: REF_A };
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: trusted,
+        warmRestorePending: true,
+      },
+    });
+    container.running = true;
+    container.snapshotBehavior = { kind: 'reject' };
+    container.destroyBehavior = 'reject';
+
+    await expect(instance.stop(REF_A)).resolves.toBe('retryable');
+
+    expect(container.snapshotCalls).toBe(0);
+    expect(readRecord()).toMatchObject({
+      state: 'stopping',
+      allocationRef: REF_A,
+      lastSnapshot: trusted,
+      snapshotOutcome: 'skipped',
+      warmRestorePending: true,
+    });
+
+    container.destroyBehavior = 'ok';
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+
+    expect(container.snapshotCalls).toBe(0);
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: trusted,
+      snapshotOutcome: 'skipped',
+    });
+  });
 });
 
 describe('SandboxContainers clear session snapshot', () => {
@@ -975,12 +1062,13 @@ describe('SandboxContainers lease and log', () => {
 });
 
 describe('SandboxContainers warm base', () => {
-  it('reports image, session snapshot, and record presence in one call', async () => {
+  it('reports image, session snapshot, record presence, and pending state in one call', async () => {
     const fresh = setup({ record: null });
     await expect(fresh.instance.warmBaseFacts()).resolves.toEqual({
       image: 'registry.example/kilo/app:test',
       sessionSnapshotId: null,
       hasRecord: false,
+      warmRestorePending: false,
     });
 
     const stored = setup({
@@ -995,6 +1083,23 @@ describe('SandboxContainers warm base', () => {
       image: 'registry.example/kilo/app:test',
       sessionSnapshotId: 'snap-stored',
       hasRecord: true,
+      warmRestorePending: false,
+    });
+
+    const pending = setup({
+      record: {
+        state: 'launching',
+        allocationRef: REF_A,
+        stopOpId: null,
+        lastSnapshot: null,
+        warmRestorePending: true,
+      },
+    });
+    await expect(pending.instance.warmBaseFacts()).resolves.toEqual({
+      image: 'registry.example/kilo/app:test',
+      sessionSnapshotId: null,
+      hasRecord: true,
+      warmRestorePending: true,
     });
   });
 
@@ -1065,5 +1170,142 @@ describe('SandboxContainers warm base', () => {
     expect(container.startCalls).toEqual([
       { containerSnapshot: { id: 'warm-snap' }, instance: 'standard-2', enableInternet: true },
     ]);
+  });
+});
+
+describe('SandboxContainers warm restore pending', () => {
+  it('writes the bit before start and keeps it on the running record', async () => {
+    const { instance, container, readRecord } = setup();
+    const originalStart = container.start.bind(container);
+    let recordAtStart: StoredRecord | undefined;
+    container.start = options => {
+      recordAtStart = readRecord();
+      originalStart(options);
+    };
+
+    await launch(instance, REF_A, {}, 'warm-snap');
+
+    expect(recordAtStart).toMatchObject({ state: 'launching', warmRestorePending: true });
+    expect(readRecord()).toMatchObject({ state: 'running', warmRestorePending: true });
+    await expect(instance.warmBaseFacts()).resolves.toMatchObject({ warmRestorePending: true });
+  });
+
+  it('leaves the bit when a warm start takes effect then throws', async () => {
+    const { instance, container, readRecord } = setup();
+    container.startBehavior = 'effect-then-reject';
+
+    await expect(launch(instance, REF_A, {}, 'warm-snap')).rejects.toThrow(
+      'container start failed after taking effect'
+    );
+
+    expect(container.running).toBe(true);
+    expect(readRecord()).toMatchObject({ state: 'launching', warmRestorePending: true });
+    await expect(instance.warmBaseFacts()).resolves.toMatchObject({ warmRestorePending: true });
+  });
+
+  it('clears an existing bit when the session snapshot wins over the warm id', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        lastSnapshot: { id: 'snap-stored', sourceAllocation: REF_A },
+        warmRestorePending: true,
+      },
+    });
+
+    await launch(instance, REF_A, {}, 'warm-snap');
+
+    expect(container.startCalls).toMatchObject([
+      { containerSnapshot: { id: 'snap-stored' } },
+    ]);
+    expect(readRecord()).toMatchObject({ state: 'running' });
+    expect(readRecord().warmRestorePending).toBeUndefined();
+  });
+
+  it('clears a stale bit on an image physical start', async () => {
+    const { instance, readRecord } = setup({
+      record: { ...idleRecord, warmRestorePending: true },
+    });
+
+    await launch(instance, REF_A);
+
+    expect(readRecord()).toMatchObject({ state: 'running' });
+    expect(readRecord().warmRestorePending).toBeUndefined();
+  });
+
+  it('leaves an in-flight bit untouched when the container is already running', async () => {
+    const pending = setup({ record: { ...idleRecord, warmRestorePending: true } });
+    pending.container.running = true;
+
+    await launch(pending.instance, REF_A);
+
+    expect(pending.container.startCalls).toHaveLength(0);
+    expect(pending.readRecord()).toMatchObject({ state: 'running', warmRestorePending: true });
+  });
+
+  it('does not synthesize a bit when an already-running start has none', async () => {
+    const fresh = setup();
+    fresh.container.running = true;
+
+    await launch(fresh.instance, REF_A);
+
+    expect(fresh.container.startCalls).toHaveLength(0);
+    expect(fresh.readRecord().warmRestorePending).toBeUndefined();
+  });
+
+  it('keeps the bit across a resume that physically starts from the warm id', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    await launch(instance, REF_A, {}, 'warm-snap');
+
+    expect(container.startCalls).toEqual([
+      { containerSnapshot: { id: 'warm-snap' }, instance: 'standard-2', enableInternet: true },
+    ]);
+    expect(readRecord()).toMatchObject({ state: 'running', warmRestorePending: true });
+    await expect(instance.warmBaseFacts()).resolves.toMatchObject({ warmRestorePending: true });
+  });
+
+  it('keeps an in-flight bit through a probe-found resume without starting', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A, warmRestorePending: true },
+    });
+    container.running = true;
+    container.execHandler = () => makeExecProcess({ exitCode: 0 });
+
+    await launch(instance, REF_A);
+
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'running', warmRestorePending: true });
+  });
+});
+
+describe('SandboxContainers clear warm restore pending', () => {
+  it('deletes the bit and leaves the rest of the record intact', async () => {
+    const { instance, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        warmRestorePending: true,
+      },
+    });
+
+    await instance.clearWarmRestorePending();
+
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+    expect(readRecord().warmRestorePending).toBeUndefined();
+  });
+
+  it('is a no-op when the bit is absent', async () => {
+    const { instance, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+
+    await instance.clearWarmRestorePending();
+
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+    expect(readRecord().warmRestorePending).toBeUndefined();
   });
 });

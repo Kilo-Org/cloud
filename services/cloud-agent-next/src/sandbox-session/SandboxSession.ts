@@ -129,6 +129,7 @@ import { validateControlSessionOptions } from './attach-payload.js';
 import { resolveWarmBaseLaunch, type WarmBaseContainerFacts } from './warm-base-launch.js';
 import {
   WARM_BASE_TTL_MS,
+  attachRestoredFromBackup,
   warmBaseHomeForWorkspace,
 } from '../sandbox-control/warm-base.js';
 import { pendingInputProjection } from './session-input-projection.js';
@@ -197,6 +198,7 @@ import {
 } from '../shared/sandbox-status.js';
 import {
   ControlRequestError,
+  WarmRestoreAcknowledgementError,
   controlDispatchDisposition,
   controlRequestResult,
   deliveryErrorLogFields,
@@ -4102,6 +4104,7 @@ export class SandboxSession extends DurableObject<Env> {
     let phase: DispatchPhase = 'preparing';
     let attachInPreparation = false;
     let attachBootstrapped = false;
+    let restoredWorkspaceAttach = false;
     let credentialsPrepared = false;
     const preparationGeneration = this.worktreeChanges.beginPreparation();
     try {
@@ -4240,12 +4243,21 @@ export class SandboxSession extends DurableObject<Env> {
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
         attachInPreparation = needsPreparation;
+        // Only container sessions have a warm-base physical start that can leave
+        // an unacknowledged restore, and only they own a container record. Every
+        // other provider decides false without an unrelated container RPC.
+        const warmRestorePending =
+          needsPreparation && provider === 'cloudflare-containers'
+            ? await this.readContainerWarmRestorePending(sandboxId)
+            : false;
+        restoredWorkspaceAttach = attachRestoredFromBackup(needsPreparation, warmRestorePending);
         const attachPayload = {
           ...status.attachment,
           ...(warmHome === undefined ? {} : { home: warmHome }),
           ...(hasModernRuntimeAuthorization(metadata)
             ? { runtimeIsolation: 'per-session' as const }
             : {}),
+          ...(restoredWorkspaceAttach ? { restoredFromBackup: true } : {}),
           ...(needsPreparation
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),
@@ -4403,6 +4415,16 @@ export class SandboxSession extends DurableObject<Env> {
       // so a later retryable not-admitted prompt cannot resurface a stale
       // "waiting for sandbox" reason.
       this.savePreparationWait(messageId, epoch, undefined);
+      // A warm restore is only acknowledged once the wrapper reported bootstrap
+      // and the pending bit is cleared. Until then the prepared binding and the
+      // prompt must not run, so a failed clear retries the delivery instead.
+      if (restoredWorkspaceAttach && attachBootstrapped) {
+        try {
+          await this.clearContainerWarmRestorePending(sandboxId);
+        } catch (error) {
+          throw new WarmRestoreAcknowledgementError(error);
+        }
+      }
       this.terminalLifecycle.recordAttachment({
         metadata: sessionMetadata,
         sandboxId,
@@ -4412,7 +4434,11 @@ export class SandboxSession extends DurableObject<Env> {
       });
       recorder.finalize({ status: 'completed' });
       this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(sessionMetadata));
-      if (attachBootstrapped && warm.publishDigest !== undefined) {
+      if (
+        attachBootstrapped &&
+        warm.publishDigest !== undefined &&
+        status.restoredWorkspace === true
+      ) {
         await this.publishWarmBase(sandboxId, warm.publishDigest);
       }
       phase = 'prompt';
@@ -4577,6 +4603,7 @@ export class SandboxSession extends DurableObject<Env> {
       // Dispatched or unresolved proofs exist: fall through to the existing terminal handling.
     }
     const rejection = error instanceof ControlRequestError && error.rejectionReceived === true;
+    const acknowledgementFailure = error instanceof WarmRestoreAcknowledgementError;
     const retryableRejection =
       rejection && error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
     const detail = confirmedControlRejectionDetail(error);
@@ -4628,9 +4655,13 @@ export class SandboxSession extends DurableObject<Env> {
       ? releaseCompletedRetryableAttach(marked ?? current, messageId, retryNotBefore)
       : (marked ?? current);
     const updated =
-      busy || (phase !== 'prompt' && !countAttachRejection)
+      busy || (phase !== 'prompt' && !countAttachRejection && !acknowledgementFailure)
         ? undefined
-        : incrementDeliveryFailure(nextMessages, messageId, phase);
+        : incrementDeliveryFailure(
+            nextMessages,
+            messageId,
+            acknowledgementFailure ? 'attach' : phase === 'prompt' ? 'prompt' : 'attach'
+          );
     const messages = (updated?.messages ?? nextMessages).map(
       (message): MessageRecord =>
         message.messageId === messageId && message.state.kind === 'queued'
@@ -4648,10 +4679,10 @@ export class SandboxSession extends DurableObject<Env> {
     }
     await this.failDelivery(
       messageId,
-      phase === 'prompt'
-        ? 'prompt_exhausted'
-        : phase === 'attach' && rejection
-          ? 'attach_exhausted'
+      acknowledgementFailure || (phase === 'attach' && rejection)
+        ? 'attach_exhausted'
+        : phase === 'prompt'
+          ? 'prompt_exhausted'
           : 'environment_failed',
       wrapperInstanceId,
       scope,
@@ -5717,6 +5748,22 @@ export class SandboxSession extends DurableObject<Env> {
   private async readContainerWarmBaseFacts(sandboxId: string): Promise<WarmBaseContainerFacts> {
     const container = this.env.SANDBOX_CONTAINERS.getByName(sandboxId);
     return container.warmBaseFacts();
+  }
+
+  /**
+   * The post-launch read of the container's unacknowledged-restore bit. It is
+   * deliberately not folded into `WarmBaseContainerFacts`: the resolver's
+   * pre-launch facts predate the physical start that writes the bit.
+   */
+  private async readContainerWarmRestorePending(sandboxId: string): Promise<boolean> {
+    const container = this.env.SANDBOX_CONTAINERS.getByName(sandboxId);
+    const facts = await container.warmBaseFacts();
+    return facts.warmRestorePending === true;
+  }
+
+  private async clearContainerWarmRestorePending(sandboxId: string): Promise<void> {
+    const container = this.env.SANDBOX_CONTAINERS.getByName(sandboxId);
+    await container.clearWarmRestorePending();
   }
 
   private persistWarmWorkspacePath(

@@ -13,7 +13,6 @@ import {
   warmBasePreparationEnvIdentity,
 } from '../sandbox-control/warm-base.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
-import { attachBranch } from '../shared/session-branch.js';
 import { readProfileBundle } from '../session-profile.js';
 import type { AgentSandboxProvider } from '../types.js';
 import { buildSessionAttachPayload } from './attach-payload.js';
@@ -84,8 +83,6 @@ export async function resolveWarmBaseLaunch(input: {
   const digest = await warmBaseDigest({
     owner: input.metadata.identity.orgId ?? input.metadata.identity.userId,
     repositoryUrl: payload.git?.url ?? '',
-    ref: attachBranch(payload.branch, input.metadata.identity.sessionId),
-    checkoutMode: payload.branchMode === 'working' ? 'working' : 'branch',
     setupCommands: payload.setupCommands ?? [],
     preparationEnvIdentity,
     wrapperVersion: WRAPPER_VERSION,

@@ -154,6 +154,7 @@ export type SandboxControlSocketHandler = {
   hasHandshakenSocket(): boolean;
   supportsOperationResults(): boolean;
   supportsWorkingBranches?(): boolean;
+  supportsRestoredWorkspace?(): boolean;
   supportsNativeRuntimeIdCapture(): boolean;
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
@@ -393,6 +394,14 @@ export function createSandboxControlSocketHandler(
       const current = currentHandshakenSocket(state);
       return (
         current !== null && readAttachment(current.socket)?.capabilities?.workingBranches === true
+      );
+    },
+
+    supportsRestoredWorkspace(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.restoredWorkspace === true
       );
     },
 

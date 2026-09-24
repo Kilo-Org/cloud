@@ -2414,6 +2414,59 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
   });
 
+  describe('session.attach restored workspace capability', () => {
+    const sentPayload = (h: Awaited<ReturnType<typeof harness>>): Record<string, unknown> => {
+      const [request] = h.sendRequest.mock.calls[0] as [SandboxControlOutboundRequest];
+      return request.payload as Record<string, unknown>;
+    };
+
+    it('keeps restoredFromBackup and reports the capability when the wrapper advertises it', async () => {
+      const h = await harness();
+      h.socket.supportsRestoredWorkspace = () => true;
+      await h.create();
+      await h.ready();
+
+      await h.control.request({
+        operation: 'session.attach',
+        session: ROUTE,
+        payload: { restoredFromBackup: true },
+      });
+
+      expect(sentPayload(h)).toHaveProperty('restoredFromBackup', true);
+      await expect(h.control.getStatus()).resolves.toMatchObject({ restoredWorkspace: true });
+    });
+
+    it('omits restoredFromBackup and the status capability when the capability is absent', async () => {
+      const h = await harness();
+      await h.create();
+      await h.ready();
+
+      await h.control.request({
+        operation: 'session.attach',
+        session: ROUTE,
+        payload: { restoredFromBackup: true },
+      });
+
+      expect(sentPayload(h)).not.toHaveProperty('restoredFromBackup');
+      await expect(h.control.getStatus()).resolves.not.toHaveProperty('restoredWorkspace');
+    });
+
+    it('omits restoredFromBackup when the capability is explicitly false', async () => {
+      const h = await harness();
+      h.socket.supportsRestoredWorkspace = () => false;
+      await h.create();
+      await h.ready();
+
+      await h.control.request({
+        operation: 'session.attach',
+        session: ROUTE,
+        payload: { restoredFromBackup: true },
+      });
+
+      expect(sentPayload(h)).not.toHaveProperty('restoredFromBackup');
+    });
+  });
+
   it.each([
     [
       'connection',

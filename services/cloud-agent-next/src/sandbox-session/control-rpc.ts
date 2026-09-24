@@ -51,6 +51,7 @@ type SandboxControlRpc = {
     operationResults?: true;
     runtimeRecovery?: true;
     runtimeReplacementInFlight?: true;
+    restoredWorkspace?: true;
     attachment?: SessionAttachPayload;
   }>;
   getStatus(input?: { sessionId?: string }): Promise<{
@@ -61,6 +62,7 @@ type SandboxControlRpc = {
     operationResults?: true;
     runtimeRecovery?: true;
     runtimeReplacementInFlight?: true;
+    restoredWorkspace?: true;
   }>;
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;

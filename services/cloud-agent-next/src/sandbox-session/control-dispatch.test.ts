@@ -6,6 +6,7 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import {
   ControlRequestError,
+  WarmRestoreAcknowledgementError,
   controlDispatchDisposition,
   controlRequestResult,
   deliveryErrorLogFields,
@@ -15,6 +16,29 @@ import {
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
+
+describe('WarmRestoreAcknowledgementError', () => {
+  it('is retryable delivery coordination, not a wrapper rejection', () => {
+    const error = new WarmRestoreAcknowledgementError(new Error('storage unavailable'));
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(ControlRequestError);
+    expect(error.retryable).toBe(true);
+    expect(error.name).toBe('WarmRestoreAcknowledgementError');
+    expect(isRetryableDeliveryError(error)).toBe(true);
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'Warm restore acknowledgement failed',
+      retryable: true,
+    });
+  });
+
+  it('does not classify a plain error with the same message as retryable', () => {
+    const plain = new Error('Warm restore acknowledgement failed');
+
+    expect(isRetryableDeliveryError(plain)).toBe(false);
+  });
+});
 
 describe('controlDispatchDisposition', () => {
   it.each([

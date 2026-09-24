@@ -17,16 +17,24 @@ const WRAPPER_INSTANCE_ID = '22222222-2222-4222-8222-222222222222';
 const LEGACY_DIRECTORY = `/workspace/user_1/sessions/${SESSION_ID}`;
 
 function metadata(
-  options: { workspacePath?: string; worktreeId?: string; provider?: string } = {}
+  options: {
+    workspacePath?: string;
+    worktreeId?: string;
+    provider?: string;
+    branchName?: string;
+    repository?: SessionMetadata['repository'];
+  } = {}
 ): SessionMetadata {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: { sessionId: SESSION_ID, userId: 'user_1', createdOnPlatform: 'cloud-agent-web' },
     auth: { kiloSessionId: 'kilo_session_1' },
     agent: { mode: 'code', model: 'test-model' },
+    ...(options.repository ? { repository: options.repository } : {}),
     workspace: {
       sandboxId: SANDBOX_ID,
       sandboxProvider: options.provider ?? 'cloudflare-containers',
+      ...(options.branchName ? { branchName: options.branchName } : {}),
       ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}),
       ...(options.worktreeId ? { worktreeId: options.worktreeId } : {}),
     },
@@ -83,6 +91,32 @@ describe('resolveWarmBaseLaunch', () => {
     expect(result.snapshotId).toBe('warm_snap');
     expect(result.publishDigest).toBeDefined();
     expect(d.readWarmRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('derives the same publish digest for two different branch names', async () => {
+    const first = await resolve(metadata({ branchName: 'feature/one' }), deps(containerFacts()));
+    const second = await resolve(metadata({ branchName: 'feature/two' }), deps(containerFacts()));
+
+    expect(first.publishDigest).toBeDefined();
+    expect(second.publishDigest).toBe(first.publishDigest);
+  });
+
+  it('derives the same publish digest for working and explicit checkout of one branch', async () => {
+    const url = 'https://example.test/acme/demo.git';
+    const working = await resolve(
+      metadata({ branchName: 'feature/x', repository: { type: 'git', url } }),
+      deps(containerFacts())
+    );
+    const explicit = await resolve(
+      metadata({
+        branchName: 'feature/x',
+        repository: { type: 'git', url, upstreamBranch: 'feature/x' },
+      }),
+      deps(containerFacts())
+    );
+
+    expect(working.publishDigest).toBeDefined();
+    expect(explicit.publishDigest).toBe(working.publishDigest);
   });
 
   it('returns the persisted directory even when persist resolves to a different path', async () => {

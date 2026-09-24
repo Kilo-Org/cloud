@@ -253,6 +253,13 @@ export function createSessionFixture(
   } satisfies Control;
   const containers = {
     clearSessionSnapshot: vi.fn(async (): Promise<void> => {}),
+    warmBaseFacts: vi.fn(async () => ({
+      image: 'registry.example/kilo/app:test',
+      sessionSnapshotId: null,
+      hasRecord: true,
+      warmRestorePending: false,
+    })),
+    clearWarmRestorePending: vi.fn(async (): Promise<void> => {}),
   };
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },

@@ -75,6 +75,7 @@ function helloFrame(
     runtimeRecovery?: true;
     scopedCleanupResult?: boolean;
     workingBranches?: boolean;
+    restoredWorkspace?: boolean;
     nativeRuntimeIdCapture?: boolean;
   }
 ): string {
@@ -476,6 +477,20 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(handler.supportsWorkingBranches?.()).toBe(true);
+  });
+
+  it('reads the restored workspace capability from the wrapper handshake', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_restored_workspace', {
+        restoredWorkspace: true,
+      })
+    );
+
+    expect(handler.supportsRestoredWorkspace?.()).toBe(true);
   });
 
   it('reads the native runtime id capture capability from the wrapper handshake', async () => {

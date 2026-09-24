@@ -1,4 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type * as IngestLimits from '../util/ingest-limits';
+
+// Keep the skip-threshold above the 4MiB RPC-budget fixtures in this file, but
+// far below production 50MiB so the oversized-item case stays inside the
+// default 5s timeout under a loaded backend gate.
+vi.mock('../util/ingest-limits', async importOriginal => {
+  const actual = await importOriginal<typeof IngestLimits>();
+  return {
+    ...actual,
+    MAX_SINGLE_ITEM_BYTES: 5 * 1024 * 1024,
+  };
+});
 
 import {
   INGEST_CHUNK_MAX_BYTES,

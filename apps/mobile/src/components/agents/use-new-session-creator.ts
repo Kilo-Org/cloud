@@ -47,6 +47,10 @@ type UseNewSessionCreatorInput = {
   autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
+  /** Manual env vars from Advanced Configuration; omitted from the body when empty. */
+  manualEnvVars?: Record<string, string>;
+  /** Manual setup commands from Advanced Configuration; omitted from the body when empty. */
+  setupCommands?: string[];
 };
 
 type UseNewSessionCreatorResult = {
@@ -88,6 +92,8 @@ export function useNewSessionCreator({
   variant,
   autoCommit,
   profileId,
+  manualEnvVars,
+  setupCommands,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useStackSafeReplace();
   const queryClient = useQueryClient();
@@ -188,6 +194,8 @@ export function useNewSessionCreator({
           model,
           variant,
           profileId,
+          envVars: manualEnvVars,
+          setupCommands,
           autoCommit,
           attachments: uploaded.wire,
           organizationId,
@@ -282,6 +290,8 @@ export function useNewSessionCreator({
     autoCommit,
     organizationId,
     profileId,
+    manualEnvVars,
+    setupCommands,
     queryClient,
     trpc,
     router,

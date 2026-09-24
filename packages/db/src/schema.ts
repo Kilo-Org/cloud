@@ -6386,6 +6386,14 @@ export const cli_sessions_v2 = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'set null',
     }),
+    // The profile the session was prepared with, resolved server-side (an
+    // explicit pick, the effective default, or a repository binding). Null on
+    // rows created before this column existed and on sessions whose create
+    // origin resolved no profile. `set null` so deleting a profile keeps the
+    // session history readable.
+    profile_id: uuid().references(() => agent_environment_profiles.id, {
+      onDelete: 'set null',
+    }),
     cloud_agent_session_id: text(),
     cloud_agent_session_scope_id: text(),
     cloud_agent_worktree_id: text(),
@@ -6416,6 +6424,10 @@ export const cli_sessions_v2 = pgTable(
       table.parent_session_id,
       table.kilo_user_id
     ),
+    // Supports the ON DELETE SET NULL scan when a profile is deleted. Built
+    // concurrently — `cli_sessions_v2` is large, so a plain build blocks writes
+    // for the whole scan, the same reason the `user_*` indexes below do.
+    index('IDX_cli_sessions_v2_profile_id').on(table.profile_id).concurrently(),
     uniqueIndex('UQ_cli_sessions_v2_public_id')
       .on(table.public_id)
       .where(isNotNull(table.public_id)),

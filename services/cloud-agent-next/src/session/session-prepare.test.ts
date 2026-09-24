@@ -21,6 +21,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
+import { CODE_REVIEW_CONTROL_PLANE_ORG_ID } from '../session-plane.js';
 import {
   resolveSharedSandboxAssignment,
   SHARED_SANDBOX_FAILOVER_SUFFIX,
@@ -1758,10 +1759,9 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
-  it('creates enrolled code-review origin sessions on the control plane without worktrees', async () => {
+  it('creates code-review origin sessions on the control plane for the gated org without worktrees', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = '*';
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -1769,7 +1769,11 @@ describe('createSessionWithLedger admission ladder', () => {
       ctx,
       makeRequest({
         finalization: { autoCommit: true },
-        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'code-review',
+          kilocodeOrganizationId: CODE_REVIEW_CONTROL_PLANE_ORG_ID,
+        },
       })
     );
 
@@ -1785,6 +1789,30 @@ describe('createSessionWithLedger admission ladder', () => {
           worktreeId: expect.anything(),
           workspacePath: expect.anything(),
         }),
+      })
+    );
+  });
+
+  it('keeps code-review origin sessions on agent_ for other orgs', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '*';
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'code-review',
+          kilocodeOrganizationId: '11111111-1111-4111-8111-111111111111',
+        },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
       })
     );
   });

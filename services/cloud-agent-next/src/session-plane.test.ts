@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CODE_REVIEW_CONTROL_PLANE_ORG_ID,
   generateSessionId,
+  isCodeReviewControlPlaneOwner,
   isControlPlaneOwner,
-  isControlPlaneSessionOrigin,
+  isInteractiveWebSession,
   isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
@@ -54,21 +56,31 @@ describe('session plane identity', () => {
     expect(isControlPlaneOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-2' })).toBe(false);
   });
 
-  it('mints workspace_ for enrolled Code Reviewer runs', () => {
+  it('mints workspace_ for Code Reviewer only for the gated org', () => {
     const codeReview = { createdOnPlatform: 'code-review' };
     expect(
-      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-1' }, codeReview)
-    ).toBe('control');
-    expect(
       sessionPlaneForNewOwner(
-        { CONTROL_PLANE_IDS: 'org-1' },
-        { userId: 'user-2', orgId: 'org-1' },
+        {},
+        { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
         codeReview
       )
     ).toBe('control');
-    expect(sessionPlaneForNewOwner({}, { userId: 'user-1' }, codeReview)).toBe('legacy');
     expect(
-      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'other' }, { userId: 'user-1' }, codeReview)
+      sessionPlaneForNewOwner(
+        { CONTROL_PLANE_IDS: '*' },
+        { userId: 'user-1', orgId: 'org-1' },
+        codeReview
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: '*' }, { userId: 'user-1' }, codeReview)
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: CODE_REVIEW_CONTROL_PLANE_ORG_ID, orgId: 'org-1' },
+        codeReview
+      )
     ).toBe('legacy');
   });
 
@@ -85,12 +97,21 @@ describe('session plane identity', () => {
     }
   );
 
-  it('admits cloud-agent-web and code-review as control-plane origins', () => {
-    expect(isControlPlaneSessionOrigin({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
-    expect(isControlPlaneSessionOrigin({ createdOnPlatform: 'code-review' })).toBe(true);
-    expect(isControlPlaneSessionOrigin({ createdOnPlatform: 'slack' })).toBe(false);
-    expect(isControlPlaneSessionOrigin({})).toBe(false);
-    expect(isControlPlaneSessionOrigin()).toBe(false);
+  it('admits only cloud-agent-web as an interactive web session', () => {
+    expect(isInteractiveWebSession({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
+    expect(isInteractiveWebSession({ createdOnPlatform: 'code-review' })).toBe(false);
+    expect(isInteractiveWebSession({ createdOnPlatform: 'slack' })).toBe(false);
+    expect(isInteractiveWebSession({})).toBe(false);
+    expect(isInteractiveWebSession()).toBe(false);
+  });
+
+  it('gates Code Reviewer control-plane ownership by org id only', () => {
+    expect(
+      isCodeReviewControlPlaneOwner({ userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID })
+    ).toBe(true);
+    expect(isCodeReviewControlPlaneOwner({ userId: 'user-1', orgId: 'org-1' })).toBe(false);
+    expect(isCodeReviewControlPlaneOwner({ userId: 'user-1' })).toBe(false);
+    expect(isCodeReviewControlPlaneOwner({ userId: CODE_REVIEW_CONTROL_PLANE_ORG_ID })).toBe(false);
   });
 
   it.each([

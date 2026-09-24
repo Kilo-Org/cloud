@@ -8,10 +8,6 @@ import type { KiloSessionId } from './types';
 import type { UserWebSystemEvent } from './user-web-connection';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// WebSocket mock — needed because connect() → resolveSession → transport → WS
-// ---------------------------------------------------------------------------
-
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
   onmessage: ((ev: MessageEvent) => void) | null;
@@ -43,10 +39,6 @@ afterEach(() => {
   // @ts-expect-error -- cleanup
   delete global.WebSocket;
 });
-
-// ---------------------------------------------------------------------------
-// Constants & helpers
-// ---------------------------------------------------------------------------
 
 const kiloSessionId = kiloId('ses_transport-tests');
 const cloudAgentSessionId = cloudAgentId('agent_12345678-1234-1234-1234-123456789abc');
@@ -90,7 +82,6 @@ async function connectSession(session: CloudAgentSession): Promise<void> {
   await new Promise(r => setTimeout(r, 0));
   await new Promise(r => setTimeout(r, 0));
   await new Promise(r => setTimeout(r, 0));
-  // Simulate WebSocket open
   mockWs.onopen?.(new Event('open'));
 }
 
@@ -152,10 +143,6 @@ function emitHeartbeatOwner(
     },
   });
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('Cloud Agent worktree refresh event pipeline', () => {
   it.each([false, true])(
@@ -791,16 +778,13 @@ describe('disconnect during resolution', () => {
     });
 
     session.connect();
-    // disconnect while resolveSession is still pending
     session.disconnect();
 
-    // Now let the resolution complete
     resolveSession({ type: 'cloud-agent', kiloSessionId, cloudAgentSessionId });
     await resolvePromise;
     // Flush microtasks so resolveAndConnect can run its post-resolve code
     await new Promise(r => setTimeout(r, 0));
 
-    // No WebSocket should have been created — the stale generation bailed out
     expect(jest.mocked(global.WebSocket).mock.calls.length).toBe(0);
     session.destroy();
   });

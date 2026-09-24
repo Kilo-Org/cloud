@@ -71,10 +71,6 @@ import { findLatestContextUsage } from './context-usage';
 import type { ContextUsage } from './context-usage';
 import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
 type SessionManagerSendPayload = SessionManagerPromptPayload | SendCommandPayload;
@@ -398,7 +394,6 @@ type SessionManagerConfig = {
   onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
 
-// Writable/read-only atom aliases for the public atoms record
 type W<T> = WritableAtom<T, [T], void>;
 
 type SessionManagerAtoms = {
@@ -572,10 +567,6 @@ type SessionManager = {
   atoms: SessionManagerAtoms;
 };
 
-// ---------------------------------------------------------------------------
-// Error formatting
-// ---------------------------------------------------------------------------
-
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
 /** Terminal message for a child session whose first page is a worker 404 (not-found). */
 const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
@@ -644,10 +635,6 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
 function formatError(err: unknown): string {
   return formatErrorDetail(err).message;
 }
-
-// ---------------------------------------------------------------------------
-// Streaming detection
-// ---------------------------------------------------------------------------
 
 function isMessageStreaming(msg: StoredMessage): boolean {
   if (msg.info.role === 'assistant' && msg.info.error) return false;
@@ -755,10 +742,6 @@ function insertOptimisticUserMessage(input: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Status → indicator mapping
-// ---------------------------------------------------------------------------
-
 function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (cs.type === 'preparing') {
@@ -845,10 +828,6 @@ function removePendingRequest<T extends { requestId: string }>(
     : list;
 }
 
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
-
 function createSessionManager(config: SessionManagerConfig): SessionManager {
   const { store } = config;
 
@@ -858,11 +837,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // authoritative message exactly once.
   const remoteOptimisticIds = new Set<string>();
 
-  // Internal atoms
   const sessionStorageAtom = atom<JotaiSessionStorage | null>(null);
   const rootSessionIdAtom = atom<string | null>(null);
 
-  // Public writable atoms
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
   /**
@@ -948,7 +925,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
-  // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
     const storage = get(sessionStorageAtom);
     if (!storage) return [];
@@ -1009,7 +985,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return (childSessionId: string): string | null => errors.get(childSessionId) ?? null;
   });
 
-  // Private mutable state
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
@@ -1655,7 +1630,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
         if (csk !== prevCsk) prevCsk = csk;
         prevCloudStatusHadIndicator = false;
-        // Fall through to existing agent status indicator logic
         const sk = sKey(st);
         if (sk !== prevSk || shouldClearCloudIndicator) {
           const ind = indicatorForStatus(st);
@@ -1739,7 +1713,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
     if (store.get(transcriptClearedAtom)) return;
-    // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
     // same result instead of starting a parallel backend request.

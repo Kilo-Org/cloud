@@ -49,7 +49,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'glm-5.2': 'zai/glm-5.2',
 };
 
-function mapResolvedModelIdToVercel(modelId: string) {
+export function mapResolvedModelIdToVercel(modelId: string) {
   const hardcodedVercelId = vercelModelIdMapping[modelId];
   if (hardcodedVercelId) {
     return hardcodedVercelId;

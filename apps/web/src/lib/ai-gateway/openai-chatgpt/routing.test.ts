@@ -12,8 +12,11 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
 // disabled, and at one point none were live at all, which silently turned the
 // exclusive cases below into ordinary-model cases. Stub a synthetic alias, but
 // preserve the real lookup for the catalog status regression tests below.
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof gatewayModels>('@/lib/ai-gateway/models');
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof gatewayModels>('@/lib/ai-gateway/kilo-exclusive-models');
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@/lib/ai-gateway/providers/definitions/openrouter'
+  );
   const testExclusiveModel: KiloExclusiveModel = {
     public_id: 'openai/kilo-exclusive-test-model',
     internal_id: 'openai/upstream-test-model',
@@ -22,7 +25,7 @@ jest.mock('@/lib/ai-gateway/models', () => {
     status: 'public',
     context_length: 8_192,
     max_completion_tokens: 4_096,
-    gateway: 'vercel',
+    provider: { ...OPENROUTER, id: 'vercel' },
     flags: [],
     pricing: null,
     inference_provider_restriction: ['openai'],
@@ -56,8 +59,9 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type * as gatewayModels from '@/lib/ai-gateway/models';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import type * as gatewayModels from '@/lib/ai-gateway/kilo-exclusive-models';
+import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';

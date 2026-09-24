@@ -16,29 +16,28 @@ import { RemoteSessionRow } from './remote-session-row';
 import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import { StoredSessionRow } from './session-row';
 
-vi.mock('react-native', async () => {
-  const React = await import('react');
-  return {
-    View: 'View',
-    Pressable: 'Pressable',
-    TextInput: 'TextInput',
-    Platform: { OS: 'ios' },
-    FlatList: ({
-      data,
-      renderItem,
-    }: {
-      data: ShareDestinationRow[];
-      renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
-    }) =>
-      React.createElement(
-        'FlatList',
-        null,
-        data.map(item =>
-          React.createElement('Cell', { key: item.session_id }, renderItem({ item }))
-        )
-      ),
-  };
-});
+// The share destination list renders through FlashList v2; the stub feeds the
+// real `renderItem` every row, exactly as the old react-native FlatList stub did.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: ({
+    data,
+    renderItem,
+  }: {
+    data: ShareDestinationRow[];
+    renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
+  }) =>
+    createElement(
+      'FlashList',
+      null,
+      data.map(item => createElement('Cell', { key: item.session_id }, renderItem({ item })))
+    ),
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  TextInput: 'TextInput',
+  Platform: { OS: 'ios' },
+}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
@@ -354,6 +353,50 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+
+  const placeholderTitle = 'New session - 2026-09-21T15:44:47.176Z';
+
+  it('renders the generic untitled label for the server creation-default title', () => {
+    const renderer = mount(row({ session: { ...session, title: placeholderTitle } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(placeholderTitle);
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain('Untitled session');
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-21');
+  });
+
+  it('seeds the rename prompt blank for the server creation-default title, never the placeholder', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: placeholderTitle },
+        onRename: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row button');
+    }
+    act(() => {
+      (button.props as { onLongPress?: () => void }).onLongPress?.();
+    });
+    const options = vi.mocked(showSessionActionMenu).mock.calls[0]?.[0];
+    if (!options?.onRename) {
+      throw new Error('Missing rename action');
+    }
+    options.onRename();
+    // The base seeds the field blank for an unnamed session, where the
+    // placeholder copy prompts for a name; the raw server title never reaches
+    // the prompt.
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith('', expect.any(Function));
+  });
+
+  it('keeps a real title that merely starts with "New session"', () => {
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session plan for the login redirect' } })
+    );
+    expect(texts(renderer)).toContain('New session plan for the login redirect');
+  });
 });
 
 describe('StoredSessionRow rename prefill', () => {

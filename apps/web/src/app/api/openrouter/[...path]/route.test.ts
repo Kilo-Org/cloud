@@ -35,8 +35,8 @@ import {
   checkPromotionLimit,
   logFreeModelRequest,
 } from '@/lib/free-model-rate-limiter';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 jest.mock('next/server', () => {
@@ -704,79 +704,6 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['google']);
-  });
-
-  it('allows an explicitly granted model through an enterprise experiment', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-1',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { model_deny_list: ['openai/gpt-4o'] },
-      plan: 'enterprise',
-    });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, id: 'martian' },
-      userByok: null,
-      bypassAccessCheck: false,
-      experiment: {
-        experimentId: 'experiment-1',
-        variantId: 'variant-1',
-        variantVersionId: 'version-1',
-        allocationSubject: 'user',
-      },
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('blocks an enterprise experiment outside the effective provider routes', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-1',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { provider_allow_list: ['openai'] },
-      plan: 'enterprise',
-    });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, id: 'martian' },
-      userByok: null,
-      bypassAccessCheck: false,
-      experiment: {
-        experimentId: 'experiment-1',
-        variantId: 'variant-1',
-        variantVersionId: 'version-1',
-        allocationSubject: 'user',
-      },
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({
-      allowed: true,
-      eligibleProviderRoutes: new Set(['openai']),
-    });
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(404);
   });
 
   it('returns 404 when the OpenRouter model id is unknown', async () => {

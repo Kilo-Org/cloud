@@ -1798,21 +1798,35 @@
       "idx": 256,
       "version": "7",
       "when": 1790097479765,
-      "tag": "0255_add_superseded_at_to_user_activity_tokens",
+      "tag": "0256_add_superseded_at_to_user_activity_tokens",
       "breakpoints": true
     },
     {
       "idx": 257,
       "version": "7",
       "when": 1790098375222,
-      "tag": "0256_user_activity_tokens_live_ios_activity_unique",
+      "tag": "0257_user_activity_tokens_live_ios_activity_unique",
       "breakpoints": true
     },
     {
       "idx": 258,
       "version": "7",
-      "when": 1790173354576,
-      "tag": "0258_spend_alerts_rollup_covering_index",
+      "when": 1790187002169,
+      "tag": "0258_github_connection_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 259,
+      "version": "7",
+      "when": 1790187043975,
+      "tag": "0259_github_connection_role_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 260,
+      "version": "7",
+      "when": 1790256176572,
+      "tag": "0260_spend_alerts_rollup_covering_index",
       "breakpoints": true
     }
   ]

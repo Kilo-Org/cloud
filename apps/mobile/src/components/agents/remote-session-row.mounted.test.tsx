@@ -174,9 +174,19 @@ afterEach(async () => {
 describe('row title', () => {
   it('paints the untitled label for a session that still carries the backend placeholder', async () => {
     // The backend seeds a fresh session with `New session - ${ISO}`; the tray
-    // row shows its own label instead of the machine string.
+    // row shows its own label instead of the machine string. Both merge sides
+    // covered this title, so the assertions live in one test: the row title and
+    // the spoken label never carry the raw timestamp.
     await render({ ...session, title: 'New session - 2026-09-22T01:09:45.623Z' });
     expect(renderer?.root.findByType('SessionRow').props.title).toBe('Untitled session');
+    const label = renderer?.root.findByType(Pressable).props.accessibilityLabel as string;
+    expect(label).toContain('Untitled session');
+    expect(label).not.toContain('2026-09-22');
+  });
+
+  it('keeps a real title unchanged', async () => {
+    await render({ ...session, title: 'Live work' });
+    expect(renderer?.root.findByType('SessionRow').props.title).toBe('Live work');
   });
 });
 

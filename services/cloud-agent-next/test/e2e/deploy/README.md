@@ -327,8 +327,9 @@ touched again.
 pnpm --filter cloud-agent-next run e2e:deployed
 ```
 
-`smoke-deployed.ts` runs every entry of `SHARED_SCENARIOS` through the shared
-gate against the deployed Worker. A scenario
+`e2e:deployed` is the serial reference runner. `smoke-deployed.ts` runs every
+entry of `SHARED_SCENARIOS` through the shared gate against the deployed Worker.
+A scenario
 whose declared capability the deployed environment does not provide is reported
 `unsupported` with the missing capability names, never run with the assertion
 dropped. The four `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
@@ -340,20 +341,27 @@ profile's expected unsupported. The summary separates passed / failed / unsuppor
 `1` if any scenario failed, else `2` if any unsupported is outside the derived
 expected set, else `0`; an expected capability gap is a reported skip, not a
 failure.
-Each scenario owns its cleanup; the runner only repeats `interruptSession` and
-`deleteSession` as a tolerant backstop. The same script runs in the
-`workflow_dispatch`-only `Cloud Agent E2E tests` workflow
-(`.github/workflows/cloud-agent-e2e-tests.yml`). See
+
+The `workflow_dispatch`-only `Cloud Agent E2E tests` workflow
+(`.github/workflows/cloud-agent-e2e-tests.yml`) runs the parallel runner
+(`e2e:parallel`) as ONE job with `E2E_PARALLEL=4`; it does not run
+`smoke-deployed.ts`. See
 [`../README.md`](../README.md#deployed-matrix-runner) for the scenario matrix
 and the env contract.
+
+Under the deployed profile the shared gate owns session teardown, so a scenario
+that did not previously delete its session now releases its sandbox:
+`interruptSession` then `deleteSession`, newest first, with the delete on a 45 s
+client budget. That budget bounds the client request, not the container's
+destruction.
 
 Aggregate-runtime risk: the four public-surface scenarios have declared
 ceilings of 10 + 25 + 12 + 30 minutes, plus cleanup (up to about 2.5 minutes)
 and transport overhead. Their budgets mix per-turn and overall timeouts, as the
 existing scenarios do (`cold-hot` alone permits four 240 s turn waits), so no
-whole-matrix total is derivable from the registry. The workflow's per-batch
-`timeout-minutes: 90` is a reasonable operational ceiling, not a certified
-whole-matrix bound. None of the four public-surface scenarios uses a `gate` or
+whole-run total is derivable from the registry. The single job's
+`timeout-minutes: 180` is a reasonable operational ceiling, not a certified
+whole-run bound. None of the four public-surface scenarios uses a `gate` or
 `hang`; `worktree-multi-chat` does issue a targeted interrupt of the sibling
 chat.
 

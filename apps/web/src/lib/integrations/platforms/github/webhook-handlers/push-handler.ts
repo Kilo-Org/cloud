@@ -15,16 +15,21 @@ import { extractBranchNameFromRef } from '@/lib/integrations/platforms/github/ut
 import { triggerBuild } from '@/lib/app-builder/app-builder-client';
 
 export async function handlePushEvent(event: PushEventPayload, integration: PlatformIntegration) {
+  if (integration.github_connection_role !== 'workflow') return;
   const branchName = extractBranchNameFromRef(event.ref);
   const repositoryFullName = event.repository.full_name;
 
   await Promise.allSettled([
-    redeployMatchingDeployments(repositoryFullName, branchName),
+    redeployMatchingDeployments(repositoryFullName, branchName, integration.id),
     rebuildMatchingAppBuilderPreviews(repositoryFullName, branchName, integration),
   ]);
 }
 
-async function redeployMatchingDeployments(repositoryFullName: string, branchName: string) {
+async function redeployMatchingDeployments(
+  repositoryFullName: string,
+  branchName: string,
+  integrationId: string
+) {
   const githubDeployments = await db
     .select({
       deployment: deployments,
@@ -40,6 +45,8 @@ async function redeployMatchingDeployments(repositoryFullName: string, branchNam
         eq(deployments.repository_source, repositoryFullName),
         eq(deployments.branch, branchName),
         eq(deployments.source_type, 'github'),
+        eq(deployments.platform_integration_id, integrationId),
+        eq(platform_integrations.github_connection_role, 'workflow'),
         eq(platform_integrations.platform, PLATFORM.GITHUB)
       )
     );

@@ -283,7 +283,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const effectiveProvider = provider;
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
-    requestBodyParsed.model = mapModelIdToVercel(requestBodyParsed.model);
+    requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
   const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);

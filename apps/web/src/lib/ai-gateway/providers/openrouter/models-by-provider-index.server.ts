@@ -153,7 +153,7 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
       snapshotProviderSlugs,
       storedModels[modelId]
     );
-    const vercelModel = vercelModels[mapModelIdToVercel(modelId)];
+    const vercelModel = vercelModels[await mapModelIdToVercel(modelId)];
     const vercelProviders = new Set(
       vercelModel?.endpoints.map(endpoint =>
         normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)

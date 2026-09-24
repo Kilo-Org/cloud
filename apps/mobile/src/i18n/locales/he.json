@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש אנטר מוסיף שורה חדשה בשדות ההודעה של הסוכנים.",
     "biometricUnlock": "ביטול נעילה באמצעות זיהוי ביומטרי",
     "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע.",
-    "featureFlags": "דגלי תכונות",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "מהשרת · ≥ {{min}}",
-    "featureFlagSkipped": "ברירת מחדל · < {{min}}",
-    "featureFlagNotLoaded": "ברירת מחדל · לא נטען",
     "gatewayTranscription": "תמלול דרך Kilo Gateway",
     "gatewayTranscriptionSubtitle": "תמלל את ההכתבה בעזרת מודל של Kilo Gateway במקום זיהוי הדיבור של המכשיר. ההקלטה נשלחת ל־Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1745,10 +1740,6 @@
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
       "linesOf": "שורות {{start}}–{{end}} מתוך {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "הפעולה {{action}} ב-Cloud Agent נכשלה ({{status}}).",
-      "failed": "הפעולה {{action}} ב-Cloud Agent נכשלה."
-    },
     "collectCopyableText": {
       "unserializableInput": "[קלט שאינו ניתן לסריאליזציה]",
       "errorPrefix": "שגיאה: {{error}}"
@@ -1844,8 +1835,7 @@
       "assistantProviderRejected": "הספק דחה את הבקשה.",
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
-      "assistantFailed": "יצירת התשובה נכשלה.",
-      "sendFailed": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
+      "assistantFailed": "יצירת התשובה נכשלה."
     },
     "filePart": {
       "loadingImage": "טוען תמונה",

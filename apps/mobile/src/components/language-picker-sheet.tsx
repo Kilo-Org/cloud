@@ -1,6 +1,6 @@
 import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, I18nManager, TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -50,8 +50,10 @@ export function LanguagePickerSheet({
   const [restarting, setRestarting] = useState(false);
   const [reloadFailed, setReloadFailed] = useState(false);
   const [query, setQuery] = useState('');
-  // Bumped on every focus so the uncontrolled TextInput remounts empty.
-  const [searchEpoch, setSearchEpoch] = useState(0);
+  // The search field is uncontrolled (iOS drops keystrokes when state drives
+  // `value`), so an emptied field is cleared through this ref rather than by
+  // remounting the input.
+  const searchInputRef = useRef<TextInput>(null);
   const skipNextGuardRef = useRef(false);
   const closeRequestedRef = useRef(false);
   const navigation = useNavigation();
@@ -79,7 +81,15 @@ export function LanguagePickerSheet({
       closeRequestedRef.current = false;
       skipNextGuardRef.current = false;
       setQuery('');
-      setSearchEpoch(epoch => epoch + 1);
+      // Empty the field imperatively instead of remounting it. A remount hands
+      // the recreated native EditText the text it still holds, and the next
+      // keystroke then appends to that stale copy: the sheet's search field
+      // read the typed term twice, as one run ("DeutschDeutsch", "ArabicArabic"),
+      // which then matched nothing (language-search-deutsch,
+      // language-search-kb-up, 2026-09-20). Clearing the live field keeps the
+      // same behaviour — a reopened sheet starts empty — without recreating the
+      // view.
+      searchInputRef.current?.clear();
       setSelected(getLanguagePreference());
       setApplied(getLanguagePreference());
       setAppliedLanguage(getResolvedLanguage());
@@ -93,7 +103,14 @@ export function LanguagePickerSheet({
   // The native layout direction, not the catalog's: the row insets and the
   // search alignment follow how the interface is laid out.
   const isRtl = I18nManager.isRTL;
-  const items = languagePickerItems(query, appliedLanguage, applied === 'device');
+  // The copy/fold/collate of the whole language table and the fresh row objects
+  // are only valid while the query and the applied language stand. Keyed the
+  // same way so a `selected` or `busy` change keeps the list identity and does
+  // not re-render every mounted row.
+  const items = useMemo(
+    () => languagePickerItems(query, appliedLanguage, applied === 'device'),
+    [query, appliedLanguage, applied]
+  );
 
   const handleDone = async () => {
     if (busy) {
@@ -214,7 +231,7 @@ export function LanguagePickerSheet({
         <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
           <Search size={18} color={colors.mutedForeground} />
           <TextInput
-            key={searchEpoch}
+            ref={searchInputRef}
             accessibilityLabel={t('language.search')}
             // leading-[normal] so no lineHeight reaches the style: iOS otherwise
             // draws the placeholder below the typed text and clips it. The fixed
@@ -227,7 +244,8 @@ export function LanguagePickerSheet({
             // to a native prop for TextInput and crashes on it in this version.
             style={isRtl ? SEARCH_RTL : undefined}
             // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-            // input remounts on focus via `searchEpoch`, so a reopen starts empty.
+            // focus effect clears the live field through the ref, so a reopen
+            // starts empty.
             onChangeText={setQuery}
             autoCapitalize="none"
             autoCorrect={false}

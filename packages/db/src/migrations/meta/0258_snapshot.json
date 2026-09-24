@@ -1,6 +1,6 @@
 {
-  "id": "5be25c12-ad9a-44df-8132-52e8cc1dabb9",
-  "prevId": "a37ceca1-c1e1-4a48-b829-5abacb2ec983",
+  "id": "f048cb32-4477-431d-9fe4-bd5d05163f3c",
+  "prevId": "6895dcc0-c940-4977-a174-22a6ab734ec8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -25511,39 +25511,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_microdollar_usage_created_at_rollup": {
-          "name": "idx_microdollar_usage_created_at_rollup",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "cost",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "idx_abuse_classification": {
           "name": "idx_abuse_classification",
           "columns": [
@@ -30641,6 +30608,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "github_connection_role": {
+          "name": "github_connection_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "github_authorized_by_user_id": {
           "name": "github_authorized_by_user_id",
           "type": "text",
@@ -31143,6 +31116,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "platform_integrations_github_connection_role_check": {
+          "name": "platform_integrations_github_connection_role_check",
+          "value": "\"platform_integrations\".\"github_connection_role\" IS NULL OR (\n        \"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_type\" = 'app'\n        AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL\n        AND \"platform_integrations\".\"github_connection_role\" IN ('workflow', 'agent_only')\n        AND (\"platform_integrations\".\"github_connection_role\" <> 'agent_only' OR \"platform_integrations\".\"github_installation_id\" IS NOT NULL)\n      )"
+        },
         "platform_integrations_owner_check": {
           "name": "platform_integrations_owner_check",
           "value": "(\n        (\"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NULL) OR\n        (\"platform_integrations\".\"owned_by_user_id\" IS NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL)\n      )"

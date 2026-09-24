@@ -26,6 +26,7 @@ describe('Mayor idle lifecycle', () => {
     townName = `mayor-idle-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
+    await town.updateTownConfig({ staged_convoys_default: false });
     await town.addRig({
       rigId: 'rig-1',
       name: 'main-rig',

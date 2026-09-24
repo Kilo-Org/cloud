@@ -913,18 +913,18 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
-// Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
+// Skip container proxy routes (CF Access at the perimeter) and db-snapshot / mayor-id
+// routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
   if (
-    path.includes('/container-registry') ||
+    path.includes('/container') ||
     path.includes('/db-snapshot') ||
-    path.includes('/mayor-id') ||
-    path.includes('/container-events')
+    path.includes('/mayor-id')
   ) {
     return next();
   }
-  await kiloAuthMiddleware(c, async () => {
+  return kiloAuthMiddleware(c, async () => {
     await adminAuditMiddleware(c, async () => {
       await townAuthMiddleware(c, next);
     });

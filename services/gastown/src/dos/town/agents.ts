@@ -141,7 +141,7 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
         ${agent_metadata.columns.last_activity_at}
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    [id, input.role, input.identity, null, 'idle', null, 0, null, null]
+    [id, input.role, input.identity, null, 'idle', null, 0, null, timestamp]
   );
 
   const agent = getAgent(sql, id);

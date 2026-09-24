@@ -7,6 +7,15 @@ import { parseJsonBody } from '../util/parse-json-body.util';
 
 const CONTAINER_LOG = '[town-container.handler]';
 
+function isEmptyJsonObject(body: unknown): boolean {
+  return (
+    body == null ||
+    typeof body !== 'object' ||
+    Array.isArray(body) ||
+    Object.keys(body as Record<string, unknown>).length === 0
+  );
+}
+
 /**
  * Proxy a request to the town container's control server and return the response.
  * Preserves the original status code and JSON body.
@@ -47,7 +56,7 @@ export async function handleContainerStartAgent(
   params: { townId: string }
 ) {
   const body = await parseJsonBody(c);
-  if (!body) return c.json(resError('Invalid JSON body'), 400);
+  if (isEmptyJsonObject(body)) return c.json(resError('Invalid JSON body'), 400);
 
   const container = getTownContainerStub(c.env, params.townId);
   return proxyToContainer(container, '/agents/start', {
@@ -82,7 +91,7 @@ export async function handleContainerSendMessage(
   params: { townId: string; agentId: string }
 ) {
   const body = await parseJsonBody(c);
-  if (!body) return c.json(resError('Invalid JSON body'), 400);
+  if (isEmptyJsonObject(body)) return c.json(resError('Invalid JSON body'), 400);
 
   const container = getTownContainerStub(c.env, params.townId);
   return proxyToContainer(container, `/agents/${params.agentId}/message`, {

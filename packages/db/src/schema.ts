@@ -5791,6 +5791,12 @@ export const modelsByProvider = pgTable('models_by_provider', {
   vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
 });
 
+export const ai_gateway_external_models_cache = pgTable('ai_gateway_external_models_cache', {
+  source: text().primaryKey(),
+  data: jsonb().$type<unknown>().notNull(),
+  synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
 export const ai_gateway_config = pgTable(
   'ai_gateway_config',
   {

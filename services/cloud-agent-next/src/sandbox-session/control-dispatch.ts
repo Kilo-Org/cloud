@@ -31,6 +31,14 @@ export class ControlRequestError extends Error {
   }
 }
 
+export function isUnconfirmedReachabilityFailure(error: unknown): error is ControlRequestError {
+  return (
+    error instanceof ControlRequestError &&
+    error.retryable === true &&
+    error.rejectionReceived !== true
+  );
+}
+
 const CONTROL_ERROR_OWN_FIELDS = Object.keys(controlErrorSchema.shape);
 
 /**

@@ -12,6 +12,7 @@
 
 import {
   captureControlWrapperProcess,
+  recycleControlConnection,
   signalKiloServerProcess,
   waitForNewSandboxPresent,
 } from './sandbox-control.js';
@@ -21,7 +22,12 @@ import {
   stopOwnedSandboxFamily,
   waitForOwnedSandbox,
 } from './lifecycle.js';
-import { captureLogCursor, readWorkerLogSnapshot } from './idle-stop-evidence.js';
+import { captureLogCursor, readWorkerLogSnapshot, type LogRecord } from './idle-stop-evidence.js';
+import {
+  AttachWindowMissedError,
+  evaluateAttachWindow,
+  type AttachWindowResult,
+} from './attach-window-evidence.js';
 import { deriveSandboxAllocationId } from '../../src/sandbox-id.js';
 import {
   collectReapEvidence,
@@ -46,6 +52,63 @@ function callbackPayload(record: CallbackRecord): CallbackPayload {
   return (
     record.body !== null && typeof record.body === 'object' ? record.body : {}
   ) as CallbackPayload;
+}
+
+/** Poll cadence for the attach-drop/reconnect worker-log correlation. */
+const CONTROL_SOCKET_LOG_POLL_MS = 250;
+/**
+ * Chosen test budget for observing the recycle sequence after `SIGUSR1`. It is
+ * not `RECONNECT_MAX_MS`, which caps one retry delay, not the whole reconnect.
+ */
+const CONTROL_SOCKET_RECYCLE_BUDGET_MS = 10_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function logString(record: Record<string, unknown>, key: string): string | undefined {
+  return typeof record[key] === 'string' ? record[key] : undefined;
+}
+
+/** Worker diagnostics that make up the attach-window stream. */
+const ATTACH_WINDOW_DIAGNOSTICS = new Set([
+  'socket_request_sent',
+  'socket_response',
+  'socket_closed',
+  'handshake_committed',
+  'wrapper_ready',
+]);
+
+function isAttachWindowRecord(record: LogRecord): boolean {
+  return (
+    typeof record.diagnosticEvent === 'string' &&
+    ATTACH_WINDOW_DIAGNOSTICS.has(record.diagnosticEvent)
+  );
+}
+
+/**
+ * `dropControlSocketDuringAttach`'s only success return: accept the attach
+ * window or throw. `missed` throws `AttachWindowMissedError` (the one retryable
+ * outcome); `late_response` throws `attach response after close` (not
+ * retryable). Exported so the capability-level test can inject a record stream
+ * without Docker.
+ */
+export function acceptAttachWindow(input: {
+  records: LogRecord[];
+  requestId: string;
+  attachConnectionId: string;
+  signalCursorPosition: number;
+  result: AttachWindowResult;
+}): AttachWindowResult {
+  const decision = evaluateAttachWindow({
+    records: input.records,
+    requestId: input.requestId,
+    attachConnectionId: input.attachConnectionId,
+    signalCursorPosition: input.signalCursorPosition,
+  });
+  if (decision.kind === 'missed') throw new AttachWindowMissedError();
+  if (decision.kind === 'late_response') throw new Error('attach response after close');
+  return input.result;
 }
 
 /**
@@ -148,6 +211,9 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     }
   };
 
+  /** The one worker-log end cursor behind both cursor-shaped capability names. */
+  const captureWorkerLogCursor = async (): Promise<number> => (await captureLogCursor()).fromByte;
+
   return {
     captureWrapperIdentity: async allocation => {
       const container = await requireOwnedContainer(allocation);
@@ -216,7 +282,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
       await signalKiloServerProcess(handle, 'CONT');
       frozenHandles.delete(target.cloudAgentSessionId);
     },
-    captureEvidenceCursor: async () => (await captureLogCursor()).fromByte,
+    captureEvidenceCursor: captureWorkerLogCursor,
     observeReapEvidence: async input => {
       if (!Number.isFinite(input.waitMs) || input.waitMs <= 0) {
         throw new Error(`sandboxFaults: invalid reap-evidence wait ${input.waitMs}`);
@@ -275,6 +341,145 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         if (input.signal?.aborted || Date.now() >= deadline) return evidence;
         await new Promise(resolve => setTimeout(resolve, 500));
       }
+    },
+    captureWorkerLogCursor,
+    dropControlSocketDuringAttach: async input => {
+      if (!Number.isFinite(input.waitForAttachMs) || input.waitForAttachMs <= 0) {
+        throw new Error(`sandboxFaults: invalid attach wait ${input.waitForAttachMs}`);
+      }
+      const attachDeadline = Date.now() + input.waitForAttachMs;
+      let attachRequestId: string | undefined;
+      let attachConnectionId: string | undefined;
+      let attachWrapperInstanceId: string | undefined;
+      for (;;) {
+        const [attach] = await readWorkerLogSnapshot({
+          fromByte: input.fromByte,
+          match: record =>
+            record.diagnosticEvent === 'socket_request_sent' &&
+            record.operation === 'session.attach' &&
+            record.sessionId === input.sessionId,
+        });
+        if (attach) {
+          attachRequestId = logString(attach, 'requestId');
+          attachConnectionId = logString(attach, 'connectionId');
+          attachWrapperInstanceId = logString(attach, 'wrapperInstanceId');
+          break;
+        }
+        if (Date.now() >= attachDeadline) throw new Error('attach did not start');
+        await sleep(CONTROL_SOCKET_LOG_POLL_MS);
+      }
+      if (attachConnectionId === undefined || attachWrapperInstanceId === undefined) {
+        throw new Error('attach did not expose a connection and wrapper identity');
+      }
+      if (attachRequestId === undefined) throw new Error('attach did not expose a request id');
+
+      // Refuse a replacement allocation or wrapper before acting, exactly as
+      // `freezeWrapperProcess` does.
+      const target: SandboxFaultTarget = {
+        cloudAgentSessionId: input.sessionId,
+        kiloSessionId: input.kiloSessionId,
+        expectedAllocationRef: input.containerId,
+        expectedWrapperInstanceId: input.expectedWrapperInstanceId,
+      };
+      const container = await requireOwnedContainer(target);
+      const expected = requireExpectedWrapper(target);
+      const handle = await captureControlWrapperProcess(container.id);
+      const observed = wrapperInstanceId(handle);
+      if (observed !== expected) {
+        throw new Error(
+          `sandboxFaults: observed wrapper ${observed} does not match expected ${expected}`
+        );
+      }
+
+      // The second pre-signal cursor: the record position at which post-signal
+      // records begin. It is the count of attach-window records already written,
+      // because `LogRecord` carries no byte offset; the pre-signal prefix is
+      // captured immediately before the signal so a natural close before it is
+      // never credited to the signal.
+      const attachRecord = (record: LogRecord): boolean =>
+        isAttachWindowRecord(record) && record.wrapperInstanceId === attachWrapperInstanceId;
+      const preSignalRecords = await readWorkerLogSnapshot({
+        fromByte: input.fromByte,
+        match: attachRecord,
+      });
+      const signalCursorPosition = preSignalRecords.length;
+      await recycleControlConnection(handle);
+
+      const deadline = Date.now() + CONTROL_SOCKET_RECYCLE_BUDGET_MS;
+      for (;;) {
+        const records = await readWorkerLogSnapshot({
+          fromByte: input.fromByte,
+          match: attachRecord,
+        });
+        let closedConnectionId: string | undefined;
+        let committedConnectionId: string | undefined;
+        let readyConnectionId: string | undefined;
+        for (let index = signalCursorPosition; index < records.length; index += 1) {
+          const record = records[index];
+          const connectionId = logString(record, 'connectionId');
+          if (record.diagnosticEvent === 'socket_closed') {
+            if (connectionId !== attachConnectionId || record.handshakeComplete !== true) {
+              throw new Error(
+                `control socket closed on an unexpected connection (${connectionId ?? 'none'})`
+              );
+            }
+            closedConnectionId = connectionId;
+            continue;
+          }
+          if (closedConnectionId === undefined) continue;
+          if (record.diagnosticEvent === 'handshake_committed') {
+            if (connectionId === undefined || connectionId === attachConnectionId) {
+              throw new Error('control socket reconnect did not use a new connection');
+            }
+            committedConnectionId ??= connectionId;
+            continue;
+          }
+          if (
+            record.diagnosticEvent === 'wrapper_ready' &&
+            committedConnectionId !== undefined &&
+            connectionId === committedConnectionId
+          ) {
+            readyConnectionId = connectionId;
+          }
+        }
+        if (closedConnectionId !== undefined && readyConnectionId !== undefined) {
+          const result: AttachWindowResult = {
+            attachRequestId,
+            attachConnectionId,
+            closedConnectionId,
+            readyConnectionId,
+            wrapperInstanceId: attachWrapperInstanceId,
+            signaledPid: handle.processId,
+          };
+          return acceptAttachWindow({
+            records,
+            requestId: attachRequestId,
+            attachConnectionId,
+            signalCursorPosition,
+            result,
+          });
+        }
+        if (Date.now() >= deadline) {
+          throw new Error(
+            closedConnectionId === undefined
+              ? 'control socket did not close after the recycle signal'
+              : committedConnectionId === undefined
+                ? 'control socket did not commit a new handshake after the close'
+                : 'control socket reconnect never reached wrapper_ready'
+          );
+        }
+        await sleep(CONTROL_SOCKET_LOG_POLL_MS);
+      }
+    },
+    countPromptDispatches: async input => {
+      const records = await readWorkerLogSnapshot({
+        fromByte: input.fromByte,
+        match: record =>
+          record.diagnosticEvent === 'socket_request_sent' &&
+          record.operation === 'session.prompt' &&
+          record.sessionId === input.sessionId,
+      });
+      return records.length;
     },
   };
 }

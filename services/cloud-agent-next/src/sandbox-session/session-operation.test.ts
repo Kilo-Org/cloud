@@ -24,6 +24,7 @@ import {
   reconcileSessionOperation,
   type SessionOperationEffects,
 } from './session-operation.js';
+import { ControlRequestError } from './control-dispatch.js';
 
 const authorization: SessionOperationAuthorization = {
   operation: 'session.prompt',
@@ -860,5 +861,26 @@ describe('reconcileSessionOperation unconfirmed diagnostics', () => {
 
     expect(result).toMatchObject({ state: 'running' });
     expect(events).toEqual([]);
+  });
+
+  it('resolves an unconfirmed lookup reachability failure as uncertain/transport', async () => {
+    const request = vi.fn(async () => {
+      throw new ControlRequestError({
+        code: 'not_ready',
+        message: 'Sandbox runtime is not ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
+    });
+
+    const { result } = await capture(() =>
+      reconcileSessionOperation(
+        authorization,
+        sessionOperationExpiresAt(authorization),
+        effects(request)
+      )
+    );
+
+    expect(result).toMatchObject({ state: 'uncertain', reason: 'transport' });
   });
 });

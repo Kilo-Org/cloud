@@ -1,7 +1,5 @@
 import type { NextResponse } from 'next/server';
 
-import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
-import type { ExperimentPromptCapture } from '@/lib/ai-gateway/processUsage.types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -31,7 +29,6 @@ type SendUpstreamAttemptResult =
   | {
       type: 'success';
       response: Response;
-      experimentPromptCapture?: ExperimentPromptCapture;
     };
 
 /** Sends one upstream attempt and mutates the request with provider-specific transforms. */
@@ -70,10 +67,6 @@ export async function sendUpstreamAttempt({
     }
   }
 
-  const experimentPromptCapture = providerContext.experiment
-    ? buildExperimentPromptCapture(request)
-    : undefined;
-
   const result = await upstreamRequest({
     chatApi: request.kind,
     search,
@@ -90,6 +83,5 @@ export async function sendUpstreamAttempt({
   return {
     type: 'success',
     response: result.response,
-    experimentPromptCapture,
   };
 }

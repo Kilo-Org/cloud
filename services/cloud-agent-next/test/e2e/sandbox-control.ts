@@ -769,6 +769,20 @@ export async function signalKiloServerProcess(
 }
 
 /**
+ * Send `SIGUSR1` to the exact captured control-wrapper process so its control
+ * socket is dropped and the production reconnect owner establishes a fresh one.
+ * Like `signalKiloServerProcess`, never rediscover the process: the captured
+ * identity is the only safe handle. A delivered signal (zero exit) is not proof
+ * of a reconnect; callers correlate the resulting worker-log sequence.
+ */
+export async function recycleControlConnection(
+  handle: KiloServerProcessHandle,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<void> {
+  await executeDocker(['exec', handle.containerId, 'kill', '-USR1', String(handle.processId)]);
+}
+
+/**
  * The control wrapper is launched as
  * `bun run /usr/local/bin/kilocode-control-wrapper.js`
  * (`src/sandbox-control/cloudflare-provider.ts`). Its basename differs from the

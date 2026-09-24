@@ -43,6 +43,9 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));

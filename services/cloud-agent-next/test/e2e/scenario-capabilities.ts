@@ -195,6 +195,48 @@ export type SandboxFaultObservation = {
     messageId?: string;
     signal?: AbortSignal;
   }): Promise<SandboxFaultReapEvidence>;
+  /**
+   * Byte offset at the current end of the local worker log, for a later bounded
+   * read. The same cursor `captureEvidenceCursor` returns; the control-socket
+   * scenarios correlate against it before signalling.
+   */
+  captureWorkerLogCursor(): Promise<number>;
+  /**
+   * Drop the owned container's control socket during the first attach and prove
+   * from existing worker diagnostics that it closed and reconnected. It refuses
+   * unless `containerId` still matches the observed owned container and its
+   * control wrapper still matches `expectedWrapperInstanceId`, then signals
+   * `SIGUSR1` to that captured process and requires, after a cursor captured
+   * immediately before the signal, the ordered sequence `socket_closed` (this
+   * attach connection, handshake complete) -> `handshake_committed` (a new
+   * connection) -> `wrapper_ready` (that same new connection), all carrying the
+   * same wrapper instance. An attach `socket_response` observed before that
+   * close is a missed window and throws `attach window missed` (the only
+   * retryable outcome); one observed after the close throws
+   * `attach response after close`. Throws on any other deviation, including a
+   * no-op signal.
+   */
+  dropControlSocketDuringAttach(input: {
+    fromByte: number;
+    sessionId: string;
+    kiloSessionId: string;
+    containerId: string;
+    expectedWrapperInstanceId: string;
+    waitForAttachMs: number;
+  }): Promise<{
+    attachRequestId: string;
+    attachConnectionId: string;
+    closedConnectionId: string;
+    readyConnectionId: string;
+    wrapperInstanceId: string;
+    signaledPid: number;
+  }>;
+  /**
+   * Count the `socket_request_sent` records for `session.prompt` on the session
+   * written after `fromByte`. The caller asserts exactly one dispatch for the
+   * turn.
+   */
+  countPromptDispatches(input: { fromByte: number; sessionId: string }): Promise<number>;
 };
 
 export type ScenarioEnvironment = {

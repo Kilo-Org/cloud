@@ -197,6 +197,7 @@ import {
   deliveryErrorLogFields,
   isRecoverableRuntimeInvalidation,
   isRetryableDeliveryError,
+  isUnconfirmedReachabilityFailure,
   observeControlAfterStopping,
   safeErrorFromQueueReason,
   SESSION_DELIVERY_TIMEOUT_MS,
@@ -4952,7 +4953,9 @@ export class SandboxSession extends DurableObject<Env> {
       ? releaseCompletedRetryableAttach(marked ?? current, messageId, retryNotBefore)
       : (marked ?? current);
     const updated =
-      busy || (phase !== 'prompt' && !countAttachRejection)
+      busy ||
+      isUnconfirmedReachabilityFailure(error) ||
+      (phase !== 'prompt' && !countAttachRejection)
         ? undefined
         : incrementDeliveryFailure(nextMessages, messageId, phase);
     const messages = (updated?.messages ?? nextMessages).map(

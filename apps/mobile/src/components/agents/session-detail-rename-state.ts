@@ -164,9 +164,14 @@ export function namedSessionTitle(
  * Both the server title and the cached fallback run through the shared title
  * helpers, so the server's creation-default placeholder (`New session -
  * <ISO timestamp>`) can never reach the header or seed the rename field —
- * either would otherwise show a raw timestamp. A missing or placeholder
- * fallback becomes the generic `Session` label. The user's `optimisticTitle`
- * is their own input and is never filtered.
+ * either would otherwise show a raw timestamp. The server title — the fetched
+ * title, or a live `session.updated` title the hook folds into `serverTitle` —
+ * passes through `namedSessionTitle`, and a missing or placeholder fallback
+ * becomes the generic `Session` label here as well; the screen also routes the
+ * cached list title through `namedSessionTitle` before passing it here
+ * (`session-detail-content.tsx`), so a placeholder cached in the list cannot
+ * reach the header either. The user's `optimisticTitle` is their own input and
+ * is never filtered.
  */
 export function getSessionDetailRenameState(input: {
   sessionId?: string;

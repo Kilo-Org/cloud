@@ -5891,6 +5891,41 @@ describe('createSessionManager', () => {
       expect(pending.get('m2')).toEqual({ status: 'failed', error: 'y', reason: 'execution' });
       expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m1');
     });
+
+    it('deletes a client-materialised failed row so a retry cannot duplicate it', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await switchAndCaptureSubscriber(config, mgr);
+
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      storage.upsertMessage(
+        stubUserMessage({ id: 'm-synthetic', sessionID: 'ses-1', synthetic: true })
+      );
+
+      mgr.clearFailedMessage('m-synthetic');
+
+      // The accepted re-send supersedes the local ghost; deleting it also keeps
+      // it gone across a relaunch.
+      expect(storage.getMessageInfo('m-synthetic')).toBeUndefined();
+    });
+
+    it('keeps a server-confirmed failed row', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await switchAndCaptureSubscriber(config, mgr);
+
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      storage.upsertMessage(stubUserMessage({ id: 'm-confirmed', sessionID: 'ses-1' }));
+
+      mgr.clearFailedMessage('m-confirmed');
+
+      // Server history is not this path's to delete; only the client ghost is.
+      expect(storage.getMessageInfo('m-confirmed')?.role).toBe('user');
+    });
   });
 
   describe('resolved delivery failures', () => {

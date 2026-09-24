@@ -2762,6 +2762,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (owner === null) return;
     if (owner === activeSessionId) {
       currentSession?.state.clearFailedMessage(messageId);
+      // A client-materialised row is a local ghost: the accepted re-send
+      // supersedes its content and materialises its own row, so leaving the
+      // original would render the prompt twice — once for the failed
+      // submission and once for the retry. Delete it outright so it stays
+      // gone across a relaunch. A confirmed row (`synthetic` undefined) is
+      // server history and must be kept.
+      const info = currentSession?.storage.getMessageInfo(messageId);
+      if (info?.role === 'user' && info.synthetic === true) {
+        currentSession?.storage.deleteMessage(messageId);
+      }
       const next = new Map(store.get(pendingMessagesAtom));
       next.delete(messageId);
       store.set(pendingMessagesAtom, next);

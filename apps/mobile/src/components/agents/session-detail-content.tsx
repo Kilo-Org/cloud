@@ -851,6 +851,12 @@ export function SessionDetailContent({
   const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [canceledQueuedMessages, setCanceledQueuedMessages] =
     useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
+  // Ids whose failed submission a retry accepted. The re-send is a new
+  // submission with its own row, so the original row must stop rendering even
+  // when it is server-confirmed (the SDK can only delete the client-materialised
+  // ghost). The row's preparation attempts go with it, or the filtered row's
+  // preparation would be re-emitted at the end of the transcript.
+  const [supersededMessageIds, setSupersededMessageIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
   const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
     null
@@ -925,9 +931,11 @@ export function SessionDetailContent({
 
   const visibleMessages = useMemo(() => {
     const base =
-      droppedQueuedIds.size === 0
+      droppedQueuedIds.size === 0 && supersededMessageIds.size === 0
         ? messages
-        : messages.filter(m => !droppedQueuedIds.has(m.info.id));
+        : messages.filter(
+            m => !droppedQueuedIds.has(m.info.id) && !supersededMessageIds.has(m.info.id)
+          );
     if (canceledQueuedMessages.size === 0) {
       return base;
     }
@@ -949,7 +957,7 @@ export function SessionDetailContent({
       }
       return 0;
     });
-  }, [messages, droppedQueuedIds, canceledQueuedMessages]);
+  }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
 
   // Visibility-only strip for the "Hide thinking details" option. Applied once
   // here so the transcript, the message-details sheet, and the subagent views
@@ -985,10 +993,18 @@ export function SessionDetailContent({
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
-  const baseTranscript = useMemo(
-    () => mergeSessionTranscript(displayedMessages, preparationAttempts, pendingMessages),
-    [displayedMessages, preparationAttempts, pendingMessages]
-  );
+  const baseTranscript = useMemo(() => {
+    // A superseded submission's preparation goes with its row: dropping only
+    // the row would leave `mergeSessionTranscript` re-emitting the attempt at
+    // the end (its trigger id is no longer in the message list).
+    const attempts =
+      supersededMessageIds.size === 0
+        ? preparationAttempts
+        : preparationAttempts.filter(
+            attempt => !supersededMessageIds.has(attempt.triggerMessageId)
+          );
+    return mergeSessionTranscript(displayedMessages, attempts, pendingMessages);
+  }, [displayedMessages, preparationAttempts, pendingMessages, supersededMessageIds]);
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
   //
@@ -1048,6 +1064,7 @@ export function SessionDetailContent({
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
     setDroppedQueuedIds(EMPTY_IDS);
+    setSupersededMessageIds(EMPTY_IDS);
     setCanceledQueuedMessages(EMPTY_CANCELED);
     setCancelQueuedStatus(null);
     setCancelQueuedSheetStatus(null);
@@ -1172,6 +1189,12 @@ export function SessionDetailContent({
       if (prompt === null) {
         return;
       }
+      // Only a user row may be superseded: `retryFailedMessage` never clears an
+      // assistant failure, so an assistant row added here would be hidden
+      // permanently (its preparation attempts are tied to a user
+      // `triggerMessageId`, but the row itself is not).
+      const messageId = message.info.id;
+      const isUser = message.info.role === 'user';
       // Same guard handleSend opens with: when no model resolves, run the send
       // anyway (the user gets the existing toast) and keep the failed row.
       if (requiresModel && !(pinned.model ?? currentModel)) {
@@ -1188,10 +1211,38 @@ export function SessionDetailContent({
       void retryFailedMessage({
         message,
         send: async () => {
-          await handleSend(prompt);
+          try {
+            // Hide the original row in the same tap as the retry. The re-send
+            // inserts its own optimistic row before the transport round-trip
+            // (and fires this hook right after), so waiting for the send to
+            // settle would render the prompt twice for the whole round-trip.
+            await handleSend(prompt, {
+              onOptimisticSend: () => {
+                if (isUser) {
+                  setSupersededMessageIds(current => new Set(current).add(messageId));
+                }
+              },
+            });
+          } catch (retryError) {
+            // A rejected re-send restored nothing: bring the original failed row
+            // and its Retry control back. `retryFailedMessage` swallows the
+            // rejection, so its contract is unchanged.
+            if (isUser) {
+              setSupersededMessageIds(current => {
+                const next = new Set(current);
+                next.delete(messageId);
+                return next;
+              });
+            }
+            throw retryError;
+          }
         },
-        clearFailedMessage: messageId => {
-          manager.clearFailedMessage(messageId, ownerSessionId);
+        clearFailedMessage: clearedMessageId => {
+          manager.clearFailedMessage(clearedMessageId, ownerSessionId);
+          // The re-send is accepted: drop the original row (and its
+          // preparation) from the transcript so a server-confirmed failed row
+          // stops duplicating alongside the retry's own row.
+          setSupersededMessageIds(current => new Set(current).add(clearedMessageId));
         },
       });
     },

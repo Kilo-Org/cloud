@@ -11,6 +11,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { capitalize } from '@/lib/utils';
 
 import { MonoScrollBlock } from './mono-scroll-block';
 
@@ -68,6 +69,17 @@ function AttemptIcon({ status }: { status: PreparationAttempt['status'] }) {
   return <AlertCircle size={16} color={colors.destructive} />;
 }
 
+/**
+ * The server emits raw phase keys as labels (`workspace_setup` ->
+ * `workspace setup`), so phase rows need the same humanizing web applies at
+ * render. Setup-command rows keep their catalog copy and never reach here.
+ * `capitalize` uses the active locale's casing, unlike the web helper's bare
+ * `toUpperCase`, which the mobile case guard rejects for display text.
+ */
+export function humanizePreparationStepLabel(label: string): string {
+  return capitalize(label.replaceAll('_', ' '));
+}
+
 function attemptTitle(status: PreparationAttempt['status'], t: TFunction): string {
   if (status === 'running') {
     return t('agentChat.preparation.preparingEnvironment');
@@ -108,7 +120,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
     step.safeError,
     step.exitCode,
   ].some(value => value !== undefined && value !== '');
-  const label = setupCommandLabel(step, t) ?? step.label;
+  const label = setupCommandLabel(step, t) ?? humanizePreparationStepLabel(step.label);
   const DetailsIcon = expanded ? ChevronDown : DirectionalChevronRight;
   return (
     <View className="overflow-hidden rounded border border-border">

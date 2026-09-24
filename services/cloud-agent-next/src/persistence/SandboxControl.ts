@@ -587,6 +587,7 @@ export type SandboxControlStatus = StatusProjection & {
    * whose environment state is still unresolved.
    */
   launchFailed?: true;
+  restoredWorkspace?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -1305,22 +1306,26 @@ export class SandboxControl extends DurableObject<Env> {
     if (!usesMaintenanceChannel) await this.assertRequestWorktreeAdmission(input);
     if (recoveryInteraction) await this.assertRecoveryInteraction(input, runtime, allocation);
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
-    const outbound =
-      input.operation === 'session.attach'
-        ? {
-            ...input,
-            payload: {
-              ...adaptSessionAttachPayloadForWrapper(
-                sessionAttachPayloadSchema.parse(input.payload),
-                this.socketHandler.supportsWorkingBranches?.() === true,
-                this.socketHandler.supportsGitAuthor?.() === true
-              ),
-              ...(this.supportsNativeRuntimeIdCapture()
-                ? { captureNativeRuntimeId: true as const }
-                : {}),
-            },
-          }
-        : input;
+    let outbound: SandboxControlOutboundRequest = input;
+    if (input.operation === 'session.attach') {
+      const adapted = adaptSessionAttachPayloadForWrapper(
+        sessionAttachPayloadSchema.parse(input.payload),
+        this.socketHandler.supportsWorkingBranches?.() === true,
+        this.socketHandler.supportsGitAuthor?.() === true
+      );
+      // An old image's strict attach schema rejects an unknown field, so only
+      // advertise the restore signal when the wrapper's hello advertised support.
+      const { restoredFromBackup: _restoredFromBackup, ...withoutRestore } = adapted;
+      outbound = {
+        ...input,
+        payload: {
+          ...(this.socketHandler.supportsRestoredWorkspace?.() === true ? adapted : withoutRestore),
+          ...(this.supportsNativeRuntimeIdCapture()
+            ? { captureNativeRuntimeId: true as const }
+            : {}),
+        },
+      };
+    }
     return this.socketHandler.sendRequest(outbound);
   }
 
@@ -3741,6 +3746,9 @@ export class SandboxControl extends DurableObject<Env> {
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
       ...(runtimeReplacementInFlight ? { runtimeReplacementInFlight: true as const } : {}),
       ...(isTerminalLaunchFailure(record) ? { launchFailed: true as const } : {}),
+      ...(this.socketHandler.supportsRestoredWorkspace?.() === true
+        ? { restoredWorkspace: true as const }
+        : {}),
     };
   }
 

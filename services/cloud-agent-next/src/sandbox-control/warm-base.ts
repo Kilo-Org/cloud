@@ -10,8 +10,6 @@ const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 export type WarmBaseDigestInput = {
   owner: string;
   repositoryUrl: string;
-  ref: string;
-  checkoutMode: 'branch' | 'working';
   setupCommands: readonly string[];
   preparationEnvIdentity: string;
   wrapperVersion: string;
@@ -24,8 +22,6 @@ export function warmBaseDigest(input: WarmBaseDigestInput): Promise<string> {
     JSON.stringify([
       input.owner,
       input.repositoryUrl,
-      input.ref,
-      input.checkoutMode,
       [...input.setupCommands],
       input.preparationEnvIdentity,
       input.wrapperVersion,
@@ -33,6 +29,15 @@ export function warmBaseDigest(input: WarmBaseDigestInput): Promise<string> {
       input.instance,
     ])
   );
+}
+
+/**
+ * The only signal that an attach must re-prepare a warm-restored workspace.
+ * `needsPreparation` is the caller's post-launch wrapper comparison; `pending`
+ * is the container record's unacknowledged-restore bit re-read after launch.
+ */
+export function attachRestoredFromBackup(needsPreparation: boolean, pending: boolean): boolean {
+  return needsPreparation && pending;
 }
 
 export function warmBasePreparationEnvIdentity(

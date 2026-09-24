@@ -63,7 +63,15 @@ type ContainersRecord = {
   allocationRef: string | null;
   stopOpId: string | null;
   lastSnapshot: { id: string; sourceAllocation: string } | null;
-  snapshotOutcome?: 'ready' | 'failed';
+  snapshotOutcome?: 'ready' | 'failed' | 'skipped';
+  /**
+   * An unacknowledged warm restore. Set immediately before a physical start
+   * that loaded the warm id, cleared only after the wrapper acknowledges
+   * bootstrap. While set, the filesystem is not this session's trusted work:
+   * it must not re-prepare a resume as already prepared, and it must not become
+   * `lastSnapshot`. Absent means false.
+   */
+  warmRestorePending?: true;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
@@ -225,21 +233,15 @@ export class SandboxContainers extends DurableObject<Env> {
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
     if (input.containment) await this.installContainmentProxy(container);
-    // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
-    await this.writeRecord({
-      ...record,
-      state: 'launching',
-      allocationRef: ref,
-      stopOpId: null,
-      wrapperAttempt: 'not_started',
-    });
+    // The helper owns the launching write and the physical-start fact, including
+    // the warm-restore pending bit. `not_started` marks that no bun exec has run
+    // yet, so a crash after start() stays distinguishable from a pending exec.
     await this.startContainerAndActivateBilling(
       container,
-      record,
-      this.startOptions(
-        input.instance,
-        selectStartSnapshot(record.lastSnapshot?.id, input.warmSnapshotId)
-      )
+      { ...record, wrapperAttempt: 'not_started' },
+      ref,
+      input.instance,
+      input.warmSnapshotId
     );
     await this.startWrapper(container, input.env, input.containment === true);
     await this.writeRunning(ref, 'clear');
@@ -356,13 +358,30 @@ export class SandboxContainers extends DurableObject<Env> {
     image: string;
     sessionSnapshotId: string | null;
     hasRecord: boolean;
+    warmRestorePending: boolean;
   }> {
     const record = await this.ctx.storage.get<ContainersRecord>(RECORD_KEY);
     return {
       image: this.containerImage(),
       sessionSnapshotId: record?.lastSnapshot?.id ?? null,
       hasRecord: record !== undefined,
+      warmRestorePending: record?.warmRestorePending === true,
     };
+  }
+
+  /**
+   * The only live-window write that clears the pending bit: called after the
+   * wrapper acknowledged bootstrap. Idempotent; re-reads inside the exclusive
+   * queue so it cannot resurrect a bit another write already dropped.
+   */
+  async clearWarmRestorePending(): Promise<void> {
+    return this.runExclusive(async () => {
+      const record = await this.readRecord();
+      if (record.warmRestorePending !== true) return;
+      const updated: ContainersRecord = { ...record };
+      delete updated.warmRestorePending;
+      await this.writeRecord(updated);
+    });
   }
 
   async captureWarmBase(): Promise<{ id: string }> {
@@ -483,36 +502,39 @@ export class SandboxContainers extends DurableObject<Env> {
     if (containment) await this.installContainmentProxy(container);
     // A stopped container is started and metered before the probe. An already
     // running container is probed first, and billing is activated by outcome.
+    let launched = record;
     if (!container.running) {
-      await this.startContainerAndActivateBilling(
+      launched = await this.startContainerAndActivateBilling(
         container,
         record,
-        this.startOptions(
-          instance,
-          selectStartSnapshot(record.lastSnapshot?.id, warmSnapshotId)
-        )
+        ref,
+        instance,
+        warmSnapshotId
       );
     }
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
       // A wrapper probe cannot confirm the running container, so activate before
       // signalling the ambiguity rather than leaving it unmetered.
-      await this.activateBillingIfRunning(container, record);
+      await this.activateBillingIfRunning(container, launched);
       throw new Error('Wrapper probe was ambiguous');
     }
     if (probe === 'absent') {
-      // Skip physical start when already running, but still activate billing.
-      await this.startContainerAndActivateBilling(
+      // A prior launch may have recorded `launching` before `start()` took
+      // effect. Apply the requested instance and snapshot before re-execing the
+      // wrapper, otherwise the retry silently runs at the default size. Pass the
+      // record the first physical start returned, never a pre-call local, so an
+      // in-flight warm-restore pending bit survives.
+      launched = await this.startContainerAndActivateBilling(
         container,
-        record,
-        this.startOptions(
-          instance,
-          selectStartSnapshot(record.lastSnapshot?.id, warmSnapshotId)
-        )
+        launched,
+        ref,
+        instance,
+        warmSnapshotId
       );
       await this.startWrapper(container, env, containment);
     } else {
-      await this.activateBillingIfRunning(container, record);
+      await this.activateBillingIfRunning(container, launched);
     }
     await this.writeRunning(ref, 'clear');
     return { started: true };
@@ -808,6 +830,19 @@ export class SandboxContainers extends DurableObject<Env> {
     ref: string,
     stopOpId: string
   ): Promise<void> {
+    const record = await this.readRecord();
+    if (record.warmRestorePending === true) {
+      // The tree is still the publisher's or a partial re-prepare. Never promote
+      // it: capture nothing, keep any previous trusted snapshot, record the skip.
+      const { result, persisted } = await this.recordSnapshotOutcome(
+        null,
+        ref,
+        stopOpId,
+        'skipped'
+      );
+      logControlDiagnostic('session_snapshot', { result, stopOpId }, persisted ? 'info' : 'warn');
+      return;
+    }
     const snapshotId = await this.captureSessionSnapshot(container);
     const { result, persisted } = await this.recordSnapshotOutcome(snapshotId, ref, stopOpId);
     logControlDiagnostic('session_snapshot', { result, stopOpId }, persisted ? 'info' : 'warn');
@@ -829,9 +864,10 @@ export class SandboxContainers extends DurableObject<Env> {
   private async recordSnapshotOutcome(
     snapshotId: string | null,
     ref: string,
-    stopOpId: string
-  ): Promise<{ result: 'ready' | 'failed'; persisted: boolean }> {
-    const result = snapshotId === null ? 'failed' : 'ready';
+    stopOpId: string,
+    skipped?: 'skipped'
+  ): Promise<{ result: 'ready' | 'failed' | 'skipped'; persisted: boolean }> {
+    const result = skipped ?? (snapshotId === null ? 'failed' : 'ready');
     try {
       const record = await this.readRecord();
       if (record.state !== 'stopping') return { result, persisted: false };
@@ -982,24 +1018,59 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Start the container if it is not already running, then activate metering for
-   * a physically running container. A start that throws after taking effect
-   * still activates before the error propagates.
+   * The single owner of the physical-start fact and of the launching write.
+   * `selectStartSnapshot` is evaluated exactly once, and only on the physical
+   * start branch: that one result is both the snapshot the container starts from
+   * and the warm-restore pending bit. When the container is already running the
+   * bit is not recomputed and the launching record is still written, so
+   * ownership is retained before `execWrapper`. A start that throws after taking
+   * effect still activates before the error propagates.
    */
   private async startContainerAndActivateBilling(
     container: Container,
     record: ContainersRecord,
-    options: ContainerStartupOptions
-  ): Promise<void> {
-    if (!container.running) {
-      try {
-        container.start(options);
-      } catch (error) {
-        await this.activateBillingIfRunning(container, record);
-        throw error;
-      }
+    ref: string,
+    instance: ContainerInstanceSize,
+    warmSnapshotId: string | undefined
+  ): Promise<ContainersRecord> {
+    if (container.running) {
+      const launching: ContainersRecord = {
+        ...record,
+        state: 'launching',
+        allocationRef: ref,
+        stopOpId: null,
+      };
+      await this.writeRecord(launching);
+      await this.activateBillingIfRunning(container, launching);
+      return launching;
     }
-    await this.activateBillingIfRunning(container, record);
+    const selected = selectStartSnapshot(record.lastSnapshot?.id, warmSnapshotId);
+    const launching: ContainersRecord = {
+      ...record,
+      state: 'launching',
+      allocationRef: ref,
+      stopOpId: null,
+    };
+    if (selected !== undefined && selected === warmSnapshotId) {
+      launching.warmRestorePending = true;
+    } else {
+      delete launching.warmRestorePending;
+    }
+    // Persist the launching record, including the pending bit, before start().
+    await this.writeRecord(launching);
+    logControlDiagnostic('warm_base', {
+      phase: 'physical_start',
+      result: selected === undefined ? 'image' : 'snapshot',
+      snapshotId: selected,
+    });
+    try {
+      container.start(this.startOptions(instance, selected));
+    } catch (error) {
+      await this.activateBillingIfRunning(container, launching);
+      throw error;
+    }
+    await this.activateBillingIfRunning(container, launching);
+    return launching;
   }
 
   private async settleBillingAtStop(record: ContainersRecord): Promise<void> {

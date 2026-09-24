@@ -2,7 +2,6 @@
 
 import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +9,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { OPENAI_TOKEN_SHARING_SCOPE } from '@/lib/auth/openai/scopes';
+import {
+  openAiChatGptByokPath,
+  startOpenAiChatGptConnect,
+} from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
+import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLink';
+import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
 
 /**
  * The BYOK entry for a delegated "Sign in with ChatGPT" connection. It is not a
@@ -19,12 +23,6 @@ import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status
  * click, and the state is always visible on the card itself.
  */
 
-/** Where the connect call returns after OpenAI redirects back to the app. */
-const BYOK_PATH = '/byok';
-
-function byokPath(organizationId: string | undefined): string {
-  return organizationId ? `/organizations/${organizationId}/byok` : BYOK_PATH;
-}
 
 /**
  * The query parameter the OpenAI callback route appends when an authorization
@@ -107,26 +105,6 @@ function openAiChatGptAuthErrorMessage(code: string): string {
     : "We couldn't connect ChatGPT. Try again.";
 }
 
-/**
- * Starts the connect round-trip: first an account-linking session for the
- * signed-in person, then the OpenAI authorization with the token-sharing
- * scope. The linking session is what lets the callback attach this identity to
- * the current account (and skip the sign-in Turnstile gate); it must succeed
- * before the browser leaves for OpenAI. When `organizationId` is set, the
- * linking session records the organization and the callback returns to its BYOK
- * page.
- */
-export async function startOpenAiChatGptConnect(
-  createLinkingSession: () => Promise<unknown>,
-  organizationId?: string
-): Promise<void> {
-  await createLinkingSession();
-  await signIn(
-    'openai',
-    { callbackUrl: byokPath(organizationId) },
-    { scope: OPENAI_TOKEN_SHARING_SCOPE }
-  );
-}
 
 /** The email claim, or the issuer-scoped subject when the token has no email. */
 function connectionIdentity(status: OpenAiChatGptStatus): string {
@@ -153,6 +131,9 @@ export type OpenAiChatGptCardViewProps = {
   isDisconnecting?: boolean;
   /** Organization scope: the connection is the member's own, not the organization's. */
   isOrganization?: boolean;
+  /** The recorded plan limit is dismissed: the card stops showing the message. */
+  isUsageLimitDismissed?: boolean;
+  onDismissUsageLimit?: () => void;
 };
 
 /**
@@ -338,6 +319,7 @@ function CardBody({
             <p className="type-body text-muted-foreground">{ORGANIZATION_SCOPE_NOTE}</p>
           ) : null}
         </div>
+        <ChatGptUsageLinkView />
         <Button
           variant="outline"
           size="sm"
@@ -372,21 +354,26 @@ function CardBody({
 /** The card in every state; the container below wires it to tRPC and OAuth. */
 export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
   return (
-    <Card>
-      <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
-        <div className="flex flex-col gap-2">
-          <CardTitle>{CARD_TITLE}</CardTitle>
-        </div>
-        <div className={CARD_STATUS_SLOT_CLASS}>
-          <CardIndicator status={props.status} />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className={CARD_BODY_CLASS}>
-          <CardBody {...props} />
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
+          <div className="flex flex-col gap-2">
+            <CardTitle>{CARD_TITLE}</CardTitle>
+          </div>
+          <div className={CARD_STATUS_SLOT_CLASS}>
+            <CardIndicator status={props.status} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className={CARD_BODY_CLASS}>
+            <CardBody {...props} />
+          </div>
+        </CardContent>
+      </Card>
+      {props.status?.usageLimit && !props.isUsageLimitDismissed ? (
+        <ChatGptUsageLimitDialog open onDismiss={() => props.onDismissUsageLimit?.()} />
+      ) : null}
+    </>
   );
 }
 
@@ -404,6 +391,12 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   // the button look idle (and clickable) while the redirect is still in flight.
   const [isConnecting, setIsConnecting] = useState(false);
 
+  // The message is dismissed per recorded limit, so a later limit shows it
+  // again instead of staying hidden for the rest of the session.
+  const [dismissedUsageLimitReachedAt, setDismissedUsageLimitReachedAt] = useState<string | null>(
+    null
+  );
+
   const ownerInput = organizationId ? { organizationId } : {};
 
   // Show the returned error once, then strip it from the URL so a refresh does
@@ -411,7 +404,7 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   useEffect(() => {
     if (!openaiError) return;
     setAuthErrorCode(openaiError);
-    router.replace(byokPath(organizationId));
+    router.replace(openAiChatGptByokPath(organizationId));
   }, [openaiError, organizationId, router]);
 
   const statusQuery = useQuery(trpc.openAiChatGpt.status.queryOptions(ownerInput));
@@ -471,6 +464,12 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
       isConnecting={isConnecting}
       isDisconnecting={disconnectMutation.isPending}
       isOrganization={Boolean(organizationId)}
+      isUsageLimitDismissed={
+        statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
+      }
+      onDismissUsageLimit={() => {
+        setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null);
+      }}
     />
   );
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "openai_chatgpt_connections" ADD COLUMN "usage_limit_reached_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "openai_chatgpt_connections" ADD COLUMN "usage_limit_resets_at" timestamp with time zone;

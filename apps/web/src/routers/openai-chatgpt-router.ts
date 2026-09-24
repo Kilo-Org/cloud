@@ -6,6 +6,7 @@ import type { User } from '@kilocode/db/schema';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   clearOpenAiChatGptConnection,
+  readOpenAiChatGptUsageLimit,
   getOpenAiChatGptConnection,
   type OpenAiChatGptOwner,
 } from '@/lib/ai-gateway/openai-chatgpt/store';
@@ -80,7 +81,15 @@ async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatu
     };
   }
 
-  return { state: 'connected', ...identity };
+  // The plan limit is read only for a live connection: an errored connection
+  // needs the reconnect message, not the usage-limit message.
+  const usageLimit = await readOpenAiChatGptUsageLimit(owner);
+
+  return {
+    state: 'connected',
+    ...identity,
+    ...(usageLimit ? { usageLimit } : {}),
+  };
 }
 
 export const openAiChatGptRouter = createTRPCRouter({

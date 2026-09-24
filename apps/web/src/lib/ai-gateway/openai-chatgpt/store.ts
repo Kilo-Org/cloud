@@ -6,6 +6,10 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { decryptApiKey, encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
+import {
+  isChatGptUsageLimitCurrent,
+  type ChatGptUsageLimit,
+} from './usage-limit';
 
 /**
  * The delegated "Sign in with ChatGPT" tokens are the OpenAI BYOK credential.
@@ -129,6 +133,8 @@ export async function saveOpenAiChatGptConnection(
     encrypted_connection,
     is_enabled: true,
     created_by: createdBy,
+    usage_limit_reached_at: null,
+    usage_limit_resets_at: null,
   };
 
   await db
@@ -146,6 +152,8 @@ export async function saveOpenAiChatGptConnection(
       set: {
         encrypted_connection,
         is_enabled: true,
+        usage_limit_reached_at: null,
+        usage_limit_resets_at: null,
       },
     });
 }
@@ -153,6 +161,59 @@ export async function saveOpenAiChatGptConnection(
 /** Deletes the owner's stored connection. */
 export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
   await db.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));
+}
+
+/**
+ * The owner's recorded plan limit, when one is still current. An expired record
+ * stays in the row and is filtered here instead of being cleared, so this read
+ * never writes; a reconnect resets the columns.
+ */
+export async function readOpenAiChatGptUsageLimit(
+  owner: OpenAiChatGptOwner,
+  now: number = Date.now()
+): Promise<{ reachedAt: string; resetsAt: string | null } | null> {
+  const rows = await db
+    .select({
+      usage_limit_reached_at: openai_chatgpt_connections.usage_limit_reached_at,
+      usage_limit_resets_at: openai_chatgpt_connections.usage_limit_resets_at,
+    })
+    .from(openai_chatgpt_connections)
+    .where(openAiChatGptOwnerWhere(owner))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row?.usage_limit_reached_at) return null;
+  if (!isChatGptUsageLimitCurrent(row.usage_limit_reached_at, row.usage_limit_resets_at, now)) {
+    return null;
+  }
+
+  return {
+    // The status contract is JSON, so a PostgreSQL timestamp string is
+    // normalized to ISO before it leaves the database layer.
+    reachedAt: new Date(row.usage_limit_reached_at).toISOString(),
+    resetsAt: row.usage_limit_resets_at
+      ? new Date(row.usage_limit_resets_at).toISOString()
+      : null,
+  };
+}
+
+/**
+ * Records the plan limit OpenAI reported on a delegated request. A missing row
+ * is a no-op: the connection was disconnected while the request was in flight,
+ * and recreating the row would resurrect a credential nobody owns.
+ */
+export async function recordOpenAiChatGptUsageLimit(
+  owner: OpenAiChatGptOwner,
+  limit: ChatGptUsageLimit
+): Promise<void> {
+  await db
+    .update(openai_chatgpt_connections)
+    .set({
+      usage_limit_reached_at: new Date().toISOString(),
+      usage_limit_resets_at:
+        limit.resetsAt === null ? null : new Date(limit.resetsAt).toISOString(),
+    })
+    .where(openAiChatGptOwnerWhere(owner));
 }
 
 /**

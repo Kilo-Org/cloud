@@ -1,5 +1,8 @@
 import type { NextResponse } from 'next/server';
 
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
+import { recordOpenAiChatGptUsageLimit } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { readChatGptUsageLimit } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -80,8 +83,37 @@ export async function sendUpstreamAttempt({
   });
   if (result.type === 'error') return result;
 
+  if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
+    await recordChatGptUsageLimitIfReached(result.response, { userId, organizationId });
+  }
+
   return {
     type: 'success',
     response: result.response,
   };
+}
+
+/**
+ * Records a ChatGPT plan limit so the web app can show the partner guideline's
+ * usage-limit message on the next page load. The response is cloned before it
+ * is read, so the original body still streams to the caller unchanged, and
+ * recording is best-effort: a database failure must never change the request's
+ * outcome, which is the upstream error the caller already has.
+ */
+async function recordChatGptUsageLimitIfReached(
+  response: Response,
+  owner: { userId: string; organizationId: string | null }
+): Promise<void> {
+  if (response.status !== 429) return;
+
+  try {
+    const limit = readChatGptUsageLimit(response.status, await response.clone().json());
+    if (!limit) return;
+    await recordOpenAiChatGptUsageLimit(
+      { kiloUserId: owner.userId, organizationId: owner.organizationId },
+      limit
+    );
+  } catch {
+    // Best-effort: the caller still receives the upstream response.
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "id": "f64a63e2-9886-46e7-94f7-eb3cfa2b4348",
+  "id": "6ca47e44-3467-4143-adb7-4c3b86f4a782",
   "prevId": "e57d892c-ce1d-420e-b533-46f38968a755",
   "version": "7",
   "dialect": "postgresql",
@@ -4299,12 +4299,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "cloud_agent_session_id": {
           "name": "cloud_agent_session_id",
           "type": "text",
@@ -4418,21 +4412,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cli_sessions_v2_profile_id": {
-          "name": "IDX_cli_sessions_v2_profile_id",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -4595,19 +4574,6 @@
           "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "cli_sessions_v2_profile_id_agent_environment_profiles_id_fk": {
-          "name": "cli_sessions_v2_profile_id_agent_environment_profiles_id_fk",
-          "tableFrom": "cli_sessions_v2",
-          "tableTo": "agent_environment_profiles",
-          "columnsFrom": [
-            "profile_id"
           ],
           "columnsTo": [
             "id"
@@ -27515,6 +27481,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "usage_limit_reached_at": {
+          "name": "usage_limit_reached_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usage_limit_resets_at": {
+          "name": "usage_limit_resets_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

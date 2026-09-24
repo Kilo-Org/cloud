@@ -7063,6 +7063,15 @@ export const openai_chatgpt_connections = pgTable(
     }),
     encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
     is_enabled: boolean().default(true).notNull(),
+    /**
+     * The last time OpenAI answered a delegated request with a plan usage
+     * limit. The gateway writes it and clears it on the next success. It is
+     * request state, not credential state, so it stays out of the encrypted
+     * payload.
+     */
+    usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** The reset time OpenAI reported with the limit, when it reported one. */
+    usage_limit_resets_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

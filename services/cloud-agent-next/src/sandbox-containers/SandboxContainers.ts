@@ -3,6 +3,11 @@ import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import {
+  CONTAINERS_INTERCEPT_CA_PATH,
+  SANDBOX_INTERCEPT_HTTPS_ENABLED,
+  SANDBOX_INTERCEPT_HTTPS_ENV,
+} from '../shared/container-intercept.js';
+import {
   CONTROL_WRAPPER_LOG_PATH,
   CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
@@ -66,17 +71,18 @@ type DelayedSchedule<T> = {
 
 const RECORD_KEY = 'containers:record:v1';
 const CONTAINER_IMAGE = 'app';
-const CONTAINERS_INTERCEPT_CA = '/etc/cloudflare/certs/cloudflare-containers-ca.crt';
 
 function containedProcessEnv(env: Record<string, string>): Record<string, string> {
-  return { ...env, NODE_EXTRA_CA_CERTS: CONTAINERS_INTERCEPT_CA };
+  // Bun reads NODE_EXTRA_CA_CERTS only at process start, so the injected CA file must be
+  // readable before this exec for the wrapper's own TLS; cert.ts only completes the bundle
+  // append and the child env afterwards.
+  return {
+    ...env,
+    [SANDBOX_INTERCEPT_HTTPS_ENV]: SANDBOX_INTERCEPT_HTTPS_ENABLED,
+    NODE_EXTRA_CA_CERTS: CONTAINERS_INTERCEPT_CA_PATH,
+  };
 }
 
-const TRUST_INTERCEPT_CA = [
-  'sh',
-  '-c',
-  `ca=${CONTAINERS_INTERCEPT_CA}; if [ -f "$ca" ]; then cp "$ca" /usr/local/share/ca-certificates/cloudflare-containers-ca.crt && update-ca-certificates; fi`,
-];
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 const WRAPPER_EXEC_TIMEOUT_MS = 60_000;
@@ -139,7 +145,6 @@ export class SandboxContainers extends DurableObject<Env> {
         record,
         this.startOptions(input.instance, record.lastSnapshot?.id)
       );
-      if (input.containment) await this.trustInterceptCa(container);
       await this.execWrapper(container, input.env, input.containment === true);
       await this.writeRecord({
         ...record,
@@ -363,7 +368,6 @@ export class SandboxContainers extends DurableObject<Env> {
         record,
         this.startOptions(instance, record.lastSnapshot?.id)
       );
-      if (containment) await this.trustInterceptCa(container);
       await this.execWrapper(container, env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
@@ -404,14 +408,6 @@ export class SandboxContainers extends DurableObject<Env> {
       }),
       WRAPPER_EXEC_TIMEOUT_MS,
       'wrapper exec timed out'
-    );
-  }
-
-  private async trustInterceptCa(container: Container): Promise<void> {
-    await withTimeout(
-      container.exec(TRUST_INTERCEPT_CA),
-      CONTAINER_CALL_TIMEOUT_MS,
-      'container CA trust timed out'
     );
   }
 

@@ -499,23 +499,38 @@ export function SessionDetailContent({
 
   const organizationId = fetchedData?.organizationId ?? undefined;
 
-  // The session's active-profile chip: the profile this session runs on. The
-  // session row stores no profile id, so the same resolution the session start
-  // used — the context's effective default — names it, matching the web
-  // indicator's layers. Tapping opens that profile's editor.
+  // The session's active-profile chip: the profile this session runs on. It
+  // resolves from the session's own recorded `profileId`, so an explicit
+  // override or a repository-bound profile — not the context's current
+  // effective default — names it. Only a session that recorded none (created
+  // before profile recording, or one whose create resolved no profile) falls
+  // back to the effective default. A recorded id that no longer resolves shows
+  // no chip rather than naming a different profile. Tapping opens that
+  // profile's editor.
   const {
-    profile: sessionProfile,
+    allProfiles: sessionProfiles,
+    effectiveDefaultId,
     isLoading: isSessionProfileLoading,
     isError: isSessionProfileError,
   } = useEffectiveAgentProfile(organizationId);
+  const recordedSessionProfileId = fetchedData?.profileId ?? null;
+  // `fetchSession` is the only source of the session's own profile id, so the
+  // chip stays hidden until it resolves rather than briefly naming the context
+  // default for a session that recorded a different profile.
+  const sessionDataLoaded = fetchedData !== undefined;
+  const activeSessionProfileId =
+    recordedSessionProfileId ?? (sessionDataLoaded ? effectiveDefaultId : null);
+  const sessionProfile =
+    activeSessionProfileId === null
+      ? null
+      : (sessionProfiles.find(profile => profile.id === activeSessionProfileId) ?? null);
   const sessionProfileIndicatorState = buildActiveProfileIndicatorState({
     selectedProfileName: sessionProfile?.name ?? null,
     repoBoundProfileName: null,
     hasManualEnvVars: false,
     hasManualSetupCommands: false,
     hasSelectedProfileId: sessionProfile !== null,
-    isProfilesLoading: isSessionProfileLoading,
-    hasProfileError: isSessionProfileError,
+    isProfilesLoading: isSessionProfileLoading || !sessionDataLoaded,
   });
   const openSessionProfileEditor = () => {
     if (sessionProfile) {

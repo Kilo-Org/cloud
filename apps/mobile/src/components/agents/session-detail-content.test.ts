@@ -710,6 +710,8 @@ type MountDetailsOptions = {
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
   sessionOrganizationId?: string;
+  /** The profile id the session row recorded, as `fetchSession` reports it. */
+  sessionProfileId?: string | null;
 };
 
 async function mountDetails(
@@ -788,6 +790,7 @@ async function mountDetails(
         cloudAgentSessionId: null,
         title: sessionTitleOverride ?? `Root ${id}`,
         organizationId: options.sessionOrganizationId ?? null,
+        profileId: options.sessionProfileId ?? null,
         gitUrl: null,
         gitBranch: null,
         mode: null,
@@ -1019,6 +1022,7 @@ describe('session detail active-profile indicator', () => {
     profileRowsState.personal = [PROFILE_ROW];
     const { renderer } = await mountDetails();
 
+    await waitFor(() => findChip(renderer).length > 0);
     const [chip] = findChip(renderer);
     if (chip === undefined) {
       throw new Error('the active-profile chip did not render');
@@ -1043,6 +1047,7 @@ describe('session detail active-profile indicator', () => {
         sessionOrganizationId: 'org-a',
         displayScope: { organizationId: 'org-a', isResolved: true },
       });
+      await waitFor(() => findChip(renderer).length > 0);
       const [chip] = findChip(renderer);
       if (!chip) {
         throw new Error('the active-profile chip did not render');
@@ -1060,6 +1065,52 @@ describe('session detail active-profile indicator', () => {
     const { renderer } = await mountDetails();
 
     expect(findChip(renderer)).toHaveLength(0);
+  });
+
+  it('names the profile the session recorded, not the context effective default', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+      { ...PROFILE_ROW, id: 'p-recorded', name: 'Recorded', isDefault: false },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Recorded');
+    expect(chip.props.accessibilityLabel).not.toContain('Default');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+  });
+
+  it('falls back to the effective default only when the session recorded no profile', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Default');
+  });
+
+  it('renders no chip when the session profile id no longer resolves', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const view = await mountDetails([], { sessionProfileId: 'p-deleted' });
+
+    // Wait for the session metadata read so the assertion is not merely the
+    // pre-load window; a fallback to the context default would surface here.
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    expect(findChip(view.renderer)).toHaveLength(0);
   });
 });
 

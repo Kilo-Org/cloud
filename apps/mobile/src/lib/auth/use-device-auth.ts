@@ -4,6 +4,7 @@ import { AppState, type AppStateStatus, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
+import { PRODUCTION_HOSTS } from '@/lib/url-contract';
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
 import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
@@ -28,12 +29,28 @@ type DeviceAuthResult = DeviceAuthState & {
 
 const START_TIMEOUT_MS = 15_000;
 
-// Android has no native auth session; expo-web-browser's polyfill keeps
-// module-level state that can get stuck and reject every future call
-// (KILO-APP-22). We poll the server for approval instead of relying on a
-// redirect, so a plain browser open is all Android needs.
+// iOS's ASWebAuthenticationSession raises a consent alert naming the auth URL's
+// host ("<App>" Wants to Use "<host>" to Sign In). On a non-product host — a
+// dev or preview stack — that alert shows the user a raw developer address
+// instead of a domain they can recognize as Kilo, so only open the native auth
+// session when the host is a product host. Otherwise present
+// SFSafariViewController via openBrowserAsync: it shares Safari's cookies (an
+// existing web session still applies) and raises no consent alert. The flow
+// polls the server for approval and never consumes the session redirect, so
+// nothing else changes. Android keeps openBrowserAsync because
+// expo-web-browser's openAuthSessionAsync polyfill can get stuck (KILO-APP-22).
+function isProductAuthHost(url: string): boolean {
+  try {
+    return PRODUCTION_HOSTS.includes(new URL(url).hostname);
+  } catch {
+    // An unparseable URL cannot be recognized as a product host, so avoid the
+    // consent alert and fall back to the plain browser.
+    return false;
+  }
+}
+
 async function openAuthBrowser(url: string) {
-  await (Platform.OS === 'android'
+  await (Platform.OS === 'android' || !isProductAuthHost(url)
     ? WebBrowser.openBrowserAsync(url)
     : WebBrowser.openAuthSessionAsync(url));
 }

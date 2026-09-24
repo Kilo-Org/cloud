@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one device-auth suite: the poll-request and token-parse contract cases plus the hook mount/state cases share one module-mock scaffold */
 /* eslint-disable import/first -- vi.mock must precede the hook import so the native modules are stubbed */
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -25,9 +26,10 @@ vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),
 }));
 
+// A product WEB_BASE_URL keeps the SSO case on the native auth session path.
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'http://localhost:3000',
-  WEB_BASE_URL: 'http://localhost:3001',
+  WEB_BASE_URL: 'https://app.kilo.ai',
 }));
 
 vi.mock('@/lib/auth/device-auth-poll', () => ({
@@ -43,7 +45,7 @@ vi.mock('@/lib/auth/pending-external-auth', () => ({
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
-import { openAuthSessionAsync } from 'expo-web-browser';
+import { openAuthSessionAsync, openBrowserAsync } from 'expo-web-browser';
 import {
   clearPendingExternalAuth,
   readPendingExternalAuth,
@@ -252,6 +254,19 @@ async function mountSettled(): Promise<{ current: DeviceAuthResult | null }> {
   return resultRef;
 }
 
+/** Runs a fresh sign-in whose server response carries `verificationUrl`, so the
+ *  test observes which browser API the auth host selects. */
+async function startSignin(verificationUrl: string): Promise<void> {
+  vi.mocked(openAuthSessionAsync).mockClear();
+  vi.mocked(openBrowserAsync).mockClear();
+  vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+  fetchMock.mockResolvedValue(Response.json({ code: 'UC', verificationUrl }));
+  const result = requireResult(await mountSettled());
+  await act(async () => {
+    await result.start('signin');
+  });
+}
+
 describe('useDeviceAuth hook', () => {
   beforeEach(() => {
     vi.mocked(readPendingExternalAuth).mockReset();
@@ -361,5 +376,19 @@ describe('useDeviceAuth hook', () => {
     expect(url.searchParams.get('email')).toBe('user@example.com');
     expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123&app=1');
     expect(url.searchParams.has('ssoOrganizationId')).toBe(false);
+  });
+
+  it('opens a plain browser for a non-product auth host (no consent alert)', async () => {
+    const url = 'http://127.0.0.1:3000/device-auth?code=UC-1';
+    await startSignin(url);
+    expect(vi.mocked(openBrowserAsync)).toHaveBeenCalledExactlyOnceWith(url);
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+  });
+
+  it('keeps the native auth session for a product auth host', async () => {
+    const url = 'https://app.kilo.ai/device-auth?code=UC-2';
+    await startSignin(url);
+    expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledExactlyOnceWith(url);
+    expect(vi.mocked(openBrowserAsync)).not.toHaveBeenCalled();
   });
 });

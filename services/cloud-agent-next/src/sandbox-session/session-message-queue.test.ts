@@ -10157,6 +10157,27 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       });
     });
 
+    it('projects a pre-dispatch cancellation as an interrupted queued failure', () => {
+      const result = cancelPendingMessage(
+        boundAggregate([queuedRecord('a', { state: { wrapperInstanceId: wrapper } })]),
+        'a',
+        1_000
+      );
+
+      expect(result.dropped).toBe(true);
+      const cancelled = result.messages?.find(message => message.messageId === 'a');
+      if (!cancelled) throw new Error('Missing cancelled message');
+      expect(failedMessageSnapshot(cancelled, 99)).toEqual({
+        messageId: 'a',
+        status: 'interrupted',
+        delivery: 'queued',
+        accepted: false,
+        reason: 'interrupted',
+        error: 'The message was interrupted',
+        timestamp: 99,
+      });
+    });
+
     it('drops a queued message with an in-flight (incomplete) attach proof', () => {
       const messages = [
         queuedRecord('a', {

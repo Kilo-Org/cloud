@@ -286,6 +286,7 @@ function pushDataForRow(
     category: 'attention',
     attentionKind: row.kind,
     ...(row.prUrl === null ? {} : { prUrl: row.prUrl }),
+    ...(row.organizationId === null ? {} : { organizationId: row.organizationId }),
   };
 }
 

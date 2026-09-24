@@ -13,15 +13,20 @@ import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { MonoScrollBlock } from './mono-scroll-block';
+import {
+  incompleteRestoreText,
+  preparationGroupExpandedByDefault,
+} from './preparation-group-state';
 
 export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
-  const [expanded, setExpanded] = useState(attempt.status !== 'completed');
+  const incomplete = incompleteRestoreText(attempt);
+  const [expanded, setExpanded] = useState(() => preparationGroupExpandedByDefault(attempt));
   const colors = useThemeColors();
   const { t } = useTranslation();
   useEffect(() => {
-    setExpanded(attempt.status !== 'completed');
-  }, [attempt.id, attempt.status]);
-  const title = attemptTitle(attempt.status, t);
+    setExpanded(attempt.status !== 'completed' || incomplete !== undefined);
+  }, [attempt.id, attempt.status, incomplete]);
+  const title = incomplete ?? attemptTitle(attempt.status, t);
   return (
     <View className="mx-4 my-2 overflow-hidden rounded-md border border-border bg-card">
       <Pressable
@@ -38,8 +43,12 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         ) : (
           <DirectionalChevronRight size={16} color={colors.mutedForeground} />
         )}
-        <AttemptIcon status={attempt.status} />
-        <Text className="text-sm font-medium">{title}</Text>
+        <AttemptIcon status={attempt.status} incomplete={incomplete !== undefined} />
+        <Text
+          className={incomplete ? 'text-sm font-medium text-destructive' : 'text-sm font-medium'}
+        >
+          {title}
+        </Text>
       </Pressable>
       {expanded && (
         <View className="gap-2 border-t border-border px-3 py-2">
@@ -57,8 +66,17 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
   );
 }
 
-function AttemptIcon({ status }: { status: PreparationAttempt['status'] }) {
+function AttemptIcon({
+  status,
+  incomplete,
+}: {
+  status: PreparationAttempt['status'];
+  incomplete: boolean;
+}) {
   const colors = useThemeColors();
+  if (incomplete) {
+    return <AlertCircle size={16} color={colors.destructive} />;
+  }
   if (status === 'running') {
     return <ActivityIndicator size="small" color={colors.mutedForeground} />;
   }
@@ -130,7 +148,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
         {step.kind === 'setup_command' ? (
           <Terminal size={14} color={colors.mutedForeground} />
         ) : (
-          <AttemptIcon status={step.status} />
+          <AttemptIcon status={step.status} incomplete={false} />
         )}
         <Text className="min-w-0 flex-1 text-sm" numberOfLines={1}>
           {label}

@@ -9,6 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'node:crypto';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -460,6 +461,12 @@ describe('explicit sandbox session creation', () => {
       });
       expect(metadata.workspace?.sandboxAllocation).toBe(preset);
       expect(metadata.workspace?.sandboxProvider).toBe(getSandboxAllocationProvider(preset));
+      expect(metadata.workspace?.credentialContainment).toEqual({
+        github: true,
+        gitlab: false,
+        bitbucket: false,
+        kilocode: true,
+      });
       expect(metadata.workspace).not.toHaveProperty('resources');
       if (preset === 'cloudflare-shared') {
         expect(resolveSharedSandboxAssignment).toHaveBeenCalledOnce();
@@ -803,6 +810,7 @@ describe('explicit sandbox session creation', () => {
         workspace: expect.objectContaining({
           sandboxProvider: 'cloudflare-containers',
           worktreeId: WORKTREE_ID,
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );
@@ -3695,6 +3703,45 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
 });
 
 describe('createSessionWithLedger changed-intent rejection', () => {
+  it.each([undefined, 'workflow', 'agent'] as const)(
+    'preserves the pre-purpose ledger fingerprint without allowing purpose elevation (%s)',
+    async githubAccessPurpose => {
+      const request = originalRequest();
+      request.repository = { type: 'github', repo: 'acme/repo', githubAccessPurpose };
+      const legacyFingerprint = createHash('sha256')
+        .update(
+          '{"agent":{"mode":"code","model":"claude-3"},"initialTurn":{"prompt":"Build the feature","type":"prompt"},"options":{"kilocodeOrganizationId":"org-abc"},"repository":{"repo":"acme/repo","type":"github"}}'
+        )
+        .digest('hex');
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          status: 'completed',
+          organization_id: 'org-abc',
+          canonical_result: {
+            cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+          },
+        }),
+      });
+      const stub = makeDoStub();
+      if (githubAccessPurpose === 'agent') {
+        await expect(runCreate(makeContext(stub), request)).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: 'session_creation_failed',
+        });
+      } else {
+        expect(await sessionCreateIntentFingerprint(request)).toBe(legacyFingerprint);
+        await expect(runCreate(makeContext(stub), request)).resolves.toMatchObject({
+          replayed: true,
+        });
+      }
+      expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
@@ -3873,6 +3920,27 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     {
       name: 'the model',
       retry: makeRequest({ agent: { mode: 'code', model: 'gpt-4' }, options: ORIGINAL_OPTIONS }),
+    },
+    {
+      name: 'the GitHub access purpose',
+      original: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          githubAccessPurpose: 'workflow',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          githubAccessPurpose: 'agent',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
     },
     {
       name: 'the organization',

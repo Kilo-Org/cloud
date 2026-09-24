@@ -85,6 +85,17 @@ export type PrepareAgentSessionDeps = {
   whenLoaded: () => Promise<boolean>;
   /** Post-success cache invalidation; the in-app callers own their query client. */
   invalidate?: () => Promise<void>;
+  /**
+   * Re-checked after the safe-retry row is persisted and immediately before
+   * the `prepareSession` mutate, while the request is still unsent. `true`
+   * abandons the intent: the caller's editable draft changed after the
+   * snapshot was taken, so the request must not create a session from stale
+   * text. The row and key stay as a retryable refusal leaves them. Only the
+   * new-session form supplies this — its composer stays editable while a
+   * create is in flight; the OS action path and the Continue clone cannot
+   * change under the call and omit it.
+   */
+  shouldAbort?: () => boolean;
 };
 
 /**
@@ -92,12 +103,16 @@ export type PrepareAgentSessionDeps = {
  * rejection) because the callers' failure feedback differs: the in-app form
  * toasts its own "could not read pending sessions" and never offers the
  * server's message, while the action path reports a retryable start failure.
+ * `aborted` is not a failure at all: the caller's `shouldAbort` predicate
+ * cancelled the intent before any request was sent, so there is no rejection
+ * to report and `message` is empty — the caller stays silent and keeps the
+ * draft. Only a caller that supplied `shouldAbort` can receive it.
  */
 export type PrepareAgentSessionOutcome =
   | { ok: true; sessionId: string }
   | {
       ok: false;
-      reason: 'outbox-unreadable' | 'prepare-failed';
+      reason: 'outbox-unreadable' | 'prepare-failed' | 'aborted';
       retryable: boolean;
       message: string;
       /**
@@ -162,6 +177,20 @@ export async function prepareAgentSession(
     await deps.writeSafeRetry({ operationKey, fingerprint, input: body });
     if (legacyRowToDrop !== null) {
       await deps.removeOutboxRow(legacyRowToDrop);
+    }
+
+    // The in-app form's composer keeps taking edits while a create is in
+    // flight (locking a focused Android input would drop the IME and collapse
+    // the pinned footer), so the draft can change after the snapshot the
+    // caller took. Re-check the caller's predicate here, with the request
+    // still unsent: an edit is a request for different text, so abandon the
+    // intent without dispatching. The caller keeps the edited draft for the
+    // next Start. The safe-retry row and key are left exactly as a retryable
+    // refusal leaves them — nothing reached the server, and a relaunch that
+    // still holds a row from an earlier same-intent attempt must keep its
+    // dedupe key.
+    if (deps.shouldAbort?.() === true) {
+      return { ok: false, reason: 'aborted', retryable: false, message: '' };
     }
 
     const result = input.organizationId

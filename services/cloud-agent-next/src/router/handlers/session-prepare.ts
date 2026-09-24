@@ -213,6 +213,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     repository = {
       type: 'github',
       repo: input.githubRepo,
+      githubAccessPurpose: input.githubAccessPurpose ?? 'workflow',
       ...(input.githubIntegrationId ? { githubIntegrationId: input.githubIntegrationId } : {}),
       branch: input.upstreamBranch,
     };

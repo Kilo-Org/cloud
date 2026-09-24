@@ -7,6 +7,7 @@ import {
   generateSandboxId,
   generateSandboxRoutingTarget,
   getDefaultSandboxDestination,
+  getManagedOutboundContainerId,
   getOutboundContainerId,
   getSandboxNamespace,
   isOrgInList,
@@ -1089,6 +1090,38 @@ describe('getOutboundContainerId', () => {
     expect(getOutboundContainerId(env, sandboxId, { managedScmContainment: true })).toBe(
       `${expected}:${sandboxId}`
     );
+  });
+});
+
+describe('getManagedOutboundContainerId', () => {
+  it('binds containers containment to the containers Durable Object, not the sandbox class', () => {
+    const env = {
+      SANDBOX_CONTAINERS: {
+        idFromName: (name: string) => ({ toString: () => `containers:${name}` }),
+      },
+      SandboxSmallContainment: {
+        idFromName: (name: string) => ({ toString: () => `sandbox:${name}` }),
+      },
+    } as unknown as Env;
+
+    expect(
+      getManagedOutboundContainerId('cloudflare-containers', env, {
+        logicalSandboxId: 'ses-logical',
+        physicalSandboxId: 'ses-physical',
+      })
+    ).toBe('containers:ses-logical');
+    expect(
+      getManagedOutboundContainerId('cloudflare', env, {
+        logicalSandboxId: 'ses-logical',
+        physicalSandboxId: 'ses-physical',
+      })
+    ).toBe('sandbox:ses-physical');
+    expect(
+      getManagedOutboundContainerId('vercel', env, {
+        logicalSandboxId: 'ses-logical',
+        physicalSandboxId: 'ses-physical',
+      })
+    ).toBeUndefined();
   });
 });
 

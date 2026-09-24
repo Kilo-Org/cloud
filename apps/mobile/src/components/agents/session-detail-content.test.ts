@@ -367,23 +367,42 @@ const openRenameModal = vi.hoisted(() => vi.fn());
 // Mirrors the real hook's modal fields; a test opens the dialog by flipping
 // `isOpen` so it can inspect the RenameModal the screen renders.
 const renameModalState = vi.hoisted(() => ({ isOpen: false, initialValue: '' }));
-vi.mock('@/components/agents/use-session-detail-rename', () => ({
-  useSessionDetailRename: ({
-    serverTitle,
-    fallbackTitle,
-  }: {
-    serverTitle?: string;
-    fallbackTitle: string;
-  }) => ({
-    title: serverTitle ?? fallbackTitle,
-    isTitleInteractive: serverTitle !== undefined,
-    isModalOpen: renameModalState.isOpen,
-    modalInitialValue: renameModalState.initialValue,
-    openModal: openRenameModal,
-    closeModal: vi.fn(),
-    submit: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
+vi.mock('@/components/agents/use-session-detail-rename', async () => {
+  // Mirror the real hook's title derivation (the shared pure helper) instead of
+  // re-stating a simpler rule, so the header assertions below exercise the
+  // production placeholder handling. Only the mutation/connection wiring the
+  // component does not touch here is stubbed out; the modal fields come from
+  // `renameModalState` so a test can open the dialog directly.
+  const { getSessionDetailRenameState, initialRenameState } =
+    await import('@/components/agents/session-detail-rename-state');
+  return {
+    useSessionDetailRename: ({
+      isLoaded = true,
+      serverTitle,
+      fallbackTitle,
+    }: {
+      isLoaded?: boolean;
+      serverTitle?: string;
+      fallbackTitle: string;
+    }) => {
+      const state = getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded,
+        serverTitle,
+        renameState: initialRenameState(),
+      });
+      return {
+        title: state.title,
+        isTitleInteractive: state.isTitleInteractive,
+        isModalOpen: renameModalState.isOpen,
+        modalInitialValue: renameModalState.initialValue,
+        openModal: openRenameModal,
+        closeModal: vi.fn(),
+        submit: vi.fn().mockResolvedValue(undefined),
+      };
+    },
+  };
+});
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),
   MESSAGE_SENT_EVENT: 'sent',
@@ -705,7 +724,10 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
-  /** The route's cached metadata title, as `[session-id].tsx` passes it. */
+  /**
+   * The route's cached list title, seeded before the session record loads, as
+   * `[session-id].tsx` passes it.
+   */
   cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
@@ -1132,6 +1154,45 @@ describe('SessionDetailContent header title', () => {
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 
+  // The ingest service names a session `New session - <ISO>` at creation, so a
+  // freshly started session has no user-readable name. The header must show the
+  // same localized `Session` label a title-less session shows, and the title
+  // stays pressable so the user can still rename it.
+  it('shows the localized fallback when the loaded server title is the machine placeholder', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T16:37:00.000Z';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(header.props.onTitlePress).toBeTypeOf('function');
+  });
+
+  // The route seeds the header from the session-list cache before the metadata
+  // read settles (and the metadata read can fail with a Retry). A placeholder
+  // cached title must never be painted on either path.
+  it('never paints a placeholder cached list title, even after the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+      cachedTitle: 'New session - 2026-09-22T16:37:00.000Z',
+    });
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retryable failure keeps the same fallback name on screen.
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
   it('shows the fallback name instead of the generated placeholder title', async () => {
     sessionTitleOverride = 'New session - 2026-09-22T02:05:22.778Z';
     const { renderer } = await mountDetails();
@@ -1184,6 +1245,21 @@ describe('SessionDetailContent header title', () => {
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
+  // The route seeds the header with the cached list title it opened from. A
+  // session created through cloud-agent-next carries the creation placeholder
+  // `New session - <ISO instant>` there, and the header must fall back to its
+  // own title rather than paint the machine string while the record loads.
+  it('shows the fallback title instead of a placeholder cached title', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], {
+      metadataReady: metadata.promise,
+      cachedTitle: 'New session - 2026-09-22T17:26:31.465Z',
+    });
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(String(header.props.title)).not.toContain('2026-09-22');
+  });
+
   it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
     const { renderer } = await mountDetails();
     const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {

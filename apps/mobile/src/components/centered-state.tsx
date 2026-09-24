@@ -12,15 +12,16 @@ import {
   PixelRatio,
   ScrollView,
   type ScrollViewProps,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
+import { ShortCenteredBandProvider } from '@/components/centered-state-band';
 import { useStateSurface } from '@/components/centered-state-surface';
-import { CenteredStateBandContext } from '@/components/centered-state-band';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import {
-  getCenteredStateBand,
   getCenteredStateLayout,
+  isShortViewport,
   type StateFrame,
 } from '@/lib/centered-state-layout';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,8 @@ export function CenteredState({
 }: CenteredStateProps) {
   const surface = useStateSurface();
   const frame = surface?.frame;
+  const windowSize = useWindowDimensions();
+  const shortBand = isShortViewport(windowSize.width, windowSize.height);
   const scrollRef = useRef<ScrollView | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
@@ -103,14 +106,6 @@ export function CenteredState({
   const measureContent = useCallback((event: LayoutChangeEvent) => {
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
-  // The pull-to-refresh line is rendered above the children, so it takes the
-  // top of the band: the band the children get is measured from its own layout
-  // rather than assumed (it is `h-0` except under reduced motion while a pull
-  // is in flight).
-  const [reservedHeight, setReservedHeight] = useState(0);
-  const measureReserved = useCallback((event: LayoutChangeEvent) => {
-    setReservedHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
-  }, []);
   const layout = useMemo(
     () =>
       surface?.frame && viewport?.surface === surface.frame && contentHeight !== null
@@ -128,12 +123,24 @@ export function CenteredState({
     [surface, viewport, contentHeight]
   );
   const ready = layout !== undefined;
+  // While the measured layout is pending, the fallback must still keep the band
+  // the surface reserved (the fixed tab bar) free: without it the body centers
+  // in the full viewport, which runs under the bar, and the bar clips the
+  // body's lower lines and its action. This padding is the only reservation —
+  // a caller that also shrinks the scroller frame by the same band clears it
+  // twice and pushes the body above the centre of the visible area.
+  const bottomReservation = surface?.bottomReservation ?? 0;
   const contentStyle = useMemo(
     () =>
       ready
         ? { flexGrow: 1, ...layout }
-        : { flexGrow: 1, justifyContent: 'center' as const, paddingVertical: 16 },
-    [layout, ready]
+        : {
+            flexGrow: 1,
+            justifyContent: 'center' as const,
+            paddingTop: 16,
+            paddingBottom: 16 + bottomReservation,
+          },
+    [bottomReservation, layout, ready]
   );
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
   useEffect(() => {
@@ -149,28 +156,13 @@ export function CenteredState({
     };
   }, [ready]);
   const visible = ready || fallbackElapsed;
-  const band = useMemo(
-    () =>
-      surface?.frame && viewport?.surface === surface.frame
-        ? Math.max(
-            0,
-            getCenteredStateBand({
-              surface: surface.frame,
-              viewport: viewport.frame,
-              topInset: surface.topInset,
-              bottomInset: surface.bottomInset,
-            }).band - reservedHeight
-          )
-        : null,
-    [surface, viewport, reservedHeight]
-  );
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');
   }
 
   return (
-    <CenteredStateBandContext value={band}>
+    <ShortCenteredBandProvider value={shortBand}>
       <ScrollView
         ref={capture}
         className={cn('flex-1', className)}
@@ -189,12 +181,10 @@ export function CenteredState({
           accessibilityElementsHidden={!visible}
           importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
         >
-          <View onLayout={measureReserved}>
-            {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
-          </View>
+          {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
           {children}
         </View>
       </ScrollView>
-    </CenteredStateBandContext>
+    </ShortCenteredBandProvider>
   );
 }

@@ -455,6 +455,33 @@ describe('applyNeedsInputNotifications', () => {
     );
   });
 
+  it('carries the organization on the posted raise so a tap switches context', async () => {
+    await applyNeedsInputNotifications({
+      publish: [notifiedRow({ organizationId: 'org-a' })],
+      dismiss: [],
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          data: expect.objectContaining({ organizationId: 'org-a' }),
+        }),
+      })
+    );
+  });
+
+  it('omits organizationId from a Personal raise so the absent key switches nothing', async () => {
+    await applyNeedsInputNotifications({
+      publish: [notifiedRow({ organizationId: null })],
+      dismiss: [],
+    });
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: Record<string, unknown> } },
+    ];
+    expect(request.content.data).not.toHaveProperty('organizationId');
+  });
+
   it('reports and swallows a rejected schedule so the mount never crashes', async () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {

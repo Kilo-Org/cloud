@@ -230,6 +230,8 @@ function createInternalApiContext(options: {
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {
+        authorizeCloudAgentGitHubRepo:
+          options.getTokenForRepo ?? vi.fn().mockResolvedValue({ success: true }),
         getTokenForRepo:
           options.getTokenForRepo ??
           vi.fn().mockResolvedValue({
@@ -813,6 +815,7 @@ describe('prepareSession endpoint', () => {
           type: 'github',
           repo: 'acme/repo',
           branch: 'feature/test-branch',
+          githubAccessPurpose: 'workflow',
         },
         profile: {
           envVars: { API_KEY: 'secret' },
@@ -1681,16 +1684,51 @@ describe('start endpoint', () => {
     });
 
     expect(getTokenForRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
       githubRepo: 'acme/repo',
       userId: 'test-user-123',
       expectedIntegrationId: githubIntegrationId,
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+          githubAccessPurpose: 'workflow',
+        },
       })
     );
   });
+
+  it.each(['slack', 'cloud-agent-web'])(
+    'does not grant agent access from public origin %s',
+    async createdOnPlatform => {
+      const doStub = createMockDOStub();
+      const authorize = vi
+        .fn()
+        .mockResolvedValue({ success: false, reason: 'integration_mismatch' });
+      const caller = appRouter.createCaller(
+        createInternalApiContext({ doStub, getTokenForRepo: authorize })
+      );
+      await expect(
+        caller.start({
+          message: { prompt: 'Access secondary repository' },
+          agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+          options: { createdOnPlatform },
+          repository: {
+            type: 'github',
+            repo: 'acme/repo',
+            githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({ accessPurpose: 'workflow' })
+      );
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
 
   it('persists default containment for standard GitLab grouped starts', async () => {
     const doStub = createMockDOStub();

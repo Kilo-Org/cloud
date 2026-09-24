@@ -145,7 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return invalidTokenResponse();
     }
 
-    if (!(await isFreeModel(requestedModelLowerCased))) {
+    if (!isFreeModel(requestedModelLowerCased)) {
       return NextResponse.json(
         {
           error: {
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const { balance, settings, plan, balanceLimitedByUserAllowance } =
       await getBalanceAndOrgSettings(organizationId, user);
 
-    if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
+    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const effectiveProvider = provider;
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
-    requestBodyParsed.model = mapModelIdToVercel(requestBodyParsed.model);
+    requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
   const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);

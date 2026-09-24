@@ -132,7 +132,28 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
-  // The two floors below keep the scroll CONTENT reachable; they do not keep
+  // The form is edge-to-edge and the window never resizes for the IME on
+  // either platform, so the screen needs two floors. The first is the
+  // navigation-bar inset, which the pinned footer reserves itself
+  // (`bottomClearance` below), so the footer can never render inside the bar:
+  // the Start action sits in a footer below the scroll body, and without the
+  // inset the footer would render in the navigation bar's region (a formSheet
+  // over this screen no longer leaves that region exposed below itself: the
+  // sheet is fixed at its shared options, `sheetShouldOverflowTopInset`). The
+  // second is the keyboard height, because the composer auto-focuses on open
+  // and with the keyboard up the scroll body is only ~1300 px tall while the
+  // form is ~2000 px, so a Start inside the scroll would sit below the fold —
+  // the user had to dismiss the keyboard (a scroll drag with
+  // `keyboardDismissMode="on-drag"` did that for them) to reach the primary
+  // action. Start therefore lives in a footer *outside* the ScrollView. The
+  // keyboard-lift view below adds the reported IME height above that inset; it
+  // is the app's cross-platform IME primitive (keyboardDidShow/DidHide on
+  // Android, keyboardWillShow/WillHide on iOS), one implementation for both
+  // platforms, and it wraps the footer alone, so the IME shrinks the scroll
+  // body and lifts the action, and no scroll position can carry the Start
+  // action under the bar or the keyboard.
+  //
+  // The composer reveal keeps the scroll CONTENT reachable; it does not keep
   // the composer card's own bottom row (the mode/model pills) above the IME —
   // the card is the first child, so it is drawn under the keyboard. This
   // reveal scrolls the card's bottom edge to the viewport's bottom, changing
@@ -151,23 +172,6 @@ export function NewSessionConfigureForm({
   // the ScrollView, which the pinned Start no longer needs and which left dead
   // space below the last field of a long form.
   const bottomClearance = useDetailScreenBottomPadding();
-  // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the screen needs two floors. The navigation-bar inset
-  // is the first: the Start action sits in a footer below the scroll body, and
-  // without the inset the footer would render in the navigation bar's region
-  // (a formSheet over this screen no longer leaves that region exposed below
-  // itself: the sheet is fixed at its shared options,
-  // `sheetShouldOverflowTopInset`). The keyboard height is the second: the
-  // composer auto-focuses on arrival, and with the keyboard up the scroll body
-  // is only ~1300 px tall while the form is ~2000 px, so a Start inside the
-  // scroll sits below the fold — the user had to dismiss the keyboard (a
-  // scroll drag with `keyboardDismissMode="on-drag"` did that for them) to
-  // reach the primary action. Start therefore lives in a footer *outside* the
-  // ScrollView. The keyboard-lift view is the app's cross-platform IME
-  // primitive (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide
-  // on iOS), so the same implementation runs on both platforms; the lift view
-  // wraps the footer alone, so the IME lifts the action and shrinks the scroll
-  // body instead of covering Start.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the footer, so the two never stack into a double lift.

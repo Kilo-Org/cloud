@@ -213,7 +213,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockResolvedValue(true);
+    mockedIsFreeModel.mockReturnValue(true);
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
     const { POST } = await import('./route');
@@ -236,7 +236,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
 
     const { POST } = await import('./route');
     const response = await POST(
@@ -257,7 +257,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
     const { POST } = await import('./route');

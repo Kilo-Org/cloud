@@ -274,15 +274,17 @@ function findElementHeight(node: Node): number | null {
   return null;
 }
 
-function findElement(node: Node, typeName: string): Record<string, unknown> | null {
+type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
+
+/** The first node of `typeName`, so a test can inspect its position in the tree. */
+function findElement(node: Node, typeName: string): ElementNode {
   if (node === null || typeof node !== 'object') {
     return null;
   }
-  const props = node.props ?? {};
-  const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type === typeName) {
-    return node;
+  const typed = node as { type?: unknown; props?: Record<string, unknown> };
+  const children = typed.props?.children;
+  if (typed.type === typeName) {
+    return typed;
   }
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findElement(child as Node, typeName);
@@ -301,13 +303,13 @@ function findOnLayoutHandler(
     return null;
   }
   const props = node.props ?? {};
+  const children = props.children;
   const type = (node as { type?: unknown }).type;
   if (type !== 'ScrollView' && typeof props.onLayout === 'function') {
     return props.onLayout as (event: {
       nativeEvent: { layout: { y: number; height: number } };
     }) => void;
   }
-  const children = props.children;
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findOnLayoutHandler(child as Node);
     if (found) {
@@ -489,7 +491,7 @@ describe('NewSessionConfigureForm', () => {
       const footerIndex = rootChildren.findIndex(
         child => findElementByType(child, 'AppAwareKeyboardPaddingView') !== null
       );
-      expect(bodyIndex).toBeGreaterThanOrEqual(0);
+      expect(bodyIndex).toBe(0);
       expect(footerIndex).toBeGreaterThan(bodyIndex);
     } finally {
       insetsState.bottom = 0;
@@ -498,19 +500,32 @@ describe('NewSessionConfigureForm', () => {
 
   it('keeps the cloud-create failure with the Start action it answers', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),
-      cloudCreateError: { retryable: true, message: 'prepare failed' },
+      runOnInstance: null,
+      cloudCreateError,
     }) as Node;
 
+    // A failure the user answers at the pinned Start must not end up scrolled
+    // off screen above it: it lives in the pinned footer, not the scroll body.
     const scrollBody = findElement(element, 'ScrollView');
     expect(scrollBody).not.toBeNull();
-    // A failure the user answers at the pinned Start must not end up scrolled
-    // off screen above it.
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
+    const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+    expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -1045,7 +1060,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
-  // ── Case 14: bottom navigation-bar clearance ──
+  // ── Case 15: bottom navigation-bar clearance ──
   it('reserves the bottom safe-area inset on the pinned footer so Start clears the navigation bar', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -1064,7 +1079,7 @@ describe('NewSessionConfigureForm', () => {
     }
   });
 
-  // ── Case 14b: the clearance leaves no dead space in the scroll body ──
+  // ── Case 15b: the clearance leaves no dead space in the scroll body ──
   it('leaves no in-scroll spacer after the last field', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -1081,7 +1096,7 @@ describe('NewSessionConfigureForm', () => {
     }
   });
 
-  // ── Case 14a: the primary action is pinned outside the scroll body ──
+  // ── Case 15a: the primary action is pinned outside the scroll body ──
   it('pins Start and the cloud-create recovery outside the scroll body, under the keyboard lift', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 

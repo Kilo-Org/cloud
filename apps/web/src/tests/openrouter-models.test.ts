@@ -15,7 +15,6 @@ import type * as ModelSettings from '@/lib/ai-gateway/providers/model-settings';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 import type * as AutoRouting from '@/lib/ai-gateway/auto-routing-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
-import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import type * as DirectByok from '@/lib/ai-gateway/providers/direct-byok';
@@ -31,7 +30,10 @@ import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@/lib/ai-gateway/byok';
 import { getTerminalBenchSummaries } from '@/lib/model-stats/terminal-bench';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
+import {
+  kiloExclusiveModels,
+  qwen36_plus_stealth_model,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
@@ -135,10 +137,6 @@ jest.mock('@/lib/ai-gateway/byok', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: jest.fn(async () => []),
-}));
-
 jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn(async (_userId: string, models: unknown[]) => models),
 }));
@@ -213,7 +211,6 @@ beforeEach(() => {
     .mockImplementation(realDirectByok.getDirectByokModelsForUser);
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
-  jest.mocked(listAvailableExperimentModels).mockReset().mockResolvedValue([]);
   invalidateModelStatsCache();
   mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
@@ -221,6 +218,39 @@ beforeEach(() => {
 });
 
 describe('GET /api/openrouter/models', () => {
+  test.each([
+    ['/api/openrouter/models', GET],
+    ['/api/gateway/v1/models', gatewayV1ModelsGET],
+  ] as const)('%s never serializes exclusive provider credentials', async (path, handler) => {
+    mockAuth = { user: null, organizationId: null };
+    jest.replaceProperty(qwen36_plus_stealth_model, 'provider', {
+      ...qwen36_plus_stealth_model.provider,
+      apiKey: 'exclusive-catalog-secret',
+      apiUrl: 'https://private-exclusive-provider.example/v1',
+    });
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+
+    const catalog = await getEnhancedOpenRouterModels();
+    const publicModel = catalog.data.find(
+      model => model.id === qwen36_plus_stealth_model.public_id
+    );
+    expect(publicModel).toBeDefined();
+    expect(publicModel).not.toHaveProperty('provider');
+    expect(publicModel).not.toHaveProperty('apiKey');
+    expect(JSON.stringify(catalog)).not.toContain('exclusive-catalog-secret');
+
+    const response = await handler(createTestRequest(path));
+    expect(response.status).toBe(200);
+    const rawBody = await response.text();
+    expect(rawBody).toContain(qwen36_plus_stealth_model.public_id);
+    expect(rawBody).not.toContain('exclusive-catalog-secret');
+    expect(rawBody).not.toContain('private-exclusive-provider.example');
+    expect(rawBody).not.toContain('"apiKey"');
+    expect(rawBody).not.toContain('"provider"');
+  });
+
   test('should handle OpenRouter API errors', async () => {
     const request = createTestRequest('/api/openrouter/models');
 
@@ -735,12 +765,9 @@ describe('shared stats and catalog snapshot', () => {
 
 describe('final Enkrypt serialization boundaries', () => {
   const stages = [
-    ['direct', 'free'],
     ['direct', 'opencode'],
     ['anonymous', 'autoRouting'],
-    ['anonymous', 'experiments'],
     ['authenticated', 'autoRouting'],
-    ['authenticated', 'experiments'],
     ['authenticated', 'byokModels'],
     ['authenticated', 'byokProviders'],
     ['authenticated', 'byokAvailability'],
@@ -758,12 +785,6 @@ describe('final Enkrypt serialization boundaries', () => {
       await released.promise;
     }
     switch (stage) {
-      case 'free':
-        jest.mocked(isFreeModel).mockImplementationOnce(async (...args) => {
-          await pause();
-          return realFreeModel.isFreeModel(...args);
-        });
-        break;
       case 'opencode':
         jest.mocked(getGatewayOpenCodeSettings).mockImplementationOnce(async (...args) => {
           await pause();
@@ -774,12 +795,6 @@ describe('final Enkrypt serialization boundaries', () => {
         jest.mocked(addAutoRoutingModels).mockImplementationOnce(async (...args) => {
           await pause();
           return realAutoRouting.addAutoRoutingModels(...args);
-        });
-        break;
-      case 'experiments':
-        jest.mocked(listAvailableExperimentModels).mockImplementationOnce(async () => {
-          await pause();
-          return [];
         });
         break;
       case 'byokModels':
@@ -911,17 +926,12 @@ describe('final Enkrypt serialization boundaries', () => {
     }
   );
 
-  test.each(['anonymous', 'authenticated', 'organization'] as const)(
+  test.each(['authenticated', 'organization'] as const)(
     'sanitizes appended %s models without changing availability',
     async branch => {
       configureBranch(branch);
       const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
       if (!original) throw new Error('Expected catalog fixture');
-      const experiment = {
-        ...original,
-        id: 'partner/experiment',
-        enkrypt: publishedEnkryptBenchmark,
-      };
       const byok = {
         ...original,
         id: 'byok/provider/model',
@@ -941,9 +951,8 @@ describe('final Enkrypt serialization boundaries', () => {
         opencode: { ai_sdk_provider: 'openai-compatible' as const, variants: undefined },
         enkrypt: publishedEnkryptBenchmark,
       };
-      jest.mocked(listAvailableExperimentModels).mockResolvedValue([experiment]);
       jest.mocked(getDirectByokModelsForUser).mockResolvedValue([byok]);
-      const appended = branch === 'anonymous' ? [experiment] : [experiment, byok];
+      const appended = [byok];
       if (branch === 'organization') {
         jest
           .mocked(getAvailableModelsForOrganization)
@@ -955,7 +964,6 @@ describe('final Enkrypt serialization boundaries', () => {
           OpenRouterModelsResponseSchema.parse({ data: [expected] }).data[0]
         );
       }
-      expect(experiment.enkrypt).toEqual(publishedEnkryptBenchmark);
       expect(byok.enkrypt).toEqual(publishedEnkryptBenchmark);
       expect(mockRows).toHaveBeenCalledTimes(1);
     }

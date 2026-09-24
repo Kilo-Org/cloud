@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Keep payloads tiny so the oversized-skip path cannot burn the default 5s
+// timeout. Production still uses 50MiB; queue-consumer.test.ts mocks the same way.
+vi.mock('../util/ingest-limits', () => ({
+  INGEST_CHUNK_MAX_BYTES: 256,
+  INGEST_CHUNK_MAX_ITEMS: 128,
+  MAX_INGEST_ITEM_BYTES: 2 * 1024 * 1024 - 64 * 1024,
+  MAX_SINGLE_ITEM_BYTES: 500,
+}));
 
 import {
   INGEST_CHUNK_MAX_BYTES,
@@ -78,7 +87,7 @@ describe('validateAndParseIngestPayload', () => {
       data: [
         validItem,
         { type: 'message', data: {} },
-        { type: 'unknown', data: { content: 'x'.repeat(1000) } },
+        { type: 'unknown', data: { content: 'x'.repeat(50) } },
       ],
     });
 
@@ -131,7 +140,7 @@ describe('validateAndParseIngestPayload', () => {
   });
 
   it('reports an oversized valid item', () => {
-    const data = { id: 'msg_large', content: 'x'.repeat(2 * 1024 * 1024) };
+    const data = { id: 'msg_large', content: 'x'.repeat(Math.floor(MAX_SINGLE_ITEM_BYTES / 2)) };
     const dataBytes = encoder.encode(JSON.stringify(data)).byteLength;
 
     expect(validate({ data: [{ type: 'message', data }] })).toMatchObject({

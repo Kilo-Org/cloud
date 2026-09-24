@@ -756,6 +756,33 @@ describe('cold-start body tap carries the session organization', () => {
       organizationId: null,
     });
   });
+
+  it('drops a session push captured before a signed-out settle', async () => {
+    const { checkInitialNotification, pending } = await loadNotifications();
+    mocks.lastResponse = {
+      notification: {
+        request: {
+          content: {
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'cli1',
+              category: 'attention',
+              organizationId: 'org-2',
+            },
+          },
+        },
+      },
+    };
+
+    checkInitialNotification();
+    expect(pending.getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/cli1?via=push');
+
+    // The launch settles signed out: no account owns this session destination,
+    // so neither it nor its organization switch opens after a later sign-in.
+    pending.setCurrentDeepLinkUserId(null);
+
+    expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
+  });
 });
 
 const SCOPE_KEY = buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-9' });

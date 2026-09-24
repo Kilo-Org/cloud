@@ -15,7 +15,7 @@ type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
 type GetLinkingURL = () => string | null;
 
 /** Per-capture flags the precedence and account rules read back. */
-type PendingDeepLinkOptions = {
+export type PendingDeepLinkOptions = {
   /** Only the cold-launch capture sets this; see the module flag below. */
   fromLaunchAppScheme?: boolean;
   /**

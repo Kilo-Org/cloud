@@ -9,6 +9,8 @@ import {
   _setSecureStoreForTests,
   consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
+  restorePersistedPendingDeepLink,
+  setCurrentDeepLinkUserId,
   setPendingDeepLink,
 } from './deep-link-launch';
 import {
@@ -17,6 +19,7 @@ import {
   registerNeedsInputCategories,
 } from './notification-actions';
 import { notificationIdentifierForSession } from './needs-input-notification';
+import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 const mocks = vi.hoisted(() => ({
   setNotificationCategoryAsync: vi.fn(),
@@ -717,6 +720,70 @@ describe('handleNeedsInputNotificationResponse — session organization', () => 
       href: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f1?via=push',
       organizationId: null,
     });
+  });
+
+  it('drops a session tap captured with no account identity when the account settles signed out', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.openPr,
+        data: raiseData({
+          prUrl: 'https://github.com/org/repo/pull/7',
+          organizationId: 'org-9',
+        }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/pr-review/org/repo/7?via=push');
+
+    // The launch settles signed out: no account owns this session destination,
+    // so it must not open — with its organization switch — after a sign-in.
+    setCurrentDeepLinkUserId(null);
+
+    expect(getPendingDeepLinkSnapshot()).toBeNull();
+    expect(consumePendingDeepLink()).toBeNull();
+  });
+
+  it('never restores an anonymous session tap for another account', async () => {
+    const records = new Map<string, string>();
+    const store = {
+      setItemAsync: vi.fn(async (key: string, value: string) => {
+        records.set(key, value);
+        await Promise.resolve();
+      }),
+      deleteItemAsync: vi.fn(async (key: string) => {
+        records.delete(key);
+        await Promise.resolve();
+      }),
+      getItemAsync: vi.fn(async (key: string) => {
+        await Promise.resolve();
+        return records.get(key) ?? null;
+      }),
+    };
+    _setSecureStoreForTests(store);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.openSession,
+        data: raiseData({ organizationId: 'org-9' }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+    // The tap was captured before the account settled, so the durable record
+    // carries no identity of its own.
+    await vi.waitFor(() => {
+      expect(records.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+    });
+
+    // The process died before the account settled; another account signs in on
+    // the next launch. The record restores the session and its organization for
+    // that account unless the destination is bound to an identity.
+    _resetDeepLinkLaunchForTests();
+    _setSecureStoreForTests(store);
+    setCurrentDeepLinkUserId('user-b');
+    await restorePersistedPendingDeepLink();
+
+    expect(consumePendingDeepLink()).toBeNull();
+    expect(getPendingDeepLinkSnapshot()).toBeNull();
   });
 });
 

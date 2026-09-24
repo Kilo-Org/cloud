@@ -49,7 +49,7 @@ import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
-  organizationIdForData,
+  pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
@@ -521,12 +521,14 @@ export function checkInitialNotification(): void {
   }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
-    // Carry the session's organization the same way the warm tap paths do
+    // Stash the session's destination the same way the warm tap paths do
     // (notification-actions.ts), so a session push that launches the app lands
     // in the session's organization instead of the previously selected one.
-    setPendingDeepLink(notificationPathForData(data), 'notification', {
-      organizationId: organizationIdForData(data),
-    });
+    setPendingDeepLink(
+      notificationPathForData(data),
+      'notification',
+      pendingDeepLinkOptionsForData(data)
+    );
   }
   Notifications.clearLastNotificationResponse();
 }

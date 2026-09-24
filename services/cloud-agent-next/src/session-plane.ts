@@ -28,6 +28,11 @@ export type SessionCreateOrigin = {
 
 export type SessionOwner = { userId: string; orgId?: string };
 
+export type SessionPlaneContext = {
+  /** Control-plane identity needs a runtime-authorization seal to recover after sandbox death. */
+  hasPolicyBearingToken?: boolean;
+};
+
 export const CODE_REVIEW_CONTROL_PLANE_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
 export function isInteractiveWebSession(origin?: SessionCreateOrigin): boolean {
@@ -58,10 +63,13 @@ export function isWorktreeOwner(
 export function sessionPlaneForNewOwner(
   env: ControlPlaneOwnerEnv,
   owner: SessionOwner,
-  origin?: SessionCreateOrigin
+  origin?: SessionCreateOrigin,
+  context?: SessionPlaneContext
 ): SessionPlane {
   if (origin?.createdOnPlatform === 'code-review') {
-    return isCodeReviewControlPlaneOwner(owner) ? 'control' : 'legacy';
+    return isCodeReviewControlPlaneOwner(owner) && context?.hasPolicyBearingToken === true
+      ? 'control'
+      : 'legacy';
   }
   return isControlPlaneOwner(env, owner) && isInteractiveWebSession(origin) ? 'control' : 'legacy';
 }

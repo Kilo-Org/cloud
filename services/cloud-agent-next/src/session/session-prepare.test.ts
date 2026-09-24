@@ -1761,9 +1761,13 @@ describe('createSessionWithLedger admission ladder', () => {
 
   it('creates code-review origin sessions on the control plane for the gated org without worktrees', async () => {
     const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
+    const ctx = modernContext(makeContext(doStub), CODE_REVIEW_CONTROL_PLANE_ORG_ID);
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: CODE_REVIEW_CONTROL_PLANE_ORG_ID }),
+    });
 
     await runCreate(
       ctx,
@@ -1793,10 +1797,41 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
-  it('keeps code-review origin sessions on agent_ for other orgs', async () => {
+  it('keeps gated-org code-review sessions on agent_ without a policy-bearing token', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: CODE_REVIEW_CONTROL_PLANE_ORG_ID }),
+    });
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'code-review',
+          kilocodeOrganizationId: CODE_REVIEW_CONTROL_PLANE_ORG_ID,
+        },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+      })
+    );
+  });
+
+  it('keeps code-review origin sessions on agent_ for other orgs', async () => {
+    const doStub = makeDoStub();
+    const ctx = modernContext(makeContext(doStub), '11111111-1111-4111-8111-111111111111');
     ctx.env.CONTROL_PLANE_IDS = '*';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: '11111111-1111-4111-8111-111111111111' }),
+    });
 
     await runCreate(
       ctx,

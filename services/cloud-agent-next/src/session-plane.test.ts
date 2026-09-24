@@ -56,29 +56,53 @@ describe('session plane identity', () => {
     expect(isControlPlaneOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-2' })).toBe(false);
   });
 
-  it('mints workspace_ for Code Reviewer only for the gated org', () => {
+  it('mints workspace_ for Code Reviewer only for the gated org with a policy-bearing token', () => {
     const codeReview = { createdOnPlatform: 'code-review' };
+    const policyBearing = { hasPolicyBearingToken: true };
     expect(
       sessionPlaneForNewOwner(
         {},
         { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
-        codeReview
+        codeReview,
+        policyBearing
       )
     ).toBe('control');
     expect(
       sessionPlaneForNewOwner(
         { CONTROL_PLANE_IDS: '*' },
         { userId: 'user-1', orgId: 'org-1' },
-        codeReview
+        codeReview,
+        policyBearing
       )
     ).toBe('legacy');
     expect(
-      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: '*' }, { userId: 'user-1' }, codeReview)
+      sessionPlaneForNewOwner(
+        { CONTROL_PLANE_IDS: '*' },
+        { userId: 'user-1' },
+        codeReview,
+        policyBearing
+      )
     ).toBe('legacy');
     expect(
       sessionPlaneForNewOwner(
         {},
         { userId: CODE_REVIEW_CONTROL_PLANE_ORG_ID, orgId: 'org-1' },
+        codeReview,
+        policyBearing
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
+        codeReview,
+        { hasPolicyBearingToken: false }
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
         codeReview
       )
     ).toBe('legacy');

@@ -152,3 +152,25 @@ export async function backfillGitHubInstallations(
   }
   return result;
 }
+
+export async function reportGitHubConnectionRoleReconciliation(limit = 100, cursor?: string) {
+  return db
+    .select({
+      integrationId: platform_integrations.id,
+      installationId: platform_integrations.platform_installation_id,
+      appType: platform_integrations.github_app_type,
+      canonicalId: platform_integrations.github_installation_id,
+      status: platform_integrations.integration_status,
+      disconnectedAt: platform_integrations.github_disconnected_at,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, 'github'),
+        isNull(platform_integrations.github_connection_role),
+        cursor ? gt(platform_integrations.id, cursor) : undefined
+      )
+    )
+    .orderBy(platform_integrations.id)
+    .limit(limit);
+}

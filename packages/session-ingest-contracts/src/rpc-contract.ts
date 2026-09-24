@@ -49,6 +49,24 @@ export const cloudAgentWorktreeDeletionStateSchema = z
   .strict();
 export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeDeletionStateSchema>;
 
+export const retireCloudAgentWorktreeIfSoleMemberSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+  })
+  .strict();
+export type RetireCloudAgentWorktreeIfSoleMemberParams = z.infer<
+  typeof retireCloudAgentWorktreeIfSoleMemberSchema
+>;
+
+export const retireCloudAgentWorktreeIfSoleMemberResultSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('exclusive') }).strict(),
+  z.object({ kind: z.literal('shared') }).strict(),
+  z.object({ kind: z.literal('unresolved') }).strict(),
+]);
+export type RetireCloudAgentWorktreeIfSoleMemberResult = z.infer<
+  typeof retireCloudAgentWorktreeIfSoleMemberResultSchema
+>;
+
 export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionSchema
   .extend({
     runtimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
@@ -902,6 +920,9 @@ export type SessionIngestRpcMethods = {
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;
+  retireCloudAgentWorktreeIfSoleMember: (
+    params: RetireCloudAgentWorktreeIfSoleMemberParams
+  ) => Promise<RetireCloudAgentWorktreeIfSoleMemberResult>;
   recordCloudAgentWorktreeCleanup: (
     params: RecordCloudAgentWorktreeCleanupParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

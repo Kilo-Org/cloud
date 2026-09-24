@@ -1,9 +1,9 @@
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 
 import { type ProviderPrRef, providerPrRefKey } from '@kilocode/app-shared/provider-review';
 
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { readStoredValueForUpdate, writeStoredValueSafe } from '@/lib/auth/secure-store-value';
 import { providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import { PR_REVIEW_VIEWED_KEY } from '@/lib/storage-keys';
 
@@ -110,26 +110,37 @@ function computeNextViewedPaths(
   return [...existing.viewedPaths, path];
 }
 
-async function readMap(): Promise<ViewedFileMap> {
+async function readMap(): Promise<ViewedFileMap | null> {
   const cached = cachedMap;
   if (cached !== null) {
     return cached;
   }
   const gen = generation;
-  const raw = await SecureStore.getItemAsync(PR_REVIEW_VIEWED_KEY);
+  const read = await readStoredValueForUpdate(PR_REVIEW_VIEWED_KEY);
   if (gen !== generation) {
     // A write or clear happened while this read was in flight. A write
-    // publishes the fresh map to `cachedMap`; a clear nulls it. Return the
+    // publishes the fresh map to `cachedMap`; a clear empties it. Return the
     // authoritative current state, never the stale parse.
-    return cachedMap ?? {};
+    return cachedMap;
   }
-  const parsed = parseMap(raw);
+  if (read.status === 'unreadable') {
+    // Leave the cache empty so a later read retries, and report the failure to
+    // the caller so it can abort its mutation. A failed read is NOT an empty
+    // map: persisting a map derived from one would wipe the stored viewed set.
+    return null;
+  }
+  const parsed = parseMap(read.value);
   cachedMap = parsed;
   return parsed;
 }
 
 export async function getViewedFiles(ref: ViewedFilesRef, headSha: string): Promise<string[]> {
   const map = await readMap();
+  if (map === null) {
+    // Unreadable: show nothing viewed rather than rejecting into the diff
+    // screen. The read is retried on the next call (the cache stays empty).
+    return [];
+  }
   const entry = map[viewedFilesKey(ref)];
   if (!entry || entry.headSha !== headSha) {
     return [];
@@ -153,6 +164,11 @@ export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<vo
   const { headSha, path } = input;
   await writeAccountMetadata(PR_REVIEW_VIEWED_KEY, async () => {
     const map = await readMap();
+    if (map === null) {
+      // The read failed and was reported at warning level. Abort: persisting a
+      // map derived from an unreadable record would wipe the stored viewed set.
+      return;
+    }
     const key = viewedFilesKey(input);
     const existing = map[key];
 
@@ -175,7 +191,10 @@ export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<vo
     for (const [trimmedKey, value] of trimmedEntries) {
       trimmed[trimmedKey] = value;
     }
-    await SecureStore.setItemAsync(PR_REVIEW_VIEWED_KEY, toJsonString(trimmed));
+    // Best effort: the caller publishes the optimistic set without awaiting
+    // this, so a failed write is reported and swallowed; the in-memory cache
+    // still advances so the current run stays consistent.
+    await writeStoredValueSafe(PR_REVIEW_VIEWED_KEY, toJsonString(trimmed));
     cachedMap = trimmed;
     generation += 1;
   });

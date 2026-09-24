@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the bar-height, label-width and label-fit suites all read one module and the same source-parity text; splitting them would duplicate that harness */
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
@@ -15,10 +16,12 @@ import {
   shouldHideTabBar,
   shouldShowTabLabel,
   TAB_ICON_FORWARD_FONT_SCALE,
+  TAB_LABEL_MINIMUM_FONT_SCALE,
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
   tabLabelFits,
+  tabLabelLineCount,
   tabLabelNumberOfLines,
   tabLabelWidth,
   visibleTabCount,
@@ -48,6 +51,29 @@ describe('getTabBarOverlayHeight', () => {
 
   it('grows to preserve scaled tab labels', () => {
     expect(getTabBarOverlayHeight(34, 'ios', 3)).toBe(164);
+  });
+});
+
+describe('tabLabelLineCount', () => {
+  it('reserves one line below the wrap threshold', () => {
+    expect(tabLabelLineCount(1)).toBe(1);
+    expect(tabLabelLineCount(TAB_LABEL_WRAP_FONT_SCALE)).toBe(1);
+  });
+
+  it('reserves the second line above the wrap threshold', () => {
+    expect(tabLabelLineCount(TAB_LABEL_WRAP_FONT_SCALE + 0.01)).toBe(2);
+    expect(tabLabelLineCount(3)).toBe(2);
+  });
+
+  it('agrees with the height the bar reserves', () => {
+    // The bar reserves one label line below the wrap threshold and two above
+    // it; the label is never allowed to render more lines than that.
+    expect(getTabBarOverlayHeight(0, 'android', 1)).toBeCloseTo(
+      34 + 16 * 1 * tabLabelLineCount(1) + 4
+    );
+    expect(getTabBarOverlayHeight(0, 'android', 1.9)).toBeCloseTo(
+      34 + 16 * 1.9 * tabLabelLineCount(1.9) + 4
+    );
   });
 });
 
@@ -251,6 +277,67 @@ describe('shouldShowTabLabel', () => {
 
   it('keeps the width rule from overriding the font-scale rule', () => {
     expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
+  });
+});
+
+describe('tab label shrink floor', () => {
+  // `TabLabel` asks the platform to shrink an overflowing label and caps the
+  // shrink at `TAB_LABEL_MINIMUM_FONT_SCALE` on iOS; RN implements
+  // `minimumFontScale` on iOS only, so Android's `adjustsFontSizeToFit` floors
+  // at RN's own platform minimum instead. The cap is therefore a residual
+  // guard, and the legibility guarantee has to come from the width rule: the
+  // bar drops the whole label row as soon as one full-size label would not fit
+  // its tab, so every label that renders already fits at scale 1 and no label
+  // can reach either platform's floor. This suite pins that contract — the
+  // platform cap may not be the thing that keeps the labels legible.
+  const LABEL_SETS: readonly (readonly string[])[] = [
+    ['Home', 'Agents', 'Profile'],
+    ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'],
+    ['Home', 'Agents', 'Bogga shakhsiga'],
+  ];
+  // The label box is the tab item minus its 10dp horizontal padding.
+  const TAB_ITEM_PADDING = 10;
+  const TAB_WIDTHS = [40, 50, 72, 80, 90, 106.67, 120, 200];
+
+  it('renders every label at the full size that already fits its tab', () => {
+    const renderedRows: { labels: readonly string[]; tabWidth: number }[] = [];
+    for (const labels of LABEL_SETS) {
+      for (const tabWidth of TAB_WIDTHS) {
+        if (shouldShowTabLabel(1, tabWidth, labels)) {
+          renderedRows.push({ labels, tabWidth });
+        }
+      }
+    }
+    // Guard against a vacuous sweep that never renders a label row.
+    expect(renderedRows.length).toBeGreaterThan(0);
+    for (const { labels, tabWidth } of renderedRows) {
+      const box = tabWidth - TAB_ITEM_PADDING;
+      for (const label of labels) {
+        expect(tabLabelFits(label, tabWidth)).toBe(true);
+        // A full-size render fits, so the shrink the platform is asked for
+        // stays a sub-1.0 margin, above `TAB_LABEL_MINIMUM_FONT_SCALE`.
+        expect(box / tabLabelWidth(label)).toBeGreaterThanOrEqual(TAB_LABEL_MINIMUM_FONT_SCALE);
+      }
+    }
+  });
+
+  it('drops the label row before a label could need a shrink below the floor', () => {
+    const floorBoundLabels = ['Profile', 'Kilo Claw', 'Bogga shakhsiga', '設定'];
+    let checkedWidths = 0;
+    for (const label of floorBoundLabels) {
+      for (const tabWidth of TAB_WIDTHS) {
+        const box = tabWidth - TAB_ITEM_PADDING;
+        // The label would only fit by shrinking below the floor, so the bar
+        // must drop the row rather than lean on the iOS-only cap to keep it
+        // legible.
+        if (tabLabelWidth(label) > box / TAB_LABEL_MINIMUM_FONT_SCALE) {
+          checkedWidths += 1;
+          expect(shouldShowTabLabel(1, tabWidth, [label])).toBe(false);
+        }
+      }
+    }
+    // The sweep must actually cross the floor boundary.
+    expect(checkedWidths).toBeGreaterThan(0);
   });
 });
 

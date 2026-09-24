@@ -93,7 +93,7 @@ export async function shouldRouteToVercel(
   }
 
   const vercelModels = await getVercelModelsFromDatabase();
-  const vercelModelId = mapModelIdToVercel(requestedModel);
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
@@ -258,7 +258,7 @@ export async function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  const vercelModelId = mapModelIdToVercel(requestedModel);
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;
 
   if (userByok) {

@@ -5,7 +5,6 @@ import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway
 const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
-  'mistralai/mistral-embed-2312': 'mistral/mistral-embed',
   'mistralai/codestral-embed-2505': 'mistral/codestral-embed',
   'mistralai/ministral-14b-2512': 'mistral/ministral-14b',
   'mistralai/ministral-3b-2512': 'mistral/ministral-3b',

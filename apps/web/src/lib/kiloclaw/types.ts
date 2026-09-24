@@ -363,7 +363,7 @@ export type UserConfigResponse = {
   customSecretMeta: Record<string, { configPath?: string }>;
   /** Whether vector memory search is enabled on this instance. */
   vectorMemoryEnabled: boolean;
-  /** Embedding model ID for vector memory (e.g. "mistralai/mistral-embed-2312"). */
+  /** Embedding model ID for vector memory (e.g. "sentence-transformers/all-mpnet-base-v2"). */
   vectorMemoryModel: string | null;
   /** Whether background dreaming (memory consolidation) is enabled. */
   dreamingEnabled: boolean;

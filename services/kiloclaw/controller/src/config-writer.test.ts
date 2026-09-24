@@ -1291,7 +1291,9 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), KILOCLAW_VECTOR_MEMORY_ENABLED: 'true' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-    expect(config.agents.defaults.memorySearch.model).toBe('mistralai/mistral-embed-2312');
+    expect(config.agents.defaults.memorySearch.model).toBe(
+      'sentence-transformers/all-mpnet-base-v2'
+    );
   });
 
   it('honors KILOCODE_API_BASE_URL override on the memorySearch remote block', () => {

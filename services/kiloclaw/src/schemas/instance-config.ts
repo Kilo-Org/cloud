@@ -195,7 +195,7 @@ export type EncryptedChannelTokens = NonNullable<InstanceConfig['channels']>;
  * own copies of this literal because they are bundled separately from the
  * worker — when changing this constant, update all three locations.
  */
-export const DEFAULT_VECTOR_MEMORY_MODEL = 'mistralai/mistral-embed-2312';
+export const DEFAULT_VECTOR_MEMORY_MODEL = 'sentence-transformers/all-mpnet-base-v2';
 
 // TODO: Legacy — no UI callers remain. Remove alongside patchChannels tRPC
 // mutation and PATCH /api/platform/channels worker route.
@@ -456,7 +456,7 @@ export const PersistedStateSchema = z.object({
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),
   // Vector memory: whether the builtin embedding-backed memory search is enabled.
   vectorMemoryEnabled: z.boolean().default(false),
-  // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed-2312").
+  // Vector memory: embedding model ID (e.g. "sentence-transformers/all-mpnet-base-v2").
   vectorMemoryModel: z.string().nullable().default(null),
   // Dreaming: whether background memory consolidation is enabled.
   dreamingEnabled: z.boolean().default(false),

@@ -38,6 +38,7 @@ import {
   type EmbeddingProxyRequest,
   validateEmbeddingDimensions,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
+import { resolveDeprecatedKiloEmbeddingModel } from '@/lib/ai-gateway/embeddings/kilo-embedding-models';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
@@ -104,7 +105,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const requestedModel = requestBodyParsed.model.trim();
-  const requestedModelLowerCased = requestedModel.toLowerCase();
+  const requestedModelLowerCased = resolveDeprecatedKiloEmbeddingModel(
+    requestedModel.toLowerCase()
+  );
+  requestBodyParsed.model = requestedModelLowerCased;
 
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();

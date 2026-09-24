@@ -109,7 +109,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestPrivacy = providerPrivacySchema.optional().safeParse(requestBodyParsed.provider);
   if (!requestPrivacy.success) return invalidRequestResponse();
-  let effectivePrivacy = getEffectiveProviderPrivacy(requestPrivacy.data);
 
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
@@ -220,7 +219,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan, balanceLimitedByUserAllowance } =
       await getBalanceAndOrgSettings(organizationId, user);
-    effectivePrivacy = getEffectiveProviderPrivacy(requestPrivacy.data, settings?.data_collection);
 
     if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
       return await creditsBlockedResponse({
@@ -260,10 +258,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (Object.keys(effectivePrivacy).length > 0) {
-    requestBodyParsed.provider = { ...requestBodyParsed.provider, ...effectivePrivacy };
-  }
-
   sentryRootSpan()?.setAttribute(
     'embedding.time_to_request_start_ms',
     performance.now() - requestStartedAt
@@ -299,7 +293,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
-  const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    requestBodyParsed.provider?.data_collection
+  );
+  const upstreamBody = buildUpstreamBody(
+    {
+      ...requestBodyParsed,
+      ...(Object.keys(effectivePrivacy).length > 0 && {
+        provider: { ...requestBodyParsed.provider, ...effectivePrivacy },
+      }),
+    },
+    requestedModelLowerCased
+  );
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
     const byokProviders: Record<string, unknown[]> = {};

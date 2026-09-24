@@ -690,13 +690,12 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
         effectiveProviderConfig = { ...providerConfig, only };
       }
     }
-    if (effectiveProviderConfig) {
-      effectiveProviderConfig = { ...effectiveProviderConfig, ...effectivePrivacy };
-    }
     return {
       balance,
       balanceLimitedByUserAllowance,
-      effectiveProviderConfig,
+      effectiveProviderConfig: effectiveProviderConfig
+        ? { ...effectiveProviderConfig, ...effectivePrivacy }
+        : undefined,
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
@@ -731,11 +730,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     return chatGptReconnectResponse(providerResult.message);
   }
   const effectiveProviderContext = providerResult;
-
-  if (effectiveProviderContext.bypassAccessCheck) {
-    if (requestProvider) requestBodyParsed.body.provider = requestProvider;
-    else delete requestBodyParsed.body.provider;
-  }
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {

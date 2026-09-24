@@ -22,7 +22,6 @@ import {
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
@@ -300,7 +299,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  let providerPolicy: OpenRouterProviderConfig | undefined;
+  let providerPolicy = providerConfig;
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -315,11 +314,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         : [...decision.eligibleProviderRoutes];
       if (only.length === 0) return modelNotAllowedResponse();
       providerPolicy = { ...providerConfig, only };
-    } else if (providerConfig) {
-      providerPolicy = providerConfig;
     }
-  } else if (providerConfig) {
-    providerPolicy = providerConfig;
   }
   const effectiveProvider =
     requestProvider || providerPolicy || Object.keys(effectivePrivacy).length > 0

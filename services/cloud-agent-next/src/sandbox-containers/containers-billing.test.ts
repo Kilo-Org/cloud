@@ -380,6 +380,28 @@ describe('ContainersBilling physical lifecycle', () => {
     expect((await instance.getState()).status).toBe('running');
   });
 
+  it('stamps the launch time, not the admission time, on the first schedule', async () => {
+    const { instance, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    const admittedAt = (storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number })
+      .usageMeasuredAtMs;
+
+    const launchedAt = T0 + 45_000;
+    vi.setSystemTime(launchedAt);
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as {
+      measurementStarted: boolean;
+      usageMeasuredAtMs: number;
+    };
+    // Containers never use the Vercel pin or `openIntervalBeforeCreate` path:
+    // their first schedule stamps `Date.now()` at launch, not at admission.
+    expect(context.measurementStarted).toBe(true);
+    expect(context.usageMeasuredAtMs).toBe(launchedAt);
+    expect(context.usageMeasuredAtMs).not.toBe(admittedAt);
+  });
+
   it('budget stop blocks, schedules force-stop, destroys, settles, and a fresh admission succeeds', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');

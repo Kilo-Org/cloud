@@ -153,7 +153,6 @@ describe('autoTopUp', () => {
         owned_by_user_id: testUser.id,
         stripe_payment_method_id: 'pm_test_primary_disabled',
         amount_cents: 5000,
-        disabled_reason: 'card_declined',
       });
       const staleUser = toUserForBalance({
         ...testUser,
@@ -305,6 +304,74 @@ describe('autoTopUp', () => {
       if (!reservation) throw new Error('Expected an Auto Top-Up reservation');
       await performReservedAutoTopUp(reservation);
       expect(client.invoices.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not execute Stripe work when balance recovers after reservation', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_recovered_balance',
+        amount_cents: 5000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const reservation = await reserveAutoTopUp(user);
+      if (!reservation) throw new Error('Expected an Auto Top-Up reservation');
+      await db
+        .update(kilocode_users)
+        .set({
+          total_microdollars_acquired: toMicrodollars(AUTO_TOP_UP_THRESHOLD_DOLLARS + 1),
+        })
+        .where(eq(kilocode_users.id, testUser.id));
+      const { client } = await import('@/lib/stripe-client');
+
+      await performReservedAutoTopUp(reservation);
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.id, reservation.config.id),
+      });
+      expect(client.invoices.create).not.toHaveBeenCalled();
+      expect(config?.attempt_started_at).toBeNull();
+    });
+
+    it('releases the reservation when the primary balance refresh fails', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_balance_refresh_failure',
+        amount_cents: 5000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const refreshError = new Error('synthetic primary balance refresh failure');
+      const findUser = jest
+        .spyOn(db.query.kilocode_users, 'findFirst')
+        .mockRejectedValueOnce(refreshError);
+
+      try {
+        await expect(reserveAutoTopUp(user)).rejects.toBe(refreshError);
+      } finally {
+        findUser.mockRestore();
+      }
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
+      });
+      expect(config?.attempt_started_at).toBeNull();
     });
 
     it('does not execute Stripe work after a newer attempt replaces the reservation', async () => {

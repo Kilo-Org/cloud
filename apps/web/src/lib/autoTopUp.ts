@@ -266,27 +266,29 @@ async function reserveAutoTopUpForEntity(
   // (another request may have completed a top-up while we were waiting for the lock)
   // We fetch fresh data from DB and compute balance directly to avoid
   // calling getBalanceForUser which would create a cycle (it calls maybePerformAutoTopUp)
-  const { currentBalance_USD, stripe_customer_id } =
-    await getEntityBalanceAndStripeCustomer(entity);
+  if (!config.attempt_started_at) {
+    throw new Error(`Auto Top-Up reservation ${config.id} has no attempt timestamp`);
+  }
+  let currentBalance_USD: number;
+  let stripe_customer_id: string | null;
+  try {
+    ({ currentBalance_USD, stripe_customer_id } = await getEntityBalanceAndStripeCustomer(entity));
+  } catch (error) {
+    await releaseAutoTopUpReservation(config.id, config.attempt_started_at);
+    throw error;
+  }
   if (currentBalance_USD >= threshold) {
     // Balance is now sufficient, release lock and exit
-    if (config.attempt_started_at) {
-      await releaseAutoTopUpReservation(config.id, config.attempt_started_at);
-    }
+    await releaseAutoTopUpReservation(config.id, config.attempt_started_at);
     return undefined;
   }
 
   if (!stripe_customer_id) {
-    if (config.attempt_started_at) {
-      await disableAutoTopUpForEntity(entity, 'no_stripe_customer', {
-        configId: config.id,
-        attemptStartedAt: config.attempt_started_at,
-      });
-    }
+    await disableAutoTopUpForEntity(entity, 'no_stripe_customer', {
+      configId: config.id,
+      attemptStartedAt: config.attempt_started_at,
+    });
     return undefined;
-  }
-  if (!config.attempt_started_at) {
-    throw new Error(`Auto Top-Up reservation ${config.id} has no attempt timestamp`);
   }
 
   return {
@@ -363,6 +365,19 @@ async function chargeReservedAutoTopUp(
     throw new Error(`Auto Top-Up reservation ${config.id} lost its execution timestamp`);
   }
   const executionStartedAt = ownedReservation.attempt_started_at;
+  let currentBalance_USD: number;
+  try {
+    ({ currentBalance_USD } = await getEntityBalanceAndStripeCustomer(entity));
+  } catch (error) {
+    await releaseAutoTopUpReservation(config.id, executionStartedAt);
+    throw error;
+  }
+  const threshold =
+    entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
+  if (currentBalance_USD >= threshold) {
+    await releaseAutoTopUpReservation(config.id, executionStartedAt);
+    return failureResult('balance_already_sufficient');
+  }
 
   const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
   const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Platform, TextInput, type TextInputProps, View } from 'react-native';
+import { TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -53,16 +53,12 @@ function FormField({
   const nativeInput = useRef<TextInput>(null);
   const displayedError = validate ? validationError : error;
 
-  // Android can recycle an EditText across two mounts of the same field, so a
-  // second "Add" would open with the previous name and URL still in the native
-  // view. defaultValue only applies on first attach; write the text after
-  // attach so a recycled field starts from this form's default, not the last.
+  // defaultValue only applies on first attach. A remounted or reused native
+  // field can keep the previous text, so write this form's default after attach.
   useLayoutEffect(() => {
     const next = defaultValue ?? '';
     valueRef.current = next;
-    if (Platform.OS === 'android') {
-      nativeInput.current?.setNativeProps({ text: next });
-    }
+    nativeInput.current?.setNativeProps({ text: next });
   }, [defaultValue]);
 
   return (

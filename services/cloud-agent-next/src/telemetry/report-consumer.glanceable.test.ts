@@ -22,7 +22,11 @@ const database = vi.hoisted(() => ({ current: undefined as WorkerDb | undefined 
 vi.mock('../db/pg.js', () => ({ getPgDb: () => database.current }));
 vi.mock('../../../../apps/web/node_modules/server-only/index.js', () => ({}));
 vi.mock('@/lib/config.server', () => ({ SESSION_INGEST_WORKER_URL: undefined }));
-vi.mock('@/lib/tokens', () => ({ generateInternalServiceToken: vi.fn() }));
+vi.mock('@/lib/bounded-service-fetch', () => ({ fetchWithinBudget: vi.fn() }));
+vi.mock('@/lib/tokens', () => ({
+  generateInternalServiceToken: vi.fn(),
+  generateBoundedInternalServiceToken: vi.fn(),
+}));
 vi.mock('@/lib/drizzle', () => ({
   get db() {
     return database.current;

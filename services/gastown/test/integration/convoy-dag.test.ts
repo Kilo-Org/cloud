@@ -15,6 +15,9 @@ describe('Convoy DAG and Feature Branches', () => {
     town = getTownStub(townName);
     // Set town ID so the alarm loop doesn't bail out
     await town.setTownId(townName);
+    // New towns default to staged convoys (#2374); these tests exercise the
+    // active dispatch path, so opt out explicitly.
+    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   // ── Feature Branch ─────────────────────────────────────────────────

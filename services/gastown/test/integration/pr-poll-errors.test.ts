@@ -27,6 +27,9 @@ describe('PR poll error discrimination (#3149)', () => {
     townName = `pr-poll-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
+    // New towns default to staged convoys (#2374); these tests exercise the
+    // active dispatch path, so opt out explicitly.
+    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   async function setupMrBeadWithPrUrl(prUrl: string) {
@@ -53,6 +56,7 @@ describe('PR poll error discrimination (#3149)', () => {
     await town.agentDone(agentId, {
       branch: 'gt/polecat/test-branch',
       summary: 'Completed task',
+      pr_url: prUrl,
     });
 
     await runDurableObjectAlarm(town);
@@ -61,18 +65,9 @@ describe('PR poll error discrimination (#3149)', () => {
     const mrBead = allMrs.find(b => b.metadata?.source_bead_id === beadId);
     expect(mrBead).toBeTruthy();
 
-    // Set the PR URL and put the MR bead back to in_progress so the
-    // reconciler will schedule a poll_pr action on the next alarm tick.
-    await town.updateBead(
-      mrBead!.bead_id,
-      {
-        metadata: {
-          ...(mrBead!.metadata ?? {}),
-          pr_url: prUrl,
-        },
-      },
-      'system'
-    );
+    // Ensure the MR bead is in_progress so the reconciler schedules a
+    // poll_pr action for it on the next alarm tick. The pr_url lives in
+    // review_metadata (set by agentDone), which is what Rule 1 reads.
     await town.updateBeadStatus(mrBead!.bead_id, 'in_progress', 'system');
 
     return { beadId, mrBeadId: mrBead!.bead_id, agentId, convoyId: result.convoy.id };

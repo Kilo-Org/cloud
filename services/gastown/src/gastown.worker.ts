@@ -924,7 +924,7 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
   ) {
     return next();
   }
-  await kiloAuthMiddleware(c, async () => {
+  return kiloAuthMiddleware(c, async () => {
     await adminAuditMiddleware(c, async () => {
       await townAuthMiddleware(c, next);
     });
@@ -1079,7 +1079,8 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
-// Protected by Cloudflare Access at the perimeter; no additional auth required.
+// kiloAuthMiddleware + townAuthMiddleware (above) require a Kilo user JWT
+// and town ownership; unauthenticated callers receive 401.
 
 app.post('/api/towns/:townId/container/agents/start', c =>
   instrumented(c, 'POST /api/towns/:townId/container/agents/start', () =>

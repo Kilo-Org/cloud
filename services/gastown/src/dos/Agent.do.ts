@@ -141,6 +141,11 @@ export class AgentDO extends DurableObject<Env> {
     console.log(`${AGENT_DO_LOG} destroy: clearing all storage`);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+    // deleteAll() drops the SQLite tables. RPCs after destroy() rely on the
+    // constructor's blockConcurrencyWhile for schema setup, which does not run
+    // again on an existing instance — so re-create the (empty) schema here.
+    this.initPromise = null;
+    await this.ensureInitialized();
   }
 
   async ping(): Promise<{ ok: true }> {

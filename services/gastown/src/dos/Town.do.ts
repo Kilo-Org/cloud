@@ -5892,6 +5892,14 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+
+    // deleteAll() also drops the SQLite tables. RPCs after destroy() rely on
+    // the constructor's blockConcurrencyWhile for schema setup, which does not
+    // run again on an existing instance — so re-create the (empty) schema here.
+    // The stored town:id is gone, so this cannot re-arm the alarm.
+    this.initPromise = null;
+    this._townId = null;
+    await this.ensureInitialized();
   }
 }
 

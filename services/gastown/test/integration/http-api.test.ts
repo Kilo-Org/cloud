@@ -1,5 +1,5 @@
-import { SELF } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { env, runDurableObjectAlarm, SELF } from 'cloudflare:test';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
 const JWT_SECRET = 'test-jwt-secret-must-be-at-least-32-chars-long';
@@ -46,12 +46,12 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+    it('should serve the service banner at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      const body = await res.json();
+      expect(body.service).toBe('gastown');
+      expect(body.status).toBe('ok');
     });
   });
 
@@ -428,6 +428,12 @@ describe('HTTP API', () => {
   // ── Done ───────────────────────────────────────────────────────────────
 
   describe('agent done', () => {
+    beforeEach(async () => {
+      // The alarm loop needs a stored town id; the HTTP routes share this DO.
+      const town = env.TOWN.get(env.TOWN.idFromName(townId));
+      await town.setTownId(townId);
+    });
+
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
       const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
@@ -464,6 +470,11 @@ describe('HTTP API', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.done).toBe(true);
+
+      // agentDone is event-only: the alarm drains the agent_done event, which
+      // unhooks the agent and submits the work to the review queue.
+      const town = env.TOWN.get(env.TOWN.idFromName(townId));
+      expect(await runDurableObjectAlarm(town)).toBe(true);
 
       // Verify agent is idle
       const agentCheck = await SELF.fetch(
@@ -620,9 +631,11 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      // The route routes the escalation through routeEscalation, which returns
+      // the escalation entry (not a raw bead).
+      expect(body.data.severity).toBe('critical');
+      expect(body.data.message).toBe('Critical failure');
+      expect(body.data.source_rig_id).toBe(id);
     });
   });
 

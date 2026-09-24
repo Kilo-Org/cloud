@@ -14,6 +14,9 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
     townName = `review-failure-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
+    // New towns default to staged convoys (#2374); these tests exercise the
+    // active dispatch path, so opt out explicitly.
+    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   async function setupConvoyWithMR() {

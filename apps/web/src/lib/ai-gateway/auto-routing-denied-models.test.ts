@@ -103,24 +103,21 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   });
 
   it('excludes paid training models for personal data-collection deny requests', async () => {
-    await expect(
-      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
-    ).resolves.toEqual([contributor]);
+    await expect(collectDeniedAutoRoutingModelIds(null, owner, true)).resolves.toEqual([
+      contributor,
+    ]);
   });
 
   it('enforces organization privacy even with unrestricted model access and a client allow', async () => {
     await expect(
-      collectDeniedAutoRoutingModelIds(policy({ dataCollection: 'deny' }), owner, {
-        data_collection: 'allow',
-      })
+      collectDeniedAutoRoutingModelIds(policy({ dataCollection: 'deny' }), owner, false)
     ).resolves.toEqual([contributor]);
   });
 
   it('excludes retained-only models for ZDR but not for training denial', async () => {
-    await expect(collectDeniedAutoRoutingModelIds(null, owner, { zdr: true })).resolves.toEqual([
-      contributor,
-      standard,
-    ]);
+    await expect(
+      collectDeniedAutoRoutingModelIds(null, owner, true, { zdr: true })
+    ).resolves.toEqual([contributor, standard]);
   });
 
   it('keeps mixed-policy models when a nontraining route is eligible', async () => {
@@ -135,14 +132,12 @@ describe('collectDeniedAutoRoutingModelIds', () => {
         ],
       ])
     );
+    await expect(collectDeniedAutoRoutingModelIds(null, owner, true)).resolves.toEqual([]);
     await expect(
-      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
-    ).resolves.toEqual([]);
-    await expect(
-      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny', only: ['meta'] })
+      collectDeniedAutoRoutingModelIds(null, owner, true, { only: ['meta'] })
     ).resolves.toEqual([contributor]);
     await expect(
-      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny', ignore: ['safe'] })
+      collectDeniedAutoRoutingModelIds(null, owner, true, { ignore: ['safe'] })
     ).resolves.toEqual([contributor]);
     jest.mocked(getEffectiveModelDecision).mockResolvedValue({
       allowed: true,
@@ -161,9 +156,10 @@ describe('collectDeniedAutoRoutingModelIds', () => {
     jest
       .mocked(hasBestEffortGuessDataCollectionRequirement)
       .mockImplementation(async id => id === contributor || id === PRIMARY_DEFAULT_MODEL);
-    await expect(
-      collectDeniedAutoRoutingModelIds(null, owner, { data_collection: 'deny' })
-    ).resolves.toEqual([contributor, PRIMARY_DEFAULT_MODEL]);
+    await expect(collectDeniedAutoRoutingModelIds(null, owner, true)).resolves.toEqual([
+      contributor,
+      PRIMARY_DEFAULT_MODEL,
+    ]);
   });
 
   it('combines access-policy and privacy denials', async () => {

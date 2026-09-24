@@ -547,7 +547,7 @@ describe('catalog training policies', () => {
     }
   );
 
-  test('does not mark a free model when a known provider does not train', async () => {
+  test('marks a free model even when a known provider does not train', async () => {
     const id = 'provider/mixed:free';
     jest.mocked(isFreeModel).mockResolvedValue(true);
     jest.mocked(getModelDataPolicies).mockResolvedValue(
@@ -569,7 +569,7 @@ describe('catalog training policies', () => {
 
     const catalog = await getEnhancedOpenRouterModels();
 
-    expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(false);
+    expect(catalog.data.find(model => model.id === id)?.mayTrainOnYourPrompts).toBe(true);
   });
 
   test('does not inherit training metadata from a free sibling and retains the free fallback', async () => {

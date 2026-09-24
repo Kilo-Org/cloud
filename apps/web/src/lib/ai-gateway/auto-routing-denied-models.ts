@@ -7,10 +7,7 @@ import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { hasBestEffortGuessDataCollectionRequirement } from '@/lib/ai-gateway/is-free-model';
 import { getModelDataPolicies } from '@/lib/ai-gateway/providers/openrouter/model-data-policy.server';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import {
-  isDataCollectionExplicitlyDisallowed,
-  type OpenRouterProviderConfig,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
@@ -98,13 +95,10 @@ export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner):
 export async function collectDeniedAutoRoutingModelIds(
   policy: EffectiveOrganizationModelPolicy | null,
   owner: AutoRoutingOwner,
-  provider?: OpenRouterProviderConfig
+  dataCollectionDisallowed = false,
+  providerRouting: Pick<OpenRouterProviderConfig, 'only' | 'ignore' | 'zdr'> = {}
 ): Promise<string[]> {
-  const privacyProvider = {
-    ...provider,
-    ...(policy?.dataCollection === 'deny' && { data_collection: 'deny' as const }),
-  };
-  const checkPrivacy = isDataCollectionExplicitlyDisallowed(privacyProvider);
+  const checkPrivacy = dataCollectionDisallowed || policy?.dataCollection === 'deny';
   const checkAccess = policy !== null && policyNeedsCandidateEvaluation(policy);
   if (!checkPrivacy && !checkAccess && !policy?.organizationModelDenyList.length) {
     return [];
@@ -135,14 +129,14 @@ export async function collectDeniedAutoRoutingModelIds(
             const slug = normalizeInferenceProviderId(route.providerSlug);
             return (
               (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(slug)) &&
-              (!privacyProvider.only ||
-                privacyProvider.only.some(id => normalizeInferenceProviderId(id) === slug)) &&
-              !privacyProvider.ignore?.some(id => normalizeInferenceProviderId(id) === slug)
+              (!providerRouting.only ||
+                providerRouting.only.some(id => normalizeInferenceProviderId(id) === slug)) &&
+              !providerRouting.ignore?.some(id => normalizeInferenceProviderId(id) === slug)
             );
           });
           if (
             !eligible.some(
-              route => !route.training && (privacyProvider.zdr !== true || !route.retainsPrompts)
+              route => !route.training && (providerRouting.zdr !== true || !route.retainsPrompts)
             )
           ) {
             return;

@@ -1145,7 +1145,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalledWith(
         null,
         { userId: 'user-123', organizationId: null },
-        { data_collection: 'deny', zdr: true, only: ['anthropic'], ignore: ['meta'] }
+        true,
+        { zdr: true, only: ['anthropic'], ignore: ['meta'] }
       );
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1190,7 +1191,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalledWith(
       expect.anything(),
       { userId: 'user-123', organizationId: 'org-123' },
-      { data_collection: 'deny' }
+      true,
+      { only: undefined, ignore: undefined, zdr: undefined }
     );
   });
 

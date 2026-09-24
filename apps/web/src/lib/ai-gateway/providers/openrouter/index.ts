@@ -1,6 +1,9 @@
 import { isPdfSupportingModel, preferredModels } from '@/lib/ai-gateway/models';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import {
+  hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
+} from '@/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
   LOCAL_FAKE_LLM_API_KEY,
@@ -174,7 +177,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: model.isFree ?? isFree,
-          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
+          mayTrainOnYourPrompts:
+            model.mayTrainOnYourPrompts === true ||
+            (await hasBestEffortGuessDataCollectionRequirement(model.id)),
           opencode:
             model.opencode ??
             (await getGatewayOpenCodeSettings(

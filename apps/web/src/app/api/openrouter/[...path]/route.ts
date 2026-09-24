@@ -373,16 +373,16 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
             !groupPolicy && plan === 'enterprise'
               ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
               : [];
+          const { only, ignore, zdr } = requestBodyParsed.body.provider ?? {};
           const deniedFromPolicy = await collectDeniedAutoRoutingModelIds(
             groupPolicy,
             {
               userId: user.id,
               organizationId: organizationId ?? null,
             },
-            {
-              ...requestBodyParsed.body.provider,
-              ...(settings?.data_collection === 'deny' && { data_collection: 'deny' }),
-            }
+            settings?.data_collection === 'deny' ||
+              isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider),
+            { only, ignore, zdr }
           );
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
           deniedAutoRoutingModelIds = deniedModelIds;

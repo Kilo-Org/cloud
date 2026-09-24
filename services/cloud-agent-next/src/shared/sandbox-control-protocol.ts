@@ -305,6 +305,7 @@ export const sandboxHelloPayloadSchema = z.object({
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      restoredWorkspace: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })
@@ -465,6 +466,7 @@ export const sessionAttachPayloadSchema = z
     home: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
+    restoredFromBackup: z.boolean().optional(),
     kilo: z
       .object({
         scopeId: z.string().min(1).max(256),
@@ -1123,6 +1125,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       eventReceipts: z.boolean().optional(),
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      restoredWorkspace: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })

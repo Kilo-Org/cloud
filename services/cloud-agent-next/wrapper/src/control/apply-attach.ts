@@ -46,6 +46,10 @@ import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import { formatGitFailure, formatGitResultFailure, gitOperationError } from '../git-errors.js';
 import {
+  RestoredWorkspaceReconciliationError,
+  reconcileRestoredWorkspaceRef,
+} from '../reconcile-restored-workspace.js';
+import {
   WorktreeKiloRuntimeError,
   type WorktreeKiloRuntime,
   type WorktreeKiloAttachment,
@@ -79,6 +83,8 @@ export type ApplyAttachDeps = {
   hasGit?: (directory: string) => Promise<boolean>;
   hasBootstrapMarker?: (directory: string) => Promise<boolean>;
   writeBootstrapMarker?: (directory: string) => Promise<void>;
+  deleteBootstrapMarker?: (directory: string) => Promise<void>;
+  emptyWorkspaceContents?: (directory: string) => Promise<boolean>;
   runGit?: (
     args: string[],
     cwd?: string,
@@ -188,6 +194,27 @@ async function defaultHasBootstrapMarker(directory: string): Promise<boolean> {
 
 async function defaultWriteBootstrapMarker(directory: string): Promise<void> {
   await fs.writeFile(await bootstrapMarkerPath(directory), 'ready\n');
+}
+
+async function defaultDeleteBootstrapMarker(directory: string): Promise<void> {
+  try {
+    await fs.unlink(await bootstrapMarkerPath(directory));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+}
+
+// Keep the workspace root: the running Kilo process uses it as its cwd. Remove
+// every child and report whether the root is now empty.
+async function defaultEmptyWorkspaceContents(directory: string): Promise<boolean> {
+  try {
+    for (const entry of await fs.readdir(directory)) {
+      await fs.rm(path.join(directory, entry), { recursive: true, force: true });
+    }
+    return (await fs.readdir(directory)).length === 0;
+  } catch {
+    return false;
+  }
 }
 
 async function defaultSessionExists(
@@ -431,6 +458,8 @@ async function executeSessionAttach(
     const hasGit = deps.hasGit ?? defaultHasGit;
     const hasBootstrapMarker = deps.hasBootstrapMarker ?? defaultHasBootstrapMarker;
     const writeBootstrapMarker = deps.writeBootstrapMarker ?? defaultWriteBootstrapMarker;
+    const deleteBootstrapMarker = deps.deleteBootstrapMarker ?? defaultDeleteBootstrapMarker;
+    const emptyWorkspaceContents = deps.emptyWorkspaceContents ?? defaultEmptyWorkspaceContents;
     const runGit =
       deps.runGit ??
       ((args, cwd, signal, options) =>
@@ -447,116 +476,245 @@ async function executeSessionAttach(
         signal.throwIfAborted();
         const alreadyBootstrapped = await hasBootstrapMarker(directory);
         signal.throwIfAborted();
+        const restored = attach.restoredFromBackup === true;
         const setupCommands = attach.setupCommands ?? [];
         const needsWorkspace = Boolean(attach.git) || setupCommands.length > 0;
-        workspaceAction = alreadyBootstrapped
-          ? 'reuse'
-          : needsWorkspace
-            ? 'bootstrap'
-            : 'not_needed';
-        if (!alreadyBootstrapped && needsWorkspace) {
+        const reuse = alreadyBootstrapped && !restored;
+        workspaceAction = reuse ? 'reuse' : needsWorkspace ? 'bootstrap' : 'not_needed';
+        if (!reuse && needsWorkspace) {
           await mkdir(directory);
           signal.throwIfAborted();
+          if (restored) {
+            await deleteBootstrapMarker(directory);
+            signal.throwIfAborted();
+          }
           if (attach.git) {
             stage = 'git_setup';
-            const needsClone = !(await hasGit(directory));
-            signal.throwIfAborted();
             const cloneStepId = 'phase:cloning';
-            progress.start('cloning', cloneStepId, 'Cloning repository…');
-            if (needsClone) {
-              progress.progress('cloning', cloneStepId, 'Cloning repository…');
-              const cloneUrl = authenticatedGitUrl(
-                attach.git.url,
-                attach.git.token,
-                attach.git.platform
+            const git = attach.git;
+            const hasGitMetadata = await hasGit(directory);
+            signal.throwIfAborted();
+            const replaceAndReconcileRestoredWorkspace = async (): Promise<void> => {
+              const consumerUrl = authenticatedGitUrl(git.url, git.token, git.platform);
+              const setUrl = await runGit(
+                ['remote', 'set-url', 'origin', consumerUrl],
+                directory,
+                signal
               );
-              const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
               signal.throwIfAborted();
-              if (cloned.exitCode !== 0) {
-                const message = formatGitResultFailure(cloned, 'git clone failed', redact);
-                progress.fail('cloning', cloneStepId, message);
-                return fail(
-                  'not_ready',
-                  message,
-                  true,
-                  gitOperationError(cloned, 'clone', redact).subtype
+              if (setUrl.exitCode !== 0) {
+                throw new RestoredWorkspaceReconciliationError(
+                  formatGitResultFailure(setUrl, 'Worktree Git remote refresh failed', redact)
                 );
               }
-            }
-            const branch = attachBranch(attach.branch, attach.kilo.scopeId);
-            if (isSyntheticReviewRef(branch) && attach.branchMode !== 'working') {
-              await checkoutSyntheticReviewRef({
-                runGit: (args, options) => runGit(args, options?.cwd, options?.signal, options),
-                workspacePath: directory,
-                branchName: branch,
-                signal,
-                onProgress: detail => progress.progress('cloning', cloneStepId, detail),
-                redact,
-              });
-            } else {
-              let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
-              if (!attach.branch || attach.branchMode === 'working') {
-                const existingBranch = await runGit(
-                  ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
+              const branch = attachBranch(attach.branch, attach.kilo.scopeId);
+              if (isSyntheticReviewRef(branch) && attach.branchMode !== 'working') {
+                await checkoutSyntheticReviewRef({
+                  runGit: (args, options) => runGit(args, options?.cwd, options?.signal, options),
+                  workspacePath: directory,
+                  branchName: branch,
+                  signal,
+                  onProgress: detail => progress.progress('cloning', cloneStepId, detail),
+                  redact,
+                });
+                return;
+              }
+              if (attach.branch && attach.branchMode !== 'working') {
+                await reconcileRestoredWorkspaceRef({
+                  runGit: args => runGit(args, directory, signal),
+                  sourceRef: attach.branch,
+                  branchName: branch,
+                });
+                return;
+              }
+              const fetched = await runGit(['fetch', 'origin', '--prune'], directory, signal);
+              signal.throwIfAborted();
+              if (fetched.exitCode !== 0) {
+                throw new RestoredWorkspaceReconciliationError(
+                  formatGitResultFailure(
+                    fetched,
+                    'Failed to fetch authoritative remote state',
+                    redact
+                  )
+                );
+              }
+              const remoteBranch = await runGit(
+                ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`],
+                directory,
+                signal
+              );
+              signal.throwIfAborted();
+              if (remoteBranch.exitCode !== 0 && remoteBranch.exitCode !== 1) {
+                throw new RestoredWorkspaceReconciliationError(
+                  formatGitResultFailure(remoteBranch, 'git branch lookup failed', redact)
+                );
+              }
+              if (remoteBranch.exitCode === 0) {
+                const tracked = await runGit(
+                  ['checkout', '-B', branch, '--track', `origin/${branch}`],
                   directory,
                   signal
                 );
                 signal.throwIfAborted();
-                if (existingBranch.exitCode !== 0 && existingBranch.exitCode !== 1) {
-                  const message = formatGitResultFailure(
-                    existingBranch,
-                    'git branch lookup failed',
-                    redact
+                if (tracked.exitCode !== 0) {
+                  throw new RestoredWorkspaceReconciliationError(
+                    formatGitResultFailure(tracked, 'git checkout failed', redact)
                   );
-                  progress.fail('cloning', cloneStepId, message);
-                  return fail('not_ready', message, true);
                 }
-                checkoutArgs = ['checkout', branch];
-                if (existingBranch.exitCode === 1) {
-                  const remoteBranch = await runGit(
-                    ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`],
+                return;
+              }
+              const defaultResult = await runGit(
+                ['ls-remote', '--symref', 'origin', 'HEAD'],
+                directory,
+                signal
+              );
+              signal.throwIfAborted();
+              const defaultMatch = defaultResult.stdout.match(/^ref: refs\/heads\/(.+)\s+HEAD$/m);
+              if (defaultResult.exitCode !== 0 || !defaultMatch?.[1]) {
+                throw new RestoredWorkspaceReconciliationError(
+                  'Failed to resolve authoritative remote default branch'
+                );
+              }
+              await reconcileRestoredWorkspaceRef({
+                runGit: args => runGit(args, directory, signal),
+                sourceRef: defaultMatch[1],
+                branchName: branch,
+              });
+            };
+            const emptyRestoredWorkspace = async (): Promise<ControlHandlerResult | undefined> => {
+              let emptied = false;
+              try {
+                emptied = await emptyWorkspaceContents(directory);
+              } catch {
+                emptied = false;
+              }
+              return emptied ? undefined : fail('not_ready', 'workspace restore failed', true);
+            };
+            let reconciled = false;
+            if (restored) {
+              if (hasGitMetadata) {
+                try {
+                  await replaceAndReconcileRestoredWorkspace();
+                  await configureWorkspaceGitAuthor(
+                    directory,
+                    (args, options) => runGit(args, options?.cwd, options?.signal),
+                    undefined,
+                    signal
+                  );
+                  signal.throwIfAborted();
+                  reconciled = true;
+                } catch (error) {
+                  if (error instanceof WrapperBootstrapError && !error.retryable) throw error;
+                  signal.throwIfAborted();
+                  const failure = await emptyRestoredWorkspace();
+                  if (failure) return failure;
+                }
+              } else {
+                const failure = await emptyRestoredWorkspace();
+                if (failure) return failure;
+              }
+            }
+            if (reconciled) {
+              progress.start('cloning', cloneStepId, 'Reconciling restored workspace…');
+              progress.complete('cloning', cloneStepId);
+            } else {
+              const needsClone = restored ? true : !hasGitMetadata;
+              progress.start('cloning', cloneStepId, 'Cloning repository…');
+              if (needsClone) {
+                progress.progress('cloning', cloneStepId, 'Cloning repository…');
+                const cloneUrl = authenticatedGitUrl(
+                  attach.git.url,
+                  attach.git.token,
+                  attach.git.platform
+                );
+                const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
+                signal.throwIfAborted();
+                if (cloned.exitCode !== 0) {
+                  const message = formatGitResultFailure(cloned, 'git clone failed', redact);
+                  progress.fail('cloning', cloneStepId, message);
+                  return fail(
+                    'not_ready',
+                    message,
+                    true,
+                    gitOperationError(cloned, 'clone', redact).subtype
+                  );
+                }
+              }
+              const branch = attachBranch(attach.branch, attach.kilo.scopeId);
+              if (isSyntheticReviewRef(branch) && attach.branchMode !== 'working') {
+                await checkoutSyntheticReviewRef({
+                  runGit: (args, options) => runGit(args, options?.cwd, options?.signal, options),
+                  workspacePath: directory,
+                  branchName: branch,
+                  signal,
+                  onProgress: detail => progress.progress('cloning', cloneStepId, detail),
+                  redact,
+                });
+              } else {
+                let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
+                if (!attach.branch || attach.branchMode === 'working') {
+                  const existingBranch = await runGit(
+                    ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
                     directory,
                     signal
                   );
                   signal.throwIfAborted();
-                  if (remoteBranch.exitCode !== 0 && remoteBranch.exitCode !== 1) {
+                  if (existingBranch.exitCode !== 0 && existingBranch.exitCode !== 1) {
                     const message = formatGitResultFailure(
-                      remoteBranch,
+                      existingBranch,
                       'git branch lookup failed',
                       redact
                     );
                     progress.fail('cloning', cloneStepId, message);
                     return fail('not_ready', message, true);
                   }
-                  checkoutArgs = [
-                    'checkout',
-                    '-b',
-                    branch,
-                    ...(remoteBranch.exitCode === 0 ? ['--track', `origin/${branch}`] : []),
-                  ];
+                  checkoutArgs = ['checkout', branch];
+                  if (existingBranch.exitCode === 1) {
+                    const remoteBranch = await runGit(
+                      ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`],
+                      directory,
+                      signal
+                    );
+                    signal.throwIfAborted();
+                    if (remoteBranch.exitCode !== 0 && remoteBranch.exitCode !== 1) {
+                      const message = formatGitResultFailure(
+                        remoteBranch,
+                        'git branch lookup failed',
+                        redact
+                      );
+                      progress.fail('cloning', cloneStepId, message);
+                      return fail('not_ready', message, true);
+                    }
+                    checkoutArgs = [
+                      'checkout',
+                      '-b',
+                      branch,
+                      ...(remoteBranch.exitCode === 0 ? ['--track', `origin/${branch}`] : []),
+                    ];
+                  }
+                }
+                const checked = await runGit(checkoutArgs, directory, signal);
+                signal.throwIfAborted();
+                if (checked.exitCode !== 0) {
+                  const message = formatGitResultFailure(checked, 'git checkout failed', redact);
+                  progress.fail('cloning', cloneStepId, message);
+                  return fail(
+                    'not_ready',
+                    message,
+                    true,
+                    gitOperationError(checked, 'checkout', redact).subtype
+                  );
                 }
               }
-              const checked = await runGit(checkoutArgs, directory, signal);
+              progress.complete('cloning', cloneStepId);
+              await configureWorkspaceGitAuthor(
+                directory,
+                (args, options) => runGit(args, options?.cwd, options?.signal),
+                undefined,
+                signal
+              );
               signal.throwIfAborted();
-              if (checked.exitCode !== 0) {
-                const message = formatGitResultFailure(checked, 'git checkout failed', redact);
-                progress.fail('cloning', cloneStepId, message);
-                return fail(
-                  'not_ready',
-                  message,
-                  true,
-                  gitOperationError(checked, 'checkout', redact).subtype
-                );
-              }
             }
-            progress.complete('cloning', cloneStepId);
-            await configureWorkspaceGitAuthor(
-              directory,
-              (args, options) => runGit(args, options?.cwd, options?.signal),
-              undefined,
-              signal
-            );
-            signal.throwIfAborted();
           }
           for (const [index, command] of setupCommands.entries()) {
             stage = 'setup_commands';

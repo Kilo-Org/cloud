@@ -212,8 +212,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
   };
 
   /** The one worker-log end cursor behind both cursor-shaped capability names. */
-  const captureWorkerLogCursor = async (): Promise<number> =>
-    (await captureLogCursor()).fromByte;
+  const captureWorkerLogCursor = async (): Promise<number> => (await captureLogCursor()).fromByte;
 
   return {
     captureWrapperIdentity: async allocation => {

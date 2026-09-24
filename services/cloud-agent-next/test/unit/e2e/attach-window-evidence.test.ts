@@ -68,12 +68,7 @@ describe('evaluateAttachWindow', () => {
   });
 
   it('ignores a response for a different request id', () => {
-    const records = [
-      attachRequest(),
-      responseFor('req_other'),
-      close(),
-      ...reconnect(),
-    ];
+    const records = [attachRequest(), responseFor('req_other'), close(), ...reconnect()];
     expect(decide(records)).toEqual({ kind: 'recovered' });
   });
 
@@ -81,7 +76,11 @@ describe('evaluateAttachWindow', () => {
     const preSignal = [attachRequest(), close()];
     const records = [
       ...preSignal,
-      { diagnosticEvent: 'socket_closed', connectionId: ATTACH_CONNECTION, handshakeComplete: true },
+      {
+        diagnosticEvent: 'socket_closed',
+        connectionId: ATTACH_CONNECTION,
+        handshakeComplete: true,
+      },
       ...reconnect(),
     ];
     expect(decide(records, preSignal.length)).toEqual({ kind: 'recovered' });

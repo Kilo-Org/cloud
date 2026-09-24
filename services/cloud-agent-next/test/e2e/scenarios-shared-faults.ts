@@ -103,6 +103,8 @@ const UNHEALTHY_TERMINAL_BUDGET_MS = 8 * 60_000;
  * before the signal can let a fast echo finish first.
  */
 const MAX_ATTACH_WINDOW_ATTEMPTS = 3;
+/** Poll interval while waiting for a discarded attempt's turn to settle. */
+const BOOT_SETTLE_POLL_MS = 500;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -121,7 +123,10 @@ function hasMessageFailed(events: StreamEvent[], messageId: string): boolean {
  * genuine post-fault failure must fail the scenario even when the capability
  * reports a window miss, so a later attempt cannot pass over it. The stream
  * history is checked first; the durable status catches a failure written but not
- * yet streamed.
+ * yet streamed. A miss can be observed while the discarded attempt's turn is
+ * still running, so the durable status is observed until the turn settles or the
+ * scenario deadline expires; a single non-terminal sample would let a failure
+ * that materializes later be retried away.
  */
 async function attachWindowTurnFailed(
   deadline: ScenarioDeadline,
@@ -131,10 +136,14 @@ async function attachWindowTurnFailed(
   events: StreamEvent[]
 ): Promise<boolean> {
   if (hasMessageFailed(events, messageId)) return true;
-  const result = await deadline.within('boot durable', signal =>
-    getMessageResult(config, session.cloudAgentSessionId, messageId, signal)
-  );
-  return result.status === 'failed' || result.status === 'interrupted';
+  for (;;) {
+    const result = await deadline.within('boot durable', signal =>
+      getMessageResult(config, session.cloudAgentSessionId, messageId, signal)
+    );
+    if (result.status === 'failed' || result.status === 'interrupted') return true;
+    if (result.status === 'completed') return false;
+    await sleep(BOOT_SETTLE_POLL_MS);
+  }
 }
 
 async function prepareSession(

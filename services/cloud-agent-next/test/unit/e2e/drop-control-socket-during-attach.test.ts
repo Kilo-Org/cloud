@@ -59,7 +59,11 @@ function attachRequest(): LogRecord {
 }
 
 function response(): LogRecord {
-  return { diagnosticEvent: 'socket_response', requestId: REQUEST_ID, connectionId: ATTACH_CONNECTION };
+  return {
+    diagnosticEvent: 'socket_response',
+    requestId: REQUEST_ID,
+    connectionId: ATTACH_CONNECTION,
+  };
 }
 
 function close(): LogRecord {
@@ -72,7 +76,11 @@ function close(): LogRecord {
 
 function reconnect(): LogRecord[] {
   return [
-    { diagnosticEvent: 'handshake_committed', connectionId: 'conn_new', wrapperInstanceId: 'wrapper_1' },
+    {
+      diagnosticEvent: 'handshake_committed',
+      connectionId: 'conn_new',
+      wrapperInstanceId: 'wrapper_1',
+    },
     { diagnosticEvent: 'wrapper_ready', connectionId: 'conn_new', wrapperInstanceId: 'wrapper_1' },
   ];
 }

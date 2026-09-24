@@ -1,4 +1,12 @@
-import { act, createElement, type EffectCallback, type ReactNode, useEffect } from 'react';
+/* eslint-disable max-lines -- The repository and model pickers' search, alignment and centering contracts share one mount harness. */
+import {
+  act,
+  createElement,
+  type EffectCallback,
+  Fragment,
+  type ReactNode,
+  useEffect,
+} from 'react';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
@@ -17,6 +25,26 @@ const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const theme = vi.hoisted(() => ({ foreground: '#111111' }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The model picker renders its rows through FlashList v2; this stub renders
+// each row through the real `renderItem` so the suite sees the row hosts.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
+    data?: { key: string }[];
+    keyExtractor?: (item: { key: string }) => string;
+    renderItem: (info: { item: { key: string }; index: number }) => ReactNode;
+  }) =>
+    createElement(
+      'FlashList',
+      props,
+      (props.data ?? []).map((item, index) =>
+        createElement(
+          Fragment,
+          { key: props.keyExtractor?.(item) ?? index },
+          props.renderItem({ item, index })
+        )
+      )
+    ),
+}));
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: i18nManager,
@@ -253,11 +281,11 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
 }
 
-// The model picker hosts its rows in a FlatList and manages its own scrolling
+// The model picker hosts its rows in a FlashList and manages its own scrolling
 // (PickerSheet scrollable=false); the repository picker renders mapped rows
 // inside the shell ScrollView and so always keeps that ScrollView mounted.
 describe.each([
-  { name: 'model', Component: ModelPickerContent, rowHost: 'FlatList', hasShellScrollView: false },
+  { name: 'model', Component: ModelPickerContent, rowHost: 'FlashList', hasShellScrollView: false },
   {
     name: 'repository',
     Component: RepoPickerScreen,
@@ -310,7 +338,7 @@ describe.each([
     repoPickerSlot.set(UNFENCED_ROUTE_KEY, { ...repoBridge, repositories: [], sections: [] });
     const renderer = await mount(Component);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(1);
-    expect(hosts(renderer, 'FlatList')).toHaveLength(0);
+    expect(hosts(renderer, 'FlashList')).toHaveLength(0);
     if (!hasShellScrollView) {
       expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
     }

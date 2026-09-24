@@ -1807,6 +1807,13 @@
       "when": 1790098375222,
       "tag": "0257_user_activity_tokens_live_ios_activity_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 258,
+      "version": "7",
+      "when": 1790208815286,
+      "tag": "0258_slim_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

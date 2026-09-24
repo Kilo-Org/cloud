@@ -920,7 +920,10 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
     path.includes('/container-registry') ||
     path.includes('/db-snapshot') ||
     path.includes('/mayor-id') ||
-    path.includes('/container-events')
+    path.includes('/container-events') ||
+    // Town Container control-plane routes are Cloudflare Access at the
+    // perimeter, not kilo JWT (see the Town Container route block).
+    path.includes('/container/')
   ) {
     return next();
   }
@@ -1383,7 +1386,24 @@ app.notFound(c => c.json(resError('Not found'), 404));
 app.onError((err, c) => {
   console.error('Unhandled error', { error: err.message, stack: err.stack });
   Sentry.captureException(err);
-  return c.json(resError('Internal server error'), 500);
+  // Empty JSON bodies in the Workers runtime can yield a Response with
+  // status 0. Hono throws RangeError when assigning that as c.res; map
+  // it to 400 instead of a generic 500. Build a fresh Response so we do
+  // not copy the invalid status, but keep CORS (and other) headers.
+  const invalidStatus =
+    err instanceof RangeError && /status codes in the range 200 to 599/i.test(err.message);
+  const status = invalidStatus ? 400 : 500;
+  const payload = resError(invalidStatus ? 'Invalid JSON body' : 'Internal server error');
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  try {
+    c.res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'content-type') return;
+      headers.set(key, value);
+    });
+  } catch {
+    // c.res itself may be an invalid-status Response
+  }
+  return new Response(JSON.stringify(payload), { status, headers });
 });
 
 // ── Export with WebSocket interception ───────────────────────────────────

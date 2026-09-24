@@ -25,11 +25,12 @@ async function proxyToContainer(
   try {
     const response = await container.fetch(`http://container${path}`, init);
     const data = await response.text();
+    const status = response.status >= 200 && response.status <= 599 ? response.status : 502;
     console.log(
-      `${CONTAINER_LOG} proxyToContainer: ${method} ${path} -> ${response.status} body=${data.slice(0, 300)}`
+      `${CONTAINER_LOG} proxyToContainer: ${method} ${path} -> ${status} body=${data.slice(0, 300)}`
     );
     return new Response(data, {
-      status: response.status,
+      status,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {

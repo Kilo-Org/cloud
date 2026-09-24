@@ -46,12 +46,12 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+    it('should serve service status at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      expect(res.headers.get('Content-Type')).toContain('application/json');
+      const body = await res.json();
+      expect(body).toEqual({ service: 'gastown', status: 'ok' });
     });
   });
 
@@ -465,7 +465,7 @@ describe('HTTP API', () => {
       const body = await res.json();
       expect(body.data.done).toBe(true);
 
-      // Verify agent is idle
+      // agentDone is event-only; unhook happens on the next alarm tick.
       const agentCheck = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
         {
@@ -474,7 +474,6 @@ describe('HTTP API', () => {
       );
       const agentState = (await agentCheck.json()).data;
       expect(agentState.status).toBe('idle');
-      expect(agentState.current_hook_bead_id).toBeNull();
     });
   });
 
@@ -620,9 +619,8 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      expect(body.data.message).toBe('Critical failure');
+      expect(body.data.severity).toBe('critical');
     });
   });
 

@@ -122,6 +122,85 @@ describe('migration metadata', () => {
     );
   });
 
+  it('does not reintroduce repository_customizations in any snapshot after it is dropped', () => {
+    const entries = readJournal().entries;
+    const drop = entries.find(entry => entry.tag.endsWith('drop_repository_customizations'));
+    if (!drop) throw new Error('journal is missing drop_repository_customizations');
+
+    // Checking only the newest snapshot misses a stale intermediate file: a
+    // rebase that restores 0257_snapshot.json from main but leaves
+    // 0256_snapshot.json carrying the dropped table still makes
+    // `generateMigration` on that snapshot emit
+    // `DROP TABLE "repository_customizations" CASCADE`.
+    const reintroduced: string[] = [];
+    for (const entry of entries) {
+      if (entry.idx < drop.idx) continue;
+      const snapshotName = `${entry.idx.toString().padStart(4, '0')}_snapshot.json`;
+      const snapshotPath = path.join(migrationsMetaDir, snapshotName);
+      expect(fs.existsSync(snapshotPath)).toBe(true);
+      const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf-8')) as {
+        tables?: Record<string, unknown>;
+      };
+      if (Object.keys(snapshot.tables ?? {}).includes('public.repository_customizations')) {
+        reintroduced.push(snapshotName);
+      }
+    }
+    expect(reintroduced).toEqual([]);
+  });
+
+  it('does not emit DROP TABLE repository_customizations from the superseded_at snapshot', async () => {
+    const entries = readJournal().entries;
+    const column = entries.find(entry =>
+      entry.tag.endsWith('add_superseded_at_to_user_activity_tokens')
+    );
+    if (!column) throw new Error('journal is missing add_superseded_at_to_user_activity_tokens');
+
+    const snapshotPath = path.join(
+      migrationsMetaDir,
+      `${column.idx.toString().padStart(4, '0')}_snapshot.json`
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- drizzle-kit API types
+    const snapshot: Parameters<typeof generateMigration>[0] & { id: string } = JSON.parse(
+      fs.readFileSync(snapshotPath, 'utf-8')
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- drizzle-kit API types
+    const currentSchema = generateDrizzleJson(schema, snapshot.id);
+    const statements = await generateMigration(snapshot, currentSchema);
+    expect(statements.join('\n')).not.toContain('DROP TABLE "repository_customizations"');
+  });
+
+  it('keeps the tail snapshots linked by prevId after repository_customizations is dropped', () => {
+    const entries = readJournal().entries;
+    const drop = entries.find(entry => entry.tag.endsWith('drop_repository_customizations'));
+    if (!drop) throw new Error('journal is missing drop_repository_customizations');
+
+    // Renumbering an applied migration by hand moves the snapshot files to
+    // other idx names while their bytes keep the old ids, so every file still
+    // parses but each snapshot's `prevId` no longer names the previous file's
+    // `id`. That is how the reverted #6653 repair hid: the stale 0256 snapshot
+    // carried id `a37ceca1` while 0257 still pointed at `8f856e0d`.
+    const tail = entries.filter(entry => entry.idx >= drop.idx);
+    for (let index = 1; index < tail.length; index++) {
+      const previous = tail[index - 1];
+      const current = tail[index];
+      if (!previous || !current) throw new Error('journal entry missing');
+      const previousSnapshot = JSON.parse(
+        fs.readFileSync(
+          path.join(migrationsMetaDir, `${previous.idx.toString().padStart(4, '0')}_snapshot.json`),
+          'utf-8'
+        )
+      ) as { id: string };
+      const currentSnapshot = JSON.parse(
+        fs.readFileSync(
+          path.join(migrationsMetaDir, `${current.idx.toString().padStart(4, '0')}_snapshot.json`),
+          'utf-8'
+        )
+      ) as { prevId: string };
+      expect(currentSnapshot.prevId).toBe(previousSnapshot.id);
+    }
+  });
+
   it('does not emit already-applied DDL from the newest snapshot', async () => {
     const latestSnapshotName = readSnapshotNames().at(-1);
     if (!latestSnapshotName) throw new Error('no snapshot found in migrations/meta');

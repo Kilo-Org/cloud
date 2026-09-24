@@ -650,6 +650,22 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(action('New session')).toBeDefined();
   });
 
+  it('names the accepted-empty history route by its destination instead of a bare See-all', async () => {
+    await renderScreen();
+    // The accepted-empty state withholds the header row, so the body's history
+    // control is the app's only route to stored sessions. A bare See-all does
+    // not say where it opens — the explorer's objectless See-all, now
+    // context-free — so the control names its destination instead of reusing
+    // the header's `home.seeAll` copy.
+    const history = action('Session history');
+    expect(history.props.testID).toBe('agents-view-history');
+    expect(history.findByType(Text).children).toEqual(['Session history']);
+    // The non-empty live list keeps the header's shared See-all copy.
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(action(i18n.t('home.seeAll')).props.testID).toBe('agents-view-history');
+  });
+
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
     // The full controls row exists only over a non-empty live list (the

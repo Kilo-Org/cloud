@@ -1,63 +1,8 @@
 import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import {
-  CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
-import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import {
-  GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
-  GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/google';
-import { KIMI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { GPT_MINI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
+import { resolveOpenRouterModelAlias } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
-import {
-  GLM_CURRENT_VERCEL_MODEL_ID,
-  GLM_FLASH_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/zai';
-import {
-  CLAUDE_FABLE_LATEST_MODEL_ALIAS,
-  CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
-  CLAUDE_OPUS_LATEST_MODEL_ALIAS,
-  CLAUDE_SONNET_LATEST_MODEL_ALIAS,
-  DEEPSEEK_FLASH_LATEST_MODEL_ALIAS,
-  DEEPSEEK_PRO_LATEST_MODEL_ALIAS,
-  DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
-  GEMINI_FLASH_LATEST_MODEL_ALIAS,
-  GEMINI_PRO_LATEST_MODEL_ALIAS,
-  GPT_ASTRA_LATEST_MODEL_ALIAS,
-  GPT_LUNA_LATEST_MODEL_ALIAS,
-  GPT_MINI_LATEST_MODEL_ALIAS,
-  GPT_SOL_LATEST_MODEL_ALIAS,
-  GPT_TERRA_LATEST_MODEL_ALIAS,
-  GLM_FLASH_LATEST_MODEL_ALIAS,
-  GLM_LATEST_MODEL_ALIAS,
-  GROK_LATEST_MODEL_ALIAS,
-  KIMI_LATEST_MODEL_ALIAS,
-} from '@/lib/ai-gateway/latest-model-aliases';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
-  [CLAUDE_FABLE_LATEST_MODEL_ALIAS]: CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
-  [CLAUDE_OPUS_LATEST_MODEL_ALIAS]: CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
-  [CLAUDE_SONNET_LATEST_MODEL_ALIAS]: CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
-  [CLAUDE_HAIKU_LATEST_MODEL_ALIAS]: CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
-  [GPT_MINI_LATEST_MODEL_ALIAS]: GPT_MINI_CURRENT_VERCEL_MODEL_ID,
-  [GPT_ASTRA_LATEST_MODEL_ALIAS]: 'openai/gpt-6-astra',
-  [GPT_LUNA_LATEST_MODEL_ALIAS]: 'openai/gpt-5.6-luna',
-  [GPT_SOL_LATEST_MODEL_ALIAS]: 'openai/gpt-5.6-sol',
-  [GPT_TERRA_LATEST_MODEL_ALIAS]: 'openai/gpt-5.6-terra',
-  [KIMI_LATEST_MODEL_ALIAS]: KIMI_CURRENT_VERCEL_MODEL_ID,
-  [GEMINI_PRO_LATEST_MODEL_ALIAS]: GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
-  [GEMINI_FLASH_LATEST_MODEL_ALIAS]: GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
-  [GROK_LATEST_MODEL_ALIAS]: GROK_CURRENT_VERCEL_MODEL_ID,
-  [GLM_LATEST_MODEL_ALIAS]: GLM_CURRENT_VERCEL_MODEL_ID,
-  [GLM_FLASH_LATEST_MODEL_ALIAS]: GLM_FLASH_CURRENT_VERCEL_MODEL_ID,
-  [DEEPSEEK_PRO_LATEST_MODEL_ALIAS]: 'deepseek/deepseek-v4-pro-0813',
-  [DEEPSEEK_FLASH_LATEST_MODEL_ALIAS]: DEEPSEEK_V4_1_FLASH_MODEL_ID,
-  [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS]: 'deepseek/deepseek-v4-flash-0731',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
   'mistralai/mistral-embed-2312': 'mistral/mistral-embed',
@@ -104,7 +49,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'glm-5.2': 'zai/glm-5.2',
 };
 
-export function mapModelIdToVercel(modelId: string) {
+export function mapResolvedModelIdToVercel(modelId: string) {
   const hardcodedVercelId = vercelModelIdMapping[modelId];
   if (hardcodedVercelId) {
     return hardcodedVercelId;
@@ -129,4 +74,12 @@ export function mapModelIdToVercel(modelId: string) {
 
   const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(internalId);
   return firstPartyProvider ? firstPartyProvider + internalId.slice(slashIndex) : internalId;
+}
+
+export async function mapModelIdToVercel(modelId: string): Promise<string> {
+  if (!modelId.startsWith('~')) {
+    return mapResolvedModelIdToVercel(modelId);
+  }
+
+  return mapResolvedModelIdToVercel(await resolveOpenRouterModelAlias(modelId));
 }

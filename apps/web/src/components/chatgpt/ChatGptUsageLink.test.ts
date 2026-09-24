@@ -16,10 +16,9 @@ const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
  */
 async function renderChatGptUsageLink(hasConnection: boolean): Promise<string> {
   jest.resetModules();
-  const [store, link, react, server] = await Promise.all([
+  const [store, link, server] = await Promise.all([
     import('@/lib/ai-gateway/openai-chatgpt/store'),
     import('@/components/chatgpt/ChatGptUsageLink'),
-    import('react'),
     import('react-dom/server'),
   ]);
 

@@ -2,8 +2,6 @@ import type { NextResponse } from 'next/server';
 
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import {
-  hasOpenAiChatGptSharedServicesConnection,
-  openAiChatGptSharedServicesOwner,
   recordOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
 } from '@/lib/ai-gateway/openai-chatgpt/store';
@@ -23,8 +21,6 @@ type SendUpstreamAttemptInput = {
   fraudHeaders: FraudDetectionHeaders;
   userId: string;
   organizationId: string | null;
-  /** The platform caller for a service run, when there is one. */
-  botId?: string | undefined;
   sessionId: string | null;
   taskId: string | null;
   search: string;
@@ -49,7 +45,6 @@ export async function sendUpstreamAttempt({
   fraudHeaders,
   userId,
   organizationId,
-  botId,
   sessionId,
   taskId,
   search,
@@ -92,7 +87,7 @@ export async function sendUpstreamAttempt({
   if (result.type === 'error') return result;
 
   if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
-    await recordChatGptUsageLimitIfReached(result.response, { userId, organizationId, botId });
+    await recordChatGptUsageLimitIfReached(result.response, providerContext.provider.chatGptOwner);
   }
 
   return {
@@ -107,39 +102,22 @@ export async function sendUpstreamAttempt({
  * is read, so the original body still streams to the caller unchanged, and
  * recording is best-effort: a database failure must never change the request's
  * outcome, which is the upstream error the caller already has.
+ *
+ * The owner is the connection the provider named, so the limit lands on the
+ * exact row that served the request: the organization's shared-services
+ * connection for a service run, and the caller's own row otherwise.
  */
 async function recordChatGptUsageLimitIfReached(
   response: Response,
-  owner: { userId: string; organizationId: string | null; botId?: string | undefined }
+  owner: OpenAiChatGptOwner | undefined
 ): Promise<void> {
-  if (response.status !== 429) return;
+  if (response.status !== 429 || !owner) return;
 
   try {
     const limit = readChatGptUsageLimit(response.status, await response.clone().json());
     if (!limit) return;
-    await recordOpenAiChatGptUsageLimit(await resolveUsageLimitOwner(owner), limit);
+    await recordOpenAiChatGptUsageLimit(owner, limit);
   } catch {
     // Best-effort: the caller still receives the upstream response.
   }
-}
-
-/**
- * The row a reported plan limit belongs to. A service request records on the
- * organization's shared-services connection when one is stored, because routing
- * would have served the request from it. Every other request records on the
- * caller's own connection, which is what routing would have used.
- */
-async function resolveUsageLimitOwner(owner: {
-  userId: string;
-  organizationId: string | null;
-  botId?: string | undefined;
-}): Promise<OpenAiChatGptOwner> {
-  if (
-    owner.botId &&
-    owner.organizationId &&
-    (await hasOpenAiChatGptSharedServicesConnection(owner.organizationId))
-  ) {
-    return openAiChatGptSharedServicesOwner(owner.organizationId);
-  }
-  return { kiloUserId: owner.userId, organizationId: owner.organizationId };
 }

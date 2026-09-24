@@ -859,7 +859,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     fraudHeaders,
     userId: user.id,
     organizationId: organizationId ?? null,
-    botId,
     sessionId: usageContext.session_id,
     taskId: taskId ?? null,
     search: url.search,

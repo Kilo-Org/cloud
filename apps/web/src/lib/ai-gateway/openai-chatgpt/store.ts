@@ -196,20 +196,6 @@ export async function saveOpenAiChatGptConnection(
     });
 }
 
-/**
- * True when the organization has a stored shared-services connection. The
- * usage-limit write uses it to record on the row that served the request.
- */
-export async function hasOpenAiChatGptSharedServicesConnection(
-  organizationId: string
-): Promise<boolean> {
-  const row = await readOpenAiChatGptConnectionRow(
-    db,
-    openAiChatGptSharedServicesOwner(organizationId)
-  );
-  return row !== null;
-}
-
 /** Deletes the owner's stored connection. */
 export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
   await db.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));

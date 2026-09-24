@@ -254,11 +254,16 @@ export async function tagOpenAiChatGptByokModels<
  * failure *after* a token was obtained is returned to the client as-is by the
  * gateway and is never silently replayed through another billing path.
  */
-export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string): Provider | null {
+export function buildOpenAiChatGptProvider(
+  apiKey: string,
+  accessToken: string,
+  owner?: OpenAiChatGptOwner
+): Provider | null {
   if (apiKey.trim().length === 0) return null;
 
   return {
     id: 'openai-chatgpt',
+    ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -326,7 +331,7 @@ export async function checkOpenAiChatGptByok(
     if (outcome.kind !== 'access_token') continue;
 
     const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken);
+    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, owner);
     // A missing partner key is a deployment-wide misconfiguration.
     if (!provider) return null;
 

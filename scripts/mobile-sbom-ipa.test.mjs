@@ -284,6 +284,31 @@ test('readIpaComponents merges load-command names with Frameworks/ bundles', () 
   ]);
 });
 
+test('readIpaComponents excludes OS-provided dylibs and frameworks', () => {
+  const executable = buildThin({
+    is64: true,
+    littleEndian: true,
+    commands: [
+      dylibCommand(LC_LOAD_DYLIB, '/usr/lib/libSystem.B.dylib', true),
+      dylibCommand(LC_LOAD_DYLIB, '/System/Library/Frameworks/UIKit.framework/UIKit', true),
+      dylibCommand(LC_LOAD_DYLIB, '@rpath/React.framework/React', true),
+    ],
+  });
+  const result = withZip(
+    [
+      ['Payload/Kilo.app/Info.plist', INFO_PLIST],
+      ['Payload/Kilo.app/Kilo', executable],
+    ],
+    ipaPath => readIpaComponents({ ipaPath })
+  );
+
+  assert.deepEqual(
+    result.components.map(component => component.name),
+    ['React.framework']
+  );
+  assert.deepEqual(result.counts, { dylibs: 0, frameworks: 1 });
+});
+
 test('readIpaComponents rejects an IPA without a Payload bundle', () => {
   assert.throws(
     () => withZip([['META-INF/MANIFEST.MF', '']], ipaPath => readIpaComponents({ ipaPath })),

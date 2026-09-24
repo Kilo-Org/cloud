@@ -53,6 +53,17 @@ const KILO_IOS_KIND = 'kilo:sbom:ios-kind';
 const KIND_LOAD_COMMAND = 'dylib-load-command';
 const KIND_DYNAMIC_FRAMEWORK = 'dynamic-framework';
 
+// iOS resolves its own libraries from /usr/lib/ (libSystem, libc++, the Swift
+// runtime) and its system frameworks from /System/Library/, including
+// /System/Library/PrivateFrameworks/. Those load commands name the OS, not code
+// the app ships, so they are not components of the IPA and must not be reported
+// as CocoaPods: the app-bundled pods and frameworks use @rpath/@executable_path.
+const OS_INSTALL_NAME_PREFIXES = ['/usr/lib/', '/System/Library/'];
+
+function isOsProvidedDylib(installName) {
+  return OS_INSTALL_NAME_PREFIXES.some(prefix => installName.startsWith(prefix));
+}
+
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.length > 0;
 }
@@ -242,6 +253,10 @@ function toComponent(name, kind) {
  * under `Payload/<App>.app/Frameworks/`. Both sources are merged by name so a
  * framework that is both linked and shipped appears once; the kind recorded is
  * the first one that discovered it (load command before on-disk bundle).
+ *
+ * A load command naming an OS-provided library (`/usr/lib/`, `/System/Library/`)
+ * is skipped: the OS supplies it, the IPA does not carry it, and counting it as
+ * a pod would overstate the CocoaPods list.
  */
 export function readIpaComponents({ ipaPath } = {}) {
   if (!isNonEmptyString(ipaPath)) {
@@ -292,6 +307,9 @@ export function readIpaComponents({ ipaPath } = {}) {
     };
 
     for (const installName of parseMachODylibs(readFileSync(executablePath))) {
+      if (isOsProvidedDylib(installName)) {
+        continue;
+      }
       add(normalizeInstallName(installName), KIND_LOAD_COMMAND);
     }
 

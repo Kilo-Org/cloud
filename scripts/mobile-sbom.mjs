@@ -43,7 +43,7 @@ const ECOSYSTEM_ORDER = ['npm', 'cocoapods', 'maven', 'native-library'];
 const ECOSYSTEM_SOURCES = {
   npm: 'pnpm-lock.yaml production dependency closure of apps/mobile (the minified shipped JS bundle carries no package metadata)',
   cocoapods:
-    'IPA scan: Mach-O LC_LOAD_DYLIB/weak/reexport install names plus Payload/*.app/Frameworks/',
+    'IPA scan: Mach-O LC_LOAD_DYLIB/weak/reexport install names plus Payload/*.app/Frameworks/ (OS-provided /usr/lib and /System/Library libraries excluded)',
   maven:
     'AAB BUNDLE-METADATA/com.android.tools.build.libraries/dependencies.pb (Android Gradle Plugin resolved Maven artifacts)',
   'native-library': 'AAB base/lib/**/*.so',

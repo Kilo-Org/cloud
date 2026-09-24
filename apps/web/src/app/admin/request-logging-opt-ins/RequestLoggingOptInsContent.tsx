@@ -140,8 +140,7 @@ export default function RequestLoggingOptInsContent() {
         <CardHeader>
           <CardTitle>Active opt-ins</CardTitle>
           <CardDescription>
-            Requests are logged only when the account or organization is opted in, including custom
-            provider requests.
+            Requests are logged only when the account or organization is opted in.
           </CardDescription>
         </CardHeader>
         <CardContent>

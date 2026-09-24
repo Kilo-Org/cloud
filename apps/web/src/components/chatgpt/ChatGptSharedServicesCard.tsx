@@ -32,13 +32,15 @@ const CONNECTING_LABEL = 'Redirecting to ChatGPT...';
 const DISCONNECTING_LABEL = 'Disconnecting...';
 const CONNECTED_LABEL = 'Connected';
 const RECONNECT_BADGE_LABEL = 'Needs reconnect';
-const SCOPE_NOTE = 'Shared services in this organization use this account. It is not your own connection.';
+const SCOPE_NOTE =
+  'Shared services in this organization use this account. It is not your own connection.';
 const FALLBACK_IDENTITY_LABEL = 'your ChatGPT account';
 const FALLBACK_ERROR_MESSAGE =
   'The shared services ChatGPT connection is not available. Reconnect to continue.';
 const LOAD_ERROR_MESSAGE = "We couldn't load the shared services connection. Try again.";
 const CONNECT_ERROR_MESSAGE = "We couldn't connect the shared services account. Try again.";
-const DISCONNECT_ERROR_MESSAGE = "We couldn't disconnect the shared services connection. Try again.";
+const DISCONNECT_ERROR_MESSAGE =
+  "We couldn't disconnect the shared services connection. Try again.";
 const CONNECT_FAILED_CODE = 'connect_failed';
 
 const CARD_BODY_CLASS = 'flex min-h-[7rem] flex-col justify-center gap-3';

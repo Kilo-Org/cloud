@@ -36,7 +36,9 @@ async function render(props: ChatGptSharedServicesCardViewProps): Promise<string
     import('react'),
     import('react-dom/server'),
   ]);
-  return server.renderToStaticMarkup(react.createElement(card.ChatGptSharedServicesCardView, props));
+  return server.renderToStaticMarkup(
+    react.createElement(card.ChatGptSharedServicesCardView, props)
+  );
 }
 
 function connectedStatus(overrides: Partial<OpenAiChatGptStatus> = {}): OpenAiChatGptStatus {

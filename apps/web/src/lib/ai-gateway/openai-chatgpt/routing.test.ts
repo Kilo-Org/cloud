@@ -688,9 +688,11 @@ describe('shared-services routing', () => {
   });
 
   it('fails readably when the shared connection credential is terminally dead', async () => {
-    jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue(
-      { kind: 'terminal' } as Awaited<ReturnType<typeof resolveOpenAiChatGptAccessToken>>
-    );
+    jest
+      .mocked(resolveOpenAiChatGptAccessToken)
+      .mockResolvedValue({ kind: 'terminal' } as Awaited<
+        ReturnType<typeof resolveOpenAiChatGptAccessToken>
+      >);
 
     await expect(
       checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))

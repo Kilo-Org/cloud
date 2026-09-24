@@ -24,9 +24,7 @@ async function renderChatGptUsageLink(hasConnection: boolean): Promise<string> {
 
   const readConnection = jest.mocked(store.getOpenAiChatGptConnection);
   readConnection.mockResolvedValue(
-    hasConnection
-      ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>)
-      : null
+    hasConnection ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>) : null
   );
 
   const element = await link.ChatGptUsageLink({ kiloUserId: 'user-1' });

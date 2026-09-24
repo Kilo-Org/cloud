@@ -795,7 +795,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
         )}
 
         <div className="flex-1 overflow-y-auto">
-            {props.notice}
+          {props.notice}
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
             {hasEnterpriseUsageViews && (
               <div className="space-y-4">

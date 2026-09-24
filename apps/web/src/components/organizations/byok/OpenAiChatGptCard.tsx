@@ -9,10 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import {
-  openAiChatGptByokPath,
-  startOpenAiChatGptConnect,
-} from '@/lib/auth/openai/connect';
+import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLink';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
@@ -22,7 +19,6 @@ import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitD
  * pasted API key: the person connects with one click and disconnects with one
  * click, and the state is always visible on the card itself.
  */
-
 
 /**
  * The query parameter the OpenAI callback route appends when an authorization
@@ -104,7 +100,6 @@ function openAiChatGptAuthErrorMessage(code: string): string {
     ? 'ChatGPT was not connected. Try again.'
     : "We couldn't connect ChatGPT. Try again.";
 }
-
 
 /** The email claim, or the issuer-scoped subject when the token has no email. */
 function connectionIdentity(status: OpenAiChatGptStatus): string {

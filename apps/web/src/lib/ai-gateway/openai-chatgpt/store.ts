@@ -6,10 +6,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { decryptApiKey, encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
-import {
-  isChatGptUsageLimitCurrent,
-  type ChatGptUsageLimit,
-} from './usage-limit';
+import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
 
 /**
  * The delegated "Sign in with ChatGPT" tokens are the OpenAI BYOK credential.
@@ -246,9 +243,7 @@ export async function readOpenAiChatGptUsageLimit(
     // The status contract is JSON, so a PostgreSQL timestamp string is
     // normalized to ISO before it leaves the database layer.
     reachedAt: new Date(row.usage_limit_reached_at).toISOString(),
-    resetsAt: row.usage_limit_resets_at
-      ? new Date(row.usage_limit_resets_at).toISOString()
-      : null,
+    resetsAt: row.usage_limit_resets_at ? new Date(row.usage_limit_resets_at).toISOString() : null,
   };
 }
 

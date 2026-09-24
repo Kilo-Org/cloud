@@ -15,18 +15,25 @@ export type AccountLinkingSession = {
    * stores the resulting ChatGPT connection for this organization.
    */
   organizationId?: string;
+  /**
+   * Set when the link connects the organization's shared-services connection
+   * rather than the linking person's own connection.
+   */
+  chatGptScope?: 'shared_services';
   createdAt: number;
 };
 
 export async function createAccountLinkingSession(
   existingUserId: string,
   targetProvider: string,
-  organizationId?: string
+  organizationId?: string,
+  chatGptScope?: 'shared_services'
 ): Promise<void> {
   const session: AccountLinkingSession = {
     existingUserId,
     targetProvider,
     ...(organizationId ? { organizationId } : {}),
+    ...(chatGptScope ? { chatGptScope } : {}),
     createdAt: Date.now(),
   };
 

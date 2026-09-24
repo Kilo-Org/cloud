@@ -84,7 +84,10 @@ import {
   OPENAI_RESOURCE,
   isOpenAiTokenSharingGrant,
 } from '@/lib/auth/openai/config';
-import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import {
+  openAiChatGptSharedServicesOwner,
+  saveOpenAiChatGptConnection,
+} from '@/lib/ai-gateway/openai-chatgpt/store';
 import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   GITHUB_CLIENT_ID,
@@ -311,11 +314,14 @@ async function persistOpenAiChatGptConnection(
     if (!isOpenAiTokenSharingGrant(account)) return;
 
     const email = (profile as { email?: unknown } | undefined)?.email;
-    const organizationId = (profile as ExtendedProfile | undefined)?.openAiChatGptOrganizationId;
-    const owner: OpenAiChatGptOwner = {
-      kiloUserId: userId,
-      organizationId: organizationId ?? null,
-    };
+    const extendedProfile = profile as ExtendedProfile | undefined;
+    const organizationId = extendedProfile?.openAiChatGptOrganizationId;
+    // A shared-services link stores the organization's single row instead of the
+    // linking person's own connection.
+    const owner: OpenAiChatGptOwner =
+      organizationId && extendedProfile?.openAiChatGptSharedServices === true
+        ? openAiChatGptSharedServicesOwner(organizationId)
+        : { kiloUserId: userId, organizationId: organizationId ?? null };
     await saveOpenAiChatGptConnection(
       owner,
       {
@@ -719,6 +725,8 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
 type ExtendedProfile = Profile & {
   isNewUser?: boolean; // Add isNewUser to the user type
   openAiChatGptOrganizationId?: string;
+  /** Set when the authorization connected the organization's shared services. */
+  openAiChatGptSharedServices?: boolean;
 };
 
 const posthogClient = PostHogClient();
@@ -1013,6 +1021,9 @@ export const authOptions: NextAuthOptions = {
           profile
         ) {
           (profile as ExtendedProfile).openAiChatGptOrganizationId = linkingSession.organizationId;
+          if (linkingSession.chatGptScope === 'shared_services') {
+            (profile as ExtendedProfile).openAiChatGptSharedServices = true;
+          }
         }
 
         // if a user's email domain matches any organization's SSO domain and they are not logging in with SSO, force them to use SSO immediately

@@ -8,6 +8,7 @@ import {
   clearOpenAiChatGptConnection,
   readOpenAiChatGptUsageLimit,
   getOpenAiChatGptConnection,
+  openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
@@ -27,6 +28,11 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const OpenAiChatGptOwnerInputSchema = z.object({
   organizationId: z.uuid().optional(),
+  /**
+   * Set for the organization's shared-services connection: one connection per
+   * organization, which only an owner or an admin may manage.
+   */
+  scope: z.literal('shared_services').optional(),
 });
 
 /**
@@ -52,11 +58,29 @@ function requireUserId(user: User | null | undefined): string {
  */
 async function resolveOwner(
   ctx: TRPCContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  scope?: 'shared_services'
 ): Promise<OpenAiChatGptOwner> {
   const userId = requireUserId(ctx.user);
-  if (!organizationId) return { kiloUserId: userId, organizationId: null };
-  await ensureOrganizationAccess(ctx, organizationId);
+  if (!organizationId) {
+    if (scope === 'shared_services') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'A shared-services connection needs an organization.',
+      });
+    }
+    return { kiloUserId: userId, organizationId: null };
+  }
+  const role = await ensureOrganizationAccess(ctx, organizationId);
+  if (scope === 'shared_services') {
+    if (role !== 'owner' && role !== 'admin') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Only an organization owner or admin can manage the shared-services connection.',
+      });
+    }
+    return openAiChatGptSharedServicesOwner(organizationId);
+  }
   return { kiloUserId: userId, organizationId };
 }
 
@@ -98,14 +122,14 @@ export const openAiChatGptRouter = createTRPCRouter({
     .output(OpenAiChatGptStatusSchema)
     .query(
       async ({ ctx, input }): Promise<OpenAiChatGptStatus> =>
-        readStatus(await resolveOwner(ctx, input.organizationId))
+        readStatus(await resolveOwner(ctx, input.organizationId, input.scope))
     ),
 
   disconnect: baseProcedure
     .input(OpenAiChatGptOwnerInputSchema)
     .output(OpenAiChatGptStatusSchema)
     .mutation(async ({ ctx, input }): Promise<OpenAiChatGptStatus> => {
-      const owner = await resolveOwner(ctx, input.organizationId);
+      const owner = await resolveOwner(ctx, input.organizationId, input.scope);
       await clearOpenAiChatGptConnection(owner);
       return readStatus(owner);
     }),

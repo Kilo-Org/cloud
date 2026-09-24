@@ -31,7 +31,9 @@ const catalogModel = {
 };
 
 describe('external model cache', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   beforeEach(() => {
     invalidateCachedOpenRouterModels();

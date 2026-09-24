@@ -34,6 +34,7 @@ import {
 import { getSandbox } from '@cloudflare/sandbox';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   getSandboxAllocationInstance,
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -179,6 +180,7 @@ import {
   loadAllocation,
   loadAllocationSync,
   initialRuntimeMetadata,
+  sandboxTypeForContainersInstance,
   loadRuntimeMetadata,
   saveRuntimeMetadata,
   saveRuntimeMetadataSync,
@@ -2004,6 +2006,27 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   /**
+   * The containers instance whose type the stored runtime metadata should project.
+   * `undefined` for every other provider, whose sandbox type is not an instance.
+   */
+  private containersInstanceForMetadata(): CloudflareContainersInstance | undefined {
+    return this.providerKind === 'cloudflare-containers'
+      ? (this.containersInstance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE)
+      : undefined;
+  }
+
+  /**
+   * Projects the containers instance type onto a stored runtime so storage
+   * converges with the launched instance. Other providers pass through unchanged.
+   */
+  private withContainersSandboxType(runtime: SandboxRuntimeMetadata): SandboxRuntimeMetadata {
+    const instance = this.containersInstanceForMetadata();
+    return instance === undefined
+      ? runtime
+      : { ...runtime, sandboxType: sandboxTypeForContainersInstance(instance) };
+  }
+
+  /**
    * Side effects of a canonical allocation commit: reset runtime metadata on a
    * fresh create, tear down the socket for an unavailable target, and re-arm the
    * control alarm. The committed transition itself is reported from the single
@@ -2026,7 +2049,10 @@ export class SandboxControl extends DurableObject<Env> {
         unavailable && (sameCanonicalAllocation(from, current) || current.state.kind === 'stopped');
       const cleanupCreating = creatingCleanup && sameCanonicalAllocation(to, current);
       if (cleanupCreating) {
-        saveRuntimeMetadataSync(kv, initialRuntimeMetadata(this.sandboxId));
+        saveRuntimeMetadataSync(
+          kv,
+          initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+        );
       }
       if (cleanupCreating || cleanupUnavailable) {
         for (const key of [
@@ -3062,14 +3088,16 @@ export class SandboxControl extends DurableObject<Env> {
     ownerId: string;
     provider: AgentSandboxProvider;
   }): Promise<SandboxStatusSnapshot> {
-    const [allocation, ownerId, provider, wrapperRuntime, routes, runtime] = await Promise.all([
-      loadAllocationResult(this.ctx.storage, this.provider.resumable),
-      this.readOwner(),
-      this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
-      this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
-      loadRouteTable(this.ctx.storage),
-      loadRuntimeMetadata(this.ctx.storage),
-    ]);
+    const [allocation, ownerId, provider, providerConfiguration, wrapperRuntime, routes, runtime] =
+      await Promise.all([
+        loadAllocationResult(this.ctx.storage, this.provider.resumable),
+        this.readOwner(),
+        this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
+        this.ctx.storage.get<unknown>(PROVIDER_CONFIGURATION_KEY),
+        this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
+        loadRouteTable(this.ctx.storage),
+        loadRuntimeMetadata(this.ctx.storage),
+      ]);
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
@@ -3079,11 +3107,28 @@ export class SandboxControl extends DurableObject<Env> {
     // canonical initial record must not read as a real sleeping allocation.
     const record =
       matches && allocation.ok && allocation.source !== 'initial' ? allocation.value : null;
+    // Observation must not persist metadata. The containers instance lives on
+    // `provider_configuration`, so project its type on read; a stored
+    // `isolated-small` from the id classification never reaches the client.
+    let projectedRuntime = runtime;
+    const configuration = sandboxProviderConfigurationSchema.safeParse(providerConfiguration);
+    if (
+      projectedRuntime !== undefined &&
+      configuration.success &&
+      configuration.data.provider === 'cloudflare-containers'
+    ) {
+      projectedRuntime = {
+        ...projectedRuntime,
+        sandboxType: sandboxTypeForContainersInstance(
+          configuration.data.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+        ),
+      };
+    }
     return projectStatusSnapshot({
       allocation: record,
       ownerId,
       provider: matches ? provider : undefined,
-      runtime,
+      runtime: projectedRuntime,
       routes: [...routes.values()],
       connection: readSandboxControlConnection(
         this.ctx,
@@ -3593,7 +3638,10 @@ export class SandboxControl extends DurableObject<Env> {
       )
         return false;
       await saveRuntimeMetadata(this.ctx.storage, {
-        ...(storedRuntime ?? initialRuntimeMetadata(this.sandboxId)),
+        ...this.withContainersSandboxType(
+          storedRuntime ??
+            initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+        ),
         wrapperVersion: safeSandboxRuntimeVersion(runtime?.wrapperVersion),
         kiloCliVersion: null,
       });
@@ -3737,8 +3785,10 @@ export class SandboxControl extends DurableObject<Env> {
         )
           return undefined;
         if (payload.kilo.version !== undefined) {
-          const runtime =
-            (await loadRuntimeMetadata(this.ctx.storage)) ?? initialRuntimeMetadata(this.sandboxId);
+          const runtime = this.withContainersSandboxType(
+            (await loadRuntimeMetadata(this.ctx.storage)) ??
+              initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+          );
           const kiloCliVersion = safeSandboxRuntimeVersion(payload.kilo.version);
           if (!this.isCurrentConnection(identity)) return undefined;
           if (runtime.kiloCliVersion !== kiloCliVersion) {

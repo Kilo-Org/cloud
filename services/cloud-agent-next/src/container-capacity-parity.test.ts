@@ -15,6 +15,7 @@ import {
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
   SANDBOX_CAPACITIES,
+  usageServiceForSandboxClass,
   type LegacySandboxClassName,
 } from './container-usage-context.js';
 
@@ -115,6 +116,13 @@ describe('production container capacity parity', () => {
           diskBytes: capacity.diskMB * 1_000_000,
         })}',`
       );
+      expect(
+        containerCapacityForService(usageServiceForSandboxClass(identity.className))
+      ).toEqual({
+        vcpu: capacity.vcpu,
+        memoryBytes: capacity.memoryMiB * 1024 ** 2,
+        diskBytes: capacity.diskMB * 1_000_000,
+      });
     }
 
     // Web labels show vCPU and memory only; disk follows the Cloudflare instance-type table.

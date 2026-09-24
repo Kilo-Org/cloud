@@ -662,6 +662,8 @@ describe('sandboxTypeCapacity', () => {
     ['isolated-small', '2 vCPU / 6 GiB'],
     ['code-review', '1 vCPU / 4 GiB'],
     ['devcontainer', '2 vCPU / 6 GiB'],
+    ['containers-standard-3', '2 vCPU / 8 GiB'],
+    ['containers-standard-4', '4 vCPU / 12 GiB'],
   ] as const)('reports the container capacity behind %s', (sandboxType, capacity) => {
     expect(sandboxTypeCapacity(sandboxType)).toBe(capacity);
   });
@@ -686,6 +688,12 @@ describe('sandboxTypeCapacity', () => {
         instanceType: 'devcontainer',
       })
     );
+    expect(sandboxTypeCapacity('containers-standard-3')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-containers-standard-3'))
+    );
+    expect(sandboxTypeCapacity('containers-standard-4')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-containers-standard-4'))
+    );
   });
 });
 
@@ -698,6 +706,25 @@ describe('sandbox status capacity', () => {
       }).capacity
     ).toBe('2 vCPU / 6 GiB');
   });
+
+  it.each([
+    ['containers-standard-3', '2 vCPU / 8 GiB'],
+    ['containers-standard-4', '4 vCPU / 12 GiB'],
+  ] as const)(
+    'presents the containers instance %s as its type and capacity',
+    (sandboxType, phrase) => {
+      expect(
+        sandboxStatusPresentation({
+          ...observation,
+          data: { ...snapshot, runtime: { ...runtime, sandboxType } },
+        })
+      ).toMatchObject({
+        provider: 'Cloudflare',
+        sandboxType: phrase,
+        capacity: phrase,
+      });
+    }
+  );
 
   it('keeps the capacity of a sleeping sandbox, which still names its container', () => {
     expect(

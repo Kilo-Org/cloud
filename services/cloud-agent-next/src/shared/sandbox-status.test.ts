@@ -254,6 +254,8 @@ describe('optional sandbox runtime metadata', () => {
     'isolated-standard',
     'code-review',
     'devcontainer',
+    'containers-standard-3',
+    'containers-standard-4',
     'unknown',
   ])('accepts bounded sandbox type %s', sandboxType => {
     expect(SandboxRuntimeMetadataSchema.parse({ ...runtime, sandboxType }).sandboxType).toBe(

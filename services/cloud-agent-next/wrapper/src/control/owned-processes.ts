@@ -254,10 +254,8 @@ function releaseChildStreams(child: OwnedChild): void {
 }
 
 function releaseGate(gate: Writable): void {
-  const fd = (gate as Writable & { _handle?: { fd?: number } })._handle?.fd;
-  if (typeof fd !== 'number') throw new Error('Owned child gate unavailable');
-  writeSync(fd, 'start\n');
-  gate.destroy();
+  gate.on('error', () => undefined);
+  gate.end('start\n');
 }
 
 function isErofs(error: unknown): boolean {

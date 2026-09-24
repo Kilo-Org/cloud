@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import type { ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import * as fs from 'node:fs';
+import { Socket } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { runProcess } from '../utils.js';
@@ -28,6 +29,27 @@ function killPid(pid: number): void {
   } catch {
     return;
   }
+}
+
+// Makes the gate's release write fail the way a broken pipe would, through the same stream
+// method the wrapper uses to release the gate.
+function spyGateEndFailure(): { mockRestore(): void } {
+  // oxlint-disable-next-line typescript-eslint/unbound-method -- invoked with an explicit receiver
+  const originalEnd = Socket.prototype.end;
+  return spyOn(Socket.prototype, 'end').mockImplementation(function (
+    this: Socket,
+    chunk?: unknown,
+    ...rest: unknown[]
+  ): Socket {
+    if (chunk === 'start\n') {
+      throw Object.assign(new Error('simulated gate release failure'), { code: 'EPIPE' });
+    }
+    return (originalEnd as (this: Socket, value?: unknown, ...args: unknown[]) => Socket).call(
+      this,
+      chunk,
+      ...rest
+    );
+  } as typeof Socket.prototype.end);
 }
 
 afterEach(async () => {
@@ -209,16 +231,7 @@ describe('owned process scopes', () => {
     } catch {
       return;
     }
-    const originalWriteSync = fs.writeSync;
-    const gateFailure = spyOn(fs, 'writeSync').mockImplementation(((
-      target: unknown,
-      ...rest: unknown[]
-    ): number => {
-      if (rest[0] === 'start\n') {
-        throw Object.assign(new Error('simulated gate release failure'), { code: 'EPIPE' });
-      }
-      return (originalWriteSync as (value: unknown, ...args: unknown[]) => number)(target, ...rest);
-    }) as typeof fs.writeSync);
+    const gateFailure = spyGateEndFailure();
     const scope = createOwnedProcessScope();
     spawned.push(scope);
     let created: string | undefined;
@@ -259,16 +272,7 @@ describe('owned process scopes', () => {
     const before = new Set(
       fs.readdirSync(placement.parentReference).filter(name => name.startsWith('kilo-control-'))
     );
-    const originalWriteSync = fs.writeSync;
-    const gateFailure = spyOn(fs, 'writeSync').mockImplementation(((
-      target: unknown,
-      ...rest: unknown[]
-    ): number => {
-      if (rest[0] === 'start\n') {
-        throw Object.assign(new Error('simulated gate release failure'), { code: 'EPIPE' });
-      }
-      return (originalWriteSync as (value: unknown, ...args: unknown[]) => number)(target, ...rest);
-    }) as typeof fs.writeSync);
+    const gateFailure = spyGateEndFailure();
     const scope = createOwnedProcessScope(placement);
     spawned.push(scope);
     try {
@@ -653,7 +657,7 @@ describe('workload cgroup integration', () => {
     const scope = createOwnedProcessScope(placement);
     spawned.push(scope);
     const server = scope.spawn(kilo, ['serve', '--port=0'], { cwd: directory, env: process.env });
-    if (!scope.observesOccupancy()) return;
+    expect(scope.observesOccupancy()).toBe(true);
     const serverPid = server.pid;
     expect(serverPid).toBeDefined();
     if (serverPid === undefined) return;
@@ -692,6 +696,36 @@ describe('workload cgroup integration', () => {
     expect(await waitFor(() => processDead(serverPid) && processDead(toolPid))).toBe(true);
     expect(await waitFor(() => !fs.existsSync(owned))).toBe(true);
   });
+
+  it.skipIf(process.platform !== 'linux')(
+    'places the gated server process in the managed server group',
+    async () => {
+      const placement = workloadPlacement();
+      if (!placement) return;
+      const before = new Set(
+        fs.readdirSync(placement.parentReference).filter(name => name.startsWith('kilo-control-'))
+      );
+      const scope = createOwnedProcessScope(placement);
+      spawned.push(scope);
+      const server = scope.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1_000)'], {
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      expect(scope.observesOccupancy()).toBe(true);
+      const serverPid = server.pid;
+      expect(serverPid).toBeDefined();
+      if (serverPid === undefined) return;
+      const owned = findManagedScope(placement, before);
+      expect(owned).toBeDefined();
+      if (!owned) return;
+      expect(
+        await waitFor(() =>
+          cgroupPids(path.join(owned, 'server', 'cgroup.procs')).includes(serverPid)
+        )
+      ).toBe(true);
+      expect(cgroupPids(path.join(owned, 'tools', 'cgroup.procs'))).not.toContain(serverPid);
+    }
+  );
 
   it('moves a kilo serve process born in the tools group back to server', async () => {
     const placement = workloadPlacement();

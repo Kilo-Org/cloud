@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
+import * as fs from 'node:fs';
 import {
   chmodSync,
   closeSync,
@@ -9,6 +13,7 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  rmdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -83,6 +88,132 @@ function procWithMemTotal(root: string, memTotalKb: number): string {
   mkdirSync(procRoot, { recursive: true });
   writeFileSync(path.join(procRoot, 'meminfo'), `MemTotal:\t${memTotalKb} kB\n`);
   return procRoot;
+}
+
+// Simulates the kernel no-internal-process rule: writing controllers to the mount root's
+// subtree_control fails while the root is populated (or always, for the permanently unwritable
+// case), and writing a pid to kilo-runtime's cgroup.procs moves that pid out of the root.
+function runWithRootWriteSimulation(
+  root: string,
+  rejectSubtree: 'while-populated' | 'always',
+  run: () => ControlWorkload
+): { workload: ControlWorkload; subtreeAttempts: number } {
+  const realWriteFileSync = fs.writeFileSync;
+  const rootSubtree = path.join(root, 'cgroup.subtree_control');
+  const rootProcs = path.join(root, 'cgroup.procs');
+  const runtimeProcs = path.join(root, 'kilo-runtime', 'cgroup.procs');
+  let subtreeAttempts = 0;
+  const spy = spyOn(fs, 'writeFileSync').mockImplementation(((
+    target: Parameters<typeof fs.writeFileSync>[0],
+    data: Parameters<typeof fs.writeFileSync>[1],
+    ...rest: unknown[]
+  ): void => {
+    if (typeof target === 'string' && target === rootSubtree) {
+      subtreeAttempts += 1;
+      const populated = existsSync(rootProcs) ? fs.readFileSync(rootProcs, 'utf8').trim() : '';
+      if (rejectSubtree === 'always' || populated !== '') {
+        throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
+      }
+    }
+    if (typeof target === 'string' && target === runtimeProcs) {
+      const moved = typeof data === 'string' ? data.trim() : '';
+      const current = existsSync(runtimeProcs) ? fs.readFileSync(runtimeProcs, 'utf8') : '';
+      const members = current
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line !== '');
+      if (!members.includes(moved)) members.push(moved);
+      realWriteFileSync(runtimeProcs, `${members.join('\n')}\n`);
+      const remaining = fs
+        .readFileSync(rootProcs, 'utf8')
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line !== '' && line !== moved);
+      realWriteFileSync(rootProcs, remaining.length > 0 ? `${remaining.join('\n')}\n` : '');
+      return;
+    }
+    (realWriteFileSync as (t: unknown, d: unknown, ...r: unknown[]) => void)(target, data, ...rest);
+  }) as typeof fs.writeFileSync);
+  try {
+    return { workload: run(), subtreeAttempts };
+  } finally {
+    spy.mockRestore();
+  }
+}
+
+function selfCgroupDirectory(): string | undefined {
+  if (process.platform !== 'linux') return undefined;
+  let membership: string | undefined;
+  try {
+    membership = readFileSync('/proc/self/cgroup', 'utf8')
+      .split('\n')
+      .find(line => line.startsWith('0::'))
+      ?.slice(3);
+  } catch {
+    return undefined;
+  }
+  if (!membership || !membership.startsWith('/')) return undefined;
+  return path.join('/sys/fs/cgroup', membership);
+}
+
+// Creates a disposable cgroup hierarchy under the runner's own cgroup, verifies the controllers
+// can be enabled and disabled, and returns the directory, or undefined when unavailable.
+function tryCreateDisposableCgroup(): string | undefined {
+  const parent = selfCgroupDirectory();
+  if (parent === undefined) return undefined;
+  const directory = path.join(parent, `kilo-workload-test-${randomUUID()}`);
+  try {
+    mkdirSync(directory);
+  } catch {
+    return undefined;
+  }
+  try {
+    if (!existsSync(path.join(directory, 'cgroup.procs'))) throw new Error('no procs');
+    writeFileSync(path.join(directory, 'cgroup.subtree_control'), '+memory +cpu');
+    writeFileSync(path.join(directory, 'cgroup.subtree_control'), '-memory -cpu');
+    return directory;
+  } catch {
+    try {
+      rmdirSync(directory);
+    } catch {
+      // Best-effort cleanup of the disposable hierarchy.
+    }
+    return undefined;
+  }
+}
+
+function probeDisposableCgroupSupport(): boolean {
+  const directory = tryCreateDisposableCgroup();
+  if (directory === undefined) return false;
+  try {
+    rmdirSync(directory);
+  } catch {
+    // Best-effort cleanup of the capability-probe hierarchy.
+  }
+  return true;
+}
+
+const canUseDisposableCgroup = probeDisposableCgroupSupport();
+
+async function stopChild(child: ReturnType<typeof spawn> | undefined): Promise<void> {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    child.kill('SIGKILL');
+  } catch {
+    return;
+  }
+  await Promise.race([once(child, 'exit'), new Promise(resolve => setTimeout(resolve, 2_000))]);
+}
+
+async function removeCgroupDirectory(directory: string): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      rmdirSync(directory);
+      return;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
 }
 
 function initialize(
@@ -313,7 +444,169 @@ describe('workload probe', () => {
     expect(workload.failure).toBeUndefined();
     expect(workload.placement?.parentDirectory).toBe(path.join(root, 'kilo-workloads'));
     expect(readFileSync(path.join(root, 'cgroup.subtree_control'), 'utf8').trim()).toBe('+memory');
+    expect(existsSync(path.join(root, 'kilo-runtime'))).toBe(false);
   });
+
+  it('does not evacuate when the mount root already delegates memory', () => {
+    const root = makeRoot();
+    writeControl(root, 'cgroup.subtree_control', 'memory cpu');
+    writeControl(root, 'cgroup.procs', '4242\n');
+    writeControl(root, 'memory.max', 'max');
+    const workload = initialize(root, '/', { CONTROL_WORKLOAD_LIMIT_MB: '12288' });
+    expect(workload.failure).toBeUndefined();
+    expect(workload.placement?.parentDirectory).toBe(path.join(root, 'kilo-workloads'));
+    expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8')).toBe('4242\n');
+    expect(existsSync(path.join(root, 'kilo-runtime'))).toBe(false);
+  });
+
+  it('evacuates a populated mount root into kilo-runtime as a last resort', () => {
+    const root = makeRoot();
+    writeControl(root, 'cgroup.subtree_control', '');
+    writeControl(root, 'cgroup.procs', '4242\n4243\n');
+    writeControl(root, 'memory.max', 'max');
+    const workload = runWithRootWriteSimulation(root, 'while-populated', () =>
+      initialize(root, '/', { CONTROL_WORKLOAD_LIMIT_MB: '12288' })
+    ).workload;
+    expect(workload.failure).toBeUndefined();
+    expect(workload.placement?.parentDirectory).toBe(path.join(root, 'kilo-workloads'));
+    expect(workload.placement?.aggregateMaxBytes).toBe(10240 * MIB);
+    expect(readFileSync(path.join(root, 'cgroup.subtree_control'), 'utf8')).toContain('memory');
+    expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8').trim()).toBe('');
+    expect(readFileSync(path.join(root, 'kilo-runtime', 'cgroup.procs'), 'utf8')).toBe(
+      '4242\n4243\n'
+    );
+    expect(readFileSync(path.join(root, 'kilo-workloads', 'memory.max'), 'utf8')).toBe(
+      String(10240 * MIB)
+    );
+    expect(existsSync(path.join(root, 'kilo-runtime', 'memory.max'))).toBe(false);
+  });
+
+  it('fails closed as unavailable when the mount root subtree_control is unreadable', () => {
+    if (process.getuid?.() === 0) return;
+    const root = makeRoot();
+    writeControl(root, 'cgroup.subtree_control', 'cpu');
+    writeControl(root, 'cgroup.procs', '4242\n');
+    writeControl(root, 'memory.max', 'max');
+    chmodSync(path.join(root, 'cgroup.subtree_control'), 0o000);
+    const workload = initialize(root, '/', { CONTROL_WORKLOAD_LIMIT_MB: '12288' });
+    expect(workload).toEqual({ enabled: true, failure: 'unavailable' });
+    expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8')).toBe('4242\n');
+    expect(existsSync(path.join(root, 'kilo-runtime'))).toBe(false);
+  });
+
+  it('does not evacuate root processes for a nested membership', () => {
+    if (process.getuid?.() === 0) return;
+    const root = makeRoot();
+    writeControl(root, 'cgroup.subtree_control', 'cpu');
+    writeControl(root, 'cgroup.procs', '4242\n');
+    writeControl(root, 'memory.max', 'max');
+    mkdirSync(path.join(root, 'a', 'b'), { recursive: true });
+    chmodSync(path.join(root, 'cgroup.subtree_control'), 0o444);
+    const workload = initialize(root, '/a/b');
+    expect(workload).toEqual({ enabled: true, failure: 'not_delegated' });
+    expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8')).toBe('4242\n');
+    expect(existsSync(path.join(root, 'kilo-runtime'))).toBe(false);
+  });
+
+  it('does not adopt a populated or capped kilo-runtime directory', () => {
+    if (process.getuid?.() === 0) return;
+    const cases: Array<{ memoryMax: string; procs: string }> = [
+      { memoryMax: 'max', procs: '999\n' },
+      { memoryMax: String(4 * GIB), procs: '' },
+    ];
+    for (const testCase of cases) {
+      const root = makeRoot();
+      writeControl(root, 'cgroup.subtree_control', 'cpu');
+      writeControl(root, 'cgroup.procs', '4242\n');
+      writeControl(root, 'memory.max', 'max');
+      writeControl(path.join(root, 'kilo-runtime'), 'memory.max', testCase.memoryMax);
+      writeControl(path.join(root, 'kilo-runtime'), 'cgroup.procs', testCase.procs);
+      chmodSync(path.join(root, 'cgroup.subtree_control'), 0o444);
+      const workload = initialize(root, '/', { CONTROL_WORKLOAD_LIMIT_MB: '12288' });
+      expect(workload).toEqual({ enabled: true, failure: 'not_delegated' });
+      expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8')).toBe('4242\n');
+      expect(readFileSync(path.join(root, 'kilo-runtime', 'cgroup.procs'), 'utf8')).toBe(
+        testCase.procs
+      );
+      expect(readFileSync(path.join(root, 'kilo-runtime', 'memory.max'), 'utf8')).toBe(
+        testCase.memoryMax
+      );
+    }
+  });
+
+  it('does not adopt an existing kilo-runtime without an empty cgroup.procs', () => {
+    if (process.getuid?.() === 0) return;
+    const root = makeRoot();
+    writeControl(root, 'cgroup.subtree_control', 'cpu');
+    writeControl(root, 'cgroup.procs', '4242\n');
+    writeControl(root, 'memory.max', 'max');
+    mkdirSync(path.join(root, 'kilo-runtime'));
+    chmodSync(path.join(root, 'cgroup.subtree_control'), 0o444);
+    const workload = initialize(root, '/', { CONTROL_WORKLOAD_LIMIT_MB: '12288' });
+    expect(workload).toEqual({ enabled: true, failure: 'not_delegated' });
+    expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8')).toBe('4242\n');
+    expect(existsSync(path.join(root, 'kilo-runtime', 'cgroup.procs'))).toBe(false);
+  });
+
+  it('stays not_delegated without throwing when the root stays unwritable after the move', () => {
+    const root = makeRoot();
+    writeControl(root, 'cgroup.subtree_control', 'cpu');
+    writeControl(root, 'cgroup.procs', '4242\n');
+    writeControl(root, 'memory.max', 'max');
+    const { workload, subtreeAttempts } = runWithRootWriteSimulation(root, 'always', () =>
+      initialize(root, '/', { CONTROL_WORKLOAD_LIMIT_MB: '12288' })
+    );
+    expect(workload).toEqual({ enabled: true, failure: 'not_delegated' });
+    expect(readFileSync(path.join(root, 'cgroup.procs'), 'utf8').trim()).toBe('');
+    expect(readFileSync(path.join(root, 'kilo-runtime', 'cgroup.procs'), 'utf8')).toBe('4242\n');
+    expect(subtreeAttempts).toBeGreaterThanOrEqual(2);
+  });
+
+  it.skipIf(!canUseDisposableCgroup)(
+    'applies a finite memory.max in a disposable hierarchy on linux',
+    async () => {
+      const disposable = tryCreateDisposableCgroup();
+      if (disposable === undefined) {
+        throw new Error('the disposable cgroup hierarchy became unavailable after the probe');
+      }
+      let child: ReturnType<typeof spawn> | undefined;
+      let workload: ControlWorkload | undefined;
+      let selfDirectory: string | undefined;
+      try {
+        child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+          stdio: 'ignore',
+        });
+        if (child.pid === undefined) {
+          throw new Error('the disposable hierarchy child did not start');
+        }
+        writeFileSync(path.join(disposable, 'cgroup.procs'), String(child.pid));
+        selfDirectory = mkdtempSync(path.join(os.tmpdir(), 'workload-self-'));
+        const selfFile = path.join(selfDirectory, 'cgroup');
+        writeFileSync(selfFile, '0::/\n');
+        workload = initializeControlWorkload({
+          env: { CONTROL_WORKLOAD_CGROUP: '1', CONTROL_WORKLOAD_LIMIT_MB: '12288' },
+          cgroupRoot: disposable,
+          selfCgroupFile: selfFile,
+          procRoot: '/proc',
+          isCgroupMount: () => true,
+          platform: 'linux',
+        });
+        expect(workload.failure).toBeUndefined();
+        expect(
+          readFileSync(path.join(disposable, 'kilo-workloads', 'memory.max'), 'utf8').trim()
+        ).toBe(String(10240 * MIB));
+      } finally {
+        if (workload !== undefined) closeControlWorkload(workload);
+        await stopChild(child);
+        await removeCgroupDirectory(path.join(disposable, 'kilo-runtime'));
+        await removeCgroupDirectory(path.join(disposable, 'kilo-workloads'));
+        await removeCgroupDirectory(disposable);
+        if (selfDirectory !== undefined) {
+          rmSync(selfDirectory, { recursive: true, force: true });
+        }
+      }
+    }
+  );
 
   it('rejects admission after a self-enabled placement is tampered with', () => {
     const root = makeRoot();

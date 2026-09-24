@@ -101,6 +101,8 @@ export const SandboxRuntimeMetadataSchema = z.object({
       'isolated-standard',
       'code-review',
       'devcontainer',
+      'containers-standard-3',
+      'containers-standard-4',
       'unknown',
     ])
     .nullable(),

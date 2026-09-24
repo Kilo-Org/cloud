@@ -29,8 +29,11 @@ export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
 export const WORKLOAD_PARENT_NAME = 'kilo-workloads';
 export const WORKLOAD_SERVER_NAME = 'server';
 export const WORKLOAD_TOOLS_NAME = 'tools';
+export const WORKLOAD_RUNTIME_NAME = 'kilo-runtime';
 export const WORKLOAD_DEFAULT_CPU_WEIGHT = 100;
 export const CGROUP_FS_MAGIC = 0x63677270;
+
+const MAX_EVACUATION_PASSES = 3;
 
 export type WorkloadFailure =
   | 'flag_off'
@@ -429,11 +432,80 @@ function enableMountRootControllers(cgroupRoot: string): void {
   }
 }
 
+function readPids(pathname: string): number[] | undefined {
+  const read = readControl(pathname);
+  if (!read.ok) return undefined;
+  const pids: number[] = [];
+  for (const token of read.text.split(/\s+/)) {
+    if (!token) continue;
+    const pid = Number.parseInt(token, 10);
+    if (Number.isSafeInteger(pid) && pid > 0) pids.push(pid);
+  }
+  return pids;
+}
+
+type RuntimeDirectory = { ok: true; directory: string } | { ok: false };
+
+function prepareRuntimeDirectory(cgroupRoot: string): RuntimeDirectory {
+  const directory = path.join(cgroupRoot, WORKLOAD_RUNTIME_NAME);
+  let stat;
+  try {
+    stat = lstatSync(directory);
+  } catch {
+    try {
+      mkdirSync(directory);
+    } catch (error) {
+      if (!isErofs(error)) return { ok: false };
+      remountCgroupWritable(cgroupRoot);
+      try {
+        mkdirSync(directory);
+      } catch {
+        return { ok: false };
+      }
+    }
+    return { ok: true, directory };
+  }
+  if (stat.isSymbolicLink() || !stat.isDirectory()) return { ok: false };
+  const memory = readMemoryMax(path.join(directory, 'memory.max'));
+  if (memory.kind === 'limit' || memory.kind === 'unreadable') return { ok: false };
+  const procs = readControl(path.join(directory, 'cgroup.procs'));
+  if (!procs.ok || procs.text.trim() !== '') return { ok: false };
+  return { ok: true, directory };
+}
+
+function evacuateMountRoot(cgroupRoot: string): boolean {
+  let remaining = readPids(path.join(cgroupRoot, 'cgroup.procs'));
+  if (remaining === undefined || remaining.length === 0) return false;
+  const runtime = prepareRuntimeDirectory(cgroupRoot);
+  if (!runtime.ok) return false;
+  for (let pass = 0; pass < MAX_EVACUATION_PASSES && remaining.length > 0; pass += 1) {
+    for (const pid of remaining) {
+      try {
+        writeFileSync(path.join(runtime.directory, 'cgroup.procs'), String(pid));
+      } catch {
+        return false;
+      }
+    }
+    remaining = readPids(path.join(cgroupRoot, 'cgroup.procs'));
+    if (remaining === undefined) return false;
+  }
+  return remaining.length === 0;
+}
+
 function findUsableParent(cgroupRoot: string, membership: string): AncestorLookup {
   const delegatedAncestor = scanDelegatingCgroup(cgroupRoot, workloadAncestors(membership));
   if (delegatedAncestor.ok || delegatedAncestor.failure === 'unavailable') return delegatedAncestor;
+
   enableMountRootControllers(cgroupRoot);
-  return scanDelegatingCgroup(cgroupRoot, workloadCgroupCandidates(membership));
+
+  const selfEnabled = scanDelegatingCgroup(cgroupRoot, workloadCgroupCandidates(membership));
+  if (selfEnabled.ok || selfEnabled.failure === 'unavailable') return selfEnabled;
+  if (membership !== '/') return selfEnabled;
+
+  if (!evacuateMountRoot(cgroupRoot)) return selfEnabled;
+
+  enableMountRootControllers(cgroupRoot);
+  return scanDelegatingCgroup(cgroupRoot, ['/']);
 }
 
 function probeWorkloadParent(input: {

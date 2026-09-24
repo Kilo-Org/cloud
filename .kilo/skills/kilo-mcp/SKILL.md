@@ -59,13 +59,13 @@ The census below is generated from the catalog. Three rules shape it:
 - **Key terms** — the prefix's row tags that also occur as a lowercase path segment below the prefix, minus the prefix's own name, ranked by frequency. Input-schema tags such as `organizationid` never qualify.
 - **Size** — no procedure path is inlined. The census stops at the prefix level plus the sub-areas of any prefix with two or more buckets, which keeps the file under the generator's byte limit.
 
-The catalog holds **859 procedures** — **367 queries** and **492 mutations** — under **51 prefixes**.
+The catalog holds **860 procedures** — **368 queries** and **492 mutations** — under **51 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations | Gloss (from catalog `summary`) | Key terms (from catalog `tags`) |
 |---|---:|---:|---:|---|---|
 | `organizations` | 305 | 132 | 173 | List the child organizations of an organization. | kiloclaw, cloudagentnext, securityagent, appbuilder, deployments, groups |
 | `kiloclaw` | 96 | 35 | 61 | Accept a pending plan conversion for the user's subscription. | acceptconversion, acceptconversionatinstance, approvedevicepairingrequest, approvepairingrequest, cancelkiloclirun, cancelplanswitch |
-| `user` | 39 | 14 | 25 | Change the saved payment method used for automatic credit top-up. | changeautotopuppaymentmethod, deletepasskey, getauthproviders, getautocompletemetrics, getautotopuppaymentmethod, getbalance |
+| `user` | 40 | 15 | 25 | Change the saved payment method used for automatic credit top-up. | changeautotopuppaymentmethod, deletepasskey, getauthproviders, getautocompletemetrics, getautotopuppaymentmethod, getbalance |
 | `cloudAgentNext` | 31 | 12 | 19 | Approve or deny a permission request from the cloud agent. | answerpermission, answerquestion, cancelqueuedmessage, checkeligibility, closeterminal, createterminal |
 | `agentProfiles` | 30 | 4 | 26 | Bind an agent profile to a repository so that repository uses the profile. | bindtorepo, cleardefault, create, createagent, createcustomskill, createkilocommand |
 | `securityAgent` | 26 | 15 | 11 | Auto-dismiss all security findings that meet the configured confidence criteria. | autodismisseligible, cancelremediation, deletefindingsbyrepository, dismissfinding, getanalysis, getauditreport |

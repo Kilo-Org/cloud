@@ -1,12 +1,13 @@
 import { getSettingsDirtyState, isValidDayCount } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -111,12 +112,12 @@ function SlaDayRow({
           </Text>
         )}
       </View>
-      <TextInput
+      <Input
         accessibilityLabel={t('securityAgent.sla.remediationDeadlineA11y', { label })}
         accessibilityHint={
           isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
         }
-        className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-[normal] text-foreground"
+        className="w-16 rounded-lg border border-input bg-background px-2 text-sm text-foreground"
         textAlign="center"
         editable={!disabled}
         accessibilityState={{ disabled }}

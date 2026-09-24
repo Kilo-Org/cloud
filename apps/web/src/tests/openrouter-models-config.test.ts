@@ -13,10 +13,8 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import {
-  GEMMA_4_26B_A4B_IT_ID,
-  gemma_4_26b_a4b_it_free_model,
-} from '@/lib/ai-gateway/providers/google';
+import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 

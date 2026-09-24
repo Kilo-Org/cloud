@@ -1,15 +1,13 @@
 import { describe, test, expect } from '@jest/globals';
+import { autoFreeModels, preferredModels, selectAutoFreeCandidate } from './models';
 import {
-  autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
-  preferredModels,
-  selectAutoFreeCandidate,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
-} from './models';
+} from './kilo-exclusive-models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -17,8 +15,8 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-} from './providers/anthropic.constants';
-import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+} from './kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -33,6 +31,11 @@ describe('rate-limited Kilo-exclusive models', () => {
 });
 
 describe('isFreeModel', () => {
+  test('returns a boolean synchronously', () => {
+    expect(isFreeModel('openrouter/free')).toBe(true);
+    expect(isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
+  });
+
   describe('free models', () => {
     test('should return true for models ending with :free', async () => {
       expect(await isFreeModel('gpt-4:free')).toBe(true);
@@ -287,10 +290,6 @@ describe('shouldRedactErrorResponse', () => {
     expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
   });
 
-  test('redacts errors for experiment provider', () => {
-    expect(shouldRedactErrorResponse('experiment', 'some-experiment-model')).toBe(true);
-  });
-
   test('redacts errors for stealth models regardless of provider', () => {
     expect(shouldRedactErrorResponse('openrouter', claude_opus_4_7_stealth_model.public_id)).toBe(
       true
@@ -306,12 +305,6 @@ describe('shouldRedactErrorResponse', () => {
 describe('shouldRedactModelNameInMicrodollarUsage', () => {
   test('redacts model name for custom provider', () => {
     expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
-      true
-    );
-  });
-
-  test('redacts model name for experiment provider', () => {
-    expect(shouldRedactModelNameInMicrodollarUsage('experiment', 'some-experiment-model')).toBe(
       true
     );
   });

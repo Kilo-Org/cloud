@@ -62,7 +62,7 @@ import * as z from 'zod';
 // things with one name.
 export const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
-  azure: 'Azure Foundry (experimental)',
+  azure: 'Azure Foundry',
   bedrock: 'AWS Bedrock',
   deepseek: 'DeepSeek',
   openai: 'OpenAI API key',

@@ -71,6 +71,23 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
+// The live list renders through FlashList v2. This stub renders every row
+// through the real `renderItem` and forwards the list props (`data`,
+// `refreshControl`), so the pull lifecycle is exercised without a DOM.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
+    data: { id: string }[];
+    renderItem: (entry: { item: { id: string } }) => ReactNode;
+    keyExtractor: (item: { id: string }) => string;
+  }) =>
+    createElement(
+      'FlashList',
+      props,
+      props.data.map(item =>
+        createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
+      )
+    ),
+}));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   InteractionManager: {
@@ -89,6 +106,7 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   FlatList: (props: {
     data: { id: string }[];
     renderItem: (entry: { item: { id: string } }) => ReactNode;
@@ -281,7 +299,7 @@ async function renderScreen() {
 }
 
 function refreshControl() {
-  const control = nodes('FlatList')[0]?.props.refreshControl as
+  const control = nodes('FlashList')[0]?.props.refreshControl as
     | { props: { refreshing: boolean; onRefresh: () => void } }
     | undefined;
   if (!control) {
@@ -324,7 +342,7 @@ async function i18nChangeLanguageEn() {
 describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
   async function expectFailedPullKeepsRowsAndShowsInlineRetry() {
     await renderScreen();
-    expect(nodes('FlatList')).toHaveLength(1);
+    expect(nodes('FlashList')).toHaveLength(1);
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
     expect(text()).not.toContain("Couldn't refresh");
 

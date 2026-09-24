@@ -47,14 +47,24 @@ afterEach(() => {
 });
 
 describe('Text mounted letter spacing', () => {
-  it.each([false, true])('clears the tracking for Arabic children with isRTL=%s', isRTL => {
-    i18nManager.isRTL = isRTL;
-    const text = hostText(
-      mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
-    );
+  // The reset belongs to the RTL interface: RTL-script copy takes it there,
+  // while a joined script in an LTR screen keeps the tracking its class asks
+  // for (`text.rtl-labels` pins that LTR case).
+  it.each([false, true])(
+    'resets the tracking for Arabic children in RTL only (isRTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+      const text = hostText(
+        mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+      );
 
-    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
-  });
+      if (isRTL) {
+        expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+      } else {
+        expect(text.props.style).toBeUndefined();
+      }
+    }
+  );
 
   it('leaves Latin children untouched and keeps LTR style undefined', () => {
     const text = hostText(
@@ -64,14 +74,15 @@ describe('Text mounted letter spacing', () => {
     expect(text.props.style).toBeUndefined();
   });
 
-  it('clears the tracking of the eyebrow variant for Arabic children', () => {
+  it('resets the eyebrow variant tracking for Arabic children in RTL', () => {
+    i18nManager.isRTL = true;
     const text = hostText(mount(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
 
-    expect(text.props.className as string).toContain('tracking-[1.5px]');
     expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
 
-  it('clears the tab label tracking for Arabic children', () => {
+  it('resets the tab label tracking for Arabic children in RTL', () => {
+    i18nManager.isRTL = true;
     const text = hostText(
       mount(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
     );
@@ -80,29 +91,42 @@ describe('Text mounted letter spacing', () => {
     expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
 
-  // The interface direction owns the reset outside joined script: an RTL
-  // interface draws every run unspaced (`RTL_NO_LETTER_SPACING`), so a Latin
-  // label keeps the paragraph direction and loses the tracking its class asks
-  // for. The joined-script rule only adds the override in an LTR interface.
-  it('keeps the RTL paragraph direction and the reset for Latin children', () => {
+  // An RTL interface keeps the paragraph direction for a Latin run and leaves
+  // its tracking alone: the reset is for RTL-script copy (`text.rtl-labels`).
+  it('keeps the RTL paragraph direction and no reset for Latin children', () => {
     i18nManager.isRTL = true;
     const text = hostText(
       mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
     );
 
     expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
-    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
   });
 });
 
 describe('Text eyebrow letterspacing', () => {
   // Finding home-ar-loading: an Arabic section label carried the Latin
-  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت').
-  it.each([false, true])('keeps the eyebrow display treatment in LTR only (RTL=%s)', isRTL => {
+  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The
+  // display treatment is dropped for RTL-script copy (Arabic, Hebrew) in an
+  // RTL interface.
+  it.each([false, true])('keeps the eyebrow display treatment for Latin copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));
     expect(classes).toEqual(
-      expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'text-muted-foreground'])
+      expect.arrayContaining([
+        'font-mono-medium',
+        'text-[10px]',
+        'text-muted-foreground',
+        'uppercase',
+        'tracking-[1.5px]',
+      ])
+    );
+  });
+
+  it.each([false, true])('drops the treatment from Arabic copy in RTL (RTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const classes = hostClasses(
+      mount(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
     );
     if (isRTL) {
       expect(classes).not.toContain('uppercase');
@@ -124,12 +148,37 @@ describe('Text eyebrow letterspacing', () => {
     const classes = hostClasses(
       mount(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
     );
-    expect(classes).toEqual(expect.arrayContaining(['font-mono-medium', 'text-[10px]']));
+    expect(classes).toEqual(expect.arrayContaining(['text-[10px]']));
     if (isRTL) {
+      // Arabic copy in an RTL interface also drops the mono family.
+      expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
       expect(classes).not.toContain('uppercase');
       expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     } else {
-      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      expect(classes).toEqual(
+        expect.arrayContaining(['font-mono-medium', 'uppercase', 'tracking-[1.5px]'])
+      );
     }
+  });
+});
+
+describe('Text mono variant in an RTL interface', () => {
+  // The mono variant carries a font that ships no RTL-script glyphs, so RTL
+  // copy loses the family in RTL while a Latin run such as a session id keeps
+  // it.
+  it('drops the mono family for an Arabic mono variant in RTL', () => {
+    i18nManager.isRTL = true;
+    const classes = hostClasses(
+      mount(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
+    );
+
+    expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
+  });
+
+  it('keeps the mono family for a session id in RTL', () => {
+    i18nManager.isRTL = true;
+    const classes = hostClasses(mount(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b')));
+
+    expect(classes).toContain('font-mono-medium');
   });
 });

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "اگر یہ ترتیب بند ہو تو ریٹرن کی دبانے سے ایجنٹ کو پیغام لکھنے کے خانے میں نئی سطر شامل ہوتی ہے۔",
     "biometricUnlock": "بایومیٹرکس سے انلاک کریں",
     "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔",
-    "featureFlags": "فیچر فلیگز",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "ریموٹ · ≥ {{min}}",
-    "featureFlagSkipped": "ڈیفالٹ · < {{min}}",
-    "featureFlagNotLoaded": "ڈیفالٹ · لوڈ نہیں ہوا",
     "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
     "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
       "linesOf": "کل {{total}} سطروں میں سے {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent کا عمل {{action}} ناکام ہو گیا ({{status}})۔",
-      "failed": "Cloud Agent کا عمل {{action}} ناکام ہو گیا۔"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ان پٹ کو سیریلائز نہیں کیا جا سکتا]",
       "errorPrefix": "خرابی: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "فراہم کنندہ نے درخواست مسترد کر دی۔",
       "assistantStopped": "جواب روک دیا گیا۔",
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
-      "assistantFailed": "جواب تیار نہیں ہو سکا۔",
-      "sendFailed": "پیغام نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔"
+      "assistantFailed": "جواب تیار نہیں ہو سکا۔"
     },
     "filePart": {
       "loadingImage": "تصویر لوڈ ہو رہی ہے",

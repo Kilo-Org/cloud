@@ -1,5 +1,12 @@
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 
+/**
+ * Authoritative runtime loss: the sandbox control reports the physical sandbox
+ * `stopped`, so the accepted turn can never complete. A transport or readiness
+ * failure is not this error and must keep the turn alive.
+ */
+export class AcceptedRuntimeLostError extends Error {}
+
 export type AcceptedAlarmDecision = { action: 'check' } | { action: 'rearm'; at: number };
 
 export function acceptedAlarmDecision(

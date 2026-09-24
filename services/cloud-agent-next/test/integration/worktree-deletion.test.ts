@@ -2358,4 +2358,35 @@ describe('worktree deletion in Durable Objects', () => {
       }
     });
   });
+
+  it('forwards an isolated sole-owner session metadata to the retirement RPC on deleteSession', async () => {
+    const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}` as const;
+    const sessionId = cloudId();
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    const retire = vi.fn(async () => ({ kind: 'exclusive' as const }));
+    let originalIngest: unknown;
+    await runInDurableObject(control, instance => {
+      originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { retireCloudAgentWorktreeIfSoleMember: retire },
+      });
+    });
+    try {
+      const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+      await runInDurableObject(session, async instance => {
+        await instance.registerSession(registration(sessionId, sandboxId));
+        await instance.deleteSession();
+      });
+
+      expect(retire).toHaveBeenCalledWith({
+        worktreeId,
+        kiloUserId: userId,
+        cloudAgentSessionId: sessionId,
+      });
+    } finally {
+      await runInDurableObject(control, instance => {
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      });
+    }
+  });
 });

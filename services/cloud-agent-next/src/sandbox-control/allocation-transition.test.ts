@@ -3,6 +3,7 @@ import type { Decision } from '../sandbox-state/commands.js';
 import { operationId } from '../sandbox-state/commands.js';
 import { decideAllocation, allocationStateKey } from '../sandbox-state/allocation/reduce.js';
 import type { AllocationRecord, AllocationTarget } from '../sandbox-state/model/allocation.js';
+import { connectingHealth } from '../sandbox-state/model/health.js';
 import type { AllocationInputEvent } from '../sandbox-state/events.js';
 import { POLICY } from '../sandbox-state/schedule.js';
 import { logger } from '../logger.js';
@@ -85,6 +86,20 @@ function allocatedHealthyRecord(options?: {
   };
 }
 
+function allocatedConnectingRecord(): AllocationRecord {
+  return {
+    v: 2,
+    resumable: true,
+    state: {
+      kind: 'allocated',
+      target: TARGET,
+      createIntent: INTENT,
+      health: connectingHealth(INC, NOW + POLICY.connectingDeadlineMs),
+      idleAt: null,
+    },
+  };
+}
+
 function stoppingDestroyingRecord(): AllocationRecord {
   return {
     v: 2,
@@ -138,6 +153,40 @@ function scenarios(): Scenario[] {
     },
     providerRef: 'ref-1',
     incarnation: INC,
+    at: NOW,
+  };
+
+  const failedFrom = allocatedConnectingRecord();
+  const launchFailedEvent: AllocationInputEvent = {
+    type: 'LAUNCH_FAILED',
+    fence: {
+      operationId: operationId('launch', INTENT.intentId),
+      providerRef: TARGET.providerRef,
+      incarnation: INC,
+    },
+    reason: 'Sandbox launch credential is unavailable',
+    at: NOW,
+  };
+
+  const unresolvedCreateFrom = creatingRecord();
+  const createFailedEvent: AllocationInputEvent = {
+    type: 'CREATE_FAILED',
+    fence: {
+      operationId: operationId('create', INTENT.intentId),
+      providerRef: null,
+      incarnation: INC,
+    },
+    reason: 'Sandbox acquisition expired',
+    at: NOW,
+  };
+  const createUnknownEvent: AllocationInputEvent = {
+    type: 'CREATE_UNKNOWN',
+    fence: {
+      operationId: operationId('create', INTENT.intentId),
+      providerRef: null,
+      incarnation: INC,
+    },
+    reason: 'container lease update timed out',
     at: NOW,
   };
 
@@ -229,6 +278,52 @@ function scenarios(): Scenario[] {
         allocationId: INTENT.intentId,
         incarnation: INC,
         reason: 'health_unhealthy_unresponsive',
+      },
+    },
+    {
+      name: 'launch-failed allocated.connecting -> unknown',
+      from: failedFrom,
+      decision: mustDecide(failedFrom, launchFailedEvent, NOW),
+      event: launchFailedEvent,
+      expected: {
+        from: 'allocated.connecting',
+        to: 'unknown',
+        event: 'launch_failed',
+        deadline: NOW + POLICY.observeDeadlineMs,
+        at: NOW,
+        allocationId: INTENT.intentId,
+        incarnation: INC,
+        reason: 'Sandbox_launch_credential_is_unavailable',
+      },
+    },
+    {
+      name: 'create-failed creating -> stopped',
+      from: unresolvedCreateFrom,
+      decision: mustDecide(unresolvedCreateFrom, createFailedEvent, NOW),
+      event: createFailedEvent,
+      expected: {
+        from: 'creating',
+        to: 'stopped',
+        event: 'create_failed',
+        deadline: null,
+        at: NOW,
+        allocationId: INTENT.intentId,
+        reason: 'Sandbox_acquisition_expired',
+      },
+    },
+    {
+      name: 'create-unknown creating -> unknown',
+      from: unresolvedCreateFrom,
+      decision: mustDecide(unresolvedCreateFrom, createUnknownEvent, NOW),
+      event: createUnknownEvent,
+      expected: {
+        from: 'creating',
+        to: 'unknown',
+        event: 'create_unknown',
+        deadline: NOW + POLICY.createDeadlineMs,
+        at: NOW,
+        allocationId: INTENT.intentId,
+        reason: 'container_lease_update_timed_out',
       },
     },
   ];

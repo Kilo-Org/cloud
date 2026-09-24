@@ -202,6 +202,10 @@ export function CloudSidebarLayout({
     string | null
   >(null);
   const pendingWorktreeCreationRef = useRef<PendingWorktreeCreationOperation | null>(null);
+  const currentSessionIdRef = useRef<string | null>(currentSessionId ?? null);
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId ?? null;
+  }, [currentSessionId]);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 
   const createdOnPlatform = useMemo(() => {
@@ -418,6 +422,10 @@ export function CloudSidebarLayout({
           )
         );
         forgetWorktreeTabs(worktreeId, deletedSessionIds);
+        const deletedCurrentSessionId = currentSessionIdRef.current;
+        if (deletedCurrentSessionId && deletedSessionIds.includes(deletedCurrentSessionId)) {
+          router.push(organizationId ? `/organizations/${organizationId}/cloud` : '/cloud');
+        }
         void invalidateSessionQueries({ queryClient, trpc });
         void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
         toast.success('Worktree deleted');

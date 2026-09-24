@@ -26,7 +26,6 @@ import {
   AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS,
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
-  DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import {
   attachPreparedAutoTopUpInvoiceFee,
@@ -73,8 +72,6 @@ export type AutoTopUpReservation = {
   traceId: string;
   config: {
     id: string;
-    stripe_payment_method_id: string;
-    amount_cents: number | null;
   };
   attemptStartedAt: string;
   stripeCustomerId: string;
@@ -296,8 +293,6 @@ async function reserveAutoTopUpForEntity(
     traceId,
     config: {
       id: config.id,
-      stripe_payment_method_id: config.stripe_payment_method_id,
-      amount_cents: config.amount_cents,
     },
     attemptStartedAt: config.attempt_started_at,
     stripeCustomerId: stripe_customer_id,
@@ -359,7 +354,11 @@ async function chargeReservedAutoTopUp(
         ownerEnabled
       )
     )
-    .returning({ attempt_started_at: auto_top_up_configs.attempt_started_at });
+    .returning({
+      amount_cents: auto_top_up_configs.amount_cents,
+      attempt_started_at: auto_top_up_configs.attempt_started_at,
+      stripe_payment_method_id: auto_top_up_configs.stripe_payment_method_id,
+    });
   if (!ownedReservation) return failureResult('reservation_no_longer_owned');
   if (!ownedReservation.attempt_started_at) {
     throw new Error(`Auto Top-Up reservation ${config.id} lost its execution timestamp`);
@@ -379,7 +378,7 @@ async function chargeReservedAutoTopUp(
     return failureResult('balance_already_sufficient');
   }
 
-  const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
+  const amountCents = ownedReservation.amount_cents;
   const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;
 
   try {
@@ -449,7 +448,7 @@ async function chargeReservedAutoTopUp(
 
     // Pay the invoice. The PaymentIntent is created during payment, not finalization.
     const paidInvoice = await client.invoices.pay(invoice.id, {
-      payment_method: config.stripe_payment_method_id,
+      payment_method: ownedReservation.stripe_payment_method_id,
       off_session: true,
     });
 

@@ -565,8 +565,6 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         traceId: 'synthetic-trace-id',
         config: {
           id: 'synthetic-config-id',
-          stripe_payment_method_id: 'pm_synthetic',
-          amount_cents: 2_000,
         },
         attemptStartedAt: '2026-09-23T21:00:00.000Z',
         stripeCustomerId: 'cus_synthetic',

@@ -306,6 +306,59 @@ describe('autoTopUp', () => {
       expect(client.invoices.create).toHaveBeenCalledTimes(1);
     });
 
+    it('uses current config values when executing a reservation', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: testUser.id,
+        stripe_payment_method_id: 'pm_test_reserved_original',
+        amount_cents: 2000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(kilocode_users.id, testUser.id));
+      const user = toUserForBalance({
+        ...testUser,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const { client } = await import('@/lib/stripe-client');
+      (client.invoices.create as jest.Mock).mockResolvedValue({
+        id: 'inv_current_config',
+        created: 1_700_000_000,
+      });
+      (client.invoices.update as jest.Mock).mockResolvedValue({ id: 'inv_current_config' });
+      (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_current_config' });
+      (client.invoices.pay as jest.Mock).mockResolvedValue({
+        id: 'inv_current_config',
+        status: 'paid',
+      });
+      const reservation = await reserveAutoTopUp(user);
+      if (!reservation) throw new Error('Expected an Auto Top-Up reservation');
+      await db
+        .update(auto_top_up_configs)
+        .set({
+          stripe_payment_method_id: 'pm_test_reserved_updated',
+          amount_cents: 10000,
+        })
+        .where(eq(auto_top_up_configs.id, reservation.config.id));
+
+      await performReservedAutoTopUp(reservation);
+
+      expect(client.invoices.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ serviceFeePrincipalMinor: '10000' }),
+        })
+      );
+      expect(client.invoiceItems.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 10000 })
+      );
+      expect(client.invoices.pay).toHaveBeenCalledWith(
+        'inv_current_config',
+        expect.objectContaining({ payment_method: 'pm_test_reserved_updated' })
+      );
+    });
+
     it('does not execute Stripe work when balance recovers after reservation', async () => {
       await db.insert(auto_top_up_configs).values({
         owned_by_user_id: testUser.id,

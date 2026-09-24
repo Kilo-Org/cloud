@@ -575,13 +575,12 @@ describe('catalog training policies', () => {
   });
 
   test('does not overwrite an explicit local Kilo-exclusive false with OpenRouter training metadata', async () => {
-    const exclusive = kiloExclusiveModels.find(
-      model =>
-        model.status === 'public' &&
-        model.pricing &&
-        !model.flags.includes('requires-data-collection')
+    const exclusive = qwen36_plus_stealth_model;
+    jest.replaceProperty(
+      exclusive,
+      'flags',
+      exclusive.flags.filter(flag => flag !== 'requires-data-collection')
     );
-    if (!exclusive) throw new Error('Expected a paid non-training Kilo-exclusive model');
     const policies: ModelDataPolicy[] = [
       { providerSlug: 'unrelated-openrouter-provider', training: true, retainsPrompts: true },
     ];

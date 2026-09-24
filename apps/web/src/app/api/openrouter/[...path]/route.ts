@@ -644,7 +644,8 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
   if (
     isAutoEfficientRequest &&
-    (autoRoutingPolicyUnavailable || deniedAutoRoutingModelIds.includes(effectiveModelIdLowerCased))
+    (autoRoutingPolicyUnavailable ||
+      deniedAutoRoutingModelIds.some(id => id.toLowerCase() === effectiveModelIdLowerCased))
   ) {
     return efficientPoolBlockedResponse();
   }

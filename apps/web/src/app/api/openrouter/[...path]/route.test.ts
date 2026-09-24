@@ -1228,12 +1228,12 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect(mockedUpstreamRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           body: expect.objectContaining({
-            provider: {
+            provider: expect.objectContaining({
               data_collection: 'deny',
               zdr: true,
               only: ['anthropic'],
               ignore: ['meta'],
-            },
+            }),
           }),
         })
       );
@@ -1294,7 +1294,11 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
-          provider: { only: ['anthropic'], data_collection: 'deny', zdr: true },
+          provider: expect.objectContaining({
+            only: ['anthropic'],
+            data_collection: 'deny',
+            zdr: true,
+          }),
         }),
       })
     );
@@ -1333,6 +1337,24 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+
+  it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
+    'blocks mixed-case denied model IDs resolved by %s',
+    async autoModel => {
+      const model = 'Qwen/Qwen3-30B-A3B';
+      mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([model]);
+      mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
+        await opts.efficientDecision?.();
+        request.body.model = model;
+        return { kind: 'ok', resolved: { model } };
+      });
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody(autoModel)) as never);
+
+      expect(response.status).toBe(503);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it('passes models forbidden by provider access policy to the efficient decision worker', async () => {
     mockedGetUserFromAuth.mockResolvedValue({

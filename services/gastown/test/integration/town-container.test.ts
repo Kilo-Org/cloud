@@ -45,12 +45,14 @@ describe('Town Container Routes', () => {
 
 describe('Heartbeat Endpoint', () => {
   const rigId = () => `rig-${crypto.randomUUID()}`;
+  const townId = () => `town-${crypto.randomUUID()}`;
 
   it('should update agent activity via heartbeat', async () => {
     const id = rigId();
+    const town = townId();
 
     // Register an agent first
-    const createRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+    const createRes = await SELF.fetch(api(`/api/towns/${town}/rigs/${id}/agents`), {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ role: 'polecat', name: 'test-polecat', identity: 'polecat-1' }),
@@ -64,11 +66,14 @@ describe('Heartbeat Endpoint', () => {
     await new Promise(r => setTimeout(r, 10));
 
     // Send heartbeat
-    const heartbeatRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}/heartbeat`), {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ status: 'running' }),
-    });
+    const heartbeatRes = await SELF.fetch(
+      api(`/api/towns/${town}/rigs/${id}/agents/${agentId}/heartbeat`),
+      {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ status: 'running' }),
+      }
+    );
     expect(heartbeatRes.status).toBe(200);
     const heartbeatBody: { success: boolean; data: { heartbeat: boolean } } =
       await heartbeatRes.json();
@@ -76,7 +81,7 @@ describe('Heartbeat Endpoint', () => {
     expect(heartbeatBody.data.heartbeat).toBe(true);
 
     // Verify agent's activity was updated
-    const getRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}`), {
+    const getRes = await SELF.fetch(api(`/api/towns/${town}/rigs/${id}/agents/${agentId}`), {
       headers: headers(),
     });
     const getBody: { data: { last_activity_at: string } } = await getRes.json();
@@ -85,11 +90,15 @@ describe('Heartbeat Endpoint', () => {
 
   it('should handle heartbeat for non-existent agent gracefully', async () => {
     const id = rigId();
-    const res = await SELF.fetch(api(`/api/rigs/${id}/agents/non-existent/heartbeat`), {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ status: 'running' }),
-    });
+    const town = townId();
+    const res = await SELF.fetch(
+      api(`/api/towns/${town}/rigs/${id}/agents/non-existent/heartbeat`),
+      {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ status: 'running' }),
+      }
+    );
     // The DO's touchAgent won't throw for non-existent agent (it's a no-op UPDATE)
     expect(res.status).toBe(200);
   });

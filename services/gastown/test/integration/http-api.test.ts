@@ -1,4 +1,4 @@
-import { SELF } from 'cloudflare:test';
+import { env, runDurableObjectAlarm, SELF } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
@@ -46,12 +46,12 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve HTML at /', async () => {
+    it('should serve a JSON service descriptor at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('Gastown Dashboard');
+      expect(res.headers.get('Content-Type')).toContain('application/json');
+      const body = await res.json();
+      expect(body).toMatchObject({ service: 'gastown', status: 'ok' });
     });
   });
 
@@ -430,6 +430,10 @@ describe('HTTP API', () => {
   describe('agent done', () => {
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
+      // setTownId stores `town:id`, which armAlarmIfNeeded() requires before
+      // hookBead/agentDone will schedule the town alarm that drains events.
+      const town = env.TOWN.get(env.TOWN.idFromName(townId));
+      await town.setTownId(townId);
       const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
@@ -464,6 +468,10 @@ describe('HTTP API', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.done).toBe(true);
+
+      // agentDone is event-only: the review-queue transition (unhook, MR
+      // creation) happens when the town's alarm drains the event.
+      await runDurableObjectAlarm(town);
 
       // Verify agent is idle
       const agentCheck = await SELF.fetch(
@@ -620,9 +628,12 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.type).toBe('escalation');
-      expect(body.data.title).toBe('Critical failure');
-      expect(body.data.priority).toBe('critical');
+      // The escalations route maps the request title to the escalation
+      // message (the optional request body is not persisted).
+      expect(body.data.id).toBeTruthy();
+      expect(body.data.severity).toBe('critical');
+      expect(body.data.source_rig_id).toBe(id);
+      expect(body.data.message).toBe('Critical failure');
     });
   });
 

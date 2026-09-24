@@ -192,6 +192,7 @@ describe('Convoy DAG and Feature Branches', () => {
           { title: 'Second Step', depends_on: [0] },
           { title: 'Third Step', depends_on: [1] },
         ],
+        staged: false,
       });
 
       // Run alarm to trigger reconciler assignment (lazy assignment).
@@ -223,6 +224,7 @@ describe('Convoy DAG and Feature Branches', () => {
         rigId: 'rig-1',
         convoyTitle: 'Two Steps',
         tasks: [{ title: 'Step 1' }, { title: 'Step 2', depends_on: [0] }],
+        staged: false,
       });
 
       // Run alarm to trigger reconciler assignment of unblocked beads
@@ -546,6 +548,7 @@ describe('Convoy DAG and Feature Branches', () => {
         convoyTitle: 'Review Queue Mode Test',
         tasks: [{ title: 'Task 1' }],
         merge_mode: 'review-then-land',
+        staged: false,
       });
 
       // Run alarm to trigger reconciler assignment

@@ -28,6 +28,7 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       rigId: 'rig-1',
       convoyTitle: 'Review Failure Test',
       tasks: [{ title: 'Task 1' }],
+      staged: false,
     });
 
     // Run alarm to trigger reconciler assignment (lazy assignment)
@@ -121,6 +122,7 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         rigId: 'rig-1',
         convoyTitle: 'Two-Task Convoy',
         tasks: [{ title: 'Task 1' }, { title: 'Task 2' }],
+        staged: false,
       });
 
       // Run alarm to trigger reconciler assignment (lazy assignment)
@@ -197,6 +199,7 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         rigId: 'rig-1',
         convoyTitle: 'Agent Done Test',
         tasks: [{ title: 'Single Task' }],
+        staged: false,
       });
 
       // Run alarm to trigger reconciler assignment (lazy assignment)

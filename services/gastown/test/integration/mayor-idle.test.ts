@@ -107,6 +107,7 @@ describe('Mayor idle lifecycle', () => {
         rigId: 'rig-1',
         convoyTitle: 'Test',
         tasks: [{ title: 'Task 1' }],
+        staged: false,
       });
 
       // Run alarm to assign and dispatch the polecat

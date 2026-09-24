@@ -141,6 +141,10 @@ export class AgentDO extends DurableObject<Env> {
     console.log(`${AGENT_DO_LOG} destroy: clearing all storage`);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+    // deleteAll() drops the SQL tables while this instance stays alive with
+    // initPromise resolved. Reset it so the next RPC re-creates the empty
+    // schema instead of throwing "no such table".
+    this.initPromise = null;
   }
 
   async ping(): Promise<{ ok: true }> {

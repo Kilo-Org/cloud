@@ -28,6 +28,7 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
       convoyTitle: 'Landing MR Test',
       tasks: [{ title: 'Task 1' }],
       merge_mode: 'review-then-land',
+      staged: false,
     });
 
     const beadId = result.beads[0].bead.bead_id;
@@ -215,6 +216,7 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
       rigId: 'rig-1',
       convoyTitle: 'Review Required Test',
       tasks: [{ title: 'Task 1' }],
+      staged: false,
     });
 
     const beadId = result.beads[0].bead.bead_id;
@@ -267,6 +269,7 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
       rigId: 'rig-1',
       convoyTitle: 'Changes Requested Test',
       tasks: [{ title: 'Task 1' }],
+      staged: false,
     });
 
     const beadId = result.beads[0].bead.bead_id;

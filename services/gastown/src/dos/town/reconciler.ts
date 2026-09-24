@@ -2305,6 +2305,10 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
 export function reconcileGC(sql: SqlStorage): Action[] {
   const actions: Action[] = [];
 
+  // Retention is measured from the last recorded activity. An agent that never
+  // received a heartbeat has none, so fall back to its own bead's creation
+  // time (the join is on the agent's bead) — otherwise "idle > 24h" would
+  // delete a freshly created agent on the same tick it becomes unhooked.
   const gcCandidates = AgentRow.array().parse([
     ...query(
       sql,
@@ -2312,7 +2316,7 @@ export function reconcileGC(sql: SqlStorage): Action[] {
         SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
                ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
                ${agent_metadata.dispatch_attempts},
-               ${agent_metadata.last_activity_at},
+               COALESCE(${agent_metadata.last_activity_at}, b.${beads.columns.created_at}) AS last_activity_at,
                b.${beads.columns.rig_id}
         FROM ${agent_metadata}
         LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}

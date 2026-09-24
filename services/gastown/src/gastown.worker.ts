@@ -913,22 +913,42 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
-// Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
+// Skipped for container-registry / container-events (which use authMiddleware
+// with container JWT support), the town container control routes (Cloudflare
+// Access at the perimeter) and db-snapshot / mayor-id.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
   if (
     path.includes('/container-registry') ||
+    path.includes('/container-events') ||
+    // Town container control routes are protected by Cloudflare Access at the
+    // perimeter and carry no user JWT (see the Town Container section below).
+    path.includes('/container/') ||
     path.includes('/db-snapshot') ||
-    path.includes('/mayor-id') ||
-    path.includes('/container-events')
+    path.includes('/mayor-id')
   ) {
     return next();
   }
-  await kiloAuthMiddleware(c, async () => {
-    await adminAuditMiddleware(c, async () => {
-      await townAuthMiddleware(c, next);
-    });
-  });
+  // Hono's `next()` resolves to the Context (not a response), so the chain's
+  // responses cannot be propagated by returning them. Capture the first
+  // rejection explicitly: dropping it left the context unfinalized and turned
+  // every rejected request on the routes registered below into a 500.
+  let rejection: Response | undefined;
+  const capture = (value: unknown) => {
+    if (value instanceof Response) rejection = value;
+  };
+
+  capture(
+    await kiloAuthMiddleware(c, async () => {
+      capture(
+        await adminAuditMiddleware(c, async () => {
+          capture(await townAuthMiddleware(c, next));
+        })
+      );
+    })
+  );
+
+  return rejection;
 });
 
 // ── Org Auth ────────────────────────────────────────────────────────────

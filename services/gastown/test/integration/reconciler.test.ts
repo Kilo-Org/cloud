@@ -40,6 +40,7 @@ describe('Reconciler', () => {
         rigId: 'rig-1',
         convoyTitle: 'Single bead',
         tasks: [{ title: 'Unassigned bead' }],
+        staged: false,
       });
 
       const beadId = result.beads[0].bead.bead_id;
@@ -60,6 +61,7 @@ describe('Reconciler', () => {
         rigId: 'rig-1',
         convoyTitle: 'Blocked test',
         tasks: [{ title: 'First' }, { title: 'Second', depends_on: [0] }],
+        staged: false,
       });
 
       await runDurableObjectAlarm(town);
@@ -78,6 +80,7 @@ describe('Reconciler', () => {
         rigId: 'rig-1',
         convoyTitle: 'Unblock test',
         tasks: [{ title: 'First' }, { title: 'Second', depends_on: [0] }],
+        staged: false,
       });
 
       // First alarm: assign agent to first bead
@@ -205,6 +208,7 @@ describe('Reconciler', () => {
         rigId: 'rig-1',
         convoyTitle: 'AgentDone test',
         tasks: [{ title: 'Agent done test' }],
+        staged: false,
       });
 
       const beadId = result.beads[0].bead.bead_id;
@@ -245,6 +249,7 @@ describe('Reconciler', () => {
         rigId: 'rig-1',
         convoyTitle: 'Refinery test',
         tasks: [{ title: 'Review dispatch test' }],
+        staged: false,
       });
 
       const beadId = result.beads[0].bead.bead_id;
@@ -293,9 +298,21 @@ describe('Reconciler', () => {
         rigId: 'rig-1',
         convoyTitle: 'Rule 6 limit test',
         tasks: [{ title: 'Dispatch limit test' }],
+        staged: false,
       });
 
       const beadId = result.beads[0].bead.bead_id;
+
+      // A configured rig is required for dispatchAgent to record a dispatch
+      // attempt on the bead (it bails out before the counter update when the
+      // rig has no stored config).
+      await town.configureRig({
+        rigId: 'rig-1',
+        townId: townName,
+        gitUrl: 'https://github.com/test/repo.git',
+        defaultBranch: 'main',
+        userId: 'test-user',
+      });
 
       // Assign agent and dispatch
       await runDurableObjectAlarm(town);
@@ -323,18 +340,18 @@ describe('Reconciler', () => {
       expect(refineries.length).toBeGreaterThan(0);
       const refinery = refineries[0];
 
-      // Simulate repeated idle→re-dispatch cycles by setting dispatch_attempts
-      // past the limit (MAX_DISPATCH_ATTEMPTS = 20) and backdating last_activity_at
-      // so the DISPATCH_COOLDOWN_MS check passes.
-      const pastTimestamp = new Date(Date.now() - 5 * 60_000).toISOString();
-      await town.setAgentDispatchAttempts(refinery.id, 25, pastTimestamp);
+      // Simulate repeated idle→re-dispatch cycles: cap the rig's refinery
+      // dispatch attempts at 1 so the MR bead — already dispatched once — is
+      // over the per-bead limit on the next tick (Rule 6).
+      await town.updateRigConfig('rig-1', { max_dispatch_attempts: 1 });
 
       // Set agent to idle (simulating agentCompleted) and ensure MR is in_progress
       await town.updateAgentStatus(refinery.id, 'idle');
       const mrBefore = await town.getBeadAsync(mrBead!.bead_id);
       expect(mrBefore?.status).toBe('in_progress');
 
-      // Run alarm — Rule 6 should see dispatch_attempts >= 20 and fail the MR bead
+      // Run alarm — Rule 6 should see the bead's dispatch_attempts (1) at the
+      // rig's max_dispatch_attempts and fail the MR bead
       await runDurableObjectAlarm(town);
 
       const mrAfter = await town.getBeadAsync(mrBead!.bead_id);

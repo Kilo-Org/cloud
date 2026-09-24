@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolveSessionTranscriptView } from './session-transcript-view';
+
 import {
   resolveSessionFooterRowItem,
   shouldShowAgentWorkingIndicator,
@@ -71,7 +73,7 @@ describe('resolveSessionFooterRowItem', () => {
     shouldShowFooterWorking: false,
     hasStatusIndicator: false,
     hasSendReason: false,
-    messageCount: 1,
+    transcriptItemCount: 1,
   };
 
   it('ranks the working spinner above the status indicator and the send reason', () => {
@@ -147,18 +149,85 @@ describe('resolveSessionFooterRowItem', () => {
     ).toBe('status');
   });
 
+  it('shows the reconnecting indicator while preparing', () => {
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        cloudStatusType: 'preparing',
+        hasInProgressTranscriptPreparation: true,
+        statusIndicatorCode: 'reconnecting-to-agent',
+        statusIndicatorType: 'progress',
+        hasStatusIndicator: true,
+      })
+    ).toBe('status');
+  });
+
+  it('shows a classified error indicator while preparing', () => {
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        cloudStatusType: 'preparing',
+        hasInProgressTranscriptPreparation: true,
+        statusIndicatorCode: 'insufficient-credits',
+        statusIndicatorType: 'error',
+        hasStatusIndicator: true,
+      })
+    ).toBe('status');
+  });
+
+  it('still hides a plain progress indicator while preparing', () => {
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        cloudStatusType: 'preparing',
+        hasInProgressTranscriptPreparation: true,
+        statusIndicatorCode: 'setting-up-environment',
+        statusIndicatorType: 'progress',
+        hasStatusIndicator: true,
+      })
+    ).toBeNull();
+  });
+
   it('suppresses progress items on an empty transcript, where the body states its own', () => {
     expect(
       resolveSessionFooterRowItem({
         ...base,
-        messageCount: 0,
+        transcriptItemCount: 0,
         shouldShowFooterWorking: true,
       })
     ).toBeNull();
     expect(
-      resolveSessionFooterRowItem({ ...base, messageCount: 0, hasStatusIndicator: true })
+      resolveSessionFooterRowItem({ ...base, transcriptItemCount: 0, hasStatusIndicator: true })
     ).toBeNull();
   });
+
+  it.each([
+    { statusIndicatorCode: 'reconnecting-to-agent', statusIndicatorType: 'progress' },
+    { statusIndicatorCode: 'connection-lost', statusIndicatorType: 'error' },
+  ])(
+    'shows $statusIndicatorType only in the body when stored messages render no content',
+    indicator => {
+      const transcriptItemCount = 0;
+      expect(
+        resolveSessionTranscriptView({
+          transcriptItemCount,
+          hasStatusIndicator: true,
+          hasOlderMessages: false,
+          olderMessagesError: null,
+        })
+      ).toBe('status');
+      expect(
+        resolveSessionFooterRowItem({
+          ...base,
+          ...indicator,
+          transcriptItemCount,
+          cloudStatusType: 'preparing',
+          hasInProgressTranscriptPreparation: true,
+          hasStatusIndicator: true,
+        })
+      ).toBeNull();
+    }
+  );
 
   it('keeps the send reason on an empty transcript, where it is the reader only line', () => {
     // The failed load on an empty transcript is behind the full-screen Retry.
@@ -167,7 +236,7 @@ describe('resolveSessionFooterRowItem', () => {
     expect(
       resolveSessionFooterRowItem({
         ...base,
-        messageCount: 0,
+        transcriptItemCount: 0,
         hasStatusIndicator: true,
         hasSendReason: true,
       })

@@ -24,6 +24,7 @@ export type ConnectionConfig = {
   onReconnected?: (() => void) | undefined;
   onError?: ((error: StreamError) => void) | undefined;
   onRefreshTicket?: (() => Promise<CloudAgentStreamTicketResult>) | undefined;
+  onReconnectExhaustionChange?: ((exhausted: boolean) => void) | undefined;
   heartbeatTimeoutMs?: number | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
@@ -108,6 +109,7 @@ export function createConnection(config: ConnectionConfig): Connection {
     onDisconnected: config.onDisconnected,
     onUnexpectedDisconnect: config.onUnexpectedDisconnect,
     onReconnected: config.onReconnected,
+    onReconnectExhaustionChange: config.onReconnectExhaustionChange,
     onError: config.onError
       ? message =>
           config.onError?.({

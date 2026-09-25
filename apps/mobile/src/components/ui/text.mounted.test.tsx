@@ -27,9 +27,8 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 /** The one live renderer's root: any previous tree is unmounted before it is replaced. */
 function renderRoot(element: ReactElement): TestRenderer.ReactTestInstance {
-  act(() => renderer?.unmount());
-  renderer = undefined;
   act(() => {
+    renderer?.unmount();
     renderer = TestRenderer.create(element);
   });
   if (!renderer) {
@@ -258,7 +257,7 @@ describe('Text mono variant in an RTL interface', () => {
   it('drops the mono family for an Arabic mono variant in RTL', () => {
     i18nManager.isRTL = true;
     const classes = hostClasses(
-      mount(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
+      renderRoot(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
     );
 
     expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
@@ -266,7 +265,9 @@ describe('Text mono variant in an RTL interface', () => {
 
   it('keeps the mono family for a session id in RTL', () => {
     i18nManager.isRTL = true;
-    const classes = hostClasses(mount(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b')));
+    const classes = hostClasses(
+      renderRoot(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b'))
+    );
 
     expect(classes).toContain('font-mono-medium');
   });

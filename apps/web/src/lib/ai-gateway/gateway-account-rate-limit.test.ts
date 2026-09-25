@@ -111,15 +111,20 @@ describe('isGatewayAccountRateLimited', () => {
     );
   });
 
-  it('rejects a request without the host needed by the firewall SDK', async () => {
+  it('uses the request URL when no host header is present', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     const requestWithoutHost = new NextRequest(
       'https://gateway.example.com/api/gateway/chat/completions'
     );
 
-    await expect(isGatewayAccountRateLimited(requestWithoutHost, 'user-123')).rejects.toThrow(
-      'without a host header'
+    await isGatewayAccountRateLimited(requestWithoutHost, 'user-123');
+
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(
+      'gateway-inference',
+      expect.objectContaining({
+        headers: expect.objectContaining({ host: 'gateway.example.com' }),
+      })
     );
-    expect(mockCheckRateLimit).not.toHaveBeenCalled();
   });
 
   it('reports the verdict', async () => {

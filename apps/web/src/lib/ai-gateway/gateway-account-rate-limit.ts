@@ -69,7 +69,7 @@ export async function isGatewayAccountRateLimited(
   request: NextRequest,
   accountKey: string
 ): Promise<boolean> {
-  const host = request.headers.get('host');
+  const host = request.headers.get('host') ?? new URL(request.url).host;
   if (!host) {
     throw new Error('Cannot check the gateway rate limit without a host header');
   }

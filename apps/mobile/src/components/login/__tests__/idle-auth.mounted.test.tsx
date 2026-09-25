@@ -513,6 +513,35 @@ describe('IdleAuth SSO recovery', () => {
 
     expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
   });
+
+  it('moves the SSO busy spinner inside its primary Button', async () => {
+    const deferred: { resolve: () => void } = { resolve: () => undefined };
+    const pending = new Promise<void>(resolve => {
+      deferred.resolve = resolve;
+    });
+    const start = vi.fn<StartFn>(async () => {
+      await pending;
+    });
+    const renderer = await mountIdleAuth(start);
+
+    const idle = findButton(renderer.root, 'Continue with SSO');
+    expect(idle.props.loading).not.toBe(true);
+
+    act(() => {
+      (idle.props.onPress as () => void)();
+    });
+
+    const busy = findButton(renderer.root, 'Continue with SSO');
+    expect(busy.props.loading).toBe(true);
+    expect(busy.props.disabled).toBe(true);
+    // The busy spinner belongs to Button; the screen adds none of its own.
+    expect(busy.findAllByType('ActivityIndicator')).toHaveLength(0);
+
+    await act(async () => {
+      deferred.resolve();
+      await pending;
+    });
+  });
 });
 
 describe('IdleAuth passkey control', () => {
@@ -898,12 +927,19 @@ describe('IdleAuth email validation layout', () => {
     expect(remounted.props.defaultValue).toBe('user@example.com');
   });
 
-  it('keeps one indicator and a disabled Continue while loading, with no reserved hole', async () => {
+  it('keeps one indicator inside Continue and no reserved hole while loading', async () => {
     nativeAuth.busy = 'otp-send';
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    // The loading state adds no reserved error slot under the field (the
+    // base branch removed the zero-opacity reserve).
     expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
-    expect(findButton(renderer.root, 'Continue with email').props.disabled).toBe(true);
-    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+    const continueButton = findButton(renderer.root, 'Continue with email');
+    expect(continueButton.props.disabled).toBe(true);
+    // Button owns the one busy spinner: the screen passes the busy flag and
+    // renders no child indicator of its own, so nothing stacks.
+    expect(continueButton.props.loading).toBe(true);
+    expect(continueButton.findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
   });
 
   it('uses the keyboard submit action for an empty field too', async () => {

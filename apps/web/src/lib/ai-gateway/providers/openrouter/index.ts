@@ -22,6 +22,7 @@ import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-set
 import { AUTO_MODELS, type AutoModel } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
@@ -114,7 +115,10 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
+  const [endpointsMetadata, dataCollectionRequiredModelIds] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getDataCollectionRequiredModelIds(),
+  ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
@@ -168,7 +172,8 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: model.isFree ?? isFree,
-          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
+          mayTrainOnYourPrompts:
+            model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
           opencode:
             model.opencode ??
             (await getGatewayOpenCodeSettings(

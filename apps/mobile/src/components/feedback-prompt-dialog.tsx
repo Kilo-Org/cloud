@@ -8,6 +8,11 @@ import { requestAppRating, sendAppFeedback } from '@/lib/feedback';
 type FeedbackPromptDialogProps = {
   userId: string | undefined;
   onDismiss: () => void;
+  /**
+   * Called once the `Modal` reports it is shown (its `onShow`). The host uses
+   * it to answer a pending request: only a shown dialog counts as presented.
+   */
+  onShown?: () => void;
 };
 
 /**
@@ -20,10 +25,14 @@ type FeedbackPromptDialogProps = {
  * Mount it only while it should be open (e.g. `{open && <FeedbackPromptDialog ... />}`),
  * the same lifecycle `DestructiveConfirmDialog` uses.
  */
-export function FeedbackPromptDialog({ userId, onDismiss }: Readonly<FeedbackPromptDialogProps>) {
+export function FeedbackPromptDialog({
+  userId,
+  onDismiss,
+  onShown,
+}: Readonly<FeedbackPromptDialogProps>) {
   const { t } = useTranslation();
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
+    <Modal visible transparent animationType="fade" onRequestClose={onDismiss} onShow={onShown}>
       <Pressable accessible={false} className="flex-1 justify-center px-6" onPress={onDismiss}>
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable

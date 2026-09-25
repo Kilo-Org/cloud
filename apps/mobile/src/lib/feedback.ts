@@ -111,10 +111,11 @@ export function showFeedbackPrompt(userId: string | undefined): boolean {
 // `present` is where the prompt appears — the native alert by default, or the
 // caller's in-app surface on Android (`feedback-prompt-platform.ts`). It is
 // invoked inside the claim, so only the call that wins the marker presents, and
-// it reports whether it actually presented. A caller whose surface unmounted
-// before this deferred claim runs reports `false`, the marker then stays unset,
-// and the next successful outcome asks again instead of losing the one-time
-// prompt silently.
+// it reports whether it actually presented. The answer may be deferred: the
+// in-app dialog reports `true` only once its `Modal` confirms it is shown, and
+// reports `false` when its host unmounts first. A `false` leaves the marker
+// unset, and the next successful outcome asks again instead of losing the
+// one-time prompt silently.
 //
 // Best effort: the caller fires this without awaiting, so a stored-marker
 // failure (reported at warning level by the metadata helper) must not surface
@@ -122,7 +123,7 @@ export function showFeedbackPrompt(userId: string | undefined): boolean {
 // asks again.
 export async function maybeAskAfterSuccessfulOutcome(
   userId: string | undefined,
-  present: (userId: string | undefined) => boolean = showFeedbackPrompt
+  present: (userId: string | undefined) => boolean | Promise<boolean> = showFeedbackPrompt
 ): Promise<void> {
   try {
     await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
@@ -130,7 +131,7 @@ export async function maybeAskAfterSuccessfulOutcome(
       if (alreadyAsked != null) {
         return;
       }
-      if (!present(userId)) {
+      if (!(await present(userId))) {
         return;
       }
       await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());

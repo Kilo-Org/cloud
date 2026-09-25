@@ -274,6 +274,35 @@ describe('feedback store-review write', () => {
     expect(alertMock.alert).not.toHaveBeenCalled();
   });
 
+  // The Android surface reports only once its dialog is shown, so the claim has
+  // to wait for that answer: writing the marker first would record a one-time
+  // prompt the user never saw.
+  it('waits for a deferred surface answer before it writes the marker', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    // Placeholder first, so no reader sees an uninitialized callback; the
+    // promise executor replaces it before this test can settle it.
+    const answer: { resolve: (presented: boolean) => void } = { resolve: () => undefined };
+    const present = vi.fn<(userId: string | undefined) => Promise<boolean>>(
+      () =>
+        new Promise<boolean>(resolve => {
+          answer.resolve = resolve;
+        })
+    );
+
+    const ask = maybeAskAfterSuccessfulOutcome('user-1', present);
+    await flushMicrotasks();
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+
+    answer.resolve(true);
+    await ask;
+
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'feedback-last-asked-at',
+      expect.any(String)
+    );
+  });
+
   it('does not present through the caller-supplied surface when the marker is set', async () => {
     const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
     secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');

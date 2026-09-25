@@ -56,6 +56,8 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+/** The answer of the last request the harness made. */
+let lastRequest: boolean | Promise<boolean> | undefined = undefined;
 
 function Harness({ userId }: Readonly<{ userId: string | undefined }>) {
   const { requestPrompt, promptDialog } = useFeedbackPrompt();
@@ -65,7 +67,7 @@ function Harness({ userId }: Readonly<{ userId: string | undefined }>) {
     createElement(Pressable, {
       className: 'request-prompt',
       onPress: () => {
-        requestPrompt(userId);
+        lastRequest = requestPrompt(userId);
       },
     }),
     promptDialog
@@ -117,6 +119,7 @@ function answer(root: TestRenderer.ReactTestInstance, token: string) {
 
 beforeEach(() => {
   platform.inApp = true;
+  lastRequest = undefined;
   feedback.showFeedbackPrompt.mockReset();
   feedback.requestAppRating.mockReset();
   feedback.sendAppFeedback.mockReset();
@@ -174,6 +177,55 @@ describe('useFeedbackPrompt', () => {
     expect(modals(root)).toHaveLength(0);
   });
 
+  // The queued dialog is not a presented dialog: the claim must not record the
+  // one-time prompt before the `Modal` confirms it is shown.
+  it('reports presented only after the dialog confirms it is shown', async () => {
+    const root = mount();
+
+    press(requestButton(root));
+    let presented: boolean | undefined = undefined;
+    void Promise.resolve(lastRequest).then(value => {
+      presented = value;
+    });
+    await act(async () => {});
+    expect(presented).toBeUndefined();
+
+    const modal = modals(root)[0];
+    const onShow = modal?.props.onShow as (() => void) | undefined;
+    act(() => {
+      onShow?.();
+    });
+
+    await vi.waitFor(() => {
+      expect(presented).toBe(true);
+    });
+  });
+
+  // The other half of the same race: a host that unmounts while the dialog is
+  // queued never shows it, so the request must report that instead of promising
+  // a presentation the caller then records as asked.
+  it('reports that it did not present when the host unmounts before the dialog is shown', async () => {
+    const root = mount();
+
+    press(requestButton(root));
+    expect(modals(root)).toHaveLength(1);
+
+    let presented: boolean | undefined = undefined;
+    void Promise.resolve(lastRequest).then(value => {
+      presented = value;
+    });
+
+    act(() => {
+      renderer?.unmount();
+    });
+    renderer = undefined;
+
+    await vi.waitFor(() => {
+      expect(presented).toBe(false);
+    });
+    expect(feedback.showFeedbackPrompt).not.toHaveBeenCalled();
+  });
+
   it('closes the in-app dialog without recording when Not now is pressed', () => {
     const root = mount();
 
@@ -189,7 +241,8 @@ describe('useFeedbackPrompt', () => {
 // The review-submit sheet's lifecycle, reproduced directly: the requesting
 // surface captures the requester, unmounts (the formSheet's `router.back`
 // dismissal), and only then does the deferred one-time claim fire the request.
-let capturedRequest: ((userId: string | undefined) => boolean) | undefined = undefined;
+let capturedRequest: ((userId: string | undefined) => boolean | Promise<boolean>) | undefined =
+  undefined;
 let unmountRequester: (() => void) | undefined = undefined;
 
 function Requester({ userId }: Readonly<{ userId: string | undefined }>) {
@@ -198,7 +251,7 @@ function Requester({ userId }: Readonly<{ userId: string | undefined }>) {
   return createElement(Pressable, {
     className: 'requester',
     onPress: () => {
-      requestPrompt(userId);
+      void requestPrompt(userId);
     },
   });
 }
@@ -250,7 +303,7 @@ describe('FeedbackPromptProvider', () => {
     expect(root.findAll(node => isType(node, 'Pressable'))).toHaveLength(0);
 
     act(() => {
-      capturedRequest?.('user-1');
+      void capturedRequest?.('user-1');
     });
 
     expect(modals(root)).toHaveLength(1);
@@ -284,7 +337,7 @@ describe('FeedbackPromptProvider', () => {
     });
     renderer = undefined;
 
-    let presented: boolean | undefined = undefined;
+    let presented: boolean | Promise<boolean> | undefined = undefined;
     act(() => {
       presented = capturedRequest?.('user-1');
     });

@@ -18,39 +18,54 @@ import { needsInAppFeedbackPrompt } from '@/lib/feedback-prompt-platform';
  * caller renders `promptDialog` in its own tree and calls `requestPrompt`
  * where the prompt is triggered, passing the user id the claim carries.
  *
- * `requestPrompt` reports whether it presented. The in-app dialog is state in
- * this host, so a request that arrives after the host unmounted cannot render
- * — the deferred post-submit claim can outlive the layout that hosts it — and
- * it reports `false`, which leaves the one-time marker unset
- * (`maybeAskAfterSuccessfulOutcome`) so the next successful outcome asks
- * again. The native alert presents regardless of the tree, so it reports
- * `true`.
+ * `requestPrompt` reports whether it presented. The native alert presents
+ * regardless of the tree, so it reports `true` at once. The in-app dialog is
+ * state in this host, so its answer is deferred until the dialog's `Modal`
+ * confirms it is shown: a request that arrives after the host unmounted, or a
+ * host that unmounts while the dialog is still queued, reports `false`. Either
+ * `false` leaves the one-time marker unset (`maybeAskAfterSuccessfulOutcome`),
+ * so the next successful outcome asks again instead of losing the prompt.
  */
 export function useFeedbackPrompt() {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const isMountedRef = useRef(true);
+  // The queued in-app request's answer, held in a ref so the unmount cleanup
+  // can settle it. The claim serializes on its marker, so at most one request
+  // waits here; a later request replaces an unanswered one.
+  const settleRef = useRef<((presented: boolean) => void) | null>(null);
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      settleRef.current?.(false);
+      settleRef.current = null;
     };
   }, []);
-  const requestPrompt = useCallback((nextUserId: string | undefined) => {
-    if (!needsInAppFeedbackPrompt()) {
-      showFeedbackPrompt(nextUserId);
-      return true;
-    }
-    if (!isMountedRef.current) {
-      return false;
-    }
-    setUserId(nextUserId);
-    setIsOpen(true);
-    return true;
-  }, []);
+  const requestPrompt = useCallback(
+    (nextUserId: string | undefined): boolean | Promise<boolean> => {
+      if (!needsInAppFeedbackPrompt()) {
+        showFeedbackPrompt(nextUserId);
+        return true;
+      }
+      if (!isMountedRef.current) {
+        return false;
+      }
+      setUserId(nextUserId);
+      return new Promise<boolean>(resolve => {
+        settleRef.current = resolve;
+        setIsOpen(true);
+      });
+    },
+    []
+  );
   const promptDialog = isOpen ? (
     <FeedbackPromptDialog
       userId={userId}
+      onShown={() => {
+        settleRef.current?.(true);
+        settleRef.current = null;
+      }}
       onDismiss={() => {
         setIsOpen(false);
       }}
@@ -59,8 +74,12 @@ export function useFeedbackPrompt() {
   return { requestPrompt, promptDialog };
 }
 
-/** Reports whether the prompt presented; `false` leaves the one-time marker unset. */
-type FeedbackPromptRequester = (userId: string | undefined) => boolean;
+/**
+ * Reports whether the prompt presented; `false` leaves the one-time marker
+ * unset. The answer may be deferred when the prompt is the in-app dialog, which
+ * reports only once it is shown.
+ */
+type FeedbackPromptRequester = (userId: string | undefined) => boolean | Promise<boolean>;
 
 const FeedbackPromptRequestContext = createContext<FeedbackPromptRequester | undefined>(undefined);
 

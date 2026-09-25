@@ -371,7 +371,7 @@ export function ProfileScreen() {
             label={t('profile.feedback')}
             hue="fern"
             onPress={() => {
-              feedbackPrompt.requestPrompt(userId);
+              void feedbackPrompt.requestPrompt(userId);
             }}
           />
           <ActionTile

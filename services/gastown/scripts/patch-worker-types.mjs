@@ -89,8 +89,14 @@ export function patchWorkerTypes(src) {
   let patched = src;
 
   // 1. Replace untyped Service bindings with their RPC surfaces.
-  patched = patched.replaceAll(/GIT_TOKEN_SERVICE:\s*Service\b[^;]*/g, 'GIT_TOKEN_SERVICE: GitTokenService');
-  patched = patched.replaceAll(/WASTELAND_SERVICE:\s*Service\b[^;]*/g, 'WASTELAND_SERVICE: WastelandService');
+  patched = patched.replaceAll(
+    /GIT_TOKEN_SERVICE:\s*Service\b[^;]*/g,
+    'GIT_TOKEN_SERVICE: GitTokenService'
+  );
+  patched = patched.replaceAll(
+    /WASTELAND_SERVICE:\s*Service\b[^;]*/g,
+    'WASTELAND_SERVICE: WastelandService'
+  );
   patched = patched.replaceAll(
     /CONTAINER_USAGE:\s*Service\b[^;]*/g,
     'CONTAINER_USAGE: ContainerUsageService'

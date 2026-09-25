@@ -6082,6 +6082,37 @@ describe('createSessionManager', () => {
       expect(secondConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
       expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith('m-original');
     });
+
+    it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {
+      // A relaunch: the row a retry superseded is server history and comes back
+      // with the snapshot, so the transcript filter needs the durable record.
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-confirmed']),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures)
+      ).toEqual(new Set(['m-confirmed']));
+    });
+
+    it('projects an accepted retry on the resolvedDeliveryFailures atom', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mgr.clearFailedMessage('m-confirmed');
+
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures).has(
+          'm-confirmed'
+        )
+      ).toBe(true);
+    });
   });
 
   describe('cancelQueuedMessage', () => {

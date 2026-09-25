@@ -908,7 +908,33 @@ export function SessionDetailContent({
   // when it is server-confirmed (the SDK can only delete the client-materialised
   // ghost). The row's preparation attempts go with it, or the filtered row's
   // preparation would be re-emitted at the end of the transcript.
-  const [supersededMessageIds, setSupersededMessageIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  //
+  // This slot holds only the in-flight window, before the manager records the
+  // resolution: `resolvedDeliveryFailures` below carries the accepted ids,
+  // including the durable record seeded on open, so the hide survives a
+  // switch-back and a relaunch.
+  const [locallySupersededMessageIds, setLocallySupersededMessageIds] =
+    useState<ReadonlySet<string>>(EMPTY_IDS);
+  // The session the row that a retry is re-sending belongs to. The re-send is
+  // awaited, so the user can switch sessions while it is in flight; `sessionId`
+  // is then the switched-to session, and this local state must not take the
+  // previous session's id.
+  const supersededOwnerSessionIdRef = useRef(sessionId);
+  supersededOwnerSessionIdRef.current = sessionId;
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededMessageIds = useMemo(() => {
+    if (locallySupersededMessageIds.size === 0) {
+      return resolvedDeliveryFailures;
+    }
+    if (resolvedDeliveryFailures.size === 0) {
+      return locallySupersededMessageIds;
+    }
+    const merged = new Set(locallySupersededMessageIds);
+    for (const id of resolvedDeliveryFailures) {
+      merged.add(id);
+    }
+    return merged;
+  }, [locallySupersededMessageIds, resolvedDeliveryFailures]);
   const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
   const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
     null
@@ -1116,7 +1142,7 @@ export function SessionDetailContent({
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
     setDroppedQueuedIds(EMPTY_IDS);
-    setSupersededMessageIds(EMPTY_IDS);
+    setLocallySupersededMessageIds(EMPTY_IDS);
     setCanceledQueuedMessages(EMPTY_CANCELED);
     setCancelQueuedStatus(null);
     setCancelQueuedSheetStatus(null);
@@ -1260,6 +1286,10 @@ export function SessionDetailContent({
       // outlive it: switching sessions while the re-send is in flight must not
       // record this resolution under the session the user switched to.
       const ownerSessionId = sessionId;
+      // This local slot is keyed to the session that owns the row. The re-send
+      // is awaited, so the user can switch sessions while it is in flight; a
+      // write under the switched-to session would put another transcript's id
+      // in its set.
       void retryFailedMessage({
         message,
         send: async () => {
@@ -1270,8 +1300,8 @@ export function SessionDetailContent({
             // settle would render the prompt twice for the whole round-trip.
             await handleSend(prompt, {
               onOptimisticSend: () => {
-                if (isUser) {
-                  setSupersededMessageIds(current => new Set(current).add(messageId));
+                if (isUser && supersededOwnerSessionIdRef.current === ownerSessionId) {
+                  setLocallySupersededMessageIds(current => new Set(current).add(messageId));
                 }
               },
             });
@@ -1279,8 +1309,8 @@ export function SessionDetailContent({
             // A rejected re-send restored nothing: bring the original failed row
             // and its Retry control back. `retryFailedMessage` swallows the
             // rejection, so its contract is unchanged.
-            if (isUser) {
-              setSupersededMessageIds(current => {
+            if (isUser && supersededOwnerSessionIdRef.current === ownerSessionId) {
+              setLocallySupersededMessageIds(current => {
                 const next = new Set(current);
                 next.delete(messageId);
                 return next;
@@ -1290,11 +1320,12 @@ export function SessionDetailContent({
           }
         },
         clearFailedMessage: clearedMessageId => {
+          // The manager records the resolution for the owning session and
+          // republishes it on `atoms.resolvedDeliveryFailures`, which already
+          // feeds the transcript filter. An accepted re-send therefore needs no
+          // local write, and the accepted id stays hidden across a switch-back
+          // and a relaunch.
           manager.clearFailedMessage(clearedMessageId, ownerSessionId);
-          // The re-send is accepted: drop the original row (and its
-          // preparation) from the transcript so a server-confirmed failed row
-          // stops duplicating alongside the retry's own row.
-          setSupersededMessageIds(current => new Set(current).add(clearedMessageId));
         },
       });
     },

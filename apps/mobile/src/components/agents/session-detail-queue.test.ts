@@ -605,6 +605,7 @@ function makeManager() {
       isLoadingOlderMessages: { value: false },
       olderMessagesError: { value: null },
       olderMessagesOmittedItemCount: { value: 0 },
+      resolvedDeliveryFailures: { value: new Set<string>() },
     },
     switchSession: vi.fn(),
     send: vi.fn(),

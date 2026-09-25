@@ -189,6 +189,12 @@ const RETAINED_MESSAGE_WINDOW = 200;
 const EMPTY_PARTS: Part[] = [];
 
 /**
+ * Shared empty sentinel for the read-only resolved-delivery projection, so a
+ * session with no recorded resolution does not allocate a Set per derivation.
+ */
+const EMPTY_RESOLVED_DELIVERY_FAILURES: ReadonlySet<string> = new Set();
+
+/**
  * Flatten a `ModelSelection` into the Decision 5 create_session model object.
  * `variant` is nested only when present (no second top-level field).
  */
@@ -484,6 +490,12 @@ type SessionManagerAtoms = {
    * (pre-clear messages may reappear — accepted tradeoff).
    */
   transcriptCleared: W<boolean>;
+  /**
+   * Ids whose delivery failure the user resolved by retrying, for the active
+   * session. Seeded from the durable resolved-delivery record on open, so a
+   * superseded row stays hidden across a switch-back and a relaunch.
+   */
+  resolvedDeliveryFailures: Atom<ReadonlySet<string>>;
 };
 
 type SessionManager = {
@@ -931,6 +943,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
+
+  // Bumped whenever a resolved delivery failure is recorded or seeded, so the
+  // read-only projection below re-derives without a storage change.
+  const resolvedDeliveryFailuresRevisionAtom = atom(0);
+  /**
+   * Ids whose delivery failure the user resolved by retrying, for the active
+   * session. A superseded row must stay hidden after the screen that hosted
+   * the retry unmounts: only a client-materialised ghost is deleted from
+   * storage, so a server-confirmed failed row is still history and would
+   * render again beside the retry's own row. The durable record seeded on open
+   * is the cross-launch source, and this projection is how the transcript
+   * filter reaches it.
+   */
+  const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get => {
+    get(resolvedDeliveryFailuresRevisionAtom);
+    // Re-derive with the new session's record on a switch.
+    get(sessionStorageAtom);
+    if (activeSessionId === null) {
+      return EMPTY_RESOLVED_DELIVERY_FAILURES;
+    }
+    return (
+      resolvedDeliveryFailuresBySession.get(activeSessionId) ?? EMPTY_RESOLVED_DELIVERY_FAILURES
+    );
+  });
 
   // Memoized per-row StoredMessage objects. Reused while both `info` and the
   // parts array keep the same reference, so unchanged rows keep object identity
@@ -1933,6 +1969,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           for (const id of ids) {
             resolvedFailures.add(id);
           }
+          if (ids.length > 0) {
+            store.set(resolvedDeliveryFailuresRevisionAtom, revision => revision + 1);
+          }
           for (const id of ids) {
             // `clearFailedMessage` reports when the pruned entry was also the
             // failure that set the terminal error and has undone it. That
@@ -2791,6 +2830,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // keeps the clear across a relaunch.
     resolvedFailuresForSession(owner).add(messageId);
     config.persistResolvedDeliveryFailure?.(owner, messageId);
+    store.set(resolvedDeliveryFailuresRevisionAtom, revision => revision + 1);
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -2971,6 +3011,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       olderMessagesError: olderMessagesErrorAtom,
       olderMessagesOmittedItemCount: olderMessagesOmittedItemCountAtom,
       transcriptCleared: transcriptClearedAtom,
+      resolvedDeliveryFailures: resolvedDeliveryFailuresAtom,
     },
   };
 }

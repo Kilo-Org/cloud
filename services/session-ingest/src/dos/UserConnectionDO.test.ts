@@ -4372,9 +4372,7 @@ describe('UserConnectionDO', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
-      sendHeartbeat(doInstance, cliWs, [
-        { id: 's1', status: 'brand-new-status', title: 'Future' },
-      ]);
+      sendHeartbeat(doInstance, cliWs, [{ id: 's1', status: 'brand-new-status', title: 'Future' }]);
 
       expect(doInstance.getActiveSessions()).toEqual([
         { id: 's1', status: 'brand-new-status', title: 'Future', connectionId: 'cli-1' },

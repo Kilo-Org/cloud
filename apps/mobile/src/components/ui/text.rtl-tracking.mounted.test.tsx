@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
-import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import {
+  NATURAL_LETTER_SPACING,
+  RTL_NO_LETTER_SPACING,
+  RTL_WRITING_DIRECTION,
+} from '@/lib/rtl-text';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({
@@ -112,6 +116,24 @@ describe('Text tracked labels in RTL', () => {
 
     expect(hostStyle(root)).toContainEqual(callerStyle);
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
+
+  it('resets joined-script text in an LTR interface and keeps the tracking class', () => {
+    i18nManager.isRTL = false;
+    const root = mount(
+      createElement(Text, { className: 'tracking-[1.5px]' }, 'استكشف')
+    );
+
+    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    expect(hostStyle(root)).toContainEqual(NATURAL_LETTER_SPACING);
+  });
+
+  it('lets an explicit caller letter spacing override the joined-script reset', () => {
+    i18nManager.isRTL = false;
+    const callerStyle = { letterSpacing: 2 };
+    const root = mount(createElement(Text, { style: callerStyle }, 'استكشف'));
+
+    expect(hostStyle(root)).toEqual([NATURAL_LETTER_SPACING, callerStyle]);
   });
 
   it('does not touch a tracked label in an LTR interface', () => {

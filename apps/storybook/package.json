@@ -43,7 +43,6 @@
     "seedrandom": "3.0.5",
     "storybook": "10.4.6",
     "tailwindcss": "4.2.4",
-    "tailwindcss-animate": "1.0.7",
     "typescript": "catalog:",
     "webpack": "5.105.4"
   }

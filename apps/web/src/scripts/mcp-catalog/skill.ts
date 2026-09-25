@@ -362,7 +362,7 @@ function renderSkillFromCensus(census: Census, template: string): string {
         'Add it where the generated census belongs — the generator has nowhere to put the census without it.'
     );
   }
-  return template.replace(CENSUS_TOKEN, renderCensus(census));
+  return template.replace(CENSUS_TOKEN, () => renderCensus(census));
 }
 
 /**

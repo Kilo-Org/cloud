@@ -253,6 +253,11 @@ describe('mcp-catalog skill', () => {
         renderCensus(censusCatalog(rows))
       );
     });
+    it('preserves dollar replacement sequences in catalog summaries', () => {
+      const rows = [fixtureRow('alpha.a', 'query', "Use $& then $$5, then $' suffix.", ['alpha'])];
+      const census = renderCensus(censusCatalog(rows));
+      expect(renderSkill(catalogJson(rows), TEMPLATE)).toBe(`HEADER\n\n${census}\n`);
+    });
 
     it('changes the census when a path is added, because the catalog drives it', () => {
       const rows = [fixtureRow('alpha.a', 'query', 'Alpha.', ['alpha'])];

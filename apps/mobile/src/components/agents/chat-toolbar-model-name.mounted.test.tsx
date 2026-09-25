@@ -334,18 +334,21 @@ describe('ChatToolbar long model name', () => {
 });
 
 describe('ChatToolbar model chip while the model list loads', () => {
-  it('keeps the chip shell with the loading label instead of a blank pill', () => {
+  it('keeps the chip shell labelled while the model list loads instead of a blank pill', () => {
     const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', MODEL_OPTIONS, {
       isLoadingModels: true,
     });
+    // The chip must read as the control it is: its own label, not an empty pill.
     const loadingLabel = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Text' &&
-        node.props.children === i18n.t('common.loading')
+        node.props.children === i18n.t('common.model')
     );
     expect(loadingLabel).toHaveLength(1);
     expect(loadingLabel[0]?.props.numberOfLines).toBe(1);
+
+    // The loading chip is not the skeleton placeholder: it renders its own shell.
     expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
   });
 });

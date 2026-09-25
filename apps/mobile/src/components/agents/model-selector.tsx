@@ -135,11 +135,11 @@ export function ModelSelector({
         accessible
         accessibilityRole="button"
         accessibilityState={{ busy: true, disabled: true }}
-        accessibilityLabel={t('common.loading')}
+        accessibilityLabel={t('common.model')}
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
       >
         <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
-          {t('common.loading')}
+          {t('common.model')}
         </Text>
         <ChevronDown size={14} color={colors.mutedForeground} />
       </View>

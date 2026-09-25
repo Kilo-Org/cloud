@@ -562,16 +562,16 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   it('does not spawn when the refreshed instance reports attachments false', async () => {
     const onSpawnAdmitted = vi.fn();
     const onSpawnFailed = vi.fn();
+    // The refreshed list holds the same host on a new connectionId, this time
+    // reporting an explicit refusal of the file payload.
+    const liveInstances = [
+      { ...INSTANCE, connectionId: 'conn-live', capabilities: { attachments: false } },
+    ];
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       getSubmitPayload: () => filesPayload,
-      refetchInstances: async () => ({
-        data: {
-          instances: [
-            { ...INSTANCE, connectionId: 'conn-live', capabilities: { attachments: false } },
-          ],
-        },
-      }),
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: liveInstances } }),
       onSpawnAdmitted: () => {
         onSpawnAdmitted();
       },
@@ -595,16 +595,16 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   it('does not spawn when the refreshed instance reports sessionClone false', async () => {
     const onCloneImportFailure = vi.fn();
     const onSpawnFailed = vi.fn();
+    // The refreshed list holds the same host on a new connectionId, this time
+    // reporting an explicit refusal of the clone source.
+    const liveInstances = [
+      { ...INSTANCE, connectionId: 'conn-live', capabilities: { sessionClone: false } },
+    ];
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       cloneFromKiloSessionId: 'ses_source',
-      refetchInstances: async () => ({
-        data: {
-          instances: [
-            { ...INSTANCE, connectionId: 'conn-live', capabilities: { sessionClone: false } },
-          ],
-        },
-      }),
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: liveInstances } }),
       onCloneImportFailure: key => {
         onCloneImportFailure(key);
       },

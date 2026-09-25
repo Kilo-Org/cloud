@@ -960,7 +960,17 @@ function RootLayoutNav({
   // would show through the opaque surface above it.
   const obscureTree = wrapperObscured || showRestoreError;
 
-  if (hasUserBootstrapError) {
+  // Sign-out from either error screen below outranks the error: the failure
+  // belongs to the account being revoked, and its Sign out starts the teardown
+  // behind the screen, so the branch would leave the stale error (and the
+  // account copy on it) over the app for the whole revoke (explorer
+  // signout-loading). While `signingOutWindow` owns the screen, the shared
+  // render below paints its wait surface; the error flags below both require
+  // the token, so clearing the token cannot bring the screen back, and the
+  // fall-through also keeps Slot mounted for the login replace.
+  const bootstrapErrorOwnsScreen = !signingOutWindow;
+
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
@@ -977,7 +987,7 @@ function RootLayoutNav({
     );
   }
 
-  if (hasConsentBootstrapError) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}

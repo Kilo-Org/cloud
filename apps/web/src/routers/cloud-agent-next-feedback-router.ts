@@ -22,7 +22,9 @@ const ListCloudAgentFeedbackInputSchema = z.object({
  */
 function toIsoTimestamp(value: string | null | undefined): string | null {
   if (!value) return null;
-  const iso = value.includes('T') ? value : value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
+  const iso = value.includes('T')
+    ? value
+    : value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
   const time = new Date(iso).getTime();
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }

@@ -87,6 +87,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.auto_expand_history).toBeDefined();
     expect(props.auto_collapse_reasoning).toBeDefined();
     expect(props.reasoning_display).toBeDefined();
+    expect(props.shared_agent_board).toBeDefined();
     expect(props.terminal_command_display).toBeDefined();
     expect(props.code_edit_display).toBeDefined();
     expect(props.hide_prompt_training_models).toBeDefined();
@@ -115,6 +116,10 @@ describe('kilo config.json schema merge', () => {
 
   test('auto_collapse_reasoning is a boolean', () => {
     expect(props.auto_collapse_reasoning).toEqual(expect.objectContaining({ type: 'boolean' }));
+  });
+
+  test('shared_agent_board is a boolean', () => {
+    expect(props.shared_agent_board).toEqual(expect.objectContaining({ type: 'boolean' }));
   });
 
   test('terminal_command_display is an enum of expanded/collapsed', () => {

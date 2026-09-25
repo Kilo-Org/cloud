@@ -944,8 +944,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
 
-  // Bumped whenever a resolved delivery failure is recorded or seeded, so the
-  // read-only projection below re-derives without a storage change.
+  // Bumped whenever the active session or its resolved-delivery record changes,
+  // so the read-only projection below re-derives on a switch, on a recorded
+  // retry, and on the durable seed. A storage read cannot serve as the trigger:
+  // a cached re-open preserves the storage object, and `destroy` nulls it
+  // before clearing the active session id.
   const resolvedDeliveryFailuresRevisionAtom = atom(0);
   /**
    * Ids whose delivery failure the user resolved by retrying, for the active
@@ -958,8 +961,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get => {
     get(resolvedDeliveryFailuresRevisionAtom);
-    // Re-derive with the new session's record on a switch.
-    get(sessionStorageAtom);
     if (activeSessionId === null) {
       return EMPTY_RESOLVED_DELIVERY_FAILURES;
     }
@@ -1947,6 +1948,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const expectedGeneration = switchGeneration;
     activeSessionId = kiloSessionId;
     activeSessionType = null;
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -1970,7 +1975,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             resolvedFailures.add(id);
           }
           if (ids.length > 0) {
-            store.set(resolvedDeliveryFailuresRevisionAtom, revision => revision + 1);
+            store.set(
+              resolvedDeliveryFailuresRevisionAtom,
+              store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+            );
           }
           for (const id of ids) {
             // `clearFailedMessage` reports when the pruned entry was also the
@@ -2830,7 +2838,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // keeps the clear across a relaunch.
     resolvedFailuresForSession(owner).add(messageId);
     config.persistResolvedDeliveryFailure?.(owner, messageId);
-    store.set(resolvedDeliveryFailuresRevisionAtom, revision => revision + 1);
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -2926,6 +2937,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     resolvedDeliveryFailuresBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
   }
 
   return {

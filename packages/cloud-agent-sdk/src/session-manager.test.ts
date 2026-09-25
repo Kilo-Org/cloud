@@ -6113,6 +6113,29 @@ describe('createSessionManager', () => {
         )
       ).toBe(true);
     });
+
+    it('projects per session and drops the previous session on a switch', async () => {
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockImplementation(async id => {
+          return id === kiloId('ses-1') ? ['m-one'] : ['m-two'];
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures)
+      ).toEqual(new Set(['m-one']));
+
+      // The projection follows the active session: another transcript's
+      // superseded id must never hide a row in the switched-to one.
+      await mgr.switchSession(kiloId('ses-2'));
+      await Promise.resolve();
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures)
+      ).toEqual(new Set(['m-two']));
+    });
   });
 
   describe('cancelQueuedMessage', () => {

@@ -23,6 +23,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
+import { CODE_REVIEW_CONTROL_PLANE_ORG_ID } from '../session-plane.js';
 import {
   resolveSharedSandboxAssignment,
   SHARED_SANDBOX_FAILOVER_SUFFIX,
@@ -1784,7 +1785,6 @@ describe('createSessionWithLedger admission ladder', () => {
     ['missing platform', undefined, undefined],
     ['automation origin', 'browser', 'scheduled'],
     ['integration origin', 'browser', 'slack'],
-    ['code-review origin', undefined, 'code-review'],
   ] as const)(
     'keeps enrolled %s creates on agent_ sessions',
     async (_label, clientProvenance, createdOnPlatform) => {
@@ -1808,6 +1808,99 @@ describe('createSessionWithLedger admission ladder', () => {
       );
     }
   );
+
+  it('creates code-review origin sessions on the control plane for the gated org without worktrees', async () => {
+    const doStub = makeDoStub();
+    const ctx = modernContext(makeContext(doStub), CODE_REVIEW_CONTROL_PLANE_ORG_ID);
+    ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: CODE_REVIEW_CONTROL_PLANE_ORG_ID }),
+    });
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        finalization: { autoCommit: true },
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'code-review',
+          kilocodeOrganizationId: CODE_REVIEW_CONTROL_PLANE_ORG_ID,
+        },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({
+          sessionId: WORKSPACE_SESSION_ID,
+          createdOnPlatform: 'code-review',
+        }),
+        finalization: { autoCommit: true },
+        workspace: expect.not.objectContaining({
+          worktreeId: expect.anything(),
+          workspacePath: expect.anything(),
+        }),
+      })
+    );
+  });
+
+  it('keeps gated-org code-review sessions on agent_ without a policy-bearing token', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: CODE_REVIEW_CONTROL_PLANE_ORG_ID }),
+    });
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'code-review',
+          kilocodeOrganizationId: CODE_REVIEW_CONTROL_PLANE_ORG_ID,
+        },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+      })
+    );
+  });
+
+  it('keeps code-review origin sessions on agent_ for other orgs', async () => {
+    const doStub = makeDoStub();
+    const ctx = modernContext(makeContext(doStub), '11111111-1111-4111-8111-111111111111');
+    ctx.env.CONTROL_PLANE_IDS = '*';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: '11111111-1111-4111-8111-111111111111' }),
+    });
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'code-review',
+          kilocodeOrganizationId: '11111111-1111-4111-8111-111111111111',
+        },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+      })
+    );
+  });
 
   it.each([
     ['missing provenance', undefined, 'cloud-agent-web'],

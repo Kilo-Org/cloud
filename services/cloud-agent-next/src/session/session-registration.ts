@@ -97,6 +97,15 @@ type SharedSandboxRouteMetadata = NonNullable<
   NonNullable<SessionMetadata['workspace']>['sandboxRoute']
 >;
 
+function isPolicyBearingToken(token: string): boolean {
+  const claims = jwt.decode(token);
+  return (
+    claims !== null &&
+    typeof claims === 'object' &&
+    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims)
+  );
+}
+
 /**
  * The plane a new session will be created on. Vercel and DO-managed Cloudflare
  * containers exist only on the control plane, so those allocations force it;
@@ -116,7 +125,8 @@ function sessionPlaneForCreate(
           userId: ctx.userId,
           orgId: input.options?.kilocodeOrganizationId,
         },
-        { createdOnPlatform: input.options?.createdOnPlatform }
+        { createdOnPlatform: input.options?.createdOnPlatform },
+        { hasPolicyBearingToken: isPolicyBearingToken(ctx.authToken) }
       );
 }
 
@@ -564,11 +574,7 @@ async function issueSessionRuntimeAuthorization(
   // authMiddleware has verified this bearer (including legacy tokens) against
   // its audience and current pepper. Decode only selects the compatibility path;
   // createRuntimeAuthorization re-verifies modern claims and runtime admission.
-  const claims = jwt.decode(ctx.authToken);
-  const isPolicyBearing =
-    claims !== null &&
-    typeof claims === 'object' &&
-    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
+  const isPolicyBearing = isPolicyBearingToken(ctx.authToken);
   if (isPolicyBearing) {
     if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;

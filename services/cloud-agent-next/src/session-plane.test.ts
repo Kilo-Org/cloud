@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CODE_REVIEW_CONTROL_PLANE_ORG_ID,
   generateSessionId,
+  isCodeReviewControlPlaneOwner,
   isControlPlaneOwner,
   isInteractiveWebSession,
   isWorktreeOwner,
@@ -54,7 +56,59 @@ describe('session plane identity', () => {
     expect(isControlPlaneOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-2' })).toBe(false);
   });
 
-  it.each([undefined, '', 'cloud-agent', 'slack', 'scheduled', 'code-review', 'webhook'] as const)(
+  it('mints workspace_ for Code Reviewer only for the gated org with a policy-bearing token', () => {
+    const codeReview = { createdOnPlatform: 'code-review' };
+    const policyBearing = { hasPolicyBearingToken: true };
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
+        codeReview,
+        policyBearing
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CONTROL_PLANE_IDS: '*' },
+        { userId: 'user-1', orgId: 'org-1' },
+        codeReview,
+        policyBearing
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        { CONTROL_PLANE_IDS: '*' },
+        { userId: 'user-1' },
+        codeReview,
+        policyBearing
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: CODE_REVIEW_CONTROL_PLANE_ORG_ID, orgId: 'org-1' },
+        codeReview,
+        policyBearing
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
+        codeReview,
+        { hasPolicyBearingToken: false }
+      )
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner(
+        {},
+        { userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID },
+        codeReview
+      )
+    ).toBe('legacy');
+  });
+
+  it.each([undefined, '', 'cloud-agent', 'slack', 'scheduled', 'webhook'] as const)(
     'keeps enrolled owners on agent_ for non-interactive origin %s',
     createdOnPlatform => {
       expect(
@@ -67,11 +121,21 @@ describe('session plane identity', () => {
     }
   );
 
-  it('treats only cloud-agent-web as an interactive web session', () => {
+  it('admits only cloud-agent-web as an interactive web session', () => {
     expect(isInteractiveWebSession({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
+    expect(isInteractiveWebSession({ createdOnPlatform: 'code-review' })).toBe(false);
     expect(isInteractiveWebSession({ createdOnPlatform: 'slack' })).toBe(false);
     expect(isInteractiveWebSession({})).toBe(false);
     expect(isInteractiveWebSession()).toBe(false);
+  });
+
+  it('gates Code Reviewer control-plane ownership by org id only', () => {
+    expect(
+      isCodeReviewControlPlaneOwner({ userId: 'user-1', orgId: CODE_REVIEW_CONTROL_PLANE_ORG_ID })
+    ).toBe(true);
+    expect(isCodeReviewControlPlaneOwner({ userId: 'user-1', orgId: 'org-1' })).toBe(false);
+    expect(isCodeReviewControlPlaneOwner({ userId: 'user-1' })).toBe(false);
+    expect(isCodeReviewControlPlaneOwner({ userId: CODE_REVIEW_CONTROL_PLANE_ORG_ID })).toBe(false);
   });
 
   it.each([

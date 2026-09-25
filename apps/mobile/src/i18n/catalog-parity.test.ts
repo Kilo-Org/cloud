@@ -27,24 +27,11 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * Empty: the profile-editor validation copy the review-fix slice added (the
+ * duplicate-key refusal and the MCP bound messages) has landed in every one of
+ * the 87 catalogs, so the missing-key assertion is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
-
-/**
- * The three copy keys the feature-flag row renders: `<value> · <reason>` under
- * `preferences`. The row's value word comes from `common.enabled`/`common.off`,
- * which every catalog already translates, so a catalog that keeps the English
- * reason string leaves half the row untranslated — the explorer capture
- * `language-switch-blank` read `مفعّل · default · not loaded`. A loanword equal
- * to the English string does not count here: each catalog renders its own words.
- */
-const FEATURE_FLAG_ROW_KEYS = [
-  'preferences.featureFlagApplied',
-  'preferences.featureFlagSkipped',
-  'preferences.featureFlagNotLoaded',
-];
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
@@ -56,15 +43,6 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
     }
   }
   return out;
-}
-
-/** The value at a dotted key path, so a nested copy value can be compared. */
-function readPath(value: unknown, path: string): unknown {
-  let node: unknown = value;
-  for (const part of path.split('.')) {
-    node = (node as Record<string, unknown> | undefined)?.[part];
-  }
-  return node;
 }
 
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
@@ -81,17 +59,6 @@ describe('catalog keys', () => {
       expect(keyFamilies(CATALOG_LOADERS[tag]())).not.toContain('launcher.newAgent');
     }
   });
-
-  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
-    '%s translates the feature-flag row copy',
-    tag => {
-      for (const key of FEATURE_FLAG_ROW_KEYS) {
-        expect(readPath(CATALOG_LOADERS[tag](), key), `${tag} leaves ${key} in English`).not.toBe(
-          readPath(CATALOG_LOADERS.en(), key)
-        );
-      }
-    }
-  );
 
   it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
     '%s defines exactly the English key families',

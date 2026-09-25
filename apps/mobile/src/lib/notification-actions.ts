@@ -32,7 +32,7 @@ import * as Sentry from '@sentry/react-native';
 
 import { i18n } from '@/i18n';
 
-import { setPendingDeepLink } from './deep-link-launch';
+import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
   type NeedsInputAction,
   type NeedsInputActionOutcome,
@@ -258,7 +258,11 @@ async function dispatchNeedsInputResponse(
       }
       // An unparseable PR URL falls back to the session route: the user still
       // lands on the raise instead of nowhere.
-      setPendingDeepLink(prPathForData(data) ?? notificationPathForData(data), 'notification');
+      setPendingDeepLink(
+        prPathForData(data) ?? notificationPathForData(data),
+        'notification',
+        pendingDeepLinkOptionsForData(data)
+      );
       return true;
     }
     case NEEDS_INPUT_ACTION_IDS.openSession: {
@@ -266,7 +270,11 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
-      setPendingDeepLink(notificationPathForData(data), 'notification');
+      setPendingDeepLink(
+        notificationPathForData(data),
+        'notification',
+        pendingDeepLinkOptionsForData(data)
+      );
       return true;
     }
     default: {
@@ -283,7 +291,11 @@ async function dispatchNeedsInputResponse(
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(notificationPathForData(data), 'notification');
+  setPendingDeepLink(
+    notificationPathForData(data),
+    'notification',
+    pendingDeepLinkOptionsForData(data)
+  );
   return false;
 }
 
@@ -331,6 +343,27 @@ function parseNotificationPayload(data: unknown): PushData | null {
 
 function isRaiseData(data: PushData | null): data is NeedsInputRaiseData {
   return data?.type === 'cloud_agent_session';
+}
+
+/**
+ * The pending-slot options a push's destination rides with.
+ *
+ * A session notification names one session of one account, so its destination
+ * is never account-independent: `sessionBound` keeps it for the account that
+ * captured it and drops a capture made with no account identity (a signed-out
+ * launch), so one account's session notification can never restore and switch
+ * the organization for another. The session's organization rides along so the
+ * gated consumer switches before it navigates; it is null for a Personal
+ * session. A push that names no session carries neither.
+ *
+ * Shared so the cold-start body tap (notifications.ts) stashes the same
+ * destination as the warm tap paths here.
+ */
+export function pendingDeepLinkOptionsForData(data: PushData): PendingDeepLinkOptions {
+  if (data.type !== 'cloud_agent_session') {
+    return {};
+  }
+  return { organizationId: data.organizationId ?? null, sessionBound: true };
 }
 
 async function dismissResponseNotification(

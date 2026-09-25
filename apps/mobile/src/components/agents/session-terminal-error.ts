@@ -335,14 +335,11 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   ) {
     return true;
   }
-  // An unclassified status error resolves to the generic assistant line, which
-  // is the same failure the row's own title states. Keyed on the title key, not
-  // the kind: an agent-execution delivery failure renders the assistant-failure
-  // title too (message-failure-state.ts), so the footer line would restate it.
-  return (
-    failure.titleKey === 'agentChat.messageFailure.assistantTitle' &&
-    copy === i18n.t('agentChat.messageFailure.assistantFailed')
-  );
+  // An unclassified status error resolves to the generic assistant line. Any
+  // last row that states a failure owns that statement — an assistant row's
+  // title says it, and a failed delivery row says it with Retry/Copy — so the
+  // footer must not restate it.
+  return copy === i18n.t('agentChat.messageFailure.assistantFailed');
 }
 
 /**

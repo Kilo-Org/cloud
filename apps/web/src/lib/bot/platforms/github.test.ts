@@ -134,6 +134,7 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
     github_app_type: 'standard',
     github_installation_id: null,
     github_disconnected_at: null,
+    github_connection_role: 'workflow',
     github_authorized_by_user_id: null,
     github_authorized_user_id: null,
     github_authorized_at: null,

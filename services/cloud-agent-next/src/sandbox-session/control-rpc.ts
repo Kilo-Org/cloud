@@ -50,15 +50,19 @@ type SandboxControlRpc = {
     allocationIncarnation?: string;
     operationResults?: true;
     runtimeRecovery?: true;
+    runtimeReplacementInFlight?: true;
+    launchFailed?: true;
     attachment?: SessionAttachPayload;
   }>;
-  getStatus(): Promise<{
+  getStatus(input?: { sessionId?: string }): Promise<{
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
     allocationIncarnation?: string;
     operationResults?: true;
     runtimeRecovery?: true;
+    runtimeReplacementInFlight?: true;
+    launchFailed?: true;
   }>;
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -75,7 +79,12 @@ type SandboxControlRpc = {
     handle: string;
   }): Promise<{ bound: true }>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
-  forgetSessionReference(sessionId: string): Promise<void>;
+  forgetSessionReference(input: {
+    sessionId: string;
+    kiloUserId: string;
+    worktreeId?: string;
+    organizationId?: string;
+  }): Promise<void>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   recordTerminalActivity(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   updateNetworkPolicy(input: {
@@ -110,7 +119,8 @@ export function sandboxControlRpc(
         'prepareSessionCredentials'
       ),
     ensureReady: input => stub().ensureReady(input),
-    getStatus: () => withDORetry(stub, control => control.getStatus(), 'getStatus', config()),
+    getStatus: input =>
+      withDORetry(stub, control => control.getStatus(input), 'getStatus', config()),
     getRuntimeCredentialProxyFence: input =>
       withDORetry(
         stub,
@@ -127,10 +137,10 @@ export function sandboxControlRpc(
       ),
     detachSession: sessionId =>
       withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),
-    forgetSessionReference: sessionId =>
+    forgetSessionReference: input =>
       withDORetry(
         stub,
-        control => control.forgetSessionReference(sessionId),
+        control => control.forgetSessionReference(input),
         'forgetSessionReference',
         config()
       ),

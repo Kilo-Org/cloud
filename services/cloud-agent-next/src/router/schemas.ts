@@ -446,6 +446,7 @@ export const CloseTerminalOutput = z.object({
  * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
 const PrepareSessionSharedFields = {
+  githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),

@@ -473,12 +473,9 @@ describe('HTTP API', () => {
       await runDurableObjectAlarm(town);
 
       // Verify agent is idle
-      const agentCheck = await SELF.fetch(
-        api(`/api/towns/${tid}/rigs/${id}/agents/${agent.id}`),
-        {
-          headers: headers(),
-        }
-      );
+      const agentCheck = await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/agents/${agent.id}`), {
+        headers: headers(),
+      });
       const agentState = (await agentCheck.json()).data;
       expect(agentState.status).toBe('idle');
       expect(agentState.current_hook_bead_id).toBeNull();

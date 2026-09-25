@@ -917,11 +917,7 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
 // routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
-  if (
-    path.includes('/container') ||
-    path.includes('/db-snapshot') ||
-    path.includes('/mayor-id')
-  ) {
+  if (path.includes('/container') || path.includes('/db-snapshot') || path.includes('/mayor-id')) {
     return next();
   }
   return kiloAuthMiddleware(c, async () => {

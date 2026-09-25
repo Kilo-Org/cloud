@@ -91,11 +91,14 @@ describe('Heartbeat Endpoint', () => {
   it('should handle heartbeat for non-existent agent gracefully', async () => {
     const id = rigId();
     const tid = townId();
-    const res = await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/agents/non-existent/heartbeat`), {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ status: 'running' }),
-    });
+    const res = await SELF.fetch(
+      api(`/api/towns/${tid}/rigs/${id}/agents/non-existent/heartbeat`),
+      {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ status: 'running' }),
+      }
+    );
     // The DO's touchAgent won't throw for non-existent agent (it's a no-op UPDATE)
     expect(res.status).toBe(200);
   });

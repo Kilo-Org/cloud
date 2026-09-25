@@ -10,7 +10,7 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type { CodeReviewCouncilResult, ManualCodeReviewConfig } from '@kilocode/db/schema-types';
@@ -19,8 +19,10 @@ import {
   cancelActiveCodeReviewsById,
   cancelActiveCodeReviewsForIntegration,
   cancelSupersededReviewsForPR,
+  cancelSupersededReviewsForPRInTransaction,
   createCodeReview,
   createCodeReviewIfAbsentInTransaction,
+  createCodeReviewForWebhook,
   createCodeReviewAttempt,
   disableBitbucketCodeReviewerForIntegration,
   createInfraRetryAttemptIfMissing,
@@ -34,6 +36,9 @@ import {
   listCodeReviews,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
+  isActiveProviderPublisherConflict,
+  attachCheckRunIdIfActive,
+  updateReviewHeadShaAndCheckRunIfActive,
   updateCodeReviewStatus,
   resetCodeReviewForRetry,
   failReservedQueuedReview,
@@ -41,6 +46,22 @@ import {
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
+
+async function waitForBlockedCancel(): Promise<void> {
+  for (let attempt = 0; attempt < 150; attempt++) {
+    const result = await db.execute<{ waiting: number }>(sql`
+      SELECT count(*)::int AS waiting
+      FROM pg_stat_activity
+      WHERE wait_event_type = 'Lock'
+        AND state = 'active'
+        AND datname = current_database()
+        AND query ILIKE '%cloud_agent_code_reviews%'
+    `);
+    if (Number(result.rows[0]?.waiting ?? 0) > 0) return;
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  throw new Error('Cancel transaction did not block on the row lock');
+}
 
 describe('review identity', () => {
   let firstUser: User;
@@ -310,6 +331,388 @@ describe('review identity', () => {
 
     expect(matchingReview?.id).toBe(reviewId);
   });
+
+  it('supersedes a competing active review at a different head SHA when creating for a webhook', async () => {
+    const repoFullName = `${REPO}-webhook-supersede`;
+    const base = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 30,
+      prUrl: `https://github.com/${repoFullName}/pull/30`,
+      prTitle: 'webhook supersede',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/webhook-supersede',
+      platform: 'github' as const,
+    };
+
+    const competingReviewId = await createCodeReview({
+      ...base,
+      headSha: 'webhook-supersede-head-a',
+    });
+    createdReviewIds.push(competingReviewId);
+
+    const creation = await createCodeReviewForWebhook({
+      ...base,
+      headSha: 'webhook-supersede-head-b',
+      triggerSource: 'webhook',
+    });
+    createdReviewIds.push(creation.reviewId);
+
+    expect(creation.created).toBe(true);
+    expect(creation.reviewId).not.toBe(competingReviewId);
+    expect(creation.cancelledReviews.map(review => review.id)).toEqual([competingReviewId]);
+
+    const competingReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, competingReviewId),
+    });
+    expect(competingReview?.status).toBe('cancelled');
+
+    const activeReviews = await db
+      .select({ id: cloud_agent_code_reviews.id, status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.platform_integration_id, firstIntegrationId),
+          eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
+          eq(cloud_agent_code_reviews.pr_number, 30),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+        )
+      );
+    expect(activeReviews).toEqual([{ id: creation.reviewId, status: 'pending' }]);
+  });
+
+  it('returns the existing review for a repeated webhook create at the same head SHA', async () => {
+    const repoFullName = `${REPO}-webhook-idempotent`;
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 31,
+      prUrl: `https://github.com/${repoFullName}/pull/31`,
+      prTitle: 'webhook idempotent',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/webhook-idempotent',
+      headSha: 'webhook-idempotent-head-sha',
+      platform: 'github' as const,
+      triggerSource: 'webhook' as const,
+    };
+
+    const first = await createCodeReviewForWebhook(params);
+    createdReviewIds.push(first.reviewId);
+    expect(first.created).toBe(true);
+
+    const second = await createCodeReviewForWebhook(params);
+    expect(second).toEqual({
+      reviewId: first.reviewId,
+      created: false,
+      reason: 'existing-same-sha',
+      cancelledReviews: [],
+    });
+  });
+
+  it('reports the holder when a manual provider review occupies the change slot', async () => {
+    const repoFullName = `${REPO}-webhook-provider-slot`;
+    const [manualReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: firstUser.id,
+        platform_integration_id: firstIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 34,
+        pr_url: `https://github.com/${repoFullName}/pull/34`,
+        pr_title: 'manual provider slot',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/manual-provider-slot',
+        head_sha: `${repoFullName}-manual-sha`,
+        status: 'pending',
+        manual_config: {
+          outputMode: 'provider',
+          instructions: null,
+          agentConfig: { model_slug: 'test-model' },
+        } as ManualCodeReviewConfig,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(manualReview.id);
+
+    const creation = await createCodeReviewForWebhook({
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 34,
+      prUrl: `https://github.com/${repoFullName}/pull/34`,
+      prTitle: 'manual provider slot',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/manual-provider-slot',
+      headSha: `${repoFullName}-webhook-sha`,
+      platform: 'github',
+      triggerSource: 'webhook',
+    });
+
+    expect(creation.created).toBe(false);
+    expect(creation.reason).toBe('existing-provider-review');
+    expect(creation.reviewId).toBe(manualReview.id);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, manualReview.id),
+    });
+    expect(stored?.status).toBe('pending');
+  });
+
+  it('detects the active-provider-publisher constraint on the raw conflicting insert', async () => {
+    const repoFullName = `${REPO}-conflict-predicate`;
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 33,
+      prUrl: `https://github.com/${repoFullName}/pull/33`,
+      prTitle: 'conflict predicate',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/conflict-predicate',
+      headSha: `${repoFullName}-sha-a`,
+      platform: 'github' as const,
+    };
+    const firstReviewId = await createCodeReview(params);
+    createdReviewIds.push(firstReviewId);
+
+    let conflict: unknown;
+    try {
+      await createCodeReview({ ...params, headSha: `${repoFullName}-sha-b` });
+    } catch (error) {
+      conflict = error;
+    }
+
+    expect(isActiveProviderPublisherConflict(conflict)).toBe(true);
+    expect(isActiveProviderPublisherConflict(new Error('unrelated'))).toBe(false);
+  });
+
+  it('serializes competing webhook creates for the same change into one active review', async () => {
+    const repoFullName = `${REPO}-webhook-concurrent`;
+    const base = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 32,
+      prUrl: `https://github.com/${repoFullName}/pull/32`,
+      prTitle: 'webhook concurrent',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/webhook-concurrent',
+      platform: 'github' as const,
+      triggerSource: 'webhook' as const,
+    };
+
+    const results = await Promise.all([
+      createCodeReviewForWebhook({ ...base, headSha: `${repoFullName}-sha-a` }),
+      createCodeReviewForWebhook({ ...base, headSha: `${repoFullName}-sha-b` }),
+    ]);
+    for (const result of results) createdReviewIds.push(result.reviewId);
+
+    const rows = await db
+      .select({ id: cloud_agent_code_reviews.id, status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.platform_integration_id, firstIntegrationId),
+          eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
+          eq(cloud_agent_code_reviews.pr_number, 32)
+        )
+      );
+    const activeRows = rows.filter(row => ['pending', 'queued', 'running'].includes(row.status));
+    const cancelledRows = rows.filter(row => row.status === 'cancelled');
+
+    expect(rows.map(row => row.id).sort()).toEqual(results.map(result => result.reviewId).sort());
+    expect(activeRows).toHaveLength(1);
+    expect(cancelledRows).toHaveLength(1);
+
+    // The winner is the call that cancelled the other; the loser returned no
+    // cancellations. Both orders are valid, so pin the relationship, not which
+    // delivery arrived first.
+    const cancellingResult = results.find(result => result.cancelledReviews.length > 0);
+    expect(cancellingResult).toBeDefined();
+    expect(cancellingResult?.cancelledReviews.map(review => review.id)).toEqual(
+      results.filter(result => result !== cancellingResult).map(result => result.reviewId)
+    );
+    expect(activeRows[0].id).toBe(cancellingResult?.reviewId);
+    expect(cancelledRows[0].id).not.toBe(cancellingResult?.reviewId);
+  });
+
+  it('attaches a check run id only while the review is active', async () => {
+    const repoFullName = `${REPO}-attach-check`;
+    const reviewId = await createCodeReview({
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 35,
+      prUrl: `https://github.com/${repoFullName}/pull/35`,
+      prTitle: 'attach check',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/attach-check',
+      headSha: `${repoFullName}-sha`,
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+
+    expect(await attachCheckRunIdIfActive(reviewId, 7001)).toBe(true);
+    let stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.check_run_id).toBe(7001);
+
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ status: 'cancelled' })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    expect(await attachCheckRunIdIfActive(reviewId, 7002)).toBe(false);
+
+    stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.check_run_id).toBe(7001);
+  });
+
+  it('reports the attached check run id when a competing review supersedes it', async () => {
+    const repoFullName = `${REPO}-supersede-check-id`;
+    const base = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 36,
+      prUrl: `https://github.com/${repoFullName}/pull/36`,
+      prTitle: 'supersede check id',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/supersede-check-id',
+      platform: 'github' as const,
+    };
+
+    const loserId = await createCodeReview({ ...base, headSha: `${repoFullName}-sha-a` });
+    createdReviewIds.push(loserId);
+    expect(await attachCheckRunIdIfActive(loserId, 7003)).toBe(true);
+
+    const winner = await createCodeReviewForWebhook({
+      ...base,
+      headSha: `${repoFullName}-sha-b`,
+      triggerSource: 'webhook',
+    });
+    createdReviewIds.push(winner.reviewId);
+
+    const cancelledLoser = winner.cancelledReviews.find(review => review.id === loserId);
+    expect(cancelledLoser?.checkRunId).toBe(7003);
+  });
+
+  it('repoints a review to a new head and check id only while it is active', async () => {
+    const repoFullName = `${REPO}-repoint-active`;
+    const reviewId = await createCodeReview({
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 37,
+      prUrl: `https://github.com/${repoFullName}/pull/37`,
+      prTitle: 'repoint active',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/repoint-active',
+      headSha: `${repoFullName}-sha-a`,
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+
+    expect(
+      await updateReviewHeadShaAndCheckRunIfActive(reviewId, `${repoFullName}-sha-b`, 8001)
+    ).toBe(true);
+    let stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.head_sha).toBe(`${repoFullName}-sha-b`);
+    expect(stored?.check_run_id).toBe(8001);
+
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ status: 'cancelled' })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    expect(
+      await updateReviewHeadShaAndCheckRunIfActive(reviewId, `${repoFullName}-sha-c`, 8002)
+    ).toBe(false);
+    stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.head_sha).toBe(`${repoFullName}-sha-b`);
+    expect(stored?.check_run_id).toBe(8001);
+  });
+
+  it('reports a check id attached by a concurrent transaction that commits while the cancel is blocked', async () => {
+    const repoFullName = `${REPO}-cancel-epq`;
+    const scope = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platform: 'github' as const,
+      repoFullName,
+      prNumber: 38,
+      platformIntegrationId: firstIntegrationId,
+    };
+    const reviewId = await createCodeReview({
+      owner: scope.owner,
+      platformIntegrationId: firstIntegrationId,
+      repoFullName,
+      prNumber: 38,
+      prUrl: `https://github.com/${repoFullName}/pull/38`,
+      prTitle: 'cancel epq',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/cancel-epq',
+      headSha: `${repoFullName}-sha`,
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+
+    let signalAttachLocked!: () => void;
+    const attachLocked = new Promise<void>(resolve => {
+      signalAttachLocked = resolve;
+    });
+    let releaseAttach!: () => void;
+    const attachGate = new Promise<void>(resolve => {
+      releaseAttach = resolve;
+    });
+
+    const attachTx = db.transaction(async tx => {
+      await tx
+        .update(cloud_agent_code_reviews)
+        .set({ check_run_id: 8100 })
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+      signalAttachLocked();
+      await attachGate;
+    });
+
+    await attachLocked;
+
+    const cancelTx = db.transaction(tx =>
+      cancelSupersededReviewsForPRInTransaction(tx, scope, 'unrelated-sha')
+    );
+
+    let waitError: unknown;
+    try {
+      await waitForBlockedCancel();
+    } catch (error) {
+      waitError = error;
+    } finally {
+      // Always release the held row lock and resolve both transactions so a
+      // failed wait cannot strand a connection and hang teardown.
+      releaseAttach();
+    }
+
+    const [, cancelled] = await Promise.all([attachTx, cancelTx]);
+    if (waitError) throw waitError;
+    expect(cancelled.find(review => review.id === reviewId)?.checkRunId).toBe(8100);
+  }, 20000);
 
   it('scopes GitLab active review uniqueness to the integration; separate instances are independent', async () => {
     const sharedParams = {
@@ -1970,10 +2373,26 @@ describe('getSessionUsageFromBilling', () => {
 
 describe('resetCodeReviewForRetry', () => {
   let testUser: User;
+  let retryIntegrationId: string;
   const reviewIds: string[] = [];
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `retry-guard-${Date.now()}`,
+        platform_account_id: 'retry-guard',
+        platform_account_login: 'retry-guard',
+        repository_access: 'all',
+        integration_status: 'active',
+      })
+      .returning({ id: platform_integrations.id });
+    if (!integration) throw new Error('Expected retry guard integration');
+    retryIntegrationId = integration.id;
   });
 
   afterEach(async () => {
@@ -1985,6 +2404,7 @@ describe('resetCodeReviewForRetry', () => {
   });
 
   afterAll(async () => {
+    await db.delete(platform_integrations).where(eq(platform_integrations.id, retryIntegrationId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
@@ -2039,6 +2459,135 @@ describe('resetCodeReviewForRetry', () => {
       where: eq(cloud_agent_code_reviews.id, reviewId),
     });
     expect(stored?.status).toBe('pending');
+  });
+
+  it('returns 0 and leaves the review failed when another active review holds the change slot', async () => {
+    const repoFullName = `${REPO}-retry-active-slot`;
+    const [activeReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform_integration_id: retryIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 41,
+        pr_url: `https://github.com/${repoFullName}/pull/41`,
+        pr_title: 'active slot',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/active-slot',
+        head_sha: 'active-slot-sha-active',
+        status: 'pending',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(activeReview.id);
+
+    const failedReviewId = await insertReview('failed', {
+      platform_integration_id: retryIntegrationId,
+      repo_full_name: repoFullName,
+      pr_number: 41,
+      head_sha: 'active-slot-sha-failed',
+    });
+
+    const count = await resetCodeReviewForRetry(failedReviewId);
+
+    expect(count).toBe(0);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, failedReviewId),
+    });
+    expect(stored?.status).toBe('failed');
+  });
+
+  it('resets a failed review in a provider slot when no other active review holds it', async () => {
+    const repoFullName = `${REPO}-retry-open-slot`;
+    const reviewId = await insertReview('failed', {
+      platform_integration_id: retryIntegrationId,
+      repo_full_name: repoFullName,
+      pr_number: 42,
+      head_sha: 'open-slot-sha-failed',
+    });
+
+    const count = await resetCodeReviewForRetry(reviewId);
+
+    expect(count).toBe(1);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.status).toBe('pending');
+  });
+
+  it('allows a reset for a manual kilo review while a provider review holds the slot', async () => {
+    const repoFullName = `${REPO}-retry-kilo-slot`;
+    const [activeProvider] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform_integration_id: retryIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 43,
+        pr_url: `https://github.com/${repoFullName}/pull/43`,
+        pr_title: 'active provider',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/active-provider',
+        head_sha: 'kilo-slot-sha-provider',
+        status: 'pending',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(activeProvider.id);
+
+    const failedKiloReviewId = await insertReview('failed', {
+      platform_integration_id: retryIntegrationId,
+      repo_full_name: repoFullName,
+      pr_number: 43,
+      head_sha: 'kilo-slot-sha-kilo',
+      manual_config: {
+        outputMode: 'kilo',
+        instructions: null,
+        agentConfig: { model_slug: 'test-model' },
+      } as ManualCodeReviewConfig,
+    });
+
+    const count = await resetCodeReviewForRetry(failedKiloReviewId);
+
+    expect(count).toBe(1);
+  });
+
+  it('serializes concurrent resets in the same slot so only one review becomes active', async () => {
+    const repoFullName = `${REPO}-retry-concurrent`;
+    const firstFailedId = await insertReview('failed', {
+      platform_integration_id: retryIntegrationId,
+      repo_full_name: repoFullName,
+      pr_number: 44,
+      head_sha: 'retry-concurrent-sha-a',
+    });
+    const secondFailedId = await insertReview('failed', {
+      platform_integration_id: retryIntegrationId,
+      repo_full_name: repoFullName,
+      pr_number: 44,
+      head_sha: 'retry-concurrent-sha-b',
+    });
+
+    const results = await Promise.all([
+      resetCodeReviewForRetry(firstFailedId),
+      resetCodeReviewForRetry(secondFailedId),
+    ]);
+
+    expect(results.slice().sort()).toEqual([0, 1]);
+
+    const activeRows = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.platform_integration_id, retryIntegrationId),
+          eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
+          eq(cloud_agent_code_reviews.pr_number, 44),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+        )
+      );
+    expect(activeRows).toHaveLength(1);
   });
 
   it('persists sanitized previous summaries while preserving null and valid markdown', async () => {

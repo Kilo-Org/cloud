@@ -4,11 +4,13 @@ import type { PullRequestPayload } from '../webhook-schemas';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
-  createCodeReview,
+  createCodeReviewForWebhook,
   cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
-  updateReviewHeadShaAndCheckRun,
+  updateReviewHeadShaAndCheckRunIfActive,
+  attachCheckRunIdIfActive,
+  type CancelledReviewRow,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
@@ -33,7 +35,6 @@ import {
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
-import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
 import { APP_URL } from '@/lib/constants';
 import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
@@ -223,11 +224,11 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
-    // 5. Cancel any existing reviews for this PR (different SHA)
-    // This prevents spam when user pushes multiple commits quickly
-    const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, pull_request.head.sha);
+    const [repoOwner, repoName] = repository.full_name.split('/');
 
-    if (cancelledReviews.length > 0) {
+    const applySupersessionSideEffects = async (cancelledReviews: CancelledReviewRow[]) => {
+      if (cancelledReviews.length === 0) return;
+
       const cancellationCounts = {
         pending: cancelledReviews.filter(review => review.prevStatus === 'pending').length,
         queued: cancelledReviews.filter(review => review.prevStatus === 'queued').length,
@@ -269,7 +270,6 @@ export async function handlePullRequestCodeReview(
           })
       );
 
-      const [repoOwner, repoName] = repository.full_name.split('/');
       await Promise.allSettled(
         cancelledReviews
           .filter(review => review.checkRunId != null && review.platform === 'github')
@@ -292,10 +292,24 @@ export async function handlePullRequestCodeReview(
               );
             } catch (error) {
               logExceptInTest(`Failed to cancel old check run ${review.checkRunId}:`, error);
+              captureException(error, {
+                tags: { source: 'pull_request_webhook_cancel_superseded_check' },
+                extra: {
+                  reviewId: review.id,
+                  checkRunId: review.checkRunId,
+                  repository: repository.full_name,
+                  prNumber: pull_request.number,
+                },
+              });
             }
           })
       );
-    }
+    };
+
+    // 5. Cancel any existing reviews for this PR (different SHA)
+    // This prevents spam when user pushes multiple commits quickly
+    const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, pull_request.head.sha);
+    await applySupersessionSideEffects(cancelledReviews);
 
     // 5b. Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
     // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
@@ -371,8 +385,10 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 7. Create review record (session_id will be updated async)
-    const reviewId = await createCodeReview({
+    // 7. Create review record (session_id will be updated async). Creation re-checks and
+    // supersedes inside a per-change advisory lock, so overlapping deliveries for the same PR
+    // cannot both insert an active review.
+    const creation = await createCodeReviewForWebhook({
       owner,
       reviewType,
       platformIntegrationId: integration.id,
@@ -389,11 +405,53 @@ export async function handlePullRequestCodeReview(
       triggerSource: 'webhook',
     });
 
+    await applySupersessionSideEffects(creation.cancelledReviews);
+
+    if (!creation.created) {
+      const sameSha = creation.reason === 'existing-same-sha';
+      logExceptInTest(
+        sameSha
+          ? `Code review already exists for ${repository.full_name}#${pull_request.number}`
+          : `Active code review holds ${repository.full_name}#${pull_request.number}; skipping webhook review`
+      );
+      return NextResponse.json(
+        {
+          message: sameSha
+            ? 'Review already exists for this commit'
+            : 'A code review is already active for this pull request',
+          reviewId: creation.reviewId,
+        },
+        { status: 200 }
+      );
+    }
+
+    const reviewId = creation.reviewId;
+
     logExceptInTest(
       `Created code review ${reviewId} for ${repository.full_name}#${pull_request.number}`
     );
 
-    const [repoOwner, repoName] = repository.full_name.split('/');
+    const cancelCheckRunSafely = async (checkRunId: number, reason: string) => {
+      try {
+        await updateCheckRun(
+          integration.platform_installation_id as string,
+          repoOwner,
+          repoName,
+          checkRunId,
+          { status: 'completed', conclusion: 'cancelled' },
+          appType
+        );
+        logExceptInTest(
+          `Cancelled ${reason} check run ${checkRunId} for ${repository.full_name}#${pull_request.number}`
+        );
+      } catch (cancelError) {
+        logExceptInTest(`Failed to cancel ${reason} check run ${checkRunId}:`, cancelError);
+        captureException(cancelError, {
+          tags: { source: 'pull_request_webhook_cancel_orphan_check' },
+          extra: { checkRunId, reason, reviewId, repository: repository.full_name },
+        });
+      }
+    };
 
     // 8. Create GitHub Check Run (PR gate) — skip for lite (read-only) app
     if (appType !== 'lite') {
@@ -414,7 +472,21 @@ export async function handlePullRequestCodeReview(
           },
           appType
         );
-        await updateCheckRunId(reviewId, checkRunId);
+        // Attach the id only while this review is still active. A concurrent delivery
+        // can supersede it while the external check is being created; the CAS fails
+        // then, and the freshly created check must be torn down rather than retained
+        // on a cancelled row.
+        const attached = await attachCheckRunIdIfActive(reviewId, checkRunId);
+        if (!attached) {
+          await cancelCheckRunSafely(checkRunId, 'superseded');
+          logExceptInTest(
+            `Review ${reviewId} superseded before check persistence for ${repository.full_name}#${pull_request.number}`
+          );
+          return NextResponse.json(
+            { message: 'Review superseded by a newer commit', reviewId },
+            { status: 200 }
+          );
+        }
         logExceptInTest(
           `Created check run ${checkRunId} for ${repository.full_name}#${pull_request.number}`
         );
@@ -425,21 +497,7 @@ export async function handlePullRequestCodeReview(
         // If we created the check run on GitHub but failed to persist its ID,
         // cancel it so it doesn't block merging on repos with required checks.
         if (checkRunId !== undefined) {
-          try {
-            await updateCheckRun(
-              integration.platform_installation_id as string,
-              repoOwner,
-              repoName,
-              checkRunId,
-              { status: 'completed', conclusion: 'cancelled' },
-              appType
-            );
-            logExceptInTest(
-              `Cancelled orphaned check run ${checkRunId} for ${repository.full_name}#${pull_request.number}`
-            );
-          } catch (cancelError) {
-            logExceptInTest('Failed to cancel orphaned check run:', cancelError);
-          }
+          await cancelCheckRunSafely(checkRunId, 'orphaned');
         }
       }
     }
@@ -564,6 +622,25 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
 }) {
   if (args.appType === 'lite') return;
 
+  const cancelMergeCommitCheckRun = async (checkRunId: number) => {
+    try {
+      await updateCheckRun(
+        args.installationId,
+        args.baseOwner,
+        args.baseRepoName,
+        checkRunId,
+        { status: 'completed', conclusion: 'cancelled' },
+        args.appType
+      );
+    } catch (cancelError) {
+      logExceptInTest('Failed to cancel orphaned merge-commit check run:', cancelError);
+      captureException(cancelError, {
+        tags: { source: 'pull_request_webhook_cancel_merge_commit_check' },
+        extra: { checkRunId, newHeadSha: args.newHeadSha },
+      });
+    }
+  };
+
   try {
     const activeReviewIds = await findActiveReviewsForPR(args.reviewScope, args.newHeadSha);
     if (activeReviewIds.length === 0) return;
@@ -590,7 +667,20 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
         },
         args.appType
       );
-      await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, newCheckRunId);
+      const migrated = await updateReviewHeadShaAndCheckRunIfActive(
+        reviewId,
+        args.newHeadSha,
+        newCheckRunId
+      );
+      if (!migrated) {
+        // The review was cancelled or superseded after the new gate was created;
+        // tear it down rather than leaving a queued check on the merge commit.
+        await cancelMergeCommitCheckRun(newCheckRunId);
+        logExceptInTest(
+          `Review ${reviewId} left active state before merge-commit migration; cancelled check run ${newCheckRunId}`
+        );
+        return;
+      }
       logExceptInTest(
         `Migrated review ${reviewId} to merge-commit head ${args.newHeadSha} (check run ${newCheckRunId})`
       );
@@ -600,18 +690,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
       // the migration, cancel the new run so it does not stay 'queued'
       // forever and block branch-protection gating.
       if (newCheckRunId !== undefined) {
-        try {
-          await updateCheckRun(
-            args.installationId,
-            args.baseOwner,
-            args.baseRepoName,
-            newCheckRunId,
-            { status: 'completed', conclusion: 'cancelled' },
-            args.appType
-          );
-        } catch (cancelError) {
-          logExceptInTest('Failed to cancel orphaned merge-commit check run:', cancelError);
-        }
+        await cancelMergeCommitCheckRun(newCheckRunId);
       }
     }
   } catch (lookupError) {

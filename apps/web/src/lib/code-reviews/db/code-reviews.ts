@@ -315,6 +315,142 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
   }
 }
 
+const ACTIVE_PROVIDER_PUBLISHER_CONSTRAINT =
+  'UQ_cloud_agent_code_reviews_active_provider_publisher';
+
+/**
+ * Detects the Postgres unique violation raised when a second active
+ * provider-publishing review is written for the same integration, repository,
+ * and pull request. Drizzle wraps driver errors, so the code and constraint may
+ * sit on `error.cause`.
+ */
+export function isActiveProviderPublisherConflict(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  const err = error as {
+    code?: string;
+    constraint?: string;
+    cause?: { code?: string; constraint?: string };
+  };
+  const pgCode = err.code ?? err.cause?.code;
+  const pgConstraint = err.constraint ?? err.cause?.constraint;
+  return pgCode === '23505' && pgConstraint === ACTIVE_PROVIDER_PUBLISHER_CONSTRAINT;
+}
+
+function codeReviewWebhookLockKey(params: CreateReviewParams): string {
+  return params.platformIntegrationId
+    ? `code-review-webhook:${params.platformIntegrationId}:${params.repoFullName}:${params.prNumber}`
+    : `code-review-webhook:${params.owner.type}:${params.owner.id}:${params.platform}:${params.repoFullName}:${params.prNumber}`;
+}
+
+export type CodeReviewWebhookCreation = {
+  reviewId: string;
+  created: boolean;
+  reason: 'created' | 'existing-same-sha' | 'existing-provider-review';
+  cancelledReviews: CancelledReviewRow[];
+};
+
+/**
+ * Creates a webhook-triggered review while holding a per-change advisory lock,
+ * so two overlapping deliveries for the same integration/repository/pull
+ * request cannot both pass the supersede-and-insert check. Inside the lock it
+ * re-checks the exact head SHA, cancels any other active provider-publishing
+ * review for the change, and inserts with `ON CONFLICT DO NOTHING`; a conflicting
+ * winner is returned instead of raising the unique violation. The partial index
+ * `UQ_cloud_agent_code_reviews_active_provider_publisher` stays the source of
+ * truth for single-active-publisher.
+ */
+export async function createCodeReviewForWebhook(
+  params: CreateReviewParams
+): Promise<CodeReviewWebhookCreation> {
+  try {
+    CreateReviewParamsSchema.parse(params);
+    await assertCouncilCreationAllowed({
+      owner: params.owner,
+      reviewType: params.reviewType,
+    });
+
+    const scope: ReviewScope = {
+      owner: params.owner,
+      platform: params.platform,
+      repoFullName: params.repoFullName,
+      prNumber: params.prNumber,
+      ...(params.platformIntegrationId
+        ? { platformIntegrationId: params.platformIntegrationId }
+        : {}),
+    };
+
+    const result = await db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${codeReviewWebhookLockKey(params)}, 0))`
+      );
+
+      const existing = await findExistingReviewWithDatabase(tx, scope, params.headSha);
+      if (existing) {
+        return {
+          reviewId: existing.id,
+          created: false,
+          reason: 'existing-same-sha' as const,
+          cancelledReviews: [],
+        };
+      }
+
+      const cancelledReviews = await cancelReviewsForPR(tx, scope, params.headSha);
+
+      const [created] = await tx
+        .insert(cloud_agent_code_reviews)
+        .values(codeReviewInsertValues(params))
+        .onConflictDoNothing()
+        .returning({ id: cloud_agent_code_reviews.id });
+      if (created) {
+        return {
+          reviewId: created.id,
+          created: true,
+          reason: 'created' as const,
+          cancelledReviews,
+        };
+      }
+
+      // The cancel step cannot clear a manual provider-publishing review (with a
+      // platform integration id in scope, `cancelReviewsForPR` only touches
+      // `manual_config IS NULL` rows), so a surviving conflict here is that
+      // manual review holding the slot.
+      const winner =
+        (await findExistingReviewWithDatabase(tx, scope, params.headSha)) ??
+        (params.platformIntegrationId
+          ? await findActiveProviderPublishingReviewWithDatabase(tx, {
+              platformIntegrationId: params.platformIntegrationId,
+              repoFullName: params.repoFullName,
+              prNumber: params.prNumber,
+            })
+          : null);
+      if (!winner) throw new Error('Code review webhook conflict winner not found');
+      return {
+        reviewId: winner.id,
+        created: false,
+        reason: 'existing-provider-review' as const,
+        cancelledReviews,
+      };
+    });
+
+    if (result.created) {
+      await admitCodeReviewLedgerRow({
+        reviewId: result.reviewId,
+        userId: params.owner.userId,
+        orgId: params.owner.type === 'org' ? params.owner.id : null,
+        triggerSource: params.triggerSource ?? null,
+      });
+    }
+    await settleCancelledReviews(result.cancelledReviews, 'superseded');
+    return result;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'createCodeReviewForWebhook' },
+      extra: { params: createCodeReviewErrorMetadata(params) },
+    });
+    throw error;
+  }
+}
+
 /**
  * Gets a code review by ID
  * Returns null if not found
@@ -1673,13 +1809,40 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<number>
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
-          inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted'])
+          inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted']),
+          // Resetting to 'pending' re-enters the single-active-publisher partial index when the
+          // review is webhook-created or provider-publishing. Refuse the reset while another
+          // active provider-publishing review already holds the same integration/repo/PR slot;
+          // callers surface the zero-row result as a conflict instead of a unique violation.
+          sql`(
+            ${cloud_agent_code_reviews.platform_integration_id} IS NULL
+            OR (
+              ${cloud_agent_code_reviews.manual_config} IS NOT NULL
+              AND ${cloud_agent_code_reviews.manual_config}->>'outputMode' IS DISTINCT FROM 'provider'
+            )
+            OR NOT EXISTS (
+              SELECT 1
+              FROM ${cloud_agent_code_reviews} AS active_provider_review
+              WHERE active_provider_review.platform_integration_id = ${cloud_agent_code_reviews.platform_integration_id}
+                AND active_provider_review.repo_full_name = ${cloud_agent_code_reviews.repo_full_name}
+                AND active_provider_review.pr_number = ${cloud_agent_code_reviews.pr_number}
+                AND active_provider_review.id <> ${cloud_agent_code_reviews.id}
+                AND active_provider_review.status IN ('pending', 'queued', 'running')
+                AND (
+                  active_provider_review.manual_config IS NULL
+                  OR active_provider_review.manual_config->>'outputMode' = 'provider'
+                )
+            )
+          )`
         )
       )
       .returning({ id: cloud_agent_code_reviews.id });
 
     return reset.length;
   } catch (error) {
+    if (isActiveProviderPublisherConflict(error)) {
+      return 0;
+    }
     captureException(error, {
       tags: { operation: 'resetCodeReviewForRetry' },
       extra: { reviewId },
@@ -1723,27 +1886,38 @@ export async function findActiveReviewsForPR(
   }
 }
 
+async function findActiveProviderPublishingReviewWithDatabase(
+  database: CodeReviewDatabase,
+  input: {
+    platformIntegrationId: string;
+    repoFullName: string;
+    prNumber: number;
+  }
+): Promise<{ id: string } | null> {
+  const [review] = await database
+    .select({ id: cloud_agent_code_reviews.id })
+    .from(cloud_agent_code_reviews)
+    .where(
+      and(
+        eq(cloud_agent_code_reviews.platform_integration_id, input.platformIntegrationId),
+        eq(cloud_agent_code_reviews.repo_full_name, input.repoFullName),
+        eq(cloud_agent_code_reviews.pr_number, input.prNumber),
+        providerPublishingCondition(),
+        inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+      )
+    )
+    .limit(1);
+
+  return review ?? null;
+}
+
 export async function findActiveProviderPublishingReview(input: {
   platformIntegrationId: string;
   repoFullName: string;
   prNumber: number;
 }): Promise<{ id: string } | null> {
   try {
-    const [review] = await db
-      .select({ id: cloud_agent_code_reviews.id })
-      .from(cloud_agent_code_reviews)
-      .where(
-        and(
-          eq(cloud_agent_code_reviews.platform_integration_id, input.platformIntegrationId),
-          eq(cloud_agent_code_reviews.repo_full_name, input.repoFullName),
-          eq(cloud_agent_code_reviews.pr_number, input.prNumber),
-          providerPublishingCondition(),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
-        )
-      )
-      .limit(1);
-
-    return review ?? null;
+    return await findActiveProviderPublishingReviewWithDatabase(db, input);
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveProviderPublishingReview' },
@@ -1762,7 +1936,9 @@ type CancelledReviewDatabaseRow = {
   prev_status: 'pending' | 'queued' | 'running';
   session_id: string | null;
   latest_active_attempt_id: string | null;
-  check_run_id: number | null;
+  // Raw `execute` rows come back from pg with the INT8 parser applied, so this is
+  // a BigInt at runtime even though Drizzle's query builder returns a number.
+  check_run_id: bigint | number | null;
   head_sha: string;
   platform: CodeReviewPlatform;
   platform_project_id: number | null;
@@ -1776,7 +1952,9 @@ function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReview
     prevStatus: row.prev_status,
     sessionId: row.session_id,
     latestActiveAttemptId: row.latest_active_attempt_id,
-    checkRunId: row.check_run_id,
+    // Raw SQL returns int8 as BigInt (see packages/db/src/client.ts). Check run ids
+    // are small and the GitHub adapter JSON-serializes them, so normalize to number.
+    checkRunId: row.check_run_id === null ? null : Number(row.check_run_id),
     headSha: row.head_sha,
     platform: row.platform,
     platformProjectId: row.platform_project_id,
@@ -1852,12 +2030,14 @@ async function cancelReviewsForPR(
       updated_at = now()
     FROM targets
     WHERE reviews.id = targets.id
+    -- reviews.* returns the post-update row (EPQ): a cancel racing a check attach
+    -- must report the id that was just written, not the pre-statement snapshot.
     RETURNING
       reviews.id,
       targets.prev_status,
       targets.session_id,
       targets.latest_active_attempt_id,
-      targets.check_run_id,
+      reviews.check_run_id,
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
@@ -1919,12 +2099,14 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
       updated_at = now()
     FROM targets
     WHERE reviews.id = targets.id
+    -- reviews.* returns the post-update row (EPQ): a cancel racing a check attach
+    -- must report the id that was just written, not the pre-statement snapshot.
     RETURNING
       reviews.id,
       targets.prev_status,
       targets.session_id,
       targets.latest_active_attempt_id,
-      targets.check_run_id,
+      reviews.check_run_id,
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
@@ -2008,12 +2190,14 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
       updated_at = now()
     FROM targets
     WHERE reviews.id = targets.id
+    -- reviews.* returns the post-update row (EPQ): a cancel racing a check attach
+    -- must report the id that was just written, not the pre-statement snapshot.
     RETURNING
       reviews.id,
       targets.prev_status,
       targets.session_id,
       targets.latest_active_attempt_id,
-      targets.check_run_id,
+      reviews.check_run_id,
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
@@ -2207,6 +2391,43 @@ export async function findPreviousCompletedReview(
 }
 
 /**
+ * Attaches a GitHub Check Run ID to a review only while the review is still in
+ * an active state. A concurrent delivery can supersede the review (moving it to
+ * a terminal state) while the external check is being created. The CAS fails
+ * when that supersede commits first, returning false so the caller can cancel
+ * the freshly created check. When the supersede commits after this succeeds, the
+ * canceller's RETURNING projection reads the post-update `check_run_id`, so the
+ * winner still tears this check down.
+ */
+export async function attachCheckRunIdIfActive(
+  reviewId: string,
+  checkRunId: number
+): Promise<boolean> {
+  try {
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        check_run_id: checkRunId,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'attachCheckRunIdIfActive' },
+      extra: { reviewId, checkRunId },
+    });
+    throw error;
+  }
+}
+
+/**
  * Stores the GitHub Check Run ID on a code review record.
  * Called after creating the initial check run so we can update it later.
  */
@@ -2255,6 +2476,44 @@ export async function updateReviewHeadShaAndCheckRun(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateReviewHeadShaAndCheckRun' },
+      extra: { reviewId, headSha, checkRunId },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Repoints an in-flight review at a new head SHA (and optionally a new check
+ * run) only while the review is still active. Returns false when a concurrent
+ * cancel or supersede won the race, so the caller can tear down the newly
+ * created external check instead of leaving an orphaned queued gate on a
+ * cancelled review. The unconditional sibling remains for callers that do not
+ * gate on liveness.
+ */
+export async function updateReviewHeadShaAndCheckRunIfActive(
+  reviewId: string,
+  headSha: string,
+  checkRunId: number | null
+): Promise<boolean> {
+  try {
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        head_sha: headSha,
+        check_run_id: checkRunId,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateReviewHeadShaAndCheckRunIfActive' },
       extra: { reviewId, headSha, checkRunId },
     });
     throw error;

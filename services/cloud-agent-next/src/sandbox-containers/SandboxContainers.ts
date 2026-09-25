@@ -11,6 +11,7 @@ import {
   CONTROL_WRAPPER_LOG_PATH,
   CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   ContainersBilling,
   ContainersBillingScheduler,
@@ -51,6 +52,9 @@ export class ContainersAllocationConflictError extends Error {
   }
 }
 
+type WrapperAttempt = 'not_started' | 'exec_pending';
+type WrapperAttemptRead = WrapperAttempt | 'missing' | 'unknown';
+
 type ContainersRecord = {
   state: ContainersState;
   allocationRef: string | null;
@@ -58,6 +62,7 @@ type ContainersRecord = {
   lastSnapshot: { id: string; sourceAllocation: string } | null;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
+  wrapperAttempt?: WrapperAttempt;
 };
 
 type DelayedSchedule<T> = {
@@ -85,10 +90,32 @@ function containedProcessEnv(env: Record<string, string>): Record<string, string
 
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
-const WRAPPER_EXEC_TIMEOUT_MS = 60_000;
+/** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
+const WRAPPER_READINESS_POLL_MS = 1_000;
 const SNAPSHOT_TIMEOUT_MS = 10_000;
 const DESTROY_TIMEOUT_MS = 30_000;
 const MAX_LOG_BYTES = 1024 * 1024;
+
+class WrapperExecTimeoutError extends Error {
+  constructor() {
+    super('wrapper exec timed out');
+    this.name = 'WrapperExecTimeoutError';
+  }
+}
+
+/**
+ * Settlement of a retained handle's `exitCode`, observed without racing it. A
+ * fulfilled value is terminal for that handle; a rejection is fenced.
+ */
+type ExitState = { kind: 'pending' } | { kind: 'fulfilled' } | { kind: 'rejected'; error: unknown };
+
+function remainingMs(deadlineAt: number): number {
+  return Math.max(0, deadlineAt - Date.now());
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 const IDLE_RECORD: ContainersRecord = {
   state: 'idle',
@@ -96,6 +123,18 @@ const IDLE_RECORD: ContainersRecord = {
   stopOpId: null,
   lastSnapshot: null,
 };
+
+/**
+ * A persisted phase is untrusted data: only the two written values are honoured.
+ * Absence on `launching` is a legacy record whose exec state is unknown; absence
+ * on `idle` is a fresh allocation. The caller's state decides which it is.
+ */
+function readWrapperAttempt(record: ContainersRecord): WrapperAttemptRead {
+  const value = (record as { wrapperAttempt?: unknown }).wrapperAttempt;
+  if (value === undefined) return 'missing';
+  if (value === 'not_started' || value === 'exec_pending') return value;
+  return 'unknown';
+}
 
 export class SandboxContainers extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
@@ -121,14 +160,33 @@ export class SandboxContainers extends DurableObject<Env> {
       if (stored.allocationRef === ref && stored.state === 'stopping') {
         throw new ContainersAllocationConflictError(ref);
       }
-      // Persist the accepted physical instance before any early return or physical
-      // operation, so a resumed launch whose exec fails still records its size.
-      const record = await this.installLaunchInstance(stored, input.instance);
-      if (record.state === 'running' && record.allocationRef === ref) {
-        return { started: false };
-      }
-      if (record.state === 'launching' && record.allocationRef === ref) {
-        return this.resumeLaunch(
+      return this.launchEntry(stored, ref, input);
+    });
+  }
+
+  /**
+   * Decide what an entry into `launchWrapper` may physically do from the
+   * persisted phase. The phase is the only durable record of whether a previous
+   * bun exec may still be in flight, so it gates every write and container call.
+   */
+  private async launchEntry(
+    stored: ContainersRecord,
+    ref: string,
+    input: ContainersLaunchInput
+  ): Promise<{ started: boolean }> {
+    const sameRef = stored.allocationRef === ref;
+    const phase = readWrapperAttempt(stored);
+    if (stored.state === 'running' && sameRef) {
+      // A pending (or unknown) phase means a bun exec may still be starting; the
+      // running record must not be touched or the fence would be lost.
+      if (phase === 'exec_pending' || phase === 'unknown') return { started: false };
+      await this.installLaunchInstance(stored, input.instance);
+      return { started: false };
+    }
+    if (stored.state === 'launching' && sameRef) {
+      if (phase === 'not_started') {
+        const record = await this.installLaunchInstance(stored, input.instance);
+        return this.resumePreExecLaunch(
           record,
           ref,
           input.env,
@@ -136,24 +194,48 @@ export class SandboxContainers extends DurableObject<Env> {
           input.containment === true
         );
       }
-      const container = this.requiredContainer();
-      if (input.containment) await this.installContainmentProxy(container);
-      // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
-      await this.writeRecord({ ...record, state: 'launching', allocationRef: ref, stopOpId: null });
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(input.instance, record.lastSnapshot?.id)
-      );
-      await this.execWrapper(container, input.env, input.containment === true);
-      await this.writeRecord({
-        ...record,
-        state: 'running',
-        allocationRef: ref,
-        stopOpId: null,
-      });
-      return { started: true };
+      if (phase === 'exec_pending' || phase === 'missing') {
+        return this.adoptUncertainWrapper(
+          stored,
+          ref,
+          input.containment === true,
+          phase === 'missing'
+        );
+      }
+      throw new Error('Container wrapper attempt phase is unknown');
+    }
+    if (stored.state === 'idle' && phase === 'missing') {
+      return this.freshLaunch(stored, ref, input);
+    }
+    throw new Error('Container wrapper attempt phase conflicts with the allocation state');
+  }
+
+  private async freshLaunch(
+    stored: ContainersRecord,
+    ref: string,
+    input: ContainersLaunchInput
+  ): Promise<{ started: boolean }> {
+    const container = this.requiredContainer();
+    // Persist the accepted physical instance before any early return or physical
+    // operation, so a resumed launch whose exec fails still records its size.
+    const record = await this.installLaunchInstance(stored, input.instance);
+    if (input.containment) await this.installContainmentProxy(container);
+    // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
+    await this.writeRecord({
+      ...record,
+      state: 'launching',
+      allocationRef: ref,
+      stopOpId: null,
+      wrapperAttempt: 'not_started',
     });
+    await this.startContainerAndActivateBilling(
+      container,
+      record,
+      this.startOptions(input.instance, record.lastSnapshot?.id)
+    );
+    await this.startWrapper(container, input.env, input.containment === true);
+    await this.writeRunning(ref, 'clear');
+    return { started: true };
   }
 
   async observe(_allocationRef: string): Promise<ContainersObservation> {
@@ -343,7 +425,12 @@ export class SandboxContainers extends DurableObject<Env> {
     }
   }
 
-  private async resumeLaunch(
+  /**
+   * Resume a `not_started` launch: the wrapper exec never ran, so it is safe to
+   * start the container (when stopped) and probe before deciding. Containment is
+   * installed before any start or probe.
+   */
+  private async resumePreExecLaunch(
     record: ContainersRecord,
     ref: string,
     env: Record<string, string>,
@@ -352,6 +439,15 @@ export class SandboxContainers extends DurableObject<Env> {
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
     if (containment) await this.installContainmentProxy(container);
+    // A stopped container is started and metered before the probe. An already
+    // running container is probed first, and billing is activated by outcome.
+    if (!container.running) {
+      await this.startContainerAndActivateBilling(
+        container,
+        record,
+        this.startOptions(instance, record.lastSnapshot?.id)
+      );
+    }
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
       // A wrapper probe cannot confirm the running container, so activate before
@@ -360,55 +456,229 @@ export class SandboxContainers extends DurableObject<Env> {
       throw new Error('Wrapper probe was ambiguous');
     }
     if (probe === 'absent') {
-      // A prior launch may have recorded `launching` before `start()` took
-      // effect. Apply the requested instance and snapshot before re-execing the
-      // wrapper, otherwise the retry silently runs at the default size.
+      // Skip physical start when already running, but still activate billing.
       await this.startContainerAndActivateBilling(
         container,
         record,
         this.startOptions(instance, record.lastSnapshot?.id)
       );
-      await this.execWrapper(container, env, containment);
+      await this.startWrapper(container, env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
     }
-    await this.writeRecord({ ...record, state: 'running', allocationRef: ref, stopOpId: null });
+    await this.writeRunning(ref, 'clear');
     return { started: true };
   }
 
-  private async probeWrapper(container: Container): Promise<'found' | 'absent' | 'ambiguous'> {
+  /**
+   * Adopt a wrapper after a previous `launching` record whose bun exec may still
+   * be in flight (pending) or may have started one (legacy). Only a physically
+   * running container may be probed, and no start, bun exec or identity change is
+   * allowed. A found wrapper keeps the fence; an absent or ambiguous probe is an
+   * error, but billing is activated for the stored generation either way.
+   */
+  private async adoptUncertainWrapper(
+    stored: ContainersRecord,
+    ref: string,
+    containment: boolean,
+    stampLegacy: boolean
+  ): Promise<{ started: boolean }> {
+    const container = this.requiredContainer();
+    if (container.running !== true) {
+      throw new Error('Container wrapper start is pending and the container is not running');
+    }
+    if (containment) await this.installContainmentProxy(container);
+    const probe = await this.probeWrapper(container);
+    await this.activateBillingIfRunning(container, stored);
+    if (probe === 'found') {
+      // Retain the fence: a different pre-existing exec may still be starting.
+      await this.writeRunning(ref, 'retain');
+      return { started: true };
+    }
+    if (stampLegacy) await this.markWrapperAttempt('exec_pending');
+    if (probe === 'ambiguous') throw new Error('Wrapper probe was ambiguous');
+    throw new Error('Container wrapper start is pending and no wrapper was found');
+  }
+
+  /**
+   * Classify one wrapper probe. Without a deadline this is the entry probe's
+   * fixed 5s + 5s. With a deadline the remaining budget is shared across the
+   * pgrep exec and its exitCode, expiry throws `WrapperExecTimeoutError`, and no
+   * call begins once no time remains.
+   */
+  private async probeWrapper(
+    container: Container,
+    deadlineAt?: number
+  ): Promise<'found' | 'absent' | 'ambiguous'> {
     try {
-      const proc = await withTimeout(
+      // Absolute check before the native invocation. Checking only inside
+      // awaitProbeCall would be too late: its argument would already have
+      // started the pgrep call.
+      if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+        throw new WrapperExecTimeoutError();
+      }
+      const proc = await this.awaitProbeCall(
         container.exec(['pgrep', '-f', CONTROL_WRAPPER_PATH]),
-        PROBE_TIMEOUT_MS,
-        'wrapper probe timed out'
+        deadlineAt
       );
-      const exitCode = await withTimeout(
-        proc.exitCode,
-        PROBE_TIMEOUT_MS,
-        'wrapper probe timed out'
-      );
+      const exitCode = await this.awaitProbeCall(proc.exitCode, deadlineAt);
       if (exitCode === 0) return 'found';
       if (exitCode === 1) return 'absent';
       return 'ambiguous';
-    } catch {
+    } catch (error) {
+      if (error instanceof WrapperExecTimeoutError) throw error;
       return 'ambiguous';
     }
   }
 
-  private async execWrapper(
+  private async awaitProbeCall<T>(operation: Promise<T>, deadlineAt?: number): Promise<T> {
+    if (deadlineAt === undefined) {
+      return withTimeout(operation, PROBE_TIMEOUT_MS, 'wrapper probe timed out');
+    }
+    const remaining = remainingMs(deadlineAt);
+    if (remaining <= 0) throw new WrapperExecTimeoutError();
+    let expired = false;
+    try {
+      return await withTimeout(operation, remaining, 'wrapper probe timed out', () => {
+        expired = true;
+      });
+    } catch (error) {
+      if (expired) throw new WrapperExecTimeoutError();
+      throw error;
+    }
+  }
+
+  /**
+   * Bring the wrapper up on an already-started container.
+   *
+   * A bun exec can return `pid: 0` before Docker has spawned the process, and it
+   * is not cancelled (`withTimeout` only races). The retained handle is observed
+   * until it settles or the readiness deadline. While its `exitCode` is pending,
+   * the wrapper is probed repeatedly, one sequential probe at a time, so a
+   * wrapper that appears late is adopted; a found probe returns success even
+   * though the wrapper's own `exitCode` is still pending. No second bun runs
+   * during that period. The phase write is awaited, never raced, and rechecked
+   * before any native call: if a stalled write returns after the deadline, no
+   * exec starts and the phase rolls back to `not_started`.
+   */
+  private async startWrapper(
     container: Container,
     env: Record<string, string>,
     containment: boolean
   ): Promise<void> {
-    await withTimeout(
+    const deadlineAt = Date.now() + DEADLINE_MS.wrapperReadiness;
+    for (;;) {
+      if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+      // Persist the fence before each bun exec. Durable writes are awaited, not
+      // raced, so a stalled write may settle the call past the deadline.
+      await this.markWrapperAttempt('exec_pending');
+      if (Date.now() >= deadlineAt) {
+        await this.rollbackToNotStarted();
+        throw new WrapperExecTimeoutError();
+      }
+      const handle = await this.awaitWrapperExec(container, env, containment, deadlineAt);
+      if (handle.pid > 0) return;
+
+      // `pid: 0` means Docker has not spawned the process yet. Probe repeatedly
+      // while this handle's exitCode is still pending; do not retry the bun. The
+      // retained handle's exitCode takes precedence over a probe result: a
+      // rejection fails the launch, and a fulfilment forces a fresh reading.
+      const exit = this.trackExit(handle.exitCode);
+      let retaken = false;
+      for (;;) {
+        const probe = await this.probeWrapper(container, deadlineAt);
+        const exitState = exit();
+        if (exitState.kind === 'rejected') throw exitState.error;
+        if (exitState.kind === 'fulfilled') {
+          if (!retaken) {
+            // The handle completed while that probe was in flight; the reading
+            // may predate completion, so take a fresh one before deciding.
+            retaken = true;
+            continue;
+          }
+          if (probe === 'found') return;
+          // An ambiguous reading cannot rule out an existing wrapper, so fail
+          // closed instead of retrying the bun.
+          if (probe === 'ambiguous') throw new WrapperExecTimeoutError();
+          await this.markWrapperAttempt('not_started');
+          if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+          break;
+        }
+        if (probe === 'found') return;
+        await this.sleepWithinDeadline(deadlineAt);
+      }
+    }
+  }
+
+  /**
+   * Race one native call against the shared deadline. A timeout is a fence, not
+   * a cancellation: the native call may still be pending, so the caller must not
+   * issue another call.
+   */
+  private async awaitContainerCall<T>(operation: Promise<T>, deadlineAt: number): Promise<T> {
+    let expired = false;
+    try {
+      return await withTimeout(
+        operation,
+        remainingMs(deadlineAt),
+        'container call timed out',
+        () => {
+          expired = true;
+        }
+      );
+    } catch (error) {
+      if (expired) throw new WrapperExecTimeoutError();
+      throw error;
+    }
+  }
+
+  private async awaitWrapperExec(
+    container: Container,
+    env: Record<string, string>,
+    containment: boolean,
+    deadlineAt: number
+  ): Promise<ExecProcess> {
+    // Absolute check at the native invocation boundary: no exec may begin at or
+    // after expiry.
+    if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+    return this.awaitContainerCall(
       container.exec(['bun', 'run', CONTROL_WRAPPER_PATH], {
         env: containment ? containedProcessEnv(env) : env,
         cwd: '/',
       }),
-      WRAPPER_EXEC_TIMEOUT_MS,
-      'wrapper exec timed out'
+      deadlineAt
     );
+  }
+
+  private trackExit(exitCode: Promise<number>): () => ExitState {
+    let state: ExitState = { kind: 'pending' };
+    void exitCode.then(
+      () => {
+        state = { kind: 'fulfilled' };
+      },
+      error => {
+        state = { kind: 'rejected', error };
+      }
+    );
+    return () => state;
+  }
+
+  private async sleepWithinDeadline(deadlineAt: number): Promise<void> {
+    const remaining = remainingMs(deadlineAt);
+    if (remaining <= 0) return;
+    await delay(Math.min(WRAPPER_READINESS_POLL_MS, remaining));
+  }
+
+  /**
+   * Best-effort rollback after a stalled phase write returned past the deadline.
+   * If the rollback write fails, the durable `exec_pending` fence is retained.
+   */
+  private async rollbackToNotStarted(): Promise<void> {
+    try {
+      await this.markWrapperAttempt('not_started');
+    } catch {
+      // Keep the durable fence; a later same-ref launch must not start a new bun.
+    }
   }
 
   private async installContainmentProxy(container: Container): Promise<void> {
@@ -461,6 +731,10 @@ export class SandboxContainers extends DurableObject<Env> {
   ): Promise<'terminal' | 'retryable'> {
     const container = this.ctx.container;
     if (!container) {
+      // A missing container only proves cleanup for a record that never reached
+      // a bun exec. Pending or unclassified phases stay stopping so a later stop
+      // can observe the destroy resolve; destroying nothing must not clear them.
+      if (readWrapperAttempt(record) !== 'not_started') return 'retryable';
       await this.writeRecord(this.terminalRecord(record));
       await this.settleBillingAtStop(record);
       return 'terminal';
@@ -469,6 +743,8 @@ export class SandboxContainers extends DurableObject<Env> {
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
     } catch {
+      // A timed-out destroy has no late callback; the phase is cleared only by a
+      // later stop that observes the destroy resolve.
       return 'retryable';
     }
     const current = await this.readRecord();
@@ -700,5 +976,31 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private async writeRecord(record: ContainersRecord): Promise<void> {
     await this.ctx.storage.put(RECORD_KEY, record);
+  }
+
+  private async markWrapperAttempt(wrapperAttempt: WrapperAttempt): Promise<void> {
+    const latest = await this.readRecord();
+    await this.writeRecord({ ...latest, wrapperAttempt });
+  }
+
+  /**
+   * Sole running-record writer. It reads the latest record so a phase written
+   * mid-call is not erased by a stale pre-start copy: `clear` completes a
+   * same-call success, `retain` keeps the pending fence after adopting a wrapper.
+   */
+  private async writeRunning(ref: string, phase: 'clear' | 'retain'): Promise<void> {
+    const latest = await this.readRecord();
+    const next: ContainersRecord = {
+      ...latest,
+      state: 'running',
+      allocationRef: ref,
+      stopOpId: null,
+    };
+    if (phase === 'retain') {
+      next.wrapperAttempt = 'exec_pending';
+    } else {
+      delete next.wrapperAttempt;
+    }
+    await this.writeRecord(next);
   }
 }

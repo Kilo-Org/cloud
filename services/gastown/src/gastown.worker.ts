@@ -913,14 +913,10 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
-// Skip for container-registry, db-snapshot, mayor-id and container-events routes
-// which use authMiddleware with container JWT support, and for the container
-// control proxy (/container/...), which is protected by Cloudflare Access at the
-// perimeter (see the Town Container section below).
+// Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
   if (
-    path.includes('/container/') ||
     path.includes('/container-registry') ||
     path.includes('/db-snapshot') ||
     path.includes('/mayor-id') ||
@@ -928,10 +924,7 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
   ) {
     return next();
   }
-  // Return the response: the auth middlewares answer with a Response (401/403)
-  // without calling next(), and dropping that value leaves the request without
-  // a response.
-  return kiloAuthMiddleware(c, async () => {
+  await kiloAuthMiddleware(c, async () => {
     await adminAuditMiddleware(c, async () => {
       await townAuthMiddleware(c, next);
     });

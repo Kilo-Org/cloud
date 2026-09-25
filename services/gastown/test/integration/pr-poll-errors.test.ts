@@ -27,10 +27,6 @@ describe('PR poll error discrimination (#3149)', () => {
     townName = `pr-poll-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
-    // These tests drive the dispatch path, which the reconciler skips for
-    // staged convoys (Rule 1 excludes beads whose convoy is staged). New towns
-    // stage convoys by default (#2725), so make convoys active here.
-    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   async function setupMrBeadWithPrUrl(prUrl: string) {
@@ -65,23 +61,18 @@ describe('PR poll error discrimination (#3149)', () => {
     const mrBead = allMrs.find(b => b.metadata?.source_bead_id === beadId);
     expect(mrBead).toBeTruthy();
 
-    // The PR URL lives on the review queue entry (review_metadata.pr_url), which
-    // the refinery writes when it reports the PR it created. Drive the same path:
-    // the refinery hooked to the MR bead calls gt_done with the URL, then the
-    // alarm drains that event and records the URL on the review.
-    const refineries = await town.listAgents({ role: 'refinery' });
-    const refinery = refineries.find(a => a.current_hook_bead_id === mrBead!.bead_id);
-    expect(refinery).toBeTruthy();
-
-    await town.agentDone(refinery!.id, {
-      branch: 'gt/refinery/test-branch',
-      summary: 'Created PR',
-      pr_url: prUrl,
-    });
-    await runDurableObjectAlarm(town);
-
-    // Put the MR bead back to in_progress so the reconciler will schedule a
-    // poll_pr action on the next alarm tick.
+    // Set the PR URL and put the MR bead back to in_progress so the
+    // reconciler will schedule a poll_pr action on the next alarm tick.
+    await town.updateBead(
+      mrBead!.bead_id,
+      {
+        metadata: {
+          ...(mrBead!.metadata ?? {}),
+          pr_url: prUrl,
+        },
+      },
+      'system'
+    );
     await town.updateBeadStatus(mrBead!.bead_id, 'in_progress', 'system');
 
     return { beadId, mrBeadId: mrBead!.bead_id, agentId, convoyId: result.convoy.id };

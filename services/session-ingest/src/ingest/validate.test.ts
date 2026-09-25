@@ -1,14 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-// Keep payloads tiny so the oversized-skip path cannot burn the default 5s
-// timeout. The production 50MiB threshold plus JSON.stringify/tokenize of that
-// body takes ~4.6s in isolation and times out under the full unit suite.
-vi.mock('../util/ingest-limits', () => ({
-  INGEST_CHUNK_MAX_BYTES: 256,
-  INGEST_CHUNK_MAX_ITEMS: 128,
-  MAX_INGEST_ITEM_BYTES: 100,
-  MAX_SINGLE_ITEM_BYTES: 500,
-}));
+import { describe, expect, it } from 'vitest';
 
 import {
   INGEST_CHUNK_MAX_BYTES,
@@ -141,7 +131,7 @@ describe('validateAndParseIngestPayload', () => {
   });
 
   it('reports an oversized valid item', () => {
-    const data = { id: 'msg_large', content: 'x'.repeat(200) };
+    const data = { id: 'msg_large', content: 'x'.repeat(2 * 1024 * 1024) };
     const dataBytes = encoder.encode(JSON.stringify(data)).byteLength;
 
     expect(validate({ data: [{ type: 'message', data }] })).toMatchObject({

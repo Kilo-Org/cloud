@@ -20,10 +20,6 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
       gitUrl: 'https://github.com/test/repo.git',
       defaultBranch: 'main',
     });
-    // These tests drive the dispatch path, which the reconciler skips for
-    // staged convoys (Rule 1 excludes beads whose convoy is staged). New towns
-    // stage convoys by default (#2725), so make convoys active here.
-    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   async function setupConvoyWithLandingMr() {
@@ -212,8 +208,6 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
       gitUrl: 'https://github.com/test/repo.git',
       defaultBranch: 'main',
     });
-    // Same as above: drive the dispatch path, so create convoys unstaged.
-    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   it('should not create a feedback bead for REVIEW_REQUIRED (awaiting approval)', async () => {

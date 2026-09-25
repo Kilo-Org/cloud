@@ -141,11 +141,6 @@ export class AgentDO extends DurableObject<Env> {
     console.log(`${AGENT_DO_LOG} destroy: clearing all storage`);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-
-    // deleteAll() drops the event table, but this instance keeps answering
-    // RPCs. Drop the cached init promise so the next query re-creates the
-    // (empty) schema instead of failing with "no such table".
-    this.initPromise = null;
   }
 
   async ping(): Promise<{ ok: true }> {

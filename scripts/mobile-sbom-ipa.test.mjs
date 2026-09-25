@@ -357,10 +357,9 @@ test('readIpaComponents includes dependencies only an embedded extension carries
     'NotifKit.framework',
     'libExtOnly.dylib',
   ]);
-  assert.deepEqual(
-    byName.get('ExtensionOnly.framework').extraProperties,
-    [{ name: 'kilo:sbom:ios-kind', value: 'dylib-load-command' }]
-  );
+  assert.deepEqual(byName.get('ExtensionOnly.framework').extraProperties, [
+    { name: 'kilo:sbom:ios-kind', value: 'dylib-load-command' },
+  ]);
   assert.deepEqual(byName.get('NotifKit.framework').extraProperties, [
     { name: 'kilo:sbom:ios-kind', value: 'dynamic-framework' },
   ]);

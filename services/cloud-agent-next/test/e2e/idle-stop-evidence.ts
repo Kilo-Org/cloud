@@ -2,14 +2,13 @@
  * Framing, matcher and bounded tail readers for cloud-agent-next
  * `sandbox_control` diagnostics.
  *
- * This module scrapes one production-owned log contract:
- * `src/sandbox-control/diagnostics.ts` (`logControlDiagnostic` stamps
- * `logTag: 'sandbox_control'` and `diagnosticEvent`), and the emitting sites in
- * `src/persistence/SandboxControl.ts` that write the `physical_committed`,
- * `provider_stop`, `deadline_fired`, `recovery_outcome` and `heartbeat`
- * records. Keep `LOG_FIELD_KEYS` and the event/field expectations below in sync
- * with those emitters; a production field rename surfaces here as a
- * missing-evidence timeout, not a compile error.
+ * This module scrapes two production-owned log contracts:
+ * `src/persistence/SandboxControl.ts` writes the `allocation_transition` line per
+ * committed allocation/health transition, and the provider adapters
+ * (`cloudflare-provider.ts`, `vercel-provider.ts`) write `native_stop`. Keep
+ * `LOG_FIELD_KEYS` and the event/field expectations below in sync with those
+ * emitters; a production field rename surfaces here as a missing-evidence
+ * timeout, not a compile error.
  *
  * Only the local Docker profile uses the tail readers: they read the local
  * `dev/logs/cloud-agent-next.log` file and return framed records for
@@ -29,7 +28,6 @@ export const CLOUD_AGENT_LOG_PATH = path.resolve(
 );
 const IDLE_LOG_READ_CHUNK_BYTES = 256 * 1024;
 const MAX_FRAMED_LOG_OBJECT_BYTES = 512 * 1024;
-const MAX_PENDING_IDLE_DEADLINES = 64;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -68,18 +66,32 @@ const LOG_FIELD_KEYS = [
   'sandboxId',
   'wrapperInstanceId',
   'connectionId',
+  // Control-socket recycle correlation (`socket_request_sent`, `socket_closed`,
+  // `handshake_committed`, `wrapper_ready`) and the attach-window oracle
+  // (`socket_response`): the dispatched operation, the closed socket's handshake
+  // state, and the request the response answers.
+  'operation',
+  'handshakeComplete',
+  'requestId',
   // Accepted-reconciliation identity emitted by the accepted-alarm diagnostic
   // (`SandboxSession` accepted-message watchdog): the emitting `sessionId`,
   // `messageId`, and `expectedWrapperInstanceId`.
   'messageId',
   'sessionId',
   'expectedWrapperInstanceId',
-  'fromState',
-  'toState',
-  'cause',
-  'stopCause',
+  // Canonical allocation-transition fields (`allocation_transition`).
+  'aggregate',
+  'from',
+  'to',
+  'event',
+  'deadline',
+  'at',
+  'incarnation',
+  'reason',
+  // Provider correlation fields on the adapter's `native_stop` record.
+  'provider',
+  'providerSessionId',
   'result',
-  'deadlineId',
   'deadlineAt',
   'latenessMs',
   'time',
@@ -101,9 +113,6 @@ const LOG_FIELD_KEYS = [
   'reportedSessions',
   'activeKiloSessions',
   'inputWaitingRoutes',
-  // Recovery-outcome fields emitted by `emitRecoveryOutcome`.
-  'outcome',
-  'committedAt',
   // Per-session heartbeat payload fields emitted by `heartbeatSessionFields`.
   'decision',
   'kiloSessionId',
@@ -256,9 +265,8 @@ function physicalSandboxMatches(record: LogRecord, physicalSandboxId: string): b
 }
 
 export type IdleStopEvidence = {
-  physicalCommittedAt: number;
+  stopInitiatedAt: number;
   providerStopAt: number;
-  deadlineAt?: number;
   observedAt: number;
   elapsedMs: number;
 };
@@ -268,11 +276,16 @@ export type IdleStopEvidenceInput = {
   /**
    * Durable logical sandbox id from `getSession` (`workspace.sandboxId`). Every
    * `sandbox_control` diagnostic stamps it as `sandboxId`. Prefer this over the
-   * derived `physicalSandboxId` (the `ses-…` allocation name) because the
-   * durable session exposes the logical id, not the allocation name.
+   * derived allocation name because the durable session exposes the logical id.
    */
   sandboxId?: string;
   physicalSandboxId?: string;
+  /** Provider allocation name (`ses-<hash>`), correlated against `native_stop`. */
+  allocationName?: string;
+  /** Provider kind (`cloudflare`/`vercel`), correlated against `native_stop`. */
+  provider?: string;
+  /** Vercel provider session id, correlated when the owned ref exposes one. */
+  providerSessionId?: string;
   cursorCapturedAt?: number;
 };
 
@@ -288,9 +301,7 @@ function recordMatchesOwnedIdentity(
   identity: { sandboxId?: string; wrapperInstanceId?: string }
 ): boolean {
   // The durable logical sandbox id is stamped on every `sandbox_control`
-  // diagnostic as `sandboxId`, including the `physical_committed` and
-  // `provider_stop` records that also carry a derived `physicalSandboxId`
-  // (the `ses-…` allocation name). Match it first so the reader needs only the
+  // diagnostic as `sandboxId`. Match it first so the reader needs only the
   // durable id, not the derived allocation name or the Docker family name.
   if (input.sandboxId !== undefined && record.sandboxId === input.sandboxId) return true;
   const expectedPhysicalSandboxId = input.physicalSandboxId ?? input.allocationId;
@@ -314,104 +325,75 @@ function recordMatchesOwnedIdentity(
   return identity.sandboxId !== undefined && record.sandboxId === identity.sandboxId;
 }
 
-function idleDeadlineMatchesIdentity(
+/** The owned idle-stop initiation: `allocated.* -> stopping.destroying` on an idle reason. */
+function isIdleStopInitiation(record: LogRecord): boolean {
+  return (
+    record.diagnosticEvent === 'allocation_transition' &&
+    record.aggregate === 'allocation' &&
+    typeof record.from === 'string' &&
+    record.from.startsWith('allocated.') &&
+    record.to === 'stopping.destroying' &&
+    isIdleStopCause(record.reason)
+  );
+}
+
+/**
+ * The provider's own terminal stop for the owned allocation. `native_stop`
+ * carries no durable sandbox id, so the allocation name and provider must both
+ * match; an absent allocation name fails closed.
+ */
+function nativeStopMatchesOwnedAllocation(
   record: LogRecord,
-  input: IdleStopEvidenceInput,
-  resolvedAllocationId: string | undefined,
-  identity: { sandboxId?: string; wrapperInstanceId?: string }
+  input: IdleStopEvidenceInput
 ): boolean {
-  if (record.deadlineId !== 'idleStop' || typeof record.deadlineAt !== 'number') return false;
-  return recordMatchesOwnedIdentity(record, input, resolvedAllocationId, identity);
+  if (input.allocationName === undefined) return false;
+  if (record.diagnosticEvent !== 'native_stop' || record.result !== 'terminal') return false;
+  if (record.allocationName !== input.allocationName) return false;
+  if (record.provider !== input.provider) return false;
+  if (
+    input.providerSessionId !== undefined &&
+    record.providerSessionId !== input.providerSessionId
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function createIdleStopEvidenceMatcher(input: IdleStopEvidenceInput): {
   feed: (record: LogRecord) => IdleStopEvidence | null;
 } {
   const cursorCapturedAt = input.cursorCapturedAt ?? Date.now();
-  const expectedPhysicalSandboxId = input.physicalSandboxId ?? input.allocationId;
   let resolvedAllocationId = input.allocationId.length > 0 ? input.allocationId : undefined;
   const identity: { sandboxId?: string; wrapperInstanceId?: string } = {};
-  const pendingDeadlines: LogRecord[] = [];
-  let physicalCommittedAt: number | undefined;
+  let stopInitiatedAt: number | undefined;
   let providerStopAt: number | undefined;
-  let deadlineAt: number | undefined;
-
-  const maybeCapturePendingDeadline = (): void => {
-    if (deadlineAt !== undefined) return;
-    for (const pending of pendingDeadlines) {
-      if (
-        idleDeadlineMatchesIdentity(
-          pending,
-          {
-            ...input,
-            physicalSandboxId: expectedPhysicalSandboxId,
-          },
-          resolvedAllocationId,
-          identity
-        )
-      ) {
-        deadlineAt = pending.deadlineAt as number;
-        return;
-      }
-    }
-  };
 
   const feed = (record: LogRecord): IdleStopEvidence | null => {
     if (recordLogTag(record) !== 'sandbox_control') return null;
     const observedAt = recordTime(record, Date.now());
-    const isDeadline = record.diagnosticEvent === 'deadline_fired';
-    if (isDeadline && record.deadlineId === 'idleStop' && typeof record.deadlineAt === 'number') {
-      if (idleDeadlineMatchesIdentity(record, input, resolvedAllocationId, identity)) {
-        deadlineAt ??= record.deadlineAt;
-      } else if (pendingDeadlines.length < MAX_PENDING_IDLE_DEADLINES) {
-        pendingDeadlines.push(record);
-      }
-    }
 
     if (
-      record.diagnosticEvent === 'physical_committed' &&
+      isIdleStopInitiation(record) &&
       recordMatchesOwnedIdentity(record, input, resolvedAllocationId, identity)
     ) {
       const recordAllocationId = identityValue(record, 'allocationId');
       if (recordAllocationId !== undefined) resolvedAllocationId = recordAllocationId;
       identity.sandboxId ??= identityValue(record, 'sandboxId');
       identity.wrapperInstanceId ??= identityValue(record, 'wrapperInstanceId');
-      maybeCapturePendingDeadline();
-      // Only the running -> stopping transition with an idle `cause` is the
-      // initiation record. A stop_attempt with stopCause=idle is not evidence.
-      if (
-        record.fromState === 'running' &&
-        record.toState === 'stopping' &&
-        isIdleStopCause(record.cause)
-      ) {
-        physicalCommittedAt ??= observedAt;
-      }
+      stopInitiatedAt ??= observedAt;
     }
 
-    if (
-      record.diagnosticEvent === 'provider_stop' &&
-      record.result === 'terminal' &&
-      recordMatchesOwnedIdentity(record, input, resolvedAllocationId, identity)
-    ) {
-      const recordAllocationId = identityValue(record, 'allocationId');
-      if (recordAllocationId !== undefined) resolvedAllocationId = recordAllocationId;
-      identity.sandboxId ??= identityValue(record, 'sandboxId');
-      identity.wrapperInstanceId ??= identityValue(record, 'wrapperInstanceId');
-      maybeCapturePendingDeadline();
+    if (nativeStopMatchesOwnedAllocation(record, input)) {
       providerStopAt ??= observedAt;
     }
 
-    if (physicalCommittedAt === undefined || providerStopAt === undefined) return null;
-    const observed = Math.max(physicalCommittedAt, providerStopAt);
+    if (stopInitiatedAt === undefined || providerStopAt === undefined) return null;
+    const observed = Math.max(stopInitiatedAt, providerStopAt);
     return {
-      physicalCommittedAt,
+      stopInitiatedAt,
       providerStopAt,
-      ...(deadlineAt !== undefined ? { deadlineAt } : {}),
       observedAt: observed,
-      elapsedMs:
-        deadlineAt !== undefined
-          ? Math.max(0, deadlineAt - cursorCapturedAt)
-          : Math.max(0, observed - cursorCapturedAt),
+      elapsedMs: Math.max(0, observed - cursorCapturedAt),
     };
   };
 

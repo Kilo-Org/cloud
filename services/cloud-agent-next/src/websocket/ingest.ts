@@ -51,10 +51,6 @@ import {
 } from './ingest-attention-classifier.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
 
-// ---------------------------------------------------------------------------
-// Ingest Attachment
-// ---------------------------------------------------------------------------
-
 /** Debounce interval for heartbeat updates (30 seconds) */
 const HEARTBEAT_DEBOUNCE_MS = 30_000;
 
@@ -193,10 +189,6 @@ function sanitizePublicEventData(eventType: string, data: unknown): unknown {
   return data;
 }
 
-// ---------------------------------------------------------------------------
-// Persistence Allowlists
-// ---------------------------------------------------------------------------
-
 /**
  * Kilocode events with entity IDs are always persisted via upsert:
  *   - message.updated   → entity_id: message/{id}
@@ -241,10 +233,6 @@ const ingestAttachmentSchema = z.object({
 
 export type IngestAttachment = z.infer<typeof ingestAttachmentSchema>;
 
-// ---------------------------------------------------------------------------
-// DO Context for handlers
-// ---------------------------------------------------------------------------
-
 export type IngestDOContext = {
   updateKiloSessionId: (id: string) => Promise<void>;
   updateUpstreamBranch: (branch: string) => Promise<void>;
@@ -277,10 +265,6 @@ export type IngestDOContext = {
    */
   onAttentionEvent?: (event: AttentionEvent) => void;
 };
-
-// ---------------------------------------------------------------------------
-// Ingest Handler Factory
-// ---------------------------------------------------------------------------
 
 /**
  * Create an ingest handler for the /ingest WebSocket endpoint.
@@ -754,9 +738,6 @@ export function createIngestHandler(
           }
         }
 
-        // -- Handler integrations --
-
-        // Handle commands.available (cache catalog in DO metadata)
         if (eventType === 'commands.available') {
           await handleCommandsAvailable(ingestEvent.data, {
             setAvailableCommands: cmds => doContext.setAvailableCommands(cmds),
@@ -764,7 +745,6 @@ export function createIngestHandler(
           });
         }
 
-        // Handle kilocode events (session ID capture)
         if (eventType === 'kilocode') {
           const parsedKilocode = kilocodeEventSchema.safeParse(ingestEvent.data);
           if (parsedKilocode.success) {

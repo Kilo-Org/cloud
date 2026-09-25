@@ -199,7 +199,8 @@ export function classifyFetchAlertsError(
 export async function checkDependabotAlertsAvailability(
   installationId: string,
   appType: GitHubAppType,
-  repositories: ReadonlyArray<{ id: number; fullName: string }>
+  repositories: ReadonlyArray<{ id: number; fullName: string }>,
+  expectedIntegrationId?: string
 ): Promise<RepositoryDependabotAlertsAvailability[]> {
   if (repositories.length === 0) return [];
 
@@ -224,7 +225,8 @@ export async function checkDependabotAlertsAvailability(
 
   let token: string;
   try {
-    token = (await generateGitHubInstallationToken(installationId, appType)).token;
+    token = (await generateGitHubInstallationToken(installationId, appType, expectedIntegrationId))
+      .token;
   } catch {
     warnExceptInTest('Unable to authenticate while checking Dependabot alerts availability');
     return repositories.map(repository => ({

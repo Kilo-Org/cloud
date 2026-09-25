@@ -1,102 +1,23 @@
-import { describe, it, expect } from '@jest/globals';
-import {
-  CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
-import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import {
-  GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
-  GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/google';
-import { KIMI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import {
-  GPT_CURRENT_VERCEL_MODEL_ID,
-  GPT_MINI_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/openai';
+import { describe, it, expect, jest } from '@jest/globals';
+
+const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>().mockResolvedValue([]);
+
+jest.mock('@/lib/drizzle', () => ({
+  readDb: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        orderBy: jest.fn(() => ({ limit: mockLimit })),
+      })),
+    })),
+  },
+}));
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
-import {
-  GLM_CURRENT_VERCEL_MODEL_ID,
-  GLM_FLASH_CURRENT_VERCEL_MODEL_ID,
-} from '@/lib/ai-gateway/providers/zai';
-import {
-  CLAUDE_FABLE_LATEST_MODEL_ALIAS,
-  CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
-  CLAUDE_OPUS_LATEST_MODEL_ALIAS,
-  CLAUDE_SONNET_LATEST_MODEL_ALIAS,
-  DEEPSEEK_FLASH_LATEST_MODEL_ALIAS,
-  DEEPSEEK_PRO_LATEST_MODEL_ALIAS,
-  DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
-  GEMINI_FLASH_LATEST_MODEL_ALIAS,
-  GEMINI_PRO_LATEST_MODEL_ALIAS,
-  GPT_ASTRA_LATEST_MODEL_ALIAS,
-  GPT_LATEST_MODEL_ALIAS,
-  GPT_LUNA_LATEST_MODEL_ALIAS,
-  GPT_MINI_LATEST_MODEL_ALIAS,
-  GPT_SOL_LATEST_MODEL_ALIAS,
-  GPT_TERRA_LATEST_MODEL_ALIAS,
-  GLM_FLASH_LATEST_MODEL_ALIAS,
-  GLM_LATEST_MODEL_ALIAS,
-  GROK_LATEST_MODEL_ALIAS,
-  KIMI_LATEST_MODEL_ALIAS,
-  LATEST_MODEL_ALIASES,
-} from '@/lib/ai-gateway/latest-model-aliases';
 
 describe('mapModelIdToVercel', () => {
-  describe('tilde-prefixed latest aliases', () => {
-    it.each([
-      [CLAUDE_FABLE_LATEST_MODEL_ALIAS, CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],
-      [CLAUDE_OPUS_LATEST_MODEL_ALIAS, CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID],
-      [CLAUDE_SONNET_LATEST_MODEL_ALIAS, CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID],
-      [CLAUDE_HAIKU_LATEST_MODEL_ALIAS, CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],
-      [GPT_LATEST_MODEL_ALIAS, GPT_CURRENT_VERCEL_MODEL_ID],
-      [GPT_MINI_LATEST_MODEL_ALIAS, GPT_MINI_CURRENT_VERCEL_MODEL_ID],
-      [GPT_ASTRA_LATEST_MODEL_ALIAS, 'openai/gpt-6-astra'],
-      [GPT_LUNA_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-luna'],
-      [GPT_SOL_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-sol'],
-      [GPT_TERRA_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-terra'],
-      [KIMI_LATEST_MODEL_ALIAS, KIMI_CURRENT_VERCEL_MODEL_ID],
-      [GEMINI_PRO_LATEST_MODEL_ALIAS, GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
-      [GEMINI_FLASH_LATEST_MODEL_ALIAS, GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
-      [GROK_LATEST_MODEL_ALIAS, GROK_CURRENT_VERCEL_MODEL_ID],
-      [GLM_LATEST_MODEL_ALIAS, GLM_CURRENT_VERCEL_MODEL_ID],
-      [GLM_FLASH_LATEST_MODEL_ALIAS, GLM_FLASH_CURRENT_VERCEL_MODEL_ID],
-      [DEEPSEEK_PRO_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-pro-0813'],
-      [DEEPSEEK_FLASH_LATEST_MODEL_ALIAS, DEEPSEEK_V4_1_FLASH_MODEL_ID],
-      [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-flash-0731'],
-    ])('maps %s to the current Vercel model id', (input, expected) => {
-      expect(mapModelIdToVercel(input)).toBe(expected);
-    });
-
-    it('exports every latest alias in one list', () => {
-      expect(LATEST_MODEL_ALIASES).toEqual([
-        CLAUDE_FABLE_LATEST_MODEL_ALIAS,
-        CLAUDE_OPUS_LATEST_MODEL_ALIAS,
-        CLAUDE_SONNET_LATEST_MODEL_ALIAS,
-        CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
-        GPT_LATEST_MODEL_ALIAS,
-        GPT_MINI_LATEST_MODEL_ALIAS,
-        GPT_ASTRA_LATEST_MODEL_ALIAS,
-        GPT_LUNA_LATEST_MODEL_ALIAS,
-        GPT_SOL_LATEST_MODEL_ALIAS,
-        GPT_TERRA_LATEST_MODEL_ALIAS,
-        KIMI_LATEST_MODEL_ALIAS,
-        GEMINI_PRO_LATEST_MODEL_ALIAS,
-        GEMINI_FLASH_LATEST_MODEL_ALIAS,
-        GROK_LATEST_MODEL_ALIAS,
-        GLM_LATEST_MODEL_ALIAS,
-        GLM_FLASH_LATEST_MODEL_ALIAS,
-        DEEPSEEK_PRO_LATEST_MODEL_ALIAS,
-        DEEPSEEK_FLASH_LATEST_MODEL_ALIAS,
-        DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
-      ]);
-    });
-
-    it('does not map a latest alias that is missing the leading tilde', () => {
-      expect(mapModelIdToVercel('deepseek/deepseek-v4-flash-latest')).toBe(
-        'deepseek/deepseek-v4-flash-latest'
+  describe('catalog aliases', () => {
+    it('leaves an unresolved latest alias unchanged', async () => {
+      await expect(mapModelIdToVercel('~anthropic/claude-sonnet-latest')).resolves.toBe(
+        '~anthropic/claude-sonnet-latest'
       );
     });
   });
@@ -121,7 +42,6 @@ describe('mapModelIdToVercel', () => {
       ['anthropic/claude-sonnet-4-5', 'anthropic/claude-sonnet-4.5'],
       ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
       ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
-      ['claude-opus-5', 'anthropic/claude-opus-5'],
       ['claude-sonnet-4', 'anthropic/claude-sonnet-4'],
       ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
       ['claude-sonnet-5', 'anthropic/claude-sonnet-5'],
@@ -148,78 +68,96 @@ describe('mapModelIdToVercel', () => {
       ['mimo-v2.5', 'xiaomi/mimo-v2.5'],
       ['glm-5.1', 'zai/glm-5.1'],
       ['glm-5.2', 'zai/glm-5.2'],
-    ])('maps %s to %s', (input, expected) => {
-      expect(mapModelIdToVercel(input)).toBe(expected);
+    ])('maps %s to %s', async (input, expected) => {
+      await expect(mapModelIdToVercel(input)).resolves.toBe(expected);
     });
 
     it.each([
       ['gpt-4o-2024-08-06', 'gpt-4o-2024-08-06'],
       ['claude-fable-5', 'claude-fable-5'],
-    ])('does not retain a mapping for %s', (input, expected) => {
-      expect(mapModelIdToVercel(input)).toBe(expected);
+    ])('does not retain a mapping for %s', async (input, expected) => {
+      await expect(mapModelIdToVercel(input)).resolves.toBe(expected);
     });
   });
 
   describe('first-party inference provider inference', () => {
-    it('rewrites the anthropic/ prefix unchanged', () => {
-      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.5')).toBe('anthropic/claude-sonnet-4.5');
+    it('rewrites the anthropic/ prefix unchanged', async () => {
+      await expect(mapModelIdToVercel('anthropic/claude-sonnet-4.5')).resolves.toBe(
+        'anthropic/claude-sonnet-4.5'
+      );
     });
 
-    it('rewrites the mistralai/ prefix to mistral/', () => {
+    it('rewrites the mistralai/ prefix to mistral/', async () => {
       // not covered by the hardcoded mapping
-      expect(mapModelIdToVercel('mistralai/some-new-model')).toBe('mistral/some-new-model');
+      await expect(mapModelIdToVercel('mistralai/some-new-model')).resolves.toBe(
+        'mistral/some-new-model'
+      );
     });
 
-    it('rewrites the qwen/ prefix to alibaba/', () => {
-      expect(mapModelIdToVercel('qwen/some-new-qwen-model')).toBe('alibaba/some-new-qwen-model');
+    it('rewrites the qwen/ prefix to alibaba/', async () => {
+      await expect(mapModelIdToVercel('qwen/some-new-qwen-model')).resolves.toBe(
+        'alibaba/some-new-qwen-model'
+      );
     });
 
-    it('rewrites x-ai/ to spacexai/', () => {
-      expect(mapModelIdToVercel('x-ai/some-new-grok')).toBe('spacexai/some-new-grok');
+    it('rewrites x-ai/ to spacexai/', async () => {
+      await expect(mapModelIdToVercel('x-ai/some-new-grok')).resolves.toBe(
+        'spacexai/some-new-grok'
+      );
     });
 
-    it('rewrites z-ai/ to zai/', () => {
-      expect(mapModelIdToVercel('z-ai/glm-5.1')).toBe('zai/glm-5.1');
+    it('rewrites z-ai/ to zai/', async () => {
+      await expect(mapModelIdToVercel('z-ai/glm-5.1')).resolves.toBe('zai/glm-5.1');
     });
 
-    it('leaves gpt-oss models unchanged', () => {
-      expect(mapModelIdToVercel('openai/gpt-oss-20b')).toBe('openai/gpt-oss-20b');
+    it('leaves gpt-oss models unchanged', async () => {
+      await expect(mapModelIdToVercel('openai/gpt-oss-20b')).resolves.toBe('openai/gpt-oss-20b');
     });
 
-    it('leaves the OpenRouter-only Poolside model unchanged', () => {
-      expect(mapModelIdToVercel('poolside/laguna-s-2.1:free')).toBe('poolside/laguna-s-2.1:free');
+    it('leaves the OpenRouter-only Poolside model unchanged', async () => {
+      await expect(mapModelIdToVercel('poolside/laguna-s-2.1:free')).resolves.toBe(
+        'poolside/laguna-s-2.1:free'
+      );
     });
 
-    it('leaves a model with an unknown provider prefix unchanged', () => {
-      expect(mapModelIdToVercel('deepseek/deepseek-v3.2')).toBe('deepseek/deepseek-v3.2');
+    it('leaves a model with an unknown provider prefix unchanged', async () => {
+      await expect(mapModelIdToVercel('deepseek/deepseek-v3.2')).resolves.toBe(
+        'deepseek/deepseek-v3.2'
+      );
     });
 
-    it('returns the model id as-is when it contains no slash', () => {
-      expect(mapModelIdToVercel('some-model-without-slash')).toBe('some-model-without-slash');
+    it('returns the model id as-is when it contains no slash', async () => {
+      await expect(mapModelIdToVercel('some-model-without-slash')).resolves.toBe(
+        'some-model-without-slash'
+      );
     });
   });
 
   describe('kilo-exclusive models', () => {
-    it('maps an exclusive flagged with vercel-routing to its internal id', () => {
+    it('maps an exclusive flagged with vercel-routing to its internal id', async () => {
       // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
       // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
-      expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).toBe(
+      await expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).resolves.toBe(
         'google/gemma-4-26b-a4b-it'
       );
     });
 
-    it('does not use internal_id for exclusives that are not vercel-routed', () => {
+    it('does not use internal_id for exclusives that are not vercel-routed', async () => {
       // claude_sonnet_4_6_stealth_model has gateway 'martian' and no
       // 'vercel-routing' flag, so the mapping must pass the public id through
       // the generic prefix rewrite instead of substituting internal_id.
-      expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).toBe('stealth/claude-sonnet-4.6');
+      await expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).resolves.toBe(
+        'stealth/claude-sonnet-4.6'
+      );
     });
 
-    it('does not use internal_id for disabled exclusives even when vercel-routed', () => {
+    it('does not use internal_id for disabled exclusives even when vercel-routed', async () => {
       // minimax_m25_free_model has the 'vercel-routing' flag but status
       // 'disabled', so it must not be substituted by internal_id and instead
       // pass the public id through the generic prefix rewrite.
-      expect(mapModelIdToVercel('minimax/minimax-m2.5:free')).toBe('minimax/minimax-m2.5:free');
+      await expect(mapModelIdToVercel('minimax/minimax-m2.5:free')).resolves.toBe(
+        'minimax/minimax-m2.5:free'
+      );
     });
   });
 });

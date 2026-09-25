@@ -2148,7 +2148,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const request = makeRequest(tmpDir);
     request.workspace.preferSnapshot = true;
     request.materialized.setupCommands = [];
-    const progress = mock(() => {});
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    const progress = mock((..._args: unknown[]) => {});
 
     const result = await prepareWrapperBootstrapWorkspace(request, progress, {
       git: async args => {
@@ -2164,19 +2166,78 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         ok: true,
         downloaded: true,
         imported: true,
-        diffs: { applied: 1, skipped: 1, total: 2 },
+        diffs: {
+          applied: 1,
+          skipped: 1,
+          total: 2,
+          skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+        },
       }),
     });
 
+    // (a) The named skipped-diff report reaches the worker metric.
     expect(result.restore).toEqual({
       path: 'cold',
-      diffs: { applied: 1, skipped: 1, total: 2 },
+      diffs: {
+        applied: 1,
+        skipped: 1,
+        total: 2,
+        skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+      },
     });
-    expect(progress).toHaveBeenCalledWith(
+    // (b) The agent rules file names the count, the reason and the path.
+    const rulesPath = path.join(
+      request.workspace.sessionHome,
+      '.kilocode/rules/restore-incomplete.md'
+    );
+    const rules = await fsp.readFile(rulesPath, 'utf8');
+    expect(rules).toContain('1 of 2 files');
+    expect(rules).toContain('the patch did not apply');
+    expect(rules).toContain('src/index.ts');
+    // (c) The named step is emitted, with `started` before `failed` (the
+    // materializer drops a step event without a preceding step_started).
+    const stepEvents = progress.mock.calls
+      .flat()
+      .filter(
+        (event): event is { type: string; step: string; stepId: string; safeError?: string } =>
+          typeof event === 'object' && event !== null && 'type' in event
+      );
+    const startedIndex = stepEvents.findIndex(
+      event => event.type === 'started' && event.stepId === 'phase:restore_incomplete'
+    );
+    const failedIndex = stepEvents.findIndex(
+      event => event.type === 'failed' && event.stepId === 'phase:restore_incomplete'
+    );
+    expect(startedIndex).toBeGreaterThanOrEqual(0);
+    expect(stepEvents[startedIndex]).toMatchObject({
+      type: 'started',
+      step: 'restore_incomplete',
+      stepId: 'phase:restore_incomplete',
+      kind: 'phase',
+      label: 'Session restore incomplete',
+    });
+    expect(failedIndex).toBeGreaterThan(startedIndex);
+    expect(stepEvents[failedIndex]).toMatchObject({
+      type: 'failed',
+      step: 'restore_incomplete',
+      stepId: 'phase:restore_incomplete',
+      safeError: expect.stringContaining('1 of 2 files'),
+    });
+    // (d) The old progress line is replaced, not duplicated.
+    expect(progress).not.toHaveBeenCalledWith(
       'kilo_session',
       'Cold restore incomplete, 1/2 files restored'
     );
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
+    // The wrapper log carries the greppable named outcome.
+    const wrapperLog = await fsp.readFile(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('bootstrap restore incomplete');
+    expect(wrapperLog).toContain('skipped=1 total=2');
+    expect(wrapperLog).toContain('reasons=patch_apply_failed');
+    expect(wrapperLog).toContain('paths=src/index.ts');
+    // The line attributes the outcome to the wrapper replacement that restored
+    // the worktree, so two rebinds in one session are distinguishable.
+    expect(wrapperLog).toContain('wrapperRunId=wr_test wrapperGeneration=1');
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
@@ -2188,7 +2249,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     request.workspace.restoredFromBackup = true;
     request.materialized.setupCommands = [];
     await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const progress = mock(() => {});
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    const progress = mock((..._args: unknown[]) => {});
 
     const result = await prepareWrapperBootstrapWorkspace(request, progress, {
       git: async args => {
@@ -2201,15 +2264,47 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         ok: true,
         downloaded: true,
         imported: true,
-        diffs: { applied: 1, skipped: 1, total: 2 },
+        diffs: {
+          applied: 1,
+          skipped: 1,
+          total: 2,
+          skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+        },
       }),
     });
 
+    // (a) The named skipped-diff report carries the restore path and the files.
     expect(result.restore).toEqual({
       path: 'backup',
-      diffs: { applied: 1, skipped: 1, total: 2 },
+      diffs: {
+        applied: 1,
+        skipped: 1,
+        total: 2,
+        skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+      },
     });
-    expect(progress).toHaveBeenCalledWith(
+    // (b) The agent rules file is written on the backup path too.
+    const rules = await fsp.readFile(
+      path.join(request.workspace.sessionHome, '.kilocode/rules/restore-incomplete.md'),
+      'utf8'
+    );
+    expect(rules).toContain('1 of 2 files');
+    expect(rules).toContain('the patch did not apply');
+    expect(rules).toContain('src/index.ts');
+    // (c) The named step is emitted.
+    expect(progress).toHaveBeenCalledWith({
+      type: 'failed',
+      step: 'restore_incomplete',
+      stepId: 'phase:restore_incomplete',
+      safeError: expect.stringContaining('1 of 2 files'),
+    });
+    const wrapperLog = await fsp.readFile(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('bootstrap restore incomplete');
+    expect(wrapperLog).toContain('skipped=1 total=2');
+    expect(wrapperLog).toContain('paths=src/index.ts');
+    expect(wrapperLog).toContain('wrapperRunId=wr_test wrapperGeneration=1');
+    // (d) Neither old progress line is emitted.
+    expect(progress).not.toHaveBeenCalledWith(
       'kilo_session',
       'Resume restore incomplete, 1/2 files restored'
     );
@@ -2258,8 +2353,17 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     request.workspace.preferSnapshot = true;
     request.workspace.requireSnapshot = true;
     request.materialized.setupCommands = [];
+    const progress = mock((..._args: unknown[]) => {});
+    // A stale note from an earlier incomplete restore must not survive a
+    // complete one.
+    const rulesPath = path.join(
+      request.workspace.sessionHome,
+      '.kilocode/rules/restore-incomplete.md'
+    );
+    await fsp.mkdir(path.dirname(rulesPath), { recursive: true });
+    await fsp.writeFile(rulesPath, 'stale incomplete note');
 
-    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
+    const result = await prepareWrapperBootstrapWorkspace(request, progress, {
       git: async args => {
         if (args[0] === 'clone') {
           await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
@@ -2283,6 +2387,19 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       path: 'cold',
       diffs: { applied: 1, skipped: 0, total: 1 },
     });
+    expect(fs.existsSync(rulesPath)).toBe(false);
+    const stepEvents = progress.mock.calls
+      .flat()
+      .filter(
+        (event): event is { type: string; step: string } =>
+          typeof event === 'object' && event !== null && 'type' in event
+      );
+    expect(stepEvents.some(event => event.step === 'restore_incomplete')).toBe(false);
+    // The complete-restore progress line is unchanged.
+    expect(progress).toHaveBeenCalledWith(
+      'kilo_session',
+      'Cold restore, snapshot applied, 1/1 files restored'
+    );
   });
 
   it('falls back to an empty import when a non-required snapshot restore returns 404', async () => {

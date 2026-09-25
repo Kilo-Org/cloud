@@ -16,6 +16,9 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 // `withUiDeadline` reads its timeout copy from here; the field contract under

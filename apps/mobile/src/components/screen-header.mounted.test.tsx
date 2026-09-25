@@ -2,6 +2,7 @@
 // eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
+import { type Href } from 'expo-router';
 import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
@@ -10,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
-import { ScreenHeader } from './screen-header';
+import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
 const routerState = vi.hoisted(() => ({
@@ -22,6 +23,8 @@ const routerState = vi.hoisted(() => ({
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** A normal phone window: wide enough for the title and its actions to share a row. */
+const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
@@ -31,6 +34,7 @@ vi.mock('react-native', () => ({
   Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: layout.width, height: 800, fontScale: layout.fontScale }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
@@ -72,6 +76,21 @@ function findTitlePressable(root: TestInstance): TestInstance {
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
+  );
+}
+
+/**
+ * The row the header puts `headerRight` on when the window is too narrow for
+ * the title and the actions to share one. Only that variant carries `mt-2`
+ * without the single-row wrapper's `max-w-[50%]`.
+ */
+function isStackedActionsRow(node: TestInstance): boolean {
+  const className = String(node.props.className ?? '');
+  return (
+    typeof node.type === 'string' &&
+    (node.type as string) === 'View' &&
+    className.includes('mt-2') &&
+    !className.includes('max-w-[50%]')
   );
 }
 
@@ -172,6 +191,26 @@ function findHeaderRight(root: TestInstance): TestInstance {
   return headerRight;
 }
 
+/**
+ * The trailing wrapper that carries `inlineActions`. It shares the `ms-3`
+ * start margin with the `headerRight` wrapper but drops the half-row
+ * `max-w-[50%]` cap.
+ */
+function findInlineActionsWrapper(root: TestInstance): TestInstance {
+  const wrapper = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(^|\s)ms-3(\s|$)/.test(node.props.className) &&
+      !node.props.className.includes('max-w-[50%]')
+  )[0];
+  if (!wrapper) {
+    throw new Error('inlineActions view not found');
+  }
+  return wrapper;
+}
+
 function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -197,6 +236,7 @@ describe('ScreenHeader mounted', () => {
     i18nManager.isRTL = false;
     platform.OS = 'ios';
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    Object.assign(layout, { width: 390, fontScale: 1 });
   });
 
   it('gives the back control a 44-point target and no hit slop', () => {
@@ -241,6 +281,60 @@ describe('ScreenHeader mounted', () => {
     expect(headerRight.props.className).toContain('max-w-[50%]');
     expect(headerRight.props.className).toContain('shrink');
     expect(headerRight.props.className).not.toContain('shrink-0');
+  });
+
+  it('renders inlineActions in the title row uncapped while headerRight keeps its cap', () => {
+    const renderer = renderHeader({
+      title: 'Agents',
+      headerRight: 'RIGHT',
+      inlineActions: 'ACTIONS',
+    });
+
+    const capped = findHeaderRight(renderer.root);
+    const inline = findInlineActionsWrapper(renderer.root);
+
+    // Both trailing slots sit in the title row beside the heading, so the
+    // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
+    expect(inline.parent).toBe(capped.parent);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    const heading = inline.parent?.children[0] as TestInstance;
+    expect(heading.props.className).toContain('min-w-0 flex-1');
+    // `headerRight` keeps its half-row cap; `inlineActions` keeps its full width
+    // instead of wrapping the controls.
+    expect(capped.props.className).toContain('max-w-[50%]');
+    expect(inline.props.className).not.toContain('max-w-[50%]');
+    expect(inline.props.className).toContain('min-w-0');
+    expect(inline.props.className).toContain('shrink');
+  });
+
+  it('renders inlineActions alone in the title row', () => {
+    const renderer = renderHeader({ title: 'Agents', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    const capped = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('max-w-[50%]')
+    );
+    expect(capped).toHaveLength(0);
+  });
+
+  it('renders inlineActions beside a centered title too', () => {
+    // A centered title (`centerTitle`, e.g. a modal with a title or eyebrow)
+    // shares its row with the leading control; the inline actions slot must not
+    // be dropped just because the title is centered.
+    const renderer = renderHeader({ modal: true, title: 'Filters', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    expect(inline.props.className).not.toContain('max-w-[50%]');
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
@@ -305,7 +399,7 @@ describe('ScreenHeader mounted', () => {
       let titleOpened = false;
       const renderer = renderHeader({
         title: 'Session',
-        backFallback: '/(app)/(tabs)/(2_agents)',
+        backFallback: '/(app)/(tabs)/(2_agents)' as Href,
         onTitlePress: () => {
           titleOpened = true;
         },
@@ -325,8 +419,8 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: true, backFallback: undefined },
-    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' },
-    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' },
+    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
+    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
   ] as const)(
     'preserves custom onBack precedence for history=$history, fallback=$backFallback',
     ({ history, backFallback }) => {
@@ -395,7 +489,7 @@ describe('ScreenHeader mounted', () => {
     const explicitlyHidden = renderHeader({
       title: 'Sessions',
       showBackButton: false,
-      backFallback: '/(app)/(tabs)/(2_agents)',
+      backFallback: '/(app)/(tabs)/(2_agents)' as Href,
     });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });
@@ -700,5 +794,99 @@ describe('ScreenHeader mounted', () => {
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.props.ellipsizeMode).toBe('middle');
     expect(eyebrow.children).toEqual(['\u00A0']);
+  });
+});
+
+describe('header actions row', () => {
+  it('keeps the actions on the title row at a normal phone width', () => {
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const actions = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        String(node.props.className ?? '').includes('max-w-[50%]')
+    );
+    // The inline wrapper's gap is the logical start margin (`ms-3`), which the
+    // RTL swap cannot mirror away; the title's box keeps its `shrink` cap.
+    expect(actions.props.className).toContain('ms-3');
+  });
+
+  it('drops the actions to their own row when the window cannot hold the title beside them', () => {
+    // The e1 geometry: 160dp wide with a 1.5 font scale left the 30px title
+    // 48dp, which broke it and the mono link beside it into letter columns.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          String(node.props.className ?? '').includes('max-w-[50%]')
+      )
+    ).toHaveLength(0);
+    // The title still shares its row with the back control; only the actions moved.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+  });
+
+  it('reflows a centered modal header the same way', () => {
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', modal: true, headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+  });
+
+  it('leaves a header without actions on its single row', () => {
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+});
+
+describe('header status line', () => {
+  it('keeps the eyebrow on one line at the reported narrow geometry', () => {
+    // e1: a 160dp window at a 1.5 font scale broke '1 LIVE' into a letter
+    // column beside the title and grew the header down over the search field.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.children).toEqual(['1 LIVE']);
+  });
+});
+
+describe('shouldStackHeaderActions', () => {
+  it('reflows at the reported 160dp window with a 1.5 font scale', () => {
+    expect(shouldStackHeaderActions(160, 1.5)).toBe(true);
+  });
+
+  it('keeps one row at every phone width the scenarios cover', () => {
+    expect(shouldStackHeaderActions(320, 1)).toBe(false);
+    expect(shouldStackHeaderActions(360, 1)).toBe(false);
+    expect(shouldStackHeaderActions(360, 2)).toBe(false);
+    expect(shouldStackHeaderActions(390, 2)).toBe(false);
+  });
+
+  it('reflows a window too narrow for the title beside the actions', () => {
+    expect(shouldStackHeaderActions(160, 1)).toBe(true);
+    expect(shouldStackHeaderActions(220, 1.5)).toBe(true);
+    expect(shouldStackHeaderActions(320, 2.5)).toBe(true);
+  });
+
+  it('treats a missing window measurement as a single row', () => {
+    expect(shouldStackHeaderActions(Number.NaN, 1)).toBe(false);
+    expect(shouldStackHeaderActions(160, Number.NaN)).toBe(true);
   });
 });

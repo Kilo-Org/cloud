@@ -1,4 +1,5 @@
-/* eslint-disable max-lines -- the string-row states and the pending/interval retry suite share one hook and one client mock harness. */
+/* eslint-disable max-lines -- the string-row states and the pending/shared-retry suite share one hook and one client mock harness. */
+import { onlineManager } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,6 +49,23 @@ function Probe({
   return null;
 }
 
+/**
+ * The renderer of the case currently running. The shared retry keeps module-level
+ * state (subscriber count, timer handle, backoff delay) that only a successful
+ * `unmount()` unwinds, so a case that throws before its own final `unmount()`
+ * leaves the module armed: `vi.useRealTimers()` drops the fake timer but not its
+ * stale handle, and every later case's `armRetryTimer()` would early-return on
+ * `retryTimer !== undefined`. `afterEach` unmounts whatever is still mounted, so
+ * one real failure cannot cascade into unrelated ones.
+ */
+let activeUnmount: (() => void) | undefined = undefined;
+
+function cleanupMountedRenderer(): void {
+  const unmount = activeUnmount;
+  activeUnmount = undefined;
+  unmount?.();
+}
+
 function mountProbes(specs: ProbeSpec[]): {
   latest: (index: number) => string;
   unmount: () => void;
@@ -76,13 +94,16 @@ function mountProbes(specs: ProbeSpec[]): {
   if (!renderer) {
     throw new Error('renderer was not created');
   }
+  const unmount = () => {
+    activeUnmount = undefined;
+    act(() => {
+      renderer.unmount();
+    });
+  };
+  activeUnmount = unmount;
   return {
     latest: index => current[index] ?? '',
-    unmount: () => {
-      act(() => {
-        renderer.unmount();
-      });
-    },
+    unmount,
   };
 }
 
@@ -118,6 +139,10 @@ beforeEach(() => {
 });
 
 describe('useTranslatedToolSummary', () => {
+  afterEach(() => {
+    cleanupMountedRenderer();
+  });
+
   it('renders the raw text when the preference is off', async () => {
     requestMock.mockResolvedValue(['translated']);
     setConfig({ enabled: false, model: MODEL });
@@ -258,6 +283,13 @@ describe('useTranslatedToolSummary', () => {
         createElement('View', null, probe('partial', 0), probe('partial', 1))
       );
     });
+    const unmountRenderer = () => {
+      activeUnmount = undefined;
+      act(() => {
+        ref.renderer?.unmount();
+      });
+    };
+    activeUnmount = unmountRenderer;
     await settle();
     expect(requestMock).toHaveBeenCalledTimes(1);
 
@@ -293,9 +325,7 @@ describe('useTranslatedToolSummary', () => {
 
     expect(current[1]).toBe('de:final');
     expect(requestMock).toHaveBeenCalledTimes(3);
-    act(() => {
-      ref.renderer?.unmount();
-    });
+    unmountRenderer();
   });
 });
 
@@ -343,13 +373,16 @@ function mountPending(text: string): { latest: () => ToolSummaryTranslation; unm
   if (!renderer) {
     throw new Error('renderer was not created');
   }
+  const unmount = () => {
+    activeUnmount = undefined;
+    act(() => {
+      renderer.unmount();
+    });
+  };
+  activeUnmount = unmount;
   return {
     latest: () => current,
-    unmount: () => {
-      act(() => {
-        renderer.unmount();
-      });
-    },
+    unmount,
   };
 }
 
@@ -365,6 +398,11 @@ describe('useToolSummaryTranslation retries an unresolved summary', () => {
   });
 
   afterEach(() => {
+    // Unwind any case that threw before its own unmount before the fake timers
+    // are discarded, then restore the module-global connectivity gate: a case
+    // that flips it must not leave the shared retry paused for the next one.
+    cleanupMountedRenderer();
+    onlineManager.setOnline(true);
     vi.useRealTimers();
   });
 
@@ -413,5 +451,96 @@ describe('useToolSummaryTranslation retries an unresolved summary', () => {
     unmount();
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS * 3);
     expect(requestMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('arms one shared timer instead of an interval per mounted row', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    requestMock.mockResolvedValue([null]);
+    setConfig({ enabled: true, model: MODEL });
+    const { latest, unmount } = mountProbes([
+      { text: 'Shared retry one', itemId: 'part-a' },
+      { text: 'Shared retry two', itemId: 'part-b' },
+      { text: 'Shared retry three', itemId: 'part-c' },
+    ]);
+
+    await advance(BATCH_WINDOW_SETTLE_MS);
+
+    // Every row is unresolved, yet the fix must never arm a per-row interval.
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(latest(0)).toBe('Shared retry one');
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    unmount();
+    setIntervalSpy.mockRestore();
+  });
+
+  it('doubles the wait after each replay', async () => {
+    requestMock.mockResolvedValue([null]);
+    setConfig({ enabled: true, model: MODEL });
+    const { latest, unmount } = mountPending('Backoff target summary');
+
+    await advance(BATCH_WINDOW_SETTLE_MS);
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // The first replay is still at the base delay.
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(latest()).toEqual({ text: 'Backoff target summary', pending: true });
+
+    // The next wake is at 2x the base: one base window later nothing new.
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
+    expect(requestMock).toHaveBeenCalledTimes(2);
+
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
+    expect(requestMock).toHaveBeenCalledTimes(3);
+    unmount();
+  });
+
+  it('pauses the shared retry while offline and replays once on reconnect', async () => {
+    requestMock.mockResolvedValue([null]);
+    setConfig({ enabled: true, model: MODEL });
+    // Offline before the failure: the shared timer must not wake, and the
+    // reconnection edge below must be the only thing that resumes it.
+    onlineManager.setOnline(false);
+    const { latest, unmount } = mountPending('Offline target summary');
+
+    await advance(BATCH_WINDOW_SETTLE_MS);
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS * 2);
+    // No wakeup and no gateway call while offline: only the mount request.
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(latest()).toEqual({ text: 'Offline target summary', pending: true });
+
+    onlineManager.setOnline(true);
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+    // Exactly one replay on the reconnection edge, at the base delay.
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('reschedules an armed backoff timer when the device reconnects', async () => {
+    requestMock.mockResolvedValue([null]);
+    setConfig({ enabled: true, model: MODEL });
+    const { unmount } = mountPending('Reconnect mid-wait summary');
+
+    await advance(BATCH_WINDOW_SETTLE_MS);
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // Two replays grow the wait to 4x the base, leaving that long timer armed.
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS * 2);
+    expect(requestMock).toHaveBeenCalledTimes(3);
+
+    // A network blip inside that wait: offline, then back online before the
+    // armed 4x timer fires.
+    onlineManager.setOnline(false);
+    onlineManager.setOnline(true);
+
+    // The reconnect must reschedule the replay at the base delay instead of
+    // letting the stale armed timer stand.
+    await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+    expect(requestMock).toHaveBeenCalledTimes(4);
+    unmount();
   });
 });

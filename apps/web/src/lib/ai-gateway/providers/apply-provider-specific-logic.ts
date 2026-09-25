@@ -6,7 +6,7 @@ import {
   type GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
@@ -151,7 +151,10 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isKimiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
+      OpenRouterInferenceProviderIdSchema.enum.alibaba,
+    ];
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
@@ -198,7 +201,7 @@ export async function applyGatewayModelsFallback(
   requestToMutate: GatewayRequest
 ) {
   if (
-    !(await isFreeModel(requestedModel)) &&
+    !isFreeModel(requestedModel) &&
     (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {

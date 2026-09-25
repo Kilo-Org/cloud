@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type MockSocket = {
   url: string;
   message: (data: string) => void;
-  closeFromServer: () => void;
+  closeFromServer: (code?: number, reason?: string) => void;
   errorFromServer: (error?: unknown) => void;
   closeCalls: number;
 };
@@ -15,28 +15,28 @@ const sockets = vi.hoisted(() => ({
 
 vi.mock('ws', () => ({
   default: class {
-    private readonly handlers = new Map<string, (value: unknown) => void>();
+    private readonly handlers = new Map<string, (...args: unknown[]) => void>();
     private readonly observed: MockSocket;
 
     constructor(url: string) {
       this.observed = {
         url,
         message: data => this.handlers.get('message')?.(Buffer.from(data)),
-        closeFromServer: () => this.handlers.get('close')?.(undefined),
+        closeFromServer: (code = 1006, reason = '') => this.handlers.get('close')?.(code, reason),
         errorFromServer: error => this.handlers.get('error')?.(error ?? new Error('ws error')),
         closeCalls: 0,
       };
       sockets.instances.push(this.observed);
     }
 
-    on(event: string, handler: (value: unknown) => void): this {
+    on(event: string, handler: (...args: unknown[]) => void): this {
       this.handlers.set(event, handler);
       return this;
     }
 
     close(): void {
       this.observed.closeCalls += 1;
-      queueMicrotask(() => this.handlers.get('close')?.(undefined));
+      queueMicrotask(() => this.handlers.get('close')?.(1005, ''));
     }
   },
 }));
@@ -725,6 +725,57 @@ describe('openStream handshake retry', () => {
   });
 });
 
+describe('openStream closeInfo', () => {
+  beforeEach(() => {
+    sockets.instances = [];
+  });
+
+  it('records the first close code/reason and ignores a superseded socket', async () => {
+    const fetchStreamTicket = vi.fn().mockResolvedValue('fresh-ticket');
+    const stream = openStream(
+      { ...baseConfig, nextAuthSecret: undefined, fetchStreamTicket },
+      SESSION_ID,
+      { ticket: 'stale-ticket' }
+    );
+
+    const superseded = sockets.instances[0];
+    if (!superseded) throw new Error('Missing stream socket');
+    // The handshake fails and the single retry opens a second socket, so the
+    // first socket is now a superseded generation.
+    superseded.errorFromServer(new Error('handshake rejected'));
+    await vi.waitFor(() => expect(sockets.instances).toHaveLength(2));
+    const current = sockets.instances[1];
+    if (!current) throw new Error('Missing retried stream socket');
+
+    current.closeFromServer(1011, 'server internal error');
+    expect(stream.closeInfo).toEqual({ code: 1011, reason: 'server internal error' });
+    expect(stream.isOpen).toBe(false);
+
+    // The superseded socket's later close must not overwrite the first cause.
+    superseded.closeFromServer(1006, 'superseded');
+    expect(stream.closeInfo).toEqual({ code: 1011, reason: 'server internal error' });
+
+    stream.close();
+  });
+
+  it('keeps the first close when the current socket closes again', () => {
+    const stream = openStream({ ...baseConfig, nextAuthSecret: undefined }, SESSION_ID, {
+      ticket: 'ticket',
+    });
+    const socket = sockets.instances[0];
+    if (!socket) throw new Error('Missing stream socket');
+
+    socket.closeFromServer(1006, 'first close');
+    expect(stream.closeInfo).toEqual({ code: 1006, reason: 'first close' });
+
+    // A second close from the same (current) generation must not overwrite it.
+    socket.closeFromServer(1011, 'second close');
+    expect(stream.closeInfo).toEqual({ code: 1006, reason: 'first close' });
+
+    stream.close();
+  });
+});
+
 describe('prepare transport', () => {
   const SECRET = 'e2e-internal-secret-0123456789';
   const prepareConfig: DriverConfig = {
@@ -828,5 +879,71 @@ describe('prepare transport', () => {
 
     expect(seen[0].url).toBe('http://worker.test/trpc/createWorktreeChat');
     expect(seen[0].headers['x-internal-api-key']).toBe(SECRET);
+  });
+});
+
+describe('create helper session tracking', () => {
+  const SECRET = 'e2e-internal-secret-0123456789';
+  const trackingConfig: DriverConfig = { ...baseConfig, internalApiSecret: SECRET };
+
+  it('reports the returned id after prepareBrowserSession resolves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_1' }))
+    );
+    const onSessionCreated = vi.fn();
+
+    const prepared = await prepareBrowserSession(
+      { ...trackingConfig, onSessionCreated },
+      { prompt: 'echo:hi' }
+    );
+
+    expect(prepared.cloudAgentSessionId).toBe(SESSION_ID);
+    expect(onSessionCreated).toHaveBeenCalledTimes(1);
+    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID);
+  });
+
+  it('does not report an id when prepareBrowserSession rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })));
+    const onSessionCreated = vi.fn();
+
+    await expect(
+      prepareBrowserSession({ ...trackingConfig, onSessionCreated }, { prompt: 'echo:hi' })
+    ).rejects.toThrow();
+    expect(onSessionCreated).not.toHaveBeenCalled();
+  });
+
+  it('reports the returned id after createWorktreeChat resolves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_2' }))
+    );
+    const onSessionCreated = vi.fn();
+
+    const created = await createWorktreeChat(
+      { ...trackingConfig, onSessionCreated },
+      { sourceKiloSessionId: 'ses_1', sourceCloudAgentSessionId: SESSION_ID }
+    );
+
+    expect(created.cloudAgentSessionId).toBe(SESSION_ID);
+    expect(onSessionCreated).toHaveBeenCalledTimes(1);
+    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID);
+  });
+
+  it('does not report an id when createWorktreeChat rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })));
+    const onSessionCreated = vi.fn();
+
+    await expect(
+      createWorktreeChat(
+        { ...trackingConfig, onSessionCreated },
+        { sourceKiloSessionId: 'ses_1', sourceCloudAgentSessionId: SESSION_ID }
+      )
+    ).rejects.toThrow();
+    expect(onSessionCreated).not.toHaveBeenCalled();
   });
 });

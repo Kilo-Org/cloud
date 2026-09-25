@@ -276,7 +276,7 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
-  it('contains non-lifecycle events before tenant routing for a shared installation', async () => {
+  it('routes operational events to the selected workflow association despite shared installation state', async () => {
     mockIsSharedGitHubInstallation.mockResolvedValue(true);
 
     const response = await handleGitHubWebhook(
@@ -286,11 +286,11 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      message: 'Event unavailable for shared installations',
+      message: 'review queued',
     });
-    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
-    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
-    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalled();
+    expect(mockHandlePullRequest).toHaveBeenCalledTimes(1);
   });
 
   it('must not route an active sibling installation webhook to a disconnected tenant', async () => {

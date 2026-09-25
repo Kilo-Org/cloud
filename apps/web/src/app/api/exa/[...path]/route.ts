@@ -19,12 +19,23 @@ import { z } from 'zod';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
+const ExaCostDollarsSchema = z.object({
+  total: z.number().finite().optional(),
+});
+// `/context` returns costDollars JSON-encoded as a string; other endpoints return an object.
+const ExaCostDollarsJsonStringSchema = z
+  .string()
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'costDollars string is not valid JSON' });
+      return z.NEVER;
+    }
+  })
+  .pipe(ExaCostDollarsSchema);
 const ExaCostResponseSchema = z.object({
-  costDollars: z
-    .object({
-      total: z.number().finite().optional(),
-    })
-    .optional(),
+  costDollars: z.union([ExaCostDollarsSchema, ExaCostDollarsJsonStringSchema]).optional(),
 });
 
 function extractExaPath(url: URL): string | null {

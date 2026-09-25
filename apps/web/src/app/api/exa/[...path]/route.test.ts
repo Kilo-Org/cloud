@@ -342,6 +342,40 @@ describe('POST /api/exa/[...path]', () => {
       });
     });
 
+    it('records cost from the JSON-encoded costDollars string returned by /context', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({
+          response: 'context',
+          costDollars: '{"total":0.007,"search":{"neural":0.007}}',
+        })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/context', { query: 'test' }) as never);
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ path: '/context', costMicrodollars: 7000 })
+      );
+      expect(mockedCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('captures and ignores a costDollars string that is not valid JSON', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ response: 'context', costDollars: 'not json' })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/context', { query: 'test' }) as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
     it('records cost with chargedToBalance when over free tier', async () => {
       setUserAuth();
       mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });

@@ -283,12 +283,13 @@ describe('feedback store-review write', () => {
     // Placeholder first, so no reader sees an uninitialized callback; the
     // promise executor replaces it before this test can settle it.
     const answer: { resolve: (presented: boolean) => void } = { resolve: () => undefined };
-    const present = vi.fn<(userId: string | undefined) => Promise<boolean>>(
-      () =>
-        new Promise<boolean>(resolve => {
-          answer.resolve = resolve;
-        })
-    );
+    const pending = new Promise<boolean>(resolve => {
+      answer.resolve = resolve;
+    });
+    const present = vi.fn<(userId: string | undefined) => Promise<boolean>>(async () => {
+      const presented = await pending;
+      return presented;
+    });
 
     const ask = maybeAskAfterSuccessfulOutcome('user-1', present);
     await flushMicrotasks();

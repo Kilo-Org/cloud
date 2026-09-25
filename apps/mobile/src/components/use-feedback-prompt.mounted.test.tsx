@@ -184,10 +184,12 @@ describe('useFeedbackPrompt', () => {
 
     press(requestButton(root));
     let presented: boolean | undefined = undefined;
-    void Promise.resolve(lastRequest).then(value => {
-      presented = value;
+    void (async () => {
+      presented = await lastRequest;
+    })();
+    await act(async () => {
+      await Promise.resolve();
     });
-    await act(async () => {});
     expect(presented).toBeUndefined();
 
     const modal = modals(root)[0];
@@ -211,9 +213,9 @@ describe('useFeedbackPrompt', () => {
     expect(modals(root)).toHaveLength(1);
 
     let presented: boolean | undefined = undefined;
-    void Promise.resolve(lastRequest).then(value => {
-      presented = value;
-    });
+    void (async () => {
+      presented = await lastRequest;
+    })();
 
     act(() => {
       renderer?.unmount();

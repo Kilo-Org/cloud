@@ -681,6 +681,14 @@ describe('PrReviewScreen recents backfill per provider', () => {
 // so it can reflow the actions onto their own row before the title is squeezed
 // (the finding: PR review at 320 dp with a font scale of 2).
 describe('PrReviewScreen header trailing cluster width', () => {
+  const MERGEABLE_OVERVIEW = {
+    state: 'open',
+    mergeable: true,
+    mergeableState: 'clean',
+    number: 7,
+    repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
+  };
+
   it('declares the width of the controls it renders', () => {
     prQueryResult = {
       data: MERGEABLE_OVERVIEW,
@@ -690,15 +698,18 @@ describe('PrReviewScreen header trailing cluster width', () => {
     };
     // eslint-disable-next-line new-cap
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    const header = findElement({
-      node: element,
-      type: 'ScreenHeader',
-      prop: 'eyebrowNumberOfLines',
-      value: 1,
-    });
     // Share 44 + `gap-1` 4 + Submit review 140 + `gap-1` 4 + Merge 44.
-    expect(header?.props.headerRightWidth).toBe(236);
+    expect(
+      findElement({
+        node: element,
+        type: 'ScreenHeader',
+        prop: 'headerRightWidth',
+        value: 236,
+      })
+    ).not.toBeNull();
+  });
 
+  it('leaves out a control this screen does not render', () => {
     // A merged PR renders no Merge action: Share 44 + `gap-1` 4 + Submit 140.
     prQueryResult = {
       data: { state: 'merged', mergeable: null, mergeableState: null },
@@ -707,14 +718,15 @@ describe('PrReviewScreen header trailing cluster width', () => {
       isFetching: false,
     };
     // eslint-disable-next-line new-cap
-    const mergedElement = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    const mergedHeader = findElement({
-      node: mergedElement,
-      type: 'ScreenHeader',
-      prop: 'eyebrowNumberOfLines',
-      value: 1,
-    });
-    expect(mergedHeader?.props.headerRightWidth).toBe(188);
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(
+      findElement({
+        node: element,
+        type: 'ScreenHeader',
+        prop: 'headerRightWidth',
+        value: 188,
+      })
+    ).not.toBeNull();
   });
 });
 

@@ -10568,6 +10568,60 @@
     ],
     "searchBlob": "githubPrReview.createReviewComment Create a new inline review comment on a specific file and line in a GitHub pull request. githubprreview createreviewcomment owner repo number body path line side startline startside commitsha operationkey owner repo number body path line side startLine startSide commitSha operationKey"
   },
+  "githubPrReview.deleteComment": {
+    "path": "githubPrReview.deleteComment",
+    "kind": "mutation",
+    "summary": "Delete a pull request review comment from GitHub by its comment ID.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "number": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "commentId": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "review",
+            "conversation"
+          ]
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "number",
+        "commentId",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "githubprreview",
+      "deletecomment",
+      "owner",
+      "repo",
+      "number",
+      "commentid",
+      "kind"
+    ],
+    "searchBlob": "githubPrReview.deleteComment Delete a pull request review comment from GitHub by its comment ID. githubprreview deletecomment owner repo number commentid kind owner repo number commentId kind"
+  },
   "githubPrReview.disableAutoMerge": {
     "path": "githubPrReview.disableAutoMerge",
     "kind": "mutation",
@@ -11370,6 +11424,67 @@
       "expectedheadsha"
     ],
     "searchBlob": "githubPrReview.updateBranch Update a GitHub pull request branch with the latest changes from its base branch. githubprreview updatebranch owner repo number expectedheadsha owner repo number expectedHeadSha"
+  },
+  "githubPrReview.updateComment": {
+    "path": "githubPrReview.updateComment",
+    "kind": "mutation",
+    "summary": "Edit the text of an existing pull request review comment on GitHub, given its comment ID.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "number": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "commentId": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "review",
+            "conversation"
+          ]
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65535
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "number",
+        "commentId",
+        "kind",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "githubprreview",
+      "updatecomment",
+      "owner",
+      "repo",
+      "number",
+      "commentid",
+      "kind",
+      "body"
+    ],
+    "searchBlob": "githubPrReview.updateComment Edit the text of an existing pull request review comment on GitHub, given its comment ID. githubprreview updatecomment owner repo number commentid kind body owner repo number commentId kind body"
   },
   "gitlab.connectWithPAT": {
     "path": "gitlab.connectWithPAT",

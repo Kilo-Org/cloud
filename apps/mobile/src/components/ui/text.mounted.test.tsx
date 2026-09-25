@@ -25,14 +25,22 @@ const { compile } = createRequire(import.meta.url)(
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function mount(children: string, style?: TextStyle, className = 'tracking-wide') {
+/** The one live renderer's root: any previous tree is unmounted before it is replaced. */
+function renderRoot(element: ReactElement): TestRenderer.ReactTestInstance {
+  act(() => renderer?.unmount());
+  renderer = undefined;
   act(() => {
-    renderer = TestRenderer.create(createElement(Text, { className, style }, children));
+    renderer = TestRenderer.create(element);
   });
   if (!renderer) {
     throw new Error('Missing Text renderer');
   }
-  return renderer.root.find(node => Object.is(node.type, 'Text'));
+  return renderer.root;
+}
+
+function mount(children: string, style?: TextStyle, className = 'tracking-wide') {
+  const root = renderRoot(createElement(Text, { className, style }, children));
+  return root.find(node => Object.is(node.type, 'Text'));
 }
 
 /** The component's own inline styles, flattened the way React Native merges them. */
@@ -63,16 +71,6 @@ async function compiledLetterSpacing(className: string): Promise<number> {
     throw new TypeError(`${className} did not compile to a letter spacing`);
   }
   return value;
-}
-
-function mountElement(element: ReactElement) {
-  act(() => {
-    renderer = TestRenderer.create(element);
-  });
-  if (!renderer) {
-    throw new Error('Missing Text renderer');
-  }
-  return renderer.root;
 }
 
 // Both assertions are kept: `hostText` reaches the host node to read its inline
@@ -125,13 +123,13 @@ describe('Text joined-script letter spacing', () => {
     expect(tracking).toBeGreaterThan(0);
 
     i18nManager.isRTL = true;
-    const latin = mount('Settings', undefined, 'tracking-[1.5px]');
-    const arabic = mount('التفصيلات', undefined, 'tracking-[1.5px]');
+    // Each mount replaces the tracked renderer, so read the Latin tree before
+    // the Arabic one takes its place.
+    const latin = ownStyles(mount('Settings', undefined, 'tracking-[1.5px]'));
+    const arabic = ownStyles(mount('التفصيلات', undefined, 'tracking-[1.5px]'));
 
-    expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...ownStyles(latin)])).toBe(
-      tracking
-    );
-    expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...ownStyles(arabic)])).toBe(0);
+    expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...latin])).toBe(tracking);
+    expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...arabic])).toBe(0);
   });
 });
 
@@ -144,7 +142,7 @@ describe('Text mounted letter spacing', () => {
     isRTL => {
       i18nManager.isRTL = isRTL;
       const text = hostText(
-        mountElement(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+        renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
       );
 
       if (isRTL) {
@@ -157,7 +155,7 @@ describe('Text mounted letter spacing', () => {
 
   it('leaves Latin children untouched and keeps LTR style undefined', () => {
     const text = hostText(
-      mountElement(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+      renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
     );
 
     expect(text.props.style).toBeUndefined();
@@ -165,7 +163,7 @@ describe('Text mounted letter spacing', () => {
 
   it('resets the eyebrow variant tracking for Arabic children in RTL', () => {
     i18nManager.isRTL = true;
-    const text = hostText(mountElement(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
+    const text = hostText(renderRoot(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
 
     expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
@@ -173,7 +171,7 @@ describe('Text mounted letter spacing', () => {
   it('resets the tab label tracking for Arabic children in RTL', () => {
     i18nManager.isRTL = true;
     const text = hostText(
-      mountElement(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
+      renderRoot(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
     );
 
     expect(text.props.className as string).toContain('tracking-[0.2px]');
@@ -185,7 +183,7 @@ describe('Text mounted letter spacing', () => {
   it('keeps the RTL paragraph direction and no reset for Latin children', () => {
     i18nManager.isRTL = true;
     const text = hostText(
-      mountElement(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+      renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
     );
 
     expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
@@ -201,7 +199,7 @@ describe('Text eyebrow letterspacing', () => {
   it.each([false, true])('keeps the eyebrow display treatment for Latin copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(
-      mountElement(createElement(Text, { variant: 'eyebrow' }, 'Live now'))
+      renderRoot(createElement(Text, { variant: 'eyebrow' }, 'Live now'))
     );
     expect(classes).toEqual(
       expect.arrayContaining([
@@ -217,7 +215,7 @@ describe('Text eyebrow letterspacing', () => {
   it.each([false, true])('drops the treatment from Arabic copy in RTL (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(
-      mountElement(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
+      renderRoot(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
     );
     if (isRTL) {
       expect(classes).not.toContain('uppercase');
@@ -229,7 +227,7 @@ describe('Text eyebrow letterspacing', () => {
 
   it('leaves a non-eyebrow variant untouched in either direction', () => {
     i18nManager.isRTL = true;
-    const classes = hostClasses(mountElement(createElement(Text, null, 'Live now')));
+    const classes = hostClasses(renderRoot(createElement(Text, null, 'Live now')));
     expect(classes).not.toContain('uppercase');
     expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
   });
@@ -237,7 +235,7 @@ describe('Text eyebrow letterspacing', () => {
   it.each([false, true])('applies the same rule to the Eyebrow component (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(
-      mountElement(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
+      renderRoot(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
     );
     expect(classes).toEqual(expect.arrayContaining(['text-[10px]']));
     if (isRTL) {

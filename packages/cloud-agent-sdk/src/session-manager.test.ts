@@ -8423,6 +8423,48 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       );
     });
 
+    it('remote with CLI support but no consumer parts path rejects before transport send', async () => {
+      // The UI gate reports a remote session supported only for a consumer
+      // that declared `supportsRemoteAttachmentParts`, so a caller that
+      // supplies parts without that declaration must not have them forwarded.
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({
+        onSendFailed,
+        supportsRemoteAttachmentParts: false,
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const attachmentParts: RemoteAttachmentPart[] = [
+        {
+          type: 'file',
+          mime: 'text/plain',
+          filename: 'file.txt',
+          url: 'https://example.com/file.txt',
+        },
+      ];
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachmentParts,
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        expect.any(String),
+        expect.objectContaining({
+          message: 'Only capable remote CLI sessions support attachments',
+        })
+      );
+    });
+
     it('read-only + attachmentParts rejects before transport send', async () => {
       const onSendFailed = jest.fn();
       const config = createMockConfig({ onSendFailed });

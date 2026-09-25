@@ -354,11 +354,12 @@ type SessionManagerConfig = {
    * The consumer's send path can deliver remote-CLI attachment parts: it
    * materializes the presigned GET parts and passes them as `attachmentParts`.
    * The `supportsAttachments` gate reports a `remote` session supported only
-   * when this is set — a consumer that knows only the cloud-only `attachments`
-   * field (web) would otherwise render an attachment control whose send the
-   * session manager rejects with `Only Cloud Agent sessions support
-   * attachments`. The mobile adapter is the canonical provider; web passes
-   * nothing, so its remote sessions stay unsupported.
+   * when this is set, and the send guard refuses `attachmentParts` from a
+   * consumer that did not declare it — a consumer that knows only the
+   * cloud-only `attachments` field (web) would otherwise render an attachment
+   * control whose send the session manager rejects with `Only Cloud Agent
+   * sessions support attachments`. The mobile adapter is the canonical
+   * provider; web passes nothing, so its remote sessions stay unsupported.
    */
   supportsRemoteAttachmentParts?: boolean;
   websocketBaseUrl?: string;
@@ -2608,13 +2609,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         throw new Error('Only Cloud Agent sessions support attachments');
       }
       if (input.attachmentParts && input.attachmentParts.length > 0) {
-        if (sessionType !== 'remote' || !cliCapabilitySupported(currentCapabilities?.attachments)) {
+        if (
+          sessionType !== 'remote' ||
+          !cliCapabilitySupported(currentCapabilities?.attachments) ||
+          config.supportsRemoteAttachmentParts !== true
+        ) {
           // A non-null `attachmentParts` for a session whose CLI explicitly
           // reported `attachments: false` (or for a non-remote session) is a
           // UI-bug: the paperclip is supposed to be hidden whenever this gate
           // fails, so we should never see payload here. Refuse to forward
           // rather than silently drop — same policy as the cloud-only branch
           // above.
+          //
+          // The consumer path is part of the gate: the UI gate reports a
+          // remote session supported only for a consumer that declared it can
+          // deliver remote attachment parts, so a caller that supplies parts
+          // without that declaration is the same kind of bug.
           throw new Error('Only capable remote CLI sessions support attachments');
         }
       }

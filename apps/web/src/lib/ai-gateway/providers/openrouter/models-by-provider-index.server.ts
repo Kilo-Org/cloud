@@ -4,9 +4,16 @@ import { readDb } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
   type StoredModelMap,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeVercelInferenceProviderIdForRouting,
+  openRouterToVercelInferenceProviderId,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { modelTrains } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
@@ -18,14 +25,15 @@ export type ModelIdToProviderSlugsIndex = ReadonlyMap<string, ReadonlySet<string
 type ProviderIndexCacheState = {
   expiresAtMs: number;
   index: ModelIdToProviderSlugsIndex;
+  dataCollectionRequiredModelIds: ReadonlySet<string>;
 };
 
 export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
 
 type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
-  /** Gateway `/models/{id}/endpoints` metadata keyed by exact (variant-suffixed) model id. */
-  fetchStoredModels: () => Promise<StoredModelMap>;
+  fetchOpenRouterModels: () => Promise<StoredModelMap>;
+  fetchVercelModels: () => Promise<StoredModelMap>;
   ttlMs: number;
   nowMs: () => number;
 };
@@ -98,29 +106,55 @@ export function buildModelIdToProviderSlugsIndex(
   return index;
 }
 
+/**
+ * Exact gateway model ids that every snapshot provider may train on. A request
+ * that denies data collection has no endpoint to route these to.
+ */
+export function buildDataCollectionRequiredModelIds(
+  snapshot: NormalizedOpenRouterResponse
+): Set<string> {
+  const trainsOnEveryProvider = new Map<string, boolean>();
+  for (const provider of snapshot.providers) {
+    for (const model of provider.models) {
+      const modelId = getSnapshotModelVariantId(model);
+      trainsOnEveryProvider.set(
+        modelId,
+        (trainsOnEveryProvider.get(modelId) ?? true) &&
+          modelTrains(model, provider.dataPolicy.training)
+      );
+    }
+  }
+  return new Set(
+    [...trainsOnEveryProvider].filter(([, trains]) => trains).map(([modelId]) => modelId)
+  );
+}
+
 export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOptions) {
   let cache: ProviderIndexCacheState | undefined;
   let inFlight: Promise<ProviderIndexCacheState> | undefined;
 
-  async function loadIndex(): Promise<ModelIdToProviderSlugsIndex> {
+  async function loadState(): Promise<ProviderIndexCacheState> {
     const now = options.nowMs();
     if (cache && cache.expiresAtMs > now) {
-      return cache.index;
+      return cache;
     }
 
     if (inFlight) {
-      const state = await inFlight;
-      return state.index;
+      return await inFlight;
     }
 
     inFlight = (async (): Promise<ProviderIndexCacheState> => {
       try {
         const snapshot = await options.fetchSnapshot().catch(() => undefined);
-        const index = snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map();
 
         return {
-          expiresAtMs: options.nowMs() + options.ttlMs,
-          index,
+          // A failed read retries on the next call so an empty data-collection
+          // set does not stick for the TTL; callers fall back to best-effort checks.
+          expiresAtMs: snapshot ? options.nowMs() + options.ttlMs : options.nowMs(),
+          index: snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map(),
+          dataCollectionRequiredModelIds: snapshot
+            ? buildDataCollectionRequiredModelIds(snapshot)
+            : new Set(),
         };
       } finally {
         inFlight = undefined;
@@ -128,7 +162,15 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     })();
 
     cache = await inFlight;
-    return cache.index;
+    return cache;
+  }
+
+  async function loadIndex(): Promise<ModelIdToProviderSlugsIndex> {
+    return (await loadState()).index;
+  }
+
+  async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
+    return (await loadState()).dataCollectionRequiredModelIds;
   }
 
   /**
@@ -139,13 +181,33 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     const index = await loadIndex();
     const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
     if (!snapshotProviderSlugs) return new Set();
-    const storedModels = await options.fetchStoredModels();
-    return narrowProviderSlugsToVariant(snapshotProviderSlugs, storedModels[modelId]);
+    const [storedModels, vercelModels] = await Promise.all([
+      options.fetchOpenRouterModels(),
+      options.fetchVercelModels(),
+    ]);
+    const openRouterProviderSlugs = narrowProviderSlugsToVariant(
+      snapshotProviderSlugs,
+      storedModels[modelId]
+    );
+    const vercelModel = vercelModels[await mapModelIdToVercel(modelId)];
+    const vercelProviders = new Set(
+      vercelModel?.endpoints.map(endpoint =>
+        normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
+      )
+    );
+    return new Set(
+      [...snapshotProviderSlugs].filter(
+        slug =>
+          openRouterProviderSlugs.has(slug) ||
+          vercelProviders.has(openRouterToVercelInferenceProviderId(slug))
+      )
+    );
   }
 
   return {
     getIndex: loadIndex,
     getProviderSlugsForModel,
+    getDataCollectionRequiredModelIds,
   };
 }
 
@@ -165,7 +227,8 @@ const DEFAULT_TTL_MS = 30_000;
 
 const defaultLoader = createModelsByProviderIndexLoader({
   fetchSnapshot: fetchLatestModelsByProviderSnapshotFromDb,
-  fetchStoredModels: getOpenRouterModelsMetadataFromDatabase,
+  fetchOpenRouterModels: getOpenRouterModelsMetadataFromDatabase,
+  fetchVercelModels: getVercelModelsMetadataFromDatabase,
   ttlMs: DEFAULT_TTL_MS,
   nowMs: () => Date.now(),
 });
@@ -176,4 +239,8 @@ export async function getProviderSlugsForModel(modelId: string): Promise<Readonl
 
 export async function getModelIdToProviderSlugsIndex(): Promise<ModelIdToProviderSlugsIndex> {
   return defaultLoader.getIndex();
+}
+
+export async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
+  return defaultLoader.getDataCollectionRequiredModelIds();
 }

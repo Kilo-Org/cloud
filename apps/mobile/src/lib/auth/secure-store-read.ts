@@ -1,6 +1,7 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
 import { E2eInjectedFaultError } from '@/lib/telemetry/e2e-fault';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
  * Bounded retry for a stored credential read.
@@ -46,9 +47,11 @@ async function readOnce(
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
-    throw new E2eInjectedFaultError(
-      `E2E secure-store fault window is open: read of ${key} rejected`
-    );
+    // No key in the message: the exhausted-read report attaches this error, and
+    // the report must carry no key material, like the real store's error. The
+    // error is an `E2eInjectedFaultError` so the Sentry `beforeSend` gate drops
+    // a harness fault instead of filing it as a product issue.
+    throw new E2eInjectedFaultError('E2E secure-store fault window is open: read rejected');
   }
   const value = await (firstAttempt ?? readStoredValue(key, options));
   return value;
@@ -119,7 +122,14 @@ async function readWithRetry(key: string, read: RetryRead): Promise<string | nul
     // eslint-disable-next-line no-await-in-loop -- backoff between attempts
     await delay(retryDelayMs);
   }
-  // Last attempt: its value is the final answer, and its rejection propagates
-  // to the caller, which owns how the failure is surfaced.
-  return readOnce(key, read.options, pending);
+  // Last attempt: its value is the final answer and its rejection propagates
+  // to the caller, which owns how the failure is surfaced. Report the
+  // rejection once here at warning level with the stable read fingerprint —
+  // reporting per attempt would multiply one failure into four events.
+  try {
+    return await readOnce(key, read.options, pending);
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    throw error;
+  }
 }

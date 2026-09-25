@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 import {
@@ -154,9 +155,23 @@ export function namedSessionTitle(
 /**
  * Pure helper that derives the session-detail header display state from the
  * authoritative server title and the reducer state. A backend default title
- * (`New session - <ISO>`) is machine output, so it is treated as no title and
- * the caller's fallback copy shows instead. Pass the session id so a title the
- * user's own rename wrote is not hidden as the backend placeholder.
+ * (`New session - <ISO>` or `Child session - <ISO>`) is machine output, so it
+ * is treated as no title: a generated placeholder title is normalised away, so
+ * the caller's fallback copy shows instead of the raw ISO string the CLI listed
+ * the session under. Pass the session id so a title the user's own rename wrote
+ * is not hidden as the backend placeholder.
+ *
+ * Both the server title and the cached fallback run through the shared title
+ * helpers, so the server's creation-default placeholder (`New session -
+ * <ISO timestamp>`) can never reach the header or seed the rename field —
+ * either would otherwise show a raw timestamp. The server title — the fetched
+ * title, or a live `session.updated` title the hook folds into `serverTitle` —
+ * passes through `namedSessionTitle`, and a missing or placeholder fallback
+ * becomes the generic `Session` label here as well; the screen also routes the
+ * cached list title through `namedSessionTitle` before passing it here
+ * (`session-detail-content.tsx`), so a placeholder cached in the list cannot
+ * reach the header either. The user's `optimisticTitle` is their own input and
+ * is never filtered.
  */
 export function getSessionDetailRenameState(input: {
   sessionId?: string;
@@ -165,8 +180,16 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
+  const fallbackTitle =
+    sessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
+  // A placeholder title (`New session - <ISO>`) is the ingest service's "no
+  // title yet" marker, not a name the user wrote. Count it as absent so the
+  // header falls back to the same localized label a title-less session shows;
+  // the session still exists, so renaming stays enabled. `namedSessionTitle`
+  // also keeps a title the app's own rename flow wrote, even one that happens
+  // to look like the placeholder.
   const serverTitle = namedSessionTitle(input.serverTitle, input.sessionId);
-  const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
+  const baseTitle = input.isLoaded ? (serverTitle ?? fallbackTitle) : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,
@@ -178,7 +201,10 @@ export function getSessionDetailRenameState(input: {
 
 /**
  * Title from a v2 `session.updated` event for this session, or undefined
- * when the event is for another session or carries no usable title.
+ * when the event is for another session or carries no usable title. A
+ * generated placeholder title is not usable either: returning it would both
+ * repaint the raw machine timestamp over the localized fallback and clear an
+ * in-flight rename.
  */
 export function titleFromSessionUpdatedEvent(
   sessionId: string,

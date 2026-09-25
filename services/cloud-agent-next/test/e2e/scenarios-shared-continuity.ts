@@ -43,8 +43,9 @@ import {
 } from './public-surface-support.js';
 import { assertMessageLifecycle } from './scenario-assertions.js';
 import {
+  awaitCorrelatedChildText,
   cleanupRemoteSession,
-  collectChildMessageText,
+  CONTENT_CORRELATION_BUDGET_MS,
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
@@ -196,12 +197,16 @@ async function interruptThenContinueBody(
       )
     );
     if (bootStatus !== 'completed') throw new Error(`boot turn durable status=${bootStatus}`);
-    const bootText = collectChildMessageText(bootStream.events, bootMessageId);
-    if (!echoPayloadMatches(bootText, bootMarker)) {
-      throw new Error(
-        `boot turn ${bootMessageId} did not complete with ${JSON.stringify(bootMarker)}; observed ${JSON.stringify(bootText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: bootStream,
+      parentMessageId: bootMessageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+      ),
+      label: 'boot turn',
+      ready: text => echoPayloadMatches(text, bootMarker),
+    });
     bootStream.close();
     bootStream = undefined;
 
@@ -438,10 +443,16 @@ async function runQuestionIdleResume(
       )
     );
     if (bootStatus !== 'completed') throw new Error(`boot turn durable status=${bootStatus}`);
-    const bootText = collectChildMessageText(bootStream.events, bootMessageId);
-    if (!echoPayloadMatches(bootText, `boot-${runId}`)) {
-      throw new Error(`boot turn did not echo boot-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: bootStream,
+      parentMessageId: bootMessageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+      ),
+      label: 'boot turn',
+      ready: text => echoPayloadMatches(text, `boot-${runId}`),
+    });
     const allocation = await waitForPresentAllocation(
       deadline,
       sandbox,
@@ -537,10 +548,16 @@ async function runQuestionIdleResume(
       RESUME_TURN_BUDGET_MS
     );
     streams.push(resume.stream);
-    const resumeText = collectChildMessageText(resume.stream.events, resume.messageId);
-    if (!echoPayloadMatches(resumeText, `resume-${runId}`)) {
-      throw new Error(`resume turn did not echo resume-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: resume.stream,
+      parentMessageId: resume.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('resume turn content'))
+      ),
+      label: 'resume turn',
+      ready: text => echoPayloadMatches(text, `resume-${runId}`),
+    });
     const replacement = await waitForPresentAllocation(
       deadline,
       sandbox,

@@ -1,9 +1,11 @@
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
+  WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
+import { wrapperRestoreTelemetrySchema } from './wrapper-bootstrap.js';
 
 // Bounded assistant-failure facts are duplicated locally (type-only import
 // above) so the standalone wrapper bundle never contains worker-utils. The
@@ -30,6 +32,26 @@ export const CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES = [
   'unknown',
 ] as const satisfies readonly CloudAgentProviderOwnership[];
 
+// Same duplication rule as the assistant-failure facts above: the wrapper
+// carries a git workspace subtype on an attach rejection, so the enum is
+// mirrored locally to keep the standalone wrapper bundle free of worker-utils.
+export const CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES = [
+  'git_clone_timeout',
+  'git_checkout_timeout',
+  'git_authentication_failed',
+  'git_rate_limited',
+  'git_network_failed',
+  'git_pack_corrupt',
+  'git_checkout_conflict',
+  'git_branch_missing',
+  'sandbox_storage_full',
+  'kilo_import_timeout',
+  'kilo_import_failed',
+  'setup_command_timeout',
+  'setup_command_failed',
+  'workspace_setup_unknown',
+] as const satisfies readonly WorkspaceFailureSubtype[];
+
 type AssertNever<_T extends never> = true;
 type _AssistantFailureReasonDriftGuard = AssertNever<
   Exclude<
@@ -40,9 +62,18 @@ type _AssistantFailureReasonDriftGuard = AssertNever<
 type _ProviderOwnershipDriftGuard = AssertNever<
   Exclude<CloudAgentProviderOwnership, (typeof CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES)[number]>
 >;
+type _WorkspaceFailureSubtypeDriftGuard = AssertNever<
+  Exclude<WorkspaceFailureSubtype, (typeof CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES)[number]>
+>;
 
 const cloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES);
 const cloudAgentProviderOwnershipSchema = z.enum(CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES);
+// An unrecognized subtype from a newer wrapper degrades to absent rather than
+// failing the whole response parse, so the field stays additive.
+const workspaceFailureSubtypeSchema = z
+  .enum(CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES)
+  .optional()
+  .catch(undefined);
 
 export {
   MAX_WORKTREE_CHANGES_BYTES,
@@ -220,6 +251,7 @@ export const controlErrorSchema = z.object({
   message: z.string(),
   retryable: z.boolean(),
   admission: z.literal('not-admitted').optional(),
+  subtype: workspaceFailureSubtypeSchema,
 });
 
 export const requestFrameSchema = z.object({
@@ -483,6 +515,12 @@ export const sessionAttachResultSchema = z
   .object({
     attached: z.literal(true),
     nativeRuntimeId: z.string().uuid().optional(),
+    /**
+     * Present when the attach restored the session from a snapshot. A skipped
+     * diff is reported to the worker from here; without it the runtime
+     * replacement's partial restore would only exist in the wrapper log.
+     */
+    restore: wrapperRestoreTelemetrySchema.optional(),
   })
   .strict();
 

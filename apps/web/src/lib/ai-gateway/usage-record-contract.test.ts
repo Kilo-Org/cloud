@@ -146,6 +146,12 @@ describe('UsageRecordRequestSchema', () => {
     expect(UsageRecordRequestSchema.safeParse(request).success).toBe(true);
   });
 
+  test('accepts System One usage for primary-region billing', () => {
+    const request = validRequest();
+    request.metadata.api_kind = 'systemone';
+    expect(UsageRecordRequestSchema.parse(request).metadata.api_kind).toBe('systemone');
+  });
+
   test('rejects an unknown api_kind', () => {
     const request = validRequest();
     request.metadata.api_kind = 'not_a_real_kind';

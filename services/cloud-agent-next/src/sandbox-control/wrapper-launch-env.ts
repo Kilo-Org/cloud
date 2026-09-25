@@ -5,6 +5,7 @@ export type ControlWrapperLaunchEnvInput = {
   workerUrl?: string;
   sandboxId: string;
   credential: string;
+  workloadCgroup?: string;
   diagnostics?: {
     allocationId: string;
     signingSecret: string | null;
@@ -48,6 +49,7 @@ export function buildControlWrapperLaunchEnv(
   }
   return {
     ...diagnosticEnv,
+    ...(input.workloadCgroup ? { CONTROL_WORKLOAD_CGROUP: input.workloadCgroup } : {}),
     SANDBOX_CONTROL_URL: sandboxControlWebSocketUrl(workerUrl, input.sandboxId),
     SANDBOX_CONTROL_CREDENTIAL: input.credential,
     PROVIDER_INSTANCE_ID: input.sandboxId,

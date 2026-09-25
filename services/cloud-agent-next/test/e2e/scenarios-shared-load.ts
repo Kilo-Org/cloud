@@ -28,8 +28,9 @@ import {
   type WorktreeSessionResult,
 } from './client.js';
 import {
+  awaitCorrelatedChildText,
   cleanupRemoteSession,
-  collectChildMessageText,
+  CONTENT_CORRELATION_BUDGET_MS,
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
@@ -166,17 +167,16 @@ async function runLargeStream(
     // The seed boot is the staging path under test. If the large write tool
     // argument cannot be staged, this is an honest `coverage=blocked`, never a
     // weaker substitute using large assistant text.
-    let boot: { messageId: string; stream: StreamConnection; text: string };
+    let boot: { messageId: string; stream: StreamConnection };
     try {
-      boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+      boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+        text.includes(`file-write:${seedPath}`)
+      );
     } catch (error) {
       return fail(`coverage=blocked; reason=seed staging failed: ${errorMessage(error)}`);
     }
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!boot.text.includes(`file-write:${seedPath}`)) {
-      return fail(`coverage=blocked; reason=seed write not staged: ${JSON.stringify(boot.text)}`);
-    }
     const allocation = await waitForPresentAllocation(
       deadline,
       sandbox,
@@ -203,7 +203,16 @@ async function runLargeStream(
     }
     streams.push(read.stream);
     events.push(...read.stream.events);
-    const readText = collectChildMessageText(read.stream.events, read.messageId);
+    const readText = await awaitCorrelatedChildText({
+      stream: read.stream,
+      parentMessageId: read.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('read turn content'))
+      ),
+      label: 'read turn',
+      ready: text => parseFileReadEcho(text, seedPath) !== null,
+    });
     const body = parseFileReadEcho(readText, seedPath);
     const status = await deadline.within('read status', signal =>
       fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, readTag, signal)
@@ -317,14 +326,17 @@ async function runConcurrentChats(
         fakeDirective(`echo:boot-${index}-${runId}`)
       );
       owned.register(session);
-      const boot = await bootToCompletion(deadline, scenarioConfig, session, `${label} boot`);
+      const boot = await bootToCompletion(
+        deadline,
+        scenarioConfig,
+        session,
+        `${label} boot`,
+        text => echoPayloadMatches(text, `boot-${index}-${runId}`)
+      );
       // Own the boot stream as soon as it exists, so an assertion or allocation
       // wait below cannot leak it past `finally`.
       entries.push({ session, boot });
       events.push(...boot.stream.events);
-      if (!echoPayloadMatches(boot.text, `boot-${index}-${runId}`)) {
-        throw new Error(`${label} boot did not echo boot-${index}-${runId}`);
-      }
       const allocation = await waitForPresentAllocation(
         deadline,
         sandbox,

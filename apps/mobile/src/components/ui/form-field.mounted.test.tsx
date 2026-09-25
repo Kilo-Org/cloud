@@ -34,6 +34,22 @@ afterEach(() => {
   });
 });
 
+/**
+ * Flattens the field's nested style array the way React Native does, without
+ * `StyleSheet` (the `react-native` mock above does not provide it).
+ */
+function flattenStyle(style: unknown): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const entry of Array.isArray(style) ? style : [style]) {
+    if (Array.isArray(entry)) {
+      Object.assign(merged, flattenStyle(entry));
+    } else if (typeof entry === 'object' && entry !== null) {
+      Object.assign(merged, entry);
+    }
+  }
+  return merged;
+}
+
 describe('FormField reserved validation space', () => {
   it.each([
     ['English', en],
@@ -113,11 +129,78 @@ describe('FormField reserved validation space', () => {
   });
 });
 
-describe('FormField direction-aware content alignment', () => {
-  function mountInput(style?: { textAlign: 'center' }) {
+describe('FormField shared single-line box', () => {
+  it('renders the shared single-line box with centered vertical alignment', () => {
     act(() => {
       renderer = TestRenderer.create(
-        createElement(FormField, { label: i18n.t('login.emailAddress'), style })
+        createElement(FormField, { label: i18n.t('login.emailAddress') })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const input = renderer.root.findByType('TextInput');
+    expect(input.props.className).toContain('min-h-[44px]');
+    expect(input.props.className).toContain('px-3');
+    expect(input.props.className).toContain('leading-[normal]');
+    expect(input.props.className).not.toContain('py-');
+    expect(input.props.textAlignVertical).toBe('center');
+  });
+
+  it('keeps the box and the content style when an error appears under the field', () => {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, { label: i18n.t('login.emailAddress') })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const mounted = renderer;
+    const inputProps = () => mounted.root.findByType('TextInput').props;
+    // The error swaps the border colour only; every other token is unchanged.
+    const borderColourTokens = new Set(['border-input', 'border-destructive']);
+    const stableTokens = (className: string) =>
+      className.split(' ').filter(token => !borderColourTokens.has(token));
+
+    const before = inputProps();
+    expect(before.className).not.toContain('border-destructive');
+
+    act(() => {
+      mounted.update(
+        createElement(FormField, {
+          label: i18n.t('login.emailAddress'),
+          error: i18n.t('login.pleaseEnterEmail'),
+        })
+      );
+    });
+
+    const after = inputProps();
+    // The message only tints the border: the box's geometry, the vertical
+    // alignment and the inline style are the ones rendered without it.
+    expect(after.className).toContain('border-destructive');
+    expect(stableTokens(String(after.className))).toEqual(stableTokens(String(before.className)));
+    for (const token of ['min-h-[44px]', 'px-3', 'leading-[normal]']) {
+      expect(after.className).toContain(token);
+    }
+    expect(after.className).not.toContain('py-');
+    expect(after.textAlignVertical).toBe('center');
+    expect(after.style).toBeUndefined();
+
+    // The message is a sibling of the input, not part of its content, so the
+    // text inside the box cannot move when it appears.
+    const input = mounted.root.findByType('TextInput');
+    const status = mounted.root.findByType(AccessibleStatus);
+    expect(status.findByType('Text').props.children).toBe(i18n.t('login.pleaseEnterEmail'));
+    expect(input.findAllByType(AccessibleStatus)).toHaveLength(0);
+  });
+});
+
+describe('FormField direction-aware content alignment', () => {
+  function mountInput(props: { style?: { textAlign: 'center' }; textAlign?: 'center' } = {}) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, { label: i18n.t('login.emailAddress'), ...props })
       );
     });
     if (!renderer) {
@@ -145,6 +228,14 @@ describe('FormField direction-aware content alignment', () => {
     rtl.isRTL = true;
     const centered = { textAlign: 'center' } as const;
 
-    expect(mountInput(centered).props.style).toEqual([{ textAlign: 'right' }, centered]);
+    expect(mountInput({ style: centered }).props.style).toEqual([{ textAlign: 'right' }, centered]);
+  });
+
+  it('keeps an explicit caller alignment passed as a prop after the RTL default', () => {
+    // The shared field threads a `textAlign` prop straight to `Input`, so the
+    // prop channel must survive the RTL default exactly like the style channel.
+    rtl.isRTL = true;
+
+    expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
   });
 });

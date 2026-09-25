@@ -191,6 +191,26 @@ function findHeaderRight(root: TestInstance): TestInstance {
   return headerRight;
 }
 
+/**
+ * The trailing wrapper that carries `inlineActions`. It shares the `ms-3`
+ * start margin with the `headerRight` wrapper but drops the half-row
+ * `max-w-[50%]` cap.
+ */
+function findInlineActionsWrapper(root: TestInstance): TestInstance {
+  const wrapper = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(^|\s)ms-3(\s|$)/.test(node.props.className) &&
+      !node.props.className.includes('max-w-[50%]')
+  )[0];
+  if (!wrapper) {
+    throw new Error('inlineActions view not found');
+  }
+  return wrapper;
+}
+
 function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -263,6 +283,60 @@ describe('ScreenHeader mounted', () => {
     expect(headerRight.props.className).not.toContain('shrink-0');
   });
 
+  it('renders inlineActions in the title row uncapped while headerRight keeps its cap', () => {
+    const renderer = renderHeader({
+      title: 'Agents',
+      headerRight: 'RIGHT',
+      inlineActions: 'ACTIONS',
+    });
+
+    const capped = findHeaderRight(renderer.root);
+    const inline = findInlineActionsWrapper(renderer.root);
+
+    // Both trailing slots sit in the title row beside the heading, so the
+    // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
+    expect(inline.parent).toBe(capped.parent);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    const heading = inline.parent?.children[0] as TestInstance;
+    expect(heading.props.className).toContain('min-w-0 flex-1');
+    // `headerRight` keeps its half-row cap; `inlineActions` keeps its full width
+    // instead of wrapping the controls.
+    expect(capped.props.className).toContain('max-w-[50%]');
+    expect(inline.props.className).not.toContain('max-w-[50%]');
+    expect(inline.props.className).toContain('min-w-0');
+    expect(inline.props.className).toContain('shrink');
+  });
+
+  it('renders inlineActions alone in the title row', () => {
+    const renderer = renderHeader({ title: 'Agents', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    const capped = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('max-w-[50%]')
+    );
+    expect(capped).toHaveLength(0);
+  });
+
+  it('renders inlineActions beside a centered title too', () => {
+    // A centered title (`centerTitle`, e.g. a modal with a title or eyebrow)
+    // shares its row with the leading control; the inline actions slot must not
+    // be dropped just because the title is centered.
+    const renderer = renderHeader({ modal: true, title: 'Filters', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    expect(inline.props.className).not.toContain('max-w-[50%]');
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -305,6 +379,18 @@ describe('ScreenHeader mounted', () => {
       // The rendered font size plus the 13pt top/bottom slop must clear 44pt.
       expect(fontSize + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  it('paints the large route title in the foreground token, never a muted one', () => {
+    // Explorer finding 5 (profile, f2181ae79) reported the Profile title muted
+    // gray while every other heading is white. A pixel measure of the capture
+    // refuted it: the large title is text-foreground, the same white as the
+    // Kilo Pass row. Pin the token so the top of the hierarchy cannot silently
+    // drop to text-muted-foreground.
+    const renderer = renderHeader({ title: 'Profile', size: 'large' });
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-foreground');
+    expect(title.props.className).not.toContain('text-muted-foreground');
   });
 
   it('returns to the previous screen by default', () => {

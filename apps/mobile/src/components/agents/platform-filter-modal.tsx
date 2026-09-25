@@ -1,14 +1,16 @@
 import { Check } from '@/components/ui/icons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { buildProjectRows, mergePlatformOptions } from '@/components/agents/platform-filter-rows';
 import {
-  formatGitUrlProject,
+  knownPlatformBucket,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
+  projectOptionKey,
 } from '@/components/agents/session-list-helpers';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -38,6 +40,12 @@ type FilterCheckboxRowProps = {
   onPress: () => void;
 };
 
+/** Every git URL that renders to one project label, offered as a single row. */
+type ProjectFilterGroup = {
+  gitUrls: string[];
+  displayName: string;
+};
+
 function platformFilterLabel(p: string): string {
   switch (p) {
     case 'cloud-agent': {
@@ -65,6 +73,12 @@ function platformFilterLabel(p: string): string {
       return platformLabel(p);
     }
   }
+}
+
+/** Collapse a persisted platform variant into the single bucket row it maps to.
+ * An unknown platform keeps its own row. */
+function normalisePlatform(platform: string): string {
+  return knownPlatformBucket(platform) ?? platform;
 }
 
 function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckboxRowProps>) {
@@ -112,15 +126,40 @@ export function SessionFilterModal({
     0,
     windowHeight - insets.top - insets.bottom - SHEET_EDGE_MARGIN * 2
   );
-  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
+  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(() => [
+    ...new Set(selectedPlatforms.map(platform => normalisePlatform(platform))),
+  ]);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
-  const platforms = [...new Set([...platformOptions, ...selectedPlatforms])];
-  const projectsByUrl = new Map(projectOptions.map(project => [project.gitUrl, project]));
-  for (const gitUrl of selectedProjects) {
-    if (!projectsByUrl.has(gitUrl)) {
-      projectsByUrl.set(gitUrl, { gitUrl, displayName: formatGitUrlProject(gitUrl) });
+  // The sheet re-renders on every checkbox toggle, so the merged platform rows
+  // and the project lookup derive from the props only. Keying the memos on those
+  // props keeps the derived values stable while the draft selection changes, so
+  // a toggle never rebuilds the recent-repository map.
+  const platforms = useMemo(
+    () =>
+      mergePlatformOptions(
+        platformOptions,
+        selectedPlatforms.map(platform => normalisePlatform(platform))
+      ),
+    [platformOptions, selectedPlatforms]
+  );
+  // One row per visible project label, in first-seen order. Two git URLs that
+  // `formatGitUrlProject` renders identically (https vs ssh, a `.git` suffix,
+  // host case) share a group, so the sheet never shows the same project twice.
+  const projectGroups = useMemo(() => {
+    const groups = new Map<string, ProjectFilterGroup>();
+    for (const project of buildProjectRows(projectOptions, selectedProjects).values()) {
+      const key = projectOptionKey(project.gitUrl);
+      const group = groups.get(key);
+      if (group) {
+        if (!group.gitUrls.includes(project.gitUrl)) {
+          group.gitUrls.push(project.gitUrl);
+        }
+      } else {
+        groups.set(key, { gitUrls: [project.gitUrl], displayName: project.displayName });
+      }
     }
-  }
+    return groups;
+  }, [projectOptions, selectedProjects]);
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -128,9 +167,13 @@ export function SessionFilterModal({
     );
   };
 
-  const toggleProject = (gitUrl: string) => {
+  // Toggle the whole group: every alias is stored or removed together, so the
+  // server query keeps the sessions of both variants filtered in.
+  const toggleProjectGroup = (group: ProjectFilterGroup) => {
     setDraftProjects(prev =>
-      prev.includes(gitUrl) ? prev.filter(value => value !== gitUrl) : [...prev, gitUrl]
+      group.gitUrls.some(gitUrl => prev.includes(gitUrl))
+        ? prev.filter(gitUrl => !group.gitUrls.includes(gitUrl))
+        : [...prev, ...group.gitUrls.filter(gitUrl => !prev.includes(gitUrl))]
     );
   };
 
@@ -169,33 +212,41 @@ export function SessionFilterModal({
           </Text>
           <ScrollView className="shrink" showsVerticalScrollIndicator={false}>
             <View className="gap-4">
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  {t('common.platform')}
-                </Text>
-                {platforms.map(platform => (
-                  <FilterCheckboxRow
-                    key={platform}
-                    label={platformFilterLabel(platform)}
-                    isChecked={draftPlatforms.includes(platform)}
-                    onPress={() => {
-                      togglePlatform(platform);
-                    }}
-                  />
-                ))}
-              </View>
-              {projectsByUrl.size > 0 && (
+              {/* The rows are derived from the live sessions, so a list whose
+                  rows all have an unknown origin (`liveSessionPlatformBucket`
+                  returns null) offers no platform at all and nothing is
+                  selected. Rendering the label then leaves an orphaned section
+                  header above PROJECT (spot defect e4-filter); the section is
+                  omitted exactly as PROJECT already is when it has no rows. */}
+              {platforms.length > 0 && (
+                <View className="gap-1">
+                  <Text variant="eyebrow" className="px-3">
+                    {t('common.platform')}
+                  </Text>
+                  {platforms.map(platform => (
+                    <FilterCheckboxRow
+                      key={platform}
+                      label={platformFilterLabel(platform)}
+                      isChecked={draftPlatforms.includes(platform)}
+                      onPress={() => {
+                        togglePlatform(platform);
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
+              {projectGroups.size > 0 && (
                 <View className="gap-1">
                   <Text variant="eyebrow" className="px-3">
                     {t('agentChat.sessionFilter.project')}
                   </Text>
-                  {[...projectsByUrl.values()].map(project => (
+                  {[...projectGroups.entries()].map(([key, group]) => (
                     <FilterCheckboxRow
-                      key={project.gitUrl}
-                      label={project.displayName}
-                      isChecked={draftProjects.includes(project.gitUrl)}
+                      key={key}
+                      label={group.displayName}
+                      isChecked={group.gitUrls.some(gitUrl => draftProjects.includes(gitUrl))}
                       onPress={() => {
-                        toggleProject(project.gitUrl);
+                        toggleProjectGroup(group);
                       }}
                     />
                   ))}

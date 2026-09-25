@@ -76,6 +76,7 @@ function makeProps(overrides: Partial<RenderProps> = {}) {
     onInputBlur: () => undefined,
     onInputFocus: () => undefined,
     onInputLayout: () => undefined,
+    onInputContentSizeChange: () => undefined,
     onInsertNewline: () => undefined,
     onSelectionChange: () => undefined,
     onStop: () => undefined,

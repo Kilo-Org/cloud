@@ -386,6 +386,18 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
+  it('paints the large route title in the foreground token, never a muted one', () => {
+    // Explorer finding 5 (profile, f2181ae79) reported the Profile title muted
+    // gray while every other heading is white. A pixel measure of the capture
+    // refuted it: the large title is text-foreground, the same white as the
+    // Kilo Pass row. Pin the token so the top of the hierarchy cannot silently
+    // drop to text-muted-foreground.
+    const renderer = renderHeader({ title: 'Profile', size: 'large' });
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-foreground');
+    expect(title.props.className).not.toContain('text-muted-foreground');
+  });
+
   it('returns to the previous screen by default', () => {
     const renderer = renderHeader({ title: 'Sessions' });
     act(() => {

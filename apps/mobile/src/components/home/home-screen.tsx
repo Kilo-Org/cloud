@@ -38,10 +38,9 @@ export function HomeScreen() {
   });
   const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
+  const liveContent = liveSessionContent(context, sessions);
   const centerFeedback =
-    liveSessionContent(context, sessions) === 'error' &&
-    !context.isReady &&
-    !(context.accountReady && prReviewEnabled);
+    liveContent === 'error' && !context.isReady && !(context.accountReady && prReviewEnabled);
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -87,7 +86,16 @@ export function HomeScreen() {
           <TabScreenScrollView
             className="flex-1"
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+            refreshControl={
+              // One indicator per surface: while the live section is `pending`
+              // it paints its own loading card, so the platform pull control
+              // must not hold the scroll inset open for a second one (finding
+              // home-loading; refresh-indicator.ts:20-23).
+              <RefreshControl
+                refreshing={refreshing && liveContent !== 'pending'}
+                onRefresh={handleRefresh}
+              />
+            }
           >
             <Animated.View layout={LinearTransition} className="gap-2">
               <AgentSessionsSection context={context} sessions={sessions} />

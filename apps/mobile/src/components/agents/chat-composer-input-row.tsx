@@ -51,6 +51,12 @@ type ChatComposerInputRowProps = {
   onInputBlur: () => void;
   onInputFocus: () => void;
   onInputLayout: (event: LayoutChangeEvent) => void;
+  /**
+   * Report the input's own rendered content height in dp. The composer uses it
+   * as the one faithful measure of the pitch this input lays lines out at (see
+   * `useTextHeight`).
+   */
+  onInputContentSizeChange: (contentHeight: number) => void;
   onInsertNewline: () => void;
   onSelectionChange: (event: TextInputSelectionChangeEvent) => void;
   onStop: () => void;
@@ -90,6 +96,7 @@ export function ChatComposerInputRow({
   onChangeText,
   onInputBlur,
   onInputFocus,
+  onInputContentSizeChange,
   onInputLayout,
   onInsertNewline,
   onSelectionChange,
@@ -182,6 +189,9 @@ export function ChatComposerInputRow({
           multiline
           maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
           onChangeText={onChangeText}
+          onContentSizeChange={event => {
+            onInputContentSizeChange(event.nativeEvent.contentSize.height);
+          }}
           onFocus={onInputFocus}
           onBlur={onInputBlur}
           onSelectionChange={onSelectionChange}

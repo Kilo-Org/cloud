@@ -95,7 +95,10 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
-import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
+import {
+  collectDataCollectionRequiredAutoRoutingModelIds,
+  collectDeniedAutoRoutingModelIds,
+} from '@/lib/ai-gateway/auto-routing-denied-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -387,13 +390,16 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
             !groupPolicy && plan === 'enterprise'
               ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
               : [];
-          const deniedFromPolicy = groupPolicy
-            ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
-                userId: user.id,
-                organizationId: organizationId ?? null,
-              })
-            : [];
-          const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
+          const owner = { userId: user.id, organizationId: organizationId ?? null };
+          const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+            groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
+            isDataCollectionExplicitlyDisallowed(effectivePrivacy)
+              ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
+              : [],
+          ]);
+          const deniedModelIds = [
+            ...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy]),
+          ];
           const result = await fetchEfficientAutoDecision({
             apiKind: requestBodyParsed.kind,
             body: requestBodyParsed.body,

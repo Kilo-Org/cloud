@@ -10,16 +10,23 @@
  * failure this gate answers), while a submission at 10:03:22Z was accepted
  * with 20 in the window.
  *
- * The count source is the App Store Connect uploads themselves, not the release
- * tags. A release tag is written only after Submit iOS *and* Submit Android, so
- * a run that uploads the IPA and then fails at Submit Android is a real upload
- * that no release tag records; with the hourly schedule it re-uploads iOS every
- * hour while the tag count still reads low. The workflow therefore pushes one
- * annotated `kilo-app-upload/<date>-<run>` marker immediately after Submit iOS
- * succeeds, and this gate counts that prefix. `kilo-app-release/*` tags stay
- * release detection only (the workflow's change detection reads them). The
- * marker is annotated, so its creatordate is the upload moment: a hold resumed
- * hours later still counts at the time of the upload, not the commit.
+ * The count source is the iOS submissions themselves, not the release tags. A
+ * release tag is written only after Submit iOS *and* Submit Android, so a run
+ * that uploads the IPA and then fails at Submit Android is a real upload that
+ * no release tag records; with the hourly schedule it re-uploads iOS every hour
+ * while the tag count still reads low. The workflow therefore pushes one
+ * annotated `kilo-app-upload/<date>-<run>` marker immediately before Submit iOS,
+ * and this gate counts that prefix. Marking before the submission is what keeps
+ * the ledger from under-counting: App Store Connect can accept the IPA and the
+ * run can then be interrupted, or the marker push can fail, and a marker pushed
+ * only once the submit had returned successfully would miss that upload. A
+ * submission the stores refuse keeps its marker for one window and holds the
+ * next run: a hold is a green run, so that costs one window, while an
+ * unrecorded accepted upload costs a refusal from the stores.
+ * `kilo-app-release/*` tags stay release detection only (the workflow's change
+ * detection reads them). The marker is annotated, so its creatordate is the
+ * submission moment: a hold resumed hours later still counts at the time of the
+ * submission, not the commit.
  *
  * The chosen cap is 10, 52 percent under the 21 that were refused, so the
  * margin absorbs the gate's granularity.
@@ -41,7 +48,7 @@ import { pathToFileURL } from 'node:url';
 
 const DEFAULT_CAP = 10;
 const DEFAULT_WINDOW_HOURS = 24;
-// One tag per App Store Connect upload, pushed right after Submit iOS succeeds.
+// One tag per iOS submission, pushed right before Submit iOS runs.
 // The release tags (`kilo-app-release/`) are release detection only: a partial
 // run never writes one, so they cannot be the upload count.
 const DEFAULT_PREFIX = 'kilo-app-upload/';

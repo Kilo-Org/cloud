@@ -131,11 +131,12 @@ jobs:
       # The cost gate: the last thing before any build. Apple refuses a
       # submission over its rolling upload limit, and the failure is the whole
       # point of the gate — never build an artifact the throttle will refuse.
-      # The count is the App Store Connect uploads themselves (the
-      # kilo-app-upload/ markers Submit iOS pushes), never the release tags: a
-      # run that uploads the IPA and then fails at Submit Android writes no
-      # release tag, and with the hourly schedule it would re-upload iOS for
-      # ever while the tag count still read low.
+      # The count is the iOS submissions themselves (the kilo-app-upload/
+      # markers pushed just before Submit iOS), never the release tags: a run
+      # that uploads the IPA and then fails at Submit Android writes no release
+      # tag, and with the hourly schedule it would re-upload iOS for ever while
+      # the tag count still read low. The marker is written before the
+      # submission, so an accepted upload can never be missing from the count.
       # A hold is not a failure: the run stays green and the next push or the
       # hourly run resumes the same unreleased change.
       - name: Gate on the App Store Connect upload limit
@@ -298,21 +299,23 @@ jobs:
           printf '%s\n' "$IDENTITY"
           printf '%s\n' "$IDENTITY" | sed -n 's/^\(ios_build\|android_build\)=/\1=/p' >> "$GITHUB_OUTPUT"
 
-      - name: Submit iOS
-        working-directory: apps/mobile
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpx eas-cli@21.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
-
-      # An iOS submission is a real App Store Connect upload even when the
-      # Android submit after it fails, so record it the moment it succeeds: the
-      # upload cap counts this marker prefix, and the release tag below stays
-      # release detection only. The marker is annotated, so its creatordate is
-      # the upload moment — a release held and resumed hours later still counts
-      # at the upload time, not the commit's. The run id and attempt keep the
-      # name unique, so an hourly retry of the same commit pushes a second,
-      # distinct marker instead of failing on a name that already exists.
-      # An annotated tag needs a tagger identity; the runner has none.
+      # The cap ledger must never under-count, so the marker is pushed BEFORE
+      # the submission, not after it succeeds. App Store Connect can accept the
+      # IPA and the run can then be interrupted, or its push can fail, and
+      # either leaves a real upload that no marker records; a later run would
+      # count fewer accepted uploads and could submit while Apple is over its
+      # limit. An accepted submission is always a recorded one this way.
+      # A marker therefore means "this run submitted an iOS build". A submission
+      # the stores refused keeps its slot for one window and holds the next run
+      # instead, which is the safe direction: the gate must never admit an
+      # upload Apple would refuse, and a hold is a green run that the next push
+      # or the hourly schedule picks up. The marker is annotated, so its
+      # creatordate is the submission moment — a release held and resumed hours
+      # later still counts at the time it was submitted, not at its commit's.
+      # The run id and attempt keep the name unique, so an hourly retry of the
+      # same commit pushes a second, distinct marker instead of failing on a
+      # name that already exists. An annotated tag needs a tagger identity; the
+      # runner has none.
       - name: Mark the iOS upload
         run: |
           git config user.name "github-actions[bot]"
@@ -320,6 +323,12 @@ jobs:
           MARKER="kilo-app-upload/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git tag -a "$MARKER" -m "$MARKER"
           git push origin "$MARKER"
+
+      - name: Submit iOS
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: pnpx eas-cli@21.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
 
       - name: Submit Android
         working-directory: apps/mobile

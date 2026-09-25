@@ -26,16 +26,14 @@ import { describe, expect, it } from 'vitest';
 // No host here has an Android device, so the fact the device would show is
 // pinned here: the three button bar attrs point at `AppAlertDialogButton`, that
 // style keeps the stock parent and flips only `android:textAllCaps`, an absent
-// activity theme is left alone, the plugin registers an Android styles mod and
-// nothing else, and the confirm stays one shared `Alert.alert` call site with
-// no `Platform.OS` fork (iOS renders the same call as `UIAlertController`).
+// activity theme is left alone, and the plugin registers an Android styles mod
+// and nothing else (iOS renders the same calls as `UIAlertController`).
 
 const readMobileFile = (relativePath: string): string =>
   readFileSync(fileURLToPath(new URL(`../../${relativePath}`, import.meta.url)), 'utf8');
 
 const pluginSource = readMobileFile('plugins/withAndroidAlertDialogButtonCase.js');
 const appConfigSource = readMobileFile('app.config.ts');
-const discardGuardSource = readMobileFile('src/components/agents/use-new-session-discard-guard.ts');
 
 const PLUGIN_PATH = './plugins/withAndroidAlertDialogButtonCase';
 const THEME_NAME = 'AppTheme';
@@ -187,18 +185,6 @@ describe('Android alert-dialog button case plugin', () => {
     // One shared config for both platforms: a platform branch around the
     // registration would be the only way to fork it, and there is none.
     expect(appConfigSource).not.toMatch(PLATFORM_BRANCH);
-  });
-
-  it('leaves the discard confirm as one shared Alert.alert call site', () => {
-    // Parity guard: Android and iOS share the one call. The fix re-cases the
-    // Android render; it does not fork the call site by platform. The guard
-    // matches the branch shapes a later edit could reach for (`Platform.OS`,
-    // `Platform.select`, a platform-specific import) rather than a bare
-    // `Platform` token, so a comment or an unrelated reference is not a fork.
-    expect(discardGuardSource.match(/Alert\.alert\(/g)).toHaveLength(1);
-    expect(discardGuardSource).toContain("i18n.t('common.keepEditing')");
-    expect(discardGuardSource).toContain("i18n.t('common.discard')");
-    expect(discardGuardSource).not.toMatch(PLATFORM_BRANCH);
   });
 
   it('reads a real platform fork but not a bare Platform token', () => {

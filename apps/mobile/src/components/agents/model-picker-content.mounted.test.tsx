@@ -103,10 +103,6 @@ vi.mock('@shopify/flash-list', async () => {
 });
 
 vi.mock('react-native', () => ({
-  // `lib/rtl-text` reads `I18nManager.isRTL` for `withRtlInputAlignment`, which
-  // the picker's search field passes its style through, so the mock must carry
-  // the module's direction flag.
-  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

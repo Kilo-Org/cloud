@@ -36,7 +36,6 @@ export function reconcileLog(
   );
 }
 
-// ── ReconcileContext ──────────────────────────────────────────────────
 //
 // Bundles state + env + reason so every reconcileLog call site
 // automatically emits to Cloudflare Analytics Engine without needing
@@ -90,8 +89,6 @@ export function createReconcileContext(
     },
   };
 }
-
-// ── Structured error/warn logging ────────────────────────────────────
 
 /**
  * Coerce an unknown caught value into an Error or string for structured logging.

@@ -884,6 +884,10 @@ describe('header actions row', () => {
   });
 
   it('keeps a narrower declared cluster on the title row', () => {
+    // A normal phone width: the suite's `beforeEach` does not cover this
+    // describe, and the test above leaves a 320dp / scale 2 window behind.
+    layout.width = 390;
+    layout.fontScale = 1;
     // Share and Merge alone: 44 + 44 + the `gap-1` between them.
     const renderer = renderHeader({
       title: 'PR review #7',
@@ -934,9 +938,11 @@ describe('shouldStackHeaderActions', () => {
     // the title a few characters. The declared cluster width reflows it.
     expect(shouldStackHeaderActions(320, 2)).toBe(false);
     expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
-    // A cluster the title still fits beside keeps the single row.
+    // A cluster the title still fits beside keeps the single row, and the PR
+    // review cluster stacks even at a normal phone width: 390 - 44 - 12 - 236
+    // leaves the title 98dp, below its 120dp minimum.
     expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
-    expect(shouldStackHeaderActions(390, 1, 236)).toBe(false);
+    expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
   });
 
   it('treats a missing window measurement as a single row', () => {

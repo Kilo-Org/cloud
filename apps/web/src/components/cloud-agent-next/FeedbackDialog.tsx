@@ -135,7 +135,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
           <MessageSquareWarning className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
           <DialogDescription>
@@ -144,7 +144,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           {showSuccess ? (
             <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
               <Check className="h-6 w-6 text-green-500" />
@@ -192,17 +192,8 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
                       Your recent feedback
                     </h3>
                   </div>
-                  {historyLoading ? (
-                    <p className="text-muted-foreground text-xs">Loading recent feedback…</p>
-                  ) : historyError ? (
-                    <p className="text-muted-foreground text-xs" role="status">
-                      Could not load recent feedback.
-                    </p>
-                  ) : history.length > 0 ? (
-                    <ul
-                      aria-labelledby={historyHeadingId}
-                      className="max-h-48 space-y-2 overflow-y-auto pr-1"
-                    >
+                  {history.length > 0 ? (
+                    <ul aria-labelledby={historyHeadingId} className="space-y-2 pr-1">
                       {history.map(item => {
                         const timestamp = formatFeedbackTimestamp(item.created_at);
                         return (
@@ -217,6 +208,12 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
                         );
                       })}
                     </ul>
+                  ) : historyLoading ? (
+                    <p className="text-muted-foreground text-xs">Loading recent feedback...</p>
+                  ) : historyError ? (
+                    <p className="text-muted-foreground text-xs" role="status">
+                      Could not load recent feedback. Close and reopen the dialog to try again.
+                    </p>
                   ) : null}
                 </div>
               )}

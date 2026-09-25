@@ -112,10 +112,19 @@ describe('cloudAgentNextFeedback.list', () => {
     expect(result.map(row => row.feedback_text)).toEqual(['limited 2', 'limited 1']);
   });
 
-  it('accepts the maximum limit and rejects out-of-range input', async () => {
+  it('caps the maximum limit and rejects out-of-range input', async () => {
+    await db.insert(cloud_agent_feedback).values(
+      Array.from({ length: 25 }, (_, index) => ({
+        kilo_user_id: regularUser.id,
+        feedback_text: `capped ${index}`,
+        // Distinct, increasing instants so the cap is observable.
+        created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      }))
+    );
+
     const caller = await createCallerForUser(regularUser.id);
 
-    await expect(caller.cloudAgentNextFeedback.list({ limit: 20 })).resolves.toEqual([]);
+    await expect(caller.cloudAgentNextFeedback.list({ limit: 20 })).resolves.toHaveLength(20);
     await expect(caller.cloudAgentNextFeedback.list({ limit: 0 })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });

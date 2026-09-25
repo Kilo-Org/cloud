@@ -104,6 +104,16 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// The personal `agentProfiles.list` rows the header's active-profile chip
+// reads; tests set it before mounting to drive the chip's presence.
+const profileRowsState = vi.hoisted(() => ({
+  personal: [] as unknown[],
+  combined: {
+    orgProfiles: [] as unknown[],
+    personalProfiles: [] as unknown[],
+    effectiveDefaultId: null as string | null,
+  },
+}));
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -196,6 +206,7 @@ vi.mock('@/components/ui/icons', () => ({
   Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'ChevronLeft',
@@ -491,6 +502,25 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
+    // The session header's active-profile chip reads the context profiles; the
+    // hoisted rows let a test resolve a default, and the empty default keeps
+    // the chip absent so the existing header assertions hold.
+    agentProfiles: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'list'],
+          queryFn: () => profileRowsState.personal,
+          initialData: profileRowsState.personal,
+        }),
+      },
+      listCombined: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'listCombined'],
+          queryFn: () => profileRowsState.combined,
+          initialData: profileRowsState.combined,
+        }),
+      },
+    },
     // The real context sheet resolves the "running on" row from the connected
     // CLI instances; the row is inert here, so an empty instance list keeps the
     // sheet rendering without a network read.
@@ -687,6 +717,8 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  profileRowsState.personal = [];
+  profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   openRenameModal.mockClear();
   renameModalState.isOpen = false;
   renameModalState.initialValue = '';
@@ -719,6 +751,9 @@ type MountDetailsOptions = {
   cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
+  sessionOrganizationId?: string;
+  /** The profile id the session row recorded, as `fetchSession` reports it. */
+  sessionProfileId?: string | null;
 };
 
 async function mountDetails(
@@ -811,7 +846,8 @@ async function mountDetails(
         kiloSessionId: id,
         cloudAgentSessionId: null,
         title: sessionTitleOverride ?? `Root ${id}`,
-        organizationId: null,
+        organizationId: options.sessionOrganizationId ?? null,
+        profileId: options.sessionProfileId ?? null,
         gitUrl: null,
         gitBranch: null,
         mode: null,
@@ -1017,6 +1053,126 @@ describe('SessionDetailContent display scope', () => {
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail active-profile indicator', () => {
+  const PROFILE_ROW = {
+    id: 'p1',
+    name: 'Production',
+    description: null,
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 2,
+    commandCount: 1,
+    mcpServerCount: 1,
+    skillCount: 1,
+    agentCount: 1,
+    kiloCommandCount: 1,
+  };
+
+  function findChip(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith(i18n.t('agentChat.newSession.profileActive'))
+    );
+  }
+
+  it('shows the chip for the session context effective default and opens its editor', async () => {
+    profileRowsState.personal = [PROFILE_ROW];
+    const { renderer } = await mountDetails();
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Production');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+  });
+
+  it.each(['user', 'organization'] as const)(
+    'opens a %s default from an organization session in its owner scope',
+    async ownerType => {
+      const profile = { ...PROFILE_ROW, ownerType };
+      profileRowsState.combined = {
+        personalProfiles: ownerType === 'user' ? [profile] : [],
+        orgProfiles: ownerType === 'organization' ? [profile] : [],
+        effectiveDefaultId: profile.id,
+      };
+      const { renderer } = await mountDetails([], {
+        sessionOrganizationId: 'org-a',
+        displayScope: { organizationId: 'org-a', isResolved: true },
+      });
+      await waitFor(() => findChip(renderer).length > 0);
+      const [chip] = findChip(renderer);
+      if (!chip) {
+        throw new Error('the active-profile chip did not render');
+      }
+      act(() => {
+        (chip.props.onPress as () => void)();
+      });
+      expect(navigationRoutes.at(-1)).toBe(
+        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+      );
+    }
+  );
+
+  it('renders no chip when the context has no profiles', async () => {
+    const { renderer } = await mountDetails();
+
+    expect(findChip(renderer)).toHaveLength(0);
+  });
+
+  it('names the profile the session recorded, not the context effective default', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+      { ...PROFILE_ROW, id: 'p-recorded', name: 'Recorded', isDefault: false },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Recorded');
+    expect(chip.props.accessibilityLabel).not.toContain('Default');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+  });
+
+  it('falls back to the effective default only when the session recorded no profile', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Default');
+  });
+
+  it('renders no chip when the session profile id no longer resolves', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const view = await mountDetails([], { sessionProfileId: 'p-deleted' });
+
+    // Wait for the session metadata read so the assertion is not merely the
+    // pre-load window; a fallback to the context default would surface here.
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    expect(findChip(view.renderer)).toHaveLength(0);
   });
 });
 

@@ -166,6 +166,41 @@ function successfulMessageOrder(events: StreamEvent[], messageIds: string[]): bo
 }
 
 /**
+ * Classify one interrupted follow-up from its settled failure event. The
+ * expected delivery is `'sent'` iff `events` holds `cloud.message.sent` for the
+ * id, else `'queued'`; `reason` must be `'interrupted'`. A dropped sent frame
+ * therefore fails (the failure reports `sent` where no sent was observed), and
+ * a never-accepted follow-up that reports `sent` fails too. The detail always
+ * names the observed and expected delivery.
+ */
+function classifyInterruptedDelivery(
+  messageId: string,
+  failedEvent: StreamEvent | null,
+  events: readonly StreamEvent[]
+): { ok: boolean; detail: string } {
+  const sentObserved = events.some(
+    event =>
+      event.streamEventType === 'cloud.message.sent' && messageIdFromEvent(event) === messageId
+  );
+  const expectedDelivery = sentObserved ? 'sent' : 'queued';
+  if (!failedEvent) {
+    return {
+      ok: false,
+      detail: `${messageId}: reason=none delivery=none expected=${expectedDelivery} (no cloud.message.failed)`,
+    };
+  }
+  const data = failedEvent.data as
+    | { reason?: string; delivery?: string; payload?: { reason?: string; delivery?: string } }
+    | undefined;
+  const reason = data?.reason ?? data?.payload?.reason;
+  const delivery = data?.delivery ?? data?.payload?.delivery;
+  return {
+    ok: reason === 'interrupted' && delivery === expectedDelivery,
+    detail: `${messageId}: reason=${reason ?? 'none'} delivery=${delivery ?? 'none'} expected=${expectedDelivery}`,
+  };
+}
+
+/**
  * queue-while-busy: enqueue two messages behind a running paced turn, let the
  * hold complete naturally, assert FIFO delivery of the held turn plus both
  * follow-ups. The paced turn is started only after the boot container is ready.
@@ -529,8 +564,14 @@ async function queueOverflowBody(
 
 /**
  * queue-interrupt-clears: enqueue messages behind a running paced turn, fire
- * `interruptSession`, assert all queued messages surface
- * `cloud.message.failed` with `reason: 'interrupted'` and `delivery: 'queued'`.
+ * `interruptSession` immediately (no pre-interrupt read, wait or sleep), then
+ * assert the settlement contract for each follow-up from the stream buffer once
+ * both `cloud.message.failed` events are present. Every follow-up must carry
+ * `reason: 'interrupted'`, and its `delivery` must be `'sent'` iff the buffer
+ * holds `cloud.message.sent` for that id, else `'queued'`. This scenario no
+ * longer proves a never-sent clear: post-#6660 a ready runtime can accept a
+ * follow-up before the interrupt is processed, so the expected delivery is
+ * derived from observed acceptance rather than a pre-interrupt snapshot.
  */
 async function queueInterruptClearsBody(
   args: LifecycleArgs,
@@ -587,7 +628,8 @@ async function queueInterruptClearsBody(
 
     await deadline.within('interrupt', signal => interruptSession(config, sessionId, signal));
 
-    // Expect cloud.message.failed for both queued follow-ups.
+    // Wait for each follow-up's failed event; only then classify from the
+    // buffer. A sent frame emitted before the failure is already present.
     const secondFailed = await stream.waitFor(
       e =>
         e.streamEventType === 'cloud.message.failed' && messageIdFromEvent(e) === second.messageId,
@@ -599,28 +641,27 @@ async function queueInterruptClearsBody(
       deadline.remaining('third failure')
     );
 
-    const events = [...stream.events];
+    const activeStream = stream;
+    const secondResult = classifyInterruptedDelivery(
+      second.messageId,
+      secondFailed,
+      activeStream.events
+    );
+    const thirdResult = classifyInterruptedDelivery(
+      third.messageId,
+      thirdFailed,
+      activeStream.events
+    );
+
+    const events = [...activeStream.events];
     stream.close();
     stream = undefined;
-
-    function failedWithReasonInterrupted(event: StreamEvent | null): boolean {
-      if (!event) return false;
-      const data = event.data as
-        | { reason?: string; delivery?: string; payload?: { reason?: string; delivery?: string } }
-        | undefined;
-      const reason = data?.reason ?? data?.payload?.reason;
-      const delivery = data?.delivery ?? data?.payload?.delivery;
-      return reason === 'interrupted' && delivery === 'queued';
-    }
-
-    const secondOk = failedWithReasonInterrupted(secondFailed);
-    const thirdOk = failedWithReasonInterrupted(thirdFailed);
 
     return {
       name: scenarioName,
       conversation,
-      ok: secondOk && thirdOk,
-      message: `second=${secondOk ? 'ok' : 'fail'}, third=${thirdOk ? 'ok' : 'fail'}`,
+      ok: secondResult.ok && thirdResult.ok,
+      message: `${secondResult.detail}; ${thirdResult.detail}`,
       events,
       durationMs: Date.now() - startedAt,
     };

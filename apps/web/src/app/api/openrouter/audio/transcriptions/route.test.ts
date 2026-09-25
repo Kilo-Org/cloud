@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
@@ -13,6 +14,10 @@ jest.mock('next/server', () => {
   };
 });
 
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureException: jest.fn(),
+}));
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/autoTopUpInFlight');
@@ -27,6 +32,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   };
 });
 
+const mockedCaptureException = jest.mocked(captureException);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsFreeModel = jest.mocked(isFreeModel);
@@ -149,7 +155,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.user).toBe(upstream.safety_identifier);
   });
 
-  it('forwards organization provider policy through the OpenRouter provider field', async () => {
+  it('does not add organization provider policy to JSON requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -174,10 +180,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     const [, init] = mockedFetch.mock.calls[0];
     const upstream = JSON.parse(init?.body as string);
-    expect(upstream.provider).toEqual({ only: ['openai'], data_collection: 'deny' });
+    expect(upstream).not.toHaveProperty('provider');
   });
 
-  it('rejects malformed transcription bodies before proxying', async () => {
+  it('rejects malformed transcription bodies before proxying without reporting to Sentry', async () => {
     setUserAuth();
 
     const { POST } = await import('./route');
@@ -185,6 +191,23 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-JSON transcription bodies without reporting to Sentry', async () => {
+    setUserAuth();
+
+    const { POST } = await import('./route');
+    const request = new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+      body: 'not json',
+    });
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
   });
 
   it('requires authentication for transcription requests', async () => {
@@ -312,7 +335,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstreamFile.size).toBe(8);
   });
 
-  it('forwards the organization provider policy on multipart requests', async () => {
+  it('does not add organization provider policy to multipart requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -337,10 +360,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     const [, init] = mockedFetch.mock.calls[0];
     const upstreamForm = init?.body as FormData;
-    expect(JSON.parse(upstreamForm.get('provider') as string)).toEqual({
-      only: ['openai'],
-      data_collection: 'deny',
-    });
+    expect(upstreamForm.has('provider')).toBe(false);
   });
 
   it('attaches the safety identifier to multipart upstream requests', async () => {
@@ -406,6 +426,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
   });
 
   it('passes an upstream 404 through for multipart requests', async () => {

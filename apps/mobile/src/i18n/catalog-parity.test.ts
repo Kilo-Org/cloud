@@ -27,8 +27,9 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * Empty: the profile-editor validation copy the review-fix slice added (the
+ * duplicate-key refusal and the MCP bound messages) has landed in every one of
+ * the 87 catalogs, so the missing-key assertion is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

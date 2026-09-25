@@ -1,6 +1,7 @@
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { FraudDetectionHeaders } from '@/lib/utils';
+import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   ReasoningDetailsTransform,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
@@ -44,6 +45,12 @@ export type ProviderResponseTransforms = ReasoningDetailsTransformType;
 
 export type Provider = {
   id: ProviderId;
+  /**
+   * The ChatGPT connection that serves this provider. Set only on the delegated
+   * "Sign in with ChatGPT" route, and it names the exact connection that paid
+   * for the request.
+   */
+  chatGptOwner?: OpenAiChatGptOwner;
   apiUrl: string;
   apiUrlOverrides: ProviderApiUrlOverrides;
   disableUrlSuffix: boolean;

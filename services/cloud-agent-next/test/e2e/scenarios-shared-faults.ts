@@ -43,8 +43,9 @@ import {
   type WorktreeSessionResult,
 } from './client.js';
 import {
+  awaitCorrelatedChildText,
+  CONTENT_CORRELATION_BUDGET_MS,
   cleanupRemoteSession,
-  collectChildMessageText,
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
@@ -306,12 +307,11 @@ async function runExternalKill(
       fakeDirective(`echo:boot-${runId}`)
     );
     owned.register(session);
-    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+      echoPayloadMatches(text, `boot-${runId}`)
+    );
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!echoPayloadMatches(boot.text, `boot-${runId}`)) {
-      return fail(`boot turn did not echo boot-${runId}`);
-    }
 
     const { allocation, target } = await captureFaultTarget(
       deadline,
@@ -333,10 +333,16 @@ async function runExternalKill(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-kill-${runId}`)) {
-      return fail(`recovery turn did not echo after-kill-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('recovery turn content'))
+      ),
+      label: 'recovery turn',
+      ready: text => echoPayloadMatches(text, `after-kill-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -481,10 +487,16 @@ async function runKillMidFlight(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-kill-${runId}`)) {
-      return fail(`recovery turn did not echo after-kill-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('recovery turn content'))
+      ),
+      label: 'recovery turn',
+      ready: text => echoPayloadMatches(text, `after-kill-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -577,12 +589,11 @@ async function runWrapperFreezeSettledReap(
       fakeDirective(`echo:boot-${runId}`)
     );
     owned.register(session);
-    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+      echoPayloadMatches(text, `boot-${runId}`)
+    );
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!echoPayloadMatches(boot.text, `boot-${runId}`)) {
-      return fail(`boot turn did not echo boot-${runId}`);
-    }
 
     const { allocation, target } = await captureFaultTarget(
       deadline,
@@ -610,10 +621,16 @@ async function runWrapperFreezeSettledReap(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-freeze-${runId}`)) {
-      return fail(`replacement turn did not echo after-freeze-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('replacement turn content'))
+      ),
+      label: 'replacement turn',
+      ready: text => echoPayloadMatches(text, `after-freeze-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -727,12 +744,11 @@ async function runWrapperFreezeInflightReap(
       fakeDirective(`echo:boot-${runId}`)
     );
     owned.register(session);
-    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+      echoPayloadMatches(text, `boot-${runId}`)
+    );
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!echoPayloadMatches(boot.text, `boot-${runId}`)) {
-      return fail(`boot turn did not echo boot-${runId}`);
-    }
 
     const { allocation, target } = await captureFaultTarget(
       deadline,
@@ -798,10 +814,16 @@ async function runWrapperFreezeInflightReap(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-freeze-${runId}`)) {
-      return fail(`replacement turn did not echo after-freeze-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('replacement turn content'))
+      ),
+      label: 'replacement turn',
+      ready: text => echoPayloadMatches(text, `after-freeze-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -1018,8 +1040,18 @@ async function runControlSocketRecycleBoot(
         )
       );
       if (status !== 'completed') throw new Error(`boot durable status=${status}`);
-      const text = collectChildMessageText(stream.events, messageId);
-      if (!echoPayloadMatches(text, `boot-${runId}`)) {
+      try {
+        await awaitCorrelatedChildText({
+          stream,
+          parentMessageId: messageId,
+          timeoutMs: Math.max(
+            1,
+            Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+          ),
+          label: 'boot turn',
+          ready: text => echoPayloadMatches(text, `boot-${runId}`),
+        });
+      } catch {
         result = fail(`boot turn did not echo boot-${runId}`);
         break;
       }

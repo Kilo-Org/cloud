@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   call-valtown:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 

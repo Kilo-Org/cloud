@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   verify-main:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
 
@@ -24,6 +25,7 @@ jobs:
           fi
 
   stage-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: verify-main
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
@@ -33,6 +35,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   stage-global-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: verify-main
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
@@ -42,6 +45,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
   promote-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: stage-app
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
@@ -52,6 +56,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-global-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: stage-global-app
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:

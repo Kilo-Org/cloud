@@ -25,6 +25,9 @@ concurrency:
 
 jobs:
   setup-smoke:
+    # Canonical-repo guard: no-op for pull_request (runs in the base-repo
+    # context, where validation is desired); skips schedule/dispatch runs in forks.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 45
 

@@ -22,6 +22,7 @@ permissions:
 
 jobs:
   source-sbom:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     name: Source dependency SBOM

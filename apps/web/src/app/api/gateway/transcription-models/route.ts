@@ -2,6 +2,6 @@ import { handleTranscriptionModelsRequest } from '@/lib/ai-gateway/handlers/tran
 import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const GET = withRestTiming(
-  '/api/openrouter/v1/transcription-models',
+  '/api/gateway/transcription-models',
   handleTranscriptionModelsRequest
 );

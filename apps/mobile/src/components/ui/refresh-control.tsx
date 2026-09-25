@@ -1,18 +1,21 @@
 import { RefreshControl as NativeRefreshControl, type RefreshControlProps } from 'react-native';
 
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { darkColors } from '@/lib/hooks/theme-colors.generated';
 
 /**
  * Android draws its pull indicator with the platform accent — a saturated blue
  * that belongs to no screen in this app (device defect model-picker). Default it
- * to the same muted foreground the KiloClaw dashboard and `RefreshProgress` use,
- * so a screen that does not pick a color still shows app chrome.
+ * to the muted foreground `RefreshProgress` already falls back to, so a screen
+ * that picks no color still shows app chrome instead of system chrome.
+ *
+ * The generated palette is read directly, like `RefreshProgress`, to keep this
+ * component free of the theme hook: it renders inside suites that stub
+ * `react-native`, and `useThemeColors` would pull `expo-router` in behind them.
  */
 export function RefreshControl({ refreshing, ...props }: Readonly<RefreshControlProps>) {
   const { reducedMotion } = useMotionPolicy();
-  const colors = useThemeColors();
-  const indicatorColor = colors.mutedForeground;
+  const indicatorColor = darkColors.mutedForeground;
 
   return (
     <NativeRefreshControl

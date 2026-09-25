@@ -37,9 +37,11 @@ const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
  * neighbouring controls keep separate tap areas. Without it a control renders
  * flush against the one before it: the microphone and the send/stop circles
  * merged into a single shape and their tap areas overlapped (spot check e1 /
- * e1-en-two-msg). Every control in the row carries this same class, so the
- * input and each trailing control sit one gap apart and a control added
- * without it cannot sit flush against its neighbour again.
+ * e1-en-two-msg). Every control but the leading paperclip carries this same
+ * class — the paperclip only ever meets the input, whose own start margin is
+ * the gap after it — so the input and each trailing control sit one gap apart
+ * and a trailing control added without it cannot sit flush against its
+ * neighbour again.
  */
 export const COMPOSER_CONTROL_GAP_CLASS = 'ms-3';
 

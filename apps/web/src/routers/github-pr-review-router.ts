@@ -39,6 +39,7 @@ import {
   REVIEW_THREADS_PAGE_SIZE,
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
+import { classifyGitHubHttpError } from '@/lib/github-pr-review/errors';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -1926,11 +1927,15 @@ export const githubPrReviewRouter = createTRPCRouter({
   // `updateComment` plus one more: GitHub 404s an already-deleted comment, so a
   // retry whose first response was lost is treated as success instead of
   // surfacing a failure for work that already happened (idempotent delete).
+  // A bare 404 is not proof of that, though: GitHub returns the same status for
+  // a missing PR / repo or a repo the App cannot see, so the write confirms the
+  // PR itself is still reachable before reporting the delete as done. When it
+  // is not, the 404 propagates and the client sees the real failure.
   deleteComment: baseProcedure.input(DeleteCommentInput).mutation(async ({ ctx, input }) => {
-    try {
-      await withGitHubUserTokenRetry({
-        kiloUserId: ctx.user.id,
-        call: async octokit => {
+    await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        try {
           if (input.kind === 'review') {
             await octokit.pulls.deleteReviewComment(
               buildDeleteReviewCommentParams({
@@ -1948,14 +1953,21 @@ export const githubPrReviewRouter = createTRPCRouter({
               })
             );
           }
-        },
-      });
-    } catch (error) {
-      if (error instanceof TRPCError && error.code === 'NOT_FOUND') {
-        return { commentId: input.commentId, deleted: true };
-      }
-      throw error;
-    }
+        } catch (error) {
+          if (classifyGitHubHttpError(error).code !== 'NOT_FOUND') {
+            throw error;
+          }
+          // Same 404 boundary as a non-matching comment: a reachable PR means
+          // the comment is gone; a failing read rethrows the provider error,
+          // which the wrapper classifies as NOT_FOUND.
+          await octokit.pulls.get({
+            owner: input.owner,
+            repo: input.repo,
+            pull_number: input.number,
+          });
+        }
+      },
+    });
     return { commentId: input.commentId, deleted: true };
   }),
 

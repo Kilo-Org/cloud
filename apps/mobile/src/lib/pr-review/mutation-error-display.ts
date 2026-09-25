@@ -16,10 +16,21 @@ import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 export type MutationErrorDisplaySurface = 'composer' | 'submit' | 'edit-comment';
 
-type MutationErrorDisplayKind = 'retryable' | 'bad-request' | 'forbidden' | 'reconnect';
+/**
+ * The inline-error kinds the display helper can return. `not-found` is the
+ * edit surface's terminal 404 (the posted comment no longer exists); it renders
+ * like the other inline kinds but keeps the surface's primary control down.
+ */
+export type MutationErrorDisplayKind =
+  | 'retryable'
+  | 'bad-request'
+  | 'forbidden'
+  | 'reconnect'
+  | 'not-found';
 
 type MutationErrorDisplay = {
   kind: MutationErrorDisplayKind;
@@ -83,6 +94,14 @@ export function mutationErrorDisplay(
   }
   if (classification.kind === 'bad-request') {
     return { kind: 'bad-request', message: badRequestMessage(surface, options?.term) };
+  }
+  // A 404 on the own-comment edit surface means the posted comment is gone
+  // (GitHub 404s a deleted comment): terminal, so the sheet shows the "can't
+  // be edited" copy and keeps Save down instead of offering a retry that can
+  // never succeed. Other surfaces keep the retryable fall-through — their
+  // 404s (a missing PR / App access) are outside this slice.
+  if (surface === 'edit-comment' && readTrpcErrorField(rawError, 'code') === 'NOT_FOUND') {
+    return { kind: 'not-found', message: i18n.t('prReview.discussion.commentEditUnavailable') };
   }
   if (classification.kind === 'reconnect') {
     return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };

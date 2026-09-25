@@ -22,6 +22,9 @@ export type ComposerInlineErrorKind =
   | 'bad-request'
   | 'forbidden'
   | 'reconnect'
+  // The edit surface's terminal 404: the posted comment no longer exists.
+  // Terminal like `forbidden` — the sheet keeps Save down.
+  | 'not-found'
   | null;
 
 type ComposerInlineErrorProps = {

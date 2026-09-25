@@ -53,7 +53,10 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import {
+  mutationErrorDisplay,
+  type MutationErrorDisplayKind,
+} from '@/lib/pr-review/mutation-error-display';
 import {
   buildProviderSubmitInput,
   type ProviderReviewEventOption,
@@ -186,9 +189,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [hasSummary, setHasSummary] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
+  // Same union the display helper returns, so a new display kind can never
+  // silently drift from this surface's state.
+  const [inlineErrorKind, setInlineErrorKind] = useState<MutationErrorDisplayKind | null>(null);
   const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');

@@ -336,4 +336,14 @@ describe('commentCrudFailure', () => {
       message: "This comment can't be deleted.",
     });
   });
+
+  it.each([
+    ['edit', "This comment can't be edited. It may have been deleted."],
+    ['delete', "This comment can't be deleted."],
+  ] as const)('classifies a provider 404 as terminal on the %s surface', (surface, message) => {
+    // GitHub 404s a comment that no longer exists; nothing to retry.
+    const gone = new Error('PR not found, you do not have access');
+    Object.assign(gone, { data: { code: 'NOT_FOUND' } });
+    expect(commentCrudFailure(gone, surface)).toEqual({ kind: 'terminal', message });
+  });
 });

@@ -11,9 +11,10 @@
 //
 // Every failure path is visible: `useComposerInlineError(error, false,
 // 'edit-comment')` mirrors the mutation error into the inline box below the
-// field, the body stays intact, and only a FORBIDDEN/reconnect classification
-// keeps Save down (their recovery lives outside the button). A retryable
-// failure keeps Save live for the same tap.
+// field, the body stays intact, and a terminal classification (FORBIDDEN,
+// reconnect, or a 404 for a comment that no longer exists) keeps Save down —
+// their recovery lives outside the button. A retryable failure keeps Save live
+// for the same tap.
 
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
@@ -184,15 +185,16 @@ export function PrCommentEditSheet({
     };
   }, []);
 
-  // An unchanged body has nothing to save; forbidden/reconnect keep Save down
-  // because their recovery lives outside the button (the reconnect notice CTA
-  // / leaving the sheet).
+  // An unchanged body has nothing to save; forbidden/reconnect/not-found keep
+  // Save down because their recovery lives outside the button (the reconnect
+  // notice CTA / leaving the sheet — a 404 means the comment is gone).
   const primaryDisabled =
     isSubmitting ||
     !hasBody ||
     !dirty ||
     inlineErrorKind === 'forbidden' ||
-    inlineErrorKind === 'reconnect';
+    inlineErrorKind === 'reconnect' ||
+    inlineErrorKind === 'not-found';
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no wrapper
   // View, no sticky-footer sibling). Footer is trailing scroll content so

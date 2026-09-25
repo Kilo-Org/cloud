@@ -469,6 +469,23 @@ describe('PrCommentEditSheet', () => {
     expect(saveDisabled(after)).toBe(true);
   });
 
+  it('shows the edit-unavailable copy and keeps Save down when the comment is gone (404)', () => {
+    const element = mountSheet();
+    typeBody(element, 'edited body');
+    updateCommentMocks.error = codeError('NOT_FOUND', 'PR not found, you do not have access');
+    mountSheet();
+    const after = mountSheet();
+
+    // GitHub 404s a comment that no longer exists: the sheet must not offer a
+    // retry that can never succeed.
+    const inline = requireByType(after, 'ComposerInlineError');
+    expect((inline.props as InlineErrorProps).inlineError).toBe(
+      "This comment can't be edited. It may have been deleted."
+    );
+    expect((inline.props as InlineErrorProps).inlineErrorKind).toBe('not-found');
+    expect(saveDisabled(after)).toBe(true);
+  });
+
   it('hands a reconnect classification to the inline notice and keeps Save down', () => {
     const element = mountSheet();
     typeBody(element, 'edited body');

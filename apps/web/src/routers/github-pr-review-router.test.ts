@@ -1564,7 +1564,7 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     });
   });
 
-  it('treats a 404 on delete as success (idempotent delete)', async () => {
+  it('treats a 404 on delete as success when the PR is still reachable (idempotent delete)', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
@@ -1572,6 +1572,9 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
       status: 404,
       message: 'Not Found',
     });
+    // The 404 only proves the comment is gone once the PR read shows the repo
+    // is reachable — GitHub 404s a missing PR / missing App access the same way.
+    t1Octokit.pulls.get.mockResolvedValueOnce({ data: { id: 1 } });
 
     const result = await caller.deleteComment({
       owner: 'octocat',
@@ -1582,6 +1585,51 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     });
 
     expect(result).toEqual({ commentId: 77, deleted: true });
+    expect(t1Octokit.pulls.get).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      pull_number: 1,
+    });
+  });
+
+  it('surfaces NOT_FOUND when the delete 404s and the PR is not reachable', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.deleteComment.mockRejectedValueOnce({
+      status: 404,
+      message: 'Not Found',
+    });
+    // Same provider status for a missing PR / repo the App cannot see: that is
+    // a real failure, not an already-deleted comment.
+    t1Octokit.pulls.get.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+
+    await expect(
+      caller.deleteComment({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 77,
+        kind: 'conversation',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('does not call the PR read when the delete succeeds', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.deleteComment.mockResolvedValueOnce({ data: {} });
+
+    await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'conversation',
+    });
+
+    expect(t1Octokit.pulls.get).not.toHaveBeenCalled();
   });
 });
 

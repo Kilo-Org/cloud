@@ -31,6 +31,7 @@ import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import {
   applyCommentBodyUpdate,
@@ -93,6 +94,16 @@ export function commentCrudFailure(
   error: unknown,
   surface: CommentCrudSurface
 ): CommentCrudFailure {
+  // A provider 404 on an own comment is terminal, not retryable: GitHub 404s a
+  // comment that no longer exists, and the router only reports a delete as
+  // done once it has confirmed the PR itself is still reachable
+  // (`deleteComment` in github-pr-review-router). `classifyPrReviewMutationError`
+  // falls through to `retryable` for NOT_FOUND — correct for a query, wrong
+  // here, where the surface's terminal copy ("it may have been deleted") is
+  // the honest one and a retry can never succeed.
+  if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
+    return { kind: 'terminal', message: i18n.t(TERMINAL_KEYS[surface]) };
+  }
   const { kind } = classifyPrReviewMutationError(error);
   if (RETRYABLE_CLASSIFICATIONS.has(kind)) {
     return { kind: 'retryable', message: i18n.t(RETRYABLE_KEYS[surface]) };

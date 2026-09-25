@@ -207,14 +207,6 @@ describe('TourScreen', () => {
     expect(screenHeader.props).not.toHaveProperty('eyebrow');
     expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
-    // Regression guard: the eyebrow used to sit alone in the screen header,
-    // which passes no title for it to name, stranding it at the top-left above
-    // a half-band dead gap. The bare back bar must not receive it; the fork's
-    // centred step header must, so the label sits over the heading.
-    const screenHeader = renderer.root.findByType('ScreenHeader' as ElementType);
-    expect(screenHeader.props).not.toHaveProperty('eyebrow');
-    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
-
     unmount();
   });
 

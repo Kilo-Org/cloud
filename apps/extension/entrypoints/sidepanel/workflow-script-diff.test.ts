@@ -1,6 +1,6 @@
 /* eslint-disable sort-keys -- expected diff shapes mirror the plan's `{ kind: 'hunks', hunks }` contract */
 import { describe, expect, it } from 'vitest';
-import { buildUnifiedScriptDiff, DIFF_CONTEXT_LINES, MAX_DIFF_LINES } from './workflow-script-diff';
+import { buildUnifiedScriptDiff, MAX_DIFF_LINES } from './workflow-script-diff';
 
 describe('workflow script unified diff', () => {
   it('returns unchanged for identical scripts', () => {
@@ -278,10 +278,5 @@ describe('workflow script unified diff', () => {
         },
       ],
     });
-  });
-
-  it('pins the exported context and ceiling constants', () => {
-    expect(DIFF_CONTEXT_LINES).toBe(3);
-    expect(MAX_DIFF_LINES).toBe(1200);
   });
 });

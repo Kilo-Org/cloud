@@ -28,7 +28,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
     model: 'stealth/space-bunny-alpha',
     weight: 1,
-    reasoning: { enabled: true, effort: 'max' },
+    reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
   {
     model: 'poolside/laguna-s-2.1:free',

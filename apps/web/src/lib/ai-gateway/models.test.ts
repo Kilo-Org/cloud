@@ -157,11 +157,11 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('hardcodes the most aggressive reasoning for every Auto Free model', () => {
+    test('hardcodes high reasoning effort for every Auto Free model', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
-        'stealth/space-bunny-alpha': { enabled: true, effort: 'max' },
+        'stealth/space-bunny-alpha': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
         'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },

@@ -9,7 +9,7 @@ import { RefreshControl } from './refresh-control';
 vi.mock('react-native', () => ({ RefreshControl: 'NativeRefreshControl' }));
 vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primary: '#68734A' }),
+  useThemeColors: () => ({ mutedForeground: '#6B6B5E' }),
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe('RefreshControl theme colors', () => {
-  it('uses the app primary color for native refresh indicators by default', () => {
+  it('uses the app muted-foreground color for native refresh indicators by default', () => {
     act(() => {
       renderer = TestRenderer.create(
         createElement(RefreshControl, { refreshing: true, onRefresh: () => undefined })
@@ -28,8 +28,8 @@ describe('RefreshControl theme colors', () => {
     });
 
     const native = renderer?.root.findByType('NativeRefreshControl' as ElementType);
-    expect(native?.props.colors).toEqual(['#68734A']);
-    expect(native?.props.tintColor).toBe('#68734A');
+    expect(native?.props.colors).toEqual(['#6B6B5E']);
+    expect(native?.props.tintColor).toBe('#6B6B5E');
     expect(native?.props.refreshing).toBe(true);
   });
 

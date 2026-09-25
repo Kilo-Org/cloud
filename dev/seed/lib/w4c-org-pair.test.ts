@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  selectSeededOrganizations,
-  SEEDED_ORGANIZATION_NAME,
-  type SeededOrganizationRow,
-} from '../app/w4c-org-pair';
+import { SEEDED_ORGANIZATION_NAME } from '../app/w4c-org-pair';
 import {
   FIXTURE_SETTINGS_KEY,
   FIXTURE_SETTINGS_VALUE,
@@ -17,8 +13,6 @@ import {
 import type { FixturePair } from './w4c-org-pair';
 
 const CREATED_AT = '2026-03-01T00:00:00.000Z';
-const OWNER = 'owner-user-id';
-const OTHER_OWNER = 'other-user-id';
 const OWNER_EMAIL = 'owner@example.com';
 const OTHER_OWNER_EMAIL = 'other-owner@example.com';
 
@@ -29,14 +23,6 @@ function organization(
   settings: unknown = {}
 ): { id: string; name: string; created_at: string; settings: unknown } {
   return { id, name, created_at, settings };
-}
-
-function seededOrganization(
-  id: string,
-  name: string,
-  createdByUserId: string | null
-): SeededOrganizationRow {
-  return { id, name, createdByUserId };
 }
 
 function membership(
@@ -58,57 +44,6 @@ function pair(ownerEmail = OWNER_EMAIL, organizationIds: string[] = []): Fixture
 void test('the seeded organization name is user-facing, not a developer marker', () => {
   assert.equal(SEEDED_ORGANIZATION_NAME.trim().length > 0, true);
   assert.equal(SEEDED_ORGANIZATION_NAME.includes('[seed:'), false);
-});
-
-// The explorer capture showed the account sheet listing the same organization
-// row about thirteen times, one row per seeding round: the reruns accumulated
-// instead of replacing the fixture's own organization.
-void test('a rerun selects every row the fixture left behind, so none accumulate', () => {
-  const accumulated = Array.from({ length: 13 }, (_, index) =>
-    seededOrganization(`legacy-${index}`, '[seed:w4c-org-pair] owner@example.com', null)
-  );
-
-  const selected = selectSeededOrganizations(accumulated, OWNER);
-
-  assert.equal(selected.length, 13);
-
-  // A rerun deletes what it selected and inserts one organization: the sheet
-  // then lists the pair once, whatever earlier rounds left.
-  const rerun = [
-    ...accumulated.filter(row => !selected.includes(row)),
-    seededOrganization('current', SEEDED_ORGANIZATION_NAME, OWNER),
-  ];
-  assert.deepEqual(selectSeededOrganizations(rerun, OWNER), [
-    seededOrganization('current', SEEDED_ORGANIZATION_NAME, OWNER),
-  ]);
-});
-
-// The current fixture name is user-facing, so it identifies the fixture's own
-// rows through the account that created them, and through the rows an earlier
-// run left without a creator (the fixture only records one since the reset).
-void test('the current name counts for the owner and for a pre-reset row', () => {
-  assert.deepEqual(
-    selectSeededOrganizations([seededOrganization('mine', SEEDED_ORGANIZATION_NAME, OWNER)], OWNER),
-    [seededOrganization('mine', SEEDED_ORGANIZATION_NAME, OWNER)]
-  );
-  assert.deepEqual(
-    selectSeededOrganizations(
-      [seededOrganization('pre-reset', SEEDED_ORGANIZATION_NAME, null)],
-      OWNER
-    ),
-    [seededOrganization('pre-reset', SEEDED_ORGANIZATION_NAME, null)]
-  );
-});
-
-// A name match alone never selects another account's row.
-void test("another account's organization of the same name stays", () => {
-  assert.deepEqual(
-    selectSeededOrganizations(
-      [seededOrganization('theirs', SEEDED_ORGANIZATION_NAME, OTHER_OWNER)],
-      OWNER
-    ),
-    []
-  );
 });
 
 void test('isPairOrganization recognizes the rows this owner created', () => {
@@ -357,13 +292,6 @@ void test('membershipsToPrune returns nothing when the pair only belongs to the 
       ['user-owner', 'user-member'],
       pair(OWNER_EMAIL, ['org-keep'])
     ),
-    []
-  );
-});
-
-void test('an organization the owner created under another name stays', () => {
-  assert.deepEqual(
-    selectSeededOrganizations([seededOrganization('unrelated', 'Real Customer Org', OWNER)], OWNER),
     []
   );
 });

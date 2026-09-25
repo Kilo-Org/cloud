@@ -22,6 +22,7 @@ import { normalizeSeedEmail } from '../lib/email';
 import {
   FIXTURE_SETTINGS_KEY,
   fixtureSettingsMarkerJson,
+  isPairOrganization,
   LEGACY_ORGANIZATION_NAME_PREFIX,
   membershipsToPrune,
   SEEDED_ORGANIZATION_NAME,
@@ -39,59 +40,6 @@ export const usage = '<owner-email> <member-email>';
  * name must stay user-facing and never carry a `[seed:...]` developer marker.
  */
 export { SEEDED_ORGANIZATION_NAME };
-
-/**
- * The developer marker an earlier revision of this fixture put in the
- * organization name. A rerun still recognizes those rows, so the duplicates
- * they accumulated disappear instead of staying in the account sheet forever.
- */
-export const SEEDED_ORGANIZATION_LEGACY_PREFIX = '[seed:w4c-org-pair]';
-
-export type SeededOrganizationRow = {
-  id: string;
-  name: string;
-  createdByUserId: string | null;
-};
-
-/**
- * Whether an organization is one this fixture created for `ownerUserId`.
- *
- * The account sheet lists an organization per row, so one organization per
- * seeding round makes the same row repeat for every round that reseeded the
- * pair (an explorer capture showed it about thirteen times). A rerun removes
- * the fixture's own organizations first, which keeps the pair at one row.
- *
- * Legacy recognition is by the stable `[seed:w4c-org-pair]` name prefix. The
- * current name is generic, so a row with it counts only as this owner's own:
- * the reset never looks outside the organizations `ownerUserId` holds the
- * `owner` role in, and inside them the fixture's row carries the fixture's
- * creator.
- *
- * This fixture only started recording `created_by_kilo_user_id` alongside the
- * reset, and the app's own create always fills the column
- * (`apps/web/src/lib/organizations/organizations.ts`), so a null creator on
- * this owner's row is an earlier run of the fixture and must be replaced too.
- */
-export function isSeededOrganization(
-  row: Pick<SeededOrganizationRow, 'name' | 'createdByUserId'>,
-  ownerUserId: string
-): boolean {
-  if (row.name.startsWith(SEEDED_ORGANIZATION_LEGACY_PREFIX)) {
-    return true;
-  }
-  if (row.name !== SEEDED_ORGANIZATION_NAME) {
-    return false;
-  }
-  return row.createdByUserId === null || row.createdByUserId === ownerUserId;
-}
-
-/** The fixture's own organizations out of the ones `ownerUserId` owns. */
-export function selectSeededOrganizations(
-  rows: readonly SeededOrganizationRow[],
-  ownerUserId: string
-): SeededOrganizationRow[] {
-  return rows.filter(row => isSeededOrganization(row, ownerUserId));
-}
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:w4c-org-pair ${usage}`);
@@ -124,18 +72,32 @@ async function lookupUserId(email: string): Promise<string> {
 }
 
 /**
- * Delete the fixture's own organizations for `ownerUserId` and return how many
- * were removed. Scoped to organizations this owner holds the `owner` role in,
- * so rerunning one pair never reaches another account's organization.
+ * Delete the organizations this fixture created for `pair` and return how many
+ * were removed.
+ *
+ * A rerun then inserts the pair again, so the accumulated rows disappear
+ * instead of repeating in the account sheet (an explorer capture showed the
+ * same organization about thirteen times, one row per seeding round).
+ *
+ * Selection is the fixture's own recognition ({@link isPairOrganization}): the
+ * settings marker naming the pair's owner, a legacy `[seed:w4c-org-pair] `
+ * name, or a `SEEDED_ORGANIZATION_NAME` row the pair is a member of. The
+ * creator column is never read: the app fills it for real organizations too
+ * (`apps/web/src/lib/organizations/organizations.ts`), so it cannot tell a
+ * fixture row from one the owner created through the app.
+ *
+ * The query is scoped to organizations `ownerUserId` holds the `owner` role
+ * in and that are not soft-deleted, so rerunning one pair never reaches
+ * another account's organization.
  */
-async function resetSeededOrganizations(ownerUserId: string): Promise<number> {
+async function resetSeededOrganizations(ownerUserId: string, pair: FixturePair): Promise<number> {
   const db = getSeedDb();
 
   const owned = await db
     .select({
       id: organizations.id,
       name: organizations.name,
-      createdByUserId: organizations.created_by_kilo_user_id,
+      settings: organizations.settings,
     })
     .from(organizations)
     .innerJoin(
@@ -150,7 +112,7 @@ async function resetSeededOrganizations(ownerUserId: string): Promise<number> {
       )
     );
 
-  const seeded = selectSeededOrganizations(owned, ownerUserId);
+  const seeded = owned.filter(organization => isPairOrganization(organization, pair));
   if (seeded.length === 0) {
     return 0;
   }
@@ -233,10 +195,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('owner-email and member-email must refer to different users');
   }
 
-  // Reset this fixture's own organizations for the owner first, so a rerun
-  // replaces the pair instead of accumulating another row in the account sheet.
-  const replaced = await resetSeededOrganizations(ownerUserId);
-
   const userIds = [ownerUserId, memberUserId];
 
   // Recognition is scoped to this pair's owner: the marker names the owner a
@@ -247,17 +205,25 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // oldest organization it created for this owner and prunes only this pair's
   // memberships elsewhere, so each of the two users ends with one fixture
   // organization membership and the account sheet lists that organization once.
+  // The memberships are read before the reset, which deletes them with the
+  // organizations they point at.
   const membershipRows = await listMemberships(userIds);
   const pair: FixturePair = {
     ownerEmail: normalizeSeedEmail(trimmedOwnerEmail),
     organizationIds: new Set(membershipRows.map(row => row.organization_id)),
   };
 
+  // Reset this fixture's own organizations for the owner, so a rerun replaces
+  // the pair instead of accumulating another row in the account sheet.
+  const replaced = await resetSeededOrganizations(ownerUserId, pair);
+
   const fixtureOrganizations = await listFixtureOrganizations();
   const keptOrganization = selectSeededOrganization(fixtureOrganizations, pair);
   const organizationId = keptOrganization?.id ?? randomUUID();
 
   if (!keptOrganization) {
+    // The creator mirrors what the app records for its own creates; it names
+    // the account and is never used to recognize a fixture row.
     await db.insert(organizations).values({
       id: organizationId,
       name: SEEDED_ORGANIZATION_NAME,

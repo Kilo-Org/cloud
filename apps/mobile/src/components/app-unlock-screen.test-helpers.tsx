@@ -60,15 +60,61 @@ const route = vi.hoisted(() => ({
   segments: ['(app)', 'agent-chat'] as string[],
   pathname: '/agent-chat',
 }));
-const lifecycle = vi.hoisted(() => ({
-  change: undefined as ((state: AppStateStatus) => void) | undefined,
-}));
-const keyboard = vi.hoisted(() => ({
-  // Both slots share one signature so either listener can be stored; `hide`
-  // is dispatched with an empty payload.
-  show: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
-  hide: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
-}));
+// AppState has more than one subscriber on this screen (the query client
+// lifecycle and the keyboard-lift hooks), so the harness keeps every listener
+// and broadcasts to all of them. A single slot let the last registration
+// shadow the earlier ones, which hid the stale-lift defect these mounted tests
+// exist to catch. Ported from the closed #6392.
+const lifecycle = vi.hoisted(() => {
+  const listeners = new Set<(state: AppStateStatus) => void>();
+  return {
+    listeners,
+    change: (state: AppStateStatus) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+const keyboard = vi.hoisted(() => {
+  // Keyboard has more than one subscriber in production: `AppRootProviders`
+  // mounts the Toaster's shared keyboard hook alongside a screen's, so the mock
+  // keeps every listener in a set per direction. One slot per direction let the
+  // last registration shadow the earlier ones, and a `remove()` that cleared
+  // both slots detached a listener it did not own. The AppState mock below is a
+  // set for the same reason. Same signature for both directions; `hide` is
+  // dispatched with an empty payload.
+  const showListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const hideListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const addListener = (
+    event: string,
+    listener: (event: { endCoordinates: { height: number } }) => void
+  ) => {
+    const listeners =
+      event === 'keyboardDidShow' || event === 'keyboardWillShow' ? showListeners : hideListeners;
+    listeners.add(listener);
+    return {
+      remove: () => {
+        listeners.delete(listener);
+      },
+    };
+  };
+  return {
+    addListener,
+    showListeners,
+    hideListeners,
+    show: (event: { endCoordinates: { height: number } }) => {
+      for (const listener of showListeners) {
+        listener(event);
+      }
+    },
+    hide: () => {
+      for (const listener of hideListeners) {
+        listener({ endCoordinates: { height: 0 } });
+      }
+    },
+  };
+});
 export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
@@ -90,30 +136,15 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   Keyboard: {
-    addListener: (
-      event: string,
-      listener: (event: { endCoordinates: { height: number } }) => void
-    ) => {
-      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-        keyboard.show = listener;
-      } else {
-        keyboard.hide = listener;
-      }
-      return {
-        remove: () => {
-          keyboard.show = undefined;
-          keyboard.hide = undefined;
-        },
-      };
-    },
+    addListener: keyboard.addListener,
   },
   AppState: {
     currentState: 'active',
     addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
-      lifecycle.change = listener;
+      lifecycle.listeners.add(listener);
       return {
         remove: () => {
-          lifecycle.change = undefined;
+          lifecycle.listeners.delete(listener);
         },
       };
     },
@@ -198,7 +229,18 @@ vi.mock('@/lib/trpc', () => ({
   TRPCProvider: 'TRPCProvider',
   trpcClient: {},
   useTRPC: () => ({
-    user: { getMe: { queryKey: () => [] } },
+    user: {
+      getMe: { queryKey: () => [] },
+      // The (app) layout's TourAutoOpen reads the account's gateway usage;
+      // give it a settled zero-usage answer so the tour gate stays closed in
+      // these layout scenes (the signed-out user id already blocks the push).
+      hasGatewayUsage: {
+        queryOptions: () => ({
+          queryKey: ['user', 'hasGatewayUsage'],
+          queryFn: () => ({ hasUsage: false }),
+        }),
+      },
+    },
     organizations: { list: { queryKey: () => [] } },
   }),
 }));
@@ -212,7 +254,16 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetDetents: () => ({ fullSheetDetent: 1 }) }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useFormSheetScreenOptions: () => ({
+    presentation: 'formSheet',
+    sheetAllowedDetents: [0.5, 1],
+    sheetGrabberVisible: true,
+    headerShown: false,
+    sheetShouldOverflowTopInset: true,
+  }),
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),
@@ -304,14 +355,11 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
 }));
 vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
-// The preferences screen mounts the feature-flag debug surface, which reads
-// PostHog flag statuses; the real module pulls in expo-application's native
-// chain, which no mounted test loads. An empty registry keeps the section
-// out of these scenes. `subscribeToPostHogReady` is listed because the consent
-// record module (reached through the (app) layout's TourAutoOpen) registers a
-// load-time listener; these scenes never exercise telemetry readiness.
+// `subscribeToPostHogReady` is listed because the consent record module
+// (reached through the (app) layout's TourAutoOpen) registers a load-time
+// listener; the real module pulls in expo-application's native chain, which no
+// mounted test loads. These scenes never exercise telemetry readiness.
 vi.mock('@/lib/analytics/posthog', () => ({
-  useFeatureFlagStatuses: () => [],
   subscribeToPostHogReady: () => () => undefined,
 }));
 
@@ -327,6 +375,9 @@ export function resetUnlockMocks() {
   platform.OS = 'ios';
   route.segments = ['(app)', 'agent-chat'];
   route.pathname = '/agent-chat';
+  lifecycle.listeners.clear();
+  keyboard.showListeners.clear();
+  keyboard.hideListeners.clear();
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

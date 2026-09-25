@@ -3,21 +3,20 @@ import { type Href, useRouter } from 'expo-router';
 import { Check, GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
-import { useRevealEndOnKeyboard } from '@/components/kilo-chat/use-reveal-end-on-keyboard';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -31,8 +30,11 @@ import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
+import { ManualReviewActionFooter } from './manual-review-action-footer';
+
 const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
 type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
+type ModelChoice = { modelSlug: string; thinkingEffort: string | null };
 
 const URL_PLACEHOLDER = {
   github: 'https://github.com/owner/repo/pull/123',
@@ -77,19 +79,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const config = useReviewConfig(scope, platform);
   const createReview = useCreateManualReview(scope);
   const { models } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
-  const [modelChoice, setModelChoice] = useState<{
-    modelSlug: string;
-    thinkingEffort: string | null;
-  } | null>(null);
+  const [modelChoice, setModelChoice] = useState<ModelChoice | null>(null);
   const effectiveModel = modelChoice ?? {
     modelSlug: config.data?.modelSlug ?? '',
     thinkingEffort: config.data?.thinkingEffort ?? null,
   };
-  // Start review is the form's last child, and the open keyboard covers it on
-  // Android (edge-to-edge: the window never resizes for the IME), so the
-  // review could not be started at all. The padding view reserves the
-  // keyboard's height and the hook reveals the button above it.
-  const scrollRef = useRevealEndOnKeyboard();
 
   const onSubmit = () => {
     const url = urlRef.current.trim();
@@ -163,7 +157,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           title={t('codeReviewer.manualReview.connectProvider')}
           description={t('codeReviewer.manualReview.connectProviderDescription')}
           action={
+            // `mt-3 w-full` matches the near-identical PR-review connect gate
+            // (pr-review-connect-gate.tsx) and the Code Reviewer
+            // ProviderConnectCard, so the same Connect GitHub action is styled
+            // the same wherever it appears.
             <Button
+              className="mt-3 w-full"
               onPress={() => {
                 router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
               }}
@@ -183,10 +182,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         eyebrow={t('common.codeReviewer')}
       />
       <AppAwareKeyboardPaddingView className="flex-1">
-        <TabScreenScrollView
-          ref={scrollRef}
+        <ScrollView
           className="flex-1"
-          contentContainerClassName="px-6 gap-6 pt-4"
+          contentContainerClassName="px-6 gap-6 pt-4 pb-4"
           automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -254,9 +252,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('codeReviewer.manualReview.pullRequestUrl')}
             </Text>
-            <TextInput
+            <Input
               key={platform}
-              className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
+              // The shared single-line box supplies the touch floor
+              // (`min-h-[44px]`, never a fixed height); the field keeps its
+              // own chrome, horizontal inset and line box.
+              className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
               placeholder={URL_PLACEHOLDER[platform]}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
@@ -308,7 +309,18 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               />
             </View>
           </View>
+        </ScrollView>
 
+        {/* The primary action is a pinned footer when the form is taller than
+            the viewport, so it is never clipped at the scroll fold. The open
+            keyboard cannot cover it either: the footer is the padding view's
+            second child, which reserves the keyboard's height on both platforms
+            (Android is edge-to-edge and the window never resizes for the IME).
+            This screen revealed the scroll body's end while the keyboard was up
+            before that move; with the action out of the scroll body there is no
+            trailing control left to reveal, and scrolling the body to its end
+            would carry the focused URL field off screen. */}
+        <ManualReviewActionFooter>
           <Button
             loading={createReview.isPending}
             disabled={!config.data || !isConnected(platform)}
@@ -320,7 +332,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 : t('codeReviewer.manualReview.start')}
             </Text>
           </Button>
-        </TabScreenScrollView>
+        </ManualReviewActionFooter>
       </AppAwareKeyboardPaddingView>
     </View>
   );

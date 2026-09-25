@@ -5,10 +5,11 @@ import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.type
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { debugSaveLog, debugSaveProxyRequest } from '@/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@/lib/getRootSpan';
+import { errorExceptInTest } from '@/lib/utils.server';
 import {
   captureProxyError,
   checkOrganizationModelRestrictions,
@@ -22,12 +23,9 @@ import {
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   extractTranscriptionPromptInfo,
@@ -105,9 +103,9 @@ async function parseMultipartTranscriptionRequest(
     formData = await request.formData();
   } catch (error) {
     // A malformed body or a missing boundary rejects instead of returning form
-    // data. Treat it as an invalid request so POST answers the controlled 400
-    // rather than surfacing an unhandled 500. Never log the body: it is audio.
-    captureException(error, { tags: { source: 'transcription-proxy' } });
+    // data. This is client input, so answer the controlled 400 without
+    // reporting it to Sentry. Never log the body: it is audio.
+    errorExceptInTest('[transcription-proxy] Invalid multipart body:', error);
     return null;
   }
   const modelField = formData.get('model');
@@ -127,19 +125,13 @@ function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscrip
   try {
     parsed = JSON.parse(requestBodyText);
   } catch (error) {
-    captureException(error, {
-      extra: { requestBodyText },
-      tags: { source: 'transcription-proxy' },
-    });
+    errorExceptInTest('[transcription-proxy] Invalid JSON body:', error);
     return null;
   }
 
   const result = TranscriptionRequestSchema.safeParse(parsed);
   if (!result.success) {
-    captureException(result.error, {
-      extra: { requestBodyText },
-      tags: { source: 'transcription-proxy' },
-    });
+    errorExceptInTest('[transcription-proxy] Invalid request body:', result.error.issues);
     return null;
   }
 
@@ -263,7 +255,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
-  if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
+  if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
     return await creditsBlockedResponse({
       user,
       balance,
@@ -279,10 +271,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  // The resolved org policy follows the request shape: merged into the JSON
-  // body, or appended to the multipart form (OpenRouter accepts the provider
-  // field on both).
-  let providerPolicy: OpenRouterProviderConfig | undefined;
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -290,18 +278,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       modelId: requestedModelLowerCased,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes) {
+    const eligibleRoutes = decision.eligibleProviderRoutes;
+    if (eligibleRoutes) {
       const currentOnly = providerConfig?.only;
-      const only = currentOnly
-        ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
-        : [...decision.eligibleProviderRoutes];
-      if (only.length === 0) return modelNotAllowedResponse();
-      providerPolicy = { ...providerConfig, only };
-    } else if (providerConfig) {
-      providerPolicy = providerConfig;
+      const hasEligibleRoute = currentOnly
+        ? currentOnly.some(route => eligibleRoutes.has(route))
+        : eligibleRoutes.size > 0;
+      if (!hasEligibleRoute) return modelNotAllowedResponse();
     }
-  } else if (providerConfig) {
-    providerPolicy = providerConfig;
   }
 
   sentryRootSpan()?.setAttribute(
@@ -320,16 +304,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const safetyIdentifier = generateProviderSpecificHash(user.id, provider);
     upstreamForm.append('safety_identifier', safetyIdentifier);
     upstreamForm.append('user', safetyIdentifier);
-    if (providerPolicy) {
-      upstreamForm.append('provider', JSON.stringify(providerPolicy));
-    }
     upstreamBody = upstreamForm;
   } else {
     parsedRequest.body.safety_identifier = generateProviderSpecificHash(user.id, provider);
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
-    if (providerPolicy) {
-      parsedRequest.body.provider = { ...parsedRequest.body.provider, ...providerPolicy };
-    }
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
 
@@ -342,25 +320,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = response.status;
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
 
   if (response.status === 402 && !userByok) {
     await captureProxyError({

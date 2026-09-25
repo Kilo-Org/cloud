@@ -52,3 +52,23 @@ export function buildEnterpriseSsoHref(searchParams: Record<string, string>): st
   params.set('sso', 'true');
   return `/users/sign_in?${params.toString()}`;
 }
+
+/**
+ * Builds the SSO sign-in URL a mismatched visitor continues to after signing
+ * out. The address the app asked for is restored so the device-auth flow
+ * completes for the right account, while approved navigation context (and a
+ * validated device `callbackPath`) is preserved. The signed-in address is
+ * never an input here, so it can never leave the browser in this URL.
+ */
+export function buildSsoAccountSwitchHref(
+  searchParams: Record<string, string>,
+  expectedEmail: string
+): string {
+  const params = new URLSearchParams();
+  params.set('sso', 'true');
+  params.set('email', expectedEmail);
+  buildSignInHref(searchParams).forEach((value, key) => {
+    params.set(key, value);
+  });
+  return `/users/sign_in?${params.toString()}`;
+}

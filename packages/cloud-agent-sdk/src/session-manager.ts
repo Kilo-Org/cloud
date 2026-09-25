@@ -46,6 +46,7 @@ import type {
   SessionInfo,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,
@@ -87,6 +88,7 @@ type SessionStatusIndicator = {
   message: string;
   timestamp: number;
   commitHash?: string;
+  code?: SdkStatusMessageCode;
 };
 type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
@@ -282,6 +284,12 @@ type FetchedSessionData = {
   totalCostMicrodollars?: number | null;
   /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
   createdOnPlatform?: string | null;
+  /**
+   * The profile the session was prepared with, as recorded on the session row.
+   * Null for a session created before profile recording, or one whose create
+   * origin resolved no profile. Populated by the mobile and extension adapters.
+   */
+  profileId?: string | null;
 };
 
 type PrepareInput = {
@@ -586,23 +594,44 @@ function isSelectedModelUnavailable(message: string | undefined): boolean {
   return message?.toLowerCase().includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ?? false;
 }
 
-function formatError(err: unknown): string {
+type FormattedErrorDetail = { message: string; code: SdkStatusMessageCode };
+
+/**
+ * Pairs the SDK's English failure copy with a stable, locale-free code so a
+ * localized client can render its own text. `formatError` remains the single
+ * string seam the web app renders.
+ */
+function formatErrorDetail(err: unknown): FormattedErrorDetail {
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
-    if (isSelectedModelUnavailable(r.data.message)) return SELECTED_MODEL_UNAVAILABLE_ERROR;
+    if (isSelectedModelUnavailable(r.data.message))
+      return { message: SELECTED_MODEL_UNAVAILABLE_ERROR, code: 'selected-model-unavailable' };
     const code = r.data.data?.code ?? r.data.shape?.code;
     const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
     if (code === 'PAYMENT_REQUIRED' || http === 402)
-      return 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.';
+      return {
+        message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+        code: 'insufficient-credits',
+      };
     if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN')
-      return 'You are not authorized to use the Cloud Agent.';
-    if (code === 'NOT_FOUND') return 'Service is unavailable right now. Please try again.';
+      return { message: 'You are not authorized to use the Cloud Agent.', code: 'not-authorized' };
+    if (code === 'NOT_FOUND')
+      return {
+        message: 'Service is unavailable right now. Please try again.',
+        code: 'service-unavailable',
+      };
     if (code === 'CONFLICT' || http === 409)
-      return 'Previous task is still finishing up. Please wait a moment.';
+      return {
+        message: 'Previous task is still finishing up. Please wait a moment.',
+        code: 'previous-task-in-progress',
+      };
     if (code === 'SERVICE_UNAVAILABLE' || http === 503)
-      return 'Service is temporarily unavailable. Please retry in a moment.';
+      return {
+        message: 'Service is temporarily unavailable. Please retry in a moment.',
+        code: 'service-temporarily-unavailable',
+      };
     if (code !== undefined || http !== undefined) {
-      return GENERIC_ERROR;
+      return { message: GENERIC_ERROR, code: 'generic-error' };
     }
     // `errorShapeSchema` uses `.passthrough()`, so `safeParse` succeeds on any
     // object — including plain `Error` instances whose own properties satisfy
@@ -612,10 +641,14 @@ function formatError(err: unknown): string {
   }
   if (err instanceof Error) {
     if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed'))
-      return 'Connection lost. Please retry in a moment.';
-    return 'Connection failed. Please retry in a moment.';
+      return { message: 'Connection lost. Please retry in a moment.', code: 'connection-lost' };
+    return { message: 'Connection failed. Please retry in a moment.', code: 'connection-failed' };
   }
-  return GENERIC_ERROR;
+  return { message: GENERIC_ERROR, code: 'generic-error' };
+}
+
+function formatError(err: unknown): string {
+  return formatErrorDetail(err).message;
 }
 
 // ---------------------------------------------------------------------------
@@ -735,12 +768,23 @@ function insertOptimisticUserMessage(input: {
 function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (cs.type === 'preparing') {
-    return { type: 'progress', message: cs.message ?? 'Setting up environment…', timestamp: now };
+    return {
+      type: 'progress',
+      message: cs.message ?? 'Setting up environment…',
+      timestamp: now,
+      ...(cs.message === undefined ? { code: 'setting-up-environment' } : {}),
+    };
   }
   if (cs.type === 'finalizing') {
-    return { type: 'progress', message: cs.message ?? 'Wrapping up…', timestamp: now };
+    return {
+      type: 'progress',
+      message: cs.message ?? 'Wrapping up…',
+      timestamp: now,
+      ...(cs.message === undefined ? { code: 'wrapping-up' } : {}),
+    };
   }
   if (cs.type === 'error') {
+    // The DO writes this text, so it carries no SDK copy code.
     return { type: 'error', message: cs.message, timestamp: now };
   }
   return null; // 'ready' — no indicator
@@ -755,12 +799,25 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
       message: s.message,
       timestamp: now,
       ...(s.step === 'completed' && s.commitHash ? { commitHash: s.commitHash } : {}),
+      ...(s.code ? { code: s.code } : {}),
     } satisfies SessionStatusIndicator;
   }
   if (s.type === 'disconnected')
-    return { type: 'error', message: 'Agent connection lost', timestamp: now };
-  if (s.type === 'error') return { type: 'error', message: s.message, timestamp: now };
-  if (s.type === 'interrupted') return { type: 'info', message: 'Session stopped', timestamp: now };
+    return {
+      type: 'error',
+      message: 'Agent connection lost',
+      timestamp: now,
+      code: 'agent-connection-lost',
+    };
+  if (s.type === 'error')
+    return {
+      type: 'error',
+      message: s.message,
+      timestamp: now,
+      ...(s.code ? { code: s.code } : {}),
+    };
+  if (s.type === 'interrupted')
+    return { type: 'info', message: 'Session stopped', timestamp: now, code: 'session-stopped' };
   return null;
 }
 
@@ -1956,11 +2013,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         acceptCachedPage = false;
         clearAllAtoms();
         store.set(isLoadingAtom, false);
-        setIndicator({
-          type: 'error',
-          message: code === 'NOT_FOUND' ? CHILD_SESSION_NOT_FOUND_MESSAGE : formatError(err),
-          timestamp: Date.now(),
-        });
+        if (code === 'NOT_FOUND') {
+          setIndicator({
+            type: 'error',
+            message: CHILD_SESSION_NOT_FOUND_MESSAGE,
+            timestamp: Date.now(),
+            code: 'child-session-not-found',
+          });
+        } else {
+          const detail = formatErrorDetail(err);
+          setIndicator({
+            type: 'error',
+            message: detail.message,
+            timestamp: Date.now(),
+            code: detail.code,
+          });
+        }
         return;
       }
       if (config.readCachedSnapshotPage) {
@@ -1984,7 +2052,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         store.set(isLoadingAtom, false);
         store.set(isRefreshingCachedTranscriptAtom, false);
-        setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+        const detail = formatErrorDetail(err);
+        setIndicator({
+          type: 'error',
+          message: detail.message,
+          timestamp: Date.now(),
+          code: detail.code,
+        });
       };
       if (!cacheReadPending) {
         surfaceFailure();
@@ -2223,6 +2297,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           type: 'error',
           message: 'Message failed to deliver',
           timestamp: Date.now(),
+          code: 'message-delivery-failed',
         });
       },
       onEvent: event => {
@@ -2533,10 +2608,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       remoteOptimisticIds.delete(messageId);
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
-      const message = formatError(err);
-      config.onSendFailed?.(messageText, message, err);
-      if (store.get(agentStatusAtom).type !== 'disconnected') {
-        setIndicator({ type: 'error', message, timestamp: Date.now() });
+      const detail = formatErrorDetail(err);
+      config.onSendFailed?.(messageText, detail.message, err);
+      // A connection-level failure is what the "Agent connection lost" line
+      // already states, so a disconnected agent keeps that line instead of
+      // restating the same thing. A classified failure (credits, authorization,
+      // service) is an answer from the server, so it must replace the stale
+      // line: the reader needs that reason, and the server just proved the
+      // connection is not the problem. Suppressing it left the failed send
+      // silent on mobile, whose only failed-send surface is this indicator.
+      const connectionFailure =
+        detail.code === 'connection-failed' || detail.code === 'connection-lost';
+      if (store.get(agentStatusAtom).type !== 'disconnected' || !connectionFailure) {
+        setIndicator({
+          type: 'error',
+          message: detail.message,
+          timestamp: Date.now(),
+          code: detail.code,
+        });
       }
       return false;
     }
@@ -2581,7 +2670,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       if (currentSession === session) {
         restoreAfterInterrupt(session);
-        setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
+        setIndicator({
+          type: 'info',
+          message: 'Session stopped',
+          timestamp: Date.now(),
+          code: 'session-stopped',
+        });
       }
     } catch {
       if (currentSession === session) {
@@ -2593,6 +2687,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           type: 'error',
           message: 'Failed to stop execution',
           timestamp: Date.now(),
+          code: 'failed-to-stop-execution',
         });
       }
     }
@@ -2699,7 +2794,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(sessionIdAtom, cloudAgentSessionId);
       await switchSession(kiloSessionId);
     } catch (err) {
-      setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      const detail = formatErrorDetail(err);
+      setIndicator({
+        type: 'error',
+        message: detail.message,
+        timestamp: Date.now(),
+        code: detail.code,
+      });
     }
   }
 
@@ -2864,7 +2965,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   };
 }
 
-export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError };
+export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError, formatErrorDetail };
 export type {
   ActiveSessionType,
   CloudAgentModelOverride,

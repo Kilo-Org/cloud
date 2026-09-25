@@ -14,6 +14,15 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
+const ACTION_BOX_CLASSES = ['shrink-0', 'max-w-full', 'flex-row'];
+const ACTION_TEXT_CLASSES = ['shrink', 'font-mono-medium', 'text-[11px]', 'text-primary'];
+const PHYSICAL_ALIGNMENT_CLASSES = new Set([
+  'text-left',
+  'text-right',
+  'text-center',
+  'text-justify',
+]);
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function mount(element: ReactElement) {
   act(() => {
@@ -36,10 +45,7 @@ afterEach(() => {
 
 describe('SectionHeader mounted layout', () => {
   // Host props protect the layout contract; only native I4 can prove scaled glyph rendering.
-  it.each([
-    { isRTL: false, alignment: 'text-right' },
-    { isRTL: true, alignment: 'text-left' },
-  ])('gives both labels spare width and wrapping with RTL=$isRTL', ({ isRTL, alignment }) => {
+  it.each([false, true])('places the action at the row outer edge with RTL=%s', isRTL => {
     i18nManager.isRTL = isRTL;
     const root = mount(
       createElement(SectionHeader, {
@@ -54,6 +60,8 @@ describe('SectionHeader mounted layout', () => {
       node => Object.is(node.type, 'Text') && node.children.includes('Live now')
     );
 
+    // The Latin display treatment is LTR-only (home-ar-loading) and is
+    // asserted per direction by the letterspacing test below.
     expect((label.props.className as string).split(' ')).toEqual(
       expect.arrayContaining([
         'grow',
@@ -68,24 +76,117 @@ describe('SectionHeader mounted layout', () => {
     expect(label.props.maxFontSizeMultiplier).toBeUndefined();
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(label.children).toEqual(['Live now']);
+    // The tracked class stays for the Latin design; the RTL letter-spacing
+    // reset applies to RTL-script copy only, so this Latin label keeps its
+    // tracking (see lib/rtl-text.ts and text.rtl-labels.mounted.test.tsx).
     if (isRTL) {
       expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect(label.props.style).not.toContainEqual({ letterSpacing: 0 });
+      expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
+    } else {
+      expect(label.props.style).toBeUndefined();
+      expect(text.props.style).toBeUndefined();
     }
 
-    expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
-      'flex-wrap'
-    );
-    expect((action.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining(['grow', 'max-w-full'])
-    );
-    expect((text.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining([alignment, 'font-mono-medium', 'text-[11px]', 'text-primary'])
-    );
+    // The action copy must sit at the row's end in both directions: the row
+    // packs every flex line to its end (`justify-end`) and only the label grows,
+    // so a lone action box on a wrapped line still lands on the row's outer edge
+    // instead of the line start that `justify-between` gives it. The box must
+    // not grow too — when both children grew the row split in half and the
+    // action sat at the inner edge of its half (the screen centre in Arabic)
+    // instead of the margin the tab bar, cards and rows below share
+    // (home-arabic-rtl, home). The layout is direction-relative and identical
+    // under RTL, and the row's outer edge comes from the row's own main-axis
+    // placement, never from a physical text alignment.
+    const rowClasses = ((action.parent?.props.className as string | undefined) ?? '').split(' ');
+    expect(rowClasses).toContain('flex-wrap');
+    expect(rowClasses).toContain('justify-end');
+    expect(rowClasses).not.toContain('justify-between');
+    const actionBoxClasses = (action.props.className as string).split(' ');
+    expect(actionBoxClasses).toEqual(expect.arrayContaining(ACTION_BOX_CLASSES));
+    expect(actionBoxClasses).not.toContain('grow');
+    expect(actionBoxClasses).not.toContain('justify-end');
+    const actionTextClasses = (text.props.className as string).split(' ');
+    expect(actionTextClasses).toEqual(expect.arrayContaining(ACTION_TEXT_CLASSES));
+    expect(actionTextClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
     expect(text.props.numberOfLines).toBeUndefined();
     expect(text.props.allowFontScaling).not.toBe(false);
     expect(text.props.maxFontSizeMultiplier).toBeUndefined();
+    expect(text.props.adjustsFontSizeToFit).not.toBe(true);
     expect(text.children).toEqual(['See all']);
   });
+
+  // The letter-spacing reset belongs to an RTL interface: in this LTR screen
+  // the eyebrow label and the action keep `tracking-[1.5px]`, and no inline
+  // style overrides the class (the RTL case below pins the reset).
+  it('keeps the tracked letter-spacing on the Arabic label and action in LTR', () => {
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const actionText = action.find(node => Object.is(node.type, 'Text'));
+
+    expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
+    expect(label.props.style).toBeUndefined();
+    expect(actionText.props.style).toBeUndefined();
+  });
+
+  it('renders Arabic labels without the mono family or letter spacing in RTL', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const text = action.find(node => Object.is(node.type, 'Text'));
+
+    for (const node of [label, text]) {
+      const classes = (node.props.className as string).split(' ');
+      expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
+      expect(node.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect(node.props.style).toContainEqual({ letterSpacing: 0 });
+    }
+    expect(label.children).toEqual(['الجلسات الجارية الآن']);
+    expect(text.children).toEqual(['عرض الكل']);
+  });
+
+  it.each([{ isRTL: false }, { isRTL: true }])(
+    'aligns the action with the row edges, never with a physical text align, with RTL=$isRTL',
+    ({ isRTL }) => {
+      // React Native swaps `textAlign: 'left'` and `'right'` under RTL (Android
+      // maps 'left' to Gravity.RIGHT), so a physical alignment would pin the
+      // action to the inner edge of its box and float "See all" away from the
+      // row end in Arabic.
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'Live now',
+          actionLabel: 'See all',
+          onActionPress: () => undefined,
+        })
+      );
+      const classes = root
+        .findAll(node => typeof node.props.className === 'string')
+        .flatMap(node => (node.props.className as string).split(' '));
+
+      expect(classes.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
+      expect(classes).not.toContain('text-left');
+      expect(classes).not.toContain('text-right');
+    }
+  );
 
   // Finding home-ar-loading: the Arabic section labels carried the Latin
   // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
@@ -117,6 +218,36 @@ describe('SectionHeader mounted layout', () => {
         expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
       }
     }
+  });
+
+  // The action's display treatment intentionally branches on direction (the
+  // LTR-only letterspacing); the layout must not.
+  it('does not branch the action layout on direction', () => {
+    function actionLayout(isRTL: boolean) {
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'Live now',
+          actionLabel: 'See all',
+          onActionPress: () => undefined,
+        })
+      );
+      const action = root.findByProps({ accessibilityRole: 'button' });
+      const text = action.find(node => Object.is(node.type, 'Text'));
+      return {
+        box: action.props.className as string,
+        physicalAlignment: (text.props.className as string)
+          .split(' ')
+          .filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name)),
+      };
+    }
+
+    const ltr = actionLayout(false);
+    act(() => renderer?.unmount());
+    renderer = undefined;
+    const rtl = actionLayout(true);
+
+    expect(rtl).toEqual(ltr);
   });
 
   it('keeps the complete accessible action name and activates the supplied destination', () => {

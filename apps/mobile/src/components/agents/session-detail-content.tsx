@@ -115,20 +115,32 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
+import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
 } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
+  collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
+  type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+} from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -167,6 +179,7 @@ import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -268,6 +281,13 @@ export function SessionDetailContent({
   }, []);
 
   const messages = useAtomValue(manager.atoms.messagesList);
+  // The live list behind a stable identity for the callbacks the transcript
+  // hands to its memoized rows. `renderItem` and `handleRetryMessage` read the
+  // current list through this ref instead of capturing `messages`, so neither
+  // changes identity on a streaming publish. Assigned during render, the same
+  // way `liveModelPickerSelectionScopeRef` below is.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -291,6 +311,18 @@ export function SessionDetailContent({
     totalCost
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  // The accessor handed to the transcript's rows must keep one identity across
+  // streaming publishes: the SDK re-emits `childMessages` on every
+  // `partsRevision` bump, and a changing prop would defeat `MessageBubble`'s
+  // shallow memo for every visible row. The in-transcript subagent card
+  // subscribes to the atom itself (`LiveChildSessionSection`), so it stays live
+  // without this identity changing.
+  const getChildMessagesRef = useRef(getChildMessages);
+  getChildMessagesRef.current = getChildMessages;
+  const getChildMessagesForRows = useCallback(
+    (childSessionId: string) => getChildMessagesRef.current(childSessionId),
+    []
+  );
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -388,7 +420,12 @@ export function SessionDetailContent({
     setFollowTailNonce(count => count + 1);
   }, []);
 
+  // The strip below the keyboard container reserves the device safe area so the
+  // composer's tail clears the navigation bar / home indicator. The container
+  // above does not add it again (`containerReservesBottomInset`), so the space
+  // is resolved once per screen instead of twice.
   const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -461,6 +498,53 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  // The session's active-profile chip: the profile this session runs on. It
+  // resolves from the session's own recorded `profileId`, so an explicit
+  // override or a repository-bound profile — not the context's current
+  // effective default — names it. Only a session that recorded none (created
+  // before profile recording, or one whose create resolved no profile) falls
+  // back to the effective default. A recorded id that no longer resolves shows
+  // no chip rather than naming a different profile. Tapping opens that
+  // profile's editor.
+  const {
+    allProfiles: sessionProfiles,
+    effectiveDefaultId,
+    isLoading: isSessionProfileLoading,
+    isError: isSessionProfileError,
+  } = useEffectiveAgentProfile(organizationId);
+  // `fetchSession` is the only source of the session's own profile id, and the
+  // atom can still hold the previous session's row. Until the CURRENT session's
+  // read resolves, the chip stays hidden rather than briefly naming the context
+  // default for a session that recorded a different profile.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
+  const activeSessionProfileId = sessionDataLoaded
+    ? (recordedSessionProfileId ?? effectiveDefaultId)
+    : null;
+  const sessionProfile =
+    activeSessionProfileId === null
+      ? null
+      : (sessionProfiles.find(profile => profile.id === activeSessionProfileId) ?? null);
+  const sessionProfileIndicatorState = buildActiveProfileIndicatorState({
+    selectedProfileName: sessionProfile?.name ?? null,
+    repoBoundProfileName: null,
+    hasManualEnvVars: false,
+    hasManualSetupCommands: false,
+    hasSelectedProfileId: sessionProfile !== null,
+    isProfilesLoading: isSessionProfileLoading || !sessionDataLoaded,
+    hasProfileError: isSessionProfileError,
+  });
+  const openSessionProfileEditor = () => {
+    if (sessionProfile) {
+      router.push(
+        getProfileOverviewPath(
+          sessionProfile.id,
+          profileOrganizationId(organizationId, sessionProfile)
+        )
+      );
+    }
+  };
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
     sessionId,
@@ -959,10 +1043,33 @@ export function SessionDetailContent({
   );
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
+  //
+  // The previous build's part→item-key map. A later build that folds new parts
+  // into an existing run — an older page prepending, or a tool part streaming
+  // into the run — reuses the key the row was already on screen under, so
+  // FlashList's viewport anchor survives. The effect refreshes the map after the
+  // commit, so the render that first shows the change still reads the old one.
+  const carriedTranscriptKeysByPartRef = useRef<TranscriptItemKeysByPart | null>(null);
   const transcript = useMemo(
-    () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
+    () =>
+      condenseToolCalls
+        ? condenseTranscriptToolRuns(
+            baseTranscript,
+            carriedTranscriptKeysByPartRef.current ?? undefined
+          )
+        : baseTranscript,
     [condenseToolCalls, baseTranscript]
   );
+  // Only the condensed build reads the map back, so while condensing is off the
+  // walk over every content-rendering part and its `Map` allocation would be
+  // dead work on every streaming update. The guard skips both; the map is
+  // refreshed again on the commit after condensing turns back on.
+  useEffect(() => {
+    if (!condenseToolCalls) {
+      return;
+    }
+    carriedTranscriptKeysByPartRef.current = collectTranscriptItemKeysByPart(transcript);
+  }, [condenseToolCalls, transcript]);
 
   // The list branch must never mount with zero items: a zero-item FlashList
   // paints blank dead space with no loading and no empty state (mobile-app
@@ -1043,9 +1150,9 @@ export function SessionDetailContent({
           buildRemoteAttachmentParts
         );
         if (!result.ok) {
-          // Retryable presign failure: the manager never reached send(), so
-          // its onSendFailed toast does not fire. Surface the retryable message
-          // through the same toast channel and throw so the composer keeps the
+          // Retryable presign failure: the manager never reached send(), so the
+          // SDK set no error status indicator. Surface the retryable message
+          // through the toast channel and throw so the composer keeps the
           // draft/attachments for a retry.
           toast.error(result.message);
           throw new Error(result.message);
@@ -1068,10 +1175,10 @@ export function SessionDetailContent({
           sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
         );
       }
-      // manager.send() reports failures via its own return value (and toasts
-      // through the manager's onSendFailed hook) rather than rejecting — it
-      // is the single toast owner for send failures. Throw here, without a
-      // second toast, purely so the composer's `await onSend(...)` sees the
+      // manager.send() reports failures via its own return value rather than
+      // rejecting; the SDK sets the translated error status indicator above the
+      // composer, which is the single failed-send surface. Throw here, without
+      // a toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
       takeOverTranscriptPositionForSend();
       const sent = await manager.send({
@@ -1113,7 +1220,7 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
-      const prompt = resolveRetryPrompt(message, messages);
+      const prompt = resolveRetryPrompt(message, messagesRef.current);
       if (prompt === null) {
         return;
       }
@@ -1140,7 +1247,7 @@ export function SessionDetailContent({
         },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(
@@ -1272,17 +1379,27 @@ export function SessionDetailContent({
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
       }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
-      }
       if (item.type === 'tool-run') {
         // Match the inset and row rhythm of a message row so the condensed row
         // sits flush with its neighbours rather than full-bleed.
-        return (
+        const run = (
           <View className="px-4 py-1">
             <MessageErrorBoundary>
               <CondensedToolRunRow parts={item.parts} />
             </MessageErrorBoundary>
+          </View>
+        );
+        // A condensed run can open a burst: its message's marker rides here so
+        // marker and row share one FlashList key and one measured height.
+        return (
+          <View>
+            {item.timeMarker && (
+              <TranscriptTimeMarker
+                created={item.timeMarker.created}
+                dayChanged={item.timeMarker.dayChanged}
+              />
+            )}
+            {run}
           </View>
         );
       }
@@ -1292,8 +1409,10 @@ export function SessionDetailContent({
           ? pendingMessages.get(item.message.info.id)
           : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
-      const retryPrompt = resolveRetryPrompt(item.message, messages);
-      return (
+      // Read the live list through the ref: capturing `messages` here would
+      // change this callback's identity on every streaming publish.
+      const retryPrompt = resolveRetryPrompt(item.message, messagesRef.current);
+      const bubble = (
         <MessageBubble
           message={item.message}
           {...(item.parts ? { partsOverride: item.parts } : {})}
@@ -1304,7 +1423,10 @@ export function SessionDetailContent({
           // so feeding it the stripped list would turn a reasoning stream into a
           // stale activity or "Waiting for activity" instead of "Thinking".
           // The card renders no child rows, so nothing thinking-related leaks.
-          getChildMessages={getChildMessages}
+          // `getChildMessagesForRows` is the ref-backed accessor: a stable
+          // identity here is what lets an unchanged row bail out of the memo.
+          // The card itself subscribes to the atom, so it stays live.
+          getChildMessages={getChildMessagesForRows}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
@@ -1319,17 +1441,31 @@ export function SessionDetailContent({
           condenseToolCalls={condenseToolCalls}
         />
       );
+      // The burst marker rides on its message row so the row keeps one FlashList
+      // key and one measured height: a prepend that moves the marker to an older
+      // message changes no key that is already on screen. Keep the wrapper and
+      // bubble's child slot stable so moving the marker does not remount it.
+      return (
+        <View>
+          {item.timeMarker && (
+            <TranscriptTimeMarker
+              created={item.timeMarker.created}
+              dayChanged={item.timeMarker.dayChanged}
+            />
+          )}
+          {bubble}
+        </View>
+      );
     },
     [
       lastAssistantMessageId,
       isStreaming,
-      getChildMessages,
+      getChildMessagesForRows,
       modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
-      messages,
       handleRetryMessage,
       handleCopyToComposer,
       handleOpenDetails,
@@ -1528,20 +1664,33 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // A generated placeholder title (`New session - <ISO>` / `Child session -
+  // <ISO>`) is a storage key, not a name: showing it truncates the header to
+  // "New session - 2026-…". Treat it as absent and let the fallback name (or a
+  // live rename) show instead. The judgement lives in `namedSessionTitle`
+  // rather than here so it can also consult the record of titles the app's own
+  // rename wrote: a user-chosen title that happens to match the placeholder
+  // shape is kept, and a genuine placeholder still reaches
+  // `getSessionDetailRenameState` as absent.
+  const serverTitle = isSessionLoaded
+    ? namedSessionTitle(fetchedData.title ?? undefined, sessionId)
+    : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". A creation
+    // placeholder cached in the list is not a title: fall back to "Session".
+    // The route's cached metadata can hold the backend's ISO placeholder,
+    // which must not paint either, while a title the user's own rename wrote
+    // is kept.
+    fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <View className="flex-row items-center gap-2">
-      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+    <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
@@ -1562,6 +1711,13 @@ export function SessionDetailContent({
       />
     </View>
   );
+  // The PR link shares the goal row so the header stays at two rows. The row
+  // mounts only once it holds data: while the fetch is in flight a no-goal,
+  // no-PR session reserves no row, so the transcript never jumps when the fetch
+  // lands with nothing. The wrapper's FadeIn reveals the PR when it lands.
+  const associatedPr = fetchedData?.associatedPr ?? null;
+  const prBadge = <SessionPrBadge pr={associatedPr} loading={false} />;
+  const hasPrRow = associatedPr !== null;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -1634,10 +1790,11 @@ export function SessionDetailContent({
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
       // Slash commands ride the same manager.send() pipeline. The manager
-      // resolves the active remoteModelOverride from its own store and is
-      // the sole transport-toast owner; we throw a stable error on a
-      // false return purely so the composer preserves the draft, and never
-      // emit a duplicate toast of our own.
+      // resolves the active remoteModelOverride from its own store; a failed
+      // send is stated once by the SDK's translated status indicator above the
+      // composer, so we throw a stable error on a false return purely so the
+      // composer preserves the draft, and never emit a duplicate toast of our
+      // own.
       takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
@@ -1651,11 +1808,11 @@ export function SessionDetailContent({
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
-  // composer's slash commands. The manager is the sole transport-toast owner,
-  // so a failed send surfaces exactly one error toast from `onSendFailed` and
-  // this helper never adds a second. Edit throws instead, so the RenameModal
-  // shows the failure inline and the user can correct the objective. One
-  // helper keeps the `/goal` payload shape in one place.
+  // composer's slash commands. A failed send is stated once by the SDK's
+  // translated status indicator above the composer, so this helper never adds a
+  // toast of its own. Edit throws instead, so the RenameModal shows the failure
+  // inline and the user can correct the objective. One helper keeps the `/goal`
+  // payload shape in one place.
   const sendGoalAction = useCallback(
     async (action: GoalAction, objective = ''): Promise<boolean> => {
       const sent = await manager.send({
@@ -1730,11 +1887,11 @@ export function SessionDetailContent({
     const removeIndex = actions.indexOf('remove');
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: t('agentChat.goal.title'),
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         const action = index === undefined ? undefined : actions[index];
@@ -1765,7 +1922,7 @@ export function SessionDetailContent({
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {
@@ -1925,9 +2082,14 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
-            titleNumberOfLines={1}
+            // The loaded header, the route's loading header and its error state
+            // all share one cap (`SESSION_HEADER_TITLE_LINES`), and
+            // `reserveTitleSpace` holds exactly that many lines, so a long title
+            // wraps at a word boundary instead of being cut to one tail-ellipsized
+            // line ("Moving-average empty windo…").
             reserveTitleSpace
-            backFallback="/(app)/(tabs)/(2_agents)"
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
+            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
             className="pb-1"
             {...(rename.isTitleInteractive
@@ -1939,7 +2101,20 @@ export function SessionDetailContent({
                 }
               : {})}
           />
-          {sessionGoal ? (
+          {sessionProfileIndicatorState ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+              className="px-4 pb-1"
+            >
+              <ActiveProfileIndicator
+                state={sessionProfileIndicatorState}
+                onPress={openSessionProfileEditor}
+              />
+            </Animated.View>
+          ) : null}
+          {sessionGoal !== null || hasPrRow ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
@@ -1948,6 +2123,7 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
+                trailing={prBadge}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}
@@ -1958,7 +2134,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (
@@ -2067,6 +2245,10 @@ export function SessionDetailContent({
               title={t('agentChat.session.renameSession')}
               placeholder={t('agentChat.session.renamePlaceholder')}
               initialValue={rename.modalInitialValue}
+              // The server accepts a title this long; the modal's 50-character
+              // default would cut a longer title mid-word and the header would
+              // then show the fragment.
+              maxLength={SESSION_TITLE_MAX_LENGTH}
               onSave={handleRenameSave}
               onClose={handleRenameClose}
             />
@@ -2115,20 +2297,21 @@ export function SessionDetailContent({
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
-            Gated on has-messages so the empty/connecting path (which
-            renders the centered status indicator inside `renderContent`)
-            does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate).
-            No `layout` transition on purpose: this wrapper animates its
-            position across keyboard show/hide and blocking-card
-            mount/unmount, and a Reanimated layout transition interrupted
-            by that same resize storm can strand the row at its pre-change
-            Y — floating mid-screen over the transcript, where the red
-            error line drew on top of a transcript row (device capture,
-            question-kb-down). FadeIn/FadeOut only touch opacity, so the
-            entry/exit cues stay; the position is always plain layout. */}
+            It carries no position layout transition: while the list resizes it
+            would animate this row's position lag and paint it over the
+            transcript rows it passes (profile-screen.tsx:275-277). It snaps in
+            the same frame and stays opaque via `bg-background`, so a future
+            layout change covers a transcript row instead of overprinting it.
+            Gated on has-messages so the empty/connecting path (which renders
+            the centered status indicator inside `renderContent`) does not
+            double-render. While preparing, suppressed when the transcript
+            already shows PreparationGroup (no duplicate). */}
         {showSessionFooterRow ? (
-          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            className="bg-background"
+          >
             {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
                 label from the last assistant part, and compute-status.ts:33-35
                 maps a reasoning part to agentChat.partDetail.thinking, so the
@@ -2391,9 +2574,10 @@ export function SessionDetailContent({
       );
     }
     return (
-      // Fades in as the skeleton fades out, so the transcript resolves in
-      // place instead of replacing the placeholder in one frame.
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      // No entrance animation: the transcript body must paint on its own, not
+      // after a `FadeIn` (which starts at `opacity: 0`) completes. The
+      // skeleton's `exiting` crossfade still carries the swap visually.
+      <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}
           items={transcript}
@@ -2414,7 +2598,7 @@ export function SessionDetailContent({
           resumeAt={resumeAnchor}
           followTailNonce={followTailNonce}
         />
-      </Animated.View>
+      </View>
     );
   }
 }

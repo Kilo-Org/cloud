@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { Bot, Loader2 } from '@/components/ui/icons';
@@ -7,6 +8,7 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   type KiloSessionId,
   type Part,
+  type SessionManager,
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -28,8 +30,7 @@ import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { partRendersContent } from './message-visibility';
 import { isToolPart } from './part-types';
-
-export { getTaskToolSessionId } from './child-session-card-state';
+import { useOptionalSessionManager } from './session-manager-context';
 
 const MAX_NESTING_DEPTH = 5;
 
@@ -132,6 +133,82 @@ export function ChildSessionSection({
       </Pressable>
     </Animated.View>
   );
+}
+
+type LiveChildSessionSectionProps = {
+  part: ToolPart;
+  /** Resolves the child transcript. Read on every render so the caller's projection applies. */
+  getChildMessages: (sessionId: string) => StoredMessage[];
+  onOpenChildSession: OpenChildSession;
+  modelOptions?: SessionModelOption[];
+};
+
+/**
+ * The in-transcript subagent card, kept live by subscribing to the manager's
+ * child-message atom. That atom re-emits on every streaming publish (the SDK
+ * bumps `partsRevision` per flush), so a card that read a resolved list once
+ * would freeze its activity label while the subagent streams. Subscribing here
+ * — below the memoized `MessageBubble` — is what lets the bubble's props stay
+ * identical across publishes while the card still updates; the transcript's
+ * `renderItem` therefore does not need to change identity to re-render rows.
+ *
+ * Outside the session screen (tests, lighter hosts) there is no manager and the
+ * card renders the resolved list the caller already produced, exactly as before.
+ */
+export function LiveChildSessionSection({
+  part,
+  getChildMessages,
+  onOpenChildSession,
+  modelOptions,
+}: Readonly<LiveChildSessionSectionProps>) {
+  const manager = useOptionalSessionManager();
+  if (!manager) {
+    return (
+      <ChildSessionSection
+        part={part}
+        childMessages={resolveChildMessages(part, getChildMessages)}
+        onOpenChildSession={onOpenChildSession}
+        modelOptions={modelOptions}
+      />
+    );
+  }
+  return (
+    <SubscribedChildSessionSection
+      manager={manager}
+      part={part}
+      getChildMessages={getChildMessages}
+      onOpenChildSession={onOpenChildSession}
+      modelOptions={modelOptions}
+    />
+  );
+}
+
+function SubscribedChildSessionSection({
+  manager,
+  part,
+  getChildMessages,
+  onOpenChildSession,
+  modelOptions,
+}: Readonly<LiveChildSessionSectionProps & { manager: SessionManager }>) {
+  // Subscribe for re-render only; the list itself is read through the caller's
+  // accessor so a hidden-thinking projection still applies.
+  useAtomValue(manager.atoms.childMessages);
+  return (
+    <ChildSessionSection
+      part={part}
+      childMessages={resolveChildMessages(part, getChildMessages)}
+      onOpenChildSession={onOpenChildSession}
+      modelOptions={modelOptions}
+    />
+  );
+}
+
+function resolveChildMessages(
+  part: ToolPart,
+  getChildMessages: (sessionId: string) => StoredMessage[]
+): StoredMessage[] {
+  const sessionId = getTaskToolSessionId(part);
+  return sessionId ? getChildMessages(sessionId) : [];
 }
 
 export function ChildSessionMessage({

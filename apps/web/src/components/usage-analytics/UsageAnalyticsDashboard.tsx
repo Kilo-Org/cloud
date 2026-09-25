@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -67,6 +67,7 @@ import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
 import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
+import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
 
 /**
  * Personal usage never targets a single organization, so org-only props
@@ -81,6 +82,8 @@ type UsageAnalyticsDashboardProps =
       context: 'personal';
       /** Page title override. */
       title?: string;
+      /** Optional content rendered above the usage panels. */
+      notice?: ReactNode;
     }
   | {
       context: 'organization';
@@ -101,6 +104,8 @@ type UsageAnalyticsDashboardProps =
       isSalesDemo?: boolean;
       /** Page title override. */
       title?: string;
+      /** Optional content rendered above the usage panels. */
+      notice?: ReactNode;
     };
 
 /** Sentinel written by DBT rollups for rows with NULL project_id. */
@@ -790,6 +795,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
         )}
 
         <div className="flex-1 overflow-y-auto">
+          {props.notice}
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
             {hasEnterpriseUsageViews && (
               <div className="space-y-4">
@@ -836,6 +842,18 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
             ) : (
               <>
                 <UsageWarning />
+
+                {/* Spend-alert settings belong to this spend view's owner and
+                    are independent of the usage queries below: they render
+                    above the summary and stay put when a query fails. */}
+                {org ? (
+                  <SpendAlertsPanel
+                    organizationId={org.organizationId}
+                    callerRole={org.callerRole}
+                  />
+                ) : (
+                  <SpendAlertsPanel />
+                )}
 
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />

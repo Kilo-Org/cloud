@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SANDBOX_USAGE_SKUS, type SandboxClassName } from '../container-usage-context.js';
 import { encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import {
+  validateContainersTerminalBillingRuntime,
   validateTerminalBillingRuntime,
   type SandboxTerminalAccessInput,
 } from './terminal-billing.js';
@@ -438,6 +439,232 @@ describe('validateTerminalBillingRuntime', () => {
     sessionId => {
       expect(
         validateTerminalBillingRuntime(billingInput({ context: context({ sessionId }) }))
+      ).toEqual({ allowed: false, reason: 'billing_session_mismatch' });
+    }
+  );
+});
+
+const CONTAINERS_LOGICAL_ID = 'ses-11111111111111111111111111111111';
+const CONTAINERS_ALLOCATION_ID = 'ses-22222222222222222222222222222222';
+const CONTAINERS_DO_ID = 'containers-durable-object';
+
+function containersContext(overrides: Partial<BillingContext> = {}): BillingContext {
+  return {
+    service: 'cloud-agent-next-sandbox-containers-standard4',
+    instanceId: CONTAINERS_LOGICAL_ID,
+    sku: SANDBOX_USAGE_SKUS.SandboxContainersStandard4,
+    subject: { type: 'user', id: access.ownerId },
+    actor: { type: 'user', id: access.ownerId },
+    sessionId: access.sessionId,
+    metadata: {
+      container_class: 'SandboxContainersStandard4',
+      durable_object_id: CONTAINERS_DO_ID,
+      origin: 'cloud-agent',
+    },
+    startEpochMs: 100,
+    generation: '8ad114f7-7967-4abc-bcc1-ce0f9312413a',
+    measurementStarted: true,
+    nextSeq: 1,
+    usageMeasuredAtMs: 100,
+    ...overrides,
+  };
+}
+
+function containersBillingInput(
+  options: {
+    access?: SandboxTerminalAccessInput;
+    sandboxId?: string;
+    providerInstanceId?: string;
+    sandboxDurableObjectId?: string;
+    sandboxClassName?: SandboxClassName;
+    running?: boolean;
+    blocked?: boolean;
+    context?: BillingContext;
+  } = {}
+) {
+  const sandboxId = options.sandboxId ?? CONTAINERS_LOGICAL_ID;
+  return {
+    access: options.access ?? access,
+    sandboxId,
+    providerInstanceId:
+      options.providerInstanceId ??
+      encodeCloudflareProviderRef({
+        sandboxId: CONTAINERS_ALLOCATION_ID,
+        containment: false,
+        instanceId: PROVIDER_CREATION_ID,
+      }),
+    sandboxDurableObjectId: options.sandboxDurableObjectId ?? CONTAINERS_DO_ID,
+    runtime: {
+      sandboxClassName: options.sandboxClassName ?? 'SandboxContainersStandard4',
+      running: options.running ?? true,
+      blocked: options.blocked ?? false,
+      context: options.context ?? containersContext(),
+    },
+  };
+}
+
+describe('validateContainersTerminalBillingRuntime', () => {
+  it('accepts a measured uncontained runtime bound to the logical session and containers DO', () => {
+    expect(validateContainersTerminalBillingRuntime(containersBillingInput())).toEqual({
+      allowed: true,
+    });
+  });
+
+  it.each([
+    {
+      name: 'missing runtime',
+      input: { ...containersBillingInput(), runtime: undefined },
+      reason: 'billing_runtime_unavailable',
+    },
+    {
+      name: 'stopped runtime',
+      input: containersBillingInput({ running: false }),
+      reason: 'billing_runtime_not_running',
+    },
+    {
+      name: 'blocked runtime',
+      input: containersBillingInput({ blocked: true }),
+      reason: 'billing_blocked',
+    },
+    {
+      name: 'missing context',
+      input: {
+        ...containersBillingInput(),
+        runtime: { ...containersBillingInput().runtime, context: undefined },
+      },
+      reason: 'billing_context_unavailable',
+    },
+    {
+      name: 'unmeasured context',
+      input: containersBillingInput({ context: containersContext({ measurementStarted: false }) }),
+      reason: 'billing_context_unmeasured',
+    },
+    {
+      name: 'stopped generation',
+      input: containersBillingInput({ context: containersContext({ stoppedObservedAtMs: 150 }) }),
+      reason: 'billing_generation_inactive',
+    },
+    {
+      name: 'pending stop',
+      input: containersBillingInput({
+        context: containersContext({
+          pendingStop: {
+            seq: 1,
+            usageSinceLast: 0,
+            measuredAtMs: 150,
+            reason: 'runtime_signal',
+          },
+        }),
+      }),
+      reason: 'billing_generation_inactive',
+    },
+  ])('rejects $name', ({ input, reason }) => {
+    expect(validateContainersTerminalBillingRuntime(input)).toEqual({ allowed: false, reason });
+  });
+
+  it.each([
+    {
+      name: 'contained reference',
+      providerInstanceId: encodeCloudflareProviderRef({
+        sandboxId: CONTAINERS_ALLOCATION_ID,
+        containment: true,
+        instanceId: PROVIDER_CREATION_ID,
+      }),
+    },
+    {
+      name: 'shared allocation',
+      providerInstanceId: encodeCloudflareProviderRef({
+        sandboxId: 'org-abcdef',
+        containment: false,
+        instanceId: PROVIDER_CREATION_ID,
+      }),
+    },
+    { name: 'invalid reference', providerInstanceId: '{' },
+    { name: 'raw sandbox ID', providerInstanceId: CONTAINERS_ALLOCATION_ID },
+  ])('rejects $name as a runtime mismatch', ({ providerInstanceId }) => {
+    expect(
+      validateContainersTerminalBillingRuntime(containersBillingInput({ providerInstanceId }))
+    ).toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
+  });
+
+  it.each([
+    {
+      name: 'billing instance',
+      input: containersBillingInput({
+        context: containersContext({ instanceId: 'ses-other' }),
+      }),
+    },
+    {
+      name: 'service',
+      input: containersBillingInput({
+        context: containersContext({ service: 'cloud-agent-next-sandbox' }),
+      }),
+    },
+    {
+      name: 'sku',
+      input: containersBillingInput({
+        context: containersContext({ sku: SANDBOX_USAGE_SKUS.Sandbox }),
+      }),
+    },
+    {
+      name: 'namespace durable object',
+      input: containersBillingInput({ sandboxDurableObjectId: 'other-do' }),
+    },
+    {
+      name: 'container class metadata',
+      input: containersBillingInput({
+        context: containersContext({
+          metadata: { container_class: 'Sandbox', durable_object_id: CONTAINERS_DO_ID },
+        }),
+      }),
+    },
+    {
+      name: 'sandbox class',
+      input: containersBillingInput({ sandboxClassName: 'SandboxSmall' }),
+    },
+    {
+      name: 'runtime class',
+      input: containersBillingInput({ sandboxClassName: 'SandboxContainersStandard3' }),
+    },
+  ])('rejects mismatched $name', ({ input }) => {
+    expect(validateContainersTerminalBillingRuntime(input)).toEqual({
+      allowed: false,
+      reason: 'billing_runtime_mismatch',
+    });
+  });
+
+  it('rejects a different organization payer', () => {
+    expect(
+      validateContainersTerminalBillingRuntime(
+        containersBillingInput({
+          access: { ...access, organizationId: 'org_expected' },
+          context: containersContext({ subject: { type: 'org', id: 'org_other' } }),
+        })
+      )
+    ).toEqual({ allowed: false, reason: 'billing_payer_mismatch' });
+  });
+
+  it('rejects a different organization actor', () => {
+    expect(
+      validateContainersTerminalBillingRuntime(
+        containersBillingInput({
+          access: { ...access, organizationId: 'org_team' },
+          context: containersContext({
+            subject: { type: 'org', id: 'org_team' },
+            actor: { type: 'user', id: 'user_other' },
+          }),
+        })
+      )
+    ).toEqual({ allowed: false, reason: 'billing_actor_mismatch' });
+  });
+
+  it.each([undefined, 'workspace_other'])(
+    'rejects isolated attribution without the requested session: %s',
+    sessionId => {
+      expect(
+        validateContainersTerminalBillingRuntime(
+          containersBillingInput({ context: containersContext({ sessionId }) })
+        )
       ).toEqual({ allowed: false, reason: 'billing_session_mismatch' });
     }
   );

@@ -306,6 +306,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             : t('prReview.screen.title', { number })
         }
         eyebrow={`${owner}/${repo}`}
+        eyebrowNumberOfLines={1}
         headerRight={
           <View className="flex-row items-center gap-1">
             {webUrl ? (
@@ -333,16 +334,16 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
                 onPress={openReviewSubmit}
                 disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
-                // The trailing header cluster is content-sized and never
-                // shrinks (ScreenHeader keeps fixed-width actions whole), so
-                // nothing squeezes this button from outside: a label grown by
-                // a large font scale used to push the whole cluster off the
-                // right screen edge (#6328). A variable-width label must be
-                // bounded at its source. 140 dp keeps the cluster — Share and
-                // Merge icon buttons included — on the narrowest 320 dp
-                // viewport and leaves 96 dp for the label, where the scale-2
-                // words ("Submit", "review") still fit, so the label wraps in
-                // place instead of clipping.
+                // The Button's own base is `shrink-0`, so nothing squeezes it
+                // from outside: ScreenHeader's half-row clamp trims the
+                // cluster's box while this label keeps its width and a large
+                // font scale used to push the whole cluster off the right
+                // screen edge (#6328). A variable-width label must be bounded
+                // at its source. 140 dp keeps the cluster — Share and Merge
+                // icon buttons included — on the narrowest 320 dp viewport and
+                // leaves 96 dp for the label, where the scale-2 words
+                // ("Submit", "review") still fit, so the label wraps in place
+                // instead of clipping.
                 className={cn('min-w-0 max-w-[140px] shrink px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />

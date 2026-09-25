@@ -82,6 +82,7 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: harnessMocks.alert },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -90,6 +91,11 @@ vi.mock('react-native', () => ({
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The harness calls the screen as a plain function, so a composite component is
+// never rendered and its host node never exists. The shared single-line field
+// is stubbed as the same-named host, like every other component here; the box
+// the field now uses is the one `@/components/ui/input` owns and s3 covers.
+vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -103,6 +109,9 @@ vi.mock('@/components/ui/directional-icons', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-inbox-list', () => ({
   PrReviewInboxList: 'PrReviewInboxList',
+}));
+vi.mock('@/components/pr-review/pr-link-placeholder', () => ({
+  PrLinkPlaceholder: 'PrLinkPlaceholder',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),

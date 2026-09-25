@@ -127,22 +127,11 @@ vi.mock('@/lib/pr-review/recent-prs', () => ({
   markRecentPrFailed: vi.fn(),
 }));
 
-vi.mock('@/components/screen-header', () => {
-  // The screen passes `headerRight` as a named slot prop. We render it
-  // alongside the `children` slot so the tree walk can find the
-  // Submit-review Button inside.
-  const MockScreenHeader = (props: {
-    headerRight?: React.ReactNode;
-    children?: React.ReactNode;
-  }): React.ReactElement =>
-    React.createElement(
-      'ScreenHeader',
-      { hasHeaderRight: props.headerRight != null },
-      props.headerRight,
-      props.children
-    );
-  return { ScreenHeader: MockScreenHeader };
-});
+// A host-node mock keeps every prop the screen passes (including
+// `eyebrowNumberOfLines`) on the node the `findElement` walk inspects, so the
+// test can assert the header's contract directly. `headerRight` stays a named
+// slot prop, which the walker follows into.
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/pr-review/merge/pr-merge-partial-success-banner', () => ({
   PrMergePartialSuccessBanner: 'PrMergePartialSuccessBanner',
 }));
@@ -273,13 +262,13 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
   });
 });
 
-// The trailing header cluster is content-sized and never shrinks (ScreenHeader
-// keeps fixed-width actions whole — the session-compose-kbup fix), so nothing
-// squeezes the Submit-review button from outside. A label grown by a large
-// font scale used to push the whole cluster off the right screen edge — the
-// explorer found the Overview "Submit review" label cut off at font scale 2
-// (#6328). The button must bound itself with a hard max-w cap while keeping
-// the shrink allowance, so the label wraps in place instead of clipping.
+// The header clamps a trailing action to half the row (ScreenHeader's
+// `max-w-[50%]`) and the Button's own base is `shrink-0`, so a label that
+// cannot shrink keeps its width and is clipped by the screen edge at large font
+// scales — the explorer found the Overview "Submit review" label cut off at
+// font scale 2 (#6328). The button must bound itself with a hard max-w cap
+// while keeping the shrink allowance, so the label wraps in place instead of
+// clipping.
 describe('PrReviewScreen Submit review header fit', () => {
   function findSubmitButton(): React.ReactElement | null {
     // eslint-disable-next-line new-cap
@@ -685,5 +674,28 @@ describe('PrReviewScreen recents backfill per provider', () => {
       number: 12,
       platform: 'gitlab',
     });
+  });
+});
+
+describe('PrReviewScreen header eyebrow cap', () => {
+  beforeEach(() => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  it('caps the repository eyebrow to a single line so it cannot wrap onto the title', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'eyebrowNumberOfLines',
+      value: 1,
+    });
+    expect(header).not.toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -103,7 +104,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
         <ForkOption
           icon={Monitor}
           title={t('tour.remoteOptionTitle')}
-          body={t('tour.remoteOptionBody')}
+          body={stripInlineCodeMarkers(t('tour.remoteOptionBody'))}
           onPress={() => {
             onChoose('remote');
           }}
@@ -181,9 +182,11 @@ export function TourScreen() {
       {/* The tour is presented `modal` (apps/mobile/src/app/(app)/_layout.tsx),
           so the header takes the modal clearance instead of re-adding the
           status-bar inset the native sheet already owns — no dead band above
-          the eyebrow. The eyebrow stays top-left and the fork has no back
-          control to return to. */}
-      <ScreenHeader eyebrow={t('tour.eyebrow')} modal centerTitle={false} showBackButton={false} />
+          the eyebrow. The eyebrow is centred (`centerTitle`): the fork body,
+          which is the only other content, is a centred column, so a top-left
+          eyebrow read as a stranded label beside it (home-quick-tour finding).
+          The fork has no back control to return to. */}
+      <ScreenHeader eyebrow={t('tour.eyebrow')} modal centerTitle showBackButton={false} />
 
       <View className="flex-1">
         <ForkStep onChoose={choosePath} />

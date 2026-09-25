@@ -3,7 +3,12 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import {
+  hasRtlScript,
+  RTL_NO_LETTER_SPACING,
+  RTL_WRITING_DIRECTION,
+  withoutMonoFamily,
+} from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -49,10 +54,12 @@ const ARIA_LEVEL = {
 } satisfies Partial<Record<TextVariant, string>>;
 
 /**
- * The eyebrow's Latin display treatment: full capitals, letterspaced. It is an
- * LTR-only addition to the variant because `letter-spacing` pulls a cursive
- * script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'. An RTL
- * interface keeps the mono family, size and color and drops both classes.
+ * The eyebrow's Latin display treatment: full capitals, letterspaced. It is
+ * dropped for RTL-script copy in an RTL interface (`hasRtlScript`: the app
+ * ships Arabic-script languages and Hebrew): `letter-spacing` pulls a
+ * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
+ * — and that copy also drops the mono family (see `withoutMonoFamily`).
+ * Latin copy, and RTL-script copy in an LTR interface, keep the treatment.
  *
  * Exported so the eyebrow-scale labels rendered outside the variant — the
  * `SectionHeader` action link — carry the identical treatment instead of a
@@ -74,18 +81,25 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
+  const isRTL = I18nManager.isRTL;
+  const isRtlScript = hasRtlScript(props.children);
+  const classes = cn(
+    textVariants({ variant }),
+    variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
+    textClass,
+    className
+  );
   return (
     <Component
-      className={cn(
-        textVariants({ variant }),
-        variant === 'eyebrow' && !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
-        textClass,
-        className
-      )}
+      className={isRTL && isRtlScript ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
+      style={
+        isRTL
+          ? [RTL_WRITING_DIRECTION, isRtlScript ? RTL_NO_LETTER_SPACING : undefined, props.style]
+          : props.style
+      }
     />
   );
 }

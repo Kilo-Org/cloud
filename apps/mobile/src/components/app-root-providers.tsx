@@ -67,7 +67,8 @@ export function AppRootProviders({
               {languageReady ? <AppUnlockAnnouncements /> : null}
               <OrganizationProvider>
                 <ToolSummaryTranslationRuntimeBootstrap />
-                <ActionSheetProvider>
+                {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
+                <ActionSheetProvider useCustomActionSheet>
                   <>
                     {children}
                     <OfflineBanner />
@@ -109,15 +110,23 @@ export function AppRootProviders({
  * bottom-anchored overlay has no other way to clear the keyboard and its
  * navigation row.
  *
- * The resting offset is one platform-free rule (`lib/toast-offset.ts`): iOS and
- * Android run the same math, and the only platform value it reads is the tab
- * bar's own rendered height, which the bar's helper owns.
+ * The offset is one platform-free rule (`lib/toast-offset.ts`): iOS and Android
+ * run the same math, and the platform enters only through the values resolved
+ * here for it — the tab bar's own rendered height, which the bar's helper owns,
+ * and the keyboard occlusion the shared hook already anchors to the screen
+ * bottom.
  */
 function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const keyboardHeight = useAppAwareKeyboardPadding();
+  // The hook reports the whole strip the IME hides, anchored to the screen
+  // bottom: Android's raw height plus the navigation bar its metric stops at
+  // (`ReactRootView` reports `imeInsets.bottom − barInsets.bottom`), iOS's
+  // overlap measured from the keyboard top. Passing the raw Android height left
+  // the toast's last line behind the IME's navigation row (2026-09-20 review
+  // finding). `lib/toast-offset.ts` stays platform-free.
+  const keyboardOcclusion = useAppAwareKeyboardPadding();
   const segments = useSegments();
   const pathname = usePathname();
   // The floating tab bar is an absolute overlay over the screen bottom, so it
@@ -146,7 +155,7 @@ function AppToaster() {
       // covered. One platform-free rule; see `lib/toast-offset.ts`.
       offset={getToastBottomOffset({
         safeAreaBottom: bottom,
-        keyboardHeight,
+        keyboardHeight: keyboardOcclusion,
         tabBarHeight,
       })}
       positionerStyle={TOAST_POSITIONER_STYLE}

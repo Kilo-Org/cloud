@@ -165,7 +165,10 @@ export function ChatComposerInputRow({
             ellipsizeMode="tail"
             allowFontScaling={false}
             pointerEvents="none"
-            className="absolute"
+            // The design-system Text is `font-medium`; the input's own text is
+            // the platform default weight, so the hint drops to `font-normal`
+            // to keep the metrics it shares with the text it stands in for.
+            className="absolute font-normal"
             style={placeholderStyle}
           >
             {placeholder}

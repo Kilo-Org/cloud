@@ -1,11 +1,10 @@
 // The Security Agent settings header Save action is a variable-width header
-// action. ScreenHeader sizes the trailing cluster to its content and never
-// shrinks it (fixed-width actions must stay whole so the rightmost control is
-// not cut off at the screen edge), so a label that grows with its copy has
-// nothing to shrink against: the catalog "Save changes" is 28 glyphs in French,
-// and an uncapped button consumed the row and left the flex-1 min-w-0 screen
-// title at ~0 width on the narrowest 320 dp viewport. The action must bound
-// itself at its source, exactly like PR review's Submit review.
+// action. ScreenHeader clamps the trailing slot to half the row and lets the
+// title shrink, but the Button's own base is `shrink-0`, so a label that grows
+// with its copy keeps its width: the catalog "Save changes" is 28 glyphs in
+// French, and an uncapped button consumed the row and left the flex-1 min-w-0
+// screen title at ~0 width on the narrowest 320 dp viewport. The action must
+// bound itself at its source, exactly like PR review's Submit review.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';

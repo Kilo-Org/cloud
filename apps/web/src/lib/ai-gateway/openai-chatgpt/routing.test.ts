@@ -1,5 +1,9 @@
 jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn(),
+  openAiChatGptSharedServicesOwner: (organizationId: string) => ({
+    organizationId,
+    scope: 'shared_services',
+  }),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
@@ -10,14 +14,41 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
 }));
 // The catalog's live Kilo-exclusive models come and go as promotions are
 // disabled, and at one point none were live at all, which silently turned the
-// exclusive cases below into ordinary-model cases. Stub the lookup so these
-// assertions test the routing rule rather than today's catalog.
-jest.mock('@/lib/ai-gateway/models', () => ({
-  ...(jest.requireActual('@/lib/ai-gateway/models') as Record<string, unknown>),
-  findKiloExclusiveModel: jest.fn((model: string) =>
-    model === 'openai/kilo-exclusive-test-model' ? { public_id: model } : null
-  ),
-}));
+// exclusive cases below into ordinary-model cases. Stub a synthetic alias, but
+// preserve the real lookup for the catalog status regression tests below.
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof gatewayModels>('@/lib/ai-gateway/kilo-exclusive-models');
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@/lib/ai-gateway/providers/definitions/openrouter'
+  );
+  const testExclusiveModel: KiloExclusiveModel = {
+    public_id: 'openai/kilo-exclusive-test-model',
+    internal_id: 'openai/upstream-test-model',
+    display_name: 'OpenAI exclusive test model',
+    description: 'Test model',
+    status: 'public',
+    context_length: 8_192,
+    max_completion_tokens: 4_096,
+    provider: { ...OPENROUTER, id: 'vercel' },
+    flags: [],
+    pricing: null,
+    inference_provider_restriction: ['openai'],
+  };
+  return {
+    ...actual,
+    findKiloExclusiveModel: jest.fn((model: string) =>
+      model === testExclusiveModel.public_id && testExclusiveModel.status !== 'disabled'
+        ? testExclusiveModel
+        : actual.findKiloExclusiveModel(model)
+    ),
+    isDisabledKiloExclusiveModel: jest.fn((model: string) =>
+      model === testExclusiveModel.public_id
+        ? testExclusiveModel.status === 'disabled'
+        : actual.isDisabledKiloExclusiveModel(model)
+    ),
+    kiloExclusiveModels: [...actual.kiloExclusiveModels, testExclusiveModel],
+  };
+});
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -31,7 +62,11 @@ jest.mock('next/server', () => ({
   }),
 }));
 
-import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import type * as gatewayModels from '@/lib/ai-gateway/kilo-exclusive-models';
+import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@/lib/ai-gateway/openai-chatgpt/served-models';
@@ -61,6 +96,10 @@ const USER_ID = 'user-1';
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: null };
 const ORG_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: ORG_ID };
+const exclusiveTestModel = kiloExclusiveModels.find(
+  model => model.public_id === 'openai/kilo-exclusive-test-model'
+);
+if (!exclusiveTestModel) throw new Error('Expected synthetic Kilo-exclusive model');
 
 const originalOpenAiChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
 const originalFetch = global.fetch;
@@ -355,6 +394,52 @@ describe('tagOpenAiChatGptByokModels', () => {
   });
 });
 
+describe.each(['public', 'hidden', 'disabled'] as const)('%s Kilo-exclusive aliases', status => {
+  const modelId = exclusiveTestModel.public_id;
+
+  beforeEach(() => {
+    jest.replaceProperty(exclusiveTestModel, 'status', status);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('rejects eligibility before looking up the upstream model or connection', async () => {
+    await expect(
+      isOpenAiChatGptEligible(
+        routingInput({ request: responsesRequest(modelId), requestedModel: ` ${modelId} ` })
+      )
+    ).resolves.toBe(false);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+  });
+
+  it('does not mark the alias BYOK-available, even when the upstream lookup would accept it', async () => {
+    await expect(tagOpenAiChatGptByokModels(USER_OWNER, [{ id: modelId }])).resolves.toEqual([
+      { id: modelId },
+    ]);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+  });
+
+  it('still tags a served ordinary model alongside the exclusive alias', async () => {
+    await expect(
+      tagOpenAiChatGptByokModels(USER_OWNER, [{ id: modelId }, { id: REQUESTED_MODEL }])
+    ).resolves.toEqual([{ id: modelId }, { id: REQUESTED_MODEL, hasUserByokAvailable: true }]);
+    expect(isOpenAiModelServed).toHaveBeenCalledTimes(1);
+    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
+  });
+
+  it('does not resolve a delegated token or build a provider for the alias', async () => {
+    await expect(
+      checkOpenAiChatGptByok(
+        routingInput({ request: responsesRequest(modelId), requestedModel: modelId })
+      )
+    ).resolves.toBeNull();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('checkOpenAiChatGptByok', () => {
   it('builds a stateless responses provider carrying the delegated token', async () => {
     const result = await checkOpenAiChatGptByok(routingInput());
@@ -550,5 +635,86 @@ describe('OPENAI_CHATGPT_API_URL', () => {
     process.env.OPENAI_CHATGPT_API_URL = ' http://localhost:8099/v1/ ';
 
     expect(loadApiUrl()).toBe('http://localhost:8099/v1');
+  });
+});
+
+describe('shared-services routing', () => {
+  const SHARED_OWNER: OpenAiChatGptOwner = { organizationId: ORG_ID, scope: 'shared_services' };
+
+  it('serves a service request from the organization shared-services connection', async () => {
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('falls back to the caller own connection when the organization has no shared connection', async () => {
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockImplementation(async owner =>
+        owner.scope === 'shared_services'
+          ? null
+          : { connection: connectedConnection(), isEnabled: true }
+      );
+
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+  });
+
+  it('falls back to the caller own connection when the shared connection is disabled', async () => {
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockImplementation(async owner =>
+        owner.scope === 'shared_services'
+          ? { connection: connectedConnection(), isEnabled: false }
+          : { connection: connectedConnection(), isEnabled: true }
+      );
+
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+  });
+
+  it('fails readably when the shared connection credential is terminally dead', async () => {
+    jest
+      .mocked(resolveOpenAiChatGptAccessToken)
+      .mockResolvedValue({ kind: 'terminal' } as Awaited<
+        ReturnType<typeof resolveOpenAiChatGptAccessToken>
+      >);
+
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))
+    ).resolves.toEqual({
+      kind: 'reconnect',
+      message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+    });
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('keeps a member request on the member connection', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }));
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('ignores a bot id without an organization', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput({ botId: 'reviewer' }));
+
+    expect(result?.kind).toBe('provider');
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
   });
 });

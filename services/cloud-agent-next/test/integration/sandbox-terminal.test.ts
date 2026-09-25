@@ -1,5 +1,6 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { waitFor } from './wait-for.js';
 import { createMemoryProviderAdapter } from '../../src/sandbox-control/provider.js';
 import { deriveKiloSandboxTargets } from '../../src/kilo/kilo-targets.js';
 import {
@@ -13,8 +14,9 @@ import {
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
 import {
   WORKTREE_CREDENTIAL_CONTAINMENT,
-  type PhysicalRecord,
-} from '../../src/sandbox-control/physical-lifecycle.js';
+  type AllocationContainment,
+  type AllocationRecord,
+} from '../../src/sandbox-state/model/allocation.js';
 import {
   sessionCredentialGrantSchema,
   type SessionCredentialGrant,
@@ -32,6 +34,19 @@ import {
 } from '../../src/shared/sandbox-control-protocol.js';
 import type { GitTokenService, SandboxId } from '../../src/types.js';
 import { getSessionWorkspacePath } from '../../src/workspace.js';
+
+import { readSessionValue } from '../../src/sandbox-state/persist/access.js';
+import { seedCanonicalAllocation, seedCanonicalRunning } from './canonical-allocation-fixtures.js';
+
+function canonicalProviderRef(record: AllocationRecord): string | null {
+  const state = record.state;
+  if (state.kind === 'stopped') return state.summary?.providerRef ?? null;
+  return state.target?.providerRef ?? null;
+}
+
+function canonicalCreateIntent(record: AllocationRecord) {
+  return record.state.kind === 'stopped' ? null : record.state.createIntent;
+}
 
 type SocketFrame = string | ArrayBuffer;
 
@@ -200,9 +215,12 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
       },
     });
     await instance.initializeOwner(owner);
-    await instance.claimCreate(creationId, false, sandboxId, WORKTREE_CREDENTIAL_CONTAINMENT);
+    await seedCanonicalRunning(state.storage, providerInstanceId, {
+      intentId: creationId,
+      allocationName: sandboxId,
+      containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+    });
     await state.storage.put('worktree_credential_grants', [grant]);
-    await instance.confirmInstance(providerInstanceId);
     await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
   });
 
@@ -312,8 +330,8 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
         if (connection.socket.readyState === 1) connection.socket.close(1000, 'test cleanup');
       }
       await runInDurableObject(controlStub, async instance => {
-        const physical = await instance.getPhysicalRecord();
-        if (physical.state === 'running') {
+        const physical = await instance.getAllocationRecord();
+        if (physical.state.kind === 'allocated') {
           await instance.beginStop('test cleanup');
           await instance.confirmStopped();
         }
@@ -467,7 +485,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     })
   );
 
-  await vi.waitFor(async () => {
+  await waitFor(async () => {
     await expect(
       runInDurableObject(controlStub, instance => instance.getStatus())
     ).resolves.toMatchObject({
@@ -491,7 +509,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
   );
   if (!admission.success) throw new Error(`Session admission failed: ${admission.error}`);
   await prepared.promise;
-  await vi.waitFor(async () => {
+  await waitFor(async () => {
     await expect(sessionStub.getMessageResult(messageId)).resolves.toMatchObject({
       type: 'found',
       result: { status: 'running' },
@@ -515,7 +533,7 @@ afterEach(async () => {
 describe('SandboxSession terminal bridge in the Workers runtime', () => {
   it.each<{
     name: string;
-    marker: (providerRef: string) => PhysicalRecord['containment'];
+    marker: (providerRef: string) => AllocationContainment | undefined;
   }>([
     { name: 'missing', marker: () => undefined },
     {
@@ -545,11 +563,22 @@ describe('SandboxSession terminal bridge in the Workers runtime', () => {
     const fixture = await createFixture();
     const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
     await runInDurableObject(control, async (instance, state) => {
-      const physical = await instance.getPhysicalRecord();
-      if (!physical.providerRef) throw new Error('Missing terminal fixture provider reference');
-      await state.storage.put('physical_record', {
-        ...physical,
-        containment: marker(physical.providerRef),
+      const physical = await instance.getAllocationRecord();
+      const providerRef = canonicalProviderRef(physical);
+      const createIntent = canonicalCreateIntent(physical);
+      if (!providerRef) throw new Error('Missing terminal fixture provider reference');
+      if (!createIntent) throw new Error('Missing terminal fixture create intent');
+      await seedCanonicalAllocation(state.storage, {
+        state: 'running',
+        provider: 'cloudflare',
+        providerRef,
+        createIntent: {
+          intentId: createIntent.intentId,
+          createdAt: Date.now(),
+          allocationName: fixture.sandboxId,
+          containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+        },
+        containment: marker(providerRef),
       });
     });
 
@@ -572,10 +601,19 @@ describe('SandboxSession terminal bridge in the Workers runtime', () => {
     const fixture = await createFixture();
     const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
     await runInDurableObject(control, async (instance, state) => {
-      const physical = await instance.getPhysicalRecord();
-      await state.storage.put('physical_record', {
-        ...physical,
+      const physical = await instance.getAllocationRecord();
+      const createIntent = canonicalCreateIntent(physical);
+      if (!createIntent) throw new Error('Missing terminal fixture create intent');
+      await seedCanonicalAllocation(state.storage, {
+        state: 'running',
+        provider: 'cloudflare',
         providerRef: fixture.sandboxId,
+        createIntent: {
+          intentId: createIntent.intentId,
+          createdAt: Date.now(),
+          allocationName: fixture.sandboxId,
+          containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+        },
         containment: { ...WORKTREE_CREDENTIAL_CONTAINMENT, providerRef: fixture.sandboxId },
       });
     });
@@ -1097,11 +1135,13 @@ describe('SandboxSession terminal bridge in the Workers runtime', () => {
     await fixture.dispose();
     const session = getSandboxSessionStub(env, fixture.ownerId, fixture.sessionId);
     await runInDurableObject(session, async (_instance, state) => {
-      const messages = (await state.storage.get('session_messages')) as
-        | { state: string }[]
+      const envelope = (await readSessionValue(state.storage)) as
+        | { messages?: { state: { kind: string } }[] }
         | undefined;
       expect(
-        messages?.every(message => message.state !== 'accepted' && message.state !== 'queued')
+        envelope?.messages?.every(
+          message => message.state.kind !== 'accepted' && message.state.kind !== 'queued'
+        )
       ).toBe(true);
       expect(await state.storage.getAlarm()).toBeNull();
     });

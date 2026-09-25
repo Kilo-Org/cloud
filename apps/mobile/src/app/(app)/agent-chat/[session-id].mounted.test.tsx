@@ -21,6 +21,7 @@ import { AgentSessionProvider, useSessionManager } from '@/components/agents/ses
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -101,6 +102,9 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
+  // The header reads the window to decide whether its actions share the title
+  // row; this phone is wide enough for them to.
+  useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
@@ -213,6 +217,7 @@ vi.mock('@/lib/hooks/use-session-mutations', () => ({
 vi.mock('@/components/agents/session-detail-content', async () => {
   const { mergeSessionTranscript } = await import('@/components/agents/session-transcript');
   const { MessageBubble } = await import('@/components/agents/message-bubble');
+  const { displaySessionTitle } = await import('@/components/agents/session-detail-rename-state');
   return {
     SessionDetailContent: function SessionDetailContent(
       props: Readonly<{ sessionId: KiloSessionId; cachedTitle?: string }>
@@ -232,7 +237,7 @@ vi.mock('@/components/agents/session-detail-content', async () => {
       const rename = useSessionDetailRename({
         sessionId,
         isLoaded: isSessionLoaded,
-        serverTitle: isSessionLoaded ? (fetchedData.title ?? undefined) : undefined,
+        serverTitle: isSessionLoaded ? displaySessionTitle(fetchedData.title) : undefined,
         fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
       });
       if (realTranscriptProbe.active) {
@@ -1334,9 +1339,11 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     );
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(propOf(title, 'numberOfLines')).toBe(2);
+    // The loading header reserves the loaded header's line cap, so the title
+    // cannot re-wrap when the real session name swaps in.
+    expect(propOf(title, 'numberOfLines')).toBe(SESSION_HEADER_TITLE_LINES);
     expect(propOf(title, 'ellipsizeMode')).toBe('tail');
-    expect(title.parent?.props.className).toContain('min-h-14');
+    expect(title.parent?.props.className).toContain('min-h-21');
     const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );

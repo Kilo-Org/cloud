@@ -33,6 +33,7 @@ export default defineProject({
     // class down to the workers so the suite prints no warnings.
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
+      'plugins/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
@@ -49,7 +50,9 @@ export default defineProject({
       'src/glanceable-android/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
-      'src/lib/kilo-pass/**/*.test.tsx',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/kilo-pass/**/!(*.mounted).test.tsx',
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',

@@ -5,16 +5,40 @@ import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { agentColor, type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
+import { type RowHue, rowTint, type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
 
 /**
  * At/above this Dynamic Type scale, ConfigureRow stacks the icon above the
  * title block so long labels never clip against the chevron in a side row.
- * Matches the tab-label wrap threshold used elsewhere in the shell.
+ * Matches the tab-label wrap threshold used elsewhere in the shell. A window
+ * narrower than `NARROW_LAYOUT_WIDTH` squeezes the same text block and takes
+ * the same presentation.
  */
 const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
+
+/**
+ * Every row without a semantic tone renders this one neutral tile. A settings
+ * list is not a list of agents: hashing each title into the agent hue ramp
+ * gave a single list (Language / Trusted hosts / Device sessions) three
+ * different accent tints. The neutral tile matches the sibling settings rows
+ * (PreferenceRow, notifications CategoryRow), which use the un-tinted
+ * secondary-foreground icon.
+ *
+ * It is shaped as a `Tint` so the shared `IconTile` renders it: the tile
+ * classes are the same neutral pair the row used inline, and the icon keeps
+ * the secondary-foreground stroke.
+ */
+const NEUTRAL_TINT = {
+  hueClass: 'bg-hair-soft',
+  hueTextClass: 'text-secondary-foreground',
+  hueBorderClass: 'border-border',
+  tileBgClass: 'bg-hair-soft',
+  tileBorderClass: 'border-border',
+  hueThemeKey: 'secondaryForeground',
+} as const satisfies Tint;
 
 type ConfigureRowProps = {
   icon: LucideIcon;
@@ -27,11 +51,17 @@ type ConfigureRowProps = {
    */
   subtitleNumberOfLines?: number;
   /**
-   * Semantic tone override (good / warn / danger). When omitted the tile
-   * tint is hashed from `title` so consistent titles stay on the same hue
-   * without any explicit mapping.
+   * Semantic tone override (good / warn / danger). When omitted the row uses
+   * the shared neutral tile, so every row in a settings list carries the same
+   * accent instead of a hue hashed from its title.
    */
   tone?: ToneKey;
+  /**
+   * Curated destination hue (see `RowHue`). A row identifies a destination, so
+   * its colour is chosen once in the table and passed explicitly here; it is
+   * never derived from the title. A semantic tone outranks it.
+   */
+  hue?: RowHue;
   onPress?: () => void;
   disabled?: boolean;
   trailing?: ReactNode;
@@ -40,13 +70,14 @@ type ConfigureRowProps = {
   className?: string;
 };
 
-/** Tinted icon tile + title + subtitle + trailing chevron row. */
+/** Neutral (or `tone`-tinted) icon tile + title + subtitle + trailing chevron row. */
 export function ConfigureRow({
   icon: Icon,
   title,
   subtitle,
   subtitleNumberOfLines,
   tone,
+  hue,
   onPress,
   disabled,
   trailing,
@@ -54,9 +85,23 @@ export function ConfigureRow({
   className,
 }: Readonly<ConfigureRowProps>) {
   const colors = useThemeColors();
-  const { fontScale } = useWindowDimensions();
-  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE;
-  const tint: Tint = tone ? toneColor(tone) : agentColor(title);
+  const { fontScale, width } = useWindowDimensions();
+  // A narrow window squeezes the flexible text block between the fixed icon
+  // tile and the chevron exactly as a large font scale does, until a whole word
+  // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,
+  // 2026-09-21). Both cases get the stacked presentation, which hands the
+  // title the row's full width.
+  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  // A semantic tone outranks the curated destination hue, and a row carrying
+  // neither keeps the neutral tile that the settings surfaces outside the
+  // Profile screen still render (preferences-screen, account-settings-screen).
+  // A title never hashes into an agent hue here.
+  let tint: Tint = NEUTRAL_TINT;
+  if (tone) {
+    tint = toneColor(tone);
+  } else if (hue) {
+    tint = rowTint(hue);
+  }
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = Boolean(onPress) && !disabled;

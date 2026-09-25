@@ -1,6 +1,6 @@
 import * as AppIntegrity from '@expo/app-integrity';
 import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync } from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import { Platform } from 'react-native';
 import * as z from 'zod';
 

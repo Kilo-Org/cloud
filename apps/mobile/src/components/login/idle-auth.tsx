@@ -1,32 +1,38 @@
 /* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, and the email/OTP switch in one surface */
-import {
-  AppleAuthenticationButton,
-  AppleAuthenticationButtonStyle,
-  AppleAuthenticationButtonType,
-  isAvailableAsync as isAppleAuthAvailableAsync,
-} from 'expo-apple-authentication';
+import { isAvailableAsync as isAppleAuthAvailableAsync } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
 
+import { AppleLogo } from '@/components/login/apple-logo';
 import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
-  INLINE_LINK_HIT_SLOP_DP,
+  INLINE_LINK_ROW_CLASS,
+  inlineLinkHitSlop,
 } from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
+
+// One fixed slot per provider row. It reserves the same width in all three
+// rows, so the flex-1 label starts from the same x, and it holds whichever of
+// the mark or the inline spinner the row has - swapping an 18pt mark for the
+// spinner cannot move the label. All three rows draw a mark in the slot (the
+// passkey row included), so the three provider options read as one group.
+export const PROVIDER_GLYPH_SLOT_CLASS = 'h-[18px] w-[18px] items-center justify-center';
 
 export function IdleAuth({
   start,
@@ -39,9 +45,10 @@ export function IdleAuth({
   initialSsoRecovery?: SsoRecoveryDraft | null;
   onBusyChange?: (busy: boolean) => void;
 }>) {
-  const colorScheme = useColorScheme();
   const {
     busy,
+    emailError,
+    clearEmailError,
     googleConfigured,
     signInWithApple,
     signInWithGoogle,
@@ -53,16 +60,12 @@ export function IdleAuth({
     handleSsoError,
   } = useNativeAuth();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
   const browserAuthStartingRef = useRef(false);
-  // Field-level validation message for the email input. Rendered under the
-  // field through FormField's `error` slot (AccessibleStatus announces it and
-  // keeps it on screen) instead of a toast, which is not part of the
-  // accessibility hierarchy.
-  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,14 +90,13 @@ export function IdleAuth({
     };
   }, []);
 
-  // A verify-step SSO_ERROR sets ssoRecovery while the user is on the OTP view,
-  // which hides the recovery block. Return to the main view so the block (and
-  // its "Continue with SSO" control) becomes visible.
+  // Both SSO recovery and an address rejected during resend need controls on
+  // the main view, rather than leaving their feedback hidden behind OTP entry.
   useEffect(() => {
-    if (ssoRecovery) {
+    if (ssoRecovery || emailError) {
       setView('main');
     }
-  }, [ssoRecovery]);
+  }, [emailError, ssoRecovery]);
 
   // Restore an SSO-recovery banner that survived an RTL language reload.
   useEffect(() => {
@@ -120,13 +122,10 @@ export function IdleAuth({
   }, [ssoRecovery]);
 
   const handleSendCode = async () => {
-    if (!emailRef.current.trim()) {
-      // Empty input is a field-level error: show it under the field so the
-      // landing never looks dead, and never post an empty address.
-      setEmailError(t('login.pleaseEnterEmail'));
-      return;
-    }
-    setEmailError(null);
+    // Empty input is a field-level error: `useNativeAuth` sets the message and
+    // never posts an empty address, and FormField renders it under the field so
+    // the landing never looks dead. The same call clears a stale message and
+    // reports a rejected address (`INVALID_REQUEST` / `INVALID_EMAIL`).
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
       setView('otp');
@@ -227,28 +226,41 @@ export function IdleAuth({
       )}
 
       {showApple && (
-        <View
-          className={authBusy ? 'opacity-50' : undefined}
-          pointerEvents={authBusy ? 'none' : 'auto'}
+        // The provider row is ours, not Apple's native control: the native
+        // button titles itself in the device language, which left English
+        // "Sign in with Apple" next to the translated Google and passkey rows
+        // when the app language differed from the device language, and it draws
+        // its own dark border (about twice the design system hairline) that no
+        // buttonStyle can match. The label comes from the catalog
+        // (`login.signInWithApple`), and the mark and outline chrome match the
+        // two rows below it: one border colour and width, one fill, radius,
+        // height and label weight across the three. Apple's HIG requires the
+        // mark and the exact "Sign in with Apple" wording; a custom control
+        // satisfies it, as does the Google button.
+        <Button
+          variant="outline"
+          size="lg"
+          // Same chrome and no-flex-wrap row as the Google and passkey rows
+          // below: the label must stay on the icon's line at the shared 44pt
+          // floor, so all three provider rows keep one height.
+          className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
+          disabled={authBusy}
+          onPress={() => {
+            void signInWithApple();
+          }}
+          accessibilityLabel={t('login.signInWithApple')}
         >
-          <AppleAuthenticationButton
-            buttonType={AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={
-              colorScheme === 'dark'
-                ? AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={8}
-            // eslint-disable-next-line react-native/no-inline-styles -- AppleAuthenticationButton isn't NativeWind-aware; height/width must be set via style, not className
-            style={{ height: 44, width: '100%' }}
-            onPress={() => {
-              if (!authBusy) {
-                void signInWithApple();
-              }
-            }}
-            accessibilityLabel={t('login.signInWithApple')}
-          />
-        </View>
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'apple' ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <AppleLogo size={18} color={colors.foreground} />
+            )}
+          </View>
+          <Text className="flex-1 text-center text-[17px] font-medium">
+            {t('login.signInWithApple')}
+          </Text>
+        </Button>
       )}
 
       {googleConfigured && (
@@ -256,18 +268,17 @@ export function IdleAuth({
           variant="outline"
           size="lg"
           // min-h (not fixed h) so Dynamic Type can grow the control; keep
-          // Apple-parity 44pt floor and full-width rounded chrome. No
-          // `flex-wrap`: a catalog whose label is longer than the row (Arabic
-          // at a small width) wrapped the label onto its own lines with the
-          // logo stranded above them, turning the button into a card. The
-          // single-line label shrinks and ellipsizes instead.
+          // Apple-parity 44pt floor and full-width rounded chrome. No flex-wrap:
+          // the label must stay on the icon's line, never wrap to its own.
           className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
           onPress={() => void signInWithGoogle()}
           accessibilityLabel={t('login.signInWithGoogle')}
         >
-          {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
-          <Text className="shrink text-center text-[17px] font-medium" numberOfLines={1}>
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
+          </View>
+          <Text className="flex-1 text-center text-[17px] font-medium">
             {t('login.signInWithGoogle')}
           </Text>
         </Button>
@@ -282,9 +293,8 @@ export function IdleAuth({
             variant="outline"
             size="lg"
             // min-h (not fixed h) so Dynamic Type can grow the control, matching
-            // the Google button's Apple-parity 44pt floor. Single line, like the
-            // Google button: a wrapped label must not turn the control into a
-            // stacked card.
+            // the Google button's Apple-parity 44pt floor. No flex-wrap: the label
+            // must stay on the icon's line, never wrap to its own.
             className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
             disabled={authBusy}
             onPress={() => {
@@ -292,8 +302,16 @@ export function IdleAuth({
             }}
             accessibilityLabel={t('login.signInWithPasskey')}
           >
-            {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
-            <Text className="shrink text-center text-[17px] font-medium" numberOfLines={1}>
+            <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+              {busy === 'passkey' ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                // Same leading-glyph slot as the Apple and Google rows, so the
+                // three provider options read as one group.
+                <KeyRound size={18} color={colors.foreground} />
+              )}
+            </View>
+            <Text className="flex-1 text-center text-[17px] font-medium">
               {t('login.signInWithPasskey')}
             </Text>
           </Button>
@@ -312,14 +330,19 @@ export function IdleAuth({
 
       <FormField
         label={t('login.emailAddress')}
+        error={emailError}
         placeholder={t('login.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
-        defaultValue={initialEmail || undefined}
-        error={emailError ?? undefined}
+        // Seed from the live ref, not the mount-time draft: the field remounts
+        // when an address error (or SSO recovery) returns the view from OTP, and
+        // an uncontrolled field reads `defaultValue` only on mount. Using the
+        // ref keeps the rejected address visible under its own error instead of
+        // blanking the field while `emailRef` still holds it.
+        defaultValue={emailRef.current || undefined}
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
         // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
@@ -331,11 +354,9 @@ export function IdleAuth({
         }}
         onChangeText={value => {
           emailRef.current = value;
-          setLoginEmailDraft(value);
           // Clear the validation message as soon as the user starts fixing it.
-          if (emailError !== null) {
-            setEmailError(null);
-          }
+          clearEmailError();
+          setLoginEmailDraft(value);
         }}
       />
       <Button
@@ -348,17 +369,26 @@ export function IdleAuth({
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('common.continue')}</Text>
       </Button>
-      <View className="flex-row flex-wrap items-center justify-center">
+      <View className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}>
         {/* The sentence is a row of nodes, not one Text with nested handlers: an
             inline link's own box is what the control-size audit measures, so
-            each link carries the shared inline-link box and its own reach. The
-            connector between them reserves at least both facing slops, so the
-            two touch regions never overlap in a catalog with a short
-            conjunction. */}
+            each link carries the shared inline-link box and its own per-side
+            reach — 4dp toward the connector, 12dp away — which still adds to
+            44pt from the 28dp floor. The box adds no height to the line (its
+            28dp floor is cancelled by the shared layout-neutral form), so the
+            only gaps between the words are the sentence's own spaces, and the
+            connector's min-width keeps both 4dp facing reaches apart in a
+            catalog with a short conjunction. The links' 44pt vertical reach
+            needs `(28 - 14) / 2 + 8 = 15dp` of free space above and below the
+            `text-xs` line, which the screen's `gap-3` gutter (10.5dp) cannot
+            give it, so the row carries the extra 5dp margin: both regions then
+            stay clear of the Continue button above and the ghost button
+            below. */}
+
         <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
         <Pressable
-          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
-          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          className={INLINE_LINK_BOX_CLASS}
+          hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
           accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
@@ -369,8 +399,8 @@ export function IdleAuth({
           {t('login.termsConnector')}
         </Text>
         <Pressable
-          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
-          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          className={INLINE_LINK_BOX_CLASS}
+          hitSlop={inlineLinkHitSlop('end')}
           accessibilityRole="link"
           accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
@@ -380,14 +410,19 @@ export function IdleAuth({
         <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
       </View>
       <Button
-        variant="ghost"
+        // A text action that opens the browser sign-in options. It wears the
+        // same underlined primary link treatment as the Terms and Privacy
+        // Policy links above, so it reads as tappable rather than as plain bold
+        // text with no affordance.
+        variant="link"
+        className="active:opacity-60"
         disabled={authBusy}
         onPress={() => {
           void startBrowserAuth();
         }}
         accessibilityLabel={t('login.moreSignInOptions')}
       >
-        <Text>{t('login.moreSignInOptions')}</Text>
+        <Text className="underline">{t('login.moreSignInOptions')}</Text>
       </Button>
     </View>
   );

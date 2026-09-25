@@ -1249,6 +1249,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection lost. Please retry in a moment.',
+          code: 'connection-lost',
         })
       );
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
@@ -1367,6 +1368,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'progress',
           message: 'Setting up environment…',
+          code: 'setting-up-environment',
         })
       );
     });
@@ -2902,6 +2904,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection lost. Please retry in a moment.',
+          code: 'connection-lost',
         })
       );
     });
@@ -3048,6 +3051,7 @@ describe('createSessionManager', () => {
           type: 'error',
           message:
             'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+          code: 'selected-model-unavailable',
         })
       );
     });
@@ -3089,6 +3093,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
 
@@ -3107,6 +3112,37 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+        })
+      );
+    });
+
+    it('paints a classified send failure even while the agent status is disconnected', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const error = Object.assign(new Error('Insufficient credits: $1 minimum required'), {
+        data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+      });
+      mockSession.send.mockRejectedValue(error);
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      expect(accepted).toBe(false);
+      expect(
+        atomValue<{ type: string; message: string; code?: string } | null>(
+          config.store,
+          mgr.atoms.statusIndicator
+        )
+      ).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          code: 'insufficient-credits',
         })
       );
     });
@@ -3137,6 +3173,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
 
@@ -3355,6 +3392,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection failed. Please retry in a moment.',
+          code: 'connection-failed',
         })
       );
     });
@@ -4701,7 +4739,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -4719,7 +4761,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'error', message: 'Failed to stop execution' })
+        expect.objectContaining({
+          type: 'error',
+          message: 'Failed to stop execution',
+          code: 'failed-to-stop-execution',
+        })
       );
     });
 
@@ -4979,7 +5025,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -5134,7 +5184,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -5262,6 +5316,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          code: 'insufficient-credits',
         })
       );
       expect(config.initiate).not.toHaveBeenCalled();

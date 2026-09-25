@@ -8,6 +8,17 @@
 
 export const AUTH_TOKEN_KEY = 'auth-token';
 export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
+/**
+ * Settled "Personal was chosen" marker, beside `ORGANIZATION_STORAGE_KEY`.
+ * That key keeps deleting on a Personal choice because every other reader
+ * treats a stored value as an organization id; this marker tells an explicit
+ * Personal choice apart from an absent key ("not chosen yet"), which the
+ * organization-context default rule resolves from the organization list.
+ * Account-scoped selection state: deleted with the rest of the account
+ * metadata on sign-out and on a direct account switch, so the next account on
+ * the device resolves its own default instead of inheriting this choice.
+ */
+export const ORGANIZATION_PERSONAL_STORAGE_KEY = 'selected-organization-personal';
 /** Filter record for the session history page. */
 export const SESSION_FILTERS_KEY = 'agent-session-filters';
 /** Filter record for the live sessions page. Separate: the pages filter separate lists. */
@@ -116,6 +127,14 @@ export const SESSION_ATTENTION_KEY = 'session-attention';
  * ids, tags, and text only, no secrets. The caller owns the expiry rule.
  */
 export const TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE = 'tool-summary-translation-cache';
+/**
+ * Encrypted-KV scope for the durable record of the session titles the user set
+ * through the app's rename flow that look like the backend's unnamed-session
+ * placeholder. Holds one serialized blob of `{ sessionId, title }` entries —
+ * ids and user titles only, no secrets. Survives an app restart so a chosen
+ * title is not re-hidden as unnamed after a cold start.
+ */
+export const USER_SESSION_TITLES_KEY = 'user-session-titles';
 /**
  * Durable "Open last session" record behind the launcher shortcut and the
  * quick-settings tile. Holds `{ sessionId, userId, storedAt }`; the account id

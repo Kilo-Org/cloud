@@ -3,7 +3,7 @@
 import Module from 'node:module';
 import { createElement, type ReactElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 
@@ -854,6 +854,50 @@ describe('MarkdownRenderer list marker alignment', () => {
     await unmountMarkdown(mounted);
   });
 
+  it('keeps a wrapped bullet item under its own first line, not under the marker', async () => {
+    // The finding's own shape: one tight bullet whose text wraps over several
+    // lines with an inline code span and an em-dash continuation. The row is a
+    // row — a fixed-width marker box beside a content View that shrinks — so
+    // every wrapped line lays out inside that content View and starts at the
+    // first line's left edge, never at the marker's. A change that moved the
+    // item text out of the shrinking View, or stopped the View shrinking, would
+    // let a continuation line start at the marker and must fail this test.
+    const mounted = await mountMarkdown(
+      '- Current branch `kilo/breezy-engine-kdc` has **no CLI** — only `src/strategies/120-ema.ts` (a top-level-await script that simulates and console.logs trades), db.ts, batch-db.ts, tickers.ts, base-url.ts.'
+    );
+    assertAlignedList(mounted, 1);
+    assertItemTextMetrics(mounted, ['Current']);
+
+    const row = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item')[0];
+    if (!row) {
+      throw new Error('list item row missing');
+    }
+    const contentView = viewChildren(row)[0];
+    if (!contentView) {
+      throw new Error('list item content View missing');
+    }
+    const textNodes = (phrase: string) =>
+      mounted.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as unknown) === 'Text' &&
+          node.children.some(child => typeof child === 'string' && child.includes(phrase))
+      );
+    // The first line and its wrapped continuation are separate inline Text
+    // nodes; both must be descendants of the one shrinking content View.
+    const firstLine = textNodes('Current branch');
+    const continuation = textNodes('— only');
+    expect(firstLine).toHaveLength(1);
+    expect(continuation).toHaveLength(1);
+    for (const text of [firstLine[0], continuation[0]]) {
+      if (!text) {
+        throw new Error('item text node missing');
+      }
+      expect(contentView.findAll(node => node === text)).toHaveLength(1);
+    }
+    await unmountMarkdown(mounted);
+  });
+
   it('keeps a leading blockquote margin in a list item', async () => {
     const mounted = await mountMarkdown('- > quoted text');
     const rows = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item');
@@ -918,5 +962,57 @@ describe('MarkdownRenderer nested table fallback', () => {
       await Promise.resolve();
       mounted.unmount();
     });
+  });
+});
+
+/**
+ * Proof for the explorer's `session-tools-ar` finding: in the Arabic interface
+ * the assistant body and its bullet list read as centre-aligned, with the
+ * marker detached at the right edge (`session-tools-ar.png`). React Native only
+ * centres a paragraph through `textAlign`, so the renderer's contract is that
+ * the RTL path names the base direction (`writingDirection: 'rtl'`, from
+ * `lib/rtl-text.ts`) and no paragraph or marker style carries a `textAlign` at
+ * all. The marker box is the library's own; the renderer never gives it one.
+ */
+describe('MarkdownRenderer RTL paragraph direction (explorer session-tools-ar)', () => {
+  afterEach(() => {
+    rnStub.I18nManager.isRTL = false;
+  });
+
+  function elementStyle(element: ReactElement): Record<string, unknown> {
+    return flattenStyle((element.props as { style?: unknown }).style);
+  }
+
+  it('names the paragraph base direction without centring it', async () => {
+    rnStub.I18nManager.isRTL = true;
+    const renderer = await createRenderer();
+    const heading = renderer.heading('Why fork PRs can fail', { fontSize: 20 }) as ReactElement;
+    const body = renderer.escape('Secrets are withheld.', { fontSize: 16 }) as ReactElement;
+    const link = renderer.link('catalog.json', 'https://example.com', {
+      fontSize: 16,
+    }) as ReactElement;
+    for (const element of [heading, body, link]) {
+      const style = elementStyle(element);
+      expect(style.writingDirection).toBe('rtl');
+      expect(style.textAlign).toBeUndefined();
+    }
+  });
+
+  it('leaves the LTR path without a writing direction or alignment', async () => {
+    const renderer = await createRenderer();
+    const body = renderer.escape('Secrets are withheld.', { fontSize: 16 }) as ReactElement;
+    const style = elementStyle(body);
+    expect(style.writingDirection).toBeUndefined();
+    expect(style.textAlign).toBeUndefined();
+  });
+
+  it('has no centring style on the paragraph or list marker box', async () => {
+    const { getMarkdownStyles } = await import('./markdown-palette');
+    const styles = getMarkdownStyles(palette);
+    for (const key of ['text', 'paragraph', 'list', 'li'] as const) {
+      const style = flattenStyle(styles[key]);
+      expect(style.textAlign).toBeUndefined();
+      expect(style.alignItems).toBeUndefined();
+    }
   });
 });

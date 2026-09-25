@@ -15,7 +15,7 @@ import { type Query, type QueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { collectUnfilteredPages } from '@/lib/agent-session-pages';
-import { getRecentPrs } from '@/lib/pr-review/recent-prs';
+import { getRecentPrsForIndex } from '@/lib/pr-review/recent-prs';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
 import {
   activeSessionSearchDocument,
@@ -133,13 +133,39 @@ export type SystemSearchCollection = {
   observedSources: Set<string>;
 };
 
+/**
+ * One query's collected documents, memoized against the payload identity that
+ * produced them. `data`, `status` and `maxPages` are exactly the query fields
+ * the decode reads, so a change to any of them invalidates the entry and the
+ * query is decoded once more.
+ */
+type QueryCollectionMemo = {
+  data: unknown;
+  status: Query['state']['status'];
+  maxPages: unknown;
+  documents: SystemSearchDocument[];
+  observedSource: string | null;
+};
+
+/**
+ * Per-client memo of each cached query's documents, keyed by `queryHash`. Keyed
+ * by the client so two clients holding the same query key never read each
+ * other's documents (production has one `QueryClient`; the tests build a new
+ * one per case), and WeakMap so the memo goes with the client it describes.
+ */
+const collectionsByClient = new WeakMap<QueryClient, Map<string, QueryCollectionMemo>>();
+
 export async function collectSystemSearchDocuments(
   queryClient: QueryClient
 ): Promise<SystemSearchCollection> {
   const documents: SystemSearchDocument[] = [];
   const observedSources = new Set<string>();
+  const collections = collectionsFor(queryClient);
+  const seen = new Set<string>();
   for (const query of queryClient.getQueryCache().getAll()) {
-    const collected = documentsFromQuery(query);
+    const queryHash = query.queryHash;
+    seen.add(queryHash);
+    const collected = collectOrReuse(collections, query, queryHash);
     documents.push(...collected.documents);
     // Only a successful query that fully enumerated a source scope is
     // authoritative. A query can hold the family path without enumerating it —
@@ -152,12 +178,63 @@ export async function collectSystemSearchDocuments(
       observedSources.add(collected.observedSource);
     }
   }
+  // Drop the queries the cache no longer holds, so a removed-then-re-added
+  // query decodes its new payload and the memo stays bounded to the cache.
+  for (const queryHash of collections.keys()) {
+    if (!seen.has(queryHash)) {
+      collections.delete(queryHash);
+    }
+  }
   const recents = await recentPrDocuments();
   documents.push(...recents.documents);
   for (const source of recents.observedSources) {
     observedSources.add(source);
   }
   return { documents: dedupeBy(documents, document => document.id), observedSources };
+}
+
+/** The query memo belonging to one client, created on first use. */
+function collectionsFor(queryClient: QueryClient): Map<string, QueryCollectionMemo> {
+  const existing = collectionsByClient.get(queryClient);
+  if (existing !== undefined) {
+    return existing;
+  }
+  const created = new Map<string, QueryCollectionMemo>();
+  collectionsByClient.set(queryClient, created);
+  return created;
+}
+
+/**
+ * One query's documents: reused from the memo when the payload identity it
+ * decoded is unchanged, decoded and memoized otherwise. `data`, `status` and
+ * `maxPages` are the fields the decode reads, so comparing them is enough to
+ * know the cached entry describes the query in front of us.
+ */
+function collectOrReuse(
+  collections: Map<string, QueryCollectionMemo>,
+  query: Query,
+  queryHash: string
+): QueryDocuments {
+  const memo = collections.get(queryHash);
+  if (
+    memo !== undefined &&
+    memo.data === query.state.data &&
+    memo.status === query.state.status &&
+    memo.maxPages === query.options.maxPages
+  ) {
+    // The payload is the same object this entry decoded, so its documents and
+    // their fingerprints are reused rather than rebuilt.
+    return memo;
+  }
+  const collected = documentsFromQuery(query);
+  collections.set(queryHash, {
+    data: query.state.data,
+    status: query.state.status,
+    maxPages: query.options.maxPages,
+    documents: collected.documents,
+    observedSource: collected.observedSource,
+  });
+  return collected;
 }
 
 /**
@@ -478,24 +555,23 @@ async function recentPrDocuments(): Promise<{
   documents: SystemSearchDocument[];
   observedSources: string[];
 }> {
-  try {
-    const recents = await getRecentPrs();
-    return {
-      documents: recents.map(entry => recentPrSearchDocument(entry)),
-      // The stored list is read whole, so every provider's recents scope is
-      // enumerated this run: an entry that is no longer in the list is
-      // genuinely gone, not a source the cache has not hydrated. No inbox
-      // query can stand in for this — Bitbucket's inbox is organization-only
-      // and GitLab's personal one is absent in an organization context — so a
-      // recents entry would otherwise never leave the index.
-      observedSources: recentPrSourceScopes(),
-    };
-  } catch {
-    // SecureStore can fail (locked device, corrupt entry); the index then
-    // simply carries no recents, and no recents scope is observed, so nothing
-    // is removed on the strength of a read that did not happen.
+  // SecureStore can fail (locked device, corrupt entry); `undefined` is that
+  // failed read, and the index then simply carries no recents and observes no
+  // recents scope, so nothing is removed on the strength of a read that did not
+  // happen. A read list is read whole, so every provider's recents scope is
+  // enumerated this run: an entry that is no longer in the list is genuinely
+  // gone, not a source the cache has not hydrated. No inbox query can stand in
+  // for this — Bitbucket's inbox is organization-only and GitLab's personal one
+  // is absent in an organization context — so a recents entry would otherwise
+  // never leave the index.
+  const recents = await getRecentPrsForIndex();
+  if (recents === undefined) {
     return { documents: [], observedSources: [] };
   }
+  return {
+    documents: recents.map(entry => recentPrSearchDocument(entry)),
+    observedSources: recentPrSourceScopes(),
+  };
 }
 
 function presentOrEmpty(document: SystemSearchDocument | null): SystemSearchDocument[] {

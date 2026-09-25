@@ -39,6 +39,7 @@ describe('InstallationLookupService database authorization', () => {
       .values({
         owned_by_user_id: user.id,
         platform: 'github',
+        github_connection_role: 'workflow',
         integration_type: 'app',
         platform_installation_id: installationId,
         github_app_type: null,
@@ -94,6 +95,7 @@ describe('InstallationLookupService database authorization', () => {
         platform_account_login: 'acme',
         github_app_type: 'standard',
         github_installation_id: canonical.id,
+        github_connection_role: 'agent_only',
         integration_status: 'active',
       })
       .returning();
@@ -102,6 +104,7 @@ describe('InstallationLookupService database authorization', () => {
         githubRepo: 'acme/repo',
         userId: user.id,
         expectedIntegrationId: association.id,
+        accessPurpose: 'agent',
       })
     ).resolves.toMatchObject({ success: true, installationId });
     await expect(
@@ -117,6 +120,7 @@ describe('InstallationLookupService database authorization', () => {
         githubRepo: 'acme/repo',
         userId: user.id,
         expectedIntegrationId: association.id,
+        accessPurpose: 'agent',
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
   });

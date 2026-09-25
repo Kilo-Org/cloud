@@ -2,11 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
@@ -119,7 +120,7 @@ export default function RepoPickerScreen() {
               edge — the physical right in RTL — and the hugging Text cannot
               drift to the other side of the field. */}
           <View className="relative flex-1">
-            <TextInput
+            <Input
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
               autoCapitalize="none"
               autoCorrect={false}

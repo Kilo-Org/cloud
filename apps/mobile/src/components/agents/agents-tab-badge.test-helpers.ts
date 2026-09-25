@@ -58,6 +58,10 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+// The live list now renders through FlashList v2; without this stub the real
+// `@shopify/flash-list` module loads and its internal `Animated` import trips
+// the minimal `react-native` mock below.
+vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native', () => ({
   // The live Agents header reads the interface direction for its action
   // label's LTR-only letterspacing (session-list-screen.tsx), so the mock
@@ -65,6 +69,7 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   View: 'View',
   FlatList: 'FlatList',
   Pressable: 'Pressable',

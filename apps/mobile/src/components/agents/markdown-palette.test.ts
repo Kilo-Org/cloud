@@ -32,6 +32,12 @@ const colors = {
   agentKilocode: '#B27214',
   agentCoral: '#C25647',
   agentSky: '#2C7FB0',
+  rowHoney: '#7C6C1D',
+  rowGold: '#7A7C1D',
+  rowLime: '#697C1D',
+  rowSage: '#587C1D',
+  rowMoss: '#467C1D',
+  rowFern: '#357C1D',
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {

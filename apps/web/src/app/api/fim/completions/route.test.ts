@@ -10,15 +10,6 @@ import type {
 } from '@/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
-let mockInceptionPromoRunning = true;
-
-jest.mock('@/lib/constants', () => ({
-  ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
-  get INCEPTION_PROMO_RUNNING() {
-    return mockInceptionPromoRunning;
-  },
-}));
-
 jest.mock('@/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
   MISTRAL_API_KEY: 'system-mistral-key',
@@ -128,7 +119,6 @@ async function flushAfter() {
 describe('POST /api/fim/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockInceptionPromoRunning = true;
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
@@ -141,8 +131,8 @@ describe('POST /api/fim/completions', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('allows the promoted Inception model with an exhausted balance', async () => {
-    setOrganizationAuth(0);
+  it('bills the Inception model when using the system key', async () => {
+    setOrganizationAuth(1000);
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { POST } = await import('./route');
@@ -159,12 +149,11 @@ describe('POST /api/fim/completions', () => {
 
     await flushAfter();
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cost_mUsd).toBe(325);
     expect(stats.market_cost).toBe(325);
   });
 
-  it('rejects an exhausted balance when the promotion is disabled', async () => {
-    mockInceptionPromoRunning = false;
+  it('rejects an exhausted balance for the Inception model', async () => {
     setOrganizationAuth(0);
 
     const { POST } = await import('./route');
@@ -177,7 +166,7 @@ describe('POST /api/fim/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('does not apply the promotion to other FIM models', async () => {
+  it('rejects an exhausted balance for other FIM models', async () => {
     setOrganizationAuth(0);
 
     const { POST } = await import('./route');
@@ -205,8 +194,7 @@ describe('POST /api/fim/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('continues to allow Inception BYOK when the promotion is disabled', async () => {
-    mockInceptionPromoRunning = false;
+  it('allows Inception BYOK with an exhausted balance', async () => {
     setOrganizationAuth(0);
     mockedGetBYOKforOrganization.mockResolvedValue([
       { providerId: 'inception', decryptedAPIKey: 'user-inception-key' },
@@ -222,5 +210,8 @@ describe('POST /api/fim/completions', () => {
     const headers = init?.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer user-inception-key');
     await flushAfter();
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.market_cost).toBe(325);
   });
 });

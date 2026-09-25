@@ -4,6 +4,7 @@ import {
   createElement,
   type ElementType,
   Fragment,
+  isValidElement,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -13,6 +14,7 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
+  type AssociatedPrData,
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
@@ -32,6 +34,7 @@ import { ChildSessionSection } from '@/components/agents/child-session-section';
 import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
+import { SessionManagerContext } from '@/components/agents/session-manager-context';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
@@ -46,6 +49,7 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -100,6 +104,16 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// The personal `agentProfiles.list` rows the header's active-profile chip
+// reads; tests set it before mounting to drive the chip's presence.
+const profileRowsState = vi.hoisted(() => ({
+  personal: [] as unknown[],
+  combined: {
+    orgProfiles: [] as unknown[],
+    personalProfiles: [] as unknown[],
+    effectiveDefaultId: null as string | null,
+  },
+}));
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -192,6 +206,7 @@ vi.mock('@/components/ui/icons', () => ({
   Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'ChevronLeft',
@@ -349,19 +364,45 @@ vi.mock('@/components/agents/use-session-config-sync', () => ({
   useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
-vi.mock('@/components/agents/use-session-detail-rename', () => ({
-  useSessionDetailRename: ({
-    serverTitle,
-    fallbackTitle,
-  }: {
-    serverTitle?: string;
-    fallbackTitle: string;
-  }) => ({
-    title: serverTitle ?? fallbackTitle,
-    isTitleInteractive: serverTitle !== undefined,
-    openModal: openRenameModal,
-  }),
-}));
+// Mirrors the real hook's modal fields; a test opens the dialog by flipping
+// `isOpen` so it can inspect the RenameModal the screen renders.
+const renameModalState = vi.hoisted(() => ({ isOpen: false, initialValue: '' }));
+vi.mock('@/components/agents/use-session-detail-rename', async () => {
+  // Mirror the real hook's title derivation (the shared pure helper) instead of
+  // re-stating a simpler rule, so the header assertions below exercise the
+  // production placeholder handling. Only the mutation/connection wiring the
+  // component does not touch here is stubbed out; the modal fields come from
+  // `renameModalState` so a test can open the dialog directly.
+  const { getSessionDetailRenameState, initialRenameState } =
+    await import('@/components/agents/session-detail-rename-state');
+  return {
+    useSessionDetailRename: ({
+      isLoaded = true,
+      serverTitle,
+      fallbackTitle,
+    }: {
+      isLoaded?: boolean;
+      serverTitle?: string;
+      fallbackTitle: string;
+    }) => {
+      const state = getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded,
+        serverTitle,
+        renameState: initialRenameState(),
+      });
+      return {
+        title: state.title,
+        isTitleInteractive: state.isTitleInteractive,
+        isModalOpen: renameModalState.isOpen,
+        modalInitialValue: renameModalState.initialValue,
+        openModal: openRenameModal,
+        closeModal: vi.fn(),
+        submit: vi.fn().mockResolvedValue(undefined),
+      };
+    },
+  };
+});
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),
   MESSAGE_SENT_EVENT: 'sent',
@@ -424,9 +465,15 @@ vi.mock('@/components/agents/session-transcript', async importOriginal => {
     },
   };
 });
-vi.mock('@/lib/hooks/use-session-model-options', () => ({
-  useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
-}));
+vi.mock('@/lib/hooks/use-session-model-options', () => {
+  // The real hook memoizes its projection, so `options` keeps one identity
+  // between catalog changes. A fresh array per call would churn every
+  // `modelOptions` consumer on any re-render and hide identity regressions.
+  const options: unknown[] = [];
+  return {
+    useSessionModelOptions: () => ({ options, selectedValue: '', selectedVariant: '' }),
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -444,6 +491,25 @@ vi.mock('@/lib/trpc', () => ({
           queryKey: ['organizations'],
           queryFn: () => organizations,
           initialData: organizations,
+        }),
+      },
+    },
+    // The session header's active-profile chip reads the context profiles; the
+    // hoisted rows let a test resolve a default, and the empty default keeps
+    // the chip absent so the existing header assertions hold.
+    agentProfiles: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'list'],
+          queryFn: () => profileRowsState.personal,
+          initialData: profileRowsState.personal,
+        }),
+      },
+      listCombined: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'listCombined'],
+          queryFn: () => profileRowsState.combined,
+          initialData: profileRowsState.combined,
         }),
       },
     },
@@ -484,6 +550,18 @@ const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
  * the shared `mountDetails` fixture at its existing three-parameter signature.
  */
 let goalMountOptions: { goal?: SessionGoal; resolvedType?: 'read-only' | 'remote' } = {};
+/** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
+let associatedPrMountOption: AssociatedPrData | null = null;
+const ASSOCIATED_PR: AssociatedPrData = {
+  url: 'https://github.com/acme/repo/pull/42',
+  number: 42,
+  state: 'open',
+  title: 'Harden the header',
+  headSha: 'abc123',
+  lastSyncedAt: '2026-01-01T00:00:00.000Z',
+  reviewDecision: null,
+  reviewDecisionPending: false,
+};
 const ROOT_ID = kiloId('ses-root');
 const NEXT_ROOT_ID = kiloId('ses-next-root');
 const SELECTED_ID = kiloId('ses-selected');
@@ -621,11 +699,16 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  profileRowsState.personal = [];
+  profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   openRenameModal.mockClear();
+  renameModalState.isOpen = false;
+  renameModalState.initialValue = '';
   showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
   hideThinking.loaded = true;
   goalMountOptions = {};
+  associatedPrMountOption = null;
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
@@ -641,8 +724,16 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /**
+   * The route's cached list title, seeded before the session record loads, as
+   * `[session-id].tsx` passes it.
+   */
+  cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
+  sessionOrganizationId?: string;
+  /** The profile id the session row recorded, as `fetchSession` reports it. */
+  sessionProfileId?: string | null;
 };
 
 async function mountDetails(
@@ -653,6 +744,7 @@ async function mountDetails(
     metadataReady,
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
+    cachedTitle,
     resumeAt,
   } = options;
   const store = createStore();
@@ -719,7 +811,8 @@ async function mountDetails(
         kiloSessionId: id,
         cloudAgentSessionId: null,
         title: sessionTitleOverride ?? `Root ${id}`,
-        organizationId: null,
+        organizationId: options.sessionOrganizationId ?? null,
+        profileId: options.sessionProfileId ?? null,
         gitUrl: null,
         gitBranch: null,
         mode: null,
@@ -731,7 +824,7 @@ async function mountDetails(
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,
-        associatedPr: null,
+        associatedPr: associatedPrMountOption,
       };
     },
   });
@@ -743,14 +836,22 @@ async function mountDetails(
   let currentRootId: KiloSessionId = ROOT_ID;
   const element = (id: KiloSessionId, at: string | null | undefined = resumeAt) =>
     createElement(
-      Provider,
-      { store },
-      createElement(SessionDetailContent, {
-        key: id,
-        sessionId: id,
-        displayScope,
-        ...(at === undefined ? {} : { resumeAt: at }),
-      })
+      // The real screen publishes the manager so the in-transcript subagent
+      // card can subscribe to the child transcript; `session-provider` is mocked
+      // in this suite, so the scope is provided here directly.
+      SessionManagerContext.Provider,
+      { value: manager },
+      createElement(
+        Provider,
+        { store },
+        createElement(SessionDetailContent, {
+          key: id,
+          sessionId: id,
+          displayScope,
+          ...(cachedTitle === undefined ? {} : { cachedTitle }),
+          ...(at === undefined ? {} : { resumeAt: at }),
+        })
+      )
     );
   const view = await renderWithProviders(element(ROOT_ID));
   onTestFinished(view.unmount);
@@ -895,6 +996,8 @@ describe('SessionDetailContent display scope', () => {
     );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
+    // The PR link shares the goal row now, so the header row holds no badge.
+    expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
@@ -913,15 +1016,136 @@ describe('SessionDetailContent display scope', () => {
   });
 });
 
+describe('session detail active-profile indicator', () => {
+  const PROFILE_ROW = {
+    id: 'p1',
+    name: 'Production',
+    description: null,
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 2,
+    commandCount: 1,
+    mcpServerCount: 1,
+    skillCount: 1,
+    agentCount: 1,
+    kiloCommandCount: 1,
+  };
+
+  function findChip(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith(i18n.t('agentChat.newSession.profileActive'))
+    );
+  }
+
+  it('shows the chip for the session context effective default and opens its editor', async () => {
+    profileRowsState.personal = [PROFILE_ROW];
+    const { renderer } = await mountDetails();
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Production');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+  });
+
+  it.each(['user', 'organization'] as const)(
+    'opens a %s default from an organization session in its owner scope',
+    async ownerType => {
+      const profile = { ...PROFILE_ROW, ownerType };
+      profileRowsState.combined = {
+        personalProfiles: ownerType === 'user' ? [profile] : [],
+        orgProfiles: ownerType === 'organization' ? [profile] : [],
+        effectiveDefaultId: profile.id,
+      };
+      const { renderer } = await mountDetails([], {
+        sessionOrganizationId: 'org-a',
+        displayScope: { organizationId: 'org-a', isResolved: true },
+      });
+      await waitFor(() => findChip(renderer).length > 0);
+      const [chip] = findChip(renderer);
+      if (!chip) {
+        throw new Error('the active-profile chip did not render');
+      }
+      act(() => {
+        (chip.props.onPress as () => void)();
+      });
+      expect(navigationRoutes.at(-1)).toBe(
+        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+      );
+    }
+  );
+
+  it('renders no chip when the context has no profiles', async () => {
+    const { renderer } = await mountDetails();
+
+    expect(findChip(renderer)).toHaveLength(0);
+  });
+
+  it('names the profile the session recorded, not the context effective default', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+      { ...PROFILE_ROW, id: 'p-recorded', name: 'Recorded', isDefault: false },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Recorded');
+    expect(chip.props.accessibilityLabel).not.toContain('Default');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+  });
+
+  it('falls back to the effective default only when the session recorded no profile', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Default');
+  });
+
+  it('renders no chip when the session profile id no longer resolves', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const view = await mountDetails([], { sessionProfileId: 'p-deleted' });
+
+    // Wait for the session metadata read so the assertion is not merely the
+    // pre-load window; a fallback to the context default would surface here.
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
 describe('SessionDetailContent header title', () => {
   // The title shares its row with a 44pt context pill and a copy action, so on
   // a narrow phone the title column is a fraction of the row width. The header
   // and this screen share the three-line cap (`SESSION_HEADER_TITLE_LINES`), so
-  // a long name wraps onto the extra line instead of being cut short mid-word;
+  // a long name wraps onto the extra line instead of being cut short mid-word
+  // the way the previous one-line clamp did ("Moving-average empty windo…");
   // the tail ellipsis only applies past the cap. The placeholder header keeps
   // the same cap, so the reserved title box does not move the body when the
   // loaded name replaces "Session".
-  it('caps a long session title at the shared line count with a tail ellipsis', async () => {
+  it('shows a long session title across the shared reserved lines without clipping mid-word', async () => {
     sessionTitleOverride = 'Moving-average rage empty baseline';
     const { renderer } = await mountDetails();
     const header = renderer.root.findByType(ScreenHeader);
@@ -930,9 +1154,112 @@ describe('SessionDetailContent header title', () => {
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 
+  // The ingest service names a session `New session - <ISO>` at creation, so a
+  // freshly started session has no user-readable name. The header must show the
+  // same localized `Session` label a title-less session shows, and the title
+  // stays pressable so the user can still rename it.
+  it('shows the localized fallback when the loaded server title is the machine placeholder', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T16:37:00.000Z';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(header.props.onTitlePress).toBeTypeOf('function');
+  });
+
+  // The route seeds the header from the session-list cache before the metadata
+  // read settles (and the metadata read can fail with a Retry). A placeholder
+  // cached title must never be painted on either path.
+  it('never paints a placeholder cached list title, even after the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+      cachedTitle: 'New session - 2026-09-22T16:37:00.000Z',
+    });
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retryable failure keeps the same fallback name on screen.
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
+  it('shows the fallback name instead of the generated placeholder title', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T02:05:22.778Z';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
+  });
+
+  it('renders a real server title unchanged', async () => {
+    sessionTitleOverride = 'Fix the session header';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe('Fix the session header');
+  });
+
+  // The rename dialog inherited RenameModal's 50-character default, below the
+  // 200-character cap the rename endpoint accepts. A longer title was dropped
+  // after character 50, and the header then rendered the leftover fragment
+  // ("Moving-average empty window rollup verification pa") as if it were the
+  // whole title.
+  it('lets the rename dialog hold a title as long as the server accepts', async () => {
+    renameModalState.isOpen = true;
+    renameModalState.initialValue = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const modal = renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      maxLength: SESSION_TITLE_MAX_LENGTH,
+      initialValue: renameModalState.initialValue,
+    });
+    expect(SESSION_TITLE_MAX_LENGTH).toBe(200);
+  });
+
+  it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
+    // The route passes its cached metadata title as `cachedTitle`, and that
+    // cache can hold the backend's ISO placeholder. It must not become the
+    // header's identity line while the session metadata is still loading.
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([], {
+      cachedTitle: 'New session - 2026-09-22T02:05:22.778Z',
+      metadataReady: metadata.promise,
+    });
+    expect(renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+  });
+
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
+  // The route seeds the header with the cached list title it opened from. A
+  // session created through cloud-agent-next carries the creation placeholder
+  // `New session - <ISO instant>` there, and the header must fall back to its
+  // own title rather than paint the machine string while the record loads.
+  it('shows the fallback title instead of a placeholder cached title', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], {
+      metadataReady: metadata.promise,
+      cachedTitle: 'New session - 2026-09-22T17:26:31.465Z',
+    });
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(String(header.props.title)).not.toContain('2026-09-22');
+  });
+
   it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
     const { renderer } = await mountDetails();
     const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {
@@ -1003,7 +1330,7 @@ describe('session detail failed delivery retry', () => {
       );
     });
     expect(renderedText(view.renderer.root)).toContain(
-      i18n.t('agentChat.messageFailure.deliveryTitle')
+      i18n.t('agentChat.messageFailure.assistantTitle')
     );
 
     const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
@@ -2244,6 +2571,69 @@ describe('hide thinking preference', () => {
     expect(renderedText(cardFor(view.renderer, RUNNING_CHILD))).toContain('Thinking');
   });
 
+  it('keeps renderItem and the row callbacks one identity across a streaming publish', async () => {
+    // A user row so the bubble actually carries `onRetryMessage`; the task row
+    // carries `getChildMessages`. Both props are compared by identity below.
+    const retryUserId = 'msg_1761000000000_retry';
+    const retryRow = userMessage(retryUserId);
+    const rootUser: StoredMessage = {
+      info: { ...retryRow.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: `${retryUserId}-text`,
+          sessionID: ROOT_ID,
+          messageID: retryUserId,
+          text: 'retry me',
+        }),
+      ],
+    };
+    const view = await mountDetails([rootUser, taskMessage(ROOT_ID, CHILD_IDS)]);
+    pressCard(view.renderer, RUNNING_CHILD);
+
+    const listProps = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('Missing SessionMessageList');
+      }
+      return list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+    };
+    const bubblePropsFor = (messageId: string) => {
+      const props = listProps();
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+      );
+      if (!item) {
+        throw new Error(`No transcript item for ${messageId}`);
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error(`No bubble for ${messageId}`);
+      }
+      return bubble.props as Record<string, unknown>;
+    };
+
+    const renderItemBefore = listProps().renderItem;
+    const bubbleBefore = bubblePropsFor(retryUserId);
+    expect(typeof bubbleBefore.onRetryMessage).toBe('function');
+    expect(typeof bubbleBefore.getChildMessages).toBe('function');
+
+    // The child's rows arrive through the same storage publication a streaming
+    // token uses: one `partsRevision` bump that re-emits every derived atom.
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    expect(listProps().renderItem).toBe(renderItemBefore);
+    const bubbleAfter = bubblePropsFor(retryUserId);
+    expect(bubbleAfter.onRetryMessage).toBe(bubbleBefore.onRetryMessage);
+    expect(bubbleAfter.getChildMessages).toBe(bubbleBefore.getChildMessages);
+  });
+
   it('renders no empty padded row for a reasoning-only child message', async () => {
     const view = await openRunningChildSheet(true);
     await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
@@ -2425,6 +2815,52 @@ describe('SessionDetailContent goal visibility', () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('hands the PR badge to the goal row and keeps it out of the header', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The badge lives on the goal row now, not beside the context pill.
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toEqual(pausedGoal);
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+  });
+
+  it('shows the goal row for a PR-only session', async () => {
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toBeNull();
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    // The row exists because the PR landed, so the badge never renders the
+    // session-loading skeleton; the wrapper's FadeIn reveals it.
+    expect(section.findAllByType('SessionPrBadge')[0]?.props.loading).toBe(false);
+  });
+
+  it('omits the goal row when it holds neither a goal nor a PR', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('omits the goal row while a no-goal, no-PR session is still loading', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    act(() => {
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    // The fetch is in flight and the session has neither a goal nor a PR, so
+    // row 2 has nothing to hold. It must not reserve a min-h-12 box for a
+    // phantom PR skeleton that unmounts (and jumps the transcript 48px) the
+    // moment the fetch lands with no PR.
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType('SessionPrBadge')).toHaveLength(0);
   });
 
   it('persists the goal disclosure through the per-session store', async () => {
@@ -2806,6 +3242,32 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 });
 
+describe('session detail composer placeholder (explorer session-detail)', () => {
+  // The explorer's `session-detail.png` shows the composer field rendering the
+  // literal developer string 'undefined'. Every placeholder the detail screen
+  // can pass is catalog copy, so the proof is that the mounted composer always
+  // receives a non-empty catalog string — never 'undefined' and never a raw key.
+  it('passes catalog copy to the composer, never the literal undefined', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.placeholder).toBe(i18n.t('common.message'));
+    expect(typeof composer.props.placeholder).toBe('string');
+    expect(composer.props.placeholder).not.toBe('undefined');
+  });
+
+  it('resolves the preparing and finalizing placeholders to catalog copy too', () => {
+    for (const key of [
+      'agentChat.composer.preparingPlaceholder',
+      'agentChat.composer.finalizingPlaceholder',
+    ]) {
+      const copy = i18n.t(key);
+      expect(copy).not.toBe(key);
+      expect(copy).not.toBe('undefined');
+      expect(copy.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('session detail duplicate failure state', () => {
   // Stored messages are ordered by id, which is time-sortable ascending, so the
   // user row must sort before the assistant row for the Retry prompt to resolve.
@@ -2877,6 +3339,42 @@ describe('session detail duplicate failure state', () => {
     });
   });
 
+  it('states a failed delivery once: the row keeps Retry/Copy and the footer drops the generic line', async () => {
+    const view = await mountDetails([rootUserMessage('please refactor')]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [USER_ID, { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'execution' }],
+        ])
+      );
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+
+    const text = renderedText(view.renderer.root);
+    // An agent-execution delivery failure renders the base's assistant-failure
+    // title with no second line (message-failure-state.ts); this branch's rule
+    // drops the footer's delivery-flavoured line, so the row states it once.
+    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    // The footer row that would restate the generic assistant line is gone: the
+    // delivery block is the single failed-send surface.
+    expect(indicatorNodes(view)).toHaveLength(0);
+    const labels = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toContain(i18n.t('common.retry'));
+    expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
+  });
+
   it('keeps the footer line when the transcript drops the failed row it names', async () => {
     // A failed assistant row whose parts render nothing is dropped by
     // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
@@ -2895,6 +3393,23 @@ describe('session detail duplicate failure state', () => {
     expect(nodes[0]?.props).toMatchObject({
       indicator: { message: 'simulated error' },
     });
+  });
+
+  it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
+    // Explorer `session-working` showed the fixed footer line printed over the
+    // scrolling transcript row it covers. The footer must be an opaque
+    // `bg-background` sibling in the column flow, never an `absolute` overlay.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    const footer = nodes[0]?.parent;
+    const className = String(footer?.props.className ?? '');
+    expect(className).toContain('bg-background');
+    expect(className).not.toContain('absolute');
   });
 });
 

@@ -711,6 +711,7 @@ async function allocateNewSession(
       sandboxProvider = selectSandboxProvider({
         env: ctx.env,
         orgId,
+        userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
         devcontainer: input.runtime?.devcontainer,
@@ -772,6 +773,7 @@ async function allocateNewSession(
       ctx.userId,
       ctx.env,
       input.options?.kilocodeOrganizationId,
+      input.profile?.resolvedProfileId,
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
@@ -1412,6 +1414,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         type: 'github',
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
+        githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
         branch: repository.branch,
       };
     case 'gitlab':
@@ -1875,6 +1878,7 @@ async function resumeCloneCreate(
       ctx.userId,
       ctx.env,
       input.options?.kilocodeOrganizationId,
+      input.profile?.resolvedProfileId,
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
@@ -1970,6 +1974,7 @@ async function resumeFirstWorktreeCreate(
         ctx.userId,
         ctx.env,
         input.options?.kilocodeOrganizationId,
+        input.profile?.resolvedProfileId,
         input.options?.createdOnPlatform ?? 'cloud-agent',
         `New session - ${new Date().toISOString()}`,
         deriveCanonicalRepositoryUrl(input.repository),

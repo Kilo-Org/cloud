@@ -42,4 +42,13 @@ describe('last active instance', () => {
 
     expect(getLastActiveInstance()).toBe('sandbox-b');
   });
+
+  it('keeps the in-memory hint and never rejects when the mirror write fails', async () => {
+    mocks.setItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const { getLastActiveInstance, setLastActiveInstance } = await import('./last-active-instance');
+
+    await expect(setLastActiveInstance('sandbox-c')).resolves.toBeUndefined();
+
+    expect(getLastActiveInstance()).toBe('sandbox-c');
+  });
 });

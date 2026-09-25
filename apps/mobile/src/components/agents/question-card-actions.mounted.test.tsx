@@ -8,6 +8,9 @@ import { QuestionCard } from './question-card';
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: MockTextInput,

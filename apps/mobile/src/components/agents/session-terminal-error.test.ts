@@ -443,7 +443,9 @@ describe('sessionStatusErrorMessage', () => {
 function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
+    titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
+    detailKey: null,
     detail,
     copyDetail: '',
     canRetry: true,
@@ -454,9 +456,25 @@ function assistantFailure(detail: string | null): MessageFailure {
 describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
+    titleKey: 'agentChat.messageFailure.deliveryTitle',
     title: 'Failed to deliver',
+    detailKey: 'agentChat.messageFailure.deliveryExhausted',
     detail: 'We could not deliver this message after several attempts.',
     copyDetail: 'Unauthorized: Unauthorized',
+    canRetry: true,
+    canCopy: true,
+  };
+
+  // An agent-execution delivery failure renders the assistant-failure title
+  // (message-failure-state.ts), so the status line must not state the same
+  // failure a second time in either of its two copies.
+  const executionFailure: MessageFailure = {
+    kind: 'delivery',
+    titleKey: 'agentChat.messageFailure.assistantTitle',
+    title: 'Response failed',
+    detailKey: null,
+    detail: null,
+    copyDetail: 'Message delivery failed',
     canRetry: true,
     canCopy: true,
   };
@@ -475,6 +493,55 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
       statusIndicatorDuplicatesMessageFailure({
         indicator: { type: 'error', message: 'Message failed to deliver' },
         failure: deliveryFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('suppresses the generic line when the last row is a failed delivery', () => {
+    // A failed delivery row states the failure and carries Retry/Copy; an
+    // unclassified status error resolves to the same generic assistant line,
+    // so the footer must not restate it above the composer.
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: deliveryFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a classified line the delivery row does not carry', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: {
+          type: 'error',
+          message: 'Assistant request failed: insufficient credits',
+        },
+        failure: deliveryFailure,
+      })
+    ).toBe(false);
+  });
+
+  it('suppresses the generic assistant line the row states in its delivery title', () => {
+    // An agent-execution delivery failure renders the assistant-failure title
+    // (message-failure-state.ts), so the unclassified status line would be the
+    // same failure stated a second time.
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: executionFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('suppresses the SDK delivery line the agent-execution row states as a response failure', () => {
+    // `normalizer.ts` writes `Message delivery failed` as the status indicator
+    // for an execution failure with no error text, while the row renders the
+    // assistant-failure title. The footer's "Failed to deliver" would restate
+    // the same failed run.
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Message delivery failed' },
+        failure: executionFailure,
       })
     ).toBe(true);
   });
@@ -507,5 +574,24 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
         failure: assistantFailure(null),
       })
     ).toBe(false);
+  });
+
+  it('still suppresses the same failure after an in-place language switch', async () => {
+    // `failure` is built inside a memo keyed on the message arrays, so an
+    // in-place LTR-to-LTR language switch (apply-language.ts) re-renders the
+    // screen without rebuilding it. The check must compare catalog keys, not
+    // the memoized copy, or the footer line reappears in the new language.
+    const failure = assistantFailure(null);
+    await i18n.changeLanguage('it');
+    try {
+      expect(
+        statusIndicatorDuplicatesMessageFailure({
+          indicator: { type: 'error', message: 'simulated error' },
+          failure,
+        })
+      ).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

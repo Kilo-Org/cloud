@@ -26,12 +26,12 @@
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "jotai": "2.18.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@jest/globals": "30.3.0",
-    "@kilocode/session-ingest-contracts": "workspace:*",
     "@swc/jest": "0.2.39",
     "@types/jest": "30.0.0",
     "@typescript/native-preview": "catalog:",

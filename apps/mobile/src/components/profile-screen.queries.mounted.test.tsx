@@ -19,6 +19,7 @@ import {
   routerPush,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
+import { i18n } from '@/i18n';
 import { AFTER_INTERACTIONS_FALLBACK_MS } from '@/lib/hooks/use-after-interactions';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
@@ -144,6 +145,51 @@ describe('ProfileScreen deferred queries', () => {
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(renderer.root.findAllByProps({ title: 'GitHub' })).toHaveLength(1);
     expectAlignedContent(renderer.root);
+
+    unmount();
+  });
+
+  it('gives every profile destination its documented row-palette hue', async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(keys.providers, {
+      providers: [{ provider: 'github', email: 'dev@kilo.ai' }],
+    });
+    queryClient.setQueryData(keys.organizations, [
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+
+    const { renderer, unmount } = await mountProfile(queryClient);
+    const root = renderer.root;
+
+    // The destination table from `agent-color.ts`: the hue identifies the row's
+    // destination, so it is passed explicitly and never derived from the label.
+    const expectRowHue = (title: string, hue: string) => {
+      const rows = findConfigureRows(root, title);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.props.hue).toBe(hue);
+    };
+    expectRowHue(i18n.t('common.codeReviewer'), 'honey');
+    expectRowHue(i18n.t('common.securityAgent'), 'honey');
+    expectRowHue(i18n.t('common.prReview'), 'gold');
+    expectRowHue(i18n.t('profile.manageOrganization'), 'lime');
+    expectRowHue(i18n.t('common.preferences'), 'sage');
+    expectRowHue(i18n.t('tour.tutorialLabel'), 'sage');
+    expectRowHue('GitHub', 'moss');
+
+    const actionTiles = root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ActionTile'
+    );
+    expect(actionTiles).toHaveLength(4);
+    const hueByLabel = new Map(actionTiles.map(tile => [tile.props.label as string, tile]));
+    expect(hueByLabel.get(i18n.t('profile.feedback'))?.props.hue).toBe('fern');
+    expect(hueByLabel.get(i18n.t('profile.privacyChoices'))?.props.hue).toBe('fern');
+    expect(hueByLabel.get(i18n.t('common.signOut'))?.props.hue).toBe('fern');
+
+    // Delete account takes the same family step, and the danger tone still wins
+    // inside ActionTile.
+    const deleteAccount = hueByLabel.get(i18n.t('profile.deleteAccount'));
+    expect(deleteAccount?.props.hue).toBe('fern');
+    expect(deleteAccount?.props.destructive).toBe(true);
 
     unmount();
   });
@@ -288,7 +334,6 @@ describe('ProfileScreen deferred queries', () => {
         nodeCount(renderer.root, 'Skeleton') === 0
     );
 
-    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts')).toBe(0);
     expectAlignedContent(renderer.root);
 

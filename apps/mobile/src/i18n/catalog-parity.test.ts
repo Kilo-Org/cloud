@@ -27,9 +27,10 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * Empty today: the notifications.category.*Unavailable reasons and the Agents
- * tab header link (`agents.sessionList.pastSessions`) both landed in all 86
- * catalogs, so every catalog carries every English key family again.
+ * Empty: the notifications.category.*Unavailable reasons, the Agents tab header
+ * link (`agents.sessionList.pastSessions`), and the profile-editor validation
+ * copy landed in every one of the 87 catalogs, so the missing-key assertion
+ * is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

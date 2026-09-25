@@ -314,7 +314,8 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
     async promptLinkAccount({ thread, identity, platformIntegration }) {
       await assertGitHubInstallationRuntimeAuthorized(
         identity.teamId,
-        platformIntegration.github_app_type ?? 'standard'
+        platformIntegration.github_app_type ?? 'standard',
+        platformIntegration.id
       );
       const url = new URL(GITHUB_LINK_PATH, APP_URL);
       url.searchParams.set(
@@ -337,7 +338,8 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
       if (!installationId) throw new Error('GitHub installation is unavailable for runtime use');
       await assertGitHubInstallationRuntimeAuthorized(
         installationId,
-        platformIntegration.github_app_type ?? 'standard'
+        platformIntegration.github_app_type ?? 'standard',
+        platformIntegration.id
       );
       return await fn();
     },
@@ -350,7 +352,8 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
 
       const tokenData = await generateGitHubInstallationToken(
         installationId,
-        platformIntegration.github_app_type ?? 'standard'
+        platformIntegration.github_app_type ?? 'standard',
+        platformIntegration.id
       );
       const octokit = new Octokit({ auth: tokenData.token });
 
@@ -440,14 +443,16 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
       if (!installationId) throw new Error('GitHub installation is unavailable for runtime use');
       await assertGitHubInstallationRuntimeAuthorized(
         installationId,
-        platformIntegration.github_app_type ?? 'standard'
+        platformIntegration.github_app_type ?? 'standard',
+        platformIntegration.id
       );
       await reactToTriggerMessage(thread, messageId, 'eyes');
       return async outcome => {
         if (outcome?.handedOff) return;
         await assertGitHubInstallationRuntimeAuthorized(
           installationId,
-          platformIntegration.github_app_type ?? 'standard'
+          platformIntegration.github_app_type ?? 'standard',
+          platformIntegration.id
         );
         await reactToTriggerMessage(thread, messageId, 'thumbs_up');
       };

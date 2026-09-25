@@ -57,14 +57,18 @@ import { runSharedScenario } from '../../e2e/scenario-capabilities.js';
 import type {
   CallbackObservation,
   CallbackPayload,
+  SandboxFaultObservation,
   SandboxObservation,
   ScenarioEnvironment,
   SessionSandboxObservation,
 } from '../../e2e/scenario-capabilities.js';
+import { AttachWindowMissedError } from '../../e2e/attach-window-evidence.js';
 import {
+  awaitCorrelatedChildText,
   buildAuthRejectProbes,
   classifyAuthProbe,
   collectChildMessageText,
+  CONTENT_CORRELATION_BUDGET_MS,
   correlatedProgressSummary,
   echoDirectivePayload,
   echoPayloadMatches,
@@ -277,6 +281,7 @@ function fakeStream(events: StreamEvent[], terminal: StreamEvent): FakeStream {
     get isOpen() {
       return true;
     },
+    closeInfo: null,
   };
 }
 
@@ -357,12 +362,16 @@ describe('cold-hot warm reuse', () => {
 
     expect(mocks.interruptSession).toHaveBeenCalledTimes(1);
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
     expect(mocks.deleteSession).toHaveBeenCalledTimes(1);
-    expect(mocks.deleteSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.deleteSession).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
 
     expect(coldStream.close).toHaveBeenCalledTimes(1);
     for (const stream of hotStreams) expect(stream.close).toHaveBeenCalledTimes(1);
@@ -374,7 +383,9 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
     expect(result.message).toContain('observed "not-hi"');
     // A failed cold assertion still cleans up the started session.
     expect(mocks.interruptSession).toHaveBeenCalledTimes(1);
@@ -431,8 +442,10 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
-    expect(result.message).toContain('observed tail "Initializing snapshot…"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
+    expect(result.message).toContain('observed "Initializing snapshot…"');
   });
 
   it('fails on empty observed text', async () => {
@@ -441,7 +454,9 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
   });
 
   it('fails when the correlated text merely contains the payload but does not end with it', async () => {
@@ -450,7 +465,9 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
     expect(result.message).toContain('observed "hi\\ntrailing noise"');
   });
 
@@ -532,12 +549,12 @@ describe('cold-hot warm reuse', () => {
     // returns instead of throwing client-side. The scenario records the
     // returned session before its workspace check, so `finally` cleans it up.
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       'agent_legacy_session',
       expect.any(AbortSignal)
     );
     expect(mocks.deleteSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       'agent_legacy_session',
       expect.any(AbortSignal)
     );
@@ -701,11 +718,15 @@ describe('unknown-model', () => {
     expect(result.message).toContain('accepted');
     // An unexpectedly accepted start must still be cleaned up.
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
-    expect(mocks.deleteSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.deleteSession).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
   });
 
   it('fails when the rejection message is unexpected', async () => {
@@ -1047,6 +1068,88 @@ describe('echoPayloadMatches', () => {
   it('fails when the preceding character is inside the payload class', () => {
     expect(echoPayloadMatches('_hi', 'hi')).toBe(false);
     expect(echoPayloadMatches('-hi', 'hi')).toBe(false);
+  });
+});
+
+describe('awaitCorrelatedChildText', () => {
+  const PARENT_ID = 'message_parent';
+  const CHILD_ID = 'message_child';
+  const PART_ID = 'part_child_text';
+
+  function correlatedTextEvents(text: string): StreamEvent[] {
+    return [assistantMessageEvent(PARENT_ID, CHILD_ID), textPartEvent(PART_ID, CHILD_ID, text)];
+  }
+
+  it('returns already-present matching text without waiting', async () => {
+    const stream = fakeStream(correlatedTextEvents('hi'), completedEvent(PARENT_ID));
+    stream.waitFor = vi.fn(() => Promise.reject(new Error('waitFor must not be called')));
+
+    const text = await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: PARENT_ID,
+      timeoutMs: CONTENT_CORRELATION_BUDGET_MS,
+      label: 'test',
+      ready: candidate => echoPayloadMatches(candidate, 'hi'),
+    });
+
+    expect(text).toBe('hi');
+    expect(stream.waitFor).not.toHaveBeenCalled();
+  });
+
+  it('fails with the observed empty text when the payload never arrives', async () => {
+    const stream = fakeStream(
+      [assistantMessageEvent(PARENT_ID, CHILD_ID)],
+      completedEvent(PARENT_ID)
+    );
+
+    await expect(
+      awaitCorrelatedChildText({
+        stream,
+        parentMessageId: PARENT_ID,
+        timeoutMs: 50,
+        label: 'must-not-mask',
+        ready: candidate => echoPayloadMatches(candidate, 'hi'),
+      })
+    ).rejects.toThrow(/must-not-mask: correlated child text did not satisfy the predicate/);
+    await expect(
+      awaitCorrelatedChildText({
+        stream,
+        parentMessageId: PARENT_ID,
+        timeoutMs: 50,
+        label: 'must-not-mask',
+        ready: candidate => echoPayloadMatches(candidate, 'hi'),
+      })
+    ).rejects.toThrow(/observed ""/);
+  });
+
+  it('returns text delivered while the wait is pending', async () => {
+    const events: StreamEvent[] = [assistantMessageEvent(PARENT_ID, CHILD_ID)];
+    const stream = fakeStream(events, completedEvent(PARENT_ID));
+    stream.waitFor = vi.fn(
+      (predicate: (event: StreamEvent) => boolean) =>
+        new Promise<StreamEvent | null>(resolve => {
+          // The correlated part arrives only after the wait is registered. The
+          // wait resolves only when `predicate` accepts the updated buffer; a
+          // predicate over a snapshot taken once, before it is registered,
+          // never resolves and the await below hangs.
+          setTimeout(() => {
+            events.push(textPartEvent(PART_ID, CHILD_ID, 'hi'));
+            const match = events.find(predicate);
+            if (match) resolve(match);
+          }, 0);
+        })
+    );
+
+    const text = await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: PARENT_ID,
+      timeoutMs: CONTENT_CORRELATION_BUDGET_MS,
+      label: 'test',
+      ready: candidate => echoPayloadMatches(candidate, 'hi'),
+    });
+
+    expect(text).toBe('hi');
+    expect(stream.waitFor).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1882,6 +1985,7 @@ describe('converted load and fault scenarios', () => {
       'external-kill',
       'wrapper-freeze-settled-reap',
       'wrapper-freeze-inflight-reap',
+      'control-socket-recycle-boot',
     ]) {
       expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox', 'sandboxFaults']);
       expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
@@ -1898,6 +2002,116 @@ describe('converted load and fault scenarios', () => {
     expect(result.ok).toBe(false);
     expect(result.unsupported).toBe(true);
     expect(result.message).toContain('sandboxFaults');
+  });
+
+  it('control-socket-recycle-boot fails a post-signal failure instead of retrying a window miss', async () => {
+    const messageId = 'message_boot';
+    const stream = fakeStream([preparingEvent(messageId)], completedEvent(messageId));
+    mocks.prepareBrowserSession.mockReset();
+    mocks.prepareBrowserSession.mockResolvedValue({
+      cloudAgentSessionId: SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+    mocks.getSessionSnapshot.mockReset();
+    mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: messageId });
+    mocks.openConnectedStream.mockReset();
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    mocks.getMessageResult.mockReset();
+    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+
+    // The capability reports a window miss but the turn has already failed: the
+    // failure must take precedence, so no second session is created.
+    const sandboxFaults = {
+      captureWorkerLogCursor: vi.fn(async () => 0),
+      captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'container_1:4242' })),
+      dropControlSocketDuringAttach: vi.fn(async () => {
+        stream.events.push(streamEvent('cloud.message.failed', { messageId }));
+        throw new AttachWindowMissedError();
+      }),
+      countPromptDispatches: vi.fn(async () => 1),
+    } as unknown as SandboxFaultObservation;
+
+    const env: ScenarioEnvironment = {
+      profile: 'local',
+      requireControlPlaneSession: false,
+      sandbox: {
+        snapshotContainerIds: vi.fn(async () => new Set<string>()),
+        waitForOwnedContainer: vi.fn(async () => 'container_1'),
+        waitForNewContainer: vi.fn(async () => 'container_1'),
+      },
+      sessionSandbox: {
+        waitForContainer: vi.fn(async () => 'container_1'),
+        currentContainer: vi.fn(async () => 'container_1'),
+      },
+      sandboxFaults,
+    };
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['control-socket-recycle-boot'], {
+      config,
+      conversation: SHARED_SCENARIOS['control-socket-recycle-boot'].defaultConversation,
+      api: 'unified',
+      env,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('failed after the attach-window signal');
+    expect(mocks.prepareBrowserSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the discarded attempt to settle before retrying a window miss', async () => {
+    const messageId = 'message_boot';
+    const stream = fakeStream([preparingEvent(messageId)], completedEvent(messageId));
+    mocks.prepareBrowserSession.mockReset();
+    mocks.prepareBrowserSession.mockResolvedValue({
+      cloudAgentSessionId: SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+    mocks.getSessionSnapshot.mockReset();
+    mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: messageId });
+    mocks.openConnectedStream.mockReset();
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    mocks.getMessageResult.mockReset();
+    // The turn is still running when the miss is observed and only fails on the
+    // next durable sample: the wait must catch it instead of retrying it away.
+    mocks.getMessageResult
+      .mockResolvedValueOnce({ status: 'running' })
+      .mockResolvedValue({ status: 'failed' });
+
+    const sandboxFaults = {
+      captureWorkerLogCursor: vi.fn(async () => 0),
+      captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'container_1:4242' })),
+      dropControlSocketDuringAttach: vi.fn(async () => {
+        throw new AttachWindowMissedError();
+      }),
+      countPromptDispatches: vi.fn(async () => 1),
+    } as unknown as SandboxFaultObservation;
+
+    const env: ScenarioEnvironment = {
+      profile: 'local',
+      requireControlPlaneSession: false,
+      sandbox: {
+        snapshotContainerIds: vi.fn(async () => new Set<string>()),
+        waitForOwnedContainer: vi.fn(async () => 'container_1'),
+        waitForNewContainer: vi.fn(async () => 'container_1'),
+      },
+      sessionSandbox: {
+        waitForContainer: vi.fn(async () => 'container_1'),
+        currentContainer: vi.fn(async () => 'container_1'),
+      },
+      sandboxFaults,
+    };
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['control-socket-recycle-boot'], {
+      config,
+      conversation: SHARED_SCENARIOS['control-socket-recycle-boot'].defaultConversation,
+      api: 'unified',
+      env,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('failed after the attach-window signal');
+    expect(mocks.prepareBrowserSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getMessageResult).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -1950,11 +2164,33 @@ function startQueueSession(messageId: string): void {
   });
 }
 
-function interruptedQueuedEvent(messageId: string): StreamEvent {
+function sentEvent(messageId: string): StreamEvent {
+  return streamEvent('cloud.message.sent', { messageId, delivery: 'sent' });
+}
+
+function interruptedDeliveryEvent(messageId: string, delivery: 'sent' | 'queued'): StreamEvent {
   return streamEvent('cloud.message.failed', {
     messageId,
     reason: 'interrupted',
-    delivery: 'queued',
+    delivery,
+  });
+}
+
+/**
+ * Run `queue-interrupt-clears` with the given follow-up stream events preloaded,
+ * so classification reads the settled buffer without a wait.
+ */
+function runInterruptClearsWith(extraEvents: StreamEvent[]): Promise<LifecycleResult> {
+  installPacedHold('message_boot', 'message_held', extraEvents);
+  mocks.sendMessage
+    .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
+    .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'queued' });
+  return runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
+    config,
+    conversation: '_',
+    api: 'unified',
+    timeoutMs: 5_000,
+    env: queueHttpEnvironment(),
   });
 }
 
@@ -1979,8 +2215,8 @@ describe('moved queue scenario run isolation', () => {
 
   it('queue-interrupt-clears boots before the hold and never touches the gate registry', async () => {
     installPacedHold('message_boot', 'message_held', [
-      interruptedQueuedEvent('message_second'),
-      interruptedQueuedEvent('message_third'),
+      interruptedDeliveryEvent('message_second', 'queued'),
+      interruptedDeliveryEvent('message_third', 'queued'),
     ]);
     mocks.sendMessage
       .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
@@ -1995,9 +2231,74 @@ describe('moved queue scenario run isolation', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.message).toContain('second=ok, third=ok');
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=queued expected=queued'
+    );
+    expect(result.message).toContain(
+      'message_third: reason=interrupted delivery=queued expected=queued'
+    );
     expect(mocks.releaseGate).not.toHaveBeenCalled();
     expect(mocks.waitForGateEngaged).not.toHaveBeenCalled();
+  }, 15_000);
+});
+
+describe('queue-interrupt-clears settlement contract', () => {
+  it('accepts an observed sent frame whose failure reports sent', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_second'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'queued'),
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=sent expected=sent'
+    );
+    expect(result.message).toContain(
+      'message_third: reason=interrupted delivery=queued expected=queued'
+    );
+  }, 15_000);
+
+  it('fails when a sent frame is observed but the failure reports queued', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_second'),
+      interruptedDeliveryEvent('message_second', 'queued'),
+      interruptedDeliveryEvent('message_third', 'queued'),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=queued expected=sent'
+    );
+  }, 15_000);
+
+  it('fails when no sent frame is observed but the failure reports sent', async () => {
+    const result = await runInterruptClearsWith([
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'queued'),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=sent expected=queued'
+    );
+  }, 15_000);
+
+  it('accepts both follow-ups accepted before the interrupt', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'sent'),
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=sent expected=sent'
+    );
+    expect(result.message).toContain(
+      'message_third: reason=interrupted delivery=sent expected=sent'
+    );
   }, 15_000);
 });
 

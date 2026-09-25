@@ -105,7 +105,6 @@ vi.mock('@shopify/flash-list', async () => {
 vi.mock('react-native', () => ({
   // `withRtlInputAlignment` reads I18nManager on every render.
   I18nManager: { isRTL: false },
-  FlatList: flatListMock,
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -399,7 +398,7 @@ describe('ModelPickerContent deferred search', () => {
     expect(buttonProps.children?.props?.children).toBe('Clear search');
     const onPress = buttonProps.onPress;
     if (typeof onPress !== 'function') {
-      throw new Error('clear search action is not pressable');
+      throw new TypeError('clear search action is not pressable');
     }
 
     await act(async () => {

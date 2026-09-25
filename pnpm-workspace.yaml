@@ -83,7 +83,7 @@ minimumReleaseAgeExclude:
   - expo-modules-jsi@57.1.0
   - '@expo/cli@57.0.23'
   - '@expo/metro-file-map@57.0.3'
-  - expo-glass-effect@57.0.3
+  - expo-glass-effect@57.0.2
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -221,6 +221,14 @@ patchedDependencies:
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@57.0.20: patches/expo-router@57.0.20.patch
+  # Typed-routes generation must skip colocated tests, exactly like the Metro
+  # blockList in apps/mobile/metro.config.js already does for the runtime
+  # bundle. A `*.test.tsx` next to a route registers as a route, and a
+  # `_layout.*.test.tsx` (src/app/(app)/(tabs)) registers as that group's
+  # layout; the generator then drops the group's entire subtree, so every
+  # `(tabs)` route vanishes from the generated `Href` union and typecheck
+  # rejects valid navigations.
+  '@expo/router-server@57.0.9': patches/@expo+router-server@57.0.9.patch
   expo-server-sdk: patches/expo-server-sdk.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally

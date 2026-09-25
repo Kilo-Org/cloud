@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 
 // The adoption hands an update token straight to the delivery, and it runs from
 // the root layout's import. The route group that would otherwise install the

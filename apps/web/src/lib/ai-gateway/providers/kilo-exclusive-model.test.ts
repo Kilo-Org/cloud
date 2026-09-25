@@ -1,4 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import {
   applyKiloExclusiveModelSettings,
   calculateCost_mUsd,
@@ -27,7 +29,7 @@ function makeModel(
     max_completion_tokens: 0,
     status: 'public',
     flags: [],
-    gateway: 'openrouter',
+    provider: OPENROUTER,
     pricing: null,
     inference_provider_restriction: [],
     ...overrides,
@@ -93,6 +95,24 @@ describe('calculateCost_mUsd', () => {
 });
 
 describe('convertFromKiloExclusiveModel', () => {
+  it('does not expose the provider or its credentials in public metadata', () => {
+    const model = makeModel({
+      internal_id: 'private/upstream-model',
+      provider: {
+        ...OPENROUTER,
+        apiKey: 'exclusive-provider-secret',
+        apiUrl: 'https://private-provider.example/v1',
+      },
+    });
+    const publicModel = convertFromKiloExclusiveModel(model);
+    expect(publicModel).not.toHaveProperty('provider');
+    expect(publicModel).not.toHaveProperty('apiKey');
+    const serialized = JSON.stringify(publicModel);
+    expect(serialized).not.toContain('exclusive-provider-secret');
+    expect(serialized).not.toContain('private-provider.example');
+    expect(serialized).not.toContain('private/upstream-model');
+  });
+
   it('only exposes the cheapest pricing tier in model metadata', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
@@ -124,7 +144,7 @@ describe('getInferenceProvider', () => {
   it('uses a single inference provider restriction before the gateway', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
-      gateway: 'vercel',
+      provider: VERCEL_AI_GATEWAY,
       inference_provider_restriction: ['openai'],
     });
 
@@ -139,7 +159,7 @@ describe('getInferenceProvider', () => {
   it('reports data collection for a concrete gateway provider', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
-      gateway: 'mistral',
+      provider: { ...OPENROUTER, id: 'mistral' },
       flags: ['requires-data-collection'],
     });
 

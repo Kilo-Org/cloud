@@ -324,6 +324,14 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
     deadline: 'destroy',
   },
   { from: 'unknown', event: 'DEADLINE', to: 'unknown', commands: ['Observe'], deadline: 'observe' },
+  {
+    from: 'unknown',
+    event: 'DEADLINE',
+    to: 'stopping.check_required',
+    commands: [],
+    deadline: null,
+  },
+  { from: 'unknown', event: 'DEADLINE', to: 'stopped', commands: [], deadline: null },
 ];
 
 /** Fields written only by this reducer. */
@@ -535,6 +543,7 @@ export function decideAllocation(
   switch (state.kind) {
     case 'stopped': {
       if (event.type !== 'DEMAND' && event.type !== 'ACQUIRE') return undefined;
+      if (event.createIntent === null) return undefined;
       const target = event.target;
       const deadlineAt = now + POLICY.createDeadlineMs;
       const next: AllocationRecord = {
@@ -963,23 +972,34 @@ export function decideAllocation(
           };
         }
         case 'DEADLINE': {
-          if (!state.target) return undefined;
+          const eager = state.reason === 'legacy_failed' || state.reason === 'legacy_unknown';
+          if (!state.target) {
+            // No ownership to lose: a target-less record has nothing to observe
+            // or preserve. A due or eager deadline settles it instead of
+            // returning `undefined`, which would tight-loop the alarm.
+            if (!eager && now < state.deadlineAt) return undefined;
+            return {
+              state: {
+                v: 2,
+                resumable: record.resumable,
+                state: { kind: 'stopped', summary: null },
+              },
+              commands: [],
+              deadlineAt: null,
+            };
+          }
           // An unresolved create/launch retains its startup deadline and emits
           // no Observe, so a caller-side poll or infrastructure alarm must not
-          // start observing inside that window. The observe/resolve ladder runs
-          // only once the retained deadline is due; re-observing after the
-          // observe deadline keeps the ladder advancing. A migrated legacy
-          // tombstone is resolved eagerly by the readiness caller, not deferred.
-          const eager = state.reason === 'legacy_failed' || state.reason === 'legacy_unknown';
+          // start observing inside that window. Once due, a record past the
+          // reconciliation window or with no create intent settles; otherwise
+          // it re-observes until it settles.
           if (!eager && now < state.deadlineAt) {
             return { state: record, commands: [], deadlineAt: state.deadlineAt };
           }
           const anchor = state.stopIntent?.createdAt ?? state.createIntent?.createdAt;
           if (
-            state.target?.provider === 'vercel' &&
-            anchor !== undefined &&
-            state.createIntent !== null &&
-            now >= anchor + POLICY.reconciliationWindowMs
+            state.createIntent === null ||
+            (anchor !== undefined && now >= anchor + POLICY.reconciliationWindowMs)
           ) {
             const checkRequired: AllocationRecord = {
               v: 2,

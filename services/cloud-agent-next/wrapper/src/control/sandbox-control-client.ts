@@ -153,6 +153,12 @@ const PERMANENT_CONTROL_ERRORS = new Set([
 export type SandboxControlClient = {
   connect(): Promise<void>;
   close(): void;
+  /**
+   * Retire the current socket so the production reconnect owner establishes a
+   * fresh one. Optional: a lighter client stub does not need to implement it,
+   * and a client that is not `ready` treats it as a no-op.
+   */
+  recycleConnection?: () => void;
   sendEvent?(
     event: string,
     payload: unknown,
@@ -1440,6 +1446,11 @@ export function createSandboxControlClient(
       if (current.kind === 'starting')
         current.abort.abort(new Error('sandbox control client closed'));
       else if (current.kind === 'ready') current.dispose();
+    },
+
+    recycleConnection(): void {
+      if (state.kind !== 'ready') return;
+      retireConnection(state.socket);
     },
 
     async sendOperationResult(

@@ -207,7 +207,7 @@ describe('Session observation wiring', () => {
     }
   );
 
-  it('preserves a shared sync failure for the watchdog runtime_unhealthy path', async () => {
+  it('keeps the accepted row when the watchdog interaction sync fails', async () => {
     const stub = env.SANDBOX_SESSION.getByName(`user_observation:workspace_${crypto.randomUUID()}`);
     await runInDurableObject(stub, async (instance, state) => {
       const f = await fixture(instance, state);
@@ -220,9 +220,10 @@ describe('Session observation wiring', () => {
         f.pending.reject(new Error('native read failed'));
         await alarm;
         expect(f.control.request).toHaveBeenCalledTimes(1);
+        // A transport or sync failure is not proof the turn is dead.
         expect(readRawSessionMessages(state.storage.kv)).toEqual([
           expect.objectContaining({
-            state: expect.objectContaining({ kind: 'failed', reason: 'runtime_unhealthy' }),
+            state: expect.objectContaining({ kind: 'accepted' }),
           }),
         ]);
         expect(f.storedEvents().filter(event => event.stream_event_type === 'kilocode')).toEqual(
@@ -367,7 +368,12 @@ describe('Session observation wiring', () => {
         writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [nextMessage]);
         f.pending.resolve(response(busy));
         await alarm;
-        expect(f.control.getStatus).toHaveBeenCalledTimes(1);
+        // Two runtime-status reads: the sync reads readiness before it finds
+        // the scope changed; on `!snapshot` the alarm re-classifies readiness
+        // before choosing blip (rearm) or ready (may recover), because an
+        // `isCurrent` false cannot tell the two apart. The replacement row must
+        // still not be failed.
+        expect(f.control.getStatus).toHaveBeenCalledTimes(2);
         expect(f.control.request).toHaveBeenCalledTimes(1);
         expect(readRawSessionMessages(state.storage.kv)).toEqual([nextMessage]);
       } finally {

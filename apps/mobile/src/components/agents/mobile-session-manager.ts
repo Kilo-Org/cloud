@@ -471,6 +471,7 @@ export function createMobileAgentSessionManager({
         cloudAgentSessionId,
         title: sessionResult.title,
         organizationId: sessionResult.organization_id,
+        profileId: sessionResult.profile_id,
         gitUrl: sessionResult.git_url,
         gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
         mode: rs?.mode ?? null,

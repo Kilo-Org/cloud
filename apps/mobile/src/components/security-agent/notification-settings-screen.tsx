@@ -5,13 +5,14 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextInput, View } from 'react-native';
+import { View } from 'react-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -248,7 +249,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                 <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
                   {t('securityAgent.notifications.slaLeadTimeLabel')}
                 </Text>
-                <TextInput
+                <Input
                   accessibilityLabel={t('securityAgent.notifications.slaLeadTimeAccessibility')}
                   accessibilityHint={
                     isValidDayCount(slaNotificationWarningDays)
@@ -256,7 +257,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       : t('securityAgent.sla.enterWholeNumber')
                   }
                   className={cn(
-                    'h-11 rounded-lg bg-secondary px-3 text-sm leading-[normal] text-foreground',
+                    'rounded-lg bg-secondary px-3 text-sm text-foreground',
                     !canManage && 'opacity-50'
                   )}
                   editable={canManage}

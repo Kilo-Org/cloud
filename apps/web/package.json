@@ -14,7 +14,7 @@
     "format:check": "pnpm -w exec oxfmt --list-different .",
     "format:changed": "git diff --name-only $(git merge-base origin/main HEAD) --diff-filter=ACMR -- '**/*.js' '**/*.jsx' '**/*.ts' '**/*.tsx' '**/*.json' '**/*.css' '**/*.md' | xargs -r pnpm -w exec oxfmt --no-error-on-unmatched-pattern",
     "test": "NODE_ENV=test jest",
-    "typecheck": "pnpm --filter @kilocode/trpc run build && GOMEMLIMIT=2GiB tsgo --noEmit --checkers 1",
+    "typecheck": "pnpm --filter @kilocode/trpc run build && GOMEMLIMIT=2GiB tsgo --noEmit --checkers 1 --tsBuildInfoFile .tsbuildinfo/tsgo.tsbuildinfo",
     "dependency-cycle-check": "madge --circular --warning --extensions ts,tsx --ts-config tsconfig.json --basedir . src",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run format:changed && pnpm run test && pnpm run dependency-cycle-check",
     "node": "node",

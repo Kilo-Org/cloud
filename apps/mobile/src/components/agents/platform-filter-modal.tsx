@@ -1,12 +1,12 @@
 import { Check } from '@/components/ui/icons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { buildProjectRows, mergePlatformOptions } from '@/components/agents/platform-filter-rows';
 import {
-  formatGitUrlProject,
   knownPlatformBucket,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
@@ -130,32 +130,36 @@ export function SessionFilterModal({
     ...new Set(selectedPlatforms.map(platform => normalisePlatform(platform))),
   ]);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
-  // A persisted platform variant collapses into its bucket row; an unknown
-  // selected platform keeps its own row.
-  const platforms = [
-    ...new Set([
-      ...platformOptions,
-      ...selectedPlatforms.map(platform => normalisePlatform(platform)),
-    ]),
-  ];
+  // The sheet re-renders on every checkbox toggle, so the merged platform rows
+  // and the project lookup derive from the props only. Keying the memos on those
+  // props keeps the derived values stable while the draft selection changes, so
+  // a toggle never rebuilds the recent-repository map.
+  const platforms = useMemo(
+    () =>
+      mergePlatformOptions(
+        platformOptions,
+        selectedPlatforms.map(platform => normalisePlatform(platform))
+      ),
+    [platformOptions, selectedPlatforms]
+  );
   // One row per visible project label, in first-seen order. Two git URLs that
   // `formatGitUrlProject` renders identically (https vs ssh, a `.git` suffix,
   // host case) share a group, so the sheet never shows the same project twice.
-  const projectGroups = new Map<string, ProjectFilterGroup>();
-  for (const project of [
-    ...projectOptions,
-    ...selectedProjects.map(gitUrl => ({ gitUrl, displayName: formatGitUrlProject(gitUrl) })),
-  ]) {
-    const key = projectOptionKey(project.gitUrl);
-    const group = projectGroups.get(key);
-    if (group) {
-      if (!group.gitUrls.includes(project.gitUrl)) {
-        group.gitUrls.push(project.gitUrl);
+  const projectGroups = useMemo(() => {
+    const groups = new Map<string, ProjectFilterGroup>();
+    for (const project of buildProjectRows(projectOptions, selectedProjects).values()) {
+      const key = projectOptionKey(project.gitUrl);
+      const group = groups.get(key);
+      if (group) {
+        if (!group.gitUrls.includes(project.gitUrl)) {
+          group.gitUrls.push(project.gitUrl);
+        }
+      } else {
+        groups.set(key, { gitUrls: [project.gitUrl], displayName: project.displayName });
       }
-    } else {
-      projectGroups.set(key, { gitUrls: [project.gitUrl], displayName: project.displayName });
     }
-  }
+    return groups;
+  }, [projectOptions, selectedProjects]);
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -208,21 +212,29 @@ export function SessionFilterModal({
           </Text>
           <ScrollView className="shrink" showsVerticalScrollIndicator={false}>
             <View className="gap-4">
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  {t('common.platform')}
-                </Text>
-                {platforms.map(platform => (
-                  <FilterCheckboxRow
-                    key={platform}
-                    label={platformFilterLabel(platform)}
-                    isChecked={draftPlatforms.includes(platform)}
-                    onPress={() => {
-                      togglePlatform(platform);
-                    }}
-                  />
-                ))}
-              </View>
+              {/* The rows are derived from the live sessions, so a list whose
+                  rows all have an unknown origin (`liveSessionPlatformBucket`
+                  returns null) offers no platform at all and nothing is
+                  selected. Rendering the label then leaves an orphaned section
+                  header above PROJECT (spot defect e4-filter); the section is
+                  omitted exactly as PROJECT already is when it has no rows. */}
+              {platforms.length > 0 && (
+                <View className="gap-1">
+                  <Text variant="eyebrow" className="px-3">
+                    {t('common.platform')}
+                  </Text>
+                  {platforms.map(platform => (
+                    <FilterCheckboxRow
+                      key={platform}
+                      label={platformFilterLabel(platform)}
+                      isChecked={draftPlatforms.includes(platform)}
+                      onPress={() => {
+                        togglePlatform(platform);
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
               {projectGroups.size > 0 && (
                 <View className="gap-1">
                   <Text variant="eyebrow" className="px-3">

@@ -168,7 +168,7 @@ export const allocatedAllocationStateSchema = z
 const stoppingBase = {
   kind: z.literal('stopping'),
   target: allocationTargetSchema,
-  createIntent: allocationCreateIntentSchema,
+  createIntent: allocationCreateIntentSchema.nullable(),
   stopIntent: allocationStopIntentSchema,
   attempts: z.number().int().nonnegative(),
 };

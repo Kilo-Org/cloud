@@ -11,15 +11,6 @@ import type {
 } from '@/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
-let mockInceptionPromoRunning = true;
-
-jest.mock('@/lib/constants', () => ({
-  ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
-  get INCEPTION_PROMO_RUNNING() {
-    return mockInceptionPromoRunning;
-  },
-}));
-
 jest.mock('@/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
 }));
@@ -168,7 +159,6 @@ describe('POST /api/edit/completions', () => {
       policy: {} as never,
       decision: { allowed: true },
     });
-    mockInceptionPromoRunning = true;
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
@@ -253,25 +243,7 @@ describe('POST /api/edit/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('allows requests when balance is exhausted during the promotion', async () => {
-    setOrganizationAuth();
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 0,
-      settings: undefined,
-      plan: 'teams',
-    });
-    mockedFetch.mockResolvedValue(makeUpstreamResponse());
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeValidRequestBody()) as never);
-
-    expect(response.status).toBe(200);
-    expect(mockedFetch).toHaveBeenCalledTimes(1);
-    await flushAfter();
-  });
-
-  it('rejects requests with exhausted balance when the promotion is disabled', async () => {
-    mockInceptionPromoRunning = false;
+  it('rejects requests with exhausted balance', async () => {
     setOrganizationAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 0,
@@ -306,7 +278,7 @@ describe('POST /api/edit/completions', () => {
     expect(upstreamBody.model).toBe('mercury-edit-2');
   });
 
-  it('persists market cost without billing non-BYOK requests', async () => {
+  it('bills non-BYOK requests and records the cache discount', async () => {
     setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
@@ -320,8 +292,8 @@ describe('POST /api/edit/completions', () => {
     const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(ctx.api_kind).toBe('edit_completions');
     expect(ctx.user_byok).toBe(false);
-    expect(stats.cost_mUsd).toBe(0);
-    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.cost_mUsd).toBe(4_750);
+    expect(stats.cacheDiscount_mUsd).toBe(20_250);
     expect(stats.market_cost).toBe(4_750);
   });
 
@@ -368,7 +340,7 @@ describe('POST /api/edit/completions', () => {
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(0);
-    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBeUndefined();
     expect(stats.inputTokens).toBe(0);
     expect(stats.outputTokens).toBe(0);
   });

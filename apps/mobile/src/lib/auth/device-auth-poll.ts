@@ -42,6 +42,14 @@ export function startDeviceAuthPoll(params: {
   let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
   let inFlight = false;
   let lastTickStartedAt = 0;
+  // The server's own throttle deadline, in `Date.now()` milliseconds. A
+  // foreground poll (`pollNow`) must not send a request before it: resuming
+  // the app is not the server's permission to poll again. Only a retry that
+  // named a `Retry-After` records a deadline; our own backoff stays
+  // bypassable so a resume still polls promptly while the server is merely
+  // pending. Always at or before the retry timer it was scheduled with, so
+  // it is never stale while a timer is pending.
+  let throttledUntil = 0;
 
   const scheduleNext = (delay: number) => {
     timeoutId = setTimeout(() => {
@@ -60,7 +68,7 @@ export function startDeviceAuthPoll(params: {
   };
 
   const runTick = async () => {
-    if (Date.now() - startedAt > POLL_OVERALL_TIMEOUT_MS) {
+    if (Date.now() - startedAt >= POLL_OVERALL_TIMEOUT_MS) {
       cleanup();
       setState(previous =>
         errorDeviceAuthState(code, i18n.t('authErrors.signInTimedOut'), previous.verificationUrl)
@@ -119,7 +127,7 @@ export function startDeviceAuthPoll(params: {
         return;
       }
 
-      const outcome = classifyPollResponse(response.status);
+      const outcome = classifyPollResponse(response.status, response.headers.get('retry-after'));
 
       // eslint-disable-next-line typescript-eslint/switch-exhaustiveness-check
       switch (outcome.status) {
@@ -139,7 +147,20 @@ export function startDeviceAuthPoll(params: {
         }
         case 'retry': {
           retryDelay = Math.min(retryDelay * 2, POLL_MAX_INTERVAL_MS);
-          scheduleNext(retryDelay);
+          // A throttled poll waits as long as the server asked, never less
+          // than our own backoff, and never past the overall poll budget: the
+          // wait is capped by the time left, so a Retry-After longer than the
+          // remaining budget cannot schedule a tick after the budget. The
+          // boundary check above is inclusive so a wait capped to exactly the
+          // remaining time times out on that tick instead of polling again.
+          const wait = Math.max(retryDelay, outcome.retryAfterMs ?? 0);
+          const remaining = POLL_OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
+          const delay = Math.min(wait, Math.max(0, remaining));
+          // Record the server's deadline for a foreground poll. Capped by the
+          // scheduled delay, so a Retry-After longer than the remaining budget
+          // never pushes the deadline past the tick that times the poll out.
+          throttledUntil = Date.now() + Math.min(outcome.retryAfterMs ?? 0, delay);
+          scheduleNext(delay);
           return;
         }
         case 'error': {
@@ -168,6 +189,12 @@ export function startDeviceAuthPoll(params: {
     // At most one extra poll per foreground transition: skip when a tick is
     // already in flight or the last tick started under 1 second ago.
     if (inFlight || Date.now() - lastTickStartedAt < 1000) {
+      return;
+    }
+    // A foreground transition is not the server's permission to poll again.
+    // While a Retry-After throttle is in force, leave the retry timer it was
+    // scheduled with in place instead of ticking: the server asked us to wait.
+    if (Date.now() < throttledUntil) {
       return;
     }
     if (timeoutId) {

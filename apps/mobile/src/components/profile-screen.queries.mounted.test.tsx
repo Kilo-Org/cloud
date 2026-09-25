@@ -334,7 +334,6 @@ describe('ProfileScreen deferred queries', () => {
         nodeCount(renderer.root, 'Skeleton') === 0
     );
 
-    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts')).toBe(0);
     expectAlignedContent(renderer.root);
 

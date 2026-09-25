@@ -269,6 +269,24 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
+  it('keeps the same item array identity when the sheet re-renders without a query change', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    const listData = renderer.root.findByType(flatListMock).props.data;
+
+    await act(async () => {
+      renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
+      await Promise.resolve();
+    });
+
+    // The derived list is only rebuilt on a query or applied-language change, so
+    // an unrelated re-render hands the list the same `data` identity and no
+    // mounted row re-renders.
+    expect(renderer.root.findByType(flatListMock).props.data).toBe(listData);
+
+    renderer.unmount();
+  });
+
   it('clears the live search field on focus instead of remounting the input', async () => {
     const renderer = await mountSheet(vi.fn<() => void>());
     const input = findByType(renderer.root, 'TextInput')[0];
@@ -522,6 +540,49 @@ describe('LanguagePickerSheet apply', () => {
   });
 });
 
+describe('LanguagePickerSheet row alignment', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    i18nManager.isRTL = false;
+  });
+
+  function rowLineClassNames(row: TestRenderer.ReactTestInstance): string[] {
+    return findByType(row, 'Text').map(line => line.props.className ?? '');
+  }
+
+  it('pins both lines of a row to the interface start edge in an LTR interface', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    // `العربية` is the row whose endonym right-aligned itself under LTR; the
+    // device row carries the same two-line shape.
+    for (const label of ['العربية', 'Device language']) {
+      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
+      expect(lines).toHaveLength(2);
+      for (const className of lines) {
+        expect(className).toContain('text-left');
+      }
+    }
+
+    renderer.unmount();
+  });
+
+  it('leaves an RTL row to the paragraph direction, never a physical edge', async () => {
+    i18nManager.isRTL = true;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    for (const label of ['العربية', 'Device language']) {
+      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
+      expect(lines).toHaveLength(2);
+      for (const className of lines) {
+        expect(className).not.toContain('text-left');
+      }
+    }
+
+    renderer.unmount();
+  });
+});
+
 describe('LanguagePickerSheet search field', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -537,6 +598,10 @@ describe('LanguagePickerSheet search field', () => {
     if (!input) {
       throw new Error('language search input not found');
     }
+    // The field is the shared single-line `Input`, which renders the TextInput
+    // itself, so the pill is the input's wrapper row: walk up to it rather than
+    // stopping at the input's own node. The shared box is what keeps the
+    // placeholder and the value in one box.
     const field = findFieldContainer(input);
 
     expect((field.props.className as string).split(/\s+/)).toEqual(

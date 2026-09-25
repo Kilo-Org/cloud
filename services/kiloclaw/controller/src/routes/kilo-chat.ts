@@ -34,9 +34,7 @@ const MAX_BODY_BYTES = 1 * 1024 * 1024;
 const MAX_SMALL_BODY_BYTES = 8 * 1024;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
 
-// ──────────────────────────────────────────────────────────────────────────
 // Helpers
-// ──────────────────────────────────────────────────────────────────────────
 
 function authorize(c: Context, options: KiloChatRouteOptions): Response | null {
   const token = getBearerToken(c.req.header('authorization'));
@@ -214,9 +212,7 @@ async function relayRoute(
   return relayRequest(c, options, config);
 }
 
-// ──────────────────────────────────────────────────────────────────────────
 // Route registrations
-// ──────────────────────────────────────────────────────────────────────────
 
 export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptions): void {
   app.post('/_kilo/kilo-chat/send', c =>

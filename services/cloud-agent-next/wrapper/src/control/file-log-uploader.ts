@@ -8,6 +8,7 @@ import {
   type ControlLogUploadResult,
 } from '../../../src/shared/control-diagnostics.js';
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
+import { restoreIncompleteRulesPath } from '../restore-incomplete.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
 
 export type ControlFileLogUploader = {
@@ -47,6 +48,25 @@ export function listControlKiloLogDirs(homeRoot = defaultControlWorktreeHomeRoot
     if (existsSync(logDir)) dirs.push(logDir);
   }
   return dirs;
+}
+
+/**
+ * The agent-facing incomplete-restore note, for every live session home. The
+ * uploaded archive is the only observable copy of the sandbox session home, so
+ * the named outcome must travel with the logs; the note is absent after a
+ * complete restore because the wrapper removes it.
+ */
+export function listControlRestoreIncompletePaths(
+  homeRoot = defaultControlWorktreeHomeRoot()
+): string[] {
+  if (!existsSync(homeRoot)) return [];
+  const paths: string[] = [];
+  for (const entry of readdirSync(homeRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    const rulesPath = restoreIncompleteRulesPath(path.join(homeRoot, entry.name));
+    if (existsSync(rulesPath)) paths.push(rulesPath);
+  }
+  return paths;
 }
 
 export function selectControlFileLogPaths(input: {
@@ -184,10 +204,13 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             if (queuedUpload === next) queuedUpload = undefined;
             activeUpload = next;
 
-            const files = selectControlFileLogPaths({
-              wrapperLogPath,
-              kiloLogDirs: listControlKiloLogDirs(homeRoot),
-            });
+            const files = [
+              ...selectControlFileLogPaths({
+                wrapperLogPath,
+                kiloLogDirs: listControlKiloLogDirs(homeRoot),
+              }),
+              ...listControlRestoreIncompletePaths(homeRoot),
+            ];
             const entries = archiveEntries(files, wrapperLogPath, homeRoot);
             if (entries.length === 0) return;
             const body = await collectArchive(entries, CONTROL_LOG_MAX_ARCHIVE_BYTES);

@@ -7,12 +7,24 @@ jest.mock('next/navigation', () => ({
 
 jest.mock('next-auth/react', () => ({ signIn: jest.fn() }));
 
-import { createElement } from 'react';
+// The dialog primitives are stubbed so the usage-limit content renders as
+// plain markup: Radix portals its content, which no server renderer emits.
+jest.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children }: { children: ReactNode }) => children,
+  DialogContent: ({ children }: { children: ReactNode }) => children,
+  DialogHeader: ({ children }: { children: ReactNode }) => children,
+  DialogTitle: ({ children }: { children: ReactNode }) => children,
+  DialogDescription: ({ children }: { children: ReactNode }) => children,
+  DialogFooter: ({ children }: { children: ReactNode }) => children,
+}));
+
+import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { OpenAiChatGptCardView, type OpenAiChatGptCardViewProps } from './OpenAiChatGptCard';
 import { OPENAI_TOKEN_SHARING_SCOPE } from '@/lib/auth/openai/scopes';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
+import { CHATGPT_USAGE_SETTINGS_URL } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
 
 const CONNECTED_AT = '2026-09-16T12:00:00.000Z';
 const RECONNECT_MESSAGE = 'Your ChatGPT connection has expired. Reconnect to continue.';
@@ -260,6 +272,13 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
 
+  it('names the expired linking session instead of the generic connect failure', () => {
+    const html = render({ status: { state: 'disconnected' }, authErrorCode: 'TURNSTILE_REQUIRED' });
+
+    expect(html).toContain('ChatGPT was not connected in time. Try again.');
+    expect(html.match(/>Try again</g)).toHaveLength(1);
+  });
+
   it('offers the promised Try again retry when the linking session fails', () => {
     const html = render({ status: { state: 'disconnected' }, authErrorCode: 'connect_failed' });
 
@@ -437,18 +456,18 @@ describe('OpenAiChatGptCard layout', () => {
 
 describe('startOpenAiChatGptConnect', () => {
   beforeEach(() => {
-    // @swc/jest does not hoist `jest.mock` above the static imports, so the card
-    // has to be loaded after the mock is registered: drop the module registry
-    // and import both the card and the mocked `signIn` freshly per test.
+    // @swc/jest does not hoist `jest.mock` above the static imports, so the
+    // connect module has to be loaded after the mock is registered: drop the
+    // module registry and import both it and the mocked `signIn` per test.
     jest.resetModules();
     jest.clearAllMocks();
   });
 
   async function loadConnect() {
-    const card = await import('./OpenAiChatGptCard');
+    const connect = await import('@/lib/auth/openai/connect');
     const nextAuth = await import('next-auth/react');
     return {
-      startOpenAiChatGptConnect: card.startOpenAiChatGptConnect,
+      startOpenAiChatGptConnect: connect.startOpenAiChatGptConnect,
       signIn: jest.mocked(nextAuth.signIn),
     };
   }
@@ -493,5 +512,78 @@ describe('startOpenAiChatGptConnect', () => {
       'linking session failed'
     );
     expect(signIn).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpenAiChatGptCard usage limit', () => {
+  const USAGE_LIMIT = { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null };
+  const USAGE_LIMIT_TITLE = 'ChatGPT usage limit reached';
+  const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
+
+  /**
+   * Renders through a fresh module registry, because @swc/jest emits the static
+   * imports before the `jest.mock` calls: the stubbed dialog only applies to a
+   * module that is required after the stub is registered.
+   */
+  async function renderWithStubbedDialog(props: OpenAiChatGptCardViewProps): Promise<string> {
+    jest.resetModules();
+    const [card, react, server] = await Promise.all([
+      import('./OpenAiChatGptCard'),
+      import('react'),
+      import('react-dom/server'),
+    ]);
+    return server.renderToStaticMarkup(react.createElement(card.OpenAiChatGptCardView, props));
+  }
+
+  it('shows the usage-limit message for a connection whose recorded limit is current', async () => {
+    const html = await renderWithStubbedDialog({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        connectedAt: CONNECTED_AT,
+        usageLimit: USAGE_LIMIT,
+      },
+    });
+
+    expect(html).toContain(USAGE_LIMIT_TITLE);
+    expect(html).toContain('Review your usage settings in ChatGPT.');
+    expect(html).toContain('Buy Kilo credits instead');
+    expect(html).toContain(CHATGPT_USAGE_SETTINGS_URL);
+  });
+
+  it('hides the usage-limit message once it is dismissed', async () => {
+    const html = await renderWithStubbedDialog({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        connectedAt: CONNECTED_AT,
+        usageLimit: USAGE_LIMIT,
+      },
+      isUsageLimitDismissed: true,
+    });
+
+    expect(html).not.toContain(USAGE_LIMIT_TITLE);
+  });
+
+  it('shows no usage-limit message without a recorded limit', () => {
+    const html = renderStatus({
+      state: 'connected',
+      email: 'user@example.com',
+      connectedAt: CONNECTED_AT,
+    });
+
+    expect(html).not.toContain(USAGE_LIMIT_TITLE);
+  });
+
+  it('offers the usage link while the connection is live and not otherwise', () => {
+    const connected = renderStatus({
+      state: 'connected',
+      email: 'user@example.com',
+      connectedAt: CONNECTED_AT,
+    });
+    expect(connected).toContain(USAGE_LINK_SUMMARY);
+    expect(connected).toContain(CHATGPT_USAGE_SETTINGS_URL);
+
+    expect(renderStatus({ state: 'disconnected' })).not.toContain(USAGE_LINK_SUMMARY);
   });
 });

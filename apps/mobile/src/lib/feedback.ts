@@ -1,5 +1,5 @@
 import * as Application from 'expo-application';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as StoreReview from 'expo-store-review';
 import { Alert, Linking, Platform } from 'react-native';
 import { toast } from 'sonner-native';
@@ -92,14 +92,22 @@ export function showFeedbackPrompt(userId: string | undefined) {
 // One-time neutral prompt after an authoritative success (for example, a full
 // PR review submit). The last-asked marker absent-check and write run inside
 // one per-key chain, so concurrent calls observe the marker atomically: only
-// the first call shows the prompt and later calls skip it.
+// the first call shows the prompt and later calls skip it. Best effort: the
+// caller fires this without awaiting, so a stored-marker failure (reported at
+// warning level by the metadata helper) must not surface as an unhandled
+// rejection — the prompt is a convenience and the next success asks again.
 export async function maybeAskAfterSuccessfulOutcome(userId: string | undefined): Promise<void> {
-  await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
-    const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
-    if (alreadyAsked != null) {
-      return;
-    }
-    await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
-    showFeedbackPrompt(userId);
-  });
+  try {
+    await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
+      const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
+      if (alreadyAsked != null) {
+        return;
+      }
+      await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
+      showFeedbackPrompt(userId);
+    });
+  } catch {
+    // Reported by the account-metadata write; the prompt is not user-actionable
+    // here and the next successful outcome asks again.
+  }
 }

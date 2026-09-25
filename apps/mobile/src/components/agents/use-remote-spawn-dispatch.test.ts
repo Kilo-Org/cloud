@@ -565,14 +565,13 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       getSubmitPayload: () => filesPayload,
-      refetchInstances: () =>
-        Promise.resolve({
-          data: {
-            instances: [
-              { ...INSTANCE, connectionId: 'conn-live', capabilities: { attachments: false } },
-            ],
-          },
-        }),
+      refetchInstances: async () => ({
+        data: {
+          instances: [
+            { ...INSTANCE, connectionId: 'conn-live', capabilities: { attachments: false } },
+          ],
+        },
+      }),
       onSpawnAdmitted: () => {
         onSpawnAdmitted();
       },
@@ -599,14 +598,13 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       cloneFromKiloSessionId: 'ses_source',
-      refetchInstances: () =>
-        Promise.resolve({
-          data: {
-            instances: [
-              { ...INSTANCE, connectionId: 'conn-live', capabilities: { sessionClone: false } },
-            ],
-          },
-        }),
+      refetchInstances: async () => ({
+        data: {
+          instances: [
+            { ...INSTANCE, connectionId: 'conn-live', capabilities: { sessionClone: false } },
+          ],
+        },
+      }),
       onCloneImportFailure: key => {
         onCloneImportFailure(key);
       },

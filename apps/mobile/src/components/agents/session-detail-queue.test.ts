@@ -606,6 +606,7 @@ function makeManager() {
       olderMessagesError: { value: null },
       olderMessagesOmittedItemCount: { value: 0 },
       resolvedDeliveryFailures: { value: new Set<string>() },
+      supersededInFlightMessageIds: { value: new Set<string>() },
     },
     switchSession: vi.fn(),
     send: vi.fn(),

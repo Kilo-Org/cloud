@@ -1624,6 +1624,76 @@ describe('session detail failed delivery retry', () => {
     );
     expect(typeof restoredRetry.props.onPress).toBe('function');
   });
+
+  it('keeps the superseded row hidden across a session switch while the re-send is pending', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open: the retry is still in flight when the
+    // user leaves the session and comes straight back.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row landed, and the row it superseded with the same
+    // tap is already hidden.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // What the second open of this session serves: the failed row the retry
+    // superseded beside the retry's own row.
+    const rows = [...view.store.get(view.manager.atoms.messagesList)];
+
+    await view.switchRoot(NEXT_ROOT_ID);
+    await view.switchRoot(ROOT_ID);
+    await view.respond(ROOT_ID, rows);
+
+    // The hide belongs to the session that owns the row, so coming back before
+    // the send settles still shows only the retry's copy of the prompt.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The accepted re-send records the resolution for the same session, so the
+    // superseded row stays hidden after the round-trip lands.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
 });
 
 describe('session detail slow load', () => {

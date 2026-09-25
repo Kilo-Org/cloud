@@ -6166,6 +6166,119 @@ describe('createSessionManager', () => {
     });
   });
 
+  describe('in-flight superseded rows', () => {
+    it('keeps the marked id for its owner session across a switch and back', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      // The retry's optimistic row lands before the transport settles, so the
+      // row it superseded stops rendering in the same tap.
+      mgr.markMessageSuperseded('m-original', kiloId('ses-1'));
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set(['m-original']));
+
+      // The user switches away while the re-send is still in flight. The
+      // switched-to session must not inherit the other transcript's id.
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set());
+
+      // Switching back before the send settles must still hide the row the
+      // retry superseded, or the transcript shows both copies of the prompt.
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set(['m-original']));
+    });
+
+    it('unmarks the id when the re-send is rejected', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.markMessageSuperseded('m-original', kiloId('ses-1'));
+
+      mgr.unmarkMessageSuperseded('m-original', kiloId('ses-1'));
+
+      // Nothing was delivered: the failed row and its retry control must come
+      // back, so the projection is empty again.
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set());
+    });
+
+    it('drops the mark on an unmark of another session, and keeps its own', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+      mgr.markMessageSuperseded('m-two', kiloId('ses-2'));
+
+      // A mark recorded while another session is active, then unmarked: its own
+      // record is the only one that may be touched.
+      mgr.markMessageSuperseded('m-one', kiloId('ses-1'));
+      mgr.unmarkMessageSuperseded('m-two', kiloId('ses-1'));
+
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set(['m-two']));
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set(['m-one']));
+    });
+
+    it('replaces the mark with the resolved record when the re-send is accepted', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.markMessageSuperseded('m-original', kiloId('ses-1'));
+
+      mgr.clearFailedMessage('m-original', kiloId('ses-1'));
+
+      // The accepted resolution is the durable record, so the row is hidden for
+      // the same reason across a relaunch; the in-flight entry is done.
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toEqual(new Set());
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures).has(
+          'm-original'
+        )
+      ).toBe(true);
+    });
+
+    it('gives a mark a new projection identity, then keeps it stable', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const before = atomValue<ReadonlySet<string>>(
+        config.store,
+        mgr.atoms.supersededInFlightMessageIds
+      );
+
+      mgr.markMessageSuperseded('m-original', kiloId('ses-1'));
+      const after = atomValue<ReadonlySet<string>>(
+        config.store,
+        mgr.atoms.supersededInFlightMessageIds
+      );
+
+      // The record is mutated in place, so an unchanged reference would leave
+      // the transcript filter hiding nothing for the whole round-trip.
+      expect(after.has('m-original')).toBe(true);
+      expect(after).not.toBe(before);
+      expect(
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.supersededInFlightMessageIds)
+      ).toBe(after);
+    });
+  });
+
   describe('cancelQueuedMessage', () => {
     it('delegates to the active session without interrupting and returns its { dropped } result', async () => {
       const config = createMockConfig();

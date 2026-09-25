@@ -903,38 +903,32 @@ export function SessionDetailContent({
   const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [canceledQueuedMessages, setCanceledQueuedMessages] =
     useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
-  // Ids whose failed submission a retry accepted. The re-send is a new
-  // submission with its own row, so the original row must stop rendering even
-  // when it is server-confirmed (the SDK can only delete the client-materialised
-  // ghost). The row's preparation attempts go with it, or the filtered row's
-  // preparation would be re-emitted at the end of the transcript.
+  // Ids whose failed submission a retry accepted, plus the ids a re-send
+  // superseded while it is still in flight. The re-send is a new submission with
+  // its own row, so the original row must stop rendering even when it is
+  // server-confirmed (the SDK can only delete the client-materialised ghost).
+  // The row's preparation attempts go with it, or the filtered row's preparation
+  // would be re-emitted at the end of the transcript.
   //
-  // This slot holds only the in-flight window, before the manager records the
-  // resolution: `resolvedDeliveryFailures` below carries the accepted ids,
-  // including the durable record seeded on open, so the hide survives a
-  // switch-back and a relaunch.
-  const [locallySupersededMessageIds, setLocallySupersededMessageIds] =
-    useState<ReadonlySet<string>>(EMPTY_IDS);
-  // The session the row that a retry is re-sending belongs to. The re-send is
-  // awaited, so the user can switch sessions while it is in flight; `sessionId`
-  // is then the switched-to session, and this local state must not take the
-  // previous session's id.
-  const supersededOwnerSessionIdRef = useRef(sessionId);
-  supersededOwnerSessionIdRef.current = sessionId;
+  // Both records live in the manager, keyed by the session that owns the row:
+  // the re-send is awaited, so the user can switch sessions while it is in
+  // flight, and the row must stay hidden when the transcript is opened again —
+  // by another screen instance, or after a relaunch.
   const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
   const supersededMessageIds = useMemo(() => {
-    if (locallySupersededMessageIds.size === 0) {
+    if (supersededInFlightMessageIds.size === 0) {
       return resolvedDeliveryFailures;
     }
     if (resolvedDeliveryFailures.size === 0) {
-      return locallySupersededMessageIds;
+      return supersededInFlightMessageIds;
     }
-    const merged = new Set(locallySupersededMessageIds);
+    const merged = new Set(supersededInFlightMessageIds);
     for (const id of resolvedDeliveryFailures) {
       merged.add(id);
     }
     return merged;
-  }, [locallySupersededMessageIds, resolvedDeliveryFailures]);
+  }, [supersededInFlightMessageIds, resolvedDeliveryFailures]);
   const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
   const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
     null
@@ -1142,7 +1136,9 @@ export function SessionDetailContent({
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
     setDroppedQueuedIds(EMPTY_IDS);
-    setLocallySupersededMessageIds(EMPTY_IDS);
+    // The superseded ids are not cleared here: the manager keys them by the
+    // session that owns the row, so switching back before an in-flight re-send
+    // settles must still hide the row it superseded.
     setCanceledQueuedMessages(EMPTY_CANCELED);
     setCancelQueuedStatus(null);
     setCancelQueuedSheetStatus(null);
@@ -1286,10 +1282,11 @@ export function SessionDetailContent({
       // outlive it: switching sessions while the re-send is in flight must not
       // record this resolution under the session the user switched to.
       const ownerSessionId = sessionId;
-      // This local slot is keyed to the session that owns the row. The re-send
-      // is awaited, so the user can switch sessions while it is in flight; a
-      // write under the switched-to session would put another transcript's id
-      // in its set.
+      // The manager records the supersede against the session that owns the
+      // row. The re-send is awaited, so the user can switch sessions while it
+      // is in flight; a write under the switched-to session would put another
+      // transcript's id in its set, and a screen-local record would be lost
+      // with the screen that hosted the retry.
       void retryFailedMessage({
         message,
         send: async () => {
@@ -1300,8 +1297,8 @@ export function SessionDetailContent({
             // settle would render the prompt twice for the whole round-trip.
             await handleSend(prompt, {
               onOptimisticSend: () => {
-                if (isUser && supersededOwnerSessionIdRef.current === ownerSessionId) {
-                  setLocallySupersededMessageIds(current => new Set(current).add(messageId));
+                if (isUser) {
+                  manager.markMessageSuperseded(messageId, ownerSessionId);
                 }
               },
             });
@@ -1309,12 +1306,8 @@ export function SessionDetailContent({
             // A rejected re-send restored nothing: bring the original failed row
             // and its Retry control back. `retryFailedMessage` swallows the
             // rejection, so its contract is unchanged.
-            if (isUser && supersededOwnerSessionIdRef.current === ownerSessionId) {
-              setLocallySupersededMessageIds(current => {
-                const next = new Set(current);
-                next.delete(messageId);
-                return next;
-              });
+            if (isUser) {
+              manager.unmarkMessageSuperseded(messageId, ownerSessionId);
             }
             throw retryError;
           }

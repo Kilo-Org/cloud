@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   formatName,
   getEnhancedOpenRouterModels,
@@ -17,9 +17,14 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
+  getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
 }));
 
 const originalFetch = global.fetch;
@@ -303,6 +308,39 @@ describe('reasoning variants', () => {
       models.data.find(model => model.id === unsupportedId)?.opencode?.variants
     ).toBeUndefined();
     expect(models.data.find(model => model.id === supportedId)?.opencode?.variants).toBeDefined();
+  });
+});
+
+describe('mayTrainOnYourPrompts', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('flags free models and models whose every provider trains on prompts', async () => {
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValueOnce(new Set(['meta/muse-spark-1.3-contributor']));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              buildModel({ id: 'meta/muse-spark-1.3-contributor' }),
+              buildModel({ id: 'meta/muse-spark-1.3' }),
+              buildModel({ id: 'vendor/model:free', pricing: { prompt: '0', completion: '0' } }),
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+    const mayTrain = (id: string) =>
+      models.data.find(model => model.id === id)?.mayTrainOnYourPrompts;
+
+    expect(mayTrain('meta/muse-spark-1.3-contributor')).toBe(true);
+    expect(mayTrain('meta/muse-spark-1.3')).toBe(false);
+    expect(mayTrain('vendor/model:free')).toBe(true);
   });
 });
 

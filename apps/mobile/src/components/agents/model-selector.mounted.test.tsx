@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 
@@ -7,6 +7,7 @@ import {
   freeModelDataLabel,
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { i18n } from '@/i18n';
 
 import {
@@ -62,6 +63,27 @@ vi.mock('@/lib/utils', () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
 }));
 
+// Locale cases switch the shared instance; put English back so the remaining
+// rows keep rendering the English catalog.
+afterEach(async () => {
+  if (i18n.language !== 'en') {
+    await i18n.changeLanguage('en');
+  }
+});
+
+function gatewayCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionModelOption {
+  return {
+    id: 'gateway-model-0',
+    name: 'Laguna S 2.1 (free)',
+    displayId: 'laguna/s-2.1',
+    variants: [],
+    isPreferred: false,
+    isFree: true,
+    showGatewayMetadata: true,
+    ...overrides,
+  };
+}
+
 // The trailing icons of a row, in render order. The favorite star must be the
 // last one so every row's star shares one right-alignment column, and the
 // selected check sits in the reserved column to its left.
@@ -87,6 +109,44 @@ describe('ModelPickerOptionRow BYOK badge', () => {
     expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
     expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
   });
+});
+
+describe('ModelPickerOptionRow free badge', () => {
+  // The gateway catalogue names free models "… (free)" and Kilo's own Auto Free
+  // model is named for it in every catalog, so the green free badge would print
+  // a fact the row title already carries.
+  it('renders no free badge when the displayed name already states it', () => {
+    const renderer = renderRow(gatewayCatalogOption({ name: 'Laguna S 2.1 (free)' }));
+
+    expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
+  });
+
+  it('still renders the free badge when the name does not state it', () => {
+    const renderer = renderRow(gatewayCatalogOption({ name: 'Laguna S 2.1' }));
+
+    expect(textStrings(renderer.root)).toContain(freeModelFreeLabel());
+  });
+
+  // The badge must be suppressed from the model's identity, not from matching
+  // copy: these nine catalogs name the Auto Free model with a free word the
+  // badge label does not literally contain (ru "Авто Бесплатный" vs
+  // "Бесплатно"), which was the localized half of the duplication.
+  it.each(['be', 'bg', 'bs', 'hr', 'mk', 'ru', 'sr', 'ta', 'uk'])(
+    'renders no free badge for the localized Auto Free name (%s)',
+    async locale => {
+      await i18n.changeLanguage(locale);
+      const renderer = renderRow(
+        gatewayCatalogOption({
+          id: 'kilo-auto/free',
+          displayId: 'kilo-auto/free',
+          name: 'backend name',
+        })
+      );
+
+      expect(textStrings(renderer.root)).toContain(i18n.t('models.auto.free'));
+      expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
+    }
+  );
 });
 
 describe('Auto model labels', () => {

@@ -16,6 +16,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -115,6 +116,13 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   const canManage = interactive;
 
   const revision = useSessionAttentionRevision();
+  // A live row's timestamp is minute-bucketed, so the clock is sampled at
+  // least twice per bucket. The tick re-renders this row from the inside:
+  // `memo` keeps the row out of a parent poll that changes no prop, so an
+  // unchanged session would otherwise keep the label it drew when its payload
+  // last changed. The shared interval means every row that reads the clock
+  // shares one timer (see `lib/hooks/now-ticker-store`).
+  const now = useNowTicker(10_000);
   // The ack store is the one input to the row that is not `session`: an ack
   // bumps the shared revision, so the flag re-derives when it ticks. A parent
   // re-render with an unchanged payload and no ack reuses this result.
@@ -133,9 +141,10 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   }, [session.id, session.status, revision]);
 
   // Every derivation below depends only on the session, the row shape, the
-  // attention flag and the recorded-titles revision, so an unchanged payload
-  // reuses them instead of redoing the Intl formatting per parent render. `t`
-  // changes identity with the language, which re-derives the localized strings.
+  // attention flag, the recorded-titles revision and the sampled clock, so an
+  // unchanged payload reuses them instead of redoing the Intl formatting per
+  // parent render. `t` changes identity with the language, which re-derives the
+  // localized strings.
   const { title, agentLabel, canExit, statusKind, subtitle, spokenPrNumber, spokenMeta } =
     useMemo(() => {
       // Spoken meta mirrors the visible meta the row renders. When `needsInput`
@@ -143,7 +152,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       // so the label omits it. Otherwise announce the same timestamp as
       // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
       const metaTimestamp = activeSessionMetaTimestamp(session);
-      const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
+      const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp, now) : null;
       return {
         title: namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled'),
         agentLabel: remoteSessionEyebrowLabel(session),
@@ -166,8 +175,8 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
           timeSpoken,
         }),
       };
-      // eslint-disable-next-line react/exhaustive-deps -- the titles revision is a real input: `namedSessionTitle` reads the recorded-titles store, so the title must re-derive when that store ticks.
-    }, [session, variant, needsInput, t, titlesRevision]);
+      // eslint-disable-next-line react/exhaustive-deps -- the titles revision and the sampled clock are real inputs: `namedSessionTitle` reads the recorded-titles store, and `formatSpokenTimeAgo` reads the clock, so both must re-derive when they tick.
+    }, [session, variant, needsInput, t, titlesRevision, now]);
 
   // Tray rows are always live: the eyebrow draws the status glyph from the
   // shared derivation, so the platform glyph has no slot beside it (and the
@@ -286,7 +295,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
           subtitle={subtitle}
           meta={composeActiveSessionVisibleMeta(
             formatSessionTotalCost(session.totalCostMicrodollars),
-            remoteMeta(session)
+            remoteMeta(session, now)
           )}
           live
           statusKind={statusKind}

@@ -7,6 +7,7 @@ import '@/i18n';
 import { RemoteSessionRow } from './remote-session-row';
 import { makeCached } from '@/lib/active-sessions-live-sync.test-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { resetNowTickersForTests } from '@/lib/hooks/now-ticker-store';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 
 // The row renders one child `SessionRow`; counting its renders counts the row's
@@ -115,6 +116,22 @@ function mountTree(ui: ReactElement): TestRenderer.ReactTestRenderer {
   return ref.current;
 }
 
+/** The visible meta string the row hands its mocked child. */
+function rowMeta(renderer: TestRenderer.ReactTestRenderer): unknown {
+  return renderer.root.findByType('SessionRow' as never).props.meta;
+}
+
+/** The row's own accessibility label, which carries the spoken time. */
+function rowLabel(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const node = renderer.root.findAll(
+    candidate => typeof candidate.props.accessibilityLabel === 'string'
+  )[0];
+  if (!node) {
+    throw new Error('row accessibility label not found');
+  }
+  return node.props.accessibilityLabel;
+}
+
 describe('RemoteSessionRow memoisation', () => {
   let client: QueryClient = createKiloAppQueryClient();
 
@@ -172,5 +189,46 @@ describe('RemoteSessionRow memoisation', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('ages the row meta and its spoken label from the row\u2019s own clock', async () => {
+    // `memo` keeps the row body out of a poll that changes no prop, so the
+    // relative time cannot come from a parent render. The row samples the
+    // shared clock itself: an unchanged session would otherwise keep the label
+    // it drew when its payload last changed, in speech as well as on screen.
+    vi.useFakeTimers();
+    resetNowTickersForTests();
+    try {
+      vi.setSystemTime(new Date('2026-08-28T12:00:00.000Z').getTime());
+      const session = makeCached({
+        id: 'clock-1',
+        status: 'busy',
+        title: 'Clock work',
+        createdOnPlatform: 'cli',
+        updatedAt: '2026-08-28T11:55:00.000Z',
+      });
+      const onPress = vi.fn<(session: ActiveSession) => void>();
+      const renderer = mountTree(
+        createElement(QueryClientProvider, { client }, createElement(Parent, { session, onPress }))
+      );
+      const metaBefore = rowMeta(renderer);
+      const labelBefore = rowLabel(renderer);
+      expect(metaBefore).toBeDefined();
+
+      // The same session object is never re-pushed: only the clock moved.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15 * 60_000);
+      });
+
+      expect(rowMeta(renderer)).not.toBe(metaBefore);
+      expect(rowLabel(renderer)).not.toBe(labelBefore);
+
+      act(() => {
+        renderer.unmount();
+      });
+    } finally {
+      resetNowTickersForTests();
+      vi.useRealTimers();
+    }
   });
 });

@@ -165,7 +165,7 @@ describe('EmailOtpForm destination layout', () => {
         expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
       } else {
         // Resend keeps its inline spinner; Verify is disabled but not busy, so
-        // it must not take the busy treatment (the muted disabled fill).
+        // it must keep the muted disabled fill, not the brand-filled busy treatment.
         expect(verify.props.loading).not.toBe(true);
         expect(resend.findAllByType('ActivityIndicator')).toHaveLength(1);
         expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);

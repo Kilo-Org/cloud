@@ -218,6 +218,28 @@ describe('BillingScheduleTable mutations', () => {
     expect(entries(storage)).toEqual({});
   });
 
+  it('ensure arms only an absent payload and preserves due time and backoff', async () => {
+    const storage = memoryStorage();
+    const table = new BillingScheduleTable({ storage, recompose: async () => undefined });
+    await table.load();
+
+    await table.ensure('a', T0 + 1_000, 'gen');
+    expect(entries(storage)).toEqual({ a: { dueAtMs: T0 + 1_000, payload: 'gen' } });
+
+    // A matching payload keeps its due time and any delivery backoff.
+    await table.deferRetry('a', 'gen', T0 + 60_000);
+    await table.ensure('a', T0 + 500, 'gen');
+    expect(entries(storage)).toEqual({
+      a: { dueAtMs: T0 + 1_000, retryNotBeforeMs: T0 + 60_000, payload: 'gen' },
+    });
+
+    // A different payload replaces it; `schedule` still replaces unconditionally.
+    await table.ensure('a', T0 + 2_000, 'other');
+    expect(entries(storage)).toEqual({ a: { dueAtMs: T0 + 2_000, payload: 'other' } });
+    await table.schedule('a', T0 + 3_000, 'other');
+    expect(entries(storage)).toEqual({ a: { dueAtMs: T0 + 3_000, payload: 'other' } });
+  });
+
   it('propagates a storage write failure without marking the mutation complete', async () => {
     const storage = memoryStorage();
     let composeCalls = 0;

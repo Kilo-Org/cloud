@@ -169,6 +169,24 @@ export class BillingScheduleTable {
   }
 
   /**
+   * Arm a continuation without clobbering an existing matching one. Unlike
+   * `schedule`, an entry for the same payload keeps its due time and any
+   * delivery backoff. The no-clobber decision runs inside the table queue, so a
+   * concurrent `markDue`/`deferRetry` is observed rather than overwritten.
+   */
+  async ensure(callback: string, dueAtMs: number, payload?: unknown): Promise<void> {
+    await this.run(async () => {
+      const table = await this.loadedTable();
+      if (table[callback]?.payload === payload) return;
+      const next: BillingScheduleEntries = { ...table };
+      next[callback] = payload === undefined ? { dueAtMs } : { dueAtMs, payload };
+      await this.deps.storage.put(VERCEL_BILLING_SCHEDULE_KEY, next);
+      this.table = next;
+    });
+    await this.compose();
+  }
+
+  /**
    * Move an existing continuation to its settlement due time. Never inserts an
    * entry, so a callback that was never armed is not created here. An existing
    * delivery backoff is preserved: a failed delivery sets `retryNotBeforeMs` and

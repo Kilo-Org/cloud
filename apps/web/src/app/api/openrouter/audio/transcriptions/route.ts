@@ -9,6 +9,7 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@/lib/getRootSpan';
+import { errorExceptInTest } from '@/lib/utils.server';
 import {
   captureProxyError,
   checkOrganizationModelRestrictions,
@@ -101,10 +102,11 @@ async function parseMultipartTranscriptionRequest(
   let formData: FormData;
   try {
     formData = await request.formData();
-  } catch {
+  } catch (error) {
     // A malformed body or a missing boundary rejects instead of returning form
     // data. This is client input, so answer the controlled 400 without
-    // reporting it rather than surfacing an unhandled 500.
+    // reporting it to Sentry. Never log the body: it is audio.
+    errorExceptInTest('[transcription-proxy] Invalid multipart body:', error);
     return null;
   }
   const modelField = formData.get('model');
@@ -123,12 +125,16 @@ function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscrip
   let parsed: unknown;
   try {
     parsed = JSON.parse(requestBodyText);
-  } catch {
+  } catch (error) {
+    errorExceptInTest('[transcription-proxy] Invalid JSON body:', error);
     return null;
   }
 
   const result = TranscriptionRequestSchema.safeParse(parsed);
-  if (!result.success) return null;
+  if (!result.success) {
+    errorExceptInTest('[transcription-proxy] Invalid request body:', result.error.issues);
+    return null;
+  }
 
   return { kind: 'json', body: result.data };
 }

@@ -57,7 +57,7 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// registration and the deadline each take exactly the waiter they own.
   private var waiters: [
     UUID: CheckedContinuation<(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime), Error>
-  ] = []
+  ] = [:]
   /// Payloads that arrived before the dispatcher registered. iOS never parks
   /// one — `perform` waits for registration instead — but the module's
   /// registration contract returns this buffer to the JS side, which is the

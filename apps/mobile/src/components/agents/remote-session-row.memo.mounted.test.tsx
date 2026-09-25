@@ -144,51 +144,62 @@ describe('RemoteSessionRow memoisation', () => {
   });
 
   it('skips the row body for identical props and re-renders it for a new session', () => {
-    const session = makeCached({
-      id: 'memo-1',
-      status: 'busy',
-      title: 'Memo work',
-      createdOnPlatform: 'cli',
-      gitBranch: 'feature/memo',
-      updatedAt: '2026-08-28T11:55:00.000Z',
-    });
-    const onPress = vi.fn<(session: ActiveSession) => void>();
-    const tree = (next: ActiveSession, interactive = true) =>
-      createElement(
-        QueryClientProvider,
-        { client },
-        createElement(Parent, { session: next, onPress, interactive })
-      );
-    const renderer = mountTree(tree(session));
-    expect(sessionRowRenders.count).toBe(1);
-    expect(spokenCostCalls.count).toBe(1);
+    // Freeze the shared clock: the row reads it through `useSyncExternalStore`,
+    // and a `Date.now()` boundary between the render and its subscribe effect
+    // forces one extra commit. That would make the render counts below depend
+    // on runner timing instead of on the memoisation under test.
+    vi.useFakeTimers();
+    resetNowTickersForTests();
+    try {
+      const session = makeCached({
+        id: 'memo-1',
+        status: 'busy',
+        title: 'Memo work',
+        createdOnPlatform: 'cli',
+        gitBranch: 'feature/memo',
+        updatedAt: '2026-08-28T11:55:00.000Z',
+      });
+      const onPress = vi.fn<(session: ActiveSession) => void>();
+      const tree = (next: ActiveSession, interactive = true) =>
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(Parent, { session: next, onPress, interactive })
+        );
+      const renderer = mountTree(tree(session));
+      expect(sessionRowRenders.count).toBe(1);
+      expect(spokenCostCalls.count).toBe(1);
 
-    // The shape an unchanged-payload poll writes: the same session object and
-    // the same stable handler. The memoised row must not re-render at all.
-    act(() => {
-      renderer.update(tree(session));
-    });
-    expect(sessionRowRenders.count).toBe(1);
-    expect(spokenCostCalls.count).toBe(1);
+      // The shape an unchanged-payload poll writes: the same session object and
+      // the same stable handler. The memoised row must not re-render at all.
+      act(() => {
+        renderer.update(tree(session));
+      });
+      expect(sessionRowRenders.count).toBe(1);
+      expect(spokenCostCalls.count).toBe(1);
 
-    // A parent commit that does re-run the row body without touching the
-    // session (here the `interactive` prop) reuses the memoised derivations.
-    act(() => {
-      renderer.update(tree(session, false));
-    });
-    expect(sessionRowRenders.count).toBe(2);
-    expect(spokenCostCalls.count).toBe(1);
+      // A parent commit that does re-run the row body without touching the
+      // session (here the `interactive` prop) reuses the memoised derivations.
+      act(() => {
+        renderer.update(tree(session, false));
+      });
+      expect(sessionRowRenders.count).toBe(2);
+      expect(spokenCostCalls.count).toBe(1);
 
-    // A new session object re-derives and re-renders.
-    act(() => {
-      renderer.update(tree({ ...session }));
-    });
-    expect(sessionRowRenders.count).toBe(3);
-    expect(spokenCostCalls.count).toBe(2);
+      // A new session object re-derives and re-renders.
+      act(() => {
+        renderer.update(tree({ ...session }));
+      });
+      expect(sessionRowRenders.count).toBe(3);
+      expect(spokenCostCalls.count).toBe(2);
 
-    act(() => {
-      renderer.unmount();
-    });
+      act(() => {
+        renderer.unmount();
+      });
+    } finally {
+      resetNowTickersForTests();
+      vi.useRealTimers();
+    }
   });
 
   it('ages the row meta and its spoken label from the row\u2019s own clock', async () => {

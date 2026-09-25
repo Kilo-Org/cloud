@@ -133,3 +133,18 @@ export function hasCodingPlanForModel(providerId: string, modelId: string): bool
 export function isMonthlyCodingPlan(planId?: string): boolean {
   return planId ? getCodingPlanPrice(planId)?.billingPeriodDays === 30 : false;
 }
+
+// MiniMax Token Plans (Plus/Max/Ultra) are closed to new subscribers. Existing
+// subscriptions continue unaffected: they keep routing, renewing, and can
+// still be canceled; only new purchases and new "notify me" waitlist entries
+// are rejected. See .specs/coding-plans.md for the governed catalog rules
+// this deliberately overrides for these three plan IDs.
+const CODING_PLANS_DISABLED_FOR_NEW_SIGNUPS = new Set<CodingPlanId>([
+  'minimax-token-plan-plus',
+  'minimax-token-plan-max',
+  'minimax-token-plan-ultra',
+]);
+
+export function isCodingPlanDisabledForNewSignups(planId: CodingPlanId): boolean {
+  return CODING_PLANS_DISABLED_FOR_NEW_SIGNUPS.has(planId);
+}

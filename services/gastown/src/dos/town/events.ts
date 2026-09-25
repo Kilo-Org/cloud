@@ -14,14 +14,8 @@ import {
 } from '../../db/tables/town-events.table';
 import type { TownEventType } from '../../db/tables/town-events.table';
 import { query } from '../../util/query.util';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
+import { generateId } from '../../util/id.util';
+import { now } from '../../util/time.util';
 
 /** Create the town_events table and indexes. Idempotent. */
 export function initTownEventsTable(sql: SqlStorage): void {

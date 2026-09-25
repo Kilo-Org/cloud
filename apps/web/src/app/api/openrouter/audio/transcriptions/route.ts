@@ -34,7 +34,6 @@ import {
 import type { PromptInfo } from '@/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 
 export const maxDuration = 800;
 
@@ -93,13 +92,7 @@ function extractMultipartLanguage(formData: FormData): string | null {
  */
 type ParsedTranscriptionRequest =
   | { kind: 'json'; body: TranscriptionRequest }
-  | {
-      kind: 'multipart';
-      file: File;
-      model: string;
-      language: string | null;
-      provider?: TranscriptionRequest['provider'];
-    };
+  | { kind: 'multipart'; file: File; model: string; language: string | null };
 
 async function parseMultipartTranscriptionRequest(
   request: NextRequest
@@ -118,26 +111,11 @@ async function parseMultipartTranscriptionRequest(
   if (typeof modelField !== 'string' || modelField.trim().length === 0) return null;
   const filePart = formData.get('file');
   if (!filePart || typeof filePart === 'string') return null;
-  const providerField = formData.get('provider');
-  let provider: TranscriptionRequest['provider'];
-  if (providerField !== null) {
-    if (typeof providerField !== 'string') return null;
-    let parsedProvider: unknown;
-    try {
-      parsedProvider = JSON.parse(providerField);
-    } catch {
-      return null;
-    }
-    const result = TranscriptionRequestSchema.shape.provider.safeParse(parsedProvider);
-    if (!result.success) return null;
-    provider = result.data;
-  }
   return {
     kind: 'multipart',
     file: filePart,
     model: modelField.trim(),
     language: extractMultipartLanguage(formData),
-    provider,
   };
 }
 
@@ -279,9 +257,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId,
     user
   );
-  const requestProvider =
-    parsedRequest.kind === 'json' ? parsedRequest.body.provider : parsedRequest.provider;
-  const effectivePrivacy = getEffectiveProviderPrivacy(requestProvider, settings?.data_collection);
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
@@ -301,7 +276,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  let providerPolicy = providerConfig;
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -309,19 +283,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       modelId: requestedModelLowerCased,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes) {
+    const eligibleRoutes = decision.eligibleProviderRoutes;
+    if (eligibleRoutes) {
       const currentOnly = providerConfig?.only;
-      const only = currentOnly
-        ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
-        : [...decision.eligibleProviderRoutes];
-      if (only.length === 0) return modelNotAllowedResponse();
-      providerPolicy = { ...providerConfig, only };
+      const hasEligibleRoute = currentOnly
+        ? currentOnly.some(route => eligibleRoutes.has(route))
+        : eligibleRoutes.size > 0;
+      if (!hasEligibleRoute) return modelNotAllowedResponse();
     }
   }
-  const effectiveProvider =
-    requestProvider || providerPolicy || Object.keys(effectivePrivacy).length > 0
-      ? { ...requestProvider, ...providerPolicy, ...effectivePrivacy }
-      : undefined;
 
   sentryRootSpan()?.setAttribute(
     'transcription.time_to_request_start_ms',
@@ -339,16 +309,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const safetyIdentifier = generateProviderSpecificHash(user.id, provider);
     upstreamForm.append('safety_identifier', safetyIdentifier);
     upstreamForm.append('user', safetyIdentifier);
-    if (effectiveProvider) {
-      upstreamForm.append('provider', JSON.stringify(effectiveProvider));
-    }
     upstreamBody = upstreamForm;
   } else {
     parsedRequest.body.safety_identifier = generateProviderSpecificHash(user.id, provider);
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
-    if (effectiveProvider) {
-      parsedRequest.body.provider = effectiveProvider;
-    }
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
 

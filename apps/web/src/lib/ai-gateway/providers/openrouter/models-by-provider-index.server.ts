@@ -148,7 +148,9 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
         const snapshot = await options.fetchSnapshot().catch(() => undefined);
 
         return {
-          expiresAtMs: options.nowMs() + options.ttlMs,
+          // A failed read retries on the next call so an empty data-collection
+          // set does not stick for the TTL; callers fall back to best-effort checks.
+          expiresAtMs: snapshot ? options.nowMs() + options.ttlMs : options.nowMs(),
           index: snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map(),
           dataCollectionRequiredModelIds: snapshot
             ? buildDataCollectionRequiredModelIds(snapshot)

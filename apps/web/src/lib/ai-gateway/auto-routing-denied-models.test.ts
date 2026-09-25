@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
 import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';

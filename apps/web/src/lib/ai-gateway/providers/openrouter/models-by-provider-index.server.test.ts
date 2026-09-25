@@ -180,6 +180,32 @@ describe('createModelsByProviderIndexLoader', () => {
     );
   });
 
+  it('retries a failed snapshot read instead of caching an empty data-collection set', async () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = snapshot.providers.map(provider =>
+      provider.slug === 'nvidia'
+        ? { ...provider, dataPolicy: { ...provider.dataPolicy, training: true } }
+        : provider
+    );
+    let calls = 0;
+    const { getDataCollectionRequiredModelIds } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('database unavailable');
+        return snapshot;
+      },
+      fetchOpenRouterModels: async () => storedModels,
+      fetchVercelModels: async () => ({}),
+      ttlMs: 60_000,
+      nowMs: () => 0,
+    });
+
+    await expect(getDataCollectionRequiredModelIds()).resolves.toEqual(new Set());
+    await expect(getDataCollectionRequiredModelIds()).resolves.toEqual(new Set([FREE_MODEL]));
+    await getDataCollectionRequiredModelIds();
+    expect(calls).toBe(2);
+  });
+
   it('resolves variant-specific providers for suffixed ids', async () => {
     const { getProviderSlugsForModel } = loader();
 

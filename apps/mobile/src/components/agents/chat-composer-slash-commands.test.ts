@@ -10,6 +10,7 @@ import {
   getLocalExitSlashCommand,
   getLocalNewSlashCommand,
   getSlashCommandCandidate,
+  getSlashCommandCatalogNotice,
   getSlashCommandDescription,
   getSlashCommandSuggestions,
   isCatalogueSlashCommand,
@@ -507,5 +508,26 @@ describe('isCatalogueSlashCommand', () => {
 
   it('accounts for a command this client registered', () => {
     expect(isCatalogueSlashCommand(getLocalNewSlashCommand())).toBe(true);
+  });
+});
+
+describe('getSlashCommandCatalogNotice', () => {
+  it('says nothing when the wrapper sent the whole catalog', () => {
+    expect(getSlashCommandCatalogNotice(null)).toBeNull();
+    expect(getSlashCommandCatalogNotice(undefined)).toBeNull();
+    expect(getSlashCommandCatalogNotice({ dropped: 0, overLimit: false })).toBeNull();
+  });
+
+  it('says that commands are hidden when rows were dropped', () => {
+    expect(getSlashCommandCatalogNotice({ dropped: 7, overLimit: false })).toBe(
+      en.agentChat.slashCommands.catalogFull
+    );
+  });
+
+  it('says that every skill is listed when an over-limit catalog dropped nothing', () => {
+    const notice = getSlashCommandCatalogNotice({ dropped: 0, overLimit: true });
+    expect(notice).toBe(en.agentChat.slashCommands.catalogOverLimit);
+    // The catalog is complete in this case, so the dropped-rows copy would lie.
+    expect(notice).not.toBe(en.agentChat.slashCommands.catalogFull);
   });
 });

@@ -2638,6 +2638,8 @@
       "useCommand": "Izmantot /{{command}}",
       "useSkillCommand": "Izmantot prasmi /{{command}}",
       "skillBadge": "Prasme",
+      "catalogFull": "Komandu katalogs ir pilns, tāpēc dažas komandas ir paslēptas.",
+      "catalogOverLimit": "Prasmju katalogs pārsniedz izmēra ierobežojumu, tāpēc tiek rādītas visas prasmes.",
       "insert": "Ievietot",
       "upgradeRequiredFallback": "Lūdzu, atjaunini savu CLI, lai izmantotu šo komandu.",
       "exitCapabilityUnavailable": "Atjaunini savu CLI, lai izietu no sesijas.",

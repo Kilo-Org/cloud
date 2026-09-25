@@ -81,6 +81,30 @@ export type BoundedSlashCommandCatalog = {
 };
 
 /**
+ * The bound status a client needs to tell the reader that the catalog the
+ * wrapper sent is not the whole catalog: `dropped` non-skill rows are missing,
+ * and `overLimit` means the rows kept still exceed a bound because the skill
+ * rows alone are over it.
+ */
+export type SlashCommandCatalogStatus = {
+  dropped: number;
+  overLimit: boolean;
+};
+
+/**
+ * The status to report for a bounded catalog, or `undefined` when the catalog
+ * is within every bound. An unbounded catalog adds nothing to the wire payload,
+ * so an absent status always means "the whole catalog was sent".
+ */
+export function slashCommandCatalogStatus(
+  bounded: BoundedSlashCommandCatalog
+): SlashCommandCatalogStatus | undefined {
+  return bounded.dropped > 0 || bounded.overLimit
+    ? { dropped: bounded.dropped, overLimit: bounded.overLimit }
+    : undefined;
+}
+
+/**
  * Bound a catalog to the shared limits without ever truncating a skill row.
  *
  * Skill rows always survive: non-skill rows fill the remaining count budget in

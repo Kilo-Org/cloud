@@ -2140,6 +2140,8 @@
       "useCommand": "Использовать /{{command}}",
       "useSkillCommand": "Использовать навык /{{command}}",
       "skillBadge": "Навык",
+      "catalogFull": "Каталог команд заполнен, поэтому часть команд скрыта.",
+      "catalogOverLimit": "Каталог навыков превышает предел размера, поэтому показаны все навыки.",
       "insert": "Вставить",
       "upgradeRequiredFallback": "Обновите CLI, чтобы использовать эту команду.",
       "exitCapabilityUnavailable": "Обновите CLI, чтобы выйти из сеанса.",

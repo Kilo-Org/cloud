@@ -2600,6 +2600,8 @@
       "useCommand": "Kasuta /{{command}}",
       "useSkillCommand": "Kasuta oskust /{{command}}",
       "skillBadge": "Oskus",
+      "catalogFull": "Käskude loend on täis, seega on osa käske peidetud.",
+      "catalogOverLimit": "Oskuste loend ületab suuruspiiri, seega kuvatakse kõik oskused.",
       "insert": "Lisa",
       "upgradeRequiredFallback": "Selle käsu kasutamiseks uuenda CLI-d.",
       "exitCapabilityUnavailable": "Seansist väljumiseks uuenda CLI-d.",

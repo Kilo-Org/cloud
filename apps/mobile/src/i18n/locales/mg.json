@@ -2600,6 +2600,8 @@
       "useCommand": "Ampiasao /{{command}}",
       "useSkillCommand": "Ampiasao ny fahaiza-manao /{{command}}",
       "skillBadge": "Fahaiza-manao",
+      "catalogFull": "Feno ny lisitry ny baiko, ka misy baiko afenina.",
+      "catalogOverLimit": "Mihoatra ny fetra ny lisitry ny fahaizana, ka aseho avokoa ny fahaizana rehetra.",
       "insert": "Ampidiro",
       "upgradeRequiredFallback": "Havaozy ny CLI mba hampiasana ity baiko ity.",
       "exitCapabilityUnavailable": "Havaozy ny CLI mba hivoahana amin'ny fotoam-piasana.",

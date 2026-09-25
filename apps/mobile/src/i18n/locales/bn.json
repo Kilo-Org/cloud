@@ -2600,6 +2600,8 @@
       "useCommand": "/{{command}} ব্যবহার করুন",
       "useSkillCommand": "/{{command}} স্কিল ব্যবহার করুন",
       "skillBadge": "স্কিল",
+      "catalogFull": "কমান্ড তালিকা পূর্ণ, তাই কিছু কমান্ড লুকানো আছে।",
+      "catalogOverLimit": "স্কিল তালিকা আকার সীমা ছাড়িয়ে গেছে, তাই সব স্কিল দেখানো হয়েছে।",
       "insert": "যোগ করুন",
       "upgradeRequiredFallback": "এই কমান্ডটি ব্যবহার করতে আপনার CLI আপগ্রেড করুন।",
       "exitCapabilityUnavailable": "সেশন শেষ করতে আপনার CLI আপডেট করুন।",

@@ -198,6 +198,20 @@ export type SlashCommandInfo = {
   subtask?: boolean | undefined;
 };
 
+/**
+ * Bound status the wrapper reports beside a `commands.available` catalog.
+ *
+ * Present only when the wrapper bounded the catalog to the shared 256-command
+ * and 512 KiB limits: `dropped` counts the non-skill rows it removed, and
+ * `overLimit` means the rows it kept still exceed a bound because the skill
+ * rows alone are over it (a skill row is never truncated). A consumer shows a
+ * notice for it, so a catalog that is missing rows is never silent.
+ */
+export type SlashCommandCatalogStatus = {
+  dropped: number;
+  overLimit: boolean;
+};
+
 /** Per-user-message delivery state, tracked via server-emitted cloud.message.* events. */
 export type MessageDeliveryState =
   | { status: 'queued' }

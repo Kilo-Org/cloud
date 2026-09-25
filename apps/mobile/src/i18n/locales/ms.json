@@ -2600,6 +2600,8 @@
       "useCommand": "Gunakan /{{command}}",
       "useSkillCommand": "Gunakan kemahiran /{{command}}",
       "skillBadge": "Kemahiran",
+      "catalogFull": "Katalog perintah penuh, jadi sesetengah perintah disembunyikan.",
+      "catalogOverLimit": "Katalog kemahiran melebihi had saiz, jadi semua kemahiran disenaraikan.",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Sila naik taraf CLI anda untuk menggunakan arahan ini.",
       "exitCapabilityUnavailable": "Kemas kini CLI anda untuk keluar daripada sesi.",

@@ -2096,6 +2096,8 @@
       "useCommand": "Gunakan /{{command}}",
       "useSkillCommand": "Gunakan keterampilan /{{command}}",
       "skillBadge": "Keterampilan",
+      "catalogFull": "Katalog perintah sudah penuh, jadi sebagian perintah disembunyikan.",
+      "catalogOverLimit": "Katalog skill melebihi batas ukuran, jadi semua skill ditampilkan.",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Perbarui CLI untuk menggunakan perintah ini.",
       "exitCapabilityUnavailable": "Perbarui CLI untuk keluar dari sesi.",

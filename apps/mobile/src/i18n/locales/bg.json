@@ -2600,6 +2600,8 @@
       "useCommand": "Използвай /{{command}}",
       "useSkillCommand": "Използвай умението /{{command}}",
       "skillBadge": "Умение",
+      "catalogFull": "Каталогът с команди е пълен, затова някои команди са скрити.",
+      "catalogOverLimit": "Каталогът с умения надхвърля ограничението за размер, затова се показват всички умения.",
       "insert": "Вмъкни",
       "upgradeRequiredFallback": "Актуализирай CLI, за да използваш тази команда.",
       "exitCapabilityUnavailable": "Актуализирай CLI, за да прекратиш сесията.",

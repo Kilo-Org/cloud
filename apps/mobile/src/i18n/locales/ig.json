@@ -2600,6 +2600,8 @@
       "useCommand": "Jiri /{{command}}",
       "useSkillCommand": "Jiri nkà /{{command}}",
       "skillBadge": "Nkà",
+      "catalogFull": "Ndekọ iwu ejuola, ya mere e zoro ụfọdụ iwu.",
+      "catalogOverLimit": "Ndekọ nkà karịrị oke nha, ya mere e gosiri nkà niile.",
       "insert": "Tinye",
       "upgradeRequiredFallback": "Biko kwalite CLI gị ka ị jiri iwu a.",
       "exitCapabilityUnavailable": "Melite CLI gị ka ị pụọ na nnọkọ.",

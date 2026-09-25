@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   boundSlashCommandCatalog,
   parseSlashInvocation,
+  slashCommandCatalogStatus,
   toSlashCommandInfo,
   commandsOrDefault,
   SLASH_COMMAND_CATALOG_MAX_COMMANDS,
@@ -249,6 +250,28 @@ describe('boundSlashCommandCatalog', () => {
     expect(
       new TextEncoder().encode(JSON.stringify(result.commands)).byteLength
     ).toBeLessThanOrEqual(SLASH_COMMAND_CATALOG_MAX_SERIALIZED_BYTES);
+  });
+});
+
+describe('slashCommandCatalogStatus', () => {
+  it('reports nothing for a catalog that fits its bounds', () => {
+    expect(
+      slashCommandCatalogStatus({ commands: [], dropped: 0, overLimit: false })
+    ).toBeUndefined();
+  });
+
+  it('reports dropped rows', () => {
+    expect(slashCommandCatalogStatus({ commands: [], dropped: 3, overLimit: false })).toEqual({
+      dropped: 3,
+      overLimit: false,
+    });
+  });
+
+  it('reports an over-limit catalog that dropped nothing', () => {
+    expect(slashCommandCatalogStatus({ commands: [], dropped: 0, overLimit: true })).toEqual({
+      dropped: 0,
+      overLimit: true,
+    });
   });
 });
 

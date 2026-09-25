@@ -18,13 +18,13 @@ describe('handleCommandsAvailable', () => {
     );
 
     expect(setAvailableCommands).toHaveBeenCalledTimes(1);
-    expect(setAvailableCommands).toHaveBeenCalledWith(
-      expect.arrayContaining([
+    expect(setAvailableCommands).toHaveBeenCalledWith({
+      commands: expect.arrayContaining([
         expect.objectContaining({ name: 'review', description: 'Review', hints: [] }),
         expect.objectContaining({ name: 'init', hints: ['$ARGUMENTS'], source: 'command' }),
         { name: 'compact', description: 'compact the current session context', hints: [] },
-      ])
-    );
+      ]),
+    });
   });
 
   it('drops items missing a name without rejecting the whole event', async () => {
@@ -34,12 +34,12 @@ describe('handleCommandsAvailable', () => {
       { setAvailableCommands, logger: silentLogger }
     );
 
-    expect(setAvailableCommands).toHaveBeenCalledWith(
-      expect.arrayContaining([
+    expect(setAvailableCommands).toHaveBeenCalledWith({
+      commands: expect.arrayContaining([
         expect.objectContaining({ name: 'ok', hints: [] }),
         { name: 'compact', description: 'compact the current session context', hints: [] },
-      ])
-    );
+      ]),
+    });
   });
 
   it('keeps a skill-sourced row the wrapper reports for the session', async () => {
@@ -59,9 +59,11 @@ describe('handleCommandsAvailable', () => {
       { setAvailableCommands, logger: silentLogger }
     );
 
-    expect(setAvailableCommands).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ name: 'kilo-config', source: 'skill' })])
-    );
+    expect(setAvailableCommands).toHaveBeenCalledWith({
+      commands: expect.arrayContaining([
+        expect.objectContaining({ name: 'kilo-config', source: 'skill' }),
+      ]),
+    });
   });
 
   it('warns and skips when commands array is missing', async () => {
@@ -90,7 +92,35 @@ describe('handleCommandsAvailable', () => {
     await handleCommandsAvailable({ commands: [] }, { setAvailableCommands, logger: silentLogger });
 
     expect(setAvailableCommands).toHaveBeenCalledTimes(1);
-    expect(setAvailableCommands).toHaveBeenCalledWith(commandsOrDefault(undefined));
+    expect(setAvailableCommands).toHaveBeenCalledWith({ commands: commandsOrDefault(undefined) });
+  });
+
+  it('persists the catalog bound status beside the catalog', async () => {
+    const setAvailableCommands = vi.fn().mockResolvedValue(undefined);
+    await handleCommandsAvailable(
+      {
+        commands: [{ name: 'review', hints: [] }],
+        catalogStatus: { dropped: 7, overLimit: false },
+      },
+      { setAvailableCommands, logger: silentLogger }
+    );
+
+    expect(setAvailableCommands).toHaveBeenCalledWith({
+      commands: expect.arrayContaining([expect.objectContaining({ name: 'review' })]),
+      catalogStatus: { dropped: 7, overLimit: false },
+    });
+  });
+
+  it('drops an invalid bound status without rejecting the catalog', async () => {
+    const setAvailableCommands = vi.fn().mockResolvedValue(undefined);
+    await handleCommandsAvailable(
+      { commands: [{ name: 'review', hints: [] }], catalogStatus: { dropped: 'many' } },
+      { setAvailableCommands, logger: silentLogger }
+    );
+
+    expect(setAvailableCommands).toHaveBeenCalledWith({
+      commands: expect.arrayContaining([expect.objectContaining({ name: 'review' })]),
+    });
   });
 
   it('persists defaults when all items fail validation', async () => {
@@ -101,6 +131,6 @@ describe('handleCommandsAvailable', () => {
     );
 
     expect(setAvailableCommands).toHaveBeenCalledTimes(1);
-    expect(setAvailableCommands).toHaveBeenCalledWith(commandsOrDefault(undefined));
+    expect(setAvailableCommands).toHaveBeenCalledWith({ commands: commandsOrDefault(undefined) });
   });
 });

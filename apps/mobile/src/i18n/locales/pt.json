@@ -2638,6 +2638,8 @@
       "useCommand": "Usar /{{command}}",
       "useSkillCommand": "Usar competência /{{command}}",
       "skillBadge": "Competência",
+      "catalogFull": "O catálogo de comandos está cheio, por isso alguns comandos ficam ocultos.",
+      "catalogOverLimit": "O catálogo de competências excede o limite de tamanho, por isso são apresentadas todas as competências.",
       "insert": "Inserir",
       "upgradeRequiredFallback": "Atualize a sua CLI para usar este comando.",
       "exitCapabilityUnavailable": "Atualize a sua CLI para sair da sessão.",

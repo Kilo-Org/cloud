@@ -2140,6 +2140,8 @@
       "useCommand": "Użyj /{{command}}",
       "useSkillCommand": "Użyj umiejętności /{{command}}",
       "skillBadge": "Umiejętność",
+      "catalogFull": "Katalog poleceń jest pełny, więc niektóre polecenia są ukryte.",
+      "catalogOverLimit": "Katalog umiejętności przekracza limit rozmiaru, więc wyświetlane są wszystkie umiejętności.",
       "insert": "Wstaw",
       "upgradeRequiredFallback": "Zaktualizuj swoje CLI, aby użyć tego polecenia.",
       "exitCapabilityUnavailable": "Zaktualizuj swoje CLI, aby zakończyć sesję.",

@@ -2638,6 +2638,8 @@
       "useCommand": "Folosește /{{command}}",
       "useSkillCommand": "Folosește competența /{{command}}",
       "skillBadge": "Competență",
+      "catalogFull": "Catalogul de comenzi este plin, așa că unele comenzi sunt ascunse.",
+      "catalogOverLimit": "Catalogul de abilități depășește limita de dimensiune, așa că toate abilitățile sunt listate.",
       "insert": "Inserează",
       "upgradeRequiredFallback": "Actualizează CLI-ul pentru a folosi această comandă.",
       "exitCapabilityUnavailable": "Actualizează CLI-ul pentru a închide sesiunea.",

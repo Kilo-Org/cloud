@@ -2600,6 +2600,8 @@
       "useCommand": "Tumia /{{command}}",
       "useSkillCommand": "Tumia ujuzi /{{command}}",
       "skillBadge": "Ujuzi",
+      "catalogFull": "Katalogi ya amri imejaa, kwa hivyo baadhi ya amri zimefichwa.",
+      "catalogOverLimit": "Katalogi ya ujuzi inazidi kikomo cha ukubwa, kwa hivyo ujuzi wote unaonyeshwa.",
       "insert": "Ingiza",
       "upgradeRequiredFallback": "Tafadhali sasisha CLI yako ili utumie amri hii.",
       "exitCapabilityUnavailable": "Sasisha CLI yako ili utoke kwenye kikao.",

@@ -2600,6 +2600,8 @@
       "useCommand": "استفاده از /{{command}}",
       "useSkillCommand": "استفاده از مهارت /{{command}}",
       "skillBadge": "مهارت",
+      "catalogFull": "فهرست فرمان‌ها پر است، بنابراین برخی فرمان‌ها پنهان شده‌اند.",
+      "catalogOverLimit": "فهرست مهارت‌ها از حد اندازه فراتر رفته است، بنابراین همه مهارت‌ها نمایش داده می‌شوند.",
       "insert": "درج",
       "upgradeRequiredFallback": "برای استفاده از این دستور، CLI خود را ارتقا دهید.",
       "exitCapabilityUnavailable": "برای خروج از نشست، CLI خود را به‌روزرسانی کنید.",

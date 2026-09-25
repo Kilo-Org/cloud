@@ -2676,6 +2676,8 @@
       "useCommand": "Uporabi /{{command}}",
       "useSkillCommand": "Uporabi veščino /{{command}}",
       "skillBadge": "Veščina",
+      "catalogFull": "Katalog ukazov je poln, zato so nekateri ukazi skriti.",
+      "catalogOverLimit": "Katalog veščin presega omejitev velikosti, zato so prikazane vse veščine.",
       "insert": "Vstavi",
       "upgradeRequiredFallback": "Nadgradi svoj CLI za uporabo tega ukaza.",
       "exitCapabilityUnavailable": "Posodobi svoj CLI za izhod iz seje.",

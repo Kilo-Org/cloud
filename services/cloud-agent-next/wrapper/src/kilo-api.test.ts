@@ -162,17 +162,21 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       },
     ]);
 
-    const commands = await createClient(stub.url).listCommands();
+    const catalog = await createClient(stub.url).listCommands();
 
-    expect(commands).toEqual([
-      { name: 'review', description: 'Review', source: 'command', hints: [] },
-      {
-        name: 'kilo-config',
-        description: 'Guide for Kilo configuration',
-        source: 'skill',
-        hints: [],
-      },
-    ]);
+    expect(catalog).toEqual({
+      commands: [
+        { name: 'review', description: 'Review', source: 'command', hints: [] },
+        {
+          name: 'kilo-config',
+          description: 'Guide for Kilo configuration',
+          source: 'skill',
+          hints: [],
+        },
+      ],
+      dropped: 0,
+      overLimit: false,
+    });
   });
 
   it('keeps every skill row when a full catalog is bounded', async () => {
@@ -193,14 +197,18 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       })),
     ]);
 
-    const commands = await createClient(stub.url).listCommands();
+    const catalog = await createClient(stub.url).listCommands();
 
-    expect(commands).toHaveLength(256);
-    expect(commands.filter(command => command.source === 'skill')).toEqual([
+    expect(catalog.commands).toHaveLength(256);
+    expect(catalog.commands.filter(command => command.source === 'skill')).toEqual([
       { name: 'skill-0', description: 'Guide', source: 'skill', hints: [] },
       { name: 'skill-1', description: 'Guide', source: 'skill', hints: [] },
       { name: 'skill-2', description: 'Guide', source: 'skill', hints: [] },
     ]);
+    // 260 non-skill rows plus 3 skill rows against a 256-command bound: the
+    // skill rows survive and 7 non-skill rows do not.
+    expect(catalog.dropped).toBe(7);
+    expect(catalog.overLimit).toBe(false);
   });
 
   it('reports the full catalog when skill rows alone exceed a bound', async () => {
@@ -220,11 +228,13 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         }))
       );
 
-      const commands = await createClient(stub.url).listCommands();
+      const catalog = await createClient(stub.url).listCommands();
 
       // Skill rows are never truncated: the over-limit catalog is returned as
       // the CLI reported it, and the wrapper says so instead of hiding skills.
-      expect(commands).toHaveLength(300);
+      expect(catalog.commands).toHaveLength(300);
+      expect(catalog.dropped).toBe(0);
+      expect(catalog.overLimit).toBe(true);
       expect(readFileSync(logPath, 'utf8')).toContain('slash command catalog over limit');
     } finally {
       if (originalLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;

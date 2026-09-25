@@ -2600,6 +2600,8 @@
       "useCommand": "Yi amfani da /{{command}}",
       "useSkillCommand": "Yi amfani da ƙwarewa /{{command}}",
       "skillBadge": "Ƙwarewa",
+      "catalogFull": "Jerin umarni ya cika, don haka wasu umarni suna ɓoye.",
+      "catalogOverLimit": "Jerin ƙwarewa ya wuce iyakar girma, don haka ana nuna kowace ƙwarewa.",
       "insert": "Saka",
       "upgradeRequiredFallback": "Sabunta CLI ɗinka don amfani da wannan umarnin.",
       "exitCapabilityUnavailable": "Sabunta CLI ɗinka don fita daga zaman.",

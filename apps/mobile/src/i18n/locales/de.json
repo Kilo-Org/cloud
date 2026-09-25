@@ -2096,6 +2096,8 @@
       "useCommand": "/{{command}} verwenden",
       "useSkillCommand": "Skill /{{command}} verwenden",
       "skillBadge": "Skill",
+      "catalogFull": "Der Befehlskatalog ist voll, daher sind einige Befehle ausgeblendet.",
+      "catalogOverLimit": "Der Skill-Katalog überschreitet sein Größenlimit, daher werden alle Skills aufgelistet.",
       "insert": "Einfügen",
       "upgradeRequiredFallback": "Bitte aktualisiere deine CLI, um diesen Befehl zu verwenden.",
       "exitCapabilityUnavailable": "Aktualisiere deine CLI, um die Sitzung zu beenden.",

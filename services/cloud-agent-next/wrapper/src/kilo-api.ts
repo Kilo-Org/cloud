@@ -19,6 +19,7 @@ import { logToFile } from './utils.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
+  type BoundedSlashCommandCatalog,
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
 
@@ -273,8 +274,12 @@ export type WrapperKiloClient = {
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<SessionCommandResponse>;
-  /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
-  listCommands: () => Promise<SlashCommandInfo[]>;
+  /**
+   * Fetch the full slash command catalog from kilo, trimmed to wire shape and
+   * bounded to the shared limits. The bound status is returned beside the
+   * commands so the client can be told when rows were dropped.
+   */
+  listCommands: () => Promise<BoundedSlashCommandCatalog>;
   answerPermission: (
     permissionId: string,
     response: PermissionResponse,
@@ -524,7 +529,8 @@ export function createWrapperKiloClient(
       }
       // Bound the catalog the same way the remote catalog is bounded. The
       // bound drops non-skill rows first and never truncates a skill row; a
-      // full catalog is reported rather than silently hiding skills.
+      // full catalog carries its status to the client rather than hiding
+      // skills silently.
       const bounded = boundSlashCommandCatalog(commands);
       if (bounded.dropped > 0 || bounded.overLimit) {
         logToFile(
@@ -533,7 +539,7 @@ export function createWrapperKiloClient(
             : `slash command catalog full: dropped ${bounded.dropped} non-skill rows, kept ${bounded.commands.length}`
         );
       }
-      return bounded.commands;
+      return bounded;
     },
 
     answerPermission: async (

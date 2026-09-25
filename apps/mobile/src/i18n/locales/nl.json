@@ -2096,6 +2096,8 @@
       "useCommand": "/{{command}} gebruiken",
       "useSkillCommand": "Vaardigheid /{{command}} gebruiken",
       "skillBadge": "Vaardigheid",
+      "catalogFull": "De opdrachtcatalogus is vol, dus sommige opdrachten zijn verborgen.",
+      "catalogOverLimit": "De vaardighedencatalogus overschrijdt de groottelimiet, dus elke vaardigheid wordt weergegeven.",
       "insert": "Invoegen",
       "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
       "exitCapabilityUnavailable": "Werk je CLI bij om de sessie af te sluiten.",

@@ -2600,6 +2600,8 @@
       "useCommand": "/{{command}} ಬಳಸಿ",
       "useSkillCommand": "/{{command}} ಕೌಶಲ್ಯ ಬಳಸಿ",
       "skillBadge": "ಕೌಶಲ್ಯ",
+      "catalogFull": "ಆಜ್ಞೆಗಳ ಪಟ್ಟಿ ತುಂಬಿದೆ, ಆದ್ದರಿಂದ ಕೆಲವು ಆಜ್ಞೆಗಳು ಮರೆಯಾಗಿವೆ.",
+      "catalogOverLimit": "ಕೌಶಲಗಳ ಪಟ್ಟಿ ಗಾತ್ರ ಮಿತಿ ಮೀರಿದೆ, ಆದ್ದರಿಂದ ಎಲ್ಲ ಕೌಶಲಗಳನ್ನು ತೋರಿಸಲಾಗಿದೆ.",
       "insert": "ಸೇರಿಸಿ",
       "upgradeRequiredFallback": "ಈ ಆಜ್ಞೆಯನ್ನು ಬಳಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
       "exitCapabilityUnavailable": "ಸೆಶನ್‌ನಿಂದ ನಿರ್ಗಮಿಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",

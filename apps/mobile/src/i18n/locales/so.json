@@ -2600,6 +2600,8 @@
       "useCommand": "Isticmaal /{{command}}",
       "useSkillCommand": "Isticmaal xirfadda /{{command}}",
       "skillBadge": "Xirfad",
+      "catalogFull": "Liiska amarrada waa buuxa, sidaas darteed qaar ka mid ah amarrada waa qarsoon yihiin.",
+      "catalogOverLimit": "Liiska xirfadaha wuu dhaafay xadka cabbirka, sidaas darteed dhammaan xirfadaha waa la muujiyay.",
       "insert": "Geli",
       "upgradeRequiredFallback": "Fadlan cusboonaysii CLI-gaaga si aad u isticmaasho amarkan.",
       "exitCapabilityUnavailable": "Cusboonaysii CLI-gaaga si aad uga baxdo kalfadhiga.",

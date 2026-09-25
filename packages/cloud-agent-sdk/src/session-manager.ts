@@ -51,6 +51,7 @@ import type {
   QuestionState,
   PermissionState,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
@@ -458,6 +459,11 @@ type SessionManagerAtoms = {
   fetchedSessionData: W<FetchedSessionData | null>;
   /** Slash command catalog reported by the wrapper for the current session. */
   availableCommands: W<SlashCommandInfo[]>;
+  /**
+   * Bound status of that catalog, or `null` when the wrapper sent the whole
+   * catalog. Present when rows were dropped or the kept rows exceed a bound.
+   */
+  availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
@@ -923,6 +929,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * DO) and on every wrapper push. Empty list = wrapper hasn't reported yet.
    */
   const availableCommandsAtom = atom<SlashCommandInfo[]>([]);
+  /**
+   * Bound status reported with the catalog: present only when the wrapper
+   * bounded it, so the composer can say that rows are missing instead of
+   * hiding them silently. Cleared with the catalog.
+   */
+  const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
@@ -1167,6 +1179,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(childSessionErrorsAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
+    store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
@@ -2328,8 +2341,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         if (event.type === 'commands.available') {
           // Replace the catalog wholesale. The DO sends the full list on
-          // every connect, so we never need to merge incrementally.
+          // every connect, so we never need to merge incrementally. The bound
+          // status is replaced with it: a catalog the wrapper bounded keeps its
+          // notice, and an unbounded one clears any previous notice.
           store.set(availableCommandsAtom, event.commands);
+          store.set(availableCommandsCatalogStatusAtom, event.catalogStatus ?? null);
           return;
         }
         if (event.type === 'queue.changed' && activeSessionType === 'remote') {
@@ -2947,6 +2963,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       billingFailure: billingFailureAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       availableCommands: availableCommandsAtom,
+      availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,

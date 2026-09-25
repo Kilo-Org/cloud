@@ -2184,6 +2184,8 @@
       "useCommand": "استخدام /{{command}}",
       "useSkillCommand": "استخدام مهارة /{{command}}",
       "skillBadge": "مهارة",
+      "catalogFull": "كتالوج الأوامر ممتلئ، لذا بعض الأوامر مخفية.",
+      "catalogOverLimit": "كتالوج المهارات يتجاوز حد الحجم، لذا تُعرض كل المهارات.",
       "insert": "إدراج",
       "upgradeRequiredFallback": "حدّث CLI لاستخدام هذا الأمر.",
       "exitCapabilityUnavailable": "حدّث CLI للخروج من الجلسة.",

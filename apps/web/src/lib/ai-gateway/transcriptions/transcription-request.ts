@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { providerPrivacySchema } from '@/lib/ai-gateway/provider-privacy';
 
 export const TranscriptionInputAudioSchema = z.object({
   data: z.string().min(1),
@@ -12,7 +11,7 @@ export const TranscriptionRequestSchema = z
     input_audio: TranscriptionInputAudioSchema,
     language: z.string().min(1).optional(),
     temperature: z.number().optional(),
-    provider: providerPrivacySchema.loose().optional(),
+    provider: z.record(z.string(), z.unknown()).optional(),
     safety_identifier: z.string().optional(),
     user: z.string().optional(),
   })

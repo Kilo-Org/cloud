@@ -30,35 +30,6 @@ describe('TranscriptionRequestSchema', () => {
       })
     ).toThrow();
   });
-
-  it.each([true, false])('preserves privacy and unknown provider fields with zdr=%s', zdr => {
-    const provider = {
-      data_collection: 'deny',
-      zdr,
-      only: ['openai'],
-      custom: { enabled: true },
-    };
-    const body = TranscriptionRequestSchema.parse({
-      model: 'openai/gpt-4o-mini-transcribe',
-      input_audio: { data: 'UklGRiQA', format: 'wav' },
-      provider,
-    });
-
-    expect(buildUpstreamBody(body).provider).toEqual(provider);
-  });
-
-  it.each([{ data_collection: 'invalid' }, { data_collection: null }, { zdr: 'true' }, { zdr: 0 }])(
-    'rejects malformed privacy %j',
-    provider => {
-      const result = TranscriptionRequestSchema.safeParse({
-        model: 'openai/gpt-4o-mini-transcribe',
-        input_audio: { data: 'UklGRiQA', format: 'wav' },
-        provider,
-      });
-
-      expect(result.success).toBe(false);
-    }
-  );
 });
 
 describe('buildUpstreamBody', () => {

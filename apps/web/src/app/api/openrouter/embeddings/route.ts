@@ -45,6 +45,7 @@ import {
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 export const maxDuration = 300;
@@ -215,10 +216,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   setTag('ui.ai_model', requestBodyParsed.model);
 
+  let organizationDataCollection: OrganizationSettings['data_collection'];
+
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan, balanceLimitedByUserAllowance } =
       await getBalanceAndOrgSettings(organizationId, user);
+    organizationDataCollection = settings?.data_collection;
 
     if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
       return await creditsBlockedResponse({
@@ -293,10 +297,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
-  const providerPolicy = providerPrivacySchema.optional().parse(requestBodyParsed.provider);
   const effectivePrivacy = getEffectiveProviderPrivacy(
     requestPrivacy.data,
-    providerPolicy?.data_collection
+    organizationDataCollection
   );
   const upstreamBody = buildUpstreamBody(
     {

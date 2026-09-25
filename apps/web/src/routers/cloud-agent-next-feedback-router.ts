@@ -5,7 +5,15 @@ import { db } from '@/lib/drizzle';
 import { cloud_agent_feedback } from '@kilocode/db/schema';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import * as z from 'zod';
+import { desc, eq } from 'drizzle-orm';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
+
+const DEFAULT_FEEDBACK_HISTORY_LIMIT = 5;
+const MAX_FEEDBACK_HISTORY_LIMIT = 20;
+
+const ListCloudAgentFeedbackInputSchema = z.object({
+  limit: z.number().int().min(1).max(MAX_FEEDBACK_HISTORY_LIMIT).optional(),
+});
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),
@@ -35,6 +43,32 @@ const CreateCloudAgentFeedbackInputSchema = z.object({
 });
 
 export const cloudAgentNextFeedbackRouter = createTRPCRouter({
+  /**
+   * The caller's own recent Cloud Agent feedback, newest first.
+   *
+   * Scoped to `kilo_user_id`, so a user can only read back what they submitted.
+   * Used by the feedback dialog to show prior submissions and answer "did I
+   * already report this?".
+   */
+  list: baseProcedure
+    .input(ListCloudAgentFeedbackInputSchema.optional())
+    .query(async ({ ctx, input }) => {
+      return db
+        .select({
+          id: cloud_agent_feedback.id,
+          feedback_text: cloud_agent_feedback.feedback_text,
+          session_type: cloud_agent_feedback.session_type,
+          cloud_agent_session_id: cloud_agent_feedback.cloud_agent_session_id,
+          model: cloud_agent_feedback.model,
+          repository: cloud_agent_feedback.repository,
+          created_at: cloud_agent_feedback.created_at,
+        })
+        .from(cloud_agent_feedback)
+        .where(eq(cloud_agent_feedback.kilo_user_id, ctx.user.id))
+        .orderBy(desc(cloud_agent_feedback.created_at))
+        .limit(input?.limit ?? DEFAULT_FEEDBACK_HISTORY_LIMIT);
+    }),
+
   create: baseProcedure
     .input(CreateCloudAgentFeedbackInputSchema)
     .mutation(async ({ ctx, input }) => {

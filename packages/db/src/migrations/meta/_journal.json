@@ -1835,6 +1835,13 @@
       "when": 1790282699427,
       "tag": "0261_broken_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 262,
+      "version": "7",
+      "when": 1790323296975,
+      "tag": "0262_drop_model_experiment_tables",
+      "breakpoints": true
     }
   ]
 }

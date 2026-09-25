@@ -104,6 +104,25 @@ describe('parseRemoteMcpServers', () => {
       },
     ]);
   });
+
+  it('keeps valid servers and credentials when another persisted entry is malformed', () => {
+    const valid = {
+      id: 'alpha',
+      name: 'Alpha',
+      url: 'https://alpha.example/mcp',
+      auth: { type: 'bearer', token: 'secret' },
+      enabled: true,
+    };
+    expect(
+      parseRemoteMcpServers(
+        JSON.stringify([
+          { ...valid, id: 'has space' },
+          valid,
+          { ...valid, id: 'bad-auth', auth: { type: 'bearer', token: 42 } },
+        ])
+      )
+    ).toEqual([valid]);
+  });
 });
 
 describe('remote MCP server store', () => {

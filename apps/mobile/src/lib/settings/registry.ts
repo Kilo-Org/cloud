@@ -36,7 +36,10 @@ export function settingsService(organizationId?: string): AppSettingsService {
   };
   return {
     settings: APP_SETTINGS,
-    read: name => Effect.flatMap(bindingFor(name), binding => Effect.succeed(binding.read())),
+    read: name =>
+      Effect.flatMap(bindingFor(name), binding =>
+        binding.readEffect ? binding.readEffect() : Effect.sync(binding.read)
+      ),
     write: (name, value) => Effect.flatMap(bindingFor(name), binding => binding.write(value)),
   };
 }

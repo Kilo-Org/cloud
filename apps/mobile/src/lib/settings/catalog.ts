@@ -1,7 +1,6 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 
-import { type NotificationPreferences } from '@/lib/hooks/agent-push-preference';
 import {
   getCondenseToolCalls,
   setCondenseToolCalls,
@@ -56,6 +55,7 @@ import {
   invalidValue,
   listSetting,
   NOTIFICATION_PREFERENCES_QUERY_KEY,
+  readNotificationPreferences,
   stringSetting,
 } from './bindings';
 import { languageEntry } from './language-catalog';
@@ -180,9 +180,11 @@ export const ENTRIES: readonly AppSettingEntry[] = [
     kind: 'enum',
     options: PREVIEW_OPTIONS,
     bind: () => ({
-      read: () =>
-        queryClient.getQueryData<NotificationPreferences>(NOTIFICATION_PREFERENCES_QUERY_KEY)
-          ?.notificationPreviews ?? 'generic',
+      readEffect: () =>
+        Effect.map(
+          readNotificationPreferences(),
+          preferences => preferences.notificationPreviews ?? 'generic'
+        ),
       write: value => {
         const parsed = previewSchema.safeParse(value);
         if (!parsed.success) {

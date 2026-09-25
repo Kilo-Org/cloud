@@ -65,8 +65,8 @@ export function getTrustedHosts(): string[] {
 }
 
 /** Replace the trusted-host list. Destructive: a caller confirms before writing. */
-export function setTrustedHosts(next: string[]): void {
-  store.preload();
+export async function setTrustedHosts(next: string[]): Promise<void> {
+  await store.whenLoaded();
   store.set(next);
 }
 

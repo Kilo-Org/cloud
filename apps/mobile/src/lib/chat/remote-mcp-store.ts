@@ -59,8 +59,6 @@ const storedRemoteMcpServerSchema = z
   })
   .strip();
 
-const storedRemoteMcpServersSchema = z.array(storedRemoteMcpServerSchema);
-
 /**
  * The callable-name slug of a server name: lowercase, non-alphanumerics to `-`,
  * no leading or trailing `-`. A name with no alphanumerics still gets one.
@@ -109,10 +107,8 @@ function normalizeStoredUrl(url: string): string | undefined {
 }
 
 /**
- * Parses the persisted server list. Malformed JSON, a non-array value, and an
- * entry that is not a well-formed server all fall back to an empty list so a
- * corrupt write can never block the settings screen. Duplicate ids and
- * duplicate normalized URLs are dropped, keeping the first.
+ * Parse entries independently so one corrupt server cannot erase healthy
+ * servers and their bearer tokens on the next write.
  */
 export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer[] {
   if (raw === null) {
@@ -120,14 +116,18 @@ export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    const result = storedRemoteMcpServersSchema.safeParse(parsed);
-    if (!result.success) {
+    if (!Array.isArray(parsed)) {
       return [];
     }
     const servers: StoredRemoteMcpServer[] = [];
     const ids = new Set<string>();
     const urls = new Set<string>();
-    for (const server of result.data) {
+    for (const entry of parsed) {
+      const result = storedRemoteMcpServerSchema.safeParse(entry);
+      if (!result.success) {
+        continue;
+      }
+      const server = result.data;
       const url = normalizeStoredUrl(server.url);
       if (url !== undefined && !ids.has(server.id) && !urls.has(url)) {
         ids.add(server.id);

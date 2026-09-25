@@ -113,6 +113,9 @@ describe('PreferenceRow', () => {
 
     expect(named).toHaveLength(1);
     expect(named[0]?.props.accessibilityRole).toBe('switch');
+    expect(named[0]?.props.accessibilityHint).toBe(
+      'Applies to theme, language, notifications, models and the rest of Preferences.'
+    );
     expect(named[0]?.props.accessibilityState).toEqual({
       disabled: false,
       busy: false,

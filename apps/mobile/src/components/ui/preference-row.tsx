@@ -42,6 +42,7 @@ export function PreferenceRow({
         }}
         accessibilityRole="switch"
         accessibilityLabel={title}
+        accessibilityHint={subtitle}
         accessibilityState={{ disabled, busy, checked: value }}
       >
         {busy ? (

@@ -38,9 +38,15 @@ type SettingValue = boolean | string | readonly string[];
 
 /** One setting's read/write wiring over its store. */
 export type SettingBinding = Readonly<{
-  read: () => SettingValue;
   write: (value: unknown) => Effect.Effect<string, ToolFailure>;
-}>;
+}> &
+  (
+    | { read: () => SettingValue; readEffect?: never }
+    | {
+        read?: never;
+        readEffect: () => Effect.Effect<SettingValue, ToolFailure>;
+      }
+  );
 
 /** A setting's descriptor plus the wiring that reaches its store. */
 export type AppSettingEntry = AppSetting &

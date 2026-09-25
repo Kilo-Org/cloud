@@ -39,15 +39,30 @@ vi.mock('@/i18n/apply-language', () => ({ applyLanguagePreference }));
 
 const notificationMutation = vi.hoisted(() => ({
   mutate: vi.fn().mockResolvedValue(undefined),
+  query: vi.fn().mockResolvedValue({
+    chatMessages: false,
+    agentAttention: true,
+    agentUpdates: true,
+    sessionStatus: true,
+    kiloclawActivity: true,
+    balanceAlerts: true,
+    securityFindings: true,
+    agentPushEnabled: true,
+    notificationPreviews: 'full',
+  }),
 }));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
-    user: { setNotificationPreferences: { mutate: notificationMutation.mutate } },
+    user: {
+      getNotificationPreferences: { query: notificationMutation.query },
+      setNotificationPreferences: { mutate: notificationMutation.mutate },
+    },
   },
 }));
 
 const queryClientMock = vi.hoisted(() => ({
   getQueryData: vi.fn(),
+  ensureQueryData: vi.fn(async ({ queryFn }: { queryFn: () => Promise<unknown> }) => queryFn()),
   invalidateQueries: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/query-client', () => ({ queryClient: queryClientMock }));
@@ -142,9 +157,17 @@ describe('settingsService one source of truth', () => {
     expect(Effect.runSync(settingsService().read('defaultVariant'))).toBe('');
   });
 
-  it('reads the trusted hosts a manual setter wrote', () => {
-    setTrustedHosts(['github.com']);
+  it('reads the trusted hosts a manual setter wrote', async () => {
+    await setTrustedHosts(['github.com']);
     expect(Effect.runSync(settingsService().read('trustedHosts'))).toEqual(['github.com']);
+  });
+
+  it('loads notification preferences before reporting their current values', async () => {
+    expect(await Effect.runPromise(settingsService().read('notifications.chatMessages'))).toBe(
+      false
+    );
+    expect(await Effect.runPromise(settingsService().read('notifications.previews'))).toBe('full');
+    expect(notificationMutation.query).toHaveBeenCalled();
   });
 
   it('writes through the same store a manual read then sees', () => {

@@ -53,13 +53,15 @@ function FormField({
   const nativeInput = useRef<TextInput>(null);
   const displayedError = validate ? validationError : error;
 
-  // defaultValue only applies on first attach. A remounted or reused native
-  // field can keep the previous text, so write this form's default after attach.
+  // Write the default only on attach; later prop changes must not move the caret
+  // while the person edits an uncontrolled field.
   useLayoutEffect(() => {
     const next = defaultValue ?? '';
     valueRef.current = next;
     nativeInput.current?.setNativeProps({ text: next });
-  }, [defaultValue]);
+    // defaultValue is initial content, not a controlled value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <View className="gap-1.5">

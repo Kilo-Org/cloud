@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import {
   type NotificationCategoryKey,
-  readAgentPushPreference,
+  type NotificationPreferences,
 } from '@/lib/hooks/agent-push-preference';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient } from '@/lib/trpc';
@@ -24,6 +24,18 @@ export const NOTIFICATION_PREFERENCES_QUERY_KEY = [
   ['user', 'getNotificationPreferences'],
   { type: 'query' },
 ] as const;
+
+/** A missing cache entry is not the user's preference; fetch the server's value. */
+export function readNotificationPreferences(): Effect.Effect<NotificationPreferences, ToolFailure> {
+  return Effect.tryPromise({
+    try: () =>
+      queryClient.ensureQueryData({
+        queryKey: NOTIFICATION_PREFERENCES_QUERY_KEY,
+        queryFn: () => trpcClient.user.getNotificationPreferences.query(),
+      }),
+    catch: error => failure(`Could not read notification preferences: ${String(error)}`),
+  });
+}
 
 const booleanSchema = z.boolean();
 const stringSchema = z.string();
@@ -106,7 +118,7 @@ export function stringSetting(
 export function listSetting(
   name: string,
   read: () => string[],
-  write: (next: string[]) => void
+  write: (next: string[]) => Promise<void>
 ): SettingBinding {
   return {
     read,
@@ -115,8 +127,13 @@ export function listSetting(
       if (!parsed.success) {
         return Effect.fail(invalidValue(name, value, 'a list of strings'));
       }
-      write(parsed.data);
-      return Effect.succeed(changed(name, JSON.stringify(parsed.data)));
+      return Effect.tryPromise({
+        try: async () => {
+          await write(parsed.data);
+          return changed(name, JSON.stringify(parsed.data));
+        },
+        catch: error => failure(`Could not change ${name}: ${String(error)}`),
+      });
     },
   };
 }
@@ -127,7 +144,7 @@ export function notificationBooleanSetting(
   key: NotificationCategoryKey
 ): SettingBinding {
   return {
-    read: () => readAgentPushPreference(queryClient, NOTIFICATION_PREFERENCES_QUERY_KEY, key),
+    readEffect: () => Effect.map(readNotificationPreferences(), preferences => preferences[key]),
     write: value => {
       const parsed = booleanSchema.safeParse(value);
       if (!parsed.success) {

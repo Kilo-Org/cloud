@@ -1,3 +1,5 @@
+import { I18nManager } from 'react-native';
+
 // The one place the mobile tap-target geometry lives. Components import these
 // numbers and classes instead of re-spelling them, so the audit floor, the
 // design target and the box that carries them stay in step.
@@ -52,11 +54,23 @@ export const INLINE_LINK_BOX_CLASS =
   'min-h-[28px] min-w-[28px] -my-[7px] items-center justify-center';
 
 /**
- * Per-side horizontal `hitSlop` for {@link INLINE_LINK_BOX_CLASS}, lifting the
- * control-size audit's 28dp floor to `DESIGN.md:364`'s touch region across the
- * sentence: 28 + 20 = 48pt.
+ * Per-side horizontal `hitSlop` of an inline link pointing at its neighbour.
+ * The two legal links are separated only by the sentence's connector, and the
+ * connector's own floor ({@link INLINE_LINK_CONNECTOR_CLASS}) is the only thing
+ * keeping the two facing reaches apart, so this side is deliberately short: the
+ * link still reaches `DESIGN.md:364`'s 44pt from its {@link MIN_TAP_TARGET_DP}
+ * floor as `28 + facing + outer`, while only `facing` of that reach points at
+ * the neighbour, so the visible gap between the words stays the sentence's own
+ * spacing instead of the reserved box's.
  */
-export const INLINE_LINK_HIT_SLOP_DP = 10;
+export const INLINE_LINK_FACING_HIT_SLOP_DP = 4;
+
+/**
+ * Per-side horizontal `hitSlop` of an inline link pointing away from its
+ * neighbour, over plain prose with no other control to reach:
+ * `28 + 4 + 12 = 44pt`.
+ */
+export const INLINE_LINK_OUTER_HIT_SLOP_DP = 12;
 
 /**
  * Per-side vertical `hitSlop` for {@link INLINE_LINK_BOX_CLASS}. `DESIGN.md:364`
@@ -73,15 +87,24 @@ export const INLINE_LINK_HIT_SLOP_DP = 10;
 export const INLINE_LINK_VERTICAL_HIT_SLOP_DP = 8;
 
 /**
- * The `hitSlop` both legal links render: at least `DESIGN.md:364`'s 44pt touch
- * region in both axes (48pt horizontally, 44pt vertically).
+ * The per-side `hitSlop` of the legal link that sits at the given end of the
+ * sentence. `hitSlop` is physical while the sentence's ends are logical, so the
+ * start/end resolve to left/right through the interface direction: a flex-row
+ * mirrors in RTL, so the link at the sentence's start faces the connector on its
+ * other physical side. Both links keep the same vertical slop
+ * ({@link INLINE_LINK_VERTICAL_HIT_SLOP_DP}); only the horizontal sides differ,
+ * facing = {@link INLINE_LINK_FACING_HIT_SLOP_DP} and outer =
+ * {@link INLINE_LINK_OUTER_HIT_SLOP_DP}.
  */
-export const INLINE_LINK_HIT_SLOP = {
-  top: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
-  bottom: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
-  left: INLINE_LINK_HIT_SLOP_DP,
-  right: INLINE_LINK_HIT_SLOP_DP,
-} as const;
+export function inlineLinkHitSlop(edge: 'start' | 'end') {
+  const facesRight = edge === 'start' ? !I18nManager.isRTL : I18nManager.isRTL;
+  return {
+    top: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    bottom: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    left: facesRight ? INLINE_LINK_OUTER_HIT_SLOP_DP : INLINE_LINK_FACING_HIT_SLOP_DP,
+    right: facesRight ? INLINE_LINK_FACING_HIT_SLOP_DP : INLINE_LINK_OUTER_HIT_SLOP_DP,
+  };
+}
 
 /**
  * The extra vertical margin the legal sentence row carries, and its class.
@@ -102,16 +125,17 @@ export const INLINE_LINK_ROW_MARGIN_DP = 5;
 export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
 
 /**
- * The class an inline-link connector carries so the two links' facing slops do
- * not overlap. The connector node is the only thing between them, so it has to
- * be at least `2 * {@link INLINE_LINK_HIT_SLOP_DP}` = 20dp wide; a narrower
- * node (ru `" и "`, pl `" i "`, ar `" و "`, zh `" 和 "`) would let the second
- * link's left slop reach into the first's right slop, and a tap between them
- * would be claimed by the later sibling. English `" and "` is already wider, so
- * its spacing is unchanged; `text-center` keeps the shorter connectors centred
- * on the space they reserve.
+ * The class an inline-link connector carries so the two links' facing reaches do
+ * not overlap. The connector node is the only thing between them, so its floor
+ * is `2 * {@link INLINE_LINK_FACING_HIT_SLOP_DP}` = 8dp plus 2dp of headroom, so
+ * the two 4dp facing reaches never meet: 10dp. The old 20dp floor was the
+ * symmetric `2 * 10dp` slop, which centred a short conjunction (ru `" и "`,
+ * pl `" i "`, ar `" و "`, zh `" 和 "`) in 20dp and added ~4.5dp of gap on each
+ * side of the `i` on top of the sentence's own space. English `" and "` is
+ * already wider, so its spacing is unchanged; `text-center` keeps the shorter
+ * connectors centred on the space they reserve.
  */
-export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[20px] text-center';
+export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
 
 /**
  * The reach a box plus its per-side slop offers. This is the number the tests

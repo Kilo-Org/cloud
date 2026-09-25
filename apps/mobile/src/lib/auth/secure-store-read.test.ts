@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INJECTED_FAULT_ERROR_NAME } from '@/lib/telemetry/e2e-fault';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const getItemAsync = vi.hoisted(() =>
   vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
@@ -123,13 +124,20 @@ describe('readStoredValueRetryingNull', () => {
 });
 
 describe('readStoredValueWithRetry', () => {
+  let events: TelemetryEvent[] = [];
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    events = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    setTelemetrySink(null);
   });
 
   it('returns the value on a healthy first read without waiting', async () => {
@@ -138,7 +146,7 @@ describe('readStoredValueWithRetry', () => {
 
     await expect(readStoredValueWithRetry('auth-token')).resolves.toBe('stored-token');
     expect(getItemAsync).toHaveBeenCalledTimes(1);
-    expect(getItemAsync).toHaveBeenCalledWith('auth-token', undefined);
+    expect(getItemAsync).toHaveBeenCalledWith('auth-token');
   });
 
   it('passes a null resolution straight through and never retries it', async () => {
@@ -188,6 +196,40 @@ describe('readStoredValueWithRetry', () => {
     expect(getItemAsync).toHaveBeenCalledTimes(4);
   });
 
+  it('reports the exhausted read exactly once at warning level with the stable fingerprint', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueWithRetry = await loadHelper();
+
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    await settled;
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'secure_store',
+      'error.operation': 'read',
+    });
+    // The key is never attached to the report.
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
+  });
+
+  it('reports nothing when a retry recovers the read', async () => {
+    getItemAsync
+      .mockRejectedValueOnce(new Error('keychain unavailable'))
+      .mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(events).toHaveLength(0);
+  });
+
   it('uses the handed-over first attempt and issues fresh reads for the retries', async () => {
     getItemAsync.mockResolvedValue('fresh-token');
     const readStoredValueWithRetry = await loadHelper();
@@ -230,17 +272,29 @@ describe('readStoredValueWithRetry', () => {
     vi.resetModules();
     vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 60_000 }));
     getItemAsync.mockResolvedValue('stored-token');
+    // `resetModules` gives the reloaded helper its own error-sink registry, so
+    // the sink is re-installed on the fresh module before the read runs.
+    const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    setFreshTelemetrySink(event => {
+      events.push(event);
+    });
     const readStoredValueWithRetry = await loadHelper();
 
     const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toMatchObject({
       name: INJECTED_FAULT_ERROR_NAME,
-      message: 'E2E secure-store fault window is open: read of auth-token rejected',
+      message: 'E2E secure-store fault window is open: read rejected',
     });
     await vi.advanceTimersByTimeAsync(2000);
 
     await settled;
     // The fault is the reason: the real store is never asked.
     expect(getItemAsync).not.toHaveBeenCalled();
+    // The exhausted-read report attaches the fault error, so that error must
+    // carry no key — the same invariant the real store's error keeps.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
 
     vi.doUnmock('@/lib/config');
     vi.resetModules();

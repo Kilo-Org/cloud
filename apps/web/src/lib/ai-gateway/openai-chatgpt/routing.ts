@@ -10,7 +10,11 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
-import { getOpenAiChatGptStoredConnection, type OpenAiChatGptOwner } from './store';
+import {
+  getOpenAiChatGptStoredConnection,
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+} from './store';
 import { isOpenAiModelServed } from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
 
@@ -91,6 +95,12 @@ export type OpenAiChatGptRoutingInput = {
    * organization's connection and never the caller's personal one.
    */
   organizationId: string | undefined;
+  /**
+   * The platform caller that made the request, when the request is a service
+   * run rather than a person's own. Set with an organization, it makes the
+   * organization's shared-services connection the first candidate.
+   */
+  botId?: string | undefined;
 };
 
 export type OpenAiChatGptRoutingResult =
@@ -125,16 +135,28 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
 }
 
 /**
- * Resolves the connection owner for a request. The connection is inherently
- * personal, so the owner is always the caller and the organization only scopes
- * which of their connections applies. An organization request uses the
- * caller's connection for that organization and never their personal one, so an
- * organization without the caller's connection falls through to the API path.
- * Anonymous callers have no owner.
+ * The connection owners a request may use, in order. A member connection is
+ * always the caller's own: an organization request uses their connection for
+ * that organization and never their personal one, so an organization without
+ * the caller's connection falls through to the API path. Anonymous callers have
+ * no owner.
+ *
+ * A service request is one the platform's own callers make for an organization,
+ * and it carries a bot id. It uses the organization's shared-services
+ * connection first, because that connection exists so a service run does not
+ * spend a member's own ChatGPT plan. An organization without a usable shared
+ * connection falls back to the caller's own connection, which is the behavior
+ * every existing caller has today.
  */
-function openAiChatGptOwner(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwner | null {
-  if (!input.userId) return null;
-  return { kiloUserId: input.userId, organizationId: input.organizationId ?? null };
+function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwner[] {
+  const owners: OpenAiChatGptOwner[] = [];
+  if (input.botId && input.organizationId) {
+    owners.push(openAiChatGptSharedServicesOwner(input.organizationId));
+  }
+  if (input.userId) {
+    owners.push({ kiloUserId: input.userId, organizationId: input.organizationId ?? null });
+  }
+  return owners;
 }
 
 /**
@@ -147,11 +169,19 @@ function openAiChatGptOwner(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwne
  * person with an api-kind error instead of their existing provider.
  */
 export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
+  const [owner] = openAiChatGptOwnerCandidates(input);
+  if (!owner) return false;
+  return isOpenAiChatGptEligibleForOwner(input, owner);
+}
+
+/** Eligibility of one specific owner's connection. */
+async function isOpenAiChatGptEligibleForOwner(
+  input: OpenAiChatGptRoutingInput,
+  owner: OpenAiChatGptOwner
+): Promise<boolean> {
   const { request, requestedModel } = input;
 
   if (request.kind !== 'responses') return false;
-  const owner = openAiChatGptOwner(input);
-  if (!owner) return false;
   if (!isOpenAiChatGptModel(requestedModel)) return false;
 
   // The catalog can list an OpenAI model the plain API does not serve. A
@@ -224,11 +254,16 @@ export async function tagOpenAiChatGptByokModels<
  * failure *after* a token was obtained is returned to the client as-is by the
  * gateway and is never silently replayed through another billing path.
  */
-export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string): Provider | null {
+export function buildOpenAiChatGptProvider(
+  apiKey: string,
+  accessToken: string,
+  owner?: OpenAiChatGptOwner
+): Provider | null {
   if (apiKey.trim().length === 0) return null;
 
   return {
     id: 'openai-chatgpt',
+    ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -279,27 +314,35 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
 export async function checkOpenAiChatGptByok(
   input: OpenAiChatGptRoutingInput
 ): Promise<OpenAiChatGptRoutingResult | null> {
-  const owner = openAiChatGptOwner(input);
-  if (!owner) return null;
-  if (!(await isOpenAiChatGptEligible(input))) return null;
+  const candidates = openAiChatGptOwnerCandidates(input);
 
-  const outcome = await resolveOpenAiChatGptAccessToken(owner);
+  for (const owner of candidates) {
+    if (!(await isOpenAiChatGptEligibleForOwner(input, owner))) continue;
 
-  if (outcome.kind === 'terminal') {
-    return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
+    const outcome = await resolveOpenAiChatGptAccessToken(owner);
+
+    // A terminally dead credential must fail readably instead of falling back
+    // to the next connection or another billing path.
+    if (outcome.kind === 'terminal') {
+      return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
+    }
+    // `no_connection` and a transient `failed` refresh keep the existing route,
+    // and let a later candidate (the caller's own connection) be tried.
+    if (outcome.kind !== 'access_token') continue;
+
+    const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, owner);
+    // A missing partner key is a deployment-wide misconfiguration.
+    if (!provider) return null;
+
+    return {
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    };
   }
-  // `no_connection` and a transient `failed` refresh keep the existing route.
-  if (outcome.kind !== 'access_token') return null;
 
-  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-  const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken);
-  if (!provider) return null;
-
-  return {
-    kind: 'provider',
-    provider,
-    userByok: null,
-    bypassAccessCheck: false,
-    skipBalanceCheck: true,
-  };
+  return null;
 }

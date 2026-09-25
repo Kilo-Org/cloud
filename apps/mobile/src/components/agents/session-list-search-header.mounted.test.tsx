@@ -156,7 +156,10 @@ describe('SessionListSearchHeader typed query alignment', () => {
   it('aligns the typed query to the field start edge in RTL', async () => {
     i18nManager.isRTL = true;
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(searchInput(renderer).props.style).toEqual({ textAlign: 'right' });
+    // The shared box applies the RTL content alignment in front of the
+    // caller's own style (this field passes none), so the field's query follows
+    // the interface direction.
+    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
   });
 });
 
@@ -234,5 +237,29 @@ describe('SessionListSearchHeader clear control', () => {
     expect(field.minHeight).toBeGreaterThanOrEqual(
       box.height + rowVerticalPaddingDp + rowVerticalBorderDp
     );
+  });
+
+  it('takes the row height from the shared field floor, not the row floor', async () => {
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} hasText />);
+    const rowClassName = fieldRow(renderer).props.className as string;
+    const rowDeclarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
+    const row = Object.assign({}, ...rowDeclarations) as { minHeight?: number };
+    const inputDeclarations = (await compiledDimensions(
+      searchInput(renderer).props.className as string
+    )) as { minHeight?: number }[];
+    const input = Object.assign({}, ...inputDeclarations) as { minHeight?: number };
+
+    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
+    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
+
+    // The shared field's 44pt floor is taller than the 38pt clear control, so
+    // the field's floor lays the row out: 44 + 10.5 + 2 = 56.5pt. The row's own
+    // `min-h-[51px]` is a lower bound the field dominates, not the height the
+    // row takes.
+    const fieldFloorDp = input.minHeight ?? 0;
+    expect(fieldFloorDp).toBe(44);
+    const laidOutHeightDp = fieldFloorDp + rowVerticalPaddingDp + rowVerticalBorderDp;
+    expect(laidOutHeightDp).toBe(56.5);
+    expect(row.minHeight).toBeLessThan(laidOutHeightDp);
   });
 });

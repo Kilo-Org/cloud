@@ -6,6 +6,7 @@ import type {
   SystemOneResult,
 } from '@typesafe-ai/sdk';
 import { z } from 'zod';
+import { providerPrivacySchema } from '../provider-privacy';
 
 export const TYPESAFE_MODEL = 'typesafe/jev-1.13';
 
@@ -43,6 +44,7 @@ export const systemOneRequestSchema = z.object({
     .default(TYPESAFE_MODEL)
     .transform(() => TYPESAFE_MODEL),
   state: entrySchema,
+  provider: providerPrivacySchema.optional(),
   questions: z
     .record(z.string(), questionSchema)
     .refine(questions => Object.keys(questions).length > 0, 'At least one question is required'),

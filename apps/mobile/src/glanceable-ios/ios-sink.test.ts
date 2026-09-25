@@ -1770,14 +1770,8 @@ describe('iosSink stray sweep', () => {
 
   it('keeps one card while a later restore is in flight, not only the first', async () => {
     const cards = [nativeStray(), nativeStray()];
-    // First restore: the locked keychain settles with nothing readable, so the
-    // in-memory snapshot stays null.
-    _setSecureStoreForTests({
-      setItemAsync: secureStoreMock.setItemAsync,
-      getItemAsync: async () => {
-        throw new Error('keychain locked');
-      },
-    });
+    // The first restore settles against an empty mirror, so the in-memory
+    // snapshot stays null and a caller would read it as "nothing persisted".
     await restorePersistedGlanceable();
 
     // A later restore re-opens the read window. A sweep landing in it must not

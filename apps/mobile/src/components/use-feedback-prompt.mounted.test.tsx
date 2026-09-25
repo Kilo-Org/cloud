@@ -189,7 +189,7 @@ describe('useFeedbackPrompt', () => {
 // The review-submit sheet's lifecycle, reproduced directly: the requesting
 // surface captures the requester, unmounts (the formSheet's `router.back`
 // dismissal), and only then does the deferred one-time claim fire the request.
-let capturedRequest: ((userId: string | undefined) => void) | undefined = undefined;
+let capturedRequest: ((userId: string | undefined) => boolean) | undefined = undefined;
 let unmountRequester: (() => void) | undefined = undefined;
 
 function Requester({ userId }: Readonly<{ userId: string | undefined }>) {
@@ -271,5 +271,25 @@ describe('FeedbackPromptProvider', () => {
 
     expect(feedback.showFeedbackPrompt).not.toHaveBeenCalled();
     expect(modals(root)).toHaveLength(1);
+  });
+
+  // The other half of the same race: when the host itself is gone, the request
+  // cannot render the dialog. It must report that instead of promising a
+  // presentation the caller then records as asked.
+  it('reports that it did not present once the host has unmounted', () => {
+    mountProvider();
+
+    act(() => {
+      renderer?.unmount();
+    });
+    renderer = undefined;
+
+    let presented: boolean | undefined = undefined;
+    act(() => {
+      presented = capturedRequest?.('user-1');
+    });
+
+    expect(presented).toBe(false);
+    expect(feedback.showFeedbackPrompt).not.toHaveBeenCalled();
   });
 });

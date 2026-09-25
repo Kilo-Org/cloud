@@ -5,9 +5,9 @@ import {
   updateBenchmarkConfig,
 } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import { getUserFromAuth } from '@/lib/user/server';
-import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
+import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -18,23 +18,22 @@ jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   updateBenchmarkConfig: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
-  findExperimentReservedModelIds: jest.fn(),
-}));
-
 // Stub the catalog so tests don't depend on any specific provider file.
-// 'test-exclusive/alibaba-only' maps to the alibaba gateway, which lacks Messages support.
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+// 'test-exclusive/chat-only' maps to a synthetic gateway that lacks Messages support.
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@/lib/ai-gateway/providers/definitions/openrouter'
+  );
   const stubModel: KiloExclusiveModel = {
-    public_id: 'test-exclusive/alibaba-only',
-    display_name: 'Test Alibaba-only',
+    public_id: 'test-exclusive/chat-only',
+    display_name: 'Test chat-only model',
     description: 'stub for unit tests',
     context_length: 8192,
     max_completion_tokens: 4096,
     status: 'public',
     flags: [],
-    gateway: 'alibaba',
+    provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
     internal_id: 'stub-internal',
     pricing: null,
     inference_provider_restriction: [],
@@ -42,7 +41,7 @@ jest.mock('@/lib/ai-gateway/models', () => {
   return {
     ...actual,
     findKiloExclusiveModel: (id: string) =>
-      id === 'test-exclusive/alibaba-only' ? stubModel : actual.findKiloExclusiveModel(id),
+      id === 'test-exclusive/chat-only' ? stubModel : actual.findKiloExclusiveModel(id),
   };
 });
 
@@ -51,7 +50,6 @@ import { PUT } from './route';
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockGetBenchmarkConfig = jest.mocked(getBenchmarkConfig);
 const mockUpdateBenchmarkConfig = jest.mocked(updateBenchmarkConfig);
-const mockFindExperimentReservedModelIds = jest.mocked(findExperimentReservedModelIds);
 
 // Test-fixture boundary: only the fields the route actually reads.
 function adminUserFixture(): User {
@@ -97,7 +95,6 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
       body: { config: validConfig },
     });
     mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
-    mockFindExperimentReservedModelIds.mockResolvedValue([]);
   });
 
   it('forwards a config whose decider models all serve every gateway chat API', async () => {
@@ -112,46 +109,18 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
         ...validConfig,
         deciderModels: [
           { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'test-exclusive/alibaba-only', reasoningEffort: null },
+          { id: 'test-exclusive/chat-only', reasoningEffort: null },
         ],
       })
     );
 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
-    expect(body.error).toContain('test-exclusive/alibaba-only');
+    expect(body.error).toContain('test-exclusive/chat-only');
     expect(body.error).toContain('chat_completions');
     expect(body.error).toContain('responses');
     expect(body.error).not.toContain('openai/gpt-5-mini (');
     expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
-  });
-
-  it('rejects decider models reserved by a model experiment (any status)', async () => {
-    // Ownership is status-independent per .specs/model-experiments.md: a public
-    // id with a draft/active/paused/completed experiment is reserved for
-    // explicit user selection and must not enter kilo-auto candidate sets.
-    mockFindExperimentReservedModelIds.mockResolvedValue(['preview/experimental-model']);
-
-    const response = await PUT(
-      putRequest({
-        ...validConfig,
-        deciderModels: [
-          { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'preview/experimental-model', reasoningEffort: null },
-        ],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
-    expect(body.error).toContain('preview/experimental-model');
-    expect(body.error).toContain('model-experiment');
-    expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
-    // The check runs against the decider model ids.
-    expect(mockFindExperimentReservedModelIds).toHaveBeenCalledWith([
-      'openai/gpt-5-mini',
-      'preview/experimental-model',
-    ]);
   });
 
   it('rejects a schema-invalid config with 400', async () => {

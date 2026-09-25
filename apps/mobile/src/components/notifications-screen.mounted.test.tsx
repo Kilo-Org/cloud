@@ -146,14 +146,14 @@ type I = ReactTestInstance;
 
 function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: { available: true, unavailableReason: null },
-    agentAttention: { available: true, unavailableReason: null },
-    agentUpdates: { available: true, unavailableReason: null },
-    sessionStatus: { available: true, unavailableReason: null },
-    kiloclawActivity: { available: true, unavailableReason: null },
-    balanceAlerts: { available: true, unavailableReason: null },
-    spendAlerts: { available: true, unavailableReason: null },
-    securityFindings: { available: true, unavailableReason: null },
+    chatMessages: { available: true, unavailableReasonCode: null },
+    agentAttention: { available: true, unavailableReasonCode: null },
+    agentUpdates: { available: true, unavailableReasonCode: null },
+    sessionStatus: { available: true, unavailableReasonCode: null },
+    kiloclawActivity: { available: true, unavailableReasonCode: null },
+    balanceAlerts: { available: true, unavailableReasonCode: null },
+    spendAlerts: { available: true, unavailableReasonCode: null },
+    securityFindings: { available: true, unavailableReasonCode: null },
     ...overrides,
   };
 }
@@ -471,7 +471,10 @@ describe('NotificationsScreen spend alerts row', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('non-retryable unhappy: an unavailable spend capability disables the row and shows the server reason', async () => {
+  it('non-retryable unhappy: an unavailable spend capability disables the row and shows the catalog subtitle', async () => {
+    // The spend row has no gated reason of its own (every signed-in account has
+    // a personal scope), but the screen must never render the server's English
+    // prose if one arrives: it falls back to the category subtitle.
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({
@@ -489,7 +492,10 @@ describe('NotificationsScreen spend alerts row', () => {
     await waitForEnabledSwitch(renderer, 'Chat messages');
 
     expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(true);
-    expect(textWithChildren(renderer.root, 'Spend alerts are unavailable.').length).toBe(1);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.spendAlertsSubtitle).length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, 'Spend alerts are unavailable.').length).toBe(0);
   });
 
   it('retryable unhappy: a spend toggle failure rolls back the optimistic flip', async () => {
@@ -545,10 +551,41 @@ describe('NotificationsScreen category availability', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
+  it('non-retryable unhappy: an unavailable category disables the switch and shows the catalog reason', async () => {
+    // The server names the reason with a machine-readable code. A response that
+    // still carries the old English `unavailableReason` prose must never render
+    // it: the row shows catalog copy instead.
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          balanceAlerts: {
+            available: false,
+            unavailableReasonCode: 'organizationRequired',
+            unavailableReason: 'SERVER PROSE SENTINEL',
+          },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+
+    // Wait for an available sibling row to be enabled first: the master gate
+    // disables every row until the permission/device-token/push-token queries
+    // settle, so the unavailable row is disabled from the first render. Waiting
+    // on the sibling proves the gate settled and capabilities loaded.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+  });
+
   it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {
     // The defect: the row rendered the response's `unavailableReason`, an
     // English sentence, inside a localized screen. The description must come
     // from the catalog, so a stale response string must never reach the screen.
+    // A server that predates the reason code sends no code at all.
     const staleServerReason = 'stale server prose';
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
@@ -614,6 +651,44 @@ describe('NotificationsScreen category availability', () => {
     ).toBe(1);
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
+
+  it('non-retryable unhappy: an unknown reason code falls back to the category subtitle', async () => {
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReasonCode: 'madeUpCode' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+    expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+    expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
+  });
+
+  // A code naming an inherited Object.prototype member is still a code the
+  // catalog does not know: it must fall back to the subtitle, not render the
+  // prototype member. `in` matched these; an own-property guard must not.
+  it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'non-retryable unhappy: the inherited prototype name %s falls back to the category subtitle',
+    async code => {
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReasonCode: code },
+          }),
+        })
+      );
+      const { renderer } = await renderScreen();
+      await waitForEnabledSwitch(renderer, 'Chat messages');
+
+      expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+      expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+      expect(textWithChildren(renderer.root, code).length).toBe(0);
+    }
+  );
 
   it('non-retryable unhappy: an unavailable category reads its description from the active catalog', async () => {
     // The exact finding, on the screen that reported it: an Urdu Notifications

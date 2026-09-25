@@ -45,6 +45,21 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// The manifest fix carries the native alert title override beside the backup
+// rules and optional-feature declarations. React Native's bundled
+// `alert_title_layout.xml` pins the title to `viewStart`; without this plugin
+// the Arabic discard confirm's title sits on the opposite edge from its message.
+const ANDROID_MANIFEST_FIX_PLUGIN = './plugins/withAndroidManifestFix';
+// Android-only by capability: AppCompat's stock button-bar text appearance
+// forces ALL-CAPS, while iOS's `UIAlertController` draws the same shared
+// `Alert.alert` copy as given and exposes no casing transform. The plugin's one
+// platform piece is the AppTheme override; it is registered once for both
+// prebuilds, so the fix behaves the same on iOS and Android.
+const ALERT_DIALOG_BUTTON_CASE_PLUGIN = './plugins/withAndroidAlertDialogButtonCase';
+// The alert dialog theme points AppCompat's DayNight defaults
+// (`colorBackgroundFloating`, `colorAccent`) at the app's surfaces; without it
+// every `Alert.alert()` confirmation renders as a foreign grey/teal panel.
+const ALERT_DIALOG_THEME_PLUGIN = './plugins/withAndroidAlertDialogTheme';
 // One entry configures Expo's native splash on both platforms. Its internal
 // Android backing-surface adapter is a documented native capability exception,
 // not a separate launch lifecycle. The wrapper owns the mod ordering.
@@ -53,6 +68,22 @@ const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
 const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
+// The developer menu is not the product. On iOS `DevMenuManager` auto-shows it
+// over the app at launch while onboarding is unfinished or EXDevMenuShowsAtLaunch
+// is set, and its SwiftUI icons carry raw SF Symbol names as accessibility labels
+// (`chevron.left.chevron.right` on "Open DevTools", `gearshape.fill` on the
+// floating tool button), so a scene dump of the product screen under it reads
+// them aloud as-is. These options keep it off the product screens; a developer
+// still opens it with Ctrl + d or a shake. Mirrored from
+// src/lib/dev-client-plugin.js -- asserted on the EVALUATED config, because a
+// config that stopped handing the plugin the options would still evaluate to the
+// dev-menu defaults (auto-show on, onboarding on).
+const DEV_CLIENT_PLUGIN = 'expo-dev-client';
+const DEV_CLIENT_PLUGIN_OPTIONS = {
+  toolsButton: false,
+  showMenuAtLaunch: false,
+  skipOnboarding: true,
+};
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -105,6 +136,26 @@ check(config.orientation === 'default', `orientation must be "default"`);
 check(
   config.ios?.requireFullScreen === true,
   'ios.requireFullScreen must be true (iPad Split View/Slide Over stays out of scope)'
+);
+
+// Platforms contract: the app is iOS and Android only (apps/mobile/AGENTS.md).
+// Expo detects the platform set when the config does not declare one
+// (getSupportedPlatforms): `react-native` resolving adds ios and android, and
+// `react-dom` resolving adds web. The dev server recorded in
+// dev/logs/mobile.log had web in its manifest platforms, so it answered a
+// browser request with the web index.html; that page requests a web bundle of
+// apps/mobile/index.js, where babel-preset-expo rewrites `react-native` to
+// `react-native-web` (not installed), and Metro logs
+// `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the app
+// console — a JavaScript error the app never causes. Declaring the two
+// platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+// browser request falls through to the manifest response instead.
+const PLATFORMS = ['ios', 'android'];
+check(
+  Array.isArray(config.platforms) &&
+    config.platforms.length === PLATFORMS.length &&
+    PLATFORMS.every(platform => config.platforms.includes(platform)),
+  `platforms must be exactly [${PLATFORMS.join(', ')}] (web is not a product target; it bundles an unsupported platform and logs a Metro resolve error into the app console)`
 );
 
 const associatedDomains = config.ios?.associatedDomains ?? [];
@@ -207,6 +258,28 @@ check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
 );
+// The manifest fix plugin writes the native alert title override (plus the
+// backup rules and optional hardware features); without it React Native's
+// bundled `viewStart` title layout returns and the Arabic discard confirm's
+// title no longer shares its message's start edge.
+check(
+  pluginNames.includes(ANDROID_MANIFEST_FIX_PLUGIN),
+  `plugins must include "${ANDROID_MANIFEST_FIX_PLUGIN}"`
+);
+// Android alert-dialog actions must render in the app's sentence case: the
+// AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy
+// (DESIGN.md:350). The plugin re-cases them from the activity theme.
+check(
+  pluginNames.includes(ALERT_DIALOG_BUTTON_CASE_PLUGIN),
+  `plugins must include "${ALERT_DIALOG_BUTTON_CASE_PLUGIN}"`
+);
+// The alert dialog theme repaints AppCompat's stock dialog surface and accent
+// with the app's own tokens; without it the sign-out confirmation (and every
+// other Alert.alert) is the DayNight default grey/teal.
+check(
+  pluginNames.includes(ALERT_DIALOG_THEME_PLUGIN),
+  `plugins must include "${ALERT_DIALOG_THEME_PLUGIN}"`
+);
 const splashEntries = (config.plugins ?? []).filter(
   plugin => Array.isArray(plugin) && plugin[0] === BRANDED_SPLASH_PLUGIN
 );
@@ -249,6 +322,20 @@ check(
   pluginNames.includes(APP_INTENT_LOCALIZATIONS_PLUGIN),
   `plugins must include "${APP_INTENT_LOCALIZATIONS_PLUGIN}"`
 );
+
+// Asserted on the EVALUATED config, not on app.config.ts's source: options that
+// never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
+// onboarding on), and the menu then sits over the product screen carrying the
+// raw SF Symbol names a scene dump reads aloud.
+const devClientPlugin = (config.plugins ?? []).find(
+  plugin => Array.isArray(plugin) && plugin[0] === DEV_CLIENT_PLUGIN
+);
+for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
+  check(
+    devClientPlugin?.[1]?.[option] === expected,
+    `plugins "${DEV_CLIENT_PLUGIN}" must set ${option}: ${JSON.stringify(expected)}`
+  );
+}
 
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {

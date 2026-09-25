@@ -1,4 +1,12 @@
-import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { FeedbackPromptDialog } from '@/components/feedback-prompt-dialog';
 import { showFeedbackPrompt } from '@/lib/feedback';
@@ -9,17 +17,36 @@ import { needsInAppFeedbackPrompt } from '@/lib/feedback-prompt-platform';
  * in-app dialog on Android (`feedback-prompt-platform.ts` explains why). A
  * caller renders `promptDialog` in its own tree and calls `requestPrompt`
  * where the prompt is triggered, passing the user id the claim carries.
+ *
+ * `requestPrompt` reports whether it presented. The in-app dialog is state in
+ * this host, so a request that arrives after the host unmounted cannot render
+ * — the deferred post-submit claim can outlive the layout that hosts it — and
+ * it reports `false`, which leaves the one-time marker unset
+ * (`maybeAskAfterSuccessfulOutcome`) so the next successful outcome asks
+ * again. The native alert presents regardless of the tree, so it reports
+ * `true`.
  */
 export function useFeedbackPrompt() {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const requestPrompt = useCallback((nextUserId: string | undefined) => {
     if (!needsInAppFeedbackPrompt()) {
       showFeedbackPrompt(nextUserId);
-      return;
+      return true;
+    }
+    if (!mounted.current) {
+      return false;
     }
     setUserId(nextUserId);
     setIsOpen(true);
+    return true;
   }, []);
   const promptDialog = isOpen ? (
     <FeedbackPromptDialog
@@ -32,7 +59,8 @@ export function useFeedbackPrompt() {
   return { requestPrompt, promptDialog };
 }
 
-type FeedbackPromptRequester = (userId: string | undefined) => void;
+/** Reports whether the prompt presented; `false` leaves the one-time marker unset. */
+type FeedbackPromptRequester = (userId: string | undefined) => boolean;
 
 const FeedbackPromptRequestContext = createContext<FeedbackPromptRequester | undefined>(undefined);
 

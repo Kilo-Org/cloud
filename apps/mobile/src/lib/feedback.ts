@@ -1,5 +1,5 @@
 import * as Application from 'expo-application';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as StoreReview from 'expo-store-review';
 import { Alert, Linking, Platform } from 'react-native';
 import { toast } from 'sonner-native';
@@ -81,7 +81,12 @@ export function sendAppFeedback(userId: string | undefined) {
   void openSupportEmail(userId);
 }
 
-export function showFeedbackPrompt(userId: string | undefined) {
+/**
+ * The native alert. It presents regardless of whether the caller's tree is
+ * still mounted, so it reports `true` — `maybeAskAfterSuccessfulOutcome` takes
+ * this as the prompt's default surface.
+ */
+export function showFeedbackPrompt(userId: string | undefined): boolean {
   Alert.alert(i18n.t('feedback.neutralTitle'), undefined, [
     { text: i18n.t('common.notNow'), style: 'cancel' },
     {
@@ -95,26 +100,43 @@ export function showFeedbackPrompt(userId: string | undefined) {
       },
     },
   ]);
+  return true;
 }
 
 // One-time neutral prompt after an authoritative success (for example, a full
 // PR review submit). The last-asked marker absent-check and write run inside
 // one per-key chain, so concurrent calls observe the marker atomically: only
-// the first call shows the prompt and later calls skip it.
+// the first call presents and later calls skip it.
 //
 // `present` is where the prompt appears — the native alert by default, or the
 // caller's in-app surface on Android (`feedback-prompt-platform.ts`). It is
-// invoked inside the claim, so only the call that wins the marker presents.
+// invoked inside the claim, so only the call that wins the marker presents, and
+// it reports whether it actually presented. A caller whose surface unmounted
+// before this deferred claim runs reports `false`, the marker then stays unset,
+// and the next successful outcome asks again instead of losing the one-time
+// prompt silently.
+//
+// Best effort: the caller fires this without awaiting, so a stored-marker
+// failure (reported at warning level by the metadata helper) must not surface
+// as an unhandled rejection — the prompt is a convenience and the next success
+// asks again.
 export async function maybeAskAfterSuccessfulOutcome(
   userId: string | undefined,
-  present: (userId: string | undefined) => void = showFeedbackPrompt
+  present: (userId: string | undefined) => boolean = showFeedbackPrompt
 ): Promise<void> {
-  await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
-    const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
-    if (alreadyAsked != null) {
-      return;
-    }
-    await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
-    present(userId);
-  });
+  try {
+    await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
+      const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
+      if (alreadyAsked != null) {
+        return;
+      }
+      if (!present(userId)) {
+        return;
+      }
+      await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
+    });
+  } catch {
+    // Reported by the account-metadata write; the prompt is not user-actionable
+    // here and the next successful outcome asks again.
+  }
 }

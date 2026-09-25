@@ -17,7 +17,7 @@ import {
 // recents come from SecureStore, so it is mocked to a settable list. Every
 // other document is built from the react-query cache below.
 const recentPrs = vi.hoisted(() => ({
-  getRecentPrs: vi.fn<() => Promise<RecentPrsModule.RecentPr[]>>(),
+  getRecentPrsForIndex: vi.fn<() => Promise<RecentPrsModule.RecentPr[] | undefined>>(),
 }));
 
 vi.mock('expo-secure-store', () => ({
@@ -28,7 +28,7 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@/lib/pr-review/recent-prs', async importOriginal => {
   const actual = await importOriginal<typeof RecentPrsModule>();
-  return { ...actual, getRecentPrs: recentPrs.getRecentPrs };
+  return { ...actual, getRecentPrsForIndex: recentPrs.getRecentPrsForIndex };
 });
 
 const SESSION_LIST_KEY = [
@@ -196,14 +196,14 @@ function projection(document: {
 
 describe('collectSystemSearchDocuments', () => {
   beforeEach(() => {
-    recentPrs.getRecentPrs.mockReset();
-    recentPrs.getRecentPrs.mockResolvedValue([]);
+    recentPrs.getRecentPrsForIndex.mockReset();
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([]);
   });
 
   it('collects one document per cached entity, in cache order', async () => {
     const client = new QueryClient();
     seed(client);
-    recentPrs.getRecentPrs.mockResolvedValue([
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([
       // The same PR as the cached inbox row, with the title the authorized
       // load stored. The id is claimed once.
       {
@@ -267,7 +267,9 @@ describe('collectSystemSearchDocuments', () => {
   });
 
   it('observes the recents scopes only when the stored list was read', async () => {
-    recentPrs.getRecentPrs.mockRejectedValue(new Error('SecureStore unavailable'));
+    // An unreadable store is `undefined`, not an empty list: the collector
+    // must not read it as evidence that the recents are gone.
+    recentPrs.getRecentPrsForIndex.mockResolvedValue(undefined);
 
     const { observedSources } = await collectSystemSearchDocuments(new QueryClient());
 
@@ -281,7 +283,7 @@ describe('collectSystemSearchDocuments', () => {
     // The stored list is empty now: the user removed the entry, or newer opens
     // evicted it. No inbox query can speak for a GitLab recents entry, so the
     // recents scope read above is the only evidence that may remove it.
-    recentPrs.getRecentPrs.mockResolvedValue([]);
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([]);
     const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
     const indexed = recentPrSearchDocument({
@@ -607,7 +609,7 @@ describe('collectSystemSearchDocuments', () => {
     client.setQueryData(PROVIDER_INBOX_KEY, providerInbox);
     // The same GitLab MR also sits in the stored recents: the collector
     // dedupes by id, so the index carries one entry per PR, not two.
-    recentPrs.getRecentPrs.mockResolvedValue([
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([
       {
         owner: 'group/sub',
         repo: 'repo',
@@ -649,5 +651,60 @@ describe('collectSystemSearchDocuments', () => {
       '/(app)/agent-chat/sess-1?organizationId=org-1',
     ]);
     expect(queryFn).not.toHaveBeenCalled();
+  });
+
+  it('reuses a query’s documents while its payload identity is unchanged', async () => {
+    const client = new QueryClient();
+    seed(client);
+
+    const first = await collectSystemSearchDocuments(client);
+    const second = await collectSystemSearchDocuments(client);
+
+    // The very same document objects come back: the second collect reused the
+    // memo entry instead of re-decoding the payload and re-fingerprinting
+    // every document.
+    expect(second.documents[0]).toBe(first.documents[0]);
+    expect(second.documents).toEqual(first.documents);
+  });
+
+  it('rebuilds a query’s documents when the cached payload changes', async () => {
+    const client = new QueryClient();
+    seed(client);
+
+    const first = await collectSystemSearchDocuments(client);
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        { cliSessions: [{ ...sessionRow, title: 'Fix login bug (renamed)' }], nextCursor: null },
+      ],
+    });
+    const second = await collectSystemSearchDocuments(client);
+
+    const renamed = second.documents.find(
+      document => document.id === '/(app)/agent-chat/sess-1?organizationId=org-1'
+    );
+    // The changed payload invalidated the memo entry, so the document carries
+    // the new title and is a fresh object rather than the reused one.
+    expect(renamed?.title).toBe('Fix login bug (renamed)');
+    expect(renamed).not.toBe(
+      first.documents.find(
+        document => document.id === '/(app)/agent-chat/sess-1?organizationId=org-1'
+      )
+    );
+  });
+
+  it('keeps one client’s memoized documents out of another client', async () => {
+    const firstClient = new QueryClient();
+    const secondClient = new QueryClient();
+    // Both clients hold the same query keys and the same payload objects, so a
+    // memo keyed by query hash alone would hand the first client's documents to
+    // the second.
+    seed(firstClient);
+    seed(secondClient);
+
+    const first = await collectSystemSearchDocuments(firstClient);
+    const second = await collectSystemSearchDocuments(secondClient);
+
+    expect(second.documents[0]).not.toBe(first.documents[0]);
+    expect(second.documents).toEqual(first.documents);
   });
 });

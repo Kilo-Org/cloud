@@ -2711,6 +2711,7 @@ describe('cli-sessions-v2-router', () => {
         .values({
           owned_by_user_id: regularUser.id,
           platform: 'github',
+          github_connection_role: 'workflow',
           integration_type: 'app',
           platform_installation_id: '12345',
           github_app_type: 'standard',

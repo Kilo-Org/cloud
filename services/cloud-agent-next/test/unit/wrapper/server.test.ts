@@ -28,10 +28,6 @@ import {
 } from '../../../wrapper/src/server.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 
-// ---------------------------------------------------------------------------
-// Test Helpers
-// ---------------------------------------------------------------------------
-
 function createMockKiloClient(): WrapperKiloClient {
   return {
     createSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
@@ -109,10 +105,6 @@ afterEach(async () => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-// ---------------------------------------------------------------------------
-// Kilo Proxy Handler
-// ---------------------------------------------------------------------------
 
 describe('createKiloProxyHandler', () => {
   it('matches only the wrapper kilo proxy path family', () => {
@@ -211,10 +203,6 @@ describe('createKiloProxyHandler', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Answer Permission
-// ---------------------------------------------------------------------------
 
 describe('createAnswerPermissionHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
@@ -329,10 +317,6 @@ describe('createAnswerPermissionHandler', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Answer Question
-// ---------------------------------------------------------------------------
-
 describe('createAnswerQuestionHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
     const state = new WrapperState();
@@ -366,10 +350,6 @@ describe('createAnswerQuestionHandler', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Reject Question
-// ---------------------------------------------------------------------------
-
 describe('createRejectQuestionHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
     const state = new WrapperState();
@@ -402,10 +382,6 @@ describe('createRejectQuestionHandler', () => {
     expect(deps.kiloClient.rejectQuestion).toHaveBeenCalledWith('q_1');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Abort
-// ---------------------------------------------------------------------------
 
 describe('createAbortHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
@@ -444,10 +420,6 @@ describe('createAbortHandler', () => {
     expect(triggerDrainAndClose).toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Session Binding (bindSessionContext)
-// ---------------------------------------------------------------------------
 
 const defaultServerConfig: ServerConfig = {
   port: 5000,
@@ -596,10 +568,6 @@ describe('bindSessionContext', () => {
     expect(deps.onSessionBound).toHaveBeenCalledOnce();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Prompt Handler
-// ---------------------------------------------------------------------------
 
 describe('createPromptHandler', () => {
   it('returns NO_SESSION on fresh wrapper without session binding', async () => {
@@ -1059,10 +1027,6 @@ describe('createPromptHandler', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Command Handler
-// ---------------------------------------------------------------------------
-
 describe('createCommandHandler', () => {
   it('routes compact through session summarize with the selected model', async () => {
     const state = new WrapperState();
@@ -1159,10 +1123,6 @@ describe('createCommandHandler', () => {
     expect(state.getMessageConfig('msg_compact')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Session Ready Handler
-// ---------------------------------------------------------------------------
 
 describe('createSessionReadyHandler', () => {
   it('delegates readiness to the wrapper runtime', async () => {

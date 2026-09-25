@@ -16,8 +16,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <PageTitleProvider>
         <EventServiceProvider>
           <PlatformPresenceMount />
-          <SidebarProvider>
-            <PrefetchedOrganizations>
+          {/*
+            The SSR-resolved user is seeded here so every consumer that renders
+            during hydration (the sidebar footer and the customer-source survey)
+            agrees with the server markup. Both live inside this boundary.
+          */}
+          <PrefetchedOrganizations>
+            <SidebarProvider>
               <AppShellSkipLink />
               <div className="flex min-h-screen w-full">
                 <Suspense fallback={null}>
@@ -30,9 +35,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </main>
                 </SidebarInset>
               </div>
-            </PrefetchedOrganizations>
-          </SidebarProvider>
-          <CustomerSourceSurvey />
+            </SidebarProvider>
+            <CustomerSourceSurvey />
+          </PrefetchedOrganizations>
         </EventServiceProvider>
       </PageTitleProvider>
       <AdminOmnibox />

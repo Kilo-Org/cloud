@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dedupeById } from './dedupe-by-id';
+import { dedupeBy, dedupeById } from './dedupe-by-id';
 
 describe('dedupeById', () => {
   it('returns the same order when there are no duplicates', () => {
@@ -33,5 +33,21 @@ describe('dedupeById', () => {
 
   it('returns an empty array for empty input', () => {
     expect(dedupeById([])).toEqual([]);
+  });
+});
+
+describe('dedupeBy', () => {
+  it('dedupes by a non-id key, keeping the first occurrence without mutating the input', () => {
+    const first = { path: 'a.ts', page: 1 };
+    const second = { path: 'b.ts', page: 1 };
+    const duplicate = { path: 'a.ts', page: 2 };
+    const items = [first, second, duplicate];
+    const snapshot = [...items];
+
+    const result = dedupeBy(items, item => item.path);
+
+    expect(result).toEqual([first, second]);
+    expect(items).toEqual(snapshot);
+    expect(result[0]).toBe(first);
   });
 });

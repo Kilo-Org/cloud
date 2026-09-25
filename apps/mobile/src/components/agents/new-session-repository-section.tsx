@@ -189,6 +189,10 @@ export function NewSessionRepositorySection({
               title={t(PROVIDER_COPY[platform].errorTitle)}
               message={t('organization.boundary.loadErrorMessage')}
               onRetry={onRefreshRepos}
+              // The error row's action is the same provider-list refresh the
+              // connect and connected-empty cards offer, so it carries the same
+              // name instead of the generic "Retry".
+              retryLabel={t('agentChat.newSession.refreshRepositories')}
               isRetrying={isRetrying}
             />
           </View>
@@ -222,6 +226,13 @@ export function NewSessionRepositorySection({
         contentClassName="gap-3"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
+        // The card stacks under the repository picker in a scrolling column,
+        // and the picker's height settles asynchronously (repos load, the
+        // selection changes), while the branch row mounts above the card once a
+        // repository is chosen. An animated layout here interpolates the card's
+        // frame against a sibling that has already snapped, so it paints over
+        // the row above it — the picker's bottom edge or the branch row.
+        animateLayout={false}
         expanded={!collapsedCtas.includes(platform)}
         onToggle={() => {
           setConnectCtaCollapsed(platform, !collapsedCtas.includes(platform));
@@ -262,7 +273,8 @@ export function NewSessionRepositorySection({
             than the glyphs Android lays out, so "Open GitLab" wrapped onto two
             lines and grew the button taller than its one-line siblings; giving
             the label the free space keeps its box wider than the text, and
-            `numberOfLines` pins the line.
+            `numberOfLines` pins the line. The explorer captures
+            new-session-filled and new-session-kb-down both showed that wrap.
           */}
           <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}

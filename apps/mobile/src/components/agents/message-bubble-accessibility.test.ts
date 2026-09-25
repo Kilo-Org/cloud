@@ -16,6 +16,9 @@ const clipboard = vi.hoisted(() => ({ text: '' }));
 vi.mock('react', async importOriginal => ({
   ...(await importOriginal<typeof React>()),
   useCallback: <T>(fn: T) => fn,
+  // The harness invokes the component directly, so React has no dispatcher;
+  // this file renders each message once and asserts nothing about memoization.
+  useMemo: <T>(fn: () => T) => fn(),
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();

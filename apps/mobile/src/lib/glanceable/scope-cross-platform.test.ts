@@ -9,14 +9,16 @@ import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys
 import { getActiveUserId, getSelectedOrganizationId } from './scope';
 
 const mocks = vi.hoisted(() => ({
-  readStoredValue: vi.fn(),
+  readStoredValueSafe: vi.fn(),
   getItemAsync: vi.fn(),
 }));
 
 // The one cross-platform read is mocked: a regression to a direct
 // `expo-secure-store` import in `scope.ts` would call the platform module
 // instead, so the assertions below fail rather than crash the suite.
-vi.mock('@/lib/auth/secure-store-value', () => ({ readStoredValue: mocks.readStoredValue }));
+vi.mock('@/lib/auth/secure-store-value', () => ({
+  readStoredValueSafe: mocks.readStoredValueSafe,
+}));
 vi.mock('expo-secure-store', () => ({ getItemAsync: mocks.getItemAsync }));
 
 const SCOPE_SOURCE = readFileSync(join(__dirname, 'scope.ts'), 'utf8');
@@ -27,13 +29,13 @@ describe('glanceable scope SecureStore entry point', () => {
   });
 
   it('reads both scope keys through the shared cross-platform helper', async () => {
-    mocks.readStoredValue.mockResolvedValue('value');
+    mocks.readStoredValueSafe.mockResolvedValue('value');
 
     await expect(getSelectedOrganizationId()).resolves.toBe('value');
     await expect(getActiveUserId()).resolves.toBe('value');
 
-    expect(mocks.readStoredValue).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
-    expect(mocks.readStoredValue).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY);
+    expect(mocks.readStoredValueSafe).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
+    expect(mocks.readStoredValueSafe).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY);
     expect(mocks.getItemAsync).not.toHaveBeenCalled();
   });
 

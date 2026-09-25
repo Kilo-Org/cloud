@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react-native';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as z from 'zod';
 
 // Module-local key: this slice does not own storage-keys.ts, so the key is
@@ -60,8 +60,20 @@ export type PendingExternalAuthReadResult =
 // Reads WITHOUT clearing. The caller must clear a `stale` record itself, after
 // its own epoch check, so a concurrent `start()` write is never deleted by a
 // restore read that observed the older record.
+//
+// Total: a rejected read is the same recoverable outcome as an absent record.
+// The guarded store reports the failure at warning level with the stable read
+// fingerprint before rethrowing, so catching here leaves exactly one event. It
+// must not reject — the mount effect `void`s this read, so a rejection would
+// surface as an unhandled error instead of the idle screen, and the person
+// could still start sign-in again.
 export async function readPendingExternalAuth(): Promise<PendingExternalAuthReadResult> {
-  const raw = await SecureStore.getItemAsync(PENDING_EXTERNAL_AUTH_KEY);
+  let raw: string | null = null;
+  try {
+    raw = await SecureStore.getItemAsync(PENDING_EXTERNAL_AUTH_KEY);
+  } catch {
+    return { kind: 'none' };
+  }
   if (!raw) {
     return { kind: 'none' };
   }

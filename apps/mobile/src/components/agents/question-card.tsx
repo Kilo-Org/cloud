@@ -1,12 +1,20 @@
 /* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, type Text as RNText, ScrollView, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  type Text as RNText,
+  ScrollView,
+  type TextInput,
+  View,
+} from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Check } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,
@@ -207,7 +215,7 @@ export function QuestionCard({
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-destructive/10 px-4 py-2">
+        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
           <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
         </View>
       ) : null}
@@ -329,7 +337,7 @@ export function QuestionCard({
                           <Check size={16} color={colors.primaryForeground} />
                         ) : null}
                       </Pressable>
-                      <TextInput
+                      <Input
                         ref={node => {
                           customInputRefs.current[qIndex] = node;
                         }}
@@ -338,12 +346,23 @@ export function QuestionCard({
                           handleCustomTextChange(qIndex, text);
                         }}
                         placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
-                        placeholderTextColor={colors.mutedForeground}
+                        // The active field swaps its fill to `bg-primary`, so the
+                        // placeholder follows the fill's foreground like the
+                        // typed text and the option label do; the muted grey is
+                        // painted for the plain background and is unreadable on
+                        // the olive fill.
+                        placeholderTextColor={
+                          isCustomActive ? colors.primaryForeground : colors.mutedForeground
+                        }
                         editable={!interactionDisabled}
                         accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
                         accessibilityState={{ disabled: interactionDisabled }}
                         className={cn(
-                          'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-[#0000000D]',
+                          // The shared single-line box supplies the touch
+                          // floor (`min-h-[44px]`, never a fixed height);
+                          // dropping `py-2.5` lets the box own the vertical
+                          // geometry, and every other token stays.
+                          'rounded-md border px-3 text-sm shadow-sm shadow-[#0000000D]',
                           isCustomActive
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',

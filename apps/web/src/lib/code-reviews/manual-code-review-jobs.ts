@@ -456,7 +456,9 @@ async function resolveConnectedGitHubSource(
   const parsed = parseGitHubPullRequestUrl(url);
   const integrations = (await getAllIntegrationsForOwner(owner)).filter(
     integration =>
-      integration.platform === PLATFORM.GITHUB && integration.integration_status === 'active'
+      integration.platform === PLATFORM.GITHUB &&
+      integration.integration_status === 'active' &&
+      integration.github_connection_role === 'workflow'
   );
 
   if (integrations.length === 0) {
@@ -478,7 +480,8 @@ async function resolveConnectedGitHubSource(
     const appType = integration.github_app_type ?? 'standard';
     const tokenData = await generateGitHubInstallationToken(
       integration.platform_installation_id,
-      appType
+      appType,
+      integration.id
     );
     const result = await fetchGitHubPullRequest(parsed, tokenData.token);
     if (result.status === 'ok') {

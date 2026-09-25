@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module-mock scaffold and the shared test-helpers harness serve the branch-row, connect-card collapse, and connect-card layout-stability suites */
 /* oxlint-disable max-lines -- one suite for the repository section: the branch row, Bitbucket restriction, connect-card collapse, one-line connect label, and post-selection compact actions all mount the same section through one hoisted preference mock */
 /* eslint-disable max-lines -- the provider connect-card states (branch row, organizations-only note, collapse, post-selection actions) and the open-label line pinning share one module-mock set */
 import { act, type TestRenderer } from '@/test/renderer';
@@ -278,6 +279,29 @@ describe('NewSessionRepositorySection connect card collapse', () => {
   });
 });
 
+describe('NewSessionRepositorySection connect card layout stability', () => {
+  // The branch row mounts above the connect card's slot as soon as a repository
+  // is chosen, so the card must not carry a layout transition: Reanimated would
+  // paint it at its pre-change position, covering the row and leaving an empty
+  // gap below. Its content still fades in.
+  it('leaves the layout transition off the connect card and keeps the content fade', () => {
+    const renderer = mountSection({
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+    });
+
+    const card = renderer.root.find(
+      node =>
+        node.type === ('Animated.View' as never) && String(node.props.className).includes('bg-card')
+    );
+    expect(card.props.layout).toBeUndefined();
+
+    const content = renderer.root.find(
+      node => node.type === ('Animated.View' as never) && node.props.entering !== undefined
+    );
+    expect(content.props.entering).toEqual({ __fadeIn: 150 });
+  });
+});
+
 describe('NewSessionRepositorySection connect button label', () => {
   it('keeps the connect action label on a single line with the row remaining width', () => {
     // A label sized to its own content is measured at its longest word's width
@@ -377,6 +401,10 @@ describe('NewSessionRepositorySection connect cards after selection', () => {
     });
     const error = renderer.root.findByType('QueryError' as never);
     expect(error.props.title).toBe(i18n.t('agentChat.newSession.couldNotLoadGitlabRepositories'));
+    // The error row's action is the provider-list refresh, so it carries that
+    // name rather than the generic "Retry" (scenario e7: the digest must show
+    // the 'Refresh repositories' control on the error row).
+    expect(error.props.retryLabel).toBe(i18n.t('agentChat.newSession.refreshRepositories'));
     act(() => {
       (error.props.onRetry as () => void)();
     });

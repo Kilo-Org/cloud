@@ -1,12 +1,12 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Check, ChevronDown } from '@/components/ui/icons';
+import { ContextPickerSheet } from '@/components/context-picker-sheet';
+import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -17,78 +17,68 @@ import { useTRPC } from '@/lib/trpc';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
-/** The caller supplies its cached memberships; the picker does not fetch data. */
+/**
+ * The caller supplies its cached memberships; the picker does not fetch data.
+ * Returns the opener for its control plus the sheet element the caller renders,
+ * so the sheet lives in the caller's tree (a portal-free `Modal`) instead of a
+ * process-wide action-sheet provider.
+ */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
-  const { showActionSheetWithOptions } = useActionSheet();
-  const colors = useThemeColors();
-  const { top, bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { organizationId, setOrganizationId } = useOrganization();
+  const { setOrganizationId, organizationId } = useOrganization();
+  const [open, setOpen] = useState(false);
 
-  return () => {
-    if (!orgs) {
+  const labels = [
+    t('common.personal'),
+    ...(orgs ?? []).map(org => org.organizationName),
+    t('common.cancel'),
+  ];
+  const cancelButtonIndex = labels.length - 1;
+  // Personal is index 0 and the memberships follow in list order. A persisted
+  // membership that is no longer listed checks nothing, so the mark never names
+  // an account the user is not on.
+  const memberIndex = orgs?.findIndex(org => org.organizationId === organizationId) ?? -1;
+  let currentIndex = -1;
+  if (organizationId === null) {
+    currentIndex = 0;
+  } else if (memberIndex >= 0) {
+    currentIndex = memberIndex + 1;
+  }
+
+  const select = (index: number) => {
+    setOpen(false);
+    if (index === cancelButtonIndex) {
       return;
     }
-    const scopeLabels = [t('common.personal'), ...orgs.map(org => org.organizationName)];
-    const options = [...scopeLabels, t('common.cancel')];
-    const cancelButtonIndex = options.length - 1;
-    // The current scope is marked, so the sheet says which account it is
-    // switching away from. The library draws `icons[i]` before every row's
-    // label — including Cancel, which is an option row on this surface — so
-    // every row gets the same slot and only the current scope fills it with a
-    // check; the labels then stay on one column instead of shifting. Personal
-    // is row 0, so an organization sits one row past its index in `orgs`; a
-    // scope that is not among the rows marks nothing.
-    let currentIndex: number | null = null;
-    if (organizationId === null) {
-      currentIndex = 0;
-    } else {
-      const orgIndex = orgs.findIndex(org => org.organizationId === organizationId);
-      if (orgIndex !== -1) {
-        currentIndex = orgIndex + 1;
-      }
+    if (index === 0) {
+      setOrganizationId(null);
+      return;
     }
-    const icons = options.map((_, index) =>
-      index === currentIndex ? (
-        <Check key={index} size={18} color={colors.foreground} />
-      ) : (
-        <View key={index} className="h-[18px] w-[18px]" />
-      )
-    );
-    showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex,
-        title: t('profile.selectAccount'),
-        // The sheet is only an option list on the library's Android surface:
-        // without separators the rows read as one block, and when the list is
-        // taller than the window the sheet starts at the very top edge, so the
-        // status-bar inset keeps the title off the system bar.
-        showSeparators: true,
-        icons,
-        containerStyle: {
-          paddingTop: top,
-          paddingBottom: bottom,
-          backgroundColor: colors.card,
-        },
-        separatorStyle: { backgroundColor: colors.border },
-        textStyle: { color: colors.foreground },
-        titleTextStyle: { color: colors.mutedForeground },
-      },
-      index => {
-        if (index === undefined || index === cancelButtonIndex) {
-          return;
-        }
-        if (index === 0) {
-          setOrganizationId(null);
-        } else {
-          const org = orgs[index - 1];
-          if (org) {
-            setOrganizationId(org.organizationId);
-          }
-        }
+    const org = orgs?.[index - 1];
+    if (org) {
+      setOrganizationId(org.organizationId);
+    }
+  };
+
+  return {
+    openPicker: () => {
+      if (orgs) {
+        setOpen(true);
       }
-    );
+    },
+    picker: orgs ? (
+      <ContextPickerSheet
+        visible={open}
+        title={t('profile.selectAccount')}
+        options={labels}
+        cancelButtonIndex={cancelButtonIndex}
+        currentIndex={currentIndex}
+        onSelect={select}
+        onClose={() => {
+          setOpen(false);
+        }}
+      />
+    ) : null,
   };
 }
 
@@ -107,7 +97,7 @@ export function ContextControl({
     enabled: token != null,
   });
   const orgs = organizations.data;
-  const openPicker = useContextPicker(orgs);
+  const { openPicker, picker } = useContextPicker(orgs);
   const organizationId = scope ? scope.organizationId : context.organizationId;
   const isResolved = scope ? scope.isResolved : context.isLoaded;
   const providerError = scope ? null : context.error;
@@ -188,6 +178,7 @@ export function ContextControl({
         </Pressable>
       )}
       <AccessibleStatus message={errorMessage} className="text-sm" />
+      {picker}
       {retry && errorMessage ? (
         <Pressable
           accessibilityRole="button"

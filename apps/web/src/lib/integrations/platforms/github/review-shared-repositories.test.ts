@@ -6,6 +6,7 @@ const sharedAssociation = {
     suspended_at: null,
     auth_invalid_at: null,
     github_disconnected_at: null,
+    github_connection_role: 'agent_only',
     github_installation_id: '00000000-0000-4000-8000-000000000001',
   },
   installation: {
@@ -53,10 +54,16 @@ jest.mock('@octokit/rest', () => ({
   })),
 }));
 import { fetchGitHubRepositories } from './adapter';
-test('REVIEW: fetch repository inventory for an exact healthy shared association', async () => {
-  // End-to-end through the real adapter: with a non-empty expectedIntegrationId, the shared
-  // (web_cloud_agent) canonical installation must be authorized and the inventory fetched.
+test('fetches inventory for an exact secondary association only with an approved purpose', async () => {
   await expect(
     fetchGitHubRepositories('123456', 'standard', '00000000-0000-4000-8000-000000000002')
+  ).rejects.toThrow('unavailable');
+  await expect(
+    fetchGitHubRepositories(
+      '123456',
+      'standard',
+      '00000000-0000-4000-8000-000000000002',
+      'management'
+    )
   ).resolves.toHaveLength(1);
 });

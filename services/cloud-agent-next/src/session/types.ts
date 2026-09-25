@@ -9,14 +9,6 @@ import type { EventId, ExecutionId } from '../types/ids.js';
 import type { ExecutionStatus } from '../core/execution.js';
 import type { ExecutionMode, StreamingMode } from '../execution/types.js';
 
-// ---------------------------------------------------------------------------
-// Execution Metadata
-// ---------------------------------------------------------------------------
-
-/**
- * Execution metadata stored in session state.
- * Tracks the status and configuration of each execution within a session.
- */
 export type ExecutionMetadata = {
   executionId: ExecutionId;
   status: ExecutionStatus;
@@ -36,10 +28,6 @@ export type ExecutionMetadata = {
   messageId?: string;
 };
 
-// ---------------------------------------------------------------------------
-// Latest Assistant Message
-// ---------------------------------------------------------------------------
-
 export type AssistantMessageInfo = Record<string, unknown> & {
   id: string;
   role: 'assistant';
@@ -57,10 +45,6 @@ export type LatestAssistantMessage = {
   parts: AssistantMessagePart[];
 };
 
-// ---------------------------------------------------------------------------
-// Session State Extension
-// ---------------------------------------------------------------------------
-
 /**
  * Extended session state with WebSocket streaming support.
  * These fields are stored in the DO key-value storage alongside metadata.
@@ -70,13 +54,6 @@ export type CloudAgentSessionStateExtension = {
   interruptRequested?: boolean;
 };
 
-// ---------------------------------------------------------------------------
-// RPC Parameters
-// ---------------------------------------------------------------------------
-
-/**
- * Parameters for adding a new execution.
- */
 export type AddExecutionParams = {
   executionId: ExecutionId;
   mode: ExecutionMode;
@@ -87,9 +64,6 @@ export type AddExecutionParams = {
   messageId?: string;
 };
 
-/**
- * Parameters for updating execution status.
- */
 export type UpdateExecutionStatusParams = {
   executionId: ExecutionId;
   status: ExecutionStatus;
@@ -98,9 +72,6 @@ export type UpdateExecutionStatusParams = {
   gateResult?: 'pass' | 'fail';
 };
 
-/**
- * Parameters for updating execution heartbeat.
- */
 export type UpdateExecutionHeartbeatParams = {
   executionId: ExecutionId;
   timestamp: number;

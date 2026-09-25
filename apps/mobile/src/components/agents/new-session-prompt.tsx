@@ -40,6 +40,7 @@ import {
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { resolveNewSessionPromptMinHeight } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
@@ -85,9 +86,9 @@ type NewSessionPromptComponentProps = NewSessionPromptProps & {
 };
 
 /**
- * New-session prompt surface: attachment strip, full-width multiline text
- * input, bottom action row (paperclip leading, voice toggle trailing), and
- * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * New-session prompt surface: model/mode toolbar, attachment strip,
+ * full-width multiline text input, and bottom action row (paperclip leading,
+ * voice toggle trailing). Owns the prompt ref (for voice input to read), the
  * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
  * route listens to `onChangeText` so the create handler can read the live
  * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
@@ -120,6 +121,8 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
+  frameHeight,
+  cardTop = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -150,10 +153,30 @@ export function NewSessionPrompt({
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
-  const promptMinHeight = resolveNewSessionPromptHeight(
-    promptLineHeight,
-    NEW_SESSION_PROMPT_DEFAULT_LINES
+  // The card rows that render only in some states, read by name in the render
+  // below (the measured card chrome covers their height without a static
+  // budget, so they need no separate reservation here).
+  const showsAttachmentStatus = attachments.some(
+    attachment => attachment.metadataStripFailed === true
   );
+  const showsCounter =
+    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
+  // The chrome the card renders around the input, measured by the card's
+  // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
+  // the frame leaves for the input.
+  const [cardChromeHeight, setCardChromeHeight] = useState(0);
+  const promptMinHeight = resolveNewSessionPromptMinHeight({
+    frameHeight: frameHeight ?? 0,
+    cardTop,
+    cardChromeHeight,
+    // The shared helper keeps the preferred 3-line floor in one place.
+    preferredMinHeight: resolveNewSessionPromptHeight(
+      promptLineHeight,
+      NEW_SESSION_PROMPT_DEFAULT_LINES
+    ),
+    lineHeight: promptLineHeight,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
@@ -276,11 +299,12 @@ export function NewSessionPrompt({
       await onPrefillAttachments([file]);
     },
     addText: text => {
-      // The hook calls the latest render's callback, so this sees a create or
-      // a voice session that started during the clipboard read. Neither may
-      // take a draft mutation. `NewSessionPrompt` holds no submit lock, so the
-      // button's own disabled rule is the authority.
-      if (!control.inputEditable) {
+      // The hook calls the latest render's callback, so this sees a create
+      // that started during the clipboard read. A create already holds its own
+      // snapshot, so a late paste must not land in the draft behind it.
+      // `NewSessionPrompt` holds no submit lock, so the button's own disabled
+      // rule is the authority.
+      if (control.draftMutationLocked) {
         return;
       }
       promptSelectionRef.current = pasteTextIntoComposer(text, {
@@ -304,12 +328,23 @@ export function NewSessionPrompt({
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
+  function handleCardLayout(event: LayoutChangeEvent) {
+    const { height } = event.nativeEvent.layout;
+    // Everything the card renders other than the input itself. The input's
+    // height changes when the fit yields and the card's height changes with it,
+    // so this is stable across the yielding re-render. The card's `y` is not
+    // read here: it is relative to the padding-free host wrapper, so the host
+    // passes the frame-relative offset as `cardTop` instead.
+    const nextChromeHeight = height - promptMeasure.height;
+    setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
+  }
+
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
   }
 
   function handleInsertNewline() {
-    if (!control.inputEditable) {
+    if (control.draftMutationLocked) {
       return;
     }
     promptSelectionRef.current = pasteTextIntoComposer('\n', {
@@ -365,7 +400,37 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <View
+      onLayout={handleCardLayout}
+      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]"
+    >
+      {isModelsError && modelOptions.length === 0 ? (
+        <QueryError
+          placement="top"
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => {
+            onRefetchModels();
+          }}
+          className="border-b border-border py-4"
+        />
+      ) : (
+        <ChatToolbar
+          mode={mode}
+          onModeChange={onModeChange}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
+      )}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}
@@ -373,7 +438,7 @@ export function NewSessionPrompt({
         onMove={onMoveAttachment}
         onReorder={onReorderAttachments}
       />
-      {attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+      {showsAttachmentStatus ? (
         <AccessibleStatus
           tone="error"
           message={t('agentChat.composer.photoMetadataNotRemoved')}
@@ -388,10 +453,13 @@ export function NewSessionPrompt({
           placeholderTextColor={colors.mutedForeground}
           multiline
           defaultValue={initialPrompt}
-          className={cn(
-            'w-full px-2 py-2 text-base leading-6 text-foreground',
-            isCreating && 'opacity-50'
-          )}
+          // No dimming while a create is in flight: the field stays editable
+          // (an in-flight create must not steal the IME from the pinned
+          // footer), so it must not read as disabled. The busy affordance is
+          // the Start button's own spinner. An edit made mid-flight is not
+          // discarded: the creator cancels the attempt before it dispatches
+          // and keeps this draft (see `createSessionFromDraft`).
+          className="w-full px-2 py-2 text-base leading-6 text-foreground"
           style={[
             promptInputStyle,
             { height: promptMeasure.height },
@@ -403,9 +471,7 @@ export function NewSessionPrompt({
           onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
           scrollEnabled={promptMeasure.height >= promptMaxHeight}
-          editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
-          accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           returnKeyType={returnSendsMessage ? 'send' : 'default'}
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
           onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
@@ -414,7 +480,7 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
+        {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
@@ -437,15 +503,15 @@ export function NewSessionPrompt({
             <View className="ml-1">
               <Pressable
                 onPress={handleInsertNewline}
-                disabled={!control.inputEditable}
+                disabled={control.draftMutationLocked}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityRole="button"
                 accessibilityLabel={t('agentChat.composer.insertNewline')}
-                accessibilityState={{ disabled: !control.inputEditable }}
+                accessibilityState={{ disabled: control.draftMutationLocked }}
                 style={{ minHeight: PROMPT_HIT_TARGET, minWidth: PROMPT_HIT_TARGET }}
                 className={cn(
                   'items-center justify-center rounded-full active:opacity-70',
-                  !control.inputEditable && 'opacity-50'
+                  control.draftMutationLocked && 'opacity-50'
                 )}
               >
                 <CornerDownLeft size={18} color={colors.mutedForeground} />
@@ -454,33 +520,6 @@ export function NewSessionPrompt({
           ) : null}
         </NewSessionPromptControls>
       </View>
-      {isModelsError && modelOptions.length === 0 ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('agentChat.newSession.couldNotLoadModels')}
-          message={t('organization.boundary.loadErrorMessage')}
-          onRetry={() => {
-            onRefetchModels();
-          }}
-          className="border-t border-border py-4"
-        />
-      ) : (
-        <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          disabled={isCreating}
-          isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-        />
-      )}
     </View>
   );
 }

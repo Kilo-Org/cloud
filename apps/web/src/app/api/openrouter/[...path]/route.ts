@@ -15,6 +15,10 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
@@ -91,7 +95,10 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
-import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
+import {
+  collectDataCollectionRequiredAutoRoutingModelIds,
+  collectDeniedAutoRoutingModelIds,
+} from '@/lib/ai-gateway/auto-routing-denied-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -270,10 +277,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Captured before auto-model resolution and provider transforms mutate the
-  // parsed body; efficient routing classifies the original user request.
-  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
-
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) ||
       determineFallbackFeature(requestBodyParsed, request.headers.get('user-agent'))
@@ -340,6 +343,21 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     request.signal.addEventListener('abort', logClientDisconnect, { once: true });
   }
 
+  const { settings: privacySettings } = await balanceAndSettingsPromise;
+  const requestProvider = requestBodyParsed.body.provider;
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    privacySettings?.data_collection
+  );
+  if (Object.keys(effectivePrivacy).length > 0) {
+    requestBodyParsed.body.provider = { ...requestProvider, ...effectivePrivacy };
+  }
+
+  // Snapshot normalized privacy before model-specific provider transforms.
+  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
+
   let autoModel: string | null = null;
   // Organization Auto can resolve through an intermediate route target before
   // reaching a concrete model. Keep that target for direct-BYOK ownership
@@ -372,13 +390,16 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
             !groupPolicy && plan === 'enterprise'
               ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
               : [];
-          const deniedFromPolicy = groupPolicy
-            ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
-                userId: user.id,
-                organizationId: organizationId ?? null,
-              })
-            : [];
-          const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
+          const owner = { userId: user.id, organizationId: organizationId ?? null };
+          const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+            groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
+            isDataCollectionExplicitlyDisallowed(effectivePrivacy)
+              ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
+              : [],
+          ]);
+          const deniedModelIds = [
+            ...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy]),
+          ];
           const result = await fetchEfficientAutoDecision({
             apiKind: requestBodyParsed.kind,
             body: requestBodyParsed.body,
@@ -678,7 +699,9 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     return {
       balance,
       balanceLimitedByUserAllowance,
-      effectiveProviderConfig,
+      effectiveProviderConfig: effectiveProviderConfig
+        ? { ...effectiveProviderConfig, ...effectivePrivacy }
+        : undefined,
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
@@ -704,6 +727,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     request: requestBodyParsed,
     user,
     organizationId,
+    botId,
     taskId,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });

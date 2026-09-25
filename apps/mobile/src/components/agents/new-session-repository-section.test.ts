@@ -238,6 +238,15 @@ describe('NewSessionRepositorySection connect card open action', () => {
       expect(label?.props.numberOfLines, key).toBe(1);
     }
   });
+
+  it('offers no open label on the connected-empty card', () => {
+    // The connected-empty card replaces the open action with its guidance, so
+    // it must leave no empty gap where the button used to be.
+    const renderer = mountSection({ groups: [group('gitlab', 'connected-empty')] });
+
+    expect(renderedText(renderer)).toContain(i18n.t('agentChat.newSession.gitlabConnected'));
+    expect(labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))).toBeUndefined();
+  });
 });
 
 describe('NewSessionRepositorySection connect card collapse', () => {

@@ -49,8 +49,10 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -104,6 +106,16 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// The personal `agentProfiles.list` rows the header's active-profile chip
+// reads; tests set it before mounting to drive the chip's presence.
+const profileRowsState = vi.hoisted(() => ({
+  personal: [] as unknown[],
+  combined: {
+    orgProfiles: [] as unknown[],
+    personalProfiles: [] as unknown[],
+    effectiveDefaultId: null as string | null,
+  },
+}));
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -196,6 +208,7 @@ vi.mock('@/components/ui/icons', () => ({
   Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'ChevronLeft',
@@ -483,6 +496,25 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
+    // The session header's active-profile chip reads the context profiles; the
+    // hoisted rows let a test resolve a default, and the empty default keeps
+    // the chip absent so the existing header assertions hold.
+    agentProfiles: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'list'],
+          queryFn: () => profileRowsState.personal,
+          initialData: profileRowsState.personal,
+        }),
+      },
+      listCombined: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'listCombined'],
+          queryFn: () => profileRowsState.combined,
+          initialData: profileRowsState.combined,
+        }),
+      },
+    },
     // The real context sheet resolves the "running on" row from the connected
     // CLI instances; the row is inert here, so an empty instance list keeps the
     // sheet rendering without a network read.
@@ -669,6 +701,8 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  profileRowsState.personal = [];
+  profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   openRenameModal.mockClear();
   renameModalState.isOpen = false;
   renameModalState.initialValue = '';
@@ -699,6 +733,9 @@ type MountDetailsOptions = {
   cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
+  sessionOrganizationId?: string;
+  /** The profile id the session row recorded, as `fetchSession` reports it. */
+  sessionProfileId?: string | null;
 };
 
 async function mountDetails(
@@ -776,7 +813,8 @@ async function mountDetails(
         kiloSessionId: id,
         cloudAgentSessionId: null,
         title: sessionTitleOverride ?? `Root ${id}`,
-        organizationId: null,
+        organizationId: options.sessionOrganizationId ?? null,
+        profileId: options.sessionProfileId ?? null,
         gitUrl: null,
         gitBranch: null,
         mode: null,
@@ -980,6 +1018,126 @@ describe('SessionDetailContent display scope', () => {
   });
 });
 
+describe('session detail active-profile indicator', () => {
+  const PROFILE_ROW = {
+    id: 'p1',
+    name: 'Production',
+    description: null,
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 2,
+    commandCount: 1,
+    mcpServerCount: 1,
+    skillCount: 1,
+    agentCount: 1,
+    kiloCommandCount: 1,
+  };
+
+  function findChip(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith(i18n.t('agentChat.newSession.profileActive'))
+    );
+  }
+
+  it('shows the chip for the session context effective default and opens its editor', async () => {
+    profileRowsState.personal = [PROFILE_ROW];
+    const { renderer } = await mountDetails();
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Production');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+  });
+
+  it.each(['user', 'organization'] as const)(
+    'opens a %s default from an organization session in its owner scope',
+    async ownerType => {
+      const profile = { ...PROFILE_ROW, ownerType };
+      profileRowsState.combined = {
+        personalProfiles: ownerType === 'user' ? [profile] : [],
+        orgProfiles: ownerType === 'organization' ? [profile] : [],
+        effectiveDefaultId: profile.id,
+      };
+      const { renderer } = await mountDetails([], {
+        sessionOrganizationId: 'org-a',
+        displayScope: { organizationId: 'org-a', isResolved: true },
+      });
+      await waitFor(() => findChip(renderer).length > 0);
+      const [chip] = findChip(renderer);
+      if (!chip) {
+        throw new Error('the active-profile chip did not render');
+      }
+      act(() => {
+        (chip.props.onPress as () => void)();
+      });
+      expect(navigationRoutes.at(-1)).toBe(
+        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+      );
+    }
+  );
+
+  it('renders no chip when the context has no profiles', async () => {
+    const { renderer } = await mountDetails();
+
+    expect(findChip(renderer)).toHaveLength(0);
+  });
+
+  it('names the profile the session recorded, not the context effective default', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+      { ...PROFILE_ROW, id: 'p-recorded', name: 'Recorded', isDefault: false },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Recorded');
+    expect(chip.props.accessibilityLabel).not.toContain('Default');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+  });
+
+  it('falls back to the effective default only when the session recorded no profile', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Default');
+  });
+
+  it('renders no chip when the session profile id no longer resolves', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const view = await mountDetails([], { sessionProfileId: 'p-deleted' });
+
+    // Wait for the session metadata read so the assertion is not merely the
+    // pre-load window; a fallback to the context default would surface here.
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
 describe('SessionDetailContent header title', () => {
   // The title shares its row with a 44pt context pill and a copy action, so on
   // a narrow phone the title column is a fraction of the row width. The header
@@ -1118,6 +1276,62 @@ describe('SessionDetailContent header title', () => {
     ).className;
     expect(metricsClassName).toContain('shrink');
     expect(metricsClassName).toContain('min-w-0');
+  });
+});
+
+describe('session detail header right cluster', () => {
+  it('caps the right cluster inside the header slot and renders no copy control', async () => {
+    const { renderer } = await mountDetails([]);
+    const header = renderer.root.findByType(ScreenHeader);
+    // The copy-link action left the header in #6343 (7fad4e808) and now lives
+    // in the context sheet, so the sliced chain-link control the explorer
+    // captured cannot paint here any more.
+    expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
+
+    // The header caps its right slot at half the row...
+    const slot = header.findAll(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
+    );
+    expect(slot).toHaveLength(1);
+    expect(slot[0]?.props.className).toContain('min-w-0');
+    expect(slot[0]?.props.className).toContain('shrink');
+
+    // ...and the cluster inside it shrinks into that cap, so it can never paint
+    // past the slot edge. It holds the context pill and nothing else: the PR
+    // badge now shares the goal row instead.
+    const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
+    expect(cluster?.props.className).toContain('min-w-0');
+    expect(cluster?.props.className).toContain('shrink');
+    expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(1);
+
+    // The pill is the flexible part of the cluster: it shrinks into the cap
+    // with it, so the cluster can never paint past the slot edge.
+    const metrics = header.findByProps({ testID: 'session-context-metrics' });
+    expect(metrics.props.className).toContain('min-w-0');
+    expect(metrics.props.className).toContain('shrink');
+  });
+
+  // The cost is the only unbounded string in the cluster: a long total must
+  // truncate inside the capped pill instead of crossing the gutter.
+  it('truncates a long cost inside the capped pill', async () => {
+    const priced = assistantMessage('msg-priced');
+    if (priced.info.role !== 'assistant') {
+      throw new Error('expected an assistant message');
+    }
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    const { renderer } = await mountDetails([priced]);
+    const expected = formatSessionTotalCost(1234.56 * 1_000_000);
+    expect(expected).not.toBeNull();
+    const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const cost = metrics.find(
+      node =>
+        Object.is(node.type, 'Text') &&
+        node.children.some(child => typeof child === 'string' && child === expected)
+    );
+    expect(cost.props.numberOfLines).toBe(1);
+    expect(cost.props.className).toContain('shrink');
   });
 });
 

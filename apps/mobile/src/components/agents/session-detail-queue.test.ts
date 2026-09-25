@@ -123,6 +123,14 @@ vi.mock('@/components/agents/file-part-cache', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     moderation: { reportContent: { mutationOptions: (options: unknown) => options } },
+    // The session header's active-profile chip reads the context profiles; the
+    // mock `useQuery` below settles an empty list, so the chip stays absent.
+    agentProfiles: {
+      list: { queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'list'], input }) },
+      listCombined: {
+        queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'listCombined'], input }),
+      },
+    },
   }),
   trpcClient: {
     cloudAgentNext: {
@@ -156,7 +164,16 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-vi.mock('@tanstack/react-query', () => ({ useMutation: () => ({ mutate: vi.fn() }) }));
+vi.mock('@tanstack/react-query', () => ({
+  useMutation: () => ({ mutate: vi.fn() }),
+  // The profile hook's queries settle empty, so the header shows no chip.
+  useQuery: () => ({
+    data: [],
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
 }));

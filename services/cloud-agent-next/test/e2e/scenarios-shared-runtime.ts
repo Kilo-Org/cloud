@@ -30,7 +30,8 @@ import {
 } from './client.js';
 import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
 import {
-  collectChildMessageText,
+  awaitCorrelatedChildText,
+  CONTENT_CORRELATION_BUDGET_MS,
   correlatedProgressSummary,
   hasCorrelatedStreamProgress,
 } from './scenarios-shared.js';
@@ -518,18 +519,20 @@ export async function sendTurn(
 }
 
 /**
- * Boot a prepared session to a completed initial turn and return its stream,
- * message id and child text. A completed real turn is the readiness proof. The
- * stream is acquired here and closed on every failure path; the caller owns it
- * on success.
+ * Boot a prepared session to a completed initial turn and return its identity
+ * and stream. A completed real turn is the readiness proof. The correlated child
+ * text is awaited with `ready` inside the `try`, so a missing payload throws and
+ * this function closes the stream it owns. The stream is acquired here and
+ * closed on every failure path; the caller owns it on success.
  */
 export async function bootToCompletion(
   deadline: ScenarioDeadline,
   config: DriverConfig,
   session: OwnedSession,
   label: string,
+  ready: (text: string) => boolean,
   budgetMs = 240_000
-): Promise<{ messageId: string; stream: StreamConnection; text: string }> {
+): Promise<{ messageId: string; stream: StreamConnection }> {
   const snapshot = await deadline.within(`${label} snapshot`, signal =>
     getSessionSnapshot(config, session.cloudAgentSessionId, signal)
   );
@@ -556,7 +559,17 @@ export async function bootToCompletion(
       )
     );
     if (status !== 'completed') throw new Error(`${label} boot durable status=${status}`);
-    return { messageId, stream, text: collectChildMessageText(stream.events, messageId) };
+    await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining(`${label} content`))
+      ),
+      label: `${label} turn`,
+      ready,
+    });
+    return { messageId, stream };
   } catch (error) {
     // This stream was acquired here, so this function owns closing it. The
     // caller never receives it to close on a failure path.

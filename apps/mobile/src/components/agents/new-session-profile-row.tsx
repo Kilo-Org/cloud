@@ -11,14 +11,24 @@ import { cn } from '@/lib/utils';
 type RenderProfileRowArgs = {
   isProfileLoading: boolean;
   t: TFunction;
-  profile: EffectiveAgentProfile | null;
+  profile: ProfileRowProfile | null;
   isProfileError: boolean;
   onRetryProfile: () => void;
 };
 
+/** The capability summary the row renders; a full profile is assignable. */
+type ProfileRowProfile = Pick<
+  EffectiveAgentProfile,
+  'name' | 'commandCount' | 'mcpServerCount' | 'skillCount' | 'agentCount'
+>;
+
 /**
  * Keep the environment visible while it gates Start, without showing a default
  * before the query settles. Every state reserves the same two text lines.
+ *
+ * This module stays free of the app's icon barrel: the mounted suite that
+ * renders it cannot load `lucide-react-native`, so the tappable
+ * `NewSessionProfileRow` (which needs the chevron) lives with its screen.
  */
 export function renderProfileRow({
   t,
@@ -32,12 +42,16 @@ export function renderProfileRow({
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
         {t('agentChat.newSession.environment')}
       </Text>
-      {renderProfileBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })}
+      {renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })}
     </View>
   );
 }
 
-function renderProfileBody({
+/**
+ * The state body without the Environment label. `NewSessionProfileRow` reuses
+ * it for its loading and failure states so both rows reserve the same lines.
+ */
+export function renderProfileRowBody({
   t,
   profile,
   isProfileLoading,

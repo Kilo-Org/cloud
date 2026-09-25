@@ -28,6 +28,7 @@ import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import {
@@ -617,19 +618,16 @@ export function checkOrganizationModelRestrictions(params: {
   }
 
   const providerAllowList = params.settings.provider_allow_list;
-  const dataCollection = params.settings.data_collection;
 
-  const providerConfig: OpenRouterProviderConfig = {};
+  const providerConfig: OpenRouterProviderConfig = getEffectiveProviderPrivacy(
+    undefined,
+    params.settings.data_collection
+  );
 
   if (params.organizationPlan === 'enterprise') {
     if (providerAllowList !== undefined) {
       providerConfig.only = providerAllowList;
     }
-  }
-
-  // Setting this only if it's set as an override on the organization settings
-  if (dataCollection) {
-    providerConfig.data_collection = dataCollection;
   }
 
   return {

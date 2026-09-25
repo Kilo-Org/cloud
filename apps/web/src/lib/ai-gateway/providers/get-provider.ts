@@ -181,6 +181,8 @@ export type GetProviderInput = {
   request: GatewayRequest;
   user: User | AnonymousUserContext;
   organizationId: string | undefined;
+  /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
+  botId?: string | undefined;
   taskId: string | undefined;
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes remain exempt. */
@@ -188,7 +190,8 @@ export type GetProviderInput = {
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, taskId, getRoutingProviderConfig } = input;
+  const { requestedModel, request, user, organizationId, botId, taskId, getRoutingProviderConfig } =
+    input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -217,6 +220,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     requestedModel,
     userId: isAnonymousContext(user) ? null : user.id,
     organizationId,
+    botId,
   });
   if (openAiChatGptByok?.kind === 'reconnect') {
     return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };

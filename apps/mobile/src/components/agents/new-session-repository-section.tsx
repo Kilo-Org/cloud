@@ -283,6 +283,8 @@ export function NewSessionRepositorySection({
             the label the free space keeps its box wider than the text, and
             `numberOfLines` pins the line. The explorer captures
             new-session-filled and new-session-kb-down both showed that wrap.
+            The logical `me-[24px]` inset keeps the centered label clear of the
+            leading glyph in RTL as well, which the physical `mr-` would not.
           */}
           <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}

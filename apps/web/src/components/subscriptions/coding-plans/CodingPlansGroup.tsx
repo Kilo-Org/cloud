@@ -57,7 +57,7 @@ export function CodingPlansGroup({
   } | null>(null);
 
   const subscriptions = subscriptionQuery.data ?? [];
-  const catalog = catalogQuery.data ?? [];
+  const catalog = (catalogQuery.data ?? []).filter(plan => plan.purchasable);
   const byokKeys = byokQuery.data ?? [];
   const selectedPlan = catalog.find(plan => plan.planId === subscriptionRequest?.planId) ?? null;
   const nonTerminalSubscriptions = subscriptions.filter(
@@ -322,6 +322,7 @@ type CodingPlanOffer = {
   features: readonly string[];
   availabilityStatus: 'available' | 'sold_out';
   notificationRequested: boolean;
+  purchasable: boolean;
 };
 
 function CodingPlanAccessNotice({

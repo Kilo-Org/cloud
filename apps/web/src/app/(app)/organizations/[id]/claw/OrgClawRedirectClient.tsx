@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
+import { ClawStatusError } from '@/app/(app)/claw/components/ClawStatusError';
 
 function LoadingState() {
   return (
@@ -18,7 +19,7 @@ function LoadingState() {
 
 export function OrgClawRedirectClient({ organizationId }: { organizationId: string }) {
   const router = useRouter();
-  const { data: status, isLoading, error } = useOrgKiloClawStatus(organizationId);
+  const { data: status, isLoading, error, refetch } = useOrgKiloClawStatus(organizationId);
   const basePath = `/organizations/${organizationId}/claw`;
   const redirectPath = status?.status ? `${basePath}/chat` : `${basePath}/new`;
 
@@ -30,13 +31,8 @@ export function OrgClawRedirectClient({ organizationId }: { organizationId: stri
 
   if (error) {
     return (
-      <div
-        className="container m-auto flex w-full max-w-[1140px] items-center justify-center p-4 md:p-6"
-        style={{ minHeight: '50vh' }}
-      >
-        <p className="text-destructive text-sm">
-          Unable to load KiloClaw status. Please refresh the page or try again later.
-        </p>
+      <div className="container m-auto w-full max-w-[1140px] p-4 md:p-6">
+        <ClawStatusError error={error} onRetry={() => void refetch()} />
       </div>
     );
   }

@@ -7,6 +7,7 @@ import {
   statusUnavailableError,
 } from '@/routers/kiloclaw-instance-status';
 import type { ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
+import { sandboxIdFromInstanceId } from '@kilocode/worker-utils/sandbox-id';
 
 const fakeSeedInstance: ActiveKiloClawInstance = {
   id: 'instance-1',
@@ -32,6 +33,14 @@ describe('isFakeSeedInstance', () => {
 
   it('does not match a real instance sandbox id', () => {
     expect(isFakeSeedInstance(realInstance)).toBe(false);
+  });
+
+  it('cannot match a sandbox id derived from a real instance id', () => {
+    // Real instance-keyed ids are `ki_{32 hex}` (packages/worker-utils/src/instance-id.ts),
+    // so the `ki_fake_` fixture prefix can never appear in one.
+    const derived = sandboxIdFromInstanceId('550e8400-e29b-41d4-a716-446655440000');
+    expect(derived).toBe('ki_550e8400e29b41d4a716446655440000');
+    expect(isFakeSeedInstance({ ...realInstance, sandboxId: derived })).toBe(false);
   });
 });
 

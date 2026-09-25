@@ -1150,8 +1150,7 @@ describe('SandboxControl lifecycle boundaries', () => {
   });
 
   it('wires the containers adapter to the control allocation and container namespace', async () => {
-    const h = await harness({ containmentEnabled: false });
-    h.session.getCredentialMetadata.mockResolvedValue(
+    const containersMetadata = () =>
       parseSessionMetadata({
         metadataSchemaVersion: 2,
         identity: { sessionId: ROUTE.sessionId, userId: OWNER },
@@ -1168,8 +1167,9 @@ describe('SandboxControl lifecycle boundaries', () => {
           },
         },
         lifecycle: { version: 1, timestamp: Date.now() },
-      })
-    );
+      });
+    const h = await harness({ containmentEnabled: false });
+    h.session.getCredentialMetadata.mockResolvedValue(containersMetadata());
     await h.control.ensureReady({
       ownerId: OWNER,
       sessionId: ROUTE.sessionId,
@@ -1210,6 +1210,86 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(canonicalProviderRef(unchanged)).toBe(canonicalProviderRef(physical));
     expect(canonicalCreateIntentId(unchanged)).toBe(canonicalCreateIntentId(physical));
     expect(h.containerStub.launchWrapper).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        await h.control.getSandboxStatus({
+          ownerId: OWNER,
+          provider: 'cloudflare-containers',
+        })
+      ).runtime?.sandboxType
+    ).toBe('containers-standard-4');
+
+    const standard3 = await harness({ containmentEnabled: false });
+    standard3.session.getCredentialMetadata.mockResolvedValue(containersMetadata());
+    await standard3.control.ensureReady({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      provider: 'cloudflare-containers',
+      instance: 'standard-3',
+      allowCreate: true,
+      billing: BILLING,
+    });
+    expect(standard3.containerStub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({ instance: 'standard-3' })
+    );
+    expect(
+      (
+        await standard3.control.getSandboxStatus({
+          ownerId: OWNER,
+          provider: 'cloudflare-containers',
+        })
+      ).runtime?.sandboxType
+    ).toBe('containers-standard-3');
+  });
+
+  it('keeps a cold passive containers read on the stored instance without persisting metadata', async () => {
+    const h = await harness();
+    h.records.clear();
+    h.records.set('owner_id', OWNER);
+    h.records.set('provider_kind', 'cloudflare-containers');
+    h.records.set('provider_configuration', {
+      provider: 'cloudflare-containers',
+      instance: 'standard-3',
+    });
+    h.records.set('runtime_metadata', {
+      sandboxType: 'isolated-small',
+      wrapperVersion: '2.4.0',
+      kiloCliVersion: '7.4.20',
+      startedAt: null,
+      stoppedAt: null,
+    });
+    seedCanonicalAllocationRecord(
+      h.records,
+      allocationFixture({
+        state: 'running',
+        providerRef: 'instance_containers',
+        createIntent: { intentId: 'instance_containers', createdAt: Date.now() - 1_000 },
+        health: 'healthy',
+        heartbeatAt: Date.now(),
+        resumable: false,
+      })!
+    );
+    await h.storage.setAlarm(Date.now() + 12_345);
+    const before = structuredClone([...h.records]);
+    const alarm = h.alarmAt;
+    const writes = [
+      vi.spyOn(h.storage, 'put'),
+      vi.spyOn(h.storage, 'delete'),
+      vi.spyOn(h.storage, 'setAlarm'),
+      vi.spyOn(h.storage, 'deleteAlarm'),
+    ];
+    await h.evict(true);
+    const snapshot = await h.control.getSandboxStatus({
+      ownerId: OWNER,
+      provider: 'cloudflare-containers',
+    });
+    expect(snapshot).toMatchObject({
+      provider: 'Cloudflare Containers',
+      runtime: { sandboxType: 'containers-standard-3' },
+    });
+    expect([...h.records]).toEqual(before);
+    expect(h.alarmAt).toBe(alarm);
+    for (const write of writes) expect(write).not.toHaveBeenCalled();
   });
 
   it('projects a seeded terminal launch failure and omits it for an in-budget unknown', async () => {
@@ -1397,7 +1477,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare-containers' })
     ).resolves.toMatchObject({
       status: 'active',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
       estimatedSleepAt: now + DEADLINE_MS.idleStop,
     });
     await expect(

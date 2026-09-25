@@ -367,7 +367,9 @@ async function seedGrant(
     ...(options.containmentEnabled === false ? { containmentEnabled: false as const } : {}),
     ...(provider === 'cloudflare'
       ? { outboundContainerId: `contained:${instance.sandboxId}` }
-      : {}),
+      : provider === 'cloudflare-containers'
+        ? { outboundContainerId: `containers:${instance.sandboxId}` }
+        : {}),
     members: [{ sessionId: input.sessionId, kiloSessionId: input.kiloSessionId }],
     kilo: {
       ...(options.containmentEnabled === false
@@ -12683,131 +12685,137 @@ describe('SandboxControl terminal runtime coordination', () => {
     }
   });
 
-  it('authorizes containers terminals from the real billing lifecycle and denies a budget block', async () => {
-    const ownerId = 'github|oauth:user/containers-terminal';
-    const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
-    const sandboxId: SandboxId = 'ses-c0f7e1a2b3d4c5e6f708192a3b4c5d6e';
-    const intentId = 'intent_containers';
-    const credential = generateSandboxCredential();
-    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
-    const allocationName = await deriveSandboxAllocationId(sandboxId, intentId);
-    const providerRef = encodeCloudflareProviderRef({
-      sandboxId: allocationName,
-      containment: false,
-      instanceId: intentId,
-    });
-    const wrapperInstanceId = crypto.randomUUID();
-    let runtimeStatus: Awaited<ReturnType<ContainersBilling['getBillingRuntimeStatus']>>;
+  it.each([
+    { label: 'uncontained', containment: false },
+    { label: 'contained', containment: true },
+  ])(
+    'authorizes containers terminals from the real billing lifecycle and denies a budget block ($label)',
+    async ({ containment }) => {
+      const ownerId = 'github|oauth:user/containers-terminal';
+      const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+      const sandboxId: SandboxId = 'ses-c0f7e1a2b3d4c5e6f708192a3b4c5d6e';
+      const intentId = 'intent_containers';
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+      const allocationName = await deriveSandboxAllocationId(sandboxId, intentId);
+      const providerRef = encodeCloudflareProviderRef({
+        sandboxId: allocationName,
+        containment,
+        instanceId: intentId,
+      });
+      const wrapperInstanceId = crypto.randomUUID();
+      let runtimeStatus: Awaited<ReturnType<ContainersBilling['getBillingRuntimeStatus']>>;
 
-    await runInDurableObject(control, async instance => {
-      await seedCreatingAllocation(instance['ctx'].storage, intentId, {
-        allocationName,
-        containment: getWorktreeCredentialContainment(false),
+      await runInDurableObject(control, async instance => {
+        await seedCreatingAllocation(instance['ctx'].storage, intentId, {
+          allocationName,
+          containment: getWorktreeCredentialContainment(containment),
+        });
+        await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
       });
-      await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
-    });
-    await installProvider(control, providerRef, 'cloudflare-containers');
-    await runInDurableObject(control, async (instance, state) => {
-      Object.assign(instance['env'], {
-        SANDBOX_CONTAINERS: {
-          idFromName: (id: string) => ({ toString: () => `containers:${id}` }),
-          getByName: () => ({
-            async getBillingRuntimeStatus() {
-              return runtimeStatus;
-            },
-          }),
-        },
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: ownerId,
-      });
-      Object.assign(instance, { providerKind: 'cloudflare-containers' });
-      await state.storage.put('provider_kind', 'cloudflare-containers');
-      await instance.initializeOwner(ownerId);
-      await seedCanonicalRunning(state.storage, providerRef, {
-        provider: 'cloudflare',
-        intentId,
-        allocationName,
-        containment: getWorktreeCredentialContainment(false),
-      });
-      const attachment = {
-        sessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/containers',
-        ownerId,
-      };
-      await seedGrant(instance, state, attachment, 'cloudflare-containers', {
-        containmentEnabled: false,
-      });
-      await instance.attachSession(attachment);
-    });
-
-    const socket = await connect(credential, sandboxId);
-    try {
-      await completeHello(socket, 'hello-containers-terminal', {
-        providerInstanceId: providerRef,
-        wrapperInstanceId,
-      });
-      signalWrapperReady(socket);
-      await waitFor(async () => {
-        await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
-      });
-
+      await installProvider(control, providerRef, 'cloudflare-containers');
       await runInDurableObject(control, async (instance, state) => {
-        const meter = new ContainersIntegrationMeter();
-        const container = {
-          schedule: async () => ({}),
-          deleteSchedules: () => {},
-          getState: async () => ({ status: 'running', lastChange: Date.now() }),
-          billingHeartbeatTick: undefined as ((generation?: string) => Promise<void>) | undefined,
-        };
-        const tasks: Promise<unknown>[] = [];
-        const billing = new ContainersBilling(containersBillingIdentity('standard-4'), {
-          container: container as unknown as ContainersBillingHost['container'],
-          storage: state.storage,
-          meter,
-          heartbeatSeconds: 300,
-          isContainerRunning: () => true,
-          stopContainer: async () => {},
-          destroyContainer: async () => {},
-          durableObjectId: `containers:${sandboxId}`,
-          waitUntil: promise => {
-            tasks.push(promise);
+        Object.assign(instance['env'], {
+          SANDBOX_CONTAINERS: {
+            idFromName: (id: string) => ({ toString: () => `containers:${id}` }),
+            getByName: () => ({
+              async getBillingRuntimeStatus() {
+                return runtimeStatus;
+              },
+            }),
           },
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+          CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: ownerId,
         });
-        const billingInput: SandboxBillingInput = {
-          sandboxId,
-          subject: { type: 'user', id: ownerId },
-          actor: { type: 'user', id: ownerId },
+        Object.assign(instance, { providerKind: 'cloudflare-containers' });
+        await state.storage.put('provider_kind', 'cloudflare-containers');
+        await instance.initializeOwner(ownerId);
+        await seedCanonicalRunning(state.storage, providerRef, {
+          provider: 'cloudflare',
+          intentId,
+          allocationName,
+          containment: getWorktreeCredentialContainment(containment),
+        });
+        const attachment = {
           sessionId,
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/containers',
+          ownerId,
         };
-        await billing.configureBilling(billingInput);
-        await Promise.all(tasks.splice(0));
-        runtimeStatus = await billing.getBillingRuntimeStatus();
-        expect(runtimeStatus).toMatchObject({
-          sandboxClassName: 'SandboxContainersStandard4',
-          running: true,
-          blocked: false,
+        await seedGrant(instance, state, attachment, 'cloudflare-containers', {
+          containmentEnabled: containment,
         });
-
-        const access = { ownerId, sessionId, wrapperInstanceId };
-        await expect(instance.validateTerminalAccess(access)).resolves.toEqual({ allowed: true });
-
-        meter.heartbeatBudget = { verdict: 'stop', remainingMicrodollars: 0 };
-        await container.billingHeartbeatTick?.();
-        await Promise.all(tasks.splice(0));
-        runtimeStatus = await billing.getBillingRuntimeStatus();
-        expect(runtimeStatus).toMatchObject({ blocked: true });
-        await expect(instance.validateTerminalAccess(access)).resolves.toEqual({
-          allowed: false,
-          reason: 'billing_blocked',
-        });
+        await instance.attachSession(attachment);
       });
-    } finally {
-      socket.close();
+
+      const socket = await connect(credential, sandboxId);
+      try {
+        await completeHello(socket, 'hello-containers-terminal', {
+          providerInstanceId: providerRef,
+          wrapperInstanceId,
+        });
+        signalWrapperReady(socket);
+        await waitFor(async () => {
+          await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+        });
+
+        await runInDurableObject(control, async (instance, state) => {
+          const meter = new ContainersIntegrationMeter();
+          const container = {
+            schedule: async () => ({}),
+            deleteSchedules: () => {},
+            getState: async () => ({ status: 'running', lastChange: Date.now() }),
+            billingHeartbeatTick: undefined as ((generation?: string) => Promise<void>) | undefined,
+          };
+          const tasks: Promise<unknown>[] = [];
+          const billing = new ContainersBilling(containersBillingIdentity('standard-4'), {
+            container: container as unknown as ContainersBillingHost['container'],
+            storage: state.storage,
+            meter,
+            heartbeatSeconds: 300,
+            isContainerRunning: () => true,
+            stopContainer: async () => {},
+            destroyContainer: async () => {},
+            durableObjectId: `containers:${sandboxId}`,
+            waitUntil: promise => {
+              tasks.push(promise);
+            },
+          });
+          const billingInput: SandboxBillingInput = {
+            sandboxId,
+            subject: { type: 'user', id: ownerId },
+            actor: { type: 'user', id: ownerId },
+            sessionId,
+            metadata: { origin: 'cloud-agent' },
+            enforcementRequested: true,
+          };
+          await billing.configureBilling(billingInput);
+          await Promise.all(tasks.splice(0));
+          runtimeStatus = await billing.getBillingRuntimeStatus();
+          expect(runtimeStatus).toMatchObject({
+            sandboxClassName: 'SandboxContainersStandard4',
+            running: true,
+            blocked: false,
+          });
+
+          const access = { ownerId, sessionId, wrapperInstanceId };
+          await expect(instance.validateTerminalAccess(access)).resolves.toEqual({ allowed: true });
+
+          meter.heartbeatBudget = { verdict: 'stop', remainingMicrodollars: 0 };
+          await container.billingHeartbeatTick?.();
+          await Promise.all(tasks.splice(0));
+          runtimeStatus = await billing.getBillingRuntimeStatus();
+          expect(runtimeStatus).toMatchObject({ blocked: true });
+          await expect(instance.validateTerminalAccess(access)).resolves.toEqual({
+            allowed: false,
+            reason: 'billing_blocked',
+          });
+        });
+      } finally {
+        socket.close();
+      }
     }
-  });
+  );
 
   it.each(['cloudflare', 'vercel'] as const)(
     'renews near-expiry and expired %s grants through authenticated terminal activity',

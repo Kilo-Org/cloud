@@ -152,11 +152,7 @@ export function validateContainersTerminalBillingRuntime(
   }
 
   const providerRef = decodeCloudflareProviderRef(input.providerInstanceId);
-  if (
-    providerRef === null ||
-    providerRef.containment ||
-    classifySandboxId(providerRef.sandboxId) !== 'isolated-small'
-  ) {
+  if (providerRef === null || classifySandboxId(providerRef.sandboxId) !== 'isolated-small') {
     return { allowed: false, reason: 'billing_runtime_mismatch' };
   }
 

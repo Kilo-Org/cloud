@@ -80,7 +80,7 @@ describe('sandbox status public contract', () => {
     expect(SandboxStatusSnapshotSchema.parse(input)).toEqual(input);
   });
 
-  it.each(['Cloudflare', 'Vercel', 'Unknown'])(
+  it.each(['Cloudflare', 'Cloudflare Containers', 'Vercel', 'Unknown'])(
     'accepts only a bounded provider label: %s',
     provider => {
       expect(SandboxStatusSnapshotSchema.parse({ ...snapshot, provider }).provider).toBe(provider);
@@ -254,6 +254,8 @@ describe('optional sandbox runtime metadata', () => {
     'isolated-standard',
     'code-review',
     'devcontainer',
+    'containers-standard-3',
+    'containers-standard-4',
     'unknown',
   ])('accepts bounded sandbox type %s', sandboxType => {
     expect(SandboxRuntimeMetadataSchema.parse({ ...runtime, sandboxType }).sandboxType).toBe(
@@ -326,7 +328,7 @@ describe('getSandboxProviderLabel', () => {
   it.each([
     ['cloudflare', 'Cloudflare'],
     ['vercel', 'Vercel'],
-    ['cloudflare-containers', 'Cloudflare'],
+    ['cloudflare-containers', 'Cloudflare Containers'],
   ])('maps the stored provider %s to %s', (provider, label) => {
     expect(getSandboxProviderLabel(provider)).toBe(label);
   });

@@ -50,7 +50,7 @@ const sandboxLifecycleCases = [
 
 describe('baseGetSandboxStatusNextOutputSchema', () => {
   it.each(sandboxLifecycleCases)('accepts $status with $detailCode', lifecycle => {
-    for (const provider of ['Cloudflare', 'Vercel', 'Unknown']) {
+    for (const provider of ['Cloudflare', 'Cloudflare Containers', 'Vercel', 'Unknown']) {
       const response = { ...sandboxSnapshot, ...lifecycle, provider };
       expect(baseGetSandboxStatusNextOutputSchema.parse(response)).toEqual(response);
     }

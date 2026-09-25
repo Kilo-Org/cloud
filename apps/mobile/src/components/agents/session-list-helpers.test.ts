@@ -141,7 +141,7 @@ describe('remoteMeta', () => {
     // passes the tick that re-rendered it. The same timestamp therefore reads
     // differently for two sampled clocks, and each matches `timeAgo`.
     const updatedAt = '2026-01-01T00:00:00.000Z';
-    const base = parseTimestamp(updatedAt);
+    const base = parseTimestamp(updatedAt).getTime();
     const firstTick = base + 5 * 60_000;
     const laterTick = base + 20 * 60_000;
 

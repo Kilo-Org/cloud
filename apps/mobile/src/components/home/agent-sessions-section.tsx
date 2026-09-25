@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
-import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
@@ -287,8 +286,9 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const navigateToSession = useAgentSessionNavigator();
   // One handler shared by every card row: with the row memoised, an unchanged
   // payload leaves each row's props referentially stable and skips its render.
+  // The handler reads only the id, so it takes the shape it needs.
   const handleRowPress = useCallback(
-    (session: ActiveSession) => {
+    (session: { id: string }) => {
       navigateToSession(session.id);
     },
     [navigateToSession]

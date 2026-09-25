@@ -22,10 +22,12 @@ const ingest = svc('cloudflare-session-ingest') ?? { port: 8800 + portOffset };
 
 const vars = [];
 
+const backendOrigin = `http://localhost:${nextjs.port}`;
 if (!process.env.VITE_KILO_API_BASE_URL) {
-  const origin = `http://localhost:${nextjs.port}`;
-  vars.push(`VITE_KILO_API_BASE_URL=${origin}`);
-  vars.push(`LOCAL_BACKEND_ORIGIN=${origin}`);
+  vars.push(`VITE_KILO_API_BASE_URL=${backendOrigin}`);
+}
+if (!process.env.LOCAL_BACKEND_ORIGIN) {
+  vars.push(`LOCAL_BACKEND_ORIGIN=${backendOrigin}`);
 }
 if (!process.env.VITE_CLOUD_AGENT_WS_URL) {
   const url = `ws://localhost:${cloudAgent.port}`;

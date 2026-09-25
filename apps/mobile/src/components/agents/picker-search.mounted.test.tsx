@@ -25,9 +25,6 @@ const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const theme = vi.hoisted(() => ({ foreground: '#111111' }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-// Hoisted and mutable: `lib/rtl-text` reads `I18nManager.isRTL` at call time, so
-// the tests flip one interface direction on and off around a mount.
-const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 // The model picker renders its rows through FlashList v2; this stub renders
 // each row through the real `renderItem` so the suite sees the row hosts.
 vi.mock('@shopify/flash-list', () => ({

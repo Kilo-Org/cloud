@@ -161,14 +161,6 @@ describe('mcp-catalog skill', () => {
       expect(rendered).not.toContain('### Sub-areas');
     });
 
-    it('carries no catalog summary or tag into the census', () => {
-      const rendered = renderCensus(
-        censusCatalog([fixtureRow('alpha.a', 'query'), fixtureRow('beta.b', 'mutation')])
-      );
-      expect(rendered).not.toContain(SENTINEL_SUMMARY);
-      expect(rendered).not.toContain(SENTINEL_TAG);
-    });
-
     it('renders unpadded tables: exact separators and one-space content cells', () => {
       const rendered = renderCensus(
         censusCatalog([
@@ -231,6 +223,15 @@ describe('mcp-catalog skill', () => {
       expect(renderSkill(catalogJson(rows), TEMPLATE)).not.toBe(
         renderSkill(catalogJson([...rows, fixtureRow('alpha.b', 'mutation')]), TEMPLATE)
       );
+    });
+
+    it('carries no catalog summary or tag into the skill', () => {
+      const rows = [fixtureRow('alpha.a', 'query'), fixtureRow('beta.b', 'mutation')];
+      // The sentinels ride in the catalog text, so this fails if the generator
+      // ever copies a row's summary or tags into the skill again.
+      const rendered = renderSkill(catalogJson(rows), TEMPLATE);
+      expect(rendered).not.toContain(SENTINEL_SUMMARY);
+      expect(rendered).not.toContain(SENTINEL_TAG);
     });
 
     it('contains no timestamp, year or sha-like token', () => {

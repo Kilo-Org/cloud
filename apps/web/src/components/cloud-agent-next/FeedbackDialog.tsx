@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
-import { MessageSquareWarning, Loader2, Check } from 'lucide-react';
+import { MessageSquareWarning, Loader2, Check, History } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +19,10 @@ import { useManager } from './CloudAgentProvider';
 import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
+import { formatFeedbackTimestamp } from './feedback-history';
+
+/** How many prior submissions the dialog shows. */
+export const FEEDBACK_HISTORY_LIMIT = 5;
 
 type FeedbackDialogProps = {
   organizationId?: string;
@@ -38,6 +42,16 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
 
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  // Prior submissions from this account, so the dialog can show that feedback
+  // was already sent instead of starting blank every time. Only fetched while
+  // the dialog is open.
+  const historyQuery = useQuery({
+    ...trpc.cloudAgentNextFeedback.list.queryOptions({ limit: FEEDBACK_HISTORY_LIMIT }),
+    enabled: isOpen,
+  });
+  const history = historyQuery.data ?? [];
 
   const {
     mutate,
@@ -48,6 +62,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
     trpc.cloudAgentNextFeedback.create.mutationOptions({
       onSuccess: () => {
         setShowSuccess(true);
+        void queryClient.invalidateQueries(trpc.cloudAgentNextFeedback.list.queryFilter());
         setTimeout(() => {
           setIsOpen(false);
         }, 1200);
@@ -153,6 +168,27 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
                   )}
                 </Button>
               </div>
+
+              {history.length > 0 && (
+                <div className="border-t pt-4">
+                  <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Your recent feedback</span>
+                  </div>
+                  <ul className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                    {history.map(item => (
+                      <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
+                        <p className="text-foreground line-clamp-2 text-sm break-words">
+                          {item.feedback_text}
+                        </p>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {formatFeedbackTimestamp(item.created_at)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </>
           )}
         </div>

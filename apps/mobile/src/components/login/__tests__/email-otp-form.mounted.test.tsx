@@ -183,8 +183,8 @@ describe('EmailOtpForm destination layout', () => {
 describe('EmailOtpForm button labels', () => {
   // The reported capture: the Arabic secondary label ("إعادة إرسال الرمز")
   // wrapped onto two lines inside a full-width button, so the copy did not fit
-  // its control. A single-line label is the same remedy the sign-in provider
-  // buttons and the segmented control take.
+  // its control. Pin the label to one line — the remedy the segmented control
+  // takes — and keep the full text as the control's accessible name.
   it.each(['en', 'ar'])('keeps the resend label on one line in %s', async language => {
     await i18n.changeLanguage(language);
     const { mounted } = mount();

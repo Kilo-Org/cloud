@@ -1,19 +1,12 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import {
-  I18nManager,
-  Text as RNText,
-  type Role,
-  type StyleProp,
-  type TextStyle,
-} from 'react-native';
+import { I18nManager, Text as RNText, type Role } from 'react-native';
 
 import {
   hasRtlScript,
   RTL_NO_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
-  textLetterSpacing,
   withoutMonoFamily,
 } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
@@ -96,20 +89,17 @@ function Text({
     textClass,
     className
   );
-  const styles: StyleProp<TextStyle>[] = [
-    textLetterSpacing(props.children) ?? (isRTL && isRtlScript ? RTL_NO_LETTER_SPACING : undefined),
-    isRTL ? RTL_WRITING_DIRECTION : undefined,
-  ].filter((style): style is TextStyle => style !== undefined);
-  if (props.style) {
-    styles.push(props.style);
-  }
   return (
     <Component
       className={isRTL && isRtlScript ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={styles.length > 0 ? styles : props.style}
+      style={
+        isRTL
+          ? [RTL_WRITING_DIRECTION, isRtlScript ? RTL_NO_LETTER_SPACING : undefined, props.style]
+          : props.style
+      }
     />
   );
 }

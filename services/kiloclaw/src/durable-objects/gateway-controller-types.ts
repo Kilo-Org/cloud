@@ -254,14 +254,12 @@ export const FileWriteResponseSchema = z.union([
 ]);
 export type FileWriteResponse = z.infer<typeof FileWriteResponseSchema>;
 
-// ──────────────────────────────────────────────────────────────────────
 // Agent config CRUD responses
 // Mirror (controller side):
 //   - controller/src/openclaw-agent-config.ts → AgentSummary, AgentConfigSummary
 //   - controller/src/openclaw-agent-cli.ts     → CreateResultSchema, DeleteResultSchema
 // Response schemas are intentionally lenient (settings as nullable strings, not
 // enums) so a newer controller adding an enum value never fails cloud-side parsing.
-// ──────────────────────────────────────────────────────────────────────
 
 // Raw model value as authored in openclaw.json: a bare string or an object.
 const AgentRawModelSchema = z.union([
@@ -413,7 +411,6 @@ export function isAgentConfigErrorEnvelope(value: unknown): value is AgentConfig
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
 //
 // These schemas describe the wire format returned by the controller's
@@ -423,7 +420,6 @@ export function isAgentConfigErrorEnvelope(value: unknown): value is AgentConfig
 // possible, so changes to one must be mirrored in the other.
 // Note: ApproveResult.statusHint is consumed by the route handler and
 // not serialized to the client, so it is intentionally absent here.
-// ──────────────────────────────────────────────────────────────────────
 
 export const ControllerChannelPairingResponseSchema = z.object({
   requests: z.array(
@@ -457,9 +453,7 @@ export const ControllerPairingApproveResponseSchema = z.object({
   message: z.string(),
 });
 
-// ──────────────────────────────────────────────────────────────────────
 // Kilo CLI run
-// ──────────────────────────────────────────────────────────────────────
 
 export const KiloCliRunStartResponseSchema = z.object({
   ok: z.boolean(),
@@ -476,9 +470,7 @@ export const KiloCliRunStatusResponseSchema = z.object({
   prompt: z.string().nullable(),
 });
 
-// ──────────────────────────────────────────────────────────────────────
 // OpenClaw doctor run (controller path, replacing the Fly exec route)
-// ──────────────────────────────────────────────────────────────────────
 
 export const OpenclawDoctorStartResponseSchema = z.object({
   ok: z.boolean(),

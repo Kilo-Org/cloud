@@ -87,6 +87,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
       <View className="items-center gap-4">
         <TourStepHeader
           icon={<Sparkles size={36} color={colors.foreground} />}
+          eyebrow={t('tour.eyebrow')}
           title={t('tour.forkTitle')}
           body={t('tour.forkSubtitle')}
         />
@@ -180,13 +181,10 @@ export function TourScreen() {
   return (
     <View className="flex-1 bg-background">
       {/* The tour is presented `modal` (apps/mobile/src/app/(app)/_layout.tsx),
-          so the header takes the modal clearance instead of re-adding the
-          status-bar inset the native sheet already owns — no dead band above
-          the eyebrow. The eyebrow is centred (`centerTitle`): the fork body,
-          which is the only other content, is a centred column, so a top-left
-          eyebrow read as a stranded label beside it (home-quick-tour finding).
-          The fork has no back control to return to. */}
-      <ScreenHeader eyebrow={t('tour.eyebrow')} modal centerTitle showBackButton={false} />
+          so the header keeps the clearance the native sheet owns. The eyebrow
+          belongs to the centred step header above the title. The fork has no
+          back control to return to. */}
+      <ScreenHeader modal showBackButton={false} />
 
       <View className="flex-1">
         <ForkStep onChoose={choosePath} />

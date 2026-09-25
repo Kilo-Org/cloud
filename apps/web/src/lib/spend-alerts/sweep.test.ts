@@ -650,6 +650,42 @@ describe('runSpendAlertSweep candidate set and batching', () => {
     expect(result.timings?.deferredScopes).toBe(all.length - MAX_SCOPE_DECISIONS_PER_RUN);
   });
 
+  it('warns when the remainder cannot be rotated inside the rollup window', async () => {
+    // The floor is capped at MAX_REMAINDER_FLOOR while the required set has
+    // work, so a remainder larger than that cap times the window's ticks cannot
+    // be walked before its scopes stop being re-derived. The run must report the
+    // shortfall rather than defer those scopes silently.
+    const delta = scopeKeys(2_500, 'user:delta');
+    const rewritten = new Set(delta);
+
+    mockSweepLog.mockClear();
+    const fits = pagedFiringDatabase(
+      () => [],
+      rollupRows([...scopeKeys(90_000, 'user:rest'), ...delta], key => rewritten.has(key))
+    );
+    await runSpendAlertSweep(fits.database, { store: recordingStore().store }, { now: NOW });
+    expect(mockSweepLog).not.toHaveBeenCalledWith(
+      'Spend alert sweep remainder outgrew the rollup window',
+      expect.anything()
+    );
+
+    mockSweepLog.mockClear();
+    const overflows = pagedFiringDatabase(
+      () => [],
+      rollupRows([...scopeKeys(92_500, 'user:rest'), ...delta], key => rewritten.has(key))
+    );
+    await runSpendAlertSweep(overflows.database, { store: recordingStore().store }, { now: NOW });
+    expect(mockSweepLog).toHaveBeenCalledWith(
+      'Spend alert sweep remainder outgrew the rollup window',
+      expect.objectContaining({
+        rederivedScopes: 92_500,
+        remainderSlots: 2_500,
+        remainderTicks: 37,
+        rollupWindowTicks: 36,
+      })
+    );
+  });
+
   it('still re-arms a firing scope when the re-derived remainder would consume the cap', async () => {
     const remainder = scopeKeys(89_983, 'user:rest');
     const firing: FiringRuleRow[] = [{ ruleId: 'rule-fire', scopeKey: 'user:firing' }];

@@ -80,20 +80,15 @@ export const SCOPE_BATCH_SIZE = 500;
  * when the delta alone outgrows the cap — and the remainder keeps a floor of
  * one window so it always advances even then. That floor is capped at
  * {@link MAX_REMAINDER_FLOOR} whenever the required set is non-empty, so a
- * 90 k-scope remainder cannot zero the delta. Every candidate is reached within
- * the {@link LOOKBACK_HOURS} rollup window, so a scope the cap deferred is
- * re-decided rather than dropped once its bucket stops moving.
+ * 90 k-scope remainder cannot zero the delta.
+ *
+ * The rotation finishes inside the {@link LOOKBACK_HOURS} rollup window while
+ * the remainder holds no more than {@link MAX_REMAINDER_FLOOR} ×
+ * {@link ROLLUP_WINDOW_TICKS} scopes (90 k at the current constants); past
+ * that a deferred scope can stop being re-derived before its turn, so the run
+ * warns rather than deferring silently.
  */
 export const MAX_SCOPE_DECISIONS_PER_RUN = 5000;
-
-/**
- * Ticks the remainder floor is sized to cover. Half the rollup window (3 h of
- * {@link LOOKBACK_HOURS} at the five-minute cron): `ceil(n / SKIP_PATH_ROTATION_TICKS)`
- * is the slots the remainder would need per tick to finish in that many ticks.
- * The actual rotation advances by the slots granted, not by this window, so a
- * stretch that receives fewer slots still tiles instead of skipping.
- */
-const SKIP_PATH_ROTATION_TICKS = 18;
 
 /**
  * Largest share of {@link MAX_SCOPE_DECISIONS_PER_RUN} the remainder floor may
@@ -155,6 +150,23 @@ const MAX_WINDOW_HOURS = 720;
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * Ticks one rollup window spans at the cron interval: how long a scope the run
+ * defers keeps being re-derived for. `LOOKBACK_HOURS` of five-minute ticks.
+ */
+const ROLLUP_WINDOW_TICKS = (LOOKBACK_HOURS * HOUR_MS) / TICK_INTERVAL_MS;
+
+/**
+ * Ticks the remainder floor is sized to cover: half the rollup window, so the
+ * rotation finishes with half a window of margin. `ceil(n /
+ * SKIP_PATH_ROTATION_TICKS)` is the slots the remainder needs per tick to
+ * finish in that many ticks. The actual rotation advances by the slots granted,
+ * not by this target, so a stretch that receives fewer slots still tiles
+ * instead of skipping. See {@link ROLLUP_WINDOW_TICKS} for the bound the
+ * rotation actually has to meet.
+ */
+const SKIP_PATH_ROTATION_TICKS = ROLLUP_WINDOW_TICKS / 2;
 
 type Db = typeof defaultDb;
 
@@ -920,6 +932,24 @@ export async function runSpendAlertSweep(
   ];
   const deferredScopes = required.length + rederived.length - decided.length;
 
+  // The rotation has to finish inside the window the rollup keeps a deferred
+  // scope re-derived for, or a scope the run deferred stops being a candidate
+  // before its turn and a crossing it would have alerted on is never decided.
+  // That holds while the remainder fits under the floor the cap allows; past
+  // it, report the shortfall instead of deferring silently.
+  const remainderTicks =
+    rederived.length === 0 || remainderSlots === 0
+      ? 0
+      : Math.ceil(rederived.length / remainderSlots);
+  if (remainderTicks > ROLLUP_WINDOW_TICKS) {
+    sentryLogger('cron', 'warning')('Spend alert sweep remainder outgrew the rollup window', {
+      rederivedScopes: rederived.length,
+      remainderSlots,
+      remainderTicks,
+      rollupWindowTicks: ROLLUP_WINDOW_TICKS,
+    });
+  }
+
   const timings: SpendAlertSweepPhaseTimings = {
     rollupMs,
     decisionMs: 0,
@@ -966,6 +996,8 @@ export async function runSpendAlertSweep(
     cleared: result.cleared,
     deliveriesEnqueued: result.deliveriesEnqueued,
     timings: result.timings,
+    remainderTicks,
+    rollupWindowTicks: ROLLUP_WINDOW_TICKS,
   });
 
   return result;

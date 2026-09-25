@@ -1768,6 +1768,30 @@ describe('iosSink stray sweep', () => {
     await restore;
   });
 
+  it('keeps one card while a later restore is in flight, not only the first', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // First restore: the locked keychain settles with nothing readable, so the
+    // in-memory snapshot stays null.
+    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
+    await restorePersistedGlanceable();
+
+    // A later restore re-opens the read window. A sweep landing in it must not
+    // read the still-null snapshot as "nothing persisted": the record this read
+    // is about to consult may name an owner.
+    const gate = Promise.withResolvers<string | null>();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => gate.promise);
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+
+    gate.resolve(null);
+    await restore;
+  });
+
   it.each(['signed_out', 'privacy'] as const)(
     'ends every card on launch after a %s blank',
     async status => {
@@ -1794,16 +1818,25 @@ describe('iosSink stray sweep', () => {
     });
   });
 
-  it('gives the surviving card the current counts instead of starting a second one', () => {
-    const card = nativeStray();
+  it('gives the surviving card the current counts instead of starting a second one', async () => {
+    const cards = [nativeStray(), nativeStray()];
     _setLastGlanceableSnapshotForTests(freshSnapshot());
 
     sweepStrayActivities();
+
+    // The sweep is what collapses the duplicates before the publish: without it
+    // both stale cards would still hold the surface when the counts arrive.
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    const survivors = cards.filter(card => card.end.mock.calls.length === 0);
+    expect(survivors).toHaveLength(1);
+    const card = survivors[0];
+
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }, { status: 'busy' }], 1), CTX);
 
-    expect(card.end).not.toHaveBeenCalled();
     expect(mockState.started).toHaveLength(0);
-    expect(card.updated).toHaveLength(1);
-    expect(card.updated[0]).toMatchObject({ running: 2 });
+    expect(card?.updated).toHaveLength(1);
+    expect(card?.updated[0]).toMatchObject({ running: 2 });
   });
 });

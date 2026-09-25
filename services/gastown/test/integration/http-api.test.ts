@@ -1,4 +1,4 @@
-import { SELF, env, runDurableObjectAlarm } from 'cloudflare:test';
+import { SELF } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
@@ -46,13 +46,12 @@ describe('HTTP API', () => {
   // ── Dashboard ──────────────────────────────────────────────────────────
 
   describe('dashboard', () => {
-    it('should serve service status at /', async () => {
+    it('should serve HTML at /', async () => {
       const res = await SELF.fetch(api('/'));
       expect(res.status).toBe(200);
-      expect(res.headers.get('Content-Type')).toContain('application/json');
-      const body = await res.json();
-      expect(body.service).toBe('gastown');
-      expect(body.status).toBe('ok');
+      expect(res.headers.get('Content-Type')).toContain('text/html');
+      const html = await res.text();
+      expect(html).toContain('Gastown Dashboard');
     });
   });
 
@@ -431,17 +430,14 @@ describe('HTTP API', () => {
   describe('agent done', () => {
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
-      const tid = `done-town-${crypto.randomUUID()}`;
-      const town = env.TOWN.get(env.TOWN.idFromName(tid));
-      await town.setTownId(tid);
-      const agentRes = await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `done-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const beadRes = await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Done test' }),
@@ -449,14 +445,14 @@ describe('HTTP API', () => {
       const bead = (await beadRes.json()).data;
 
       // Hook the bead
-      await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/agents/${agent.id}/hook`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ bead_id: bead.bead_id }),
       });
 
       // Mark done
-      const res = await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/agents/${agent.id}/done`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/done`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({
@@ -469,13 +465,13 @@ describe('HTTP API', () => {
       const body = await res.json();
       expect(body.data.done).toBe(true);
 
-      // agentDone is event-only — drain the alarm so the hook is released
-      await runDurableObjectAlarm(town);
-
       // Verify agent is idle
-      const agentCheck = await SELF.fetch(api(`/api/towns/${tid}/rigs/${id}/agents/${agent.id}`), {
-        headers: headers(),
-      });
+      const agentCheck = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
+        {
+          headers: headers(),
+        }
+      );
       const agentState = (await agentCheck.json()).data;
       expect(agentState.status).toBe('idle');
       expect(agentState.current_hook_bead_id).toBeNull();
@@ -624,8 +620,9 @@ describe('HTTP API', () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.data.message).toBe('Critical failure');
-      expect(body.data.severity).toBe('critical');
+      expect(body.data.type).toBe('escalation');
+      expect(body.data.title).toBe('Critical failure');
+      expect(body.data.priority).toBe('critical');
     });
   });
 

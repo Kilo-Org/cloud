@@ -27,7 +27,6 @@ describe('PR poll error discrimination (#3149)', () => {
     townName = `pr-poll-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
-    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   async function setupMrBeadWithPrUrl(prUrl: string) {
@@ -54,7 +53,6 @@ describe('PR poll error discrimination (#3149)', () => {
     await town.agentDone(agentId, {
       branch: 'gt/polecat/test-branch',
       summary: 'Completed task',
-      pr_url: prUrl,
     });
 
     await runDurableObjectAlarm(town);

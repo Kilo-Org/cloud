@@ -141,8 +141,6 @@ export class AgentDO extends DurableObject<Env> {
     console.log(`${AGENT_DO_LOG} destroy: clearing all storage`);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-    this.initPromise = null;
-    await this.ensureInitialized();
   }
 
   async ping(): Promise<{ ok: true }> {

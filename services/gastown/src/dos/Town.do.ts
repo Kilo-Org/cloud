@@ -5892,11 +5892,6 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-    // deleteAll() drops SQLite tables but leaves initPromise resolved, so a
-    // reused isolate (in-flight RPC or a late alarm) would throw SQLITE_ERROR.
-    // Recreate an empty schema. armAlarmIfNeeded no-ops when town:id is gone.
-    this.initPromise = null;
-    await this.ensureInitialized();
   }
 }
 

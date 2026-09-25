@@ -706,6 +706,85 @@ it.each([null, '/(app)/(tabs)/(3_profile)'])(
   }
 );
 
+describe('cold-start body tap carries the session organization', () => {
+  it('stashes the organization a session push carried, so the tap switches context', async () => {
+    const { checkInitialNotification, pending } = await loadNotifications();
+    mocks.lastResponse = {
+      notification: {
+        request: {
+          content: {
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'cli1',
+              category: 'attention',
+              attentionKind: 'question',
+              organizationId: 'org-2',
+            },
+          },
+        },
+      },
+    };
+
+    checkInitialNotification();
+
+    expect(pending.consumePendingDeepLink()).toEqual({
+      href: '/(app)/agent-chat/cli1?via=push',
+      organizationId: 'org-2',
+    });
+  });
+
+  it('stashes no organization for a Personal session push', async () => {
+    const { checkInitialNotification, pending } = await loadNotifications();
+    mocks.lastResponse = {
+      notification: {
+        request: {
+          content: {
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'cli1',
+              category: 'status',
+            },
+          },
+        },
+      },
+    };
+
+    checkInitialNotification();
+
+    expect(pending.consumePendingDeepLink()).toEqual({
+      href: '/(app)/agent-chat/cli1?via=push',
+      organizationId: null,
+    });
+  });
+
+  it('drops a session push captured before a signed-out settle', async () => {
+    const { checkInitialNotification, pending } = await loadNotifications();
+    mocks.lastResponse = {
+      notification: {
+        request: {
+          content: {
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'cli1',
+              category: 'attention',
+              organizationId: 'org-2',
+            },
+          },
+        },
+      },
+    };
+
+    checkInitialNotification();
+    expect(pending.getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/cli1?via=push');
+
+    // The launch settles signed out: no account owns this session destination,
+    // so neither it nor its organization switch opens after a later sign-in.
+    pending.setCurrentDeepLinkUserId(null);
+
+    expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
+  });
+});
+
 const SCOPE_KEY = buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-9' });
 
 function glanceableSnapshot(

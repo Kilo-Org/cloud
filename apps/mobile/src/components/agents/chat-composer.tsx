@@ -101,6 +101,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
 import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
@@ -260,6 +261,7 @@ export function ChatComposer({
   controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { height: windowHeight, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -1163,13 +1165,17 @@ export function ChatComposer({
     // and the composer's send flow consults `upload.isUploading` /
     // `upload.hasFailedAttachments` to gate admission.
     void addCandidates(
-      await pickAgentAttachments(showActionSheetWithOptions, {
-        userId,
-        surface: 'agent-chat',
-        sessionId: sessionId ?? null,
-      })
+      await pickAgentAttachments(
+        showActionSheetWithOptions,
+        {
+          userId,
+          surface: 'agent-chat',
+          sessionId: sessionId ?? null,
+        },
+        themedSheet
+      )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId, sessionId]);
+  }, [addCandidates, showActionSheetWithOptions, userId, sessionId, themedSheet]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,

@@ -29,6 +29,7 @@ import {
 } from './worktree-runtime';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { createControlFileLogUploader, type ControlFileLogUploader } from './file-log-uploader';
+import { installInterceptTrustIfEnabled } from './cert';
 import {
   classifyRetirementCause,
   controlLogWrapperIdSchema,
@@ -36,6 +37,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 import { createControlEventFailureHandler } from './control-event-transport';
+import { closeControlWorkload, initializeControlWorkload } from './workload-cgroup';
 
 import type { ControlEventOutboxFailure } from './control-event-outbox';
 
@@ -53,6 +55,10 @@ function main(
   delete process.env.SANDBOX_CONTROL_CREDENTIAL;
 
   logToFile(`control-plane wrapper ${WRAPPER_VERSION} starting`);
+  const workload = initializeControlWorkload({
+    env: process.env,
+    report: diagnostics.onDiagnostic,
+  });
   const abort = new AbortController();
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
@@ -116,6 +122,7 @@ function main(
     deps.operations.notifyRootDisappeared(disappearance);
   };
   const kiloRuntimes = createWorktreeKiloRuntimes({
+    workload,
     onDiagnostic: diagnostics.onDiagnostic,
     onRootRetirementStarted: markRootRetirementStarted,
     onRootDisappeared: notifyRootDisappeared,
@@ -140,6 +147,12 @@ function main(
         identity.rootKiloSessionId,
         event.properties
       );
+      deps.operations.observeRootEvent({
+        type: event.type,
+        sessionID: identity.kiloSessionId,
+        rootKiloSessionId: identity.rootKiloSessionId,
+        properties: event.properties,
+      });
       try {
         void Promise.resolve(
           control?.publishSessionEvent?.(
@@ -379,6 +392,7 @@ function main(
         try {
           kiloRuntimes.shutdown();
         } finally {
+          closeControlWorkload(workload);
           process.exit(exitCode);
         }
       }
@@ -426,6 +440,9 @@ function main(
   process.once('SIGINT', () => shutdown(0, 'Wrapper received SIGINT'));
   process.once('uncaughtException', () => shutdown(1, 'Wrapper uncaught exception'));
   process.once('unhandledRejection', () => shutdown(1, 'Wrapper unhandled rejection'));
+  process.on('SIGUSR1', () => {
+    control?.recycleConnection?.();
+  });
 
   control = maybeStartSandboxControlClient(controlConfig, logToFile, {
     onDiagnostic: diagnostics.onDiagnostic,
@@ -562,10 +579,10 @@ delete process.env.CONTROL_LOG_UPLOAD_URL;
 delete process.env.CONTROL_LOG_UPLOAD_GRANT;
 delete process.env.CONTROL_WRAPPER_INSTANCE_ID;
 diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
-diagnostics.start();
-fileLogs.start();
-
 try {
+  await installInterceptTrustIfEnabled(logToFile);
+  diagnostics.start();
+  fileLogs.start();
   main(diagnostics, fileLogs, wrapperInstanceId);
 } catch {
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'start_failed' });

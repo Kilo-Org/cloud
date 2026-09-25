@@ -87,6 +87,7 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
     tried.push('platform integration (none configured)');
   } else {
     tried.push(`${sourceLabel} (GIT_TOKEN_SERVICE not bound)`);
+    return { ok: false, tried };
   }
 
   // 3. Stored git_auth.github_token — last-resort fallback

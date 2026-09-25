@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db, pool } from '@/lib/drizzle';
 import {
-  repository_customizations,
   platform_integrations,
   kilocode_users,
   organizations,
@@ -16,15 +15,12 @@ import {
   createPendingIntegration,
   findIntegrationByInstallationId,
   findGitHubBotLinkIntegrations,
-  getRepositoryCustomization,
-  listRepositoryCustomizations,
   suspendIntegration,
   suspendIntegrationForOwner,
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
   updateIntegrationMetadataForOwner,
   updateIntegrationRepositories,
-  upsertRepositoryCustomization,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
@@ -1147,6 +1143,7 @@ describe('findGitHubBotLinkIntegrations', () => {
           platform_installation_id: '881122',
           github_app_type: 'standard',
           github_installation_id: canonical.id,
+          github_connection_role: 'workflow',
           integration_status: 'active',
         },
         {
@@ -1156,6 +1153,7 @@ describe('findGitHubBotLinkIntegrations', () => {
           platform_installation_id: '881122',
           github_app_type: 'standard',
           github_installation_id: canonical.id,
+          github_connection_role: 'agent_only',
           integration_status: 'active',
         },
       ])
@@ -1170,6 +1168,13 @@ describe('findGitHubBotLinkIntegrations', () => {
     ).resolves.toEqual([expect.objectContaining({ id: associations[0]!.id })]);
     await expect(
       findGitHubBotLinkIntegrations({ installationId: '881122', appType: 'standard' })
+    ).resolves.toEqual([expect.objectContaining({ id: associations[0]!.id })]);
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[1]!.id,
+      })
     ).resolves.toEqual([]);
     await expect(
       findGitHubBotLinkIntegrations({
@@ -1254,6 +1259,7 @@ describe('findGitHubBotLinkIntegrations', () => {
         integration_type: 'app',
         platform_installation_id: '881123',
         github_app_type: null,
+        github_connection_role: 'workflow',
         integration_status: 'active',
       })
       .returning();
@@ -1372,144 +1378,5 @@ describe('updateIntegrationMetadataForOwner', () => {
         integrationId
       )
     ).rejects.toThrow('No github integration found for owner');
-  });
-});
-
-describe('repository_customizations accessors', () => {
-  const orgId = crypto.randomUUID();
-  const installationId = `test-repo-custom-${Date.now()}`;
-  let integrationId: string;
-
-  beforeEach(async () => {
-    await db.insert(organizations).values({ id: orgId, name: `Repo custom org ${Date.now()}` });
-    const [integration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_organization_id: orgId,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: installationId,
-        integration_status: 'active',
-        repository_access: 'all',
-      })
-      .returning();
-    integrationId = integration.id;
-  });
-
-  afterEach(async () => {
-    await db.delete(organizations).where(eq(organizations.id, orgId));
-  });
-
-  test('upsertRepositoryCustomization inserts, then updates only the supplied fields', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-
-    await upsertRepositoryCustomization(integrationId, '1', {
-      pr_review_mode: 'off',
-    });
-
-    const [row] = await listRepositoryCustomizations(integrationId);
-
-    expect(row).toMatchObject({
-      repository_id: '1',
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'off',
-    });
-  });
-
-  test('upsertRepositoryCustomization clears a field back to inherited with null', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: null,
-    });
-
-    const [row] = await listRepositoryCustomizations(integrationId);
-
-    expect(row).toMatchObject({ bot_mention_model_slug: null, pr_review_mode: 'on' });
-  });
-
-  test('listRepositoryCustomizations only returns rows for the given integration', async () => {
-    const [otherIntegration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_organization_id: orgId,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: `${installationId}-other`,
-        integration_status: 'active',
-        repository_access: 'all',
-      })
-      .returning();
-
-    await upsertRepositoryCustomization(integrationId, '1', { pr_review_mode: 'on' });
-    await upsertRepositoryCustomization(otherIntegration.id, '1', { pr_review_mode: 'off' });
-
-    const rows = await listRepositoryCustomizations(integrationId);
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ platform_integration_id: integrationId, pr_review_mode: 'on' });
-  });
-
-  test('deleting the parent integration cascades to its customizations', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', { pr_review_mode: 'on' });
-
-    await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
-
-    const remaining = await db
-      .select()
-      .from(repository_customizations)
-      .where(eq(repository_customizations.platform_integration_id, integrationId));
-
-    expect(remaining).toHaveLength(0);
-  });
-
-  test('getRepositoryCustomization returns null when the repository has no override', async () => {
-    const customization = await getRepositoryCustomization(integrationId, '1');
-
-    expect(customization).toBeNull();
-  });
-
-  test('getRepositoryCustomization returns the matching row', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-
-    const customization = await getRepositoryCustomization(integrationId, '1');
-
-    expect(customization).toMatchObject({
-      platform_integration_id: integrationId,
-      repository_id: '1',
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-  });
-
-  test("getRepositoryCustomization does not leak another integration's row for the same repository_id", async () => {
-    const [otherIntegration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_organization_id: orgId,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: `${installationId}-other-lookup`,
-        integration_status: 'active',
-        repository_access: 'all',
-      })
-      .returning();
-
-    await upsertRepositoryCustomization(otherIntegration.id, '1', {
-      bot_mention_model_slug: 'other-integration-model',
-    });
-
-    const customization = await getRepositoryCustomization(integrationId, '1');
-
-    expect(customization).toBeNull();
   });
 });

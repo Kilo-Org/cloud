@@ -2,17 +2,20 @@ import { describe, expect, it } from 'vitest';
 import {
   CLOUD_AGENT_ASSISTANT_FAILURE_REASONS,
   CLOUD_AGENT_PROVIDER_OWNERSHIPS,
+  WORKSPACE_FAILURE_SUBTYPES,
   type CloudAgentAssistantFailureReason,
   type CloudAgentFailureCode,
   type CloudAgentFailureReason,
   type CloudAgentFailureResponsibility,
   type CloudAgentFailureStage,
   type CloudAgentProviderOwnership,
+  type WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { CloudAgentRunFailureClassifications } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import {
   CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES,
   CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES,
+  CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES,
 } from '../shared/sandbox-control-protocol.js';
 import { resolveAssistantProviderOwnership } from '../shared/assistant-failure.js';
 import {
@@ -34,6 +37,7 @@ type FenceCase = {
   assistantReason?: CloudAgentAssistantFailureReason;
   providerOwnership?: CloudAgentProviderOwnership;
   admittedModel?: string;
+  workspaceSubtype?: WorkspaceFailureSubtype;
   stage: CloudAgentFailureStage;
   code: CloudAgentFailureCode;
   responsibility?: CloudAgentFailureResponsibility;
@@ -304,6 +308,26 @@ const cases: readonly FenceCase[] = [
     failureReason: 'sandbox_connectivity',
   },
   {
+    name: 'health_unhealthy_unresponsive accepted',
+    reason: 'health_unhealthy_unresponsive',
+    dispatchState: 'accepted',
+    status: 'failed',
+    stage: 'post_dispatch_no_activity',
+    code: 'wrapper_disconnected',
+    responsibility: 'platform',
+    failureReason: 'wrapper_disconnected',
+  },
+  {
+    name: 'health_unhealthy_absent accepted',
+    reason: 'health_unhealthy_absent',
+    dispatchState: 'accepted',
+    status: 'failed',
+    stage: 'post_dispatch_no_activity',
+    code: 'wrapper_disconnected',
+    responsibility: 'platform',
+    failureReason: 'wrapper_disconnected',
+  },
+  {
     name: 'idle accepted',
     reason: 'idle',
     dispatchState: 'accepted',
@@ -316,6 +340,106 @@ const cases: readonly FenceCase[] = [
   {
     name: 'worktree_deleted stays unclassified',
     reason: 'worktree_deleted',
+    dispatchState: 'accepted',
+    status: 'failed',
+    stage: 'unknown',
+    code: 'unclassified',
+    responsibility: 'unknown',
+    failureReason: 'unclassified',
+  },
+  // An attach rejection that carries a git subtype is a workspace setup
+  // failure, not `wrapper_start_failed / runtime_startup`. Expected values are
+  // authored from the subtype→reason mapping, not from the classifier.
+  {
+    name: 'attach clone rate limit is a workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'git_rate_limited',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'platform',
+    failureReason: 'rate_limited',
+  },
+  {
+    name: 'attach clone timeout is a workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'git_clone_timeout',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'platform',
+    failureReason: 'source_control_clone_timeout',
+  },
+  {
+    name: 'attach checkout timeout is a workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'git_checkout_timeout',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'platform',
+    failureReason: 'source_control_checkout_timeout',
+  },
+  {
+    name: 'attach network failure is a workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'git_network_failed',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'platform',
+    failureReason: 'source_control_network',
+  },
+  {
+    name: 'attach authentication failure is a user workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'git_authentication_failed',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'user',
+    failureReason: 'source_control_authentication',
+  },
+  {
+    name: 'attach storage exhaustion is a platform workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'sandbox_storage_full',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'platform',
+    failureReason: 'sandbox_capacity',
+  },
+  {
+    name: 'attach unknown git failure stays a workspace setup failure',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    workspaceSubtype: 'workspace_setup_unknown',
+    stage: 'pre_dispatch',
+    code: 'workspace_setup_failed',
+    responsibility: 'unknown',
+    failureReason: 'workspace_unknown',
+  },
+  {
+    name: 'attach without a subtype keeps wrapper_start_failed',
+    reason: 'attach_exhausted',
+    dispatchState: 'pre_dispatch',
+    status: 'failed',
+    stage: 'pre_dispatch',
+    code: 'wrapper_start_failed',
+    responsibility: 'platform',
+    failureReason: 'runtime_startup',
+  },
+  {
+    name: 'session_deleted stays unclassified',
+    reason: 'session_deleted',
     dispatchState: 'accepted',
     status: 'failed',
     stage: 'unknown',
@@ -343,6 +467,7 @@ function run(input: FenceCase) {
       ? {}
       : { providerOwnership: input.providerOwnership }),
     ...(input.admittedModel === undefined ? {} : { admittedModel: input.admittedModel }),
+    ...(input.workspaceSubtype === undefined ? {} : { workspaceSubtype: input.workspaceSubtype }),
   });
 }
 
@@ -368,6 +493,7 @@ describe('classifyControlPlaneRunFailure', () => {
       CLOUD_AGENT_ASSISTANT_FAILURE_REASONS
     );
     expect(CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES).toEqual(CLOUD_AGENT_PROVIDER_OWNERSHIPS);
+    expect(CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES).toEqual(WORKSPACE_FAILURE_SUBTYPES);
   });
 });
 

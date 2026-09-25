@@ -10,6 +10,7 @@ import {
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
 import { type getOutboundContainerId, isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
@@ -17,7 +18,7 @@ import {
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
   issueCloudAgentKiloSessionCapability,
-  resolveGitHubTokenForRepo,
+  authorizeCloudAgentGitHubRepo,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
   resolveManagedBitbucketToken,
@@ -26,7 +27,12 @@ import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
-import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
+import {
+  agentSandboxProviderSchema,
+  parseCanonicalBitbucketCloneUrl,
+  sessionIdSchema,
+  type Env,
+} from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
 import {
   buildKiloCredentialInjectionRules,
@@ -103,6 +109,7 @@ const repositorySchema = z.discriminatedUnion('type', [
       repo: z.string().min(1),
       authentication: z.enum(['managed', 'explicit']),
       expectedIntegrationId: z.string().uuid().optional(),
+      accessPurpose: z.enum(['workflow', 'agent']).optional(),
       allowUserAuthorization: z.boolean(),
     })
     .strict(),
@@ -180,7 +187,7 @@ export const sessionCredentialGrantSchema = z
       ),
     userId: z.string().min(1),
     orgId: organizationIdSchema.optional(),
-    provider: z.enum(['cloudflare', 'vercel']),
+    provider: agentSandboxProviderSchema,
     outboundContainerId: z.string().min(1).optional(),
     members: z.array(memberSchema).min(1),
     repository: repositorySchema.optional(),
@@ -208,7 +215,7 @@ export const sessionCredentialGrantSchema = z
       new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
       new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
       (grant.containmentEnabled !== false &&
-        grant.provider === 'cloudflare' &&
+        providerUsesOutboundCredentialProxy(grant.provider) &&
         !grant.outboundContainerId)
     ) {
       reject();
@@ -245,7 +252,7 @@ export const sessionCredentialGrantSchema = z
       if (
         !grant.members.some(member => member.sessionId === sessionId) ||
         !capability.credential.startsWith('kka1.') ||
-        grant.provider !== 'cloudflare'
+        !providerUsesOutboundCredentialProxy(grant.provider)
       ) {
         reject();
       }
@@ -454,7 +461,11 @@ function repositoryFromMetadata(
     }
     const explicit =
       Boolean(repository.token) && !isKnownScmCredential(repository.token, existing?.scm);
-    if (requiresContainmentSandbox(metadata) && provider === 'cloudflare' && explicit) {
+    if (
+      requiresContainmentSandbox(metadata) &&
+      providerUsesOutboundCredentialProxy(provider) &&
+      explicit
+    ) {
       invalidCredentials();
     }
     return {
@@ -470,6 +481,7 @@ function repositoryFromMetadata(
       ...(repository.githubIntegrationId
         ? { expectedIntegrationId: repository.githubIntegrationId }
         : {}),
+      ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
         metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
         metadata.identity.createdOnPlatform === 'slack',
@@ -578,6 +590,17 @@ async function refreshScmCapability(
 ): Promise<SessionCredentialGrant> {
   const repository = grant.repository;
   if (!repository || repository.type === 'git') return grant;
+  if (repository.type === 'github' && repository.expectedIntegrationId) {
+    // Cached capabilities still require current association authorization; older brokers fail closed.
+    const authorized = await authorizeCloudAgentGitHubRepo(env, {
+      githubRepo: repository.repo,
+      userId: grant.userId,
+      orgId: grant.orgId,
+      expectedIntegrationId: repository.expectedIntegrationId,
+      accessPurpose: repository.accessPurpose ?? 'workflow',
+    });
+    if (!authorized.success) throw new Error('GitHub credential is unavailable');
+  }
   if (isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now)) return grant;
   const common = {
     userId: grant.userId,
@@ -590,6 +613,7 @@ async function refreshScmCapability(
     const issued = await issueCloudAgentGitHubSessionCapability(env, {
       ...common,
       githubRepo: repository.repo,
+      accessPurpose: repository.accessPurpose ?? 'workflow',
       allowUserAuthorization: repository.allowUserAuthorization,
       ...(repository.expectedIntegrationId
         ? { expectedIntegrationId: repository.expectedIntegrationId }
@@ -804,6 +828,7 @@ async function resolveDirectScmCredentials(
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         ...common,
         githubRepo: repository.repo,
+        accessPurpose: repository.accessPurpose ?? 'workflow',
         allowUserAuthorization: repository.allowUserAuthorization,
         ...(repository.expectedIntegrationId
           ? { expectedIntegrationId: repository.expectedIntegrationId }
@@ -993,7 +1018,7 @@ export async function prepareSessionCredentials(input: {
   };
   if (!containmentEnabled) {
     grant = await resolveDirectScmCredentials(env, grant, payload);
-  } else if (provider === 'cloudflare') {
+  } else if (providerUsesOutboundCredentialProxy(provider)) {
     const outboundContainerId = input.outboundContainerId;
     if (!outboundContainerId) invalidCredentials();
     grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
@@ -1001,8 +1026,10 @@ export async function prepareSessionCredentials(input: {
   } else if (repository?.type === 'github') {
     let nativeToken = payload.git?.token;
     if (repository.authentication === 'managed') {
-      const resolved = await resolveGitHubTokenForRepo(env, {
+      const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         githubRepo: repository.repo,
+        accessPurpose: repository.accessPurpose ?? 'workflow',
+        allowUserAuthorization: false,
         userId: grant.userId,
         ...(grant.orgId ? { orgId: grant.orgId } : {}),
         ...(repository.expectedIntegrationId
@@ -1010,7 +1037,7 @@ export async function prepareSessionCredentials(input: {
           : {}),
       });
       if (!resolved.success) throw new Error('GitHub credential is unavailable');
-      nativeToken = resolved.value.token;
+      nativeToken = resolved.value.githubToken;
     }
     if (!nativeToken) invalidCredentials();
     grant = {
@@ -1140,7 +1167,7 @@ export async function resolveSessionCredential(input: {
   const alias = parseControlPlaneCredential(input.credential);
   if (
     !isContainedSessionCredentialGrant(grant) ||
-    grant.provider !== 'cloudflare' ||
+    !providerUsesOutboundCredentialProxy(grant.provider) ||
     now < grant.preparedAt ||
     now >= grant.expiresAt ||
     alias?.sandboxId !== grant.sandboxId ||

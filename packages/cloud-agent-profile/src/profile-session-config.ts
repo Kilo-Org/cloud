@@ -101,6 +101,14 @@ export type MergeProfileConfigurationResult = {
   skills?: MergedSkillForSession[];
   agents?: MergedAgentForSession[];
   kiloCommands?: KiloCommandForSession[];
+  /**
+   * The profile that claimed the active layer: the explicit pick or effective
+   * default when one applied, else the repository-binding base. Absent when no
+   * profile applied to the session. Mirrors the picker's `selectedProfileId`
+   * (`topProfile?.id ?? baseProfile?.id`) so a recorded id names the profile
+   * the user saw selected.
+   */
+  resolvedProfileId?: string;
 };
 
 /** Ensure a profileId belongs to the given owner (or, for org context, to the user personally). */
@@ -347,7 +355,15 @@ export async function mergeProfileConfiguration(
   const inline = inlineToLayer(args);
   if (inline) layers.push(inline);
 
-  return mergeLayers(layers);
+  // The active layer's id: the top layer when it applied, else the repo-binding
+  // base. `top` is dropped when it duplicates `base`, so a dropped top leaves
+  // the (identical) base id as the active profile.
+  const resolvedProfileId = top?.profileId ?? base?.profileId ?? null;
+
+  return {
+    ...mergeLayers(layers),
+    ...(resolvedProfileId ? { resolvedProfileId } : {}),
+  };
 }
 
 /**

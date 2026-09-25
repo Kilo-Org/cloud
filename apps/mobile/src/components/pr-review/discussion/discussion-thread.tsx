@@ -39,7 +39,7 @@ import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import {
   type ReviewComment,
@@ -359,7 +359,7 @@ function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveTogglePr
       // The frame is the tap target the size audit measures (38.5pt on
       // device) and the header row grows to hold it, so the whole frame is
       // hittable; the 3pt slop reaches the 44pt minimum.
-      hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+      hitSlop={COMPACT_H11_HIT_SLOP_DP}
       className="h-11 w-11 items-center justify-center active:opacity-70"
     >
       {/* The visible circle stays compact (explicit px, because NativeWind's

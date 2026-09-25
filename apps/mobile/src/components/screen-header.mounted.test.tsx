@@ -866,6 +866,34 @@ describe('header actions row', () => {
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
+
+  it('drops a declared trailing cluster to its own row before it squeezes the title', () => {
+    // PR review at 320dp with a font scale of 2: Share, Submit review and
+    // Merge (236dp of fixed-width controls) left the title a few characters
+    // while the width-only rule kept them all on one row.
+    layout.width = 320;
+    layout.fontScale = 2;
+    const renderer = renderHeader({
+      title: 'PR review #7',
+      eyebrow: 'owner/repo',
+      headerRight: 'RIGHT',
+      headerRightWidth: 236,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+  });
+
+  it('keeps a narrower declared cluster on the title row', () => {
+    // Share and Merge alone: 44 + 44 + the `gap-1` between them.
+    const renderer = renderHeader({
+      title: 'PR review #7',
+      eyebrow: 'owner/repo',
+      headerRight: 'RIGHT',
+      headerRightWidth: 92,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
 });
 
 describe('header status line', () => {
@@ -898,6 +926,17 @@ describe('shouldStackHeaderActions', () => {
     expect(shouldStackHeaderActions(160, 1)).toBe(true);
     expect(shouldStackHeaderActions(220, 1.5)).toBe(true);
     expect(shouldStackHeaderActions(320, 2.5)).toBe(true);
+  });
+
+  it('reflows for a declared trailing cluster the title cannot share the row with', () => {
+    // The PR review header at 320dp with a font scale of 2: the width-only
+    // rule kept Share, Submit review and Merge on the title's row, which left
+    // the title a few characters. The declared cluster width reflows it.
+    expect(shouldStackHeaderActions(320, 2)).toBe(false);
+    expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
+    // A cluster the title still fits beside keeps the single row.
+    expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
+    expect(shouldStackHeaderActions(390, 1, 236)).toBe(false);
   });
 
   it('treats a missing window measurement as a single row', () => {

@@ -677,6 +677,47 @@ describe('PrReviewScreen recents backfill per provider', () => {
   });
 });
 
+// The header reserves the width of the trailing cluster this screen renders,
+// so it can reflow the actions onto their own row before the title is squeezed
+// (the finding: PR review at 320 dp with a font scale of 2).
+describe('PrReviewScreen header trailing cluster width', () => {
+  it('declares the width of the controls it renders', () => {
+    prQueryResult = {
+      data: MERGEABLE_OVERVIEW,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'eyebrowNumberOfLines',
+      value: 1,
+    });
+    // Share 44 + `gap-1` 4 + Submit review 140 + `gap-1` 4 + Merge 44.
+    expect(header?.props.headerRightWidth).toBe(236);
+
+    // A merged PR renders no Merge action: Share 44 + `gap-1` 4 + Submit 140.
+    prQueryResult = {
+      data: { state: 'merged', mergeable: null, mergeableState: null },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const mergedElement = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const mergedHeader = findElement({
+      node: mergedElement,
+      type: 'ScreenHeader',
+      prop: 'eyebrowNumberOfLines',
+      value: 1,
+    });
+    expect(mergedHeader?.props.headerRightWidth).toBe(188);
+  });
+});
+
 describe('PrReviewScreen header eyebrow cap', () => {
   beforeEach(() => {
     prQueryResult = {

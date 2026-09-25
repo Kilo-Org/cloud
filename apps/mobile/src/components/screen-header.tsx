@@ -45,16 +45,35 @@ const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
 const HEADER_CONTENT_GUTTER = 44;
 
 /**
+ * The `ms-3` gap the trailing cluster keeps from the heading, in dp. The
+ * cluster and the heading are separate flex children, so the title loses this
+ * as well whenever the row holds both.
+ */
+const HEADER_ACTIONS_GAP = 12;
+
+/**
  * Whether the header's actions drop to their own row instead of sharing the
  * title's. `width` is the window width in dp; `fontScale` is the system font
  * scale, so a large font reflows before a small one at the same width.
+ * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
+ * dp — the widths the caller renders, not a worst case it may never show. A
+ * cluster wide enough to leave the title below its readable minimum reflows
+ * too: at 320 dp with a font scale of 2 the PR review header's Share, Submit
+ * review and Merge controls left the title a few characters. Fixed-size
+ * children (icon buttons, a label capped at its own max-w) do not grow with the
+ * font scale, so this width is taken as laid out and is not scaled.
  */
-export function shouldStackHeaderActions(width: number, fontScale: number): boolean {
+export function shouldStackHeaderActions(
+  width: number,
+  fontScale: number,
+  headerRightWidth = 0
+): boolean {
   if (!Number.isFinite(width)) {
     return false;
   }
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
-  return width - HEADER_CONTENT_GUTTER < HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH * scale;
+  const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
+  return titleWidth < HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH * scale;
 }
 
 /**
@@ -87,6 +106,14 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
+  /**
+   * Width the `headerRight` cluster lays out at, in dp. The stacking decision
+   * reserves it (see `shouldStackHeaderActions`), so a wide cluster reflows the
+   * actions onto their own row instead of squeezing the title to a few
+   * characters. Pass the widths of the controls actually rendered. Omit it for
+   * a cluster no wider than a single icon button.
+   */
+  headerRightWidth?: number;
   /** Controls rendered at the trailing edge of the title row, in the
    * leading-aligned row and beside a centered title alike. The heading keeps
    * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
@@ -145,6 +172,7 @@ export function ScreenHeader({
   reserveEyebrow = false,
   size = 'default',
   headerRight,
+  headerRightWidth,
   inlineActions,
   context,
   modal,
@@ -167,8 +195,11 @@ export function ScreenHeader({
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
   // to their own row instead of squeezing the title into a single-letter
-  // column. Only a header that has actions can reflow this way.
-  const stackActions = headerRight != null && shouldStackHeaderActions(windowWidth, fontScale);
+  // column. Only a header that has actions can reflow this way, and a caller
+  // that declares its cluster's width reflows before that cluster eats the
+  // title's readable minimum (see `headerRightWidth`).
+  const stackActions =
+    headerRight != null && shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
 
   // A modal is a native sheet that owns its own top inset; the header keeps the
   // fixed grabber clearance on both platforms. A pinned header adds the app

@@ -33,6 +33,13 @@ import { cn } from '@/lib/utils';
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
 
+/** Width of a `Button` size `icon` control: a fixed 44dp square. */
+const HEADER_ICON_ACTION_WIDTH = 44;
+/** Width the Submit review label caps itself at (`max-w-[140px]`). */
+const HEADER_SUBMIT_REVIEW_WIDTH = 140;
+/** The `gap-1` between the header cluster's children, in dp. */
+const HEADER_ACTION_GAP = 4;
+
 type PrReviewScreenProps = {
   readonly owner: string;
   readonly repo: string;
@@ -246,6 +253,22 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       ? getMergeabilityStatus(pr.data) === 'mergeable'
       : pr.data.state === 'open');
 
+  // The header's trailing cluster is bounded by design, so the header can
+  // reserve its width and reflow it onto its own row before the title is
+  // squeezed: `Button` size `icon` is a fixed 44dp square and the Submit review
+  // label caps itself at 140dp (`max-w-[140px]`), so the widths below are the
+  // widths that actually lay out, with `gap-1` between the children. Only the
+  // controls this screen renders are counted — a Files tab with Share and Merge
+  // alone is narrow enough to keep the title beside them.
+  const headerActionsWidths = [
+    webUrl ? HEADER_ICON_ACTION_WIDTH : 0,
+    tab === 'overview' && canSubmitReview ? HEADER_SUBMIT_REVIEW_WIDTH : 0,
+    canMerge ? HEADER_ICON_ACTION_WIDTH : 0,
+  ].filter(width => width > 0);
+  const headerRightWidth =
+    headerActionsWidths.reduce((total, width) => total + width, 0) +
+    Math.max(headerActionsWidths.length - 1, 0) * HEADER_ACTION_GAP;
+
   let body: ReactNode = null;
   if (!queries.isReady) {
     // Non-retryable: Bitbucket Cloud review is organization-scoped and no
@@ -307,6 +330,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         }
         eyebrow={`${owner}/${repo}`}
         eyebrowNumberOfLines={1}
+        headerRightWidth={headerRightWidth}
         headerRight={
           <View className="flex-row items-center gap-1">
             {webUrl ? (

@@ -81,8 +81,8 @@ function findTitlePressable(root: TestInstance): TestInstance {
 
 /**
  * The row the header puts `headerRight` on when the window is too narrow for
- * the title and the actions to share one. Only that variant carries `mt-2`
- * without the single-row wrapper's `max-w-[50%]`.
+ * the title and the actions to share one. Only that variant carries `mt-2`;
+ * the single-row variant wraps the cluster in an `ms-3 shrink-0` View instead.
  */
 function isStackedActionsRow(node: TestInstance): boolean {
   const className = String(node.props.className ?? '');
@@ -90,7 +90,7 @@ function isStackedActionsRow(node: TestInstance): boolean {
     typeof node.type === 'string' &&
     (node.type as string) === 'View' &&
     className.includes('mt-2') &&
-    !className.includes('max-w-[50%]')
+    !className.includes('shrink-0')
   );
 }
 
@@ -193,18 +193,19 @@ function findHeaderRight(root: TestInstance): TestInstance {
 
 /**
  * The trailing wrapper that carries `inlineActions`. It shares the `ms-3`
- * start margin with the `headerRight` wrapper but drops the half-row
- * `max-w-[50%]` cap.
+ * start margin with the `headerRight` cluster and is the second trailing slot
+ * in the row, so the last match wins.
  */
 function findInlineActionsWrapper(root: TestInstance): TestInstance {
-  const wrapper = root.findAll(
+  const wrappers = root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
       typeof node.props.className === 'string' &&
       /(^|\s)ms-3(\s|$)/.test(node.props.className) &&
-      !node.props.className.includes('max-w-[50%]')
-  )[0];
+      !node.props.className.includes('shrink-0')
+  );
+  const wrapper = wrappers.at(-1);
   if (!wrapper) {
     throw new Error('inlineActions view not found');
   }
@@ -283,6 +284,7 @@ describe('ScreenHeader mounted', () => {
     // painting past the screen edge (session-compose-kbup capture).
     expect(headerRight.props.className).toContain('shrink-0');
     expect(headerRight.props.className).not.toContain('max-w-[50%]');
+    expect(headerRight.children).toEqual(['RIGHT']);
   });
 
   it('renders inlineActions in the title row uncapped beside the content-sized cluster', () => {
@@ -304,8 +306,7 @@ describe('ScreenHeader mounted', () => {
     expect(heading.props.className).toContain('min-w-0 flex-1');
     // Neither trailing slot clamps itself: `headerRight` sizes to its content
     // and `inlineActions` keeps its full width instead of wrapping the controls.
-    expect(cluster.props.className).not.toContain('max-w-[50%]');
-    expect(inline.props.className).not.toContain('max-w-[50%]');
+    expect(cluster.children).toEqual(['RIGHT']);
     expect(inline.props.className).toContain('min-w-0');
     expect(inline.props.className).toContain('shrink');
   });
@@ -315,14 +316,16 @@ describe('ScreenHeader mounted', () => {
 
     const inline = findInlineActionsWrapper(renderer.root);
     expect(inline.parent?.props.className).toContain('flex-row');
-    const capped = renderer.root.findAll(
+    // The inline slot is the row's only trailing wrapper: no `headerRight`
+    // cluster is rendered beside it.
+    const trailing = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
         typeof node.props.className === 'string' &&
-        node.props.className.includes('max-w-[50%]')
+        /(^|\s)ms-3(\s|$)/.test(node.props.className)
     );
-    expect(capped).toHaveLength(0);
+    expect(trailing).toEqual([inline]);
   });
 
   it('renders inlineActions beside a centered title too', () => {
@@ -334,7 +337,7 @@ describe('ScreenHeader mounted', () => {
     const inline = findInlineActionsWrapper(renderer.root);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
-    expect(inline.props.className).not.toContain('max-w-[50%]');
+    expect(inline.props.className).toContain('min-w-0');
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     expect(title.props.className).toContain('text-center');
   });
@@ -820,12 +823,13 @@ describe('header actions row', () => {
     const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    // The single-row cluster is gone: the actions own a full-width row.
     expect(
       renderer.root.findAll(
         node =>
           typeof node.type === 'string' &&
           (node.type as string) === 'View' &&
-          String(node.props.className ?? '').includes('max-w-[50%]')
+          String(node.props.className ?? '').includes('ms-3 shrink-0')
       )
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.

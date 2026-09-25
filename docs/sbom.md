@@ -85,18 +85,22 @@ artifact you hold to confirm the SBOM describes those bytes.
 
 ## Reproducing the mobile coverage numbers
 
-Re-measure the limits above on any release. For the iOS pod gap, point the generator at a real
-`Podfile.lock` and it prints how many pods the lockfile declares, how many the IPA shows, and the
-names of those it does not:
+Re-measure the limits above on any release. Run both commands from the repository root; the paths
+under `apps/mobile/` are the ones the release workflow leaves behind. For the iOS pod gap, point the
+generator at a real `Podfile.lock` and it prints how many pods the lockfile declares, how many the
+IPA shows, and the names of those it does not:
 
 ```sh
-node scripts/mobile-sbom.mjs --ipa artifacts/app.ipa --aab artifacts/app.aab --build-json build.json --out-dir artifacts --podfile-lock Podfile.lock
+node scripts/mobile-sbom.mjs \
+  --ipa apps/mobile/artifacts/app.ipa --aab apps/mobile/artifacts/app.aab \
+  --build-json apps/mobile/build.json --out-dir apps/mobile/artifacts \
+  --podfile-lock apps/mobile/ios/Podfile.lock
 ```
 
 For Android, compare what the AAB's own metadata carries against what syft reports on its own:
 
 ```sh
-syft scan artifacts/app.aab -o cyclonedx-json
+syft scan apps/mobile/artifacts/app.aab -o cyclonedx-json
 ```
 
 ## Verifying an image SBOM attestation

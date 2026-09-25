@@ -72,6 +72,7 @@ function ClawNewLoader({
   return (
     <ClawOnboardingWithBoundary
       statusQuery={statusQueryForBoundary}
+      onRetry={() => void statusQuery.refetch()}
       mode={mode}
       createFlowStarted={createFlowStartedAt !== null}
       setupFailed={setupFailed}

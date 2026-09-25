@@ -3,6 +3,7 @@
 import React, { type ComponentType } from 'react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { Card, CardContent } from '@/components/ui/card';
+import { ClawStatusError } from './ClawStatusError';
 
 type StatusQueryLike = {
   data: KiloClawDashboardStatus | undefined;
@@ -11,11 +12,6 @@ type StatusQueryLike = {
 };
 
 export type { StatusQueryLike };
-
-function formatError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return 'Unknown error';
-}
 
 type WithStatusProp = {
   status: KiloClawDashboardStatus | undefined;
@@ -26,10 +22,12 @@ export function withStatusQueryBoundary<P extends WithStatusProp>(Component: Com
   return function StatusBoundary(
     props: Omit<P, keyof WithStatusProp> & {
       statusQuery: StatusQueryLike;
+      /** Re-runs the status read behind this boundary. */
+      onRetry: () => void;
       organizationId?: string;
     }
   ) {
-    const { statusQuery, organizationId, ...componentPropsWithoutStatus } = props;
+    const { statusQuery, onRetry, organizationId, ...componentPropsWithoutStatus } = props;
 
     if (statusQuery.isLoading) {
       return (
@@ -46,11 +44,7 @@ export function withStatusQueryBoundary<P extends WithStatusProp>(Component: Com
     if (statusQuery.error) {
       return (
         <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-red-600">Failed to load: {formatError(statusQuery.error)}</p>
-            </CardContent>
-          </Card>
+          <ClawStatusError error={statusQuery.error} onRetry={onRetry} />
         </div>
       );
     }

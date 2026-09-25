@@ -66,6 +66,7 @@ describe('withStatusQueryBoundary', () => {
           isLoading: true,
           error: null,
         },
+        onRetry: () => {},
       })
     );
 
@@ -85,11 +86,13 @@ describe('withStatusQueryBoundary', () => {
           isLoading: false,
           error: new Error('network issue'),
         },
+        onRetry: () => {},
       })
     );
 
-    expect(html).toContain('Failed to load:');
+    expect(html).toContain('Could not load KiloClaw instances');
     expect(html).toContain('network issue');
+    expect(html).toContain('Try Again');
   });
 
   test('renders wrapped component when query is resolved', () => {
@@ -105,6 +108,7 @@ describe('withStatusQueryBoundary', () => {
           isLoading: false,
           error: null,
         },
+        onRetry: () => {},
       })
     );
 

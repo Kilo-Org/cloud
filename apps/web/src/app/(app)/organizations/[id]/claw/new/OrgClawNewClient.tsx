@@ -57,6 +57,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={{ data: undefined, isLoading: true, error: null }}
+        onRetry={() => void statusQuery.refetch()}
         mode="post-provisioning"
         organizationId={organizationId}
         createFlowStarted={false}
@@ -106,6 +107,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={statusQuery}
+        onRetry={() => void statusQuery.refetch()}
         mode="post-provisioning"
         organizationId={organizationId}
         createFlowStarted={createFlowStartedAt !== null}
@@ -120,6 +122,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={{ data: undefined, isLoading: true, error: null }}
+        onRetry={() => void statusQuery.refetch()}
         mode="post-provisioning"
         organizationId={organizationId}
         createFlowStarted={createFlowStartedAt !== null}
@@ -155,6 +158,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         data: settledStatus,
         error: setupFailed ? null : statusQuery.error,
       }}
+      onRetry={() => void statusQuery.refetch()}
       mode={mode}
       organizationId={organizationId}
       createFlowStarted={createFlowStartedAt !== null}

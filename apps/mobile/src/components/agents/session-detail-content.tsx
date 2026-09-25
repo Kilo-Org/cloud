@@ -115,6 +115,11 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
+import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
@@ -493,6 +498,53 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  // The session's active-profile chip: the profile this session runs on. It
+  // resolves from the session's own recorded `profileId`, so an explicit
+  // override or a repository-bound profile — not the context's current
+  // effective default — names it. Only a session that recorded none (created
+  // before profile recording, or one whose create resolved no profile) falls
+  // back to the effective default. A recorded id that no longer resolves shows
+  // no chip rather than naming a different profile. Tapping opens that
+  // profile's editor.
+  const {
+    allProfiles: sessionProfiles,
+    effectiveDefaultId,
+    isLoading: isSessionProfileLoading,
+    isError: isSessionProfileError,
+  } = useEffectiveAgentProfile(organizationId);
+  // `fetchSession` is the only source of the session's own profile id, and the
+  // atom can still hold the previous session's row. Until the CURRENT session's
+  // read resolves, the chip stays hidden rather than briefly naming the context
+  // default for a session that recorded a different profile.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
+  const activeSessionProfileId = sessionDataLoaded
+    ? (recordedSessionProfileId ?? effectiveDefaultId)
+    : null;
+  const sessionProfile =
+    activeSessionProfileId === null
+      ? null
+      : (sessionProfiles.find(profile => profile.id === activeSessionProfileId) ?? null);
+  const sessionProfileIndicatorState = buildActiveProfileIndicatorState({
+    selectedProfileName: sessionProfile?.name ?? null,
+    repoBoundProfileName: null,
+    hasManualEnvVars: false,
+    hasManualSetupCommands: false,
+    hasSelectedProfileId: sessionProfile !== null,
+    isProfilesLoading: isSessionProfileLoading || !sessionDataLoaded,
+    hasProfileError: isSessionProfileError,
+  });
+  const openSessionProfileEditor = () => {
+    if (sessionProfile) {
+      router.push(
+        getProfileOverviewPath(
+          sessionProfile.id,
+          profileOrganizationId(organizationId, sessionProfile)
+        )
+      );
+    }
+  };
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
     sessionId,
@@ -1628,9 +1680,11 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session". The route's
-    // cached metadata can hold the backend's ISO placeholder, which must not
-    // paint either, while a title the user's own rename wrote is kept.
+    // title it opened with instead of blinking back to "Session". A creation
+    // placeholder cached in the list is not a title: fall back to "Session".
+    // The route's cached metadata can hold the backend's ISO placeholder,
+    // which must not paint either, while a title the user's own rename wrote
+    // is kept.
     fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
@@ -2047,6 +2101,19 @@ export function SessionDetailContent({
                 }
               : {})}
           />
+          {sessionProfileIndicatorState ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+              className="px-4 pb-1"
+            >
+              <ActiveProfileIndicator
+                state={sessionProfileIndicatorState}
+                onPress={openSessionProfileEditor}
+              />
+            </Animated.View>
+          ) : null}
           {sessionGoal !== null || hasPrRow ? (
             <Animated.View
               entering={FadeIn.duration(200)}

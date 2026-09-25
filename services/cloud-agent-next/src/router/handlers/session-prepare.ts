@@ -162,6 +162,10 @@ function applyProfileResolution(
     ...input,
     profile: {
       ...input.profile,
+      // The resolved active profile id. Absent when no profile applied, so a
+      // session that runs on no profile records none rather than the client's
+      // requested id.
+      ...(resolved.resolvedProfileId ? { resolvedProfileId: resolved.resolvedProfileId } : {}),
       resolved: {
         envVars: resolved.envVars,
         setupCommands: resolved.setupCommands,

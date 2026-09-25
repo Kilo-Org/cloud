@@ -32,8 +32,6 @@ import {
   isKiloExclusiveFreeModel,
 } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -82,7 +80,10 @@ export async function getAutoFreeCandidates(
   for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
       const kiloModel = findKiloExclusiveModel(model);
-      if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
+      if (
+        kiloModel &&
+        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
+      ) {
         candidates.add(model);
       }
     } else if (openRouterModels.has(model)) {
@@ -90,15 +91,6 @@ export async function getAutoFreeCandidates(
     }
   }
   return [...candidates].toSorted();
-}
-
-function gatewaySupportsApiKind(
-  gateway: ProviderId,
-  apiKind: GatewayRequest['kind'] | null
-): boolean {
-  if (apiKind === null) return true;
-  const provider = tryGetProviderById(gateway);
-  return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
 }
 
 type OrganizationAutoContext = {

@@ -11,6 +11,7 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
 }));
@@ -42,8 +43,26 @@ vi.mock('@/components/agents/new-session-run-target', () => ({
 vi.mock('@/components/agents/new-session-start-button', () => ({
   NewSessionStartButton: 'NewSessionStartButton',
 }));
+// The environment row and the advanced-config disclosure reach the profile
+// surfaces; stub them so this geometry suite mounts no picker, no router and no
+// profile query, and the theme hook (which reads `expo-router` themes) stays out
+// of the module graph.
+vi.mock('@/components/agents/advanced-config-panel', () => ({
+  AdvancedConfigPanel: 'AdvancedConfigPanel',
+}));
+vi.mock('@/components/agents/active-profile-indicator', () => ({
+  ActiveProfileIndicator: 'ActiveProfileIndicator',
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
+}));
+
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
+  RefreshCw: 'RefreshCw',
+  SlidersHorizontal: 'SlidersHorizontal',
+}));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -102,7 +121,15 @@ function defaultProps() {
     profile: null,
     isProfileLoading: false,
     isProfileError: false,
+    profileOverrideNeedsAttention: false,
     onRetryProfile: vi.fn(),
+    onOpenProfilePicker: vi.fn(),
+    selectedProfileId: null as string | null,
+    onSelectProfile: vi.fn(),
+    manualVars: [],
+    manualCommands: [],
+    onManualVarsChange: vi.fn(),
+    onManualCommandsChange: vi.fn(),
     autoCommit: false,
     onAutoCommitChange: vi.fn(),
     isSpawningRemote: false,

@@ -13,6 +13,19 @@ export const OpenAiChatGptStatusSchema = z.object({
   email: z.string().optional(),
   subject: z.string().optional(),
   connectedAt: z.string().optional(),
+  /**
+   * The current ChatGPT plan usage limit. Absent means no limit is known or the
+   * recorded one has expired, so a client renders the usage-limit message only
+   * when this is present.
+   */
+  usageLimit: z
+    .object({
+      /** ISO timestamp of the request that OpenAI answered with the limit. */
+      reachedAt: z.string(),
+      /** ISO timestamp of the reported reset, or null when OpenAI gave none. */
+      resetsAt: z.string().nullable(),
+    })
+    .optional(),
   errorMessage: z.string().optional(),
 });
 

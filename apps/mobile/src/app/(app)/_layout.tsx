@@ -147,6 +147,7 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
             <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
             <Stack.Screen name="share-gate" options={sheetOptions} />
             <Stack.Screen name="language-picker" options={sheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={sheetOptions} />

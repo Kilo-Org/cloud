@@ -100,14 +100,9 @@ RUN cd /tmp/wrapper-build/wrapper && \
     rm -rf /tmp/wrapper-build
 
 # Keep PID 1 alive so the Durable Object's `exec` always has a running container to attach to.
-# Trust the ephemeral intercept CA when containment is enabled; it is absent otherwise.
+# The intercept CA is not baked in; the control wrapper trusts it when containment is enabled.
 RUN printf '%s\n' \
 	'#!/bin/sh' \
-	'ca=/etc/cloudflare/certs/cloudflare-containers-ca.crt' \
-	'if [ -f "$ca" ]; then' \
-	'  cp "$ca" /usr/local/share/ca-certificates/cloudflare-containers-ca.crt' \
-	'  update-ca-certificates' \
-	'fi' \
 	'exec sleep infinity' \
 	> /usr/local/bin/kilo-containers-entrypoint \
 	&& chmod +x /usr/local/bin/kilo-containers-entrypoint

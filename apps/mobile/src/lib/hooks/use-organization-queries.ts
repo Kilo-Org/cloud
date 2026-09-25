@@ -3,7 +3,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { useAuth } from '@/lib/auth/auth-context';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
 import { INFINITE_QUERY_MAX_PAGES, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
@@ -11,28 +11,16 @@ import { useTRPC } from '@/lib/trpc';
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /**
- * The current user's role in the active organization. `trpc.organizations.list`
- * requires auth (not an active org selection), so it's gated on the token
- * rather than on `organizationId` — mirrors profile-screen's `orgs` query.
+ * The current user's role in the active organization, resolved from the shared
+ * membership list (`useOrganizationsList`).
  *
  * Pass `organizationIdOverride` to resolve role/membership against an explicit
  * org id (e.g. a deep-link `?org=` param) instead of the persisted selection.
  */
 function useOrgRole(organizationIdOverride?: string) {
-  const trpc = useTRPC();
-  const { token } = useAuth();
   const { organizationId: contextOrganizationId } = useOrganization();
   const organizationId = organizationIdOverride ?? contextOrganizationId;
-  const {
-    data: orgs,
-    isLoading,
-    isError,
-    isFetching,
-    refetch,
-  } = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
-  });
+  const { data: orgs, isLoading, isError, isFetching, refetch } = useOrganizationsList();
   const org = orgs?.find(entry => entry.organizationId === organizationId);
   return {
     organizationId,

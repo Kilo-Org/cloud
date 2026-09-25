@@ -514,9 +514,6 @@ importers:
       expo-font:
         specifier: ~57.0.4
         version: 57.0.4(expo@57.0.24)(react-native@0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      expo-glass-effect:
-        specifier: ~57.0.3
-        version: 57.0.3(expo@57.0.24)(react-native@0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       expo-haptics:
         specifier: ~57.0.3
         version: 57.0.3(expo@57.0.24)

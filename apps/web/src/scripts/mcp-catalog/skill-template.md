@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Explains the search-then-call sequence, the query/mutation (kind) split and the mutation safety rule, the catalog row shape (path, kind, summary, inputSchema, tags, searchBlob), the retry rule after an ambiguous transport error, and maps every prefix, query/mutation count, key terms and sub-area of services/kilo-mcp/catalog.json. Generated from that catalog — read the catalog, not this file, for current detail.
+description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and every area of services/kilo-mcp/catalog.json with its query and mutation counts. Generated from that catalog — read the catalog for current detail.
 ---
 
 <!--
@@ -13,50 +13,30 @@ Then regenerate:
 
 # Kilo MCP
 
-The Kilo MCP server exposes the Kilo API through two tools. On the wire they are
-`search` and `call`; an agent sees them namespaced as `kilo_search` and
+The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
 `kilo_call`.
 
-## How the MCP works
+## How to use it
 
-Run `kilo_search` before every `kilo_call`. Search returns the path, summary and
-input schema the call needs, and `kilo_call` only accepts paths the catalog
-publishes — paths outside the catalog and inputs that violate the published
-schema are rejected before any request is made.
+1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
+2. **Call one path.** `kilo_call` takes a `path` from the catalog and an `input` that satisfies that row's `inputSchema`. A path outside the catalog and an input that violates the schema are rejected before any request is made.
+3. **Check the kind.** Every row carries a `kind`: `"query"` reads data, `"mutation"` changes it. Call a mutation path only when the user asked for that change.
+4. **Retry with care.** On a mutation, an ambiguous transport error — a timeout, a dropped connection, an unknown outcome — leaves the result unknown. Check the current state before a retry. A query carries no such ambiguity and can be retried.
 
-Every search result carries a `kind`. `"query"` reads data; `"mutation"` changes
-it. Call a mutation path only when the user asked for that change.
+A catalog row carries `path` (the `kilo_call` argument), `kind`, `summary`,
+`inputSchema`, `tags`, and `searchBlob` — the text search matches. A row behind
+an admin guard carries `admin: true`; an opted-in admin connection also gets
+`call_protected`, which fixes a reviewed admin or debug call and its payload,
+and `submit_otp`, which runs it once the user approves with their authenticator
+code. A row whose top segment is `debug` carries `debug: true`.
 
-A mutation that fails with an ambiguous transport error — a timeout, a dropped
-connection, an unknown outcome — must not be blind-retried. Check the current
-state first, then decide whether to retry. A query never has that ambiguity and
-can simply be retried.
+The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
+it, and the catalog wins when the two disagree — read the catalog, not this
+file, for current detail.
 
-A catalog row has:
+## Areas
 
-- `path` — the dotted endpoint path, the argument to `kilo_call`.
-- `kind` — `"query"` or `"mutation"`.
-- `summary` — what the endpoint does, in search-friendly words.
-- `inputSchema` — the JSON Schema the call's `input` must satisfy.
-- `tags` — path-segment and input-field keywords.
-- `searchBlob` — the text that search matches against.
-
-Rows behind an admin guard carry `admin: true`; rows whose top segment is
-`debug` carry `debug: true`. An opted-in admin connection also gets
-`call_protected` and `submit_otp`: `call_protected` fixes the endpoint and its
-payload for a reviewed admin or debug call, and `submit_otp` runs it once the
-user reads their authenticator code back to approve it.
-
-The catalog lives at `services/kilo-mcp/catalog.json`. This skill is generated
-from it, and the catalog wins whenever the two disagree — read the catalog, not
-this file, for current detail.
-
-## Areas of queries and mutations
-
-The census below is generated from the catalog. Three rules shape it:
-
-- **Gloss** — the first sentence of the prefix's root row summary, capped at a word boundary. A period closing a single-letter abbreviation such as `e.g.` or `i.e.` does not end the sentence. A prefix whose catalog summary is blank shows `—`; no gloss is invented.
-- **Key terms** — the prefix's row tags that also occur as a lowercase path segment below the prefix, minus the prefix's own name, ranked by frequency. Input-schema tags such as `organizationid` never qualify.
-- **Size** — no procedure path is inlined. The census stops at the prefix level plus the sub-areas of any prefix with two or more buckets, which keeps the file under the generator's byte limit.
+The first path segment names an area. Search to learn an area's vocabulary:
+each row's `summary` and `tags` are what the search matches.
 
 {{CENSUS}}

@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Explains the search-then-call sequence, the query/mutation (kind) split and the mutation safety rule, the catalog row shape (path, kind, summary, inputSchema, tags, searchBlob), the retry rule after an ambiguous transport error, and maps every prefix, query/mutation count, key terms and sub-area of services/kilo-mcp/catalog.json. Generated from that catalog — read the catalog, not this file, for current detail.
+description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and every area of services/kilo-mcp/catalog.json with its query and mutation counts. Generated from that catalog — read the catalog for current detail.
 ---
 
 <!--
@@ -13,142 +13,92 @@ Then regenerate:
 
 # Kilo MCP
 
-The Kilo MCP server exposes the Kilo API through two tools. On the wire they are
-`search` and `call`; an agent sees them namespaced as `kilo_search` and
+The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
 `kilo_call`.
 
-## How the MCP works
+## How to use it
 
-Run `kilo_search` before every `kilo_call`. Search returns the path, summary and
-input schema the call needs, and `kilo_call` only accepts paths the catalog
-publishes — paths outside the catalog and inputs that violate the published
-schema are rejected before any request is made.
+1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
+2. **Call one path.** `kilo_call` takes a `path` from the catalog and an `input` that satisfies that row's `inputSchema`. A path outside the catalog and an input that violates the schema are rejected before any request is made.
+3. **Check the kind.** Every row carries a `kind`: `"query"` reads data, `"mutation"` changes it. Call a mutation path only when the user asked for that change.
+4. **Retry with care.** On a mutation, an ambiguous transport error — a timeout, a dropped connection, an unknown outcome — leaves the result unknown. Check the current state before a retry. A query carries no such ambiguity and can be retried.
 
-Every search result carries a `kind`. `"query"` reads data; `"mutation"` changes
-it. Call a mutation path only when the user asked for that change.
+A catalog row carries `path` (the `kilo_call` argument), `kind`, `summary`,
+`inputSchema`, `tags`, and `searchBlob` — the text search matches. A row behind
+an admin guard carries `admin: true`; an opted-in admin connection also gets
+`call_protected`, which fixes a reviewed admin or debug call and its payload,
+and `submit_otp`, which runs it once the user approves with their authenticator
+code. A row whose top segment is `debug` carries `debug: true`.
 
-A mutation that fails with an ambiguous transport error — a timeout, a dropped
-connection, an unknown outcome — must not be blind-retried. Check the current
-state first, then decide whether to retry. A query never has that ambiguity and
-can simply be retried.
+The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
+it, and the catalog wins when the two disagree — read the catalog, not this
+file, for current detail.
 
-A catalog row has:
+## Areas
 
-- `path` — the dotted endpoint path, the argument to `kilo_call`.
-- `kind` — `"query"` or `"mutation"`.
-- `summary` — what the endpoint does, in search-friendly words.
-- `inputSchema` — the JSON Schema the call's `input` must satisfy.
-- `tags` — path-segment and input-field keywords.
-- `searchBlob` — the text that search matches against.
+The first path segment names an area. Search to learn an area's vocabulary:
+each row's `summary` and `tags` are what the search matches.
 
-Rows behind an admin guard carry `admin: true`; rows whose top segment is
-`debug` carry `debug: true`. An opted-in admin connection also gets
-`call_protected` and `submit_otp`: `call_protected` fixes the endpoint and its
-payload for a reviewed admin or debug call, and `submit_otp` runs it once the
-user reads their authenticator code back to approve it.
+**860 procedures** — **368 queries**, **492 mutations** — under **51 prefixes**.
 
-The catalog lives at `services/kilo-mcp/catalog.json`. This skill is generated
-from it, and the catalog wins whenever the two disagree — read the catalog, not
-this file, for current detail.
-
-## Areas of queries and mutations
-
-The census below is generated from the catalog. Three rules shape it:
-
-- **Gloss** — the first sentence of the prefix's root row summary, capped at a word boundary. A period closing a single-letter abbreviation such as `e.g.` or `i.e.` does not end the sentence. A prefix whose catalog summary is blank shows `—`; no gloss is invented.
-- **Key terms** — the prefix's row tags that also occur as a lowercase path segment below the prefix, minus the prefix's own name, ranked by frequency. Input-schema tags such as `organizationid` never qualify.
-- **Size** — no procedure path is inlined. The census stops at the prefix level plus the sub-areas of any prefix with two or more buckets, which keeps the file under the generator's byte limit.
-
-The catalog holds **860 procedures** — **368 queries** and **492 mutations** — under **51 prefixes**.
-
-| Prefix | Procedures | Queries | Mutations | Gloss (from catalog `summary`) | Key terms (from catalog `tags`) |
-|---|---:|---:|---:|---|---|
-| `organizations` | 305 | 132 | 173 | List the child organizations of an organization. | kiloclaw, cloudagentnext, securityagent, appbuilder, deployments, groups |
-| `kiloclaw` | 96 | 35 | 61 | Accept a pending plan conversion for the user's subscription. | acceptconversion, acceptconversionatinstance, approvedevicepairingrequest, approvepairingrequest, cancelkiloclirun, cancelplanswitch |
-| `user` | 40 | 15 | 25 | Change the saved payment method used for automatic credit top-up. | changeautotopuppaymentmethod, deletepasskey, getauthproviders, getautocompletemetrics, getautotopuppaymentmethod, getbalance |
-| `cloudAgentNext` | 31 | 12 | 19 | Approve or deny a permission request from the cloud agent. | answerpermission, answerquestion, cancelqueuedmessage, checkeligibility, closeterminal, createterminal |
-| `agentProfiles` | 30 | 4 | 26 | Bind an agent profile to a repository so that repository uses the profile. | bindtorepo, cleardefault, create, createagent, createcustomskill, createkilocommand |
-| `securityAgent` | 26 | 15 | 11 | Auto-dismiss all security findings that meet the configured confidence criteria. | autodismisseligible, cancelremediation, deletefindingsbyrepository, dismissfinding, getanalysis, getauditreport |
-| `kiloPass` | 22 | 11 | 11 | Apply a Kilo Pass checkout's hosting intent and attach KiloClaw hosting to the new subscription after a completed Stripe checkout. | activatecheckouthosting, cancelscheduledchange, cancelsubscription, completeappstorepurchase, completeplaypurchase, createcheckoutsession |
-| `githubApps` | 19 | 9 | 10 | Start connecting a GitHub account or organization to Kilo. | beginconnection, cancelpendinginstallation, checkuserpendinginstallation, connectuserauthorization, disconnectconnection, disconnectuserauthorization |
-| `githubPrReview` | 18 | 6 | 12 | Add a general conversation comment to a GitHub pull request or issue. | addissuecomment, addreaction, createreviewcomment, disableautomerge, enableautomerge, getfilelines |
-| `cliSessionsV2` | 17 | 9 | 8 | Delete a CLI cloud agent session, including its child sessions and cloud-agent cleanup. | delete, deleteworktree, get, getbycloudagentsessionid, getsessionmessages, getsessionmessagespage |
-| `appBuilder` | 16 | 6 | 10 | Check whether an app builder project can be migrated or exported to a GitHub repository. | canmigratetogithub, checkeligibility, createproject, deleteproject, deployproject, generateclonetoken |
-| `cliSessions` | 16 | 7 | 9 | Create a new Kilo CLI coding session for the current user. | create, createv2, delete, fork, forkforreview, get |
-| `mcpGateway` | 16 | 4 | 12 | Grant a specific user access to an organization MCP gateway connection. | assignuser, createorganization, createpersonal, delete, disable, discover |
-| `providerReview` | 16 | 8 | 8 | Add a review comment to a pull request or merge request on GitLab or Bitbucket, optionally anchored to a specific file and line. | addcomment, disableautomerge, enableautomerge, getcapabilities, getfilelines, getmergestate |
-| `deployments` | 14 | 6 | 8 | Cancel a running or queued build for a deployment. | cancelbuild, checkdeploymenteligibility, checkslugavailability, createdeployment, deletedeployment, deleteenvvar |
-| `moderation` | 11 | 3 | 8 | Accept the current user-generated content terms and age posture. | acceptterms, appealreport, blockuser, getreportreceipt, gettermsstatus, listhiddenusers |
-| `codeReviews` | 9 | 6 | 3 | Cancel a running or queued code review, stopping its processing and cloud agent session. | analytics, cancel, get, getdashboard, getreviewstreaminfo, getsessionmessages |
-| `gitlab` | 9 | 3 | 6 | Connect a GitLab account to Kilo using a personal access token, optionally for an organization. | connectwithpat, disconnect, getinstallation, listbranches, listrepositories, refreshrepositories |
-| `personalReviewAgent` | 9 | 5 | 4 | Manually start a code review on a repository, pull request, or commit instead of waiting for an automatic trigger. | createmanualreviewjob, getgithubstatus, getgitlabstatus, getreviewconfig, listgithubrepositories, listgitlabrepositories |
-| `autoFix` | 8 | 4 | 4 | Cancel or stop a running or pending auto-fix ticket. | cancel, getconfig, getticket, listticketsfororganization, listticketsforuser, retrigger |
-| `codingPlans` | 8 | 5 | 3 | Cancel an active coding plan subscription for the current user. | cancel, catalog, getbillinghistory, getsubscriptiondetail, getusage, listsubscriptions |
-| `personalAutoTriage` | 8 | 4 | 4 | Get your current personal auto-triage agent settings, such as whether it is enabled, which repositories and labels it applies to, thresholds, and the model and custom instructions… | getautotriageconfig, getgithubstatus, interruptticket, listgithubrepositories, listtickets, retryticket |
-| `reviewMemory` | 8 | 3 | 5 | Approve a review memory proposal and open a change request or pull request with its generated markdown. | approveandopenchangerequest, getdashboardsummary, listproposals, listproposalspage, rejectproposal, setenabled |
-| `webhookTriggers` | 8 | 4 | 4 | Check which webhook trigger features the current user is allowed to use, such as whether they can set sandbox allocation limits. | capabilities, create, delete, get, invoke, list |
-| `byok` | 7 | 2 | 5 | Add a new bring-your-own-key (BYOK) API key for an AI provider, either for the current user or for an organization. | create, delete, list, listsupportedmodels, setenabled, testapikey |
-| `codeIndexing` | 7 | 5 | 2 | Delete specific indexed files from the codebase index for a project and git branch. | delete, deletebeforedate, getmanifest, getorganizationstats, getprojectfiles, getrecentsearches |
-| `personalAutoFix` | 7 | 3 | 4 | Cancel an in-progress auto-fix run for a ticket. | cancelfix, getautofixconfig, listgithubrepositories, listtickets, retriggerfix, saveautofixconfig |
-| `userExports` | 7 | 3 | 4 | Exchange the emailed download code for a download link to a completed data export. | createdownload, exportableorganizations, list, request, requestdownloadcode, requestorganization |
-| `autoTriage` | 6 | 4 | 2 | Get the organization's auto-triage agent configuration, returning defaults and an isEnabled flag when no saved config exists. | getconfig, getticket, listticketsfororganization, listticketsforuser, retrigger, saveconfig |
-| `dolthub` | 6 | 4 | 2 | Disconnect and remove the DoltHub integration, either for your personal account or for an organization. | disconnect, getinstallation, getinstallationcredentials, rememberusername, resolveusername, verifyupstream |
-| `modelPreferences` | 6 | 1 | 5 | Add a model to the current user's list of favorite models, without creating duplicates. | addfavorite, clearlastselected, get, removefavorite, setfavorites, setlastselected |
-| `usageAnalytics` | 6 | 6 | 0 | Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. | getbreakdown, getscopeorganizations, getsummary, gettable, gettimeseries, resolveorgusers |
-| `workspaceFolders` | 6 | 1 | 5 | Create a new workspace folder to organize worktrees, with a name and color. | create, delete, list, moveworktree, reorder, update |
-| `activeSessions` | 4 | 3 | 1 | Create a one-time web ticket that lets the current user watch or attach to a live active session from the browser. | createwebticket, gettoken, list, listinstances |
-| `debug` | 4 | 4 | 0 | Debug endpoint that echoes a short string back, used to exercise input validation errors. | badinputerror, badinputobjecterror, handledtrpcerror, unhandlederror |
-| `discord` | 4 | 1 | 3 | Check whether the Discord integration is installed for the current organization or owner, returning the guild (server) ID, name, granted scopes, installation date, and the… | getinstallation, testconnection, uninstallapp, updatemodel |
-| `securityAuditLog` | 4 | 3 | 1 | Export your security audit logs as a CSV or JSON file, optionally filtered by time range and action types. | export, getactiontypes, getsummary, list |
-| `slack` | 4 | 1 | 3 | Check whether the Slack integration is installed for the current organization or workspace, and retrieve installation details like team ID, team name, installation status, scopes,… | getinstallation, testconnection, uninstallapp, updatemodel |
-| `linear` | 3 | 1 | 2 | Check whether the Linear integration is installed for the current or specified organization, returning installation status and details like workspace name, scopes, and configured… | getinstallation, uninstallapp, updatemodel |
-| `quickChat` | 3 | 1 | 2 | Add one or more chat messages to an organization's quick chat thread in a specific order. | appendmessages, getorcreatethread, listmessages |
-| `unifiedSessions` | 3 | 3 | 0 | List CLI sessions (across both session storage versions) with pagination, filtering by platform, organization, repository git URL, or sub-session inclusion, plus ordering and… | list, recentrepositories, search |
-| `mcpGatewayAuthorizations` | 2 | 1 | 1 | List the MCP gateway authorizations granted to the current user, optionally filtered by personal vs organization scope or a specific organization, returning active grants with… | listmine, revoke |
-| `openAiChatGpt` | 2 | 1 | 1 | Disconnect the user's linked ChatGPT account and remove the stored OpenAI ChatGPT connection, returning the updated connection status. | disconnect, status |
-| `spendAlerts` | 2 | 1 | 1 | View the current spend alert configuration and notification settings for your personal account or an organization you belong to, including whether you have permission to change… | get, save |
-| `appBuilderFeedback` | 1 | 0 | 1 | Submit user feedback about the App Builder experience for a project, including the feedback text and the preview session state at the time. | create |
-| `appReportedMessages` | 1 | 0 | 1 | Report a problematic app or extension message for review, such as an unparsed or unstyled message from a CLI session. | createreport |
-| `cloudAgentNextFeedback` | 1 | 0 | 1 | Submit user feedback about a Cloud Agent session, including the rating text, model, repository, and recent messages. | create |
-| `kiloChat` | 1 | 1 | 0 | Get an authentication token for the Kilo chat service for the current user. | gettoken |
-| `models` | 1 | 1 | 0 | List all available OpenRouter AI models with their ids, names, vision support, and which ones are marked as preferred. | list |
-| `platformIntegrations` | 1 | 1 | 0 | Check which platform integrations (e.g. GitHub, GitLab, Bitbucket) are already configured or missing so you know what setup steps remain for an organization. | listsetupstatus |
-| `userFeedback` | 1 | 0 | 1 | Submit user feedback or a bug report to the Kilo team along with context about the app area and source it came from. | create |
+| Prefix | Procedures | Queries | Mutations |
+|---|---:|---:|---:|
+| `organizations` | 305 | 132 | 173 |
+| `kiloclaw` | 96 | 35 | 61 |
+| `user` | 40 | 15 | 25 |
+| `cloudAgentNext` | 31 | 12 | 19 |
+| `agentProfiles` | 30 | 4 | 26 |
+| `securityAgent` | 26 | 15 | 11 |
+| `kiloPass` | 22 | 11 | 11 |
+| `githubApps` | 19 | 9 | 10 |
+| `githubPrReview` | 18 | 6 | 12 |
+| `cliSessionsV2` | 17 | 9 | 8 |
+| `appBuilder` | 16 | 6 | 10 |
+| `cliSessions` | 16 | 7 | 9 |
+| `mcpGateway` | 16 | 4 | 12 |
+| `providerReview` | 16 | 8 | 8 |
+| `deployments` | 14 | 6 | 8 |
+| `moderation` | 11 | 3 | 8 |
+| `codeReviews` | 9 | 6 | 3 |
+| `gitlab` | 9 | 3 | 6 |
+| `personalReviewAgent` | 9 | 5 | 4 |
+| `autoFix` | 8 | 4 | 4 |
+| `codingPlans` | 8 | 5 | 3 |
+| `personalAutoTriage` | 8 | 4 | 4 |
+| `reviewMemory` | 8 | 3 | 5 |
+| `webhookTriggers` | 8 | 4 | 4 |
+| `byok` | 7 | 2 | 5 |
+| `codeIndexing` | 7 | 5 | 2 |
+| `personalAutoFix` | 7 | 3 | 4 |
+| `userExports` | 7 | 3 | 4 |
+| `autoTriage` | 6 | 4 | 2 |
+| `dolthub` | 6 | 4 | 2 |
+| `modelPreferences` | 6 | 1 | 5 |
+| `usageAnalytics` | 6 | 6 | 0 |
+| `workspaceFolders` | 6 | 1 | 5 |
+| `activeSessions` | 4 | 3 | 1 |
+| `debug` | 4 | 4 | 0 |
+| `discord` | 4 | 1 | 3 |
+| `securityAuditLog` | 4 | 3 | 1 |
+| `slack` | 4 | 1 | 3 |
+| `linear` | 3 | 1 | 2 |
+| `quickChat` | 3 | 1 | 2 |
+| `unifiedSessions` | 3 | 3 | 0 |
+| `mcpGatewayAuthorizations` | 2 | 1 | 1 |
+| `openAiChatGpt` | 2 | 1 | 1 |
+| `spendAlerts` | 2 | 1 | 1 |
+| `appBuilderFeedback` | 1 | 0 | 1 |
+| `appReportedMessages` | 1 | 0 | 1 |
+| `cloudAgentNextFeedback` | 1 | 0 | 1 |
+| `kiloChat` | 1 | 1 | 0 |
+| `models` | 1 | 1 | 0 |
+| `platformIntegrations` | 1 | 1 | 0 |
+| `userFeedback` | 1 | 0 | 1 |
 
 ### Sub-areas
-#### `organizations.*` — 305 procedures (132 queries, 173 mutations)
 
-| Sub-area | Procedures | Queries | Mutations |
-|---|---:|---:|---:|
-| `organizations.kiloclaw` | 66 | 26 | 40 |
-| `organizations.cloudAgentNext` | 31 | 13 | 18 |
-| `organizations.securityAgent` | 26 | 15 | 11 |
-| `organizations` | 19 | 13 | 6 |
-| `organizations.appBuilder` | 17 | 7 | 10 |
-| `organizations.deployments` | 17 | 7 | 10 |
-| `organizations.groups` | 14 | 4 | 10 |
-| `organizations.reviewAgent` | 13 | 7 | 6 |
-| `organizations.subscription` | 12 | 5 | 7 |
-| `organizations.kiloPass` | 11 | 5 | 6 |
-| `organizations.settings` | 11 | 1 | 10 |
-| `organizations.autoTriage` | 8 | 4 | 4 |
-| `organizations.autoFix` | 7 | 3 | 4 |
-| `organizations.members` | 7 | 1 | 6 |
-| `organizations.bitbucket` | 6 | 1 | 5 |
-| `organizations.sso` | 6 | 1 | 5 |
-| `organizations.autoTopUp` | 5 | 1 | 4 |
-| `organizations.modes` | 5 | 2 | 3 |
-| `organizations.subOrganizations` | 5 | 5 | 0 |
-| `organizations.usageDetails` | 5 | 3 | 2 |
-| `organizations.securityAuditLog` | 4 | 3 | 1 |
-| `organizations.verifiedDomains` | 4 | 1 | 3 |
-| `organizations.auditLogs` | 3 | 3 | 0 |
-| `organizations.funds` | 2 | 1 | 1 |
-| `organizations.salesDemo` | 1 | 0 | 1 |
+The second path segment of each area that splits, with procedure counts:
 
-#### `codeReviews.*` — 9 procedures (6 queries, 3 mutations)
+- `organizations.*` — 305: `kiloclaw` 66, `cloudAgentNext` 31, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `bitbucket` 6, `sso` 6, `autoTopUp` 5, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `verifiedDomains` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
 
-| Sub-area | Procedures | Queries | Mutations |
-|---|---:|---:|---:|
-| `codeReviews` | 7 | 5 | 2 |
-| `codeReviews.analytics` | 2 | 1 | 1 |
+- `codeReviews.*` — 9: `(direct)` 7, `analytics` 2

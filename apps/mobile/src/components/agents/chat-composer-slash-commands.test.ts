@@ -84,7 +84,10 @@ describe('createMobileSlashCommandList', () => {
     expect(list).toBe(SAMPLE_COMMANDS);
   });
 
-  it('lists a cloud-agent skill row and invokes it like any other command', () => {
+  it('keeps a cloud-agent skill row in the mobile suggestion list and invokes it like any other command', () => {
+    // The mobile layer only has to pass a reported skill row through; the
+    // wrapper guarantee that skills survive `commands.available` is pinned by
+    // `services/cloud-agent-next/wrapper/src/kilo-api.test.ts`.
     const skill: SlashCommandInfo = {
       name: 'kilo-config',
       description: 'Guide for Kilo configuration',

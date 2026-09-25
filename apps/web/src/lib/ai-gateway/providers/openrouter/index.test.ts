@@ -311,6 +311,72 @@ describe('reasoning variants', () => {
   });
 });
 
+describe('virtual router tool support', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  function buildVirtualModel(overrides: Partial<OpenRouterModel>): OpenRouterModel {
+    return buildModel({
+      architecture: {
+        input_modalities: ['text'],
+        output_modalities: ['text'],
+        tokenizer: 'Router',
+      },
+      pricing: { prompt: '-1', completion: '-1' },
+      supported_parameters: [],
+      ...overrides,
+    });
+  }
+
+  async function supportedParametersById(models: OpenRouterModel[]) {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: models } }))
+    ) as unknown as typeof fetch;
+    const catalog = await getEnhancedOpenRouterModels();
+    return new Map(catalog.data.map(model => [model.id, model.supported_parameters]));
+  }
+
+  it('adds tools to virtual routers that omit it', async () => {
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'typesafe/jev-router', name: 'TypeSafe: Jev Router' }),
+      buildVirtualModel({
+        id: 'openrouter/pareto-code',
+        name: 'Pareto Code Router',
+        supported_parameters: undefined,
+      }),
+    ]);
+
+    expect(params.get('typesafe/jev-router')).toEqual(['tools']);
+    expect(params.get('openrouter/pareto-code')).toEqual(['tools']);
+  });
+
+  it('keeps upstream parameters of virtual routers that already list tools', async () => {
+    const upstream = ['max_tokens', 'tools', 'reasoning'];
+    const params = await supportedParametersById([
+      buildVirtualModel({
+        id: 'openrouter/auto',
+        name: 'Auto Router',
+        supported_parameters: upstream,
+      }),
+    ]);
+
+    expect(params.get('openrouter/auto')).toEqual(upstream);
+  });
+
+  it('does not add tools to virtual models that are not routers or to regular models', async () => {
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'openrouter/fusion', name: 'OpenRouter: Fusion' }),
+      buildVirtualModel({ id: 'openrouter/bodybuilder', name: 'Body Builder (beta)' }),
+      buildModel({ id: 'vendor/router-model', name: 'Router Model', supported_parameters: [] }),
+    ]);
+
+    expect(params.get('openrouter/fusion')).toEqual([]);
+    expect(params.get('openrouter/bodybuilder')).toEqual([]);
+    expect(params.get('vendor/router-model')).toEqual([]);
+  });
+});
+
 describe('mayTrainOnYourPrompts', () => {
   afterEach(() => {
     global.fetch = originalFetch;

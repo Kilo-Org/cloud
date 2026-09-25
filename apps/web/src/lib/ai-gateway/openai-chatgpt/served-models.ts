@@ -1,3 +1,4 @@
+import { createCachedFetch } from '@/lib/cached-fetch';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
@@ -30,29 +31,36 @@ const FAILURE_TTL_MS = 30 * 1000;
 /** A slow list must not hold up a request. */
 const REQUEST_TIMEOUT_MS = 2_000;
 
-let cachedModelIds: Set<string> | null = null;
-let cacheExpiresAt = 0;
-let failureExpiresAt = 0;
-let inFlight: Promise<Set<string> | null> | null = null;
+async function fetchServedModelIds(apiKey: string): Promise<ReadonlySet<string>> {
+  const response = await fetch(MODELS_URL, {
+    cache: 'force-cache',
+    headers: { authorization: `Bearer ${apiKey}` },
+    next: { revalidate: CACHE_TTL_SECONDS },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`OpenAI models lookup failed: ${response.status}`);
 
-async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
-  try {
-    const response = await fetch(MODELS_URL, {
-      cache: 'force-cache',
-      headers: { authorization: `Bearer ${apiKey}` },
-      next: { revalidate: CACHE_TTL_SECONDS },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
+  const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
+  const ids = (body.data ?? [])
+    .map(model => (typeof model?.id === 'string' ? model.id : null))
+    .filter((id): id is string => id !== null);
+  return new Set(ids);
+}
 
-    const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
-    const ids = (body.data ?? [])
-      .map(model => (typeof model?.id === 'string' ? model.id : null))
-      .filter((id): id is string => id !== null);
-    return new Set(ids);
-  } catch {
-    return null;
+const servedModelIdsByKey = new Map<string, () => Promise<ReadonlySet<string> | null>>();
+
+function getServedModelIds(apiKey: string): Promise<ReadonlySet<string> | null> {
+  let get = servedModelIdsByKey.get(apiKey);
+  if (!get) {
+    get = createCachedFetch<ReadonlySet<string> | null>(
+      () => fetchServedModelIds(apiKey),
+      CACHE_TTL_MS,
+      null,
+      { failureTtlMs: FAILURE_TTL_MS }
+    );
+    servedModelIdsByKey.set(apiKey, get);
   }
+  return get();
 }
 
 /**
@@ -66,37 +74,11 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;
 
-  if (!cachedModelIds || Date.now() >= cacheExpiresAt) {
-    // A recent failure already answered "unknown": fail open without another
-    // request until its short TTL passes.
-    if (Date.now() < failureExpiresAt) return true;
-
-    inFlight ??= fetchServedModelIds(apiKey)
-      .then(ids => {
-        if (ids) {
-          cachedModelIds = ids;
-          cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-          failureExpiresAt = 0;
-        } else {
-          failureExpiresAt = Date.now() + FAILURE_TTL_MS;
-        }
-        return ids;
-      })
-      .finally(() => {
-        inFlight = null;
-      });
-
-    const ids = await inFlight;
-    if (!ids) return true;
-  }
-
-  return cachedModelIds?.has(modelId) ?? true;
+  const ids = await getServedModelIds(apiKey);
+  return ids?.has(modelId) ?? true;
 }
 
-/** Drops the cached list. Tests call this between cases. */
+/** Drops the cached lists. Tests call this between cases. */
 export function resetServedModelIdsCache(): void {
-  cachedModelIds = null;
-  cacheExpiresAt = 0;
-  failureExpiresAt = 0;
-  inFlight = null;
+  servedModelIdsByKey.clear();
 }

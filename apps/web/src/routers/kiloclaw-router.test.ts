@@ -151,7 +151,10 @@ jest.mock('@/lib/kiloclaw/install-dispatch', () => {
   };
 });
 
-let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
+let createCaller: (ctx: {
+  user: Awaited<ReturnType<typeof insertTestUser>>;
+  requestSignal?: AbortSignal;
+}) => {
   getStatus: () => Promise<unknown>;
   latestVersion: (input?: { currentImageTag?: string }) => Promise<unknown>;
   fileTree: (input?: { path?: string }) => Promise<unknown>;
@@ -483,7 +486,7 @@ describe('kiloclawRouter getStatus', () => {
     kiloclawClientMock.__getStatusMock.mockRejectedValue(
       Object.assign(new Error('aborted'), { name: 'AbortError' })
     );
-    const caller = createCaller({ user });
+    const caller = createCaller({ user, requestSignal: AbortSignal.abort() });
 
     await expect(caller.getStatus()).rejects.toMatchObject({
       code: 'CLIENT_CLOSED_REQUEST',

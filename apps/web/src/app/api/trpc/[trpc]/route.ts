@@ -9,7 +9,7 @@ const handler = (req: Request) =>
     endpoint: '/api/trpc',
     req,
     router: rootRouter,
-    createContext: createTRPCContext,
+    createContext: ({ req }) => createTRPCContext(req.signal),
     allowMethodOverride: true,
     // A batched call answers 207 when one procedure fails, and folds the failure
     // into the response body. Without this the server log shows only the 207, so

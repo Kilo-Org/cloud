@@ -3080,15 +3080,17 @@ export const kiloclawRouter = createTRPCRouter({
 
     const client = new KiloClawInternalClient();
     const [status, inboundEmailAddress, scheduledAction] = await Promise.all([
-      client.getStatus(ctx.user.id, workerInstanceId(instance)).catch((error: unknown) => {
-        if (!isClientAbortError(error)) {
-          sentryLogger('kiloclaw-status', 'error')('Failed to fetch KiloClaw status', {
-            error,
-            instanceId: instance.id,
-          });
-        }
-        throw statusUnavailableError(error);
-      }),
+      client
+        .getStatus(ctx.user.id, workerInstanceId(instance), ctx.requestSignal)
+        .catch((error: unknown) => {
+          if (!isClientAbortError(error, ctx.requestSignal)) {
+            sentryLogger('kiloclaw-status', 'error')('Failed to fetch KiloClaw status', {
+              error,
+              instanceId: instance.id,
+            });
+          }
+          throw statusUnavailableError(error, ctx.requestSignal);
+        }),
       getInboundEmailAddressForInstance(instance.id),
       getUpcomingScheduledActionForInstance(instance.id),
     ]);

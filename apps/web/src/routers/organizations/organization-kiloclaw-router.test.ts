@@ -293,7 +293,7 @@ describe('organizations.kiloclaw.getStatus', () => {
       Object.assign(new Error('aborted'), { name: 'AbortError' })
     );
 
-    const caller = await createCallerForUser(user.id);
+    const caller = await createCallerForUser(user.id, { requestSignal: AbortSignal.abort() });
     await expect(
       caller.organizations.kiloclaw.getStatus({ organizationId: organization.id })
     ).rejects.toMatchObject({

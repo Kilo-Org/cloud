@@ -48,12 +48,13 @@ export type TRPCContext = {
   trpcType?: string;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
+  requestSignal?: AbortSignal;
 };
 
 /**
  * @see: https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (): Promise<TRPCContext> => {
+export const createTRPCContext = async (requestSignal?: AbortSignal): Promise<TRPCContext> => {
   const headersList = await headers();
   const { user, deviceSessionId, tokenSource } = await getUserFromAuth({ adminOnly: false });
   if (!user) {
@@ -74,6 +75,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
     tokenSource: tokenSource ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
+    requestSignal,
   };
 };
 

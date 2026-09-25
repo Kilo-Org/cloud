@@ -445,12 +445,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getStatus(userId: string, instanceId?: string): Promise<PlatformStatusResponse> {
+  async getStatus(
+    userId: string,
+    instanceId?: string,
+    signal?: AbortSignal
+  ): Promise<PlatformStatusResponse> {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);
-    return this.request(`/api/platform/status?${params.toString()}`, undefined, {
-      userId,
-    });
+    return this.request(`/api/platform/status?${params.toString()}`, { signal }, { userId });
   }
 
   async getMorningBriefingStatus(

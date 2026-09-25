@@ -6,7 +6,10 @@ import { generateApiToken } from '@/lib/tokens';
 const createCaller = createCallerFactory(rootRouter);
 
 /** Test-only caller bound to a real user row and an optional device session. */
-export async function createCallerForUser(userId: string, opts?: { deviceSessionId?: string }) {
+export async function createCallerForUser(
+  userId: string,
+  opts?: { deviceSessionId?: string; requestSignal?: AbortSignal }
+) {
   const user = await findUserById(userId);
   if (!user) {
     throw new Error(`Test user not found: ${userId}`);
@@ -14,6 +17,7 @@ export async function createCallerForUser(userId: string, opts?: { deviceSession
   return createCaller({
     user,
     deviceSessionId: opts?.deviceSessionId,
+    requestSignal: opts?.requestSignal,
     headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
   });
 }

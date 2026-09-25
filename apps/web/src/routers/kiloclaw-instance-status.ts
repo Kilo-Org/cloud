@@ -80,14 +80,12 @@ export function createFakeSeedInstanceStatus(
 }
 
 /**
- * True when a rejection came from the client going away (the request was
- * aborted) rather than from an upstream fault. The dev-stack log for the
- * original finding showed `uncaughtException: Error: aborted` alongside the
- * tRPC 500, so `message === 'aborted'` is included explicitly.
+ * An upstream abort does not prove that our caller disconnected. Only classify
+ * it as a client cancellation when the incoming HTTP request was also aborted.
  */
-export function isClientAbortError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const code = (error as { code?: unknown }).code;
+export function isClientAbortError(error: unknown, requestSignal?: AbortSignal): boolean {
+  if (!requestSignal?.aborted || !(error instanceof Error)) return false;
+  const code = 'code' in error ? error.code : undefined;
   return (
     error.name === 'AbortError' ||
     code === 'ABORT_ERR' ||
@@ -97,14 +95,11 @@ export function isClientAbortError(error: unknown): boolean {
 }
 
 /**
- * Map a KiloClaw worker status failure to a tRPC error that names the cause
- * instead of the opaque INTERNAL_SERVER_ERROR. A client disconnect becomes 499
- * (mirrors `apps/web/src/lib/ai-gateway/providers/upstream-request.ts`), which
- * is never a 5xx; every other worker failure becomes a 502 so the caller gets
- * a specific reason.
+ * A canceled incoming request becomes 499; an upstream failure (including an
+ * upstream abort while the caller is connected) becomes 502.
  */
-export function statusUnavailableError(error: unknown): TRPCError {
-  if (isClientAbortError(error)) {
+export function statusUnavailableError(error: unknown, requestSignal?: AbortSignal): TRPCError {
+  if (isClientAbortError(error, requestSignal)) {
     return new TRPCError({
       code: 'CLIENT_CLOSED_REQUEST',
       message: 'Client disconnected before the KiloClaw status could be read',

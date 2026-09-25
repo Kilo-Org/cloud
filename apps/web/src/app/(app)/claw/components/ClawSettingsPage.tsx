@@ -164,7 +164,7 @@ function ClawSettingsWithStatus({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const oauthFeedbackHandledRef = useRef(false);
-  const personalStatus = useKiloClawStatus();
+  const personalStatus = useKiloClawStatus({ enabled: !organizationId });
   const orgStatus = useOrgKiloClawStatus(organizationId);
   const { data: status, isLoading, error, refetch } = organizationId ? orgStatus : personalStatus;
 

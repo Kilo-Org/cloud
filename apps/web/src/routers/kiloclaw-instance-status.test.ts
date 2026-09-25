@@ -110,38 +110,55 @@ describe('createFakeSeedInstanceStatus', () => {
 });
 
 describe('isClientAbortError', () => {
+  const disconnected = AbortSignal.abort();
+
   it('matches an AbortError by name', () => {
-    expect(isClientAbortError(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe(true);
+    expect(
+      isClientAbortError(Object.assign(new Error('x'), { name: 'AbortError' }), disconnected)
+    ).toBe(true);
   });
 
   it('matches the raw "aborted" message from the dev-stack log', () => {
-    expect(isClientAbortError(new Error('aborted'))).toBe(true);
+    expect(isClientAbortError(new Error('aborted'), disconnected)).toBe(true);
   });
 
   it('matches the undici ABORT_ERR code', () => {
-    expect(isClientAbortError(Object.assign(new Error('x'), { code: 'ABORT_ERR' }))).toBe(true);
+    expect(
+      isClientAbortError(Object.assign(new Error('x'), { code: 'ABORT_ERR' }), disconnected)
+    ).toBe(true);
   });
 
   it('matches the undici UND_ERR_ABORTED code', () => {
-    expect(isClientAbortError(Object.assign(new Error('x'), { code: 'UND_ERR_ABORTED' }))).toBe(
-      true
-    );
+    expect(
+      isClientAbortError(Object.assign(new Error('x'), { code: 'UND_ERR_ABORTED' }), disconnected)
+    ).toBe(true);
   });
 
-  it('rejects a non-abort error', () => {
-    expect(isClientAbortError(new Error('upstream 500'))).toBe(false);
-    expect(isClientAbortError('aborted')).toBe(false);
-    expect(isClientAbortError(null)).toBe(false);
+  it('does not mistake an upstream abort for a disconnected client', () => {
+    const upstreamAbort = Object.assign(new Error('aborted'), { name: 'AbortError' });
+    expect(isClientAbortError(upstreamAbort)).toBe(false);
+    expect(isClientAbortError(upstreamAbort, new AbortController().signal)).toBe(false);
+    expect(isClientAbortError(new Error('upstream 500'), disconnected)).toBe(false);
+    expect(isClientAbortError('aborted', disconnected)).toBe(false);
+    expect(isClientAbortError(null, disconnected)).toBe(false);
   });
 });
 
 describe('statusUnavailableError', () => {
   it('maps a client abort to CLIENT_CLOSED_REQUEST and keeps the cause', () => {
     const cause = Object.assign(new Error('aborted'), { name: 'AbortError' });
-    const error = statusUnavailableError(cause);
+    const error = statusUnavailableError(cause, AbortSignal.abort());
 
     expect(error.code).toBe('CLIENT_CLOSED_REQUEST');
     expect(error.message).toBe('Client disconnected before the KiloClaw status could be read');
+    expect(error.cause).toBe(cause);
+  });
+
+  it('reports an upstream abort as BAD_GATEWAY while the caller is connected', () => {
+    const cause = Object.assign(new Error('aborted'), { name: 'AbortError' });
+    const error = statusUnavailableError(cause, new AbortController().signal);
+
+    expect(error.code).toBe('BAD_GATEWAY');
     expect(error.cause).toBe(cause);
   });
 

@@ -579,6 +579,10 @@ describe('Home live presentation', () => {
     });
     const unsubscribe = observer.subscribe(() => undefined);
     try {
+      // An accepted-empty surface paints no loading card, so the native pull
+      // indicator is its only in-flight indicator and round-trips `refreshing`
+      // there (the `pending` surface withholds it; see the case below).
+      state.live.hasAcceptedSuccess = true;
       const pending = Promise.withResolvers<boolean>();
       state.refetch.mockReturnValue(pending.promise);
       await renderHome();
@@ -629,6 +633,47 @@ describe('Home live presentation', () => {
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(text()).toContain('Nothing running right now');
     expect(state.announcements).toEqual(['Loading…']);
+  });
+
+  it('withholds the platform pull indicator while the live section shows its own loading card', async () => {
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    state.live.hasAcceptedSuccess = false;
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // The section's own loading card is the surface's single in-flight
+    // indicator while the live content is pending, so the platform pull
+    // control must not also hold the scroll inset open for a second one.
+    expect(refresh().props.refreshing).toBe(false);
+    expect(nodes('Skeleton')[0]?.props.className).toContain('min-h-[72px]');
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+
+    // Control: an accepted empty card paints no loading card, so the native
+    // pull indicator is the surface's only in-flight indicator there.
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    const control = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(control.promise);
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      control.resolve(true);
+      await control.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
   });
 });
 

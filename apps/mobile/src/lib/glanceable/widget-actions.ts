@@ -88,6 +88,17 @@ export type WidgetActionResult = { kind: WidgetActionResultKind };
  * One approve attempt: the outcome the widget reports, plus the tray session it
  * answered. The id is what `runWidgetAction` retires the raise's app-owned
  * notification with; every other outcome answers nothing, so it is null.
+ *
+ * A successful approve also records the answer before it returns
+ * (`ackSessionAttention`), the way every other answer path does after a
+ * successful response — the in-app permission card (`use-interaction-handlers`),
+ * the notification's Approve and Reply (`notification-action-interaction`), and
+ * the wrist control (`approve-front-agent`). The republish `runWidgetAction`
+ * runs next derives its counts from the tray through `resolveAnsweredRaises`,
+ * and the tray row's status trails the control plane's sync: without the ack
+ * that row still counts as waiting, so the redraw `register.ts` performs right
+ * after the action shows the pre-action counts — the answered session still
+ * presented as waiting — until the sync lands or the user refreshes.
  */
 type ApproveOutcome = {
   kind: WidgetActionResultKind;
@@ -185,19 +196,27 @@ export function oldestPendingPermissionId(permissions: readonly unknown[]): stri
   return null;
 }
 
-async function readStoredScope(): Promise<WidgetScope> {
+/**
+ * One read whose failure must stay observable: reported at warning level and
+ * rethrown, so the widget action settles on `failed` rather than acting on a
+ * value it could not read — the same report-and-rethrow shape
+ * `writeStoredValue` has for the write side.
+ */
+async function readStoredValueReported(key: string): Promise<string | null> {
   try {
-    const [organizationId, userId] = await Promise.all([
-      readStoredValue(ORGANIZATION_STORAGE_KEY),
-      readStoredValue(ACTIVE_USER_ID_KEY),
-    ]);
-    return { organizationId: organizationId ?? null, userId: userId ?? null };
+    return await readStoredValue(key);
   } catch (error) {
-    // Reported at warning level and rethrown: the widget action must settle on
-    // `failed` rather than act on a scope it could not read.
     reportSecureStoreFailure('read', error);
     throw error;
   }
+}
+
+async function readStoredScope(): Promise<WidgetScope> {
+  const [organizationId, userId] = await Promise.all([
+    readStoredValueReported(ORGANIZATION_STORAGE_KEY),
+    readStoredValueReported(ACTIVE_USER_ID_KEY),
+  ]);
+  return { organizationId: organizationId ?? null, userId: userId ?? null };
 }
 
 /**
@@ -254,29 +273,12 @@ async function approveWaitingSession(organizationId: string | null): Promise<App
       ...answer,
       organizationId,
     });
-    return { kind: approved(waiting.id), answeredSessionId: waiting.id };
+    ackSessionAttention(waiting.id);
+    return { kind: 'approved', answeredSessionId: waiting.id };
   }
   await trpcClient.cloudAgentNext.answerPermission.mutate(answer);
-  return { kind: approved(waiting.id), answeredSessionId: waiting.id };
-}
-
-/**
- * Record the answer and report it. Every other answer path performs the same
- * ack after a successful response — the in-app permission card
- * (`use-interaction-handlers`), the notification's Approve and Reply
- * (`notification-action-interaction`), and the wrist control
- * (`approve-front-agent`) — so the widget's in-place Approve must too.
- *
- * The republish `runWidgetAction` runs next derives its counts from the tray
- * through `resolveAnsweredRaises`, and the tray row's status trails the
- * control plane's sync. Without the ack that row still counts as waiting, so
- * the redraw `register.ts` performs right after the action shows the
- * pre-action counts — the answered session still presented as waiting — until
- * the sync lands or the user refreshes.
- */
-function approved(kiloSessionId: string): WidgetActionResultKind {
-  ackSessionAttention(kiloSessionId);
-  return 'approved';
+  ackSessionAttention(waiting.id);
+  return { kind: 'approved', answeredSessionId: waiting.id };
 }
 
 type RecentRepositoryField =
@@ -344,18 +346,9 @@ async function resolveRecentRepository(
 async function readPersistedModel(
   organizationId: string | null
 ): Promise<{ model: string; variant: string } | null> {
-  const raw = await readPersistedModelRaw();
+  const raw = await readStoredValueReported(AGENT_MODEL_PREFERENCE_KEY);
   const entry = parseStoredModelPreference(raw)[contextKey(organizationId ?? undefined)];
   return entry ?? null;
-}
-
-async function readPersistedModelRaw(): Promise<string | null> {
-  try {
-    return await readStoredValue(AGENT_MODEL_PREFERENCE_KEY);
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
-    throw error;
-  }
 }
 
 /**

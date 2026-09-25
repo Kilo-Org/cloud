@@ -47,7 +47,7 @@ export function projectAllocationInspection(
     }
     return {
       logicalSandboxId,
-      physicalProviderRef: state.summary.providerRef,
+      physicalProviderRef: null,
       physicalState: 'stopped',
     };
   }

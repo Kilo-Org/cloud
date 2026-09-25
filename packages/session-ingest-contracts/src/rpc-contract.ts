@@ -155,6 +155,11 @@ export const createSessionForCloudAgentSchema = z.object({
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
+  // The profile the session was prepared with, as resolved by the caller
+  // (explicit pick, effective default, or repository binding). Optional and
+  // nullable so a caller that predates profile recording still creates the
+  // session; that row then carries no profile.
+  profileId: z.string().min(1).nullable().optional(),
   // Compatibility: old callers omit this field and create empty destination
   // storage. Remove that path only when all deployed callers require cloning.
   cloneFromKiloSessionId: sessionIdSchema.optional(),

@@ -138,9 +138,8 @@ export function VoiceTranscriptionControl() {
     const value: 'granted' | 'declined' = next ? 'granted' : 'declined';
     const previous = consent;
     setConsent(value);
-    try {
-      await writeVoiceNetworkConsent(userId, value);
-    } catch {
+    const stored = await writeVoiceNetworkConsent(userId, value);
+    if (!stored) {
       // Roll back the optimistic flip so the switch reflects the stored value.
       setConsent(previous);
       toast.error(t('consent.couldNotSaveChoice'));

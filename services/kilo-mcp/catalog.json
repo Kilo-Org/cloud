@@ -4262,6 +4262,7 @@
                 "minimax",
                 "mistral",
                 "moonshotai",
+                "nebius",
                 "novita",
                 "perplexity",
                 "vertex",
@@ -16089,15 +16090,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "scope": {
+          "type": "string",
+          "const": "shared_services"
         }
       }
     },
     "tags": [
       "openaichatgpt",
       "disconnect",
-      "organizationid"
+      "organizationid",
+      "scope"
     ],
-    "searchBlob": "openAiChatGpt.disconnect Disconnect the user's linked ChatGPT account and remove the stored OpenAI ChatGPT connection, returning the updated connection status. openaichatgpt disconnect organizationid organizationId"
+    "searchBlob": "openAiChatGpt.disconnect Disconnect the user's linked ChatGPT account and remove the stored OpenAI ChatGPT connection, returning the updated connection status. openaichatgpt disconnect organizationid scope organizationId scope"
   },
   "openAiChatGpt.status": {
     "path": "openAiChatGpt.status",
@@ -16111,15 +16117,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "scope": {
+          "type": "string",
+          "const": "shared_services"
         }
       }
     },
     "tags": [
       "openaichatgpt",
       "status",
-      "organizationid"
+      "organizationid",
+      "scope"
     ],
-    "searchBlob": "openAiChatGpt.status Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time. openaichatgpt status organizationid organizationId"
+    "searchBlob": "openAiChatGpt.status Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time. openaichatgpt status organizationid scope organizationId scope"
   },
   "organizations.appBuilder.canMigrateToGitHub": {
     "path": "organizations.appBuilder.canMigrateToGitHub",
@@ -36794,6 +36805,10 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "chatGptScope": {
+          "type": "string",
+          "const": "shared_services"
         }
       },
       "required": [
@@ -36804,9 +36819,10 @@
       "user",
       "linkauthprovider",
       "provider",
-      "organizationid"
+      "organizationid",
+      "chatgptscope"
     ],
-    "searchBlob": "user.linkAuthProvider Connect a social login provider, such as GitHub, Google, or Discord, to the current account so the user can sign in with it. user linkauthprovider provider organizationid provider organizationId"
+    "searchBlob": "user.linkAuthProvider Connect a social login provider, such as GitHub, Google, or Discord, to the current account so the user can sign in with it. user linkauthprovider provider organizationid chatgptscope provider organizationId chatGptScope"
   },
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",

@@ -82,7 +82,7 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const routingPercentage = (await isFreeModel(requestedModel))
+  const routingPercentage = isFreeModel(requestedModel)
     ? routingConfig.vercelFree
     : routingConfig.vercelPaid;
 

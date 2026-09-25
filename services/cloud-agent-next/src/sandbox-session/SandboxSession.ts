@@ -186,6 +186,10 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
+  restoreIncompleteLogFields,
+  type WrapperRestoreTelemetry,
+} from '../shared/wrapper-bootstrap.js';
+import {
   SandboxStatusSnapshotSchema,
   getSandboxProviderLabel,
   type SandboxStatusSnapshot,
@@ -197,6 +201,7 @@ import {
   deliveryErrorLogFields,
   isRecoverableRuntimeInvalidation,
   isRetryableDeliveryError,
+  isUnconfirmedReachabilityFailure,
   observeControlAfterStopping,
   safeErrorFromQueueReason,
   SESSION_DELIVERY_TIMEOUT_MS,
@@ -354,6 +359,35 @@ class StopCommitRejectedError extends Error {
 }
 
 const MAX_TERMINAL_DETAIL_LENGTH = 4_096;
+
+/**
+ * Name a partial snapshot restore on a runtime replacement. The attach result
+ * carries the wrapper's restore telemetry; without this the skipped diffs would
+ * only exist in the wrapper log the worker never reads.
+ */
+function logRestoreIncomplete(input: {
+  sessionId: string | undefined;
+  kiloSessionId?: string;
+  messageId: string;
+  wrapperInstanceId?: string;
+  restore: WrapperRestoreTelemetry | undefined;
+}): void {
+  const restoreFields = restoreIncompleteLogFields(input.restore);
+  if (!restoreFields) return;
+  logger
+    .withFields({
+      sessionId: input.sessionId,
+      kiloSessionId: input.kiloSessionId,
+      messageId: input.messageId,
+    })
+    .warn('Cloud agent restore incomplete', {
+      metric: 'cloud_agent_restore_incomplete',
+      count: 1,
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.wrapperInstanceId ? { wrapperInstanceId: input.wrapperInstanceId } : {}),
+      ...restoreFields,
+    });
+}
 
 function confirmedControlRejectionDetail(error: unknown): string | undefined {
   if (!(error instanceof ControlRequestError) || !error.rejectionReceived) return undefined;
@@ -3408,7 +3442,8 @@ export class SandboxSession extends DurableObject<Env> {
                 // A pending-input event (question/permission) during the awaited
                 // sync changes the interaction scope, so the sync returns
                 // undefined. The accepted turn is usually still current, so the
-                // watchdog must survive and may recover it.
+                // watchdog must survive; `failOverdueAcceptedMessage` still
+                // refuses recovery while the session has unresolved input.
                 await this.rescheduleAcceptedWatchdog(accepted, epoch, diagnostic);
                 const watched = this.loadMessages().find(
                   item => item.messageId === accepted.messageId
@@ -3511,6 +3546,9 @@ export class SandboxSession extends DurableObject<Env> {
    * (message-only: no quarantine and no native-runtime retirement) and records
    * the attempt count. The follow-up abort is best-effort and fenced with the
    * captured wrapper instance.
+   *
+   * A session-scoped unresolved question or permission is not no output: the
+   * turn is left parked and spends no recovery attempt.
    */
   private async failOverdueAcceptedMessage(
     accepted: MessageRecord,
@@ -3554,6 +3592,19 @@ export class SandboxSession extends DurableObject<Env> {
         result: settlement.state,
       });
       return true;
+    }
+    // Unresolved session input is not no output. The stored snapshot carries no
+    // messageId, so a parked question or permission means this session is
+    // waiting on the user (or a sibling accepted turn is), and recovering this
+    // turn would re-run it under a still-open question. The snapshot path has
+    // already refreshed this KV before the call; the proof-backed `running`
+    // path has not, and accepts that a stale snapshot can suppress recovery.
+    const pendingInput = this.readPendingInteractions();
+    if (
+      pendingInput &&
+      (pendingInput.questions.length > 0 || pendingInput.permissions.length > 0)
+    ) {
+      return false;
     }
     const recoveryAttempts = currentState.recoveryAttempts ?? 0;
     if (noOutputRecoveryAllowed(recoveryAttempts)) {
@@ -4256,6 +4307,13 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (operation === 'session.attach') {
         const attached = sessionAttachResultSchema.parse(dispatched.result);
+        logRestoreIncomplete({
+          sessionId: this.sessionId,
+          kiloSessionId,
+          messageId,
+          wrapperInstanceId,
+          restore: attached.restore,
+        });
         logControlDiagnostic('session_attach_completion', {
           sessionId: this.sessionId,
           messageId,
@@ -4625,7 +4683,7 @@ export class SandboxSession extends DurableObject<Env> {
             return;
           }
         } else {
-          await dispatch('attach', () =>
+          const attached = await dispatch('attach', () =>
             wait(
               async () =>
                 sessionAttachResultSchema.parse(
@@ -4649,6 +4707,13 @@ export class SandboxSession extends DurableObject<Env> {
               SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
             )
           );
+          logRestoreIncomplete({
+            sessionId,
+            kiloSessionId,
+            messageId,
+            wrapperInstanceId,
+            restore: attached.restore,
+          });
         }
         phase = 'preparing';
         if (!isCurrent()) {
@@ -4935,7 +5000,9 @@ export class SandboxSession extends DurableObject<Env> {
       ? releaseCompletedRetryableAttach(marked ?? current, messageId, retryNotBefore)
       : (marked ?? current);
     const updated =
-      busy || (phase !== 'prompt' && !countAttachRejection)
+      busy ||
+      isUnconfirmedReachabilityFailure(error) ||
+      (phase !== 'prompt' && !countAttachRejection)
         ? undefined
         : incrementDeliveryFailure(nextMessages, messageId, phase);
     const messages = (updated?.messages ?? nextMessages).map(

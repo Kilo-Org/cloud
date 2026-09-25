@@ -36,6 +36,7 @@ const {
 }: typeof import('@pierre/diffs') = require('@pierre/diffs');
 const {
   default: WorktreeFileRenderer,
+  parseWorktreeDiffStyle,
   prepareWorktreeFileHighlighter,
 }: typeof import('./WorktreeFileRenderer') = require('./WorktreeFileRenderer');
 const {
@@ -1277,6 +1278,91 @@ describe('saved file view modes', () => {
     assert.match(html, /<h1>Deleted original<\/h1>/);
     assert.match(button(html, 'Show all lines'), /aria-disabled="true"/);
     assert.match(button(html, 'Preview Markdown'), /aria-pressed="true"/);
+  });
+});
+
+describe('saved file diff style', () => {
+  function button(html: string, label: string) {
+    const control = html
+      .match(/<button\b[^>]*>/g)
+      ?.find(tag => tag.includes(`aria-label="${label}"`));
+    assert.ok(control, `Missing ${label} control`);
+    return control;
+  }
+
+  it('parses only the stored JSON unified/split preference', () => {
+    assert.equal(parseWorktreeDiffStyle(JSON.stringify('split')), 'split');
+    assert.equal(parseWorktreeDiffStyle(JSON.stringify('unified')), 'unified');
+    assert.equal(parseWorktreeDiffStyle('split'), 'unified');
+    assert.equal(parseWorktreeDiffStyle('{'), 'unified');
+    assert.equal(parseWorktreeDiffStyle('null'), 'unified');
+    assert.equal(parseWorktreeDiffStyle('1'), 'unified');
+    assert.equal(parseWorktreeDiffStyle('"wide"'), 'unified');
+    assert.equal(parseWorktreeDiffStyle('"Split"'), 'unified');
+  });
+
+  it('adds an always-enabled side-by-side control to every header', t => {
+    const { record: metadataOnly } = gitFixture(t, {
+      before: 'unchanged\n',
+      current: 'unchanged\n',
+      modeChange: true,
+    });
+    const { record: expandable } = gitFixture(t, {
+      before: 'unchanged\n'.repeat(40) + 'old\n',
+      current: 'unchanged\n'.repeat(40) + 'new\n',
+    });
+    const omitted: WorktreeFileRecord = {
+      ...file,
+      path: 'README.md',
+      diff: { status: 'omitted', reason: 'binary' },
+      content: { status: 'unavailable', reason: 'binary' },
+    };
+    const cases: Array<[string, string]> = [
+      ['diff', renderFile(file, 'diff')],
+      ['expanded', renderFile(expandable, 'expanded')],
+      ['preview', renderFile({ ...file, path: 'README.md' }, 'preview')],
+      ['omitted', renderFile(omitted, 'diff')],
+      ['metadata-only', renderFile(metadataOnly, 'diff')],
+    ];
+    for (const [name, html] of cases) {
+      const toggle = button(html, 'Show side-by-side diff');
+      assert.match(toggle, /aria-pressed="false"/, name);
+      assert.doesNotMatch(toggle, /\sdisabled=""/, name);
+    }
+    assert.match(button(cases[0][1], 'Show all lines'), /aria-pressed="false"/);
+    assert.match(button(cases[1][1], 'Hide unchanged lines'), /aria-pressed="true"/);
+    assert.match(button(cases[2][1], 'Preview Markdown'), /aria-pressed="true"/);
+  });
+
+  it('renders split columns with deletions before additions', async t => {
+    await preloadHighlighter({ langs: ['text'], themes: ['pierre-dark'] });
+    const renderer = new DiffHunksRenderer({
+      theme: 'pierre-dark',
+      diffStyle: 'split',
+      diffIndicators: 'classic',
+      disableFileHeader: true,
+      lineDiffType: 'none',
+      overflow: 'wrap',
+    });
+    t.after(() => renderer.cleanUp());
+    const parsed = parseSavedWorktreePatch(patch, file.path);
+    assert.ok(parsed);
+    const result = renderer.renderDiff(parsed);
+    assert.ok(result);
+    const html = renderer.renderFullHTML(result);
+    const deletions = html.indexOf('data-deletions');
+    const additions = html.indexOf('data-additions');
+    assert.ok(deletions >= 0, 'deletions column missing');
+    assert.ok(additions > deletions, 'additions column must follow deletions');
+    const deletionsSection = html.slice(deletions, additions);
+    const additionsSection = html.slice(additions);
+    const text = (section: string) => section.replaceAll(/<[^>]*>/g, '');
+    assert.match(text(deletionsSection), /old value/);
+    assert.doesNotMatch(text(deletionsSection), /new value/);
+    assert.match(text(additionsSection), /new value/);
+    assert.doesNotMatch(text(additionsSection), /old value/);
+    assert.match(deletionsSection, /data-line-type="change-deletion"/);
+    assert.match(additionsSection, /data-line-type="change-addition"/);
   });
 });
 

@@ -334,6 +334,21 @@ export function ScreenHeader({
       )}
     </Pressable>
   ) : null;
+  // The trailing cluster sizes to its content and never shrinks (`shrink-0`).
+  // The previous `max-w-[50%] shrink` cap clamped the cluster's box on narrow
+  // screens (a 360 dp viewport gives the session header's PR badge + metrics
+  // pill cluster just 180 dp) while its fixed-width children kept painting at
+  // their full width — the last control's glyphs ran past the right screen
+  // edge and were cut off (device capture, session-compose-kbup). Content
+  // sizing moves the squeeze to the title: `heading` is `min-w-0 flex-1`, so
+  // a long title truncates in place and the controls stay whole inside the
+  // screen's own padding.
+  //
+  // A window too narrow to hold both drops the actions to their own row
+  // (`stackActions`), so the title is never squeezed to zero, and a
+  // variable-width `headerRight` still caps itself: PR review's Submit review
+  // (pr-review-screen.tsx) and the Security Agent settings Save button
+  // (settings-save-button.tsx) each carry a 140 dp max-w.
   const centeredControls =
     separateHeading && backControl && !inlineActions && (!headerRight || stackActions) ? (
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
@@ -348,7 +363,7 @@ export function ScreenHeader({
               {backControl}
               <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
               {headerRight && !stackActions ? (
-                <View className="ms-3 max-w-[50%] min-w-0 shrink">{headerRight}</View>
+                <View className="ms-3 shrink-0">{headerRight}</View>
               ) : (
                 centeredControls
               )}
@@ -370,7 +385,7 @@ export function ScreenHeader({
                 {heading}
               </View>
               {headerRight && !stackActions ? (
-                <View className="ms-3 min-w-0 max-w-[50%] shrink">{headerRight}</View>
+                <View className="ms-3 shrink-0">{headerRight}</View>
               ) : null}
               {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
             </View>

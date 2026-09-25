@@ -278,31 +278,33 @@ describe('ScreenHeader mounted', () => {
     expect(await compiledMarginProperties(headerRight.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
-    expect(headerRight.props.className).toContain('max-w-[50%]');
-    expect(headerRight.props.className).toContain('shrink');
-    expect(headerRight.props.className).not.toContain('shrink-0');
+    // The cluster is content-sized and never shrinks, so a fixed-width
+    // trailing control keeps its full width instead of being clamped and
+    // painting past the screen edge (session-compose-kbup capture).
+    expect(headerRight.props.className).toContain('shrink-0');
+    expect(headerRight.props.className).not.toContain('max-w-[50%]');
   });
 
-  it('renders inlineActions in the title row uncapped while headerRight keeps its cap', () => {
+  it('renders inlineActions in the title row uncapped beside the content-sized cluster', () => {
     const renderer = renderHeader({
       title: 'Agents',
       headerRight: 'RIGHT',
       inlineActions: 'ACTIONS',
     });
 
-    const capped = findHeaderRight(renderer.root);
+    const cluster = findHeaderRight(renderer.root);
     const inline = findInlineActionsWrapper(renderer.root);
 
     // Both trailing slots sit in the title row beside the heading, so the
     // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
-    expect(inline.parent).toBe(capped.parent);
+    expect(inline.parent).toBe(cluster.parent);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
     const heading = inline.parent?.children[0] as TestInstance;
     expect(heading.props.className).toContain('min-w-0 flex-1');
-    // `headerRight` keeps its half-row cap; `inlineActions` keeps its full width
-    // instead of wrapping the controls.
-    expect(capped.props.className).toContain('max-w-[50%]');
+    // Neither trailing slot clamps itself: `headerRight` sizes to its content
+    // and `inlineActions` keeps its full width instead of wrapping the controls.
+    expect(cluster.props.className).not.toContain('max-w-[50%]');
     expect(inline.props.className).not.toContain('max-w-[50%]');
     expect(inline.props.className).toContain('min-w-0');
     expect(inline.props.className).toContain('shrink');
@@ -802,15 +804,12 @@ describe('header actions row', () => {
     const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
-    const actions = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        String(node.props.className ?? '').includes('max-w-[50%]')
-    );
-    // The inline wrapper's gap is the logical start margin (`ms-3`), which the
-    // RTL swap cannot mirror away; the title's box keeps its `shrink` cap.
-    expect(actions.props.className).toContain('ms-3');
+    const cluster = findHeaderRight(renderer.root);
+    // The cluster's gap is the logical start margin (`ms-3`), which the RTL
+    // swap cannot mirror away; it sizes to its content and never shrinks, so
+    // the heading's `flex-1 min-w-0` box is what absorbs the squeeze.
+    expect(cluster.props.className).toContain('ms-3');
+    expect(cluster.props.className).toContain('shrink-0');
   });
 
   it('drops the actions to their own row when the window cannot hold the title beside them', () => {

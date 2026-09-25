@@ -54,6 +54,17 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
   return out;
 }
 
+function readCatalogKey(catalog: unknown, path: readonly string[]): unknown {
+  let value = catalog;
+  for (const key of path) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return undefined;
+    }
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value;
+}
+
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
 describe('catalog keys', () => {
@@ -72,16 +83,9 @@ describe('catalog keys', () => {
   it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
     '%s translates the preview empty-state description',
     tag => {
-      const catalog = CATALOG_LOADERS[tag]();
-      const english = CATALOG_LOADERS.en();
-      const description =
-        typeof catalog === 'string'
-          ? undefined
-          : catalog.agentChat?.session?.emptyTranscriptDescription;
-      const englishDescription =
-        typeof english === 'string'
-          ? undefined
-          : english.agentChat?.session?.emptyTranscriptDescription;
+      const path = ['agentChat', 'session', 'emptyTranscriptDescription'];
+      const description = readCatalogKey(CATALOG_LOADERS[tag](), path);
+      const englishDescription = readCatalogKey(CATALOG_LOADERS.en(), path);
       expect(description, `${tag} lacks ${PREVIEW_EMPTY_DESCRIPTION_KEY}`).toBeTypeOf('string');
       expect(description, `${tag} leaves ${PREVIEW_EMPTY_DESCRIPTION_KEY} in English`).not.toBe(
         englishDescription

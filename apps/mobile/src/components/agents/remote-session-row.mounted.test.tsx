@@ -396,6 +396,25 @@ describe('RemoteSessionRow long-press preview', () => {
     });
   });
 
+  it('does not prefetch for a remote row without preview actions', async () => {
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(RemoteSessionRow, { session, onPress: vi.fn(), interactive: false })
+        )
+      );
+      await flush();
+    });
+    const props = pressableProps();
+    expect(props.onLongPress).toBeUndefined();
+    act(() => {
+      props.onPressIn?.();
+    });
+    expect(prefetchSessionTranscript).not.toHaveBeenCalled();
+  });
+
   it('opens the preview from the rotor manage action', async () => {
     await render();
     const props = pressableProps();

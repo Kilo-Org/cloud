@@ -228,11 +228,15 @@ export function RemoteSessionRow({
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() =>
-        void prefetchSessionTranscript(
-          queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
-        )
+      onPressIn={
+        canManage
+          ? () => {
+              void prefetchSessionTranscript(
+                queryClient,
+                trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
+              );
+            }
+          : undefined
       }
       onLongPress={canManage ? handleLongPress : undefined}
       accessibilityRole="button"

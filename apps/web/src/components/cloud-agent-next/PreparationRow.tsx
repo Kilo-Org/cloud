@@ -34,7 +34,7 @@ export function PreparationRow({ attempt, onOpenDetails }: PreparationRowProps) 
         className="text-muted-foreground group-hover:text-foreground flex w-full min-w-0 items-center gap-2 py-2 transition-colors"
         aria-live="polite"
       >
-        <AttemptIcon status={attempt.status} />
+        <AttemptIcon status={attempt.status} summary={summary} />
         <RowLabel summary={summary} />
         {summary.kind !== 'failed' && (
           <span className="shrink-0 underline underline-offset-2 opacity-0 transition-opacity group-focus-visible:opacity-100 group-hover:opacity-100">
@@ -75,6 +75,9 @@ function RowLabel({ summary }: { summary: PreparationRowSummary }) {
       </>
     );
   }
+  if (summary.kind === 'incomplete') {
+    return <span className="text-status-destructive min-w-0 truncate">{summary.text}</span>;
+  }
   return (
     <>
       <span className="text-destructive shrink-0">Preparation failed</span>
@@ -104,7 +107,16 @@ function OutputTicker({ lines }: { lines: string[] }) {
   );
 }
 
-function AttemptIcon({ status }: { status: PreparationAttempt['status'] }) {
+function AttemptIcon({
+  status,
+  summary,
+}: {
+  status: PreparationAttempt['status'];
+  summary: PreparationRowSummary;
+}) {
+  if (summary.kind === 'incomplete') {
+    return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
+  }
   if (status === 'running') return <StatusSpinner className="h-3 w-3 shrink-0" />;
   if (status === 'completed') return <Check className="h-3 w-3 shrink-0" />;
   return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;

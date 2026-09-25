@@ -201,7 +201,7 @@ export async function applyGatewayModelsFallback(
   requestToMutate: GatewayRequest
 ) {
   if (
-    !(await isFreeModel(requestedModel)) &&
+    !isFreeModel(requestedModel) &&
     (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {

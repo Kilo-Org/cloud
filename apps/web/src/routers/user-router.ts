@@ -174,6 +174,8 @@ const AutocompleteMetricsOutputSchema = z.object({
 const LinkAuthProviderInputSchema = z.object({
   provider: AuthProviderIdSchema,
   organizationId: z.uuid().optional(),
+  /** Set when the person connects the organization's shared-services account. */
+  chatGptScope: z.literal('shared_services').optional(),
 });
 
 const UnlinkAuthProviderInputSchema = z.object({
@@ -633,12 +635,30 @@ export const userRouter = createTRPCRouter({
             message: 'Organization connections are only supported for OpenAI.',
           });
         }
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        const role = await ensureOrganizationAccess(ctx, input.organizationId);
+        // The shared-services connection is an organization setting, so
+        // membership alone is not enough to connect it.
+        if (input.chatGptScope === 'shared_services' && role !== 'owner' && role !== 'admin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only an organization owner or admin can connect shared services.',
+          });
+        }
+      } else if (input.chatGptScope === 'shared_services') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A shared-services connection needs an organization.',
+        });
       }
 
       try {
         // Create a secure linking session
-        await createAccountLinkingSession(ctx.user.id, input.provider, input.organizationId);
+        await createAccountLinkingSession(
+          ctx.user.id,
+          input.provider,
+          input.organizationId,
+          input.chatGptScope
+        );
 
         return successResult();
       } catch (error) {

@@ -11,6 +11,7 @@ import {
   ACQUISITION_CLEANUP_REOPENS_KEY,
   ACQUISITION_RECEIPTS_KEY,
   MAX_ACQUISITION_CLEANUP_REOPENS,
+  cleanupAllocationId,
   createAllocationController,
 } from './allocation-controller.js';
 import type { AllocationTransition } from './allocation-transition.js';
@@ -123,6 +124,21 @@ function stoppingCheckRequiredRecord(): AllocationRecord {
       kind: 'stopping',
       target: TARGET,
       createIntent: CREATE_INTENT,
+      stopIntent: { reason: 'environment_failed', createdAt: NOW - 2_000 },
+      attempts: POLICY.stopMaxAttempts,
+      step: 'check_required',
+    },
+  };
+}
+
+function checkRequiredNoIntentRecord(): AllocationRecord {
+  return {
+    v: 2,
+    resumable: true,
+    state: {
+      kind: 'stopping',
+      target: TARGET,
+      createIntent: null,
       stopIntent: { reason: 'environment_failed', createdAt: NOW - 2_000 },
       attempts: POLICY.stopMaxAttempts,
       step: 'check_required',
@@ -349,6 +365,13 @@ describe('allocation controller — acquisition fencing', () => {
 });
 
 describe('allocation controller — cleanup reopen ledger', () => {
+  it('keys an intent-less check_required cleanup on the preserved provider ref', () => {
+    const record = checkRequiredNoIntentRecord();
+    expect(allocationRecordSchema.parse(record)).toEqual(record);
+    expect(cleanupAllocationId(record)).toBe('ref-1');
+    expect(cleanupAllocationId(stoppingCheckRequiredRecord())).toBe(CREATE_INTENT.intentId);
+  });
+
   it('fails closed at capacity instead of evicting a live reopen marker', async () => {
     const { controller, storage } = controllerFor(stoppingCheckRequiredRecord());
     const record = await controller.load();

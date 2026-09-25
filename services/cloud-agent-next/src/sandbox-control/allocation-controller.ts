@@ -152,7 +152,7 @@ export function isLiveAllocation(record: AllocationRecord): boolean {
 
 /** The allocation identity a `stopping` cleanup belongs to. */
 export function cleanupAllocationId(record: AllocationRecord): string | undefined {
-  return record.state.kind === 'stopping' ? record.state.createIntent.intentId : undefined;
+  return record.state.kind === 'stopping' ? allocationIdentity(record)?.id : undefined;
 }
 
 /**

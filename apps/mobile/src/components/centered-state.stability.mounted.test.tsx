@@ -36,6 +36,9 @@ vi.mock('react-native', () => ({
   PixelRatio: {
     roundToNearestPixel: (value: number) => Math.round(value * native.scale) / native.scale,
   },
+  // A portrait window, so the short-band flag the scroller publishes stays
+  // false and this fixture measures the full stack.
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;

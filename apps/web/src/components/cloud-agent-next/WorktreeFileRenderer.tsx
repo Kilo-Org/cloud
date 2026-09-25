@@ -13,10 +13,11 @@ import { File, FileDiff } from '@pierre/diffs/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { FoldVertical, UnfoldVertical } from 'lucide-react';
+import { Columns2, FoldVertical, UnfoldVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -82,6 +83,17 @@ const fileOptions = {
   lineHoverHighlight: 'disabled',
   unsafeCSS: rendererCSS,
 } satisfies FileOptions<undefined>;
+
+export type WorktreeDiffStyle = 'unified' | 'split';
+
+export function parseWorktreeDiffStyle(value: string): WorktreeDiffStyle {
+  try {
+    const style: unknown = JSON.parse(value);
+    return style === 'unified' || style === 'split' ? style : 'unified';
+  } catch {
+    return 'unified';
+  }
+}
 
 export type WorktreeFileHighlighterResult =
   | { status: 'ready'; lang: SupportedLanguages }
@@ -188,12 +200,14 @@ function HighlightedWorktreeDiff({
   revision,
   expanded,
   reviewProps,
+  diffStyle,
 }: {
   diff: FileDiffMetadata;
   lang: SupportedLanguages;
   revision: number;
   expanded: boolean;
   reviewProps?: WorktreeReviewDiffProps;
+  diffStyle: WorktreeDiffStyle;
 }) {
   const fileDiff = useMemo(() => ({ ...diff, lang }), [diff, lang]);
   const reviewPostRender = reviewProps?.options?.onPostRender;
@@ -217,7 +231,7 @@ function HighlightedWorktreeDiff({
         unsafeCSS: [fileOptions.unsafeCSS, reviewProps?.options?.unsafeCSS]
           .filter(Boolean)
           .join('\n'),
-        diffStyle: 'unified',
+        diffStyle,
         diffIndicators: 'none',
         hunkSeparators: 'line-info-basic',
         expandUnchanged: expanded,
@@ -254,8 +268,14 @@ export default function WorktreeFileRenderer({
   const requestedMode = getWorktreeFileViewMode(file, mode);
   const viewMode = requestedMode === 'expanded' && !canExpand ? 'diff' : requestedMode;
   const expanded = viewMode === 'expanded';
+  const [diffStyle, setDiffStyle] = useLocalStorage<WorktreeDiffStyle>(
+    'cloud-agent:worktree-diff-style',
+    'unified',
+    { initializeWithValue: false, deserializer: parseWorktreeDiffStyle }
+  );
   const canPreview = file.content.status === 'available';
   const expandLabel = expanded ? 'Hide unchanged lines' : 'Show all lines';
+  const diffStyleLabel = diffStyle === 'split' ? 'Show unified diff' : 'Show side-by-side diff';
   const expansionHint =
     expansion?.status === 'unavailable'
       ? `Full content unavailable. ${worktreeFileOmissionMessages[expansion.reason]}`
@@ -355,6 +375,7 @@ export default function WorktreeFileRenderer({
               revision={file.revision}
               expanded={expanded}
               reviewProps={reviewProps}
+              diffStyle={diffStyle}
             />
           )}
         </WorktreeFileHighlighter>
@@ -404,6 +425,24 @@ export default function WorktreeFileRenderer({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
             {canExpand ? expandLabel : expansionHint}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant={diffStyle === 'split' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="text-muted-foreground h-11 w-11 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent motion-reduce:transition-none sm:h-8 sm:w-8"
+              aria-label={diffStyleLabel}
+              aria-pressed={diffStyle === 'split'}
+              onClick={() => setDiffStyle(diffStyle === 'split' ? 'unified' : 'split')}
+            >
+              <Columns2 aria-hidden="true" className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs">
+            {diffStyleLabel}
           </TooltipContent>
         </Tooltip>
         {isWorktreeMarkdownPath(file.path) && (

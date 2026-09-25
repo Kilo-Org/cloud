@@ -299,6 +299,26 @@ function allocationWithoutTimeFields(record: AllocationRecord): unknown {
   return comparable;
 }
 
+/**
+ * A queued follow-up now dispatches behind an accepted row, so it gains a
+ * preparation attempt and a delivery deadline while the wrapper is unavailable.
+ * Normalize only those incidental queued fields; the rest of the snapshot keeps
+ * its full equality check.
+ */
+function withoutQueuedDispatch<T extends { messages: SessionMessage[] }>(value: T): T {
+  return {
+    ...value,
+    messages: value.messages.map(message =>
+      message.state.kind === 'queued'
+        ? {
+            ...message,
+            state: { ...message.state, deadlineAt: null, preparationAttemptId: undefined },
+          }
+        : message
+    ),
+  };
+}
+
 const sandboxId = 'sbx__control_smoke';
 const ROOT_ID = 'ses_abcdefghijklmnopqrstuvwxyz';
 const SECOND_ROOT_ID = 'ses_zyxwvutsrqponmlkjihgfedcba';
@@ -726,7 +746,8 @@ function captureAndAcceptControlRequests(
 async function installProvider(
   control: ReturnType<typeof env.SANDBOX_CONTROL.getByName>,
   initialRef?: string,
-  sandboxProvider: AgentSandboxProvider = 'cloudflare'
+  sandboxProvider: AgentSandboxProvider = 'cloudflare',
+  githubAuthorization?: GitHubAuthorizationSubject
 ) {
   const allocations = new Set(initialRef ? [initialRef] : []);
   const allocationRef = (sandboxName: string, instanceId: string) =>
@@ -767,6 +788,8 @@ async function installProvider(
     ),
   } satisfies ProviderAdapter;
   await runInDurableObject(control, instance => {
+    const broker = fakeCredentialBroker();
+    if (githubAuthorization) broker.githubAuthorizations.splice(0, 1, githubAuthorization);
     const prototype = Object.getPrototypeOf(instance) as {
       createProviderAdapter: () => ProviderAdapter;
     };
@@ -781,7 +804,7 @@ async function installProvider(
       VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
       VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
       ...fakeCloudflareContainers(() => instance.getAllocationRecord()).bindings,
-      GIT_TOKEN_SERVICE: fakeCredentialBroker().binding,
+      GIT_TOKEN_SERVICE: broker.binding,
       KILOCODE_BACKEND_BASE_URL: CONTAINMENT_TARGETS.backendBaseUrl,
       KILO_OPENROUTER_BASE: CONTAINMENT_TARGETS.providerBaseUrl,
       KILO_SESSION_INGEST_URL: CONTAINMENT_TARGETS.sessionIngestBaseUrl,
@@ -1045,6 +1068,9 @@ function policyUpdateInput(ownerId = CONTAINMENT_OWNER): {
 type CredentialRegistration = Parameters<SandboxSession['registerSession']>[0];
 type KiloSubject = Parameters<GitTokenService['issueKiloSessionCapability']>[0];
 type GitHubSubject = Parameters<GitTokenService['issueGitHubSessionCapability']>[0];
+type GitHubAuthorizationSubject = Parameters<
+  NonNullable<GitTokenService['authorizeCloudAgentGitHubRepo']>
+>[0];
 
 const VERCEL_ENV = {
   VERCEL_TOKEN: 'fixture-vercel-token',
@@ -1057,26 +1083,55 @@ const VERCEL_ENV = {
   VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
 };
 
-function fakeCredentialBroker() {
+function fakeCredentialBroker(accessPurpose: 'workflow' | 'agent' = 'workflow') {
   const kiloSubjects = new Map<string, KiloSubject>();
   const githubSubjects = new Map<string, GitHubSubject>();
   const tokens = { github: GITHUB_TOKEN };
+  const githubAuthorization = {
+    userId: CONTAINMENT_OWNER,
+    orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    githubRepo: 'acme/repo',
+    expectedIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    accessPurpose,
+  };
+  const githubRequests: GitHubAuthorizationSubject[] = [];
+  const githubAuthorizations: GitHubAuthorizationSubject[] = [githubAuthorization];
+  const authorizeGitHub = (subject: GitHubAuthorizationSubject) => {
+    githubRequests.push({ ...subject });
+    return githubAuthorizations.some(
+      expected =>
+        subject.userId === expected.userId &&
+        subject.orgId === expected.orgId &&
+        subject.githubRepo === expected.githubRepo &&
+        subject.expectedIntegrationId === expected.expectedIntegrationId &&
+        subject.accessPurpose === expected.accessPurpose
+    );
+  };
   let serial = 0;
   const unexpected = async (): Promise<never> => {
     throw new Error('Unexpected raw credential lookup or capability redemption');
   };
   const binding: GitTokenService = {
-    async getTokenForRepo() {
+    getTokenForRepo: unexpected,
+    async authorizeCloudAgentGitHubRepo(subject) {
+      return authorizeGitHub(subject)
+        ? { success: true }
+        : { success: false, reason: 'integration_mismatch' };
+    },
+    async getCloudAgentAuthForRepo(subject) {
+      if (!authorizeGitHub(subject)) return { success: false, reason: 'integration_mismatch' };
+      expect(subject.allowUserAuthorization).toBe(false);
       return {
         success: true,
-        token: tokens.github,
+        githubToken: tokens.github,
         installationId: '42',
         accountLogin: 'acme',
         appType: 'standard',
+        source: 'installation',
+        gitAuthor: { name: 'fixture bot', email: 'fixture@example.com' },
       };
     },
     getToken: unexpected,
-    getCloudAgentAuthForRepo: unexpected,
     getGitLabToken: unexpected,
     issueGitLabSessionCapability: unexpected,
     redeemGitLabSessionCapability: unexpected,
@@ -1090,6 +1145,7 @@ function fakeCredentialBroker() {
       return { success: true, capability };
     },
     async issueGitHubSessionCapability(subject) {
+      if (!authorizeGitHub(subject)) return { success: false, reason: 'integration_mismatch' };
       const capability = `kgh2.fixture-${++serial}`;
       githubSubjects.set(capability, subject);
       return {
@@ -1103,7 +1159,15 @@ function fakeCredentialBroker() {
       };
     },
   };
-  return { binding, kiloSubjects, githubSubjects, tokens };
+  return {
+    binding,
+    kiloSubjects,
+    githubSubjects,
+    tokens,
+    githubAuthorization,
+    githubAuthorizations,
+    githubRequests,
+  };
 }
 
 type WrapperLaunch = {
@@ -1344,10 +1408,12 @@ class ContainersIntegrationMeter implements ContainerUsageRpcMethods {
 async function credentialFixture(
   provider: AgentSandboxProvider = 'cloudflare',
   id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`,
-  sandboxAllocation?: SandboxAllocation
+  sandboxAllocation?: SandboxAllocation,
+  githubAccessPurpose?: 'workflow' | 'agent',
+  repository?: SessionMetadata['repository']
 ) {
   const control = env.SANDBOX_CONTROL.getByName(id);
-  const broker = fakeCredentialBroker();
+  const broker = fakeCredentialBroker(githubAccessPurpose);
   const environment = {
     ...env,
     ...VERCEL_ENV,
@@ -1386,10 +1452,11 @@ async function credentialFixture(
     },
     auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
     agent: { mode: 'code', model: 'test' },
-    repository: {
+    repository: repository ?? {
       type: 'github',
       repo: 'acme/repo',
       githubIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      ...(githubAccessPurpose ? { githubAccessPurpose } : {}),
     },
     workspace: {
       sandboxId: id,
@@ -3543,6 +3610,137 @@ describe('SandboxControl contained Vercel lifecycle', () => {
 });
 
 describe('SandboxControl mandatory worktree credentials', () => {
+  it.each([
+    { type: 'git' as const, url: 'https://example.com/acme/repo.git' },
+    { type: 'gitlab' as const, url: 'https://gitlab.com/acme/repo.git' },
+    {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      repositoryUuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      bitbucketIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    },
+  ])(
+    'rejects a different $type repository on re-registration without changing stored state',
+    async repository => {
+      const { session, registration } = await credentialFixture(
+        'cloudflare',
+        undefined,
+        undefined,
+        undefined,
+        repository
+      );
+      const before = await session.getCredentialMetadata();
+      await expect(
+        session.registerSession({
+          ...registration,
+          repository: { ...repository, url: repository.url.replace('/repo.git', '/other.git') },
+        })
+      ).resolves.toMatchObject({
+        success: false,
+        error: 'Repository authorization does not match registered session',
+      });
+      expect(await session.getCredentialMetadata()).toEqual(before);
+      await expect(
+        session.registerSession({
+          ...registration,
+          repository: { ...repository, url: repository.url.replace('.git', '') },
+        })
+      ).resolves.toEqual({ success: true });
+    }
+  );
+
+  it.each(['workspaceUuid', 'repositoryUuid', 'bitbucketIntegrationId'] as const)(
+    'rejects Bitbucket %s substitution during registration replay',
+    async field => {
+      const repository = {
+        type: 'bitbucket' as const,
+        url: 'https://bitbucket.org/acme/repo.git',
+        workspaceUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        repositoryUuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        bitbucketIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      };
+      const { session, registration } = await credentialFixture(
+        'cloudflare',
+        undefined,
+        undefined,
+        undefined,
+        repository
+      );
+      const before = await session.getCredentialMetadata();
+      await expect(
+        session.registerSession({
+          ...registration,
+          repository: { ...repository, [field]: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+        })
+      ).resolves.toMatchObject({
+        success: false,
+        error: 'Repository authorization does not match registered session',
+      });
+      expect(await session.getCredentialMetadata()).toEqual(before);
+    }
+  );
+
+  it.each(['cloudflare', 'vercel'] as const)(
+    'preserves exact managed agent authorization in %s Workers RPCs',
+    async provider => {
+      const { control, registration, broker } = await credentialFixture(
+        provider,
+        undefined,
+        undefined,
+        'agent'
+      );
+      const ready = await control.ensureReady({
+        ...credentialInput(registration),
+        provider,
+        allowCreate: true,
+      });
+      expect(ready.attachment).toBeDefined();
+      expect(broker.githubRequests.length).toBeGreaterThan(0);
+      for (const request of broker.githubRequests)
+        expect(request).toMatchObject(broker.githubAuthorization);
+      expect(await storedGrants(control)).toMatchObject([
+        {
+          repository: {
+            type: 'github',
+            repo: 'acme/repo',
+            expectedIntegrationId: broker.githubAuthorization.expectedIntegrationId,
+            accessPurpose: 'agent',
+          },
+        },
+      ]);
+    }
+  );
+
+  it.each(
+    (['cloudflare', 'vercel'] as const).flatMap(provider =>
+      (['userId', 'orgId', 'githubRepo', 'expectedIntegrationId', 'accessPurpose'] as const).map(
+        field => ({ provider, field })
+      )
+    )
+  )(
+    'rejects a managed $field mismatch before $provider provisioning',
+    async ({ provider, field }) => {
+      const { control, registration, broker, containers, vercel } = await credentialFixture(
+        provider,
+        undefined,
+        undefined,
+        'agent'
+      );
+      const expected = { ...broker.githubAuthorization };
+      if (field === 'accessPurpose') broker.githubAuthorization.accessPurpose = 'workflow';
+      else broker.githubAuthorization[field] = `${broker.githubAuthorization[field]}-other`;
+      await expect(async () =>
+        control.ensureReady({ ...credentialInput(registration), provider, allowCreate: true })
+      ).rejects.toThrow('GitHub credential is unavailable');
+      expect(broker.githubRequests).toEqual([expect.objectContaining(expected)]);
+      expect(await storedGrants(control)).toEqual([]);
+      expect(containers.launches).toEqual([]);
+      expect(vercel.runtime.creates).toBe(0);
+      expect(broker.githubSubjects.size).toBe(0);
+    }
+  );
+
   it('joins authoritative session metadata, native containment, wrapper handshake, and sanitized attach', async () => {
     const fixture = await credentialFixture();
     const { control, registration, broker, containers } = fixture;
@@ -3704,6 +3902,11 @@ describe('SandboxControl mandatory worktree credentials', () => {
   it('shares stable aliases across two roots of one worktree without granting access to another worktree', async () => {
     const fixture = await credentialFixture();
     const { control, registration, broker } = fixture;
+    broker.githubAuthorizations.push({
+      ...broker.githubAuthorization,
+      githubRepo: 'acme/other',
+      expectedIntegrationId: undefined,
+    });
     const second: CredentialRegistration = {
       ...registration,
       identity: { ...registration.identity, sessionId: `workspace_${crypto.randomUUID()}` },
@@ -4347,6 +4550,11 @@ describe('SandboxControl native worktree containment', () => {
   it('installs, refreshes, and removes the combined Vercel policy for exact worktree roots', async () => {
     const fixture = await credentialFixture('vercel');
     const { control, registration, session, broker, vercel } = fixture;
+    broker.githubAuthorizations.push({
+      ...broker.githubAuthorization,
+      githubRepo: 'acme/other',
+      expectedIntegrationId: undefined,
+    });
     const second: CredentialRegistration = {
       ...registration,
       identity: { ...registration.identity, sessionId: `workspace_${crypto.randomUUID()}` },
@@ -5953,6 +6161,7 @@ describe('SandboxControl acquisition receipts', () => {
     const markers = await runInDurableObject(control, async (_instance, state) => {
       const record = await readCanonicalAllocationRecord(state.storage);
       if (record?.state.kind !== 'stopping') throw new Error('Expected a stopping cleanup');
+      if (record.state.createIntent === null) throw new Error('Expected an intent-backed cleanup');
       const seeded = Array.from({ length: MAX_ACQUISITION_CLEANUP_REOPENS }, (_, index) => ({
         id: `acq-${index}`,
         deadlineAt: now + SESSION_DELIVERY_TIMEOUT_MS,
@@ -7575,7 +7784,11 @@ async function worktreeFixture(
     inTransaction: boolean;
   }[] = [];
   await seedRunningCredential(credential, sandboxId);
-  const { provider } = await installProvider(control, cloudflareRef(sandboxId));
+  const { provider } = await installProvider(control, cloudflareRef(sandboxId), 'cloudflare', {
+    userId,
+    githubRepo: 'acme/demo',
+    accessPurpose: 'workflow',
+  });
   await runInDurableObject(control, async (instance, state) => {
     await instance.initializeOwner(userId);
     const waitUntil = state.waitUntil.bind(state);
@@ -10153,6 +10366,10 @@ describe('SandboxSession control-plane regressions', () => {
       },
       auth: { kiloSessionId: ROOT_ID, kilocodeToken: 'stored-test-token' },
       agent,
+      workspace: {
+        sandboxId: fixture.sandboxId,
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+      },
     });
     await runInDurableObject(session, (_instance, state) => {
       seedMessages(state.storage.kv, [
@@ -10620,7 +10837,9 @@ describe('SandboxSession control-plane regressions', () => {
       ).rejects.toThrow('admission reset');
       release.resolve();
       session = env.SANDBOX_SESSION.get(env.SANDBOX_SESSION.idFromString(session.id.toString()));
-      expect(await admissionState(session)).toEqual(before);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(before)
+      );
       expect(
         await runInDurableObject(session, (_instance, state) => state.storage.getAlarm())
       ).toBe(alarmAt);
@@ -10735,7 +10954,9 @@ describe('SandboxSession control-plane regressions', () => {
         acceptControlRequest(socket, request);
         held = undefined;
         await dispatch;
-        expect(await admissionState(session)).toEqual(terminal);
+        expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+          withoutQueuedDispatch(terminal)
+        );
         expect(await lifecycleEvents(session)).toEqual(events);
         await expect(
           session.admitSubmittedMessage({
@@ -11226,7 +11447,9 @@ describe('SandboxSession control-plane regressions', () => {
         session.admitSubmittedMessage({ ...replay, agent: { model: modelB } })
       ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
       await runInDurableObject(session, instance => instance.alarm());
-      expect(await admissionState(session)).toEqual(beforeReplay);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(beforeReplay)
+      );
       expect(waitingRequests).toEqual([]);
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 
@@ -11236,7 +11459,9 @@ describe('SandboxSession control-plane regressions', () => {
         cloudflareRef(fixture.sandboxId)
       );
       session = env.SANDBOX_SESSION.get(env.SANDBOX_SESSION.idFromString(session.id.toString()));
-      expect(await admissionState(session)).toEqual(beforeReplay);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(beforeReplay)
+      );
       replacement = await connect(credential, fixture.sandboxId);
       await completeHello(replacement, 'hello_frozen_recreated', {
         providerInstanceId: cloudflareRef(fixture.sandboxId),
@@ -11252,7 +11477,9 @@ describe('SandboxSession control-plane regressions', () => {
         success: true,
         compatibilityDelivery: 'sent',
       });
-      expect(await admissionState(session)).toEqual(accepted);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(accepted)
+      );
       await completeTurn(session, INITIAL_MESSAGE_ID, fixture.wrapperInstanceId);
       await waitForAccepted(session, 'msg_b');
       await completeTurn(session, 'msg_b', fixture.wrapperInstanceId);
@@ -11286,7 +11513,9 @@ describe('SandboxSession control-plane regressions', () => {
         success: false,
         code: 'BAD_REQUEST',
       });
-      expect(await admissionState(session)).toEqual(terminal);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(terminal)
+      );
       expect(terminal.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     } finally {
@@ -11301,10 +11530,17 @@ describe('SandboxSession control-plane regressions', () => {
       model: modelB,
       variant: 'low',
     });
+    const registered = await session.getCredentialMetadata();
+    if (!registered) throw new Error('Missing registered fixture');
     await expect(
       session.createSessionWithInitialAdmission({
-        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        identity: {
+          sessionId: fixture.sessionId,
+          userId: fixture.ownerId,
+          orgId: registered.identity.orgId,
+        },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+        repository: registered.repository,
         agent: { mode: 'reviewer', model: agentA.model },
         message: {
           initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
@@ -11378,28 +11614,32 @@ describe('SandboxSession control-plane regressions', () => {
         { messageId: 'msg_model_less', state: expect.objectContaining({ kind: 'accepted' }) },
         {
           messageId: 'msg_selected',
-          state: { kind: 'queued', intent: { agent: { model: modelB } } },
+          state: { kind: 'accepted', intent: { agent: { model: modelB } } },
         },
       ]);
       expect(delivered.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       await runInDurableObject(session, instance => instance.alarm());
       await runInDurableObject(session, instance => instance.alarm());
-      expect(await admissionState(session)).toEqual(delivered);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(delivered)
+      );
       expect(requests.map(request => request.operation)).toEqual([
         'session.attach',
+        'session.prompt',
         'session.prompt',
       ]);
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => request.payload)
-      ).toEqual([
+      ).toMatchObject([
         {
           messageId: 'msg_model_less',
           turn: { type: 'command', command: 'status', arguments: '--all' },
           agent: { mode: 'reviewer' },
           finalization: { autoCommit: true },
         },
+        { messageId: 'msg_selected' },
       ]);
       await runInDurableObject(session, (_instance, state) => {
         const events = createEventQueries(
@@ -11466,7 +11706,9 @@ describe('SandboxSession control-plane regressions', () => {
         agent: { model: modelB, mode: 'reviewer', variant: 'low' },
       });
       expect(result).toEqual({ success: false, code: outcome.code, error: outcome.error });
-      expect(await admissionState(session)).toEqual(before);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(before)
+      );
       if (result.success) throw new Error('Expected model admission failure');
       expect(() => throwAdmissionError(result)).toThrowError(
         expect.objectContaining({
@@ -11494,7 +11736,9 @@ describe('SandboxSession control-plane regressions', () => {
         turn: { type: 'prompt', id: 'msg_missing', prompt: 'missing selection' },
       })
     ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
-    expect(await admissionState(session)).toEqual(before);
+    expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+      withoutQueuedDispatch(before)
+    );
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -11588,7 +11832,9 @@ describe('SandboxSession control-plane regressions', () => {
         const winner = await admissionState(session);
         validation.release();
         await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
-        expect(await admissionState(session)).toEqual(winner);
+        expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+          withoutQueuedDispatch(winner)
+        );
         expect(
           winner.messages.filter(message => message.messageId === 'msg_concurrent')
         ).toMatchObject([{ state: { intent: { agent: nextAgent } } }]);
@@ -11633,7 +11879,9 @@ describe('SandboxSession control-plane regressions', () => {
         success: true,
         compatibilityDelivery: 'sent',
       });
-      expect(await admissionState(session)).toEqual(winner);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(winner)
+      );
       expect(winner.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(requests.filter(request => request.operation === 'session.prompt')).toHaveLength(1);
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
@@ -11660,7 +11908,9 @@ describe('SandboxSession control-plane regressions', () => {
       const terminal = await admissionState(session);
       validation.release();
       await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
-      expect(await admissionState(session)).toEqual(terminal);
+      expect(withoutQueuedDispatch(await admissionState(session))).toEqual(
+        withoutQueuedDispatch(terminal)
+      );
       expect(
         terminal.messages.find(message => message.messageId === 'msg_terminal')?.state.kind
       ).toBe('cancelled');
@@ -11732,7 +11982,9 @@ describe('SandboxSession control-plane regressions', () => {
       })
     ).resolves.toMatchObject({ success: true });
     const frozen = await admissionState(session);
-    expect(frozen.messages.slice(0, 2)).toEqual(history);
+    expect(withoutQueuedDispatch(frozen).messages.slice(0, 2)).toEqual(
+      withoutQueuedDispatch({ messages: history }).messages
+    );
     expect(frozen.messages.slice(2).map(message => message.state.intent)).toEqual([
       { turn: { type: 'prompt', messageId: 'msg_old_turn', prompt: 'old turn A' }, agent: agentA },
       {
@@ -11898,7 +12150,7 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForAccepted(session, INITIAL_MESSAGE_ID);
       await runInDurableObject(session, instance => instance.alarm());
       const delivered = requests.filter(request => request.operation === 'session.prompt');
-      expect(delivered).toHaveLength(2);
+      expect(delivered).toHaveLength(3);
       expect(delivered[0]?.payload).toEqual(delivered[1]?.payload);
       expect(delivered[1]?.payload).toEqual({
         messageId: INITIAL_MESSAGE_ID,
@@ -11906,10 +12158,11 @@ describe('SandboxSession control-plane regressions', () => {
         agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
         finalization: { autoCommit: true },
       });
+      expect(delivered[2]?.payload).toMatchObject({ messageId: 'msg_retry_b' });
       const accepted = await admissionState(session);
       expect(accepted.messages).toMatchObject([
         { messageId: INITIAL_MESSAGE_ID, state: { kind: 'accepted', intent: original } },
-        { messageId: 'msg_retry_b', state: expect.objectContaining({ kind: 'queued' }) },
+        { messageId: 'msg_retry_b', state: expect.objectContaining({ kind: 'accepted' }) },
       ]);
       expect(accepted.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -12153,6 +12406,15 @@ describe('SandboxSession control-plane regressions', () => {
           auth: { kiloSessionId: 'kilo_root' },
           agent: { mode: 'code', model: 'test' },
           repository,
+          workspace: {
+            sandboxId: 'istd-636f6e74726f6c636f6d6d616e6473',
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+          },
           message: { initialTurn },
         })
       ).resolves.toMatchObject({ success: true, messageId: initialTurn.messageId });
@@ -12189,8 +12451,11 @@ describe('SandboxSession control-plane regressions', () => {
         finalization: { autoCommit: true },
       });
       expect(
-        ((await readSessionValue(state.storage)) as { messages?: SessionMessage[] } | undefined)
-          ?.messages ?? []
+        withoutQueuedDispatch({
+          messages:
+            ((await readSessionValue(state.storage)) as { messages?: SessionMessage[] } | undefined)
+              ?.messages ?? [],
+        }).messages
       ).toEqual([
         blocker,
         {
@@ -14080,7 +14345,11 @@ describe('SandboxSession worktree admission', () => {
         await instance.initializeOwner(ownerId);
         await seedRunningCloudflare(instance);
       });
-      await installProvider(control, cloudflareRef(targetSandboxId));
+      await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+        userId: ownerId,
+        githubRepo: 'Kilo-Org/cloud',
+        accessPurpose: 'workflow',
+      });
 
       const ws = await connect(credential, targetSandboxId);
       await completeHello(ws, 'hello-grouped-initial', { wrapperInstanceId: crypto.randomUUID() });
@@ -14120,8 +14389,14 @@ describe('SandboxSession worktree admission', () => {
           turn: { type: 'prompt', prompt: 'first grouped turn' },
         });
         expect(
-          ((await readSessionValue(state.storage)) as { messages?: SessionMessage[] } | undefined)
-            ?.messages ?? []
+          withoutQueuedDispatch({
+            messages:
+              (
+                (await readSessionValue(state.storage)) as
+                  | { messages?: SessionMessage[] }
+                  | undefined
+              )?.messages ?? [],
+          }).messages
         ).toEqual([
           expect.objectContaining({
             messageId: INITIAL_MESSAGE_ID,
@@ -14184,7 +14459,11 @@ describe('SandboxSession worktree admission', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-grouped-command', {
@@ -14305,7 +14584,11 @@ describe('SandboxSession worktree admission', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-grouped-attachment', {
@@ -14426,7 +14709,11 @@ describe('SandboxSession worktree admission', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-ungrouped-followup-command', {
@@ -14583,7 +14870,9 @@ describe('SandboxSession worktree admission', () => {
             // Admission now persists a stable queue timestamp for reporting.
             state: { ...record.state, queuedAt: expect.any(Number) },
           });
-          expect(readRawSessionMessages(state.storage.kv)).toEqual(expectedMessages);
+          expect(
+            withoutQueuedDispatch({ messages: readRawSessionMessages(state.storage.kv) }).messages
+          ).toEqual(expectedMessages);
           expect(await instance.getMetadata()).toEqual(metadata);
         }
       });
@@ -14665,7 +14954,9 @@ describe('SandboxSession worktree admission', () => {
             instance.admitSubmittedMessage({ ...request, finalization })
           ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
         }
-        expect(readRawSessionMessages(state.storage.kv)).toEqual(messages);
+        expect(
+          withoutQueuedDispatch({ messages: readRawSessionMessages(state.storage.kv) }).messages
+        ).toEqual(withoutQueuedDispatch({ messages }).messages);
         expect(await instance.getMetadata()).toEqual(metadata);
         expect(globalThis.fetch).not.toHaveBeenCalled();
       });
@@ -14693,7 +14984,11 @@ describe('SandboxSession worktree admission', () => {
         await instance.initializeOwner(ownerId);
         await seedRunningCloudflare(instance);
       });
-      await installProvider(control, cloudflareRef(targetSandboxId));
+      await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+        userId: ownerId,
+        githubRepo: 'Kilo-Org/cloud',
+        accessPurpose: 'workflow',
+      });
 
       const wrapper = await connect(credential, targetSandboxId);
       await completeHello(wrapper, 'hello-grouped-legacy-record', {
@@ -14827,7 +15122,11 @@ describe('SandboxSession durable message lifecycle', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-grouped-sent', { wrapperInstanceId: crypto.randomUUID() });

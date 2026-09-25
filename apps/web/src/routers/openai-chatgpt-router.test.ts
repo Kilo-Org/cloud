@@ -3,6 +3,7 @@
 jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
   clearOpenAiChatGptConnection: jest.fn(),
+  readOpenAiChatGptUsageLimit: jest.fn(),
 }));
 
 jest.mock('@/routers/organizations/utils', () => {
@@ -16,6 +17,7 @@ import { rootRouter } from '@/routers/root-router';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
+  readOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
 } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -56,10 +58,34 @@ function callerFor(user: { id: string } | null) {
 describe('openAiChatGpt.status', () => {
   const getConnection = jest.mocked(getOpenAiChatGptConnection);
   const ensureOrgAccess = jest.mocked(ensureOrganizationAccess);
+  const usageLimitRead = jest.mocked(readOpenAiChatGptUsageLimit);
 
   beforeEach(() => {
     getConnection.mockReset();
     ensureOrgAccess.mockReset();
+    usageLimitRead.mockReset();
+    usageLimitRead.mockResolvedValue(null);
+  });
+
+  it('reports the recorded plan limit for a live connection', async () => {
+    getConnection.mockResolvedValue(connectedConnection());
+    usageLimitRead.mockResolvedValue({ reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null });
+
+    await expect(callerFor({ id: USER_ID }).openAiChatGpt.status({})).resolves.toMatchObject({
+      state: 'connected',
+      usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null },
+    });
+  });
+
+  it('does not read the plan limit for an errored connection', async () => {
+    getConnection.mockResolvedValue(
+      connectedConnection({ status: 'error', error_message: 'expired' })
+    );
+
+    await expect(callerFor({ id: USER_ID }).openAiChatGpt.status({})).resolves.toMatchObject({
+      state: 'error',
+    });
+    expect(usageLimitRead).not.toHaveBeenCalled();
   });
 
   it('reports disconnected for the signed-in user when no connection is stored', async () => {

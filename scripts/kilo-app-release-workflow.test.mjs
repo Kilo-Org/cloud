@@ -127,8 +127,9 @@ function validate(workflow) {
 
   // The cap counts iOS submissions, and a run that uploads the IPA and then
   // fails at Submit Android is a real App Store Connect upload that writes no
-  // release tag. The marker is pushed right after Submit iOS and before Submit
-  // Android, and is annotated so its creatordate is the upload moment.
+  // release tag. The marker is pushed before Submit iOS, so an accepted upload
+  // can never be missing from the ledger, and it is annotated so its
+  // creatordate is the submission moment.
   const submitIosIndex = names.indexOf('Submit iOS');
   const submitAndroidIndex = names.indexOf('Submit Android');
   const markerIndex = buildJob.steps.findIndex(item => /kilo-app-upload\//.test(item.run ?? ''));
@@ -136,8 +137,8 @@ function validate(workflow) {
   assert.ok(submitAndroidIndex >= 0, 'build-and-submit: the Submit Android step is missing');
   assert.ok(markerIndex >= 0, 'build-and-submit: the iOS upload marker step is missing');
   assert.ok(
-    markerIndex > submitIosIndex && markerIndex < submitAndroidIndex,
-    'the iOS upload marker must be pushed after Submit iOS and before Submit Android'
+    markerIndex < submitIosIndex && markerIndex < submitAndroidIndex,
+    'the iOS upload marker must be pushed before Submit iOS, so an upload the stores accepted is never missing from the cap ledger'
   );
   const marker = buildJob.steps[markerIndex];
   assert.match(
@@ -148,7 +149,7 @@ function validate(workflow) {
   assert.match(
     marker.run,
     /git tag -a "\$MARKER" -m "\$MARKER"/,
-    'the marker must be annotated, so its creatordate is the upload moment'
+    'the marker must be annotated, so its creatordate is the submission moment'
   );
   assert.match(marker.run, /git push origin "\$MARKER"/, 'the marker must be pushed');
   assert.match(
@@ -354,12 +355,12 @@ const mutations = {
       1
     );
   },
-  'the iOS upload marker is pushed after Submit Android': workflow => {
+  'the iOS upload marker is pushed after Submit iOS': workflow => {
     const steps = workflow.jobs['build-and-submit'].steps;
     const index = steps.findIndex(item => /kilo-app-upload\//.test(item.run ?? ''));
     const [marker] = steps.splice(index, 1);
-    const android = steps.findIndex(item => item.name === 'Submit Android');
-    steps.splice(android + 1, 0, marker);
+    const ios = steps.findIndex(item => item.name === 'Submit iOS');
+    steps.splice(ios + 1, 0, marker);
   },
   'the iOS upload marker is not annotated': workflow => {
     const marker = workflow.jobs['build-and-submit'].steps.find(item =>

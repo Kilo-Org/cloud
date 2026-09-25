@@ -1,8 +1,8 @@
-import { createElement } from 'react';
+import { type ComponentProps, createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import type * as AvailableModels from '@/lib/hooks/use-available-models';
 import { toModelOptions } from '@/lib/hooks/use-available-models';
 import {
@@ -155,7 +155,7 @@ function cliCatalogModelOptions(): SessionModelOption[] {
 function renderToolbar(
   model = 'deepseek/deepseek-v4.1-flash',
   modelOptions: SessionModelOption[] = MODEL_OPTIONS,
-  variant = 'low'
+  overrides: Partial<ComponentProps<typeof ChatToolbar>> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
@@ -164,10 +164,11 @@ function renderToolbar(
         mode: 'code',
         onModeChange: vi.fn<(mode: string) => void>(),
         model,
-        variant,
+        variant: 'low',
         modelOptions,
         onModelSelect: vi.fn<(modelId: string, variant: string) => void>(),
         onPaste: vi.fn<() => void>(),
+        ...overrides,
       })
     );
   });
@@ -252,7 +253,9 @@ describe('ChatToolbar long model name', () => {
     const reportedOptions = reportedModelOptions();
     expect(reportedOptions[0]?.name).toBe(LONG_MODEL_NAME);
 
-    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', reportedOptions, 'low');
+    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', reportedOptions, {
+      variant: 'low',
+    });
 
     // The whole name, not `DeepSeek V4.1 F...`, and clipped to one line.
     const modelLabel = renderer.root.findAll(
@@ -317,7 +320,7 @@ describe('ChatToolbar long model name', () => {
       throw new Error('Expected one CLI catalog option');
     }
 
-    const renderer = renderToolbar(option.id, options, '');
+    const renderer = renderToolbar(option.id, options, { variant: '' });
 
     const labels = renderer.root
       .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
@@ -327,5 +330,25 @@ describe('ChatToolbar long model name', () => {
     expect(labels.some(label => typeof label === 'string' && label.includes('DeepSeek:'))).toBe(
       false
     );
+  });
+});
+
+describe('ChatToolbar model chip while the model list loads', () => {
+  it('keeps the chip shell labelled while the model list loads instead of a blank pill', () => {
+    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', MODEL_OPTIONS, {
+      isLoadingModels: true,
+    });
+    // The chip must read as the control it is: its own label, not an empty pill.
+    const loadingLabel = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === i18n.t('common.model')
+    );
+    expect(loadingLabel).toHaveLength(1);
+    expect(loadingLabel[0]?.props.numberOfLines).toBe(1);
+
+    // The loading chip is not the skeleton placeholder: it renders its own shell.
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
   });
 });

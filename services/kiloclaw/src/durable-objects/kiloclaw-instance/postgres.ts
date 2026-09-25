@@ -386,7 +386,6 @@ export async function syncAdminSizeOverrideToPostgresHelper(
   }
 }
 
-// ─── Morning Briefing config (kiloclaw_morning_briefing_configs) ─────
 //
 // Denormalized read cache. Plugin's local config.json on the instance is
 // the source of truth for actual runtime behavior; this table mirrors

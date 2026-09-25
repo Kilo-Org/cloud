@@ -991,8 +991,6 @@ describe('generateBaseConfig', () => {
     expect(config.channels.slack).toBeUndefined();
   });
 
-  // ─── Kilo Chat ───────────────────────────────────────────────────────────
-
   it('always configures kilo-chat channel and plugin', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -1005,8 +1003,6 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
     expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
   });
-
-  // ─── Session ─────────────────────────────────────────────────────────────
 
   it('defaults session.dmScope to per-channel-peer', () => {
     const { deps } = fakeDeps();

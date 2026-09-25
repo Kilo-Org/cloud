@@ -1,4 +1,4 @@
-import type { OrgTrialStatus } from './organization-types';
+import type { OrganizationTrialDisplayStatus } from '@kilocode/organization-entitlement';
 
 export {
   classifyOrganizationEntitlement,
@@ -9,7 +9,8 @@ export type {
   OrganizationEntitlementBypassReason,
   OrganizationEntitlementClassification,
 } from '@kilocode/organization-entitlement';
+export type { OrganizationTrialDisplayStatus };
 
-export function isStatusReadOnly(status: OrgTrialStatus): boolean {
+export function isStatusReadOnly(status: OrganizationTrialDisplayStatus): boolean {
   return status === 'trial_expired_soft' || status === 'trial_expired_hard';
 }

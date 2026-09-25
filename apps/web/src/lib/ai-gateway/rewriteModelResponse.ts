@@ -73,19 +73,6 @@ type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
 
-async function isLoggingEnabledForUser(
-  user: User | null,
-  organizationId: string | null
-): Promise<boolean> {
-  // Hardcoded opt-ins mainly for local testing
-  if (user?.google_user_email.endsWith('@anaconda.com')) return true;
-  if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
-  return isDynamicallyOptedIntoRequestLogging({
-    accountId: user?.id ?? null,
-    organizationId,
-  });
-}
-
 export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
   const gateway = request.body.providerOptions?.gateway;
   if (!gateway?.byok) {
@@ -115,7 +102,12 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  if (provider !== 'custom' && !(await isLoggingEnabledForUser(user, organization_id))) {
+  if (
+    !(await isDynamicallyOptedIntoRequestLogging({
+      accountId: user?.id ?? null,
+      organizationId: organization_id,
+    }))
+  ) {
     return null;
   }
   const status = response.status;

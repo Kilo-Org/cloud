@@ -3,6 +3,8 @@ import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import type * as AvailableModels from '@/lib/hooks/use-available-models';
+import { toModelOptions } from '@/lib/hooks/use-available-models';
 import {
   buildSessionModelOptions,
   type SessionModelOption,
@@ -17,6 +19,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+// The real `use-available-models` (used below to run the reported catalogue
+// name through `toModelOptions`) reaches `expo-secure-store` through the auth
+// token owner; stub it as the pure `use-available-models.test.ts` does.
+vi.mock('expo-secure-store', () => ({}));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: vi.fn() }),
@@ -37,9 +43,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/hooks/use-available-models', () => ({
-  thinkingEffortLabel: (variant: string) => variant,
-}));
+vi.mock('@/lib/hooks/use-available-models', async importOriginal => {
+  const actual = await importOriginal<typeof AvailableModels>();
+  return { ...actual, thinkingEffortLabel: (variant: string) => variant };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#111827',
@@ -56,9 +63,13 @@ vi.mock('@/lib/utils', () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
 }));
 
-// The model name from the explorer capture: 19 characters, wider than one
-// nowrap toolbar row leaves after the shrink-0 mode chip and the effort badge.
-// The row must truncate it via `numberOfLines={1}` instead of letting it wrap.
+// The catalogue name the explorer capture reported, exactly as the gateway
+// sends it: `<Vendor>: <Model>`. The chip truncated it to
+// `DeepSeek: DeepSeek V4.1 F...` once the `Low` effort badge rendered.
+const CATALOGUE_MODEL_NAME = 'DeepSeek: DeepSeek V4.1 Flash';
+// The 19-character label the chip must render in full: wider than one nowrap
+// toolbar row leaves after the shrink-0 mode chip and the effort badge. The row
+// must truncate it via `numberOfLines={1}` instead of letting it wrap.
 const LONG_MODEL_NAME = 'DeepSeek V4.1 Flash';
 
 const MODEL_OPTIONS: SessionModelOption[] = [
@@ -71,6 +82,34 @@ const MODEL_OPTIONS: SessionModelOption[] = [
     showGatewayMetadata: true,
   },
 ];
+
+/**
+ * Builds the chip's option the way the app does: the raw gateway catalogue
+ * name goes through `toModelOptions`, which strips `<Vendor>: `, and then
+ * `buildSessionModelOptions`, which projects the `ModelOption` onto the
+ * `SessionModelOption` the chip reads. This test never strips the prefix
+ * itself, so deleting the strip from `toModelOptions` fails the assertion
+ * below.
+ */
+function reportedModelOptions(): SessionModelOption[] {
+  const gatewayModels = toModelOptions({
+    data: [
+      {
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: CATALOGUE_MODEL_NAME,
+        opencode: { variants: { low: {}, medium: {} } },
+      },
+    ],
+  });
+  return buildSessionModelOptions({
+    activeSessionType: null,
+    remoteModelState: { ownerConnectionId: null, protocol: 'unknown', refresh: 'idle' },
+    observedModel: null,
+    remoteModelOverride: null,
+    gatewayModels,
+    gatewayModelsLoading: false,
+  }).options;
+}
 
 // The remote CLI catalog repeats the vendor inside the display name
 // ("DeepSeek: DeepSeek V4 Flash 0731"), the string the explorer captured on the
@@ -202,6 +241,50 @@ describe('ChatToolbar long model name', () => {
     );
     expect(label).toHaveLength(1);
     expect(label[0]?.props.numberOfLines).toBe(1);
+  });
+
+  it('renders the reported catalogue name whole beside the low effort badge', () => {
+    // Pins the exact reported input end to end: the gateway catalogue's
+    // `DeepSeek: DeepSeek V4.1 Flash` goes through the real option builders
+    // (`toModelOptions` then `buildSessionModelOptions`) and the resulting
+    // option reaches the chip. This test never strips the prefix itself, so
+    // deleting the strip from `toModelOptions` fails here.
+    const reportedOptions = reportedModelOptions();
+    expect(reportedOptions[0]?.name).toBe(LONG_MODEL_NAME);
+
+    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', reportedOptions, 'low');
+
+    // The whole name, not `DeepSeek V4.1 F...`, and clipped to one line.
+    const modelLabel = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === LONG_MODEL_NAME
+    );
+    expect(modelLabel).toHaveLength(1);
+    expect(modelLabel[0]?.props.numberOfLines).toBe(1);
+    expect(modelLabel[0]?.props.children).toBe('DeepSeek V4.1 Flash');
+
+    // The `Low` effort badge (the trigger for the truncation) is present.
+    const effortLabel = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'low'
+    );
+    expect(effortLabel).toHaveLength(1);
+
+    // The toolbar never wraps: the chip keeps the whole name on the one row and
+    // clips it there, instead of shedding characters under the shrink-0 mode
+    // chip and the effort badge.
+    const wrappedRows = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('flex-wrap')
+    );
+    expect(wrappedRows).toHaveLength(0);
   });
 
   it('packs the paste button into the model chip row so it stays on the chip line', () => {

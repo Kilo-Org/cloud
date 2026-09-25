@@ -26,6 +26,11 @@ export type AutoFreeModel = {
 
 export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
+    model: 'stealth/space-bunny-alpha',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
+  {
     model: 'poolside/laguna-s-2.1:free',
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
@@ -42,11 +47,6 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   } satisfies AutoFreeModel,
   {
     model: 'nex-agi/nex-n2.5-pro:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'inclusionai/ling-3.0-flash-vl:free',
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,

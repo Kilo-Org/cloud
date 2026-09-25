@@ -1587,6 +1587,44 @@ describe('User', () => {
           .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
     });
+
+    it("keeps the organization's shared-services row when the connector is deleted", async () => {
+      const connector = await insertTestUser({
+        google_user_email: `chatgpt-shared-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT shared cleanup ${randomUUID()}`,
+        connector.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: connector.id,
+        organization_id: organization.id,
+        is_shared_services: true,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        created_by: connector.id,
+      });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, connector.id));
+
+      // The organization's connection belongs to the organization, so the
+      // deletion keeps it: only the reference to the deleted connector is
+      // cleared, and `created_by` keeps the record of who connected it.
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.organization_id, organization.id),
+            eq(openai_chatgpt_connections.is_shared_services, true)
+          )
+        );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].kilo_user_id).toBeNull();
+      expect(rows[0].created_by).toBe(connector.id);
+    });
   });
 
   describe('softDeleteUser', () => {

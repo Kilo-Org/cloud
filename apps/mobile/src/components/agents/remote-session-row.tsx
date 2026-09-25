@@ -95,13 +95,16 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  // The server's creation-default title (`New session - <ISO timestamp>`) is an
-  // internal marker, never row copy: `namedSessionTitle` resolves it through
-  // the shared `sessionDisplayTitle` helper and additionally keeps a
-  // placeholder-shaped title the user's own rename wrote, so the same label
-  // feeds the row, the accessibility label, and the rename prompt. The
-  // subscription repaints the row once the durable record hydrates after a
-  // cold start.
+  // One derivation for the visible label, the spoken label and the rename
+  // prompt: the server's creation-default title (`New session - <ISO
+  // timestamp>`) is an internal marker, never row copy, so a creation
+  // placeholder title reads as "Untitled session" — the row falls back to the
+  // localized unnamed name the same way the session header does.
+  // `namedSessionTitle` makes that judgement through the shared
+  // `sessionDisplayTitle` helper and additionally keeps a placeholder-shaped
+  // title the user's own rename wrote, so the same label feeds the row, the
+  // accessibility label, and the rename prompt. The subscription repaints the
+  // row once the durable record hydrates after a cold start.
   const titlesRevision = useUserSessionTitlesRevision();
   // Same seeding as the stored row: a session the backend has not named yet
   // opens an empty rename field instead of the `New session - <ISO>` machine

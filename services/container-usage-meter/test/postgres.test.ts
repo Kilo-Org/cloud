@@ -965,6 +965,12 @@ describe('container usage PostgreSQL application', () => {
       raceFingerprint,
       2_000
     );
+    // Attach the rejection assertion before releasing the blocker: otherwise the
+    // expected conflict can reject before it is awaited and Vitest reports it as
+    // an unhandled rejection.
+    const contenderRejection = expect(contender).rejects.toThrow(
+      'Another usage interval is already open'
+    );
     await expect
       .poll(async () => {
         const result = await client.pool.query<{ count: string }>(
@@ -980,7 +986,7 @@ describe('container usage PostgreSQL application', () => {
     releaseBlocker();
     await blocker;
 
-    await expect(contender).rejects.toThrow('Another usage interval is already open');
+    await contenderRejection;
     const contenders = await client.db
       .select()
       .from(container_usage_interval)

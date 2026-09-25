@@ -1,0 +1,23 @@
+diff --git a/build/typed-routes/generate.js b/build/typed-routes/generate.js
+index 8c0627238cd0139ba4345673b414ca95e7404f34..30ffd7cc7dca51080e259b88d03708e3b40f3f19 100644
+--- a/build/typed-routes/generate.js
++++ b/build/typed-routes/generate.js
+@@ -13,7 +13,17 @@ function getTypedRoutesDeclarationFile(ctx, { partialTypedGroups = false, testIg
+     let routeNode = null;
+     try {
+         routeNode = (0, routing_1.getRoutes)(ctx, {
+-            ignore: [/_layout\.[tj]sx?$/], // Skip layout files
++            // START FORK
++            // Colocated test files must not become routes here. Expo Router's
++            // require.context matches every `.tsx` under the app root, so a
++            // `*.test.tsx` next to a route registers as a route — mirroring the
++            // Metro blockList in metro.config.js. Worse, a `_layout.*.test.tsx`
++            // is detected as the directory's layout, and groupRouteNodes below
++            // skips non-route nodes together with their children, dropping the
++            // whole subtree (e.g. every `(tabs)` route) from the generated
++            // `Href` union.
++            ignore: [/_layout\.[tj]sx?$/, /\.test\.[tj]sx?$/], // Skip layout files and colocated tests
++            // END FORK
+             platformRoutes: false, // We don't need to generate platform specific routes
+             notFound: false, // We don't need +not-found routes either
+             ignoreEntryPoints: true,

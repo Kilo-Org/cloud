@@ -2,9 +2,9 @@ import 'server-only';
 import crypto from 'node:crypto';
 import type { SerializedMessage, SerializedThread, StateAdapter } from 'chat';
 import * as z from 'zod';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { createSignedToken, verifySignedToken } from '@/lib/signed-token';
 
 const CHAT_SDK_CACHE_KEY_PREFIX = 'chat-sdk:cache:';
 const LINK_ACCOUNT_CONTEXT_KEY_PREFIX = 'link-account-context:';
@@ -36,11 +36,6 @@ export type PlatformIdentity = {
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
   userId: string;
   githubAppType?: 'standard' | 'lite';
-};
-
-type LinkTokenPayload = {
-  identity: PlatformIdentity;
-  contextKey: string;
 };
 
 type LinkAccountContext = {
@@ -136,13 +131,11 @@ export async function unlinkTeamKiloUsers(
 //
 // The link-account URL carries a single `token` query parameter rather than
 // plain-text platform/teamId/userId.  The token is HMAC-signed and time-limited
-// so a third party cannot forge a link for a team they don't belong to.
+// (via createSignedToken) so a third party cannot forge a link for a team they
+// don't belong to.
 //
 // Format:  base64url({ identity, contextKey, iat, nonce }) . HMAC-SHA256
-//
-// Follows the same pattern as src/lib/integrations/oauth-state.ts.
 
-const HMAC_ALGORITHM = 'sha256';
 const TOKEN_TTL_SECONDS = 30 * 60;
 const LINK_ACCOUNT_CONTEXT_TTL_MS = TOKEN_TTL_SECONDS * 1000;
 const NONCE_BYTES = 16;
@@ -195,28 +188,12 @@ const serializedMessageSchema = z.custom<SerializedMessage>(
 const linkTokenPayloadSchema = z.object({
   identity: platformIdentitySchema,
   contextKey: z.string(),
-  iat: z.number(),
-  nonce: z.string().min(1),
 });
 
 const linkAccountContextSchema = z.object({
   thread: serializedThreadSchema,
   message: serializedMessageSchema,
 });
-
-function hmacSign(data: string): string {
-  return crypto.createHmac(HMAC_ALGORITHM, NEXTAUTH_SECRET).update(data).digest('base64url');
-}
-
-/** Create a signed, time-limited token encoding a PlatformIdentity. */
-function createLinkToken(payload: LinkTokenPayload): string {
-  const iat = Math.floor(Date.now() / 1000);
-  const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
-  const encodedPayload = Buffer.from(JSON.stringify({ ...payload, iat, nonce })).toString(
-    'base64url'
-  );
-  return `${encodedPayload}.${hmacSign(encodedPayload)}`;
-}
 
 export async function createLinkAccountToken({
   identity,
@@ -229,7 +206,7 @@ export async function createLinkAccountToken({
 }): Promise<string> {
   const contextKey = `${LINK_ACCOUNT_CONTEXT_KEY_PREFIX}${crypto.randomBytes(NONCE_BYTES).toString('base64url')}`;
   await state.set<LinkAccountContext>(contextKey, { thread, message }, LINK_ACCOUNT_CONTEXT_TTL_MS);
-  return createLinkToken({ identity, contextKey });
+  return createSignedToken({ identity, contextKey });
 }
 
 export async function consumeLinkAccountContext(
@@ -245,33 +222,23 @@ export async function verifyLinkToken(
   state: StateAdapter,
   token: string
 ): Promise<VerifiedLinkToken | null> {
-  const dotIndex = token.indexOf('.');
-  if (dotIndex === -1) return null;
-
-  const payload = token.slice(0, dotIndex);
-  const providedSig = token.slice(dotIndex + 1);
-
-  const expectedSig = hmacSign(payload);
-  if (
-    providedSig.length !== expectedSig.length ||
-    !crypto.timingSafeEqual(Buffer.from(providedSig), Buffer.from(expectedSig))
-  ) {
-    return null;
-  }
+  const payload = verifySignedToken(token, {
+    ttlSeconds: TOKEN_TTL_SECONDS,
+    parse: raw => {
+      const parsed = linkTokenPayloadSchema.safeParse(raw);
+      if (!parsed.success) return null;
+      return { identity: parsed.data.identity, contextKey: parsed.data.contextKey };
+    },
+  });
+  if (!payload) return null;
 
   try {
-    const data = linkTokenPayloadSchema.parse(
-      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
-    );
-    const age = Math.floor(Date.now() / 1000) - data.iat;
-    if (age < 0 || age > TOKEN_TTL_SECONDS) return null;
-
-    const context = await state.get<unknown>(data.contextKey);
+    const context = await state.get<unknown>(payload.contextKey);
     const linkAccountContext = linkAccountContextSchema.parse(context);
 
     return {
-      contextKey: data.contextKey,
-      identity: data.identity,
+      contextKey: payload.contextKey,
+      identity: payload.identity,
       thread: linkAccountContext.thread,
       message: linkAccountContext.message,
     };

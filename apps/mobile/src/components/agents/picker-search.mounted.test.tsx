@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- the model and repository picker direction cases share a mount harness. */
+/* eslint-disable max-lines -- The repository and model pickers' search, alignment and centering contracts share one mount harness. */
 import {
   act,
   createElement,
@@ -16,6 +16,13 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type RepoOption } from '@/lib/picker-bridge';
 import { modelPickerSlot, repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import '@/i18n';
+
+// Live so a test can flip the interface direction before it mounts; the input
+// alignment helper reads `I18nManager.isRTL` when it composes the style.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The one token the picker's search input passes inline; the assertions read
+// the same value the mock hands the component.
+const theme = vi.hoisted(() => ({ foreground: '#111111' }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // Hoisted and mutable: `lib/rtl-text` reads `I18nManager.isRTL` at call time, so
@@ -74,7 +81,9 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: theme.foreground }),
+}));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({ favorites: [], addFavorite: vi.fn(), removeFavorite: vi.fn() }),
 }));
@@ -280,6 +289,60 @@ describe('picker search alignment follows the interface direction', () => {
       expect(textClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
     }
   );
+});
+
+describe('repository picker query alignment', () => {
+  function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    return input;
+  }
+
+  it('aligns the typed query to the field start edge in RTL', async () => {
+    // `textAlign: 'auto'` resolves against the first strong character, so a
+    // Latin query stays at the left edge while the clear and search controls
+    // sit at the right, leaving a dead gap between them.
+    i18nManager.isRTL = true;
+    const renderer = await mount(RepoPickerScreen);
+    expect(searchInput(renderer).props.style).toEqual([
+      { textAlign: 'right' },
+      { color: theme.foreground },
+    ]);
+  });
+
+  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(RepoPickerScreen);
+    expect(searchInput(renderer).props.style).toEqual({ color: theme.foreground });
+  });
+});
+
+describe('model picker query alignment', () => {
+  function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    return input;
+  }
+
+  it('aligns the query and its native placeholder to the field start edge in RTL', async () => {
+    // `textAlign: 'auto'` resolves against the first strong character, so a
+    // Latin query and the Arabic placeholder stay at the left edge while the
+    // clear and search controls sit at the right, leaving a dead gap between
+    // them. The model picker had no alignment at all before this.
+    i18nManager.isRTL = true;
+    const renderer = await mount(ModelPickerContent);
+    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
+  });
+
+  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(ModelPickerContent);
+    expect(searchInput(renderer).props.style).toBeUndefined();
+  });
 });
 
 async function mount(Component: () => ReactNode) {

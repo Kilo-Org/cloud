@@ -321,7 +321,7 @@ describe('StoredSessionRow live speech', () => {
     const button = hosts(renderer, 'Pressable')[0];
     expect(button?.props.onLongPress).toBeUndefined();
     act(() => {
-      button?.props.onPressIn?.();
+      (button?.props as { onPressIn?: () => void } | undefined)?.onPressIn?.();
     });
     expect(prefetchSessionTranscript).not.toHaveBeenCalled();
   });

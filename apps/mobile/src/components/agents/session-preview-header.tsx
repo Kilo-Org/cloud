@@ -59,11 +59,14 @@ export function SessionPreviewHeaderMeta({
     liveStatus === null ? null : glanceableStatusKind(liveStatus);
   const statusKind = rowStatusKind ?? target.statusKind;
 
-  const stateLabel = needsInput
-    ? t('agents.sessionRow.needsInput')
-    : target.live
-      ? t(statusKind === 'idle' ? 'common.idle' : 'common.working')
-      : null;
+  // A finished session has no live state, so its card shows the cost alone,
+  // exactly like the row it was opened from. Needs input outranks liveness.
+  let stateLabel: string | null = null;
+  if (needsInput) {
+    stateLabel = t('agents.sessionRow.needsInput');
+  } else if (target.live) {
+    stateLabel = t(statusKind === 'idle' ? 'common.idle' : 'common.working');
+  }
   const cost = formatSessionTotalCost(
     liveRow?.total_cost_microdollars ?? target.totalCostMicrodollars
   );

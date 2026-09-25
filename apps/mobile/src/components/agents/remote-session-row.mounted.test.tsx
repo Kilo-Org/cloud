@@ -402,7 +402,11 @@ describe('RemoteSessionRow long-press preview', () => {
         createElement(
           QueryClientProvider,
           { client },
-          createElement(RemoteSessionRow, { session, onPress: vi.fn(), interactive: false })
+          createElement(RemoteSessionRow, {
+            session,
+            onPress: vi.fn<() => void>(),
+            interactive: false,
+          })
         )
       );
       await flush();

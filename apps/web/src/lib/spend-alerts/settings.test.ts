@@ -6,7 +6,11 @@ import {
   organizations,
   user_notification_preferences,
 } from '@kilocode/db/schema';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  createOrganization,
+  removeUserFromOrganization,
+} from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   authorizedBillingContacts,
@@ -403,20 +407,31 @@ describe('authorizedBillingContacts', () => {
     expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
   });
 
-  it('includes the owner with no membership row at all', async () => {
-    const owner = await insertTestUser({
-      google_user_email: `sa-owner-absent-${Date.now()}@example.com`,
+  it('stops delivering to the creator whose membership was removed', async () => {
+    const creator = await insertTestUser({
+      google_user_email: `sa-owner-removed-${Date.now()}@example.com`,
+    });
+    const billingManager = await insertTestUser({
+      google_user_email: `sa-removed-billing-${Date.now()}@example.com`,
     });
 
-    const organization = await createOrganization('Spend alert absent owner', owner.id, false);
+    const organization = await createOrganization('Spend alert removed owner', creator.id, false);
     createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    // The creator held access and lost it. The organization keeps their id in
+    // `created_by_kilo_user_id`, so resolution must follow the membership row
+    // or the removed creator keeps receiving the organization's spend.
+    await addUserToOrganization(organization.id, creator.id, 'owner');
+    await removeUserFromOrganization(organization.id, creator.id);
 
     const contacts = await authorizedBillingContacts(db, {
       type: 'organization',
       organizationId: organization.id,
     });
 
-    expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
+    expect(contacts.userIds).not.toContain(creator.id);
+    expect(contacts.emails).not.toContain(creator.google_user_email);
+    expect(new Set(contacts.userIds)).toEqual(new Set([billingManager.id]));
   });
 
   it('includes a co-owner whose membership role is owner, not only the creator', async () => {
@@ -427,7 +442,8 @@ describe('authorizedBillingContacts', () => {
       google_user_email: `sa-co-owner-${Date.now()}@example.com`,
     });
 
-    // The creator holds no membership row; the co-owner holds the `owner` role.
+    // The creator holds no membership row, so they no longer receive the alert;
+    // the co-owner holds the `owner` role and does.
     const organization = await createOrganization('Spend alert co-owner', creator.id, false);
     createdOrganizationIds.push(organization.id);
     await addUserToOrganization(organization.id, coOwner.id, 'owner');
@@ -437,7 +453,8 @@ describe('authorizedBillingContacts', () => {
       organizationId: organization.id,
     });
 
-    expect(new Set(contacts.userIds)).toEqual(new Set([creator.id, coOwner.id]));
+    expect(new Set(contacts.userIds)).toEqual(new Set([coOwner.id]));
+    expect(contacts.userIds).not.toContain(creator.id);
   });
 
   it('includes the owner membership role of an organization with no creator', async () => {

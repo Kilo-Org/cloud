@@ -498,10 +498,11 @@ export async function saveSpendAlertSettings(
  * addresses. Organization scope: the organization's owners and the members
  * holding a recipient role ({@link ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES}) —
  * an `admin` with no billing duty is excluded. An owner is matched either by
- * the `owner` membership role or by `organizations.created_by_kilo_user_id`, so
- * a co-owner, and an owner whose membership is `member` (or who has no
- * membership row at all), still receives the alert. Personal scope: the owner
- * alone.
+ * the `owner` membership role or by `organizations.created_by_kilo_user_id`
+ * while that creator still holds a membership of the organization, so a
+ * co-owner, and a creator whose membership is `member`, still receive the
+ * alert, while a creator whose membership was removed does not. Personal scope:
+ * the owner alone.
  *
  * The recipient ids come from one `IN (SELECT ... UNION SELECT ...)`: the
  * planner can resolve the union from the organization's own rows, then
@@ -529,6 +530,20 @@ export async function authorizedBillingContacts(
   const recipientUserIds = database
     .select({ userId: organizations.created_by_kilo_user_id })
     .from(organizations)
+    // The creator counts as an owner only while they hold a membership row of
+    // this organization. `created_by_kilo_user_id` is history and is never
+    // cleared, so a removed creator would otherwise keep receiving the
+    // organization's spend; the row itself is the access
+    // (`ensureOrganizationAccess` reads memberships only). The role is
+    // deliberately not restricted here: the creator stays the organization's
+    // billing owner even when their membership says `member`.
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, organizations.id),
+        eq(organization_memberships.kilo_user_id, organizations.created_by_kilo_user_id)
+      )
+    )
     .where(eq(organizations.id, scope.organizationId))
     .union(
       database

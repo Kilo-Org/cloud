@@ -1,9 +1,16 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, describe, expect, it } from '@jest/globals';
 import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { spend_alert_deliveries } from '@kilocode/db/schema';
+import { organizations, spend_alert_deliveries } from '@kilocode/db/schema';
+import {
+  addUserToOrganization,
+  createOrganization,
+  removeUserFromOrganization,
+} from '@/lib/organizations/organizations';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 import { drainPendingSpendAlertDeliveries, type SpendAlertDeliveryDeps } from './delivery';
+import { organizationScopeKey } from './settings';
 
 type EmailInput = Parameters<SpendAlertDeliveryDeps['sendEmail']>[0];
 type PushInput = Parameters<SpendAlertDeliveryDeps['dispatchPush']>[0];
@@ -19,6 +26,7 @@ const DELIVERY_PAYLOAD = {
 };
 
 const createdDeliveryIds: string[] = [];
+const createdOrganizationIds: string[] = [];
 
 /**
  * A due pending row. Other suites share this table, so each test asserts on
@@ -156,6 +164,13 @@ afterEach(async () => {
       .delete(spend_alert_deliveries)
       .where(inArray(spend_alert_deliveries.id, createdDeliveryIds));
     createdDeliveryIds.length = 0;
+  }
+});
+
+afterAll(async () => {
+  if (createdOrganizationIds.length > 0) {
+    await db.delete(organizations).where(inArray(organizations.id, createdOrganizationIds));
+    createdOrganizationIds.length = 0;
   }
 });
 
@@ -477,5 +492,68 @@ describe('drainPendingSpendAlertDeliveries', () => {
     expect(after?.status).toBe('sent');
     expect(after?.attempt_count).toBe(1);
     expect(first.claimed + second.claimed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('drops an organization member who lost access before the queued alert was sent', async () => {
+    const creator = await insertTestUser({
+      google_user_email: `sa-drain-creator-${Date.now()}@example.com`,
+    });
+    const billingManager = await insertTestUser({
+      google_user_email: `sa-drain-billing-${Date.now()}@example.com`,
+    });
+    const removed = await insertTestUser({
+      google_user_email: `sa-drain-removed-${Date.now()}@example.com`,
+    });
+    const organization = await createOrganization('Spend alert drain scope', creator.id);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, removed.id, 'billing_manager');
+
+    // The sweep enqueued the alert with this recipient list, and the membership
+    // was removed before the drain sent the row.
+    const id = await insertDelivery({
+      scope_key: organizationScopeKey(organization.id),
+      recipients: {
+        userIds: [creator.id, billingManager.id, removed.id],
+        emails: [
+          creator.google_user_email,
+          billingManager.google_user_email,
+          removed.google_user_email,
+        ],
+      },
+    });
+    await removeUserFromOrganization(organization.id, removed.id);
+    const { deps, emails } = recordingDeps();
+
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 20 });
+
+    const emailed = emails.filter(input => input.scopeId === organization.id);
+    expect(emailed).toHaveLength(1);
+    expect(new Set(emailed[0]?.to)).toEqual(
+      new Set([creator.google_user_email, billingManager.google_user_email])
+    );
+    expect(emailed[0]?.to).not.toContain(removed.google_user_email);
+    expect((await readDelivery(id))?.status).toBe('sent');
+  });
+
+  it('keeps the stored recipients when nobody lost access', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-drain-kept-${Date.now()}@example.com`,
+    });
+    const organization = await createOrganization('Spend alert drain kept', owner.id);
+    createdOrganizationIds.push(organization.id);
+
+    const id = await insertDelivery({
+      scope_key: organizationScopeKey(organization.id),
+      recipients: { userIds: [owner.id], emails: [owner.google_user_email] },
+    });
+    const { deps, emails } = recordingDeps();
+
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 20 });
+
+    const emailed = emails.filter(input => input.scopeId === organization.id);
+    expect(emailed).toHaveLength(1);
+    expect(emailed[0]?.to).toEqual([owner.google_user_email]);
+    expect((await readDelivery(id))?.status).toBe('sent');
   });
 });

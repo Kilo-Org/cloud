@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useId, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import { MessageSquareWarning, Loader2, Check, History } from 'lucide-react';
@@ -22,7 +22,7 @@ import { isTextPart } from './types';
 import { formatFeedbackTimestamp } from './feedback-history';
 
 /** How many prior submissions the dialog shows. */
-export const FEEDBACK_HISTORY_LIMIT = 5;
+const FEEDBACK_HISTORY_LIMIT = 5;
 
 type FeedbackDialogProps = {
   organizationId?: string;
@@ -43,6 +43,14 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyHeadingId = useId();
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
   // Prior submissions from this account, so the dialog can show that feedback
   // was already sent instead of starting blank every time. Only fetched while
@@ -52,6 +60,9 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
     enabled: isOpen,
   });
   const history = historyQuery.data ?? [];
+  const historyError = historyQuery.isError;
+  const historyLoading = historyQuery.isPending;
+  const showHistorySection = historyLoading || historyError || history.length > 0;
 
   const {
     mutate,
@@ -63,7 +74,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
       onSuccess: () => {
         setShowSuccess(true);
         void queryClient.invalidateQueries(trpc.cloudAgentNextFeedback.list.queryFilter());
-        setTimeout(() => {
+        closeTimerRef.current = setTimeout(() => {
           setIsOpen(false);
         }, 1200);
       },
@@ -72,6 +83,10 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
       setIsOpen(open);
       setFeedbackText('');
       setShowSuccess(false);
@@ -131,7 +146,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
         <div className="space-y-4">
           {showSuccess ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
               <Check className="h-6 w-6 text-green-500" />
               <span className="ml-2 text-sm text-green-500">Thank you for your feedback!</span>
             </div>
@@ -147,7 +162,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
               />
 
               {error && (
-                <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400">
+                <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400" role="alert">
                   Failed to send feedback. Please try again.
                 </div>
               )}
@@ -169,24 +184,40 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
                 </Button>
               </div>
 
-              {history.length > 0 && (
+              {showHistorySection && (
                 <div className="border-t pt-4">
                   <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
                     <History className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span className="text-xs font-medium">Your recent feedback</span>
+                    <h3 id={historyHeadingId} className="text-xs font-medium">
+                      Your recent feedback
+                    </h3>
                   </div>
-                  <ul className="max-h-48 space-y-2 overflow-y-auto pr-1">
-                    {history.map(item => (
-                      <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
-                        <p className="text-foreground line-clamp-2 text-sm break-words">
-                          {item.feedback_text}
-                        </p>
-                        <p className="text-muted-foreground mt-0.5 text-xs">
-                          {formatFeedbackTimestamp(item.created_at)}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                  {historyLoading ? (
+                    <p className="text-muted-foreground text-xs">Loading recent feedback…</p>
+                  ) : historyError ? (
+                    <p className="text-muted-foreground text-xs" role="status">
+                      Could not load recent feedback.
+                    </p>
+                  ) : history.length > 0 ? (
+                    <ul
+                      aria-labelledby={historyHeadingId}
+                      className="max-h-48 space-y-2 overflow-y-auto pr-1"
+                    >
+                      {history.map(item => {
+                        const timestamp = formatFeedbackTimestamp(item.created_at);
+                        return (
+                          <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
+                            <p className="text-foreground line-clamp-2 text-sm break-words">
+                              {item.feedback_text}
+                            </p>
+                            {timestamp && (
+                              <p className="text-muted-foreground mt-0.5 text-xs">{timestamp}</p>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
                 </div>
               )}
             </>

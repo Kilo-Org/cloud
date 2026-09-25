@@ -559,6 +559,70 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
+  it('does not spawn when the refreshed instance reports attachments false', async () => {
+    const onSpawnAdmitted = vi.fn();
+    const onSpawnFailed = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => filesPayload,
+      refetchInstances: () =>
+        Promise.resolve({
+          data: {
+            instances: [
+              { ...INSTANCE, connectionId: 'conn-live', capabilities: { attachments: false } },
+            ],
+          },
+        }),
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+      onSpawnFailed: () => {
+        onSpawnFailed();
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
+    });
+    // The press-time row admitted the file payload because its capability was
+    // unknown, so the refreshed row's explicit refusal has to stop the spawn
+    // that was already admitted and re-arm the abandon guard.
+    expect(onSpawnAdmitted).toHaveBeenCalledTimes(1);
+    expect(onSpawnFailed).toHaveBeenCalledTimes(1);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it('does not spawn when the refreshed instance reports sessionClone false', async () => {
+    const onCloneImportFailure = vi.fn();
+    const onSpawnFailed = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      cloneFromKiloSessionId: 'ses_source',
+      refetchInstances: () =>
+        Promise.resolve({
+          data: {
+            instances: [
+              { ...INSTANCE, connectionId: 'conn-live', capabilities: { sessionClone: false } },
+            ],
+          },
+        }),
+      onCloneImportFailure: key => {
+        onCloneImportFailure(key);
+      },
+      onSpawnFailed: () => {
+        onSpawnFailed();
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotContinue');
+    });
+    expect(onSpawnFailed).toHaveBeenCalledTimes(1);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it('spawns a clone when the instance capability is unknown (optimistic default)', async () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',

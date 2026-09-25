@@ -302,6 +302,26 @@ export function useRemoteSpawnDispatch({
           onSpawnFailedRef.current?.();
           return;
         }
+        // The live row can differ from the press-time row (a rebooted host
+        // comes back on a new connectionId), and it can report an explicit
+        // refusal the press-time row did not. Re-run both admission checks
+        // against it, so a file payload or a clone source is never spawned on
+        // an instance that now refuses it. The attempt was already admitted at
+        // press time, so a refusal here fails it and re-arms the abandon guard.
+        const liveAdmission = resolveRemoteSpawnAdmission({
+          instance: live,
+          payload: submitPayload,
+        });
+        if (!liveAdmission.allowed) {
+          toast.error(liveAdmission.toast);
+          onSpawnFailedRef.current?.();
+          return;
+        }
+        if (fields.cloneFromKiloSessionId && live.capabilities?.sessionClone === false) {
+          onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
+          onSpawnFailedRef.current?.();
+          return;
+        }
         const selectedConnectionId = live.connectionId;
         // A rebooted host advertises the same name + projectName on a new
         // connectionId. Remap the selection to the live row so the spawn and

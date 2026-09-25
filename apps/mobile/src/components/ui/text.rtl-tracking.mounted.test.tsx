@@ -120,9 +120,7 @@ describe('Text tracked labels in RTL', () => {
 
   it('resets joined-script text in an LTR interface and keeps the tracking class', () => {
     i18nManager.isRTL = false;
-    const root = mount(
-      createElement(Text, { className: 'tracking-[1.5px]' }, 'استكشف')
-    );
+    const root = mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'استكشف'));
 
     expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
     expect(hostStyle(root)).toContainEqual(NATURAL_LETTER_SPACING);

@@ -97,8 +97,7 @@ function Text({
     className
   );
   const styles: StyleProp<TextStyle>[] = [
-    textLetterSpacing(props.children) ??
-      (isRTL && isRtlScript ? RTL_NO_LETTER_SPACING : undefined),
+    textLetterSpacing(props.children) ?? (isRTL && isRtlScript ? RTL_NO_LETTER_SPACING : undefined),
     isRTL ? RTL_WRITING_DIRECTION : undefined,
   ].filter((style): style is TextStyle => style !== undefined);
   if (props.style) {

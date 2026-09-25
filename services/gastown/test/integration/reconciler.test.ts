@@ -39,7 +39,6 @@ describe('Reconciler', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Single bead',
-        staged: false,
         tasks: [{ title: 'Unassigned bead' }],
       });
 
@@ -60,7 +59,6 @@ describe('Reconciler', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Blocked test',
-        staged: false,
         tasks: [{ title: 'First' }, { title: 'Second', depends_on: [0] }],
       });
 
@@ -79,7 +77,6 @@ describe('Reconciler', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Unblock test',
-        staged: false,
         tasks: [{ title: 'First' }, { title: 'Second', depends_on: [0] }],
       });
 
@@ -207,7 +204,6 @@ describe('Reconciler', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'AgentDone test',
-        staged: false,
         tasks: [{ title: 'Agent done test' }],
       });
 
@@ -248,7 +244,6 @@ describe('Reconciler', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Refinery test',
-        staged: false,
         tasks: [{ title: 'Review dispatch test' }],
       });
 
@@ -297,7 +292,6 @@ describe('Reconciler', () => {
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Rule 6 limit test',
-        staged: false,
         tasks: [{ title: 'Dispatch limit test' }],
       });
 

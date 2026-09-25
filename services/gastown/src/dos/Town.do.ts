@@ -1990,23 +1990,6 @@ export class TownDO extends DurableObject<Env> {
       `,
       [attempts, lastActivityAt ?? null, agentId]
     );
-
-    // Mirror resetAgentDispatchAttempts: the reconciler's per-bead dispatch cap
-    // (Rule 6) reads the hooked bead's counter, so an exhausted agent must also
-    // exhaust its hooked bead or the simulation would not reach the cap check.
-    const hookedBeadId = agents.getAgent(this.sql, agentId)?.current_hook_bead_id;
-    if (hookedBeadId) {
-      query(
-        this.sql,
-        /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.dispatch_attempts} = ?,
-              ${beads.columns.last_dispatch_attempt_at} = COALESCE(?, ${beads.columns.last_dispatch_attempt_at})
-          WHERE ${beads.bead_id} = ?
-        `,
-        [attempts, lastActivityAt ?? null, hookedBeadId]
-      );
-    }
   }
 
   async sendMail(input: SendMailInput): Promise<void> {
@@ -5909,14 +5892,6 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-
-    // deleteAll() drops the DO's SQLite tables but leaves this instance's
-    // resolved initPromise in place, so the next RPC would run against a
-    // schema-less database and throw "no such table". Most RPCs (listBeads,
-    // listAgents) do not call ensureInitialized, so re-create empty tables
-    // here. armAlarmIfNeeded stays a no-op because town:id is gone.
-    this.initPromise = null;
-    await this.ensureInitialized();
   }
 }
 

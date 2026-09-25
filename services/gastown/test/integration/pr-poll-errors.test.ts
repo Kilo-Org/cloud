@@ -40,7 +40,6 @@ describe('PR poll error discrimination (#3149)', () => {
     const result = await town.slingConvoy({
       rigId: 'rig-1',
       convoyTitle: 'PR Poll Test',
-      staged: false,
       tasks: [{ title: 'Task 1' }],
     });
 
@@ -54,7 +53,6 @@ describe('PR poll error discrimination (#3149)', () => {
     await town.agentDone(agentId, {
       branch: 'gt/polecat/test-branch',
       summary: 'Completed task',
-      pr_url: prUrl,
     });
 
     await runDurableObjectAlarm(town);
@@ -63,8 +61,18 @@ describe('PR poll error discrimination (#3149)', () => {
     const mrBead = allMrs.find(b => b.metadata?.source_bead_id === beadId);
     expect(mrBead).toBeTruthy();
 
-    // poll_pr only runs for in_progress MRs with review_metadata.pr_url
-    // (set above via agentDone). Open MRs wait for a refinery.
+    // Set the PR URL and put the MR bead back to in_progress so the
+    // reconciler will schedule a poll_pr action on the next alarm tick.
+    await town.updateBead(
+      mrBead!.bead_id,
+      {
+        metadata: {
+          ...(mrBead!.metadata ?? {}),
+          pr_url: prUrl,
+        },
+      },
+      'system'
+    );
     await town.updateBeadStatus(mrBead!.bead_id, 'in_progress', 'system');
 
     return { beadId, mrBeadId: mrBead!.bead_id, agentId, convoyId: result.convoy.id };

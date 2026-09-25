@@ -1266,6 +1266,7 @@ export const GatewayApiKindSchema = z.enum([
   'messages',
   'responses',
   'audio_transcriptions',
+  'systemone',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
@@ -2257,6 +2258,12 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  alias_target: z
+    .object({
+      slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
   reasoning: z
     .object({
       mandatory: z.boolean(),

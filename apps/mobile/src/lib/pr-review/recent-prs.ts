@@ -1,4 +1,3 @@
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 
 import {
@@ -8,6 +7,11 @@ import {
 } from '@kilocode/app-shared/provider-review';
 
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import {
+  readStoredValueForUpdate,
+  readStoredValueSafe,
+  writeStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
 import { PR_REVIEW_RECENTS_KEY } from '@/lib/storage-keys';
 
 export type RecentPr = {
@@ -134,8 +138,35 @@ function toJsonString(recents: RecentPr[]): string {
 }
 
 export async function getRecentPrs(): Promise<RecentPr[]> {
-  const raw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
+  // A failed read is reported and reads as "no recents"; the list is a
+  // convenience and must not reject into the screen.
+  const raw = await readStoredValueSafe(PR_REVIEW_RECENTS_KEY);
   return parseRecents(raw);
+}
+
+/**
+ * The recents for the OS search index. `undefined` means the read failed and
+ * was reported at warning level; the index must then claim no recents scope,
+ * because a read that did not happen is not evidence that an indexed entry is
+ * gone. {@link getRecentPrs} cannot serve this: reading a failure as "no
+ * recents" is the right screen outcome and the wrong index one, because the
+ * collector treats a read list as the whole scope and would delete every
+ * indexed recents entry.
+ */
+export async function getRecentPrsForIndex(): Promise<RecentPr[] | undefined> {
+  const read = await readStoredValueForUpdate(PR_REVIEW_RECENTS_KEY);
+  return read.status === 'unreadable' ? undefined : parseRecents(read.value);
+}
+
+/**
+ * The recents for a read-modify-write. `undefined` means the read failed and
+ * was reported at warning level; the caller must abort, because treating it as
+ * "no recents" would persist a list that never contained the stored entries and
+ * so destroy them. A successful read of nothing stored is `[]`.
+ */
+async function readRecentsForUpdate(): Promise<RecentPr[] | undefined> {
+  const read = await readStoredValueForUpdate(PR_REVIEW_RECENTS_KEY);
+  return read.status === 'unreadable' ? undefined : parseRecents(read.value);
 }
 
 /**
@@ -148,12 +179,18 @@ export async function getRecentPrs(): Promise<RecentPr[]> {
  */
 export async function upsertRecentPr(entry: RecentPr): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
-    const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
-    const existing = parseRecents(existingRaw);
+    const existing = await readRecentsForUpdate();
+    if (existing === undefined) {
+      // Unreadable: leave the stored recents untouched rather than replacing
+      // them with a list built from an empty one.
+      return;
+    }
     const incomingKey = recentPrKey(entry);
     const filtered = existing.filter(item => recentPrKey(item) !== incomingKey);
     const next = [entry, ...filtered].slice(0, RECENT_PR_LIMIT);
-    await SecureStore.setItemAsync(PR_REVIEW_RECENTS_KEY, toJsonString(next));
+    // Best effort: the caller fires this without awaiting, so a failed write is
+    // reported and swallowed rather than surfacing as an unhandled rejection.
+    await writeStoredValueSafe(PR_REVIEW_RECENTS_KEY, toJsonString(next));
   });
 }
 
@@ -162,11 +199,13 @@ export async function upsertRecentPr(entry: RecentPr): Promise<void> {
  */
 export async function removeRecentPr(ref: RecentPrRef): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
-    const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
-    const existing = parseRecents(existingRaw);
+    const existing = await readRecentsForUpdate();
+    if (existing === undefined) {
+      return;
+    }
     const targetKey = recentPrKey(ref);
     const next = existing.filter(item => recentPrKey(item) !== targetKey);
-    await SecureStore.setItemAsync(PR_REVIEW_RECENTS_KEY, toJsonString(next));
+    await writeStoredValueSafe(PR_REVIEW_RECENTS_KEY, toJsonString(next));
   });
 }
 
@@ -178,8 +217,10 @@ export async function removeRecentPr(ref: RecentPrRef): Promise<void> {
  */
 export async function markRecentPrFailed(ref: RecentPrRef): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
-    const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
-    const existing = parseRecents(existingRaw);
+    const existing = await readRecentsForUpdate();
+    if (existing === undefined) {
+      return;
+    }
     const targetKey = recentPrKey(ref);
     // `existing` is freshly parsed (safe to mutate in place); set the marker
     // only on the matching entry and never create one.
@@ -193,7 +234,7 @@ export async function markRecentPrFailed(ref: RecentPrRef): Promise<void> {
     if (!found) {
       return;
     }
-    await SecureStore.setItemAsync(PR_REVIEW_RECENTS_KEY, toJsonString(existing));
+    await writeStoredValueSafe(PR_REVIEW_RECENTS_KEY, toJsonString(existing));
   });
 }
 

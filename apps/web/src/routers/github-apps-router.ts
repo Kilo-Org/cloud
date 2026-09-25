@@ -54,6 +54,7 @@ import {
 import { createGitHubConnectionOAuthState } from '@/lib/integrations/github/connection-state';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  canUninstallGitHubInstallation,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
@@ -213,10 +214,15 @@ export const githubAppsRouter = createTRPCRouter({
         canConnectExisting: existingConnectionAdmission.allowed,
         existingConnectionAdmission,
         canAdd: canManageOrganization(role) && multipleInstallationsApproved,
-        installations: integrations.map(integration => {
-          const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
-          const status: 'connected' | 'disconnected' | 'pending' | 'suspended' | 'needs_attention' =
-            integration.github_disconnected_at
+        installations: await Promise.all(
+          integrations.map(async integration => {
+            const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
+            const status:
+              | 'connected'
+              | 'disconnected'
+              | 'pending'
+              | 'suspended'
+              | 'needs_attention' = integration.github_disconnected_at
               ? 'disconnected'
               : isPlatformIntegrationHealthy(integration)
                 ? 'connected'
@@ -225,29 +231,39 @@ export const githubAppsRouter = createTRPCRouter({
                   : integration.suspended_at || integration.integration_status === 'suspended'
                     ? 'suspended'
                     : 'needs_attention';
-          const canCancel =
-            status === 'pending' &&
-            (ctx.user.is_admin ||
-              role === 'owner' ||
-              role === 'admin' ||
-              integration.kilo_requester_user_id === ctx.user.id);
-          const metadata = integration.metadata as Record<string, unknown> | null;
+            const canCancel =
+              status === 'pending' &&
+              (ctx.user.is_admin ||
+                role === 'owner' ||
+                role === 'admin' ||
+                integration.kilo_requester_user_id === ctx.user.id);
+            const metadata = integration.metadata as Record<string, unknown> | null;
+            const hasConnectionRole =
+              integration.github_connection_role === 'workflow' ||
+              integration.github_connection_role === 'agent_only';
 
-          return {
-            id: integration.id,
-            accountLogin: integration.platform_account_login,
-            installationId: integration.platform_installation_id,
-            status,
-            repositorySelection: integration.repository_access,
-            repositories,
-            isPrimary: integration.id === primaryId,
-            canRefresh: status === 'connected' || status === 'needs_attention',
-            canUninstall: ctx.user.is_admin || role === 'owner' || role === 'admin',
-            canCancel,
-            modelSlug: (metadata?.model_slug as string) || null,
-            canManageModel,
-          };
-        }),
+            return {
+              id: integration.id,
+              accountLogin: integration.platform_account_login,
+              installationId: integration.platform_installation_id,
+              status,
+              connectionRole: integration.github_connection_role,
+              repositorySelection: integration.repository_access,
+              repositories,
+              isPrimary: integration.id === primaryId,
+              canRefresh:
+                hasConnectionRole && (status === 'connected' || status === 'needs_attention'),
+              canDisconnect:
+                canManageConnections && status !== 'disconnected' && status !== 'pending',
+              canUninstall:
+                (ctx.user.is_admin || role === 'owner' || role === 'admin') &&
+                (await canUninstallGitHubInstallation(integration)),
+              canCancel,
+              modelSlug: (metadata?.model_slug as string) || null,
+              canManageModel,
+            };
+          })
+        ),
       };
     }),
 
@@ -634,7 +650,12 @@ export const githubAppsRouter = createTRPCRouter({
         repositoryAccess: installationDetails.repository_selection,
         installedAt: installationDetails.created_at,
       });
-      const repositories = await fetchGitHubRepositories(installationId, appType, integration.id);
+      const repositories = await fetchGitHubRepositories(
+        installationId,
+        appType,
+        integration.id,
+        'management'
+      );
       await updateRepositoriesForIntegration(integration.id, repositories);
 
       if (input?.organizationId) {
@@ -717,7 +738,12 @@ export const githubAppsRouter = createTRPCRouter({
         ((owner.type === 'org' && integration.owned_by_organization_id === owner.id) ||
           (owner.type === 'user' && integration.owned_by_user_id === owner.id));
       if (integration && belongsToOwner) {
-        const repositories = await fetchGitHubRepositories(input.installationId, appType);
+        const repositories = await fetchGitHubRepositories(
+          input.installationId,
+          appType,
+          integration.id,
+          'management'
+        );
         await updateRepositoriesForIntegration(integration.id, repositories);
       }
 

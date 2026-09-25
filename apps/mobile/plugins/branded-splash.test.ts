@@ -5,7 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compileModsAsync, type ConfigPlugin, type ExportedConfig } from 'expo/config-plugins';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Each case runs expo-splash-screen's image pipeline through `compileModsAsync`,
+// and the idempotence case compiles twice. On a loaded machine (the full gate
+// saturates every core) that real filesystem work can stretch past the project's
+// 15 s budget and fail a healthy test. The file-wide timeout leaves that
+// headroom; a genuinely hung compile still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
 
 const require = createRequire(import.meta.url);
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -188,12 +195,12 @@ describe('shared branded splash', () => {
     // `resources` when the file is absent, so the project's own gitignored
     // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
     // worktree that prebuilt) cannot add its icon, notification or app-background
-    // entries to the array. Assert the splash color this plugin owns is present,
-    // like the styles assertion below, instead of that the file holds nothing
-    // else: containment, not the whole array and not its exact length, so a
-    // prebuild's other colors (iconBackground, colorPrimary, …) surviving here
-    // cannot fail the case, while the exact `#FAF74F` value stays pinned to the
-    // entry this plugin writes.
+    // entries to the array. The plugin's contract is that its own color is
+    // present, not that it is the only one: assert the splash color this plugin
+    // owns by containment, not by pinning the whole array or its exact length,
+    // and keep the exact `#FAF74F` value, the same way the styles assertion
+    // below pins its theme, so this case speaks only for the entry this plugin
+    // writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

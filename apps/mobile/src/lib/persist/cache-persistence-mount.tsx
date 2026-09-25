@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import { persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
 import { useEffect, useRef } from 'react';
 

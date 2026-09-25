@@ -216,6 +216,7 @@ export default function SessionDetailScreen() {
               />
             </View>
           }
+          headerRightShrinks
         />
         <SessionSkeletonMessages sessionId={sessionId} />
         <SessionComposerSkeleton />

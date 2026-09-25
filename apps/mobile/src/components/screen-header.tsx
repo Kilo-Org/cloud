@@ -114,6 +114,15 @@ type ScreenHeaderProps = {
    * a cluster no wider than a single icon button.
    */
   headerRightWidth?: number;
+  /**
+   * The `headerRight` cluster shrinks and truncates on its own (the session
+   * header's context pill: `min-w-0 shrink`, one-line cost). The slot then
+   * keeps its half-row cap, so an unbounded value truncates inside the cluster
+   * instead of pushing the title to zero width and the pill past the screen
+   * edge. Leave it off for fixed-width controls: a capped box cannot shrink
+   * them, so they would paint past it.
+   */
+  headerRightShrinks?: boolean;
   /** Controls rendered at the trailing edge of the title row, in the
    * leading-aligned row and beside a centered title alike. The heading keeps
    * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
@@ -173,6 +182,7 @@ export function ScreenHeader({
   size = 'default',
   headerRight,
   headerRightWidth,
+  headerRightShrinks = false,
   inlineActions,
   context,
   modal,
@@ -365,21 +375,24 @@ export function ScreenHeader({
       )}
     </Pressable>
   ) : null;
-  // The trailing cluster sizes to its content and never shrinks (`shrink-0`).
-  // The previous `max-w-[50%] shrink` cap clamped the cluster's box on narrow
-  // screens (a 360 dp viewport gives the session header's PR badge + metrics
-  // pill cluster just 180 dp) while its fixed-width children kept painting at
-  // their full width — the last control's glyphs ran past the right screen
-  // edge and were cut off (device capture, session-compose-kbup). Content
-  // sizing moves the squeeze to the title: `heading` is `min-w-0 flex-1`, so
-  // a long title truncates in place and the controls stay whole inside the
-  // screen's own padding.
+  // A fixed-width trailing cluster sizes to its content and never shrinks
+  // (`shrink-0`). A `max-w-[50%] shrink` cap clamped the cluster's box on
+  // narrow screens while its fixed-width children kept painting at their full
+  // width, so the last control's glyphs ran past the right screen edge and were
+  // cut off (device capture, session-compose-kbup). Content sizing moves the
+  // squeeze to the title: `heading` is `min-w-0 flex-1`, so a long title
+  // truncates in place and the controls stay whole inside the screen's own
+  // padding. A window too narrow to hold both drops the actions to their own
+  // row (`stackActions`), and a variable-width button caps itself: PR review's
+  // Submit review (pr-review-screen.tsx) and the Security Agent settings Save
+  // button (settings-save-button.tsx) each carry a 140 dp max-w.
   //
-  // A window too narrow to hold both drops the actions to their own row
-  // (`stackActions`), so the title is never squeezed to zero, and a
-  // variable-width `headerRight` still caps itself: PR review's Submit review
-  // (pr-review-screen.tsx) and the Security Agent settings Save button
-  // (settings-save-button.tsx) each carry a 140 dp max-w.
+  // A cluster that shrinks on its own (`headerRightShrinks`) keeps the
+  // half-row cap: its unbounded text truncates inside the cap, and the title
+  // keeps the other half of the row.
+  const headerRightSlotClassName = headerRightShrinks
+    ? 'ms-3 max-w-[50%] min-w-0 shrink'
+    : 'ms-3 shrink-0';
   const centeredControls =
     separateHeading && backControl && !inlineActions && (!headerRight || stackActions) ? (
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
@@ -394,7 +407,7 @@ export function ScreenHeader({
               {backControl}
               <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
               {headerRight && !stackActions ? (
-                <View className="ms-3 shrink-0">{headerRight}</View>
+                <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : (
                 centeredControls
               )}
@@ -416,7 +429,7 @@ export function ScreenHeader({
                 {heading}
               </View>
               {headerRight && !stackActions ? (
-                <View className="ms-3 shrink-0">{headerRight}</View>
+                <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : null}
               {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
             </View>

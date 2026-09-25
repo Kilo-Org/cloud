@@ -1280,7 +1280,7 @@ describe('SessionDetailContent header title', () => {
 });
 
 describe('session detail header right cluster', () => {
-  it('sizes the right cluster to its content and renders no copy control', async () => {
+  it('caps the right cluster inside the header slot and renders no copy control', async () => {
     const { renderer } = await mountDetails([]);
     const header = renderer.root.findByType(ScreenHeader);
     // The copy-link action left the header in #6343 (7fad4e808) and now lives
@@ -1288,22 +1288,18 @@ describe('session detail header right cluster', () => {
     // captured cannot paint here any more.
     expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
 
-    // The header sizes its right slot to the cluster's content and no longer
-    // caps it at half the row: a clamped box let the cluster's fixed-width
-    // children paint past the slot edge (session-compose-kbup capture), so the
-    // squeeze moved to the `min-w-0 flex-1` title instead.
+    // The header caps its right slot at half the row...
     const slot = header.findAll(
       node =>
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('ms-3') &&
-        node.props.className.includes('shrink-0')
+        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
     );
     expect(slot).toHaveLength(1);
-    expect(slot[0]?.props.className).not.toContain('max-w-[50%]');
+    expect(slot[0]?.props.className).toContain('min-w-0');
+    expect(slot[0]?.props.className).toContain('shrink');
 
-    // ...and the cluster inside it keeps its own `min-w-0 shrink`, so the pill
-    // stays the flexible part. It holds the context pill and nothing else: the
-    // PR badge now shares the goal row instead.
+    // ...and the cluster inside it shrinks into that cap, so it can never paint
+    // past the slot edge. It holds the context pill and nothing else: the PR
+    // badge now shares the goal row instead.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');

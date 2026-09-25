@@ -665,7 +665,12 @@ describe('Home live presentation', () => {
     // indicator while the live content is pending, so the platform pull
     // control must not also hold the scroll inset open for a second one.
     expect(refresh().props.refreshing).toBe(false);
-    expect(nodes('Skeleton')[0]?.props.className).toContain('min-h-[72px]');
+    expect(
+      nodes('View').some(view => {
+        const className = String(view.props.className ?? '');
+        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+      })
+    ).toBe(true);
     await act(async () => {
       pending.resolve(true);
       await pending.promise;

@@ -21,7 +21,7 @@ import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import type { AgentMode } from '@/components/cloud-agent/types';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Webhook, ExternalLink, RefreshCw } from 'lucide-react';
 

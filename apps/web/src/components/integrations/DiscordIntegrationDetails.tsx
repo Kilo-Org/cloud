@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { useConfirm } from '@/components/ui/confirm';
 
 type DiscordIntegrationDetailsProps = {

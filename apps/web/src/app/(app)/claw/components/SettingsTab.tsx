@@ -23,7 +23,7 @@ import { OpenclawExportCard } from './OpenclawExportCard';
 import { usePostHog } from 'posthog-js/react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';

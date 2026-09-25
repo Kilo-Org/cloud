@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';

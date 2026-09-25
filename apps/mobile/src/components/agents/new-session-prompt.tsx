@@ -470,7 +470,7 @@ export function NewSessionPrompt({
           onChangeText={handlePromptChange}
           onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
-          scrollEnabled={promptMeasure.height >= promptMaxHeight}
+          scrollEnabled={promptMeasure.height >= promptMeasure.maxHeight}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           returnKeyType={returnSendsMessage ? 'send' : 'default'}
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}

@@ -6,6 +6,7 @@ import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -79,8 +80,15 @@ class KiloSurfaceGeometryModule : Module() {
   }
 }
 
-/** Ints per ancestor in the signal's clip walk: presence, left, top, right, bottom. */
-private const val CLIP_STRIDE = 5
+/**
+ * Ints per ancestor in the signal's clip walk: presence, left, top, right,
+ * bottom, `clipChildren`, `clipToPadding`.
+ *
+ * The two flags are part of the walk because `measure` reads the visible rect
+ * they can change without any layout pass: a draw-only change to an ancestor's
+ * clipping would otherwise leave the signal equal and skip the measurement.
+ */
+private const val CLIP_STRIDE = 7
 
 /**
  * Android's surface-geometry probe: a `ViewTreeObserver.OnPreDrawListener`,
@@ -228,10 +236,10 @@ private class SurfaceGeometryObserver(
    * `measure` reads between layout events: the root's height, attachment, shown
    * state and window visibility, its screen location written into the
    * preallocated array, the ancestor scroll offsets, the ancestor walk's alpha
-   * product, clip bounds and transform chain, and the window insets, visible
-   * display frame and soft-input mode the safe-area and keyboard branches read.
-   * A change here is the only thing that starts a measurement between layout
-   * events.
+   * product, clip bounds, clipping flags and transform chain, and the window
+   * insets, visible display frame and soft-input mode the safe-area and keyboard
+   * branches read. A change here is the only thing that starts a measurement
+   * between layout events.
    */
   private fun signalChanged(root: View): Boolean {
     root.getLocationOnScreen(windowLocation)
@@ -260,6 +268,12 @@ private class SurfaceGeometryObserver(
         clipWalk[base + 3] = 0
         clipWalk[base + 4] = 0
       }
+      // Clipping flags are a ViewGroup property. A plain View clips nothing, so
+      // it records the default for both and never signals a change, while a
+      // ViewGroup signals a change that no layout event carries.
+      val group = ancestor as? ViewGroup
+      clipWalk[base + 5] = if (group == null || group.clipChildren) 1 else 0
+      clipWalk[base + 6] = if (group == null || group.clipToPadding) 1 else 0
       clipCount += 1
       val parent = ancestor.parent as? View
       if (parent != null) scroll += parent.scrollX + parent.scrollY

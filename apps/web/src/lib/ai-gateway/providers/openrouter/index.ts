@@ -109,17 +109,13 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return name;
 }
 
-// OpenRouter lists virtual models (tokenizer "Router") such as typesafe/jev-router with
-// empty supported_parameters, which makes Kilo clients drop them. Routers that forward to
-// regular chat models are likely to accept tools; other virtual models such as
-// openrouter/fusion or openrouter/bodybuilder are not, so only models named "Router" qualify.
-function isLikelyToolCapableVirtualRouter(model: OpenRouterModel): boolean {
-  return model.architecture.tokenizer === 'Router' && /\brouter\b/i.test(model.name);
-}
+// OpenRouter lists these virtual routers with empty supported_parameters, which makes Kilo
+// clients drop them, even though they route to regular chat models that accept tools.
+const TOOL_CAPABLE_VIRTUAL_ROUTER_IDS = new Set(['typesafe/jev-router', 'openrouter/pareto-code']);
 
-function addLikelyVirtualRouterToolSupport(model: OpenRouterModel): OpenRouterModel {
+function addVirtualRouterToolSupport(model: OpenRouterModel): OpenRouterModel {
   const supportedParameters = model.supported_parameters ?? [];
-  if (supportedParameters.includes('tools') || !isLikelyToolCapableVirtualRouter(model)) {
+  if (supportedParameters.includes('tools') || !TOOL_CAPABLE_VIRTUAL_ROUTER_IDS.has(model.id)) {
     return model;
   }
   return { ...model, supported_parameters: [...supportedParameters, 'tools'] };
@@ -162,7 +158,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
         return {
-          ...addLikelyVirtualRouterToolSupport(model),
+          ...addVirtualRouterToolSupport(model),
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
         };

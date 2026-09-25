@@ -337,7 +337,7 @@ describe('virtual router tool support', () => {
     return new Map(catalog.data.map(model => [model.id, model.supported_parameters]));
   }
 
-  it('adds tools to virtual routers that omit it', async () => {
+  it('adds tools to the allowlisted virtual routers', async () => {
     const params = await supportedParametersById([
       buildVirtualModel({ id: 'typesafe/jev-router', name: 'TypeSafe: Jev Router' }),
       buildVirtualModel({
@@ -351,29 +351,23 @@ describe('virtual router tool support', () => {
     expect(params.get('openrouter/pareto-code')).toEqual(['tools']);
   });
 
-  it('keeps upstream parameters of virtual routers that already list tools', async () => {
-    const upstream = ['max_tokens', 'tools', 'reasoning'];
+  it('does not duplicate tools when upstream already lists it', async () => {
+    const upstream = ['max_tokens', 'tools'];
     const params = await supportedParametersById([
-      buildVirtualModel({
-        id: 'openrouter/auto',
-        name: 'Auto Router',
-        supported_parameters: upstream,
-      }),
+      buildVirtualModel({ id: 'typesafe/jev-router', supported_parameters: upstream }),
     ]);
 
-    expect(params.get('openrouter/auto')).toEqual(upstream);
+    expect(params.get('typesafe/jev-router')).toEqual(upstream);
   });
 
-  it('does not add tools to virtual models that are not routers or to regular models', async () => {
+  it('does not add tools to other virtual models', async () => {
     const params = await supportedParametersById([
       buildVirtualModel({ id: 'openrouter/fusion', name: 'OpenRouter: Fusion' }),
-      buildVirtualModel({ id: 'openrouter/bodybuilder', name: 'Body Builder (beta)' }),
-      buildModel({ id: 'vendor/router-model', name: 'Router Model', supported_parameters: [] }),
+      buildVirtualModel({ id: 'vendor/other-router', name: 'Other Router' }),
     ]);
 
     expect(params.get('openrouter/fusion')).toEqual([]);
-    expect(params.get('openrouter/bodybuilder')).toEqual([]);
-    expect(params.get('vendor/router-model')).toEqual([]);
+    expect(params.get('vendor/other-router')).toEqual([]);
   });
 });
 

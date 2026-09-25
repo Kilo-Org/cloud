@@ -12,6 +12,7 @@ import android.util.Log
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -99,7 +100,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // the prefs fsync and the `AlarmManager` round-trip — to the module queue.
     Function("setWidgetSnapshot") { snapshot: String, expiresAt: Double ->
       widgetSnapshot = snapshot
-      executor.execute {
+      durableQueue.execute {
         durable {
           ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
         }
@@ -124,32 +125,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
     Function("getPostedChannel") {
       postedChannelOrNull()
     }
-
-    OnDestroy {
-      // The single queue thread must not outlive the module: a reload would
-      // otherwise leak one executor thread per module instance.
-      executor.shutdown()
-    }
   }
 
   /**
-   * The module's one serial queue for the durable write path.
-   *
-   * The JS thread must not pay the prefs fsync and binder round-trips these
-   * writes make, and neither default queue fits: `Queues.DEFAULT` is a thread
-   * pool (the writes would race each other and the order `post` depends on
-   * would not hold) and `Queues.MAIN` would put the fsync on the UI thread. A
-   * single-thread executor wrapped as a scope is what `runOnQueue` accepts for
-   * a custom queue.
-   *
-   * The queue is Android's alone, like the SharedPreferences fsync and the
-   * `AlarmManager` round-trip it carries: iOS's counterpart card is the
-   * ActivityKit Live Activity driven from `src/glanceable-ios/ios-sink.ts`,
-   * whose snapshot is persisted in JS, so that side has no synchronous native
-   * write to move off the JS thread.
+   * The module's one serial queue for the durable write path, shared by every
+   * module instance in the process (see `durableQueue`).
    */
-  private val executor = Executors.newSingleThreadExecutor { Thread(it, "active-agents-live-update") }
-  private val moduleQueue = CoroutineScope(executor.asCoroutineDispatcher())
+  private val moduleQueue = CoroutineScope(durableQueue.asCoroutineDispatcher())
 
   /**
    * The snapshot this JS runtime most recently handed to `setWidgetSnapshot`, or
@@ -480,5 +462,32 @@ class ActiveAgentsLiveUpdateModule : Module() {
     /** The kind marker in the channel id the JS side creates for needs-input. */
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
     const val APPROVE_REQUEST_CODE = 1003
+
+    /**
+     * The module's one serial queue for the durable write path, shared by every
+     * module instance in the process.
+     *
+     * The JS thread must not pay the prefs fsync and binder round-trips these
+     * writes make, and neither default queue fits: `Queues.DEFAULT` is a thread
+     * pool (the writes would race each other and the order `post` depends on
+     * would not hold) and `Queues.MAIN` would put the fsync on the UI thread. A
+     * single-thread executor wrapped as a scope is what `runOnQueue` accepts for
+     * a custom queue.
+     *
+     * It is a process-wide singleton rather than a per-instance executor:
+     * `OnDestroy` cannot drain a queue, so a replaced module's already-queued
+     * write would otherwise land after the replacement's newer write and
+     * persist a stale snapshot or deadline. One queue keeps every durable write
+     * in submission order across instances, and one thread for the process
+     * replaces the per-instance thread a shutdown used to guard against.
+     *
+     * The queue is Android's alone, like the SharedPreferences fsync and the
+     * `AlarmManager` round-trip it carries: iOS's counterpart card is the
+     * ActivityKit Live Activity driven from `src/glanceable-ios/ios-sink.ts`,
+     * whose snapshot is persisted in JS, so that side has no synchronous native
+     * write to move off the JS thread.
+     */
+    val durableQueue: ExecutorService =
+      Executors.newSingleThreadExecutor { Thread(it, "active-agents-live-update") }
   }
 }

@@ -5,6 +5,7 @@ import type {
   OpenRouterModel,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
+  buildDataCollectionRequiredModelIds,
   buildModelIdToProviderSlugsIndex,
   createModelsByProviderIndexLoader,
   getEndpointProviderSlugs,
@@ -76,6 +77,54 @@ describe('getSnapshotModelVariantId', () => {
     expect(getSnapshotModelVariantId({ ...snapshotModel(MODEL, 'free'), endpoint: null })).toBe(
       MODEL
     );
+  });
+});
+
+describe('buildDataCollectionRequiredModelIds', () => {
+  function provider(slug: string, training: boolean, models: OpenRouterModel[]) {
+    return {
+      name: slug,
+      displayName: slug,
+      slug,
+      dataPolicy: { training, retainsPrompts: true, canPublish: false },
+      models,
+    };
+  }
+
+  function withTraining(model: OpenRouterModel, training: boolean): OpenRouterModel {
+    return model.endpoint
+      ? { ...model, endpoint: { ...model.endpoint, data_policy: { training } } }
+      : model;
+  }
+
+  it('includes only model variants that train on every provider', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('meta', false, [
+        withTraining(snapshotModel('meta/muse-spark-1.3-contributor', 'standard'), true),
+        withTraining(snapshotModel('meta/muse-spark-1.3', 'standard'), false),
+        withTraining(snapshotModel('mixed/model', 'standard'), true),
+      ]),
+      provider('other', true, [
+        snapshotModel('mixed/model', 'standard'),
+        snapshotModel(MODEL, 'free'),
+      ]),
+      provider('private', false, [withTraining(snapshotModel('mixed/model', 'standard'), false)]),
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(
+      new Set(['meta/muse-spark-1.3-contributor', FREE_MODEL])
+    );
+  });
+
+  it('keys standard and free variants separately', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('paid', false, [snapshotModel(MODEL, 'standard')]),
+      provider('free', false, [withTraining(snapshotModel(MODEL, 'free'), true)]),
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(new Set([FREE_MODEL]));
   });
 });
 

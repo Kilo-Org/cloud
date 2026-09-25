@@ -186,10 +186,12 @@ const secureStoreMock = {
     secureStore.set(key, value);
     await Promise.resolve();
   },
-  getItemAsync: async (key: string) => {
+  // `vi.fn` so a test can install a one-shot read failure or a read that stays
+  // in flight; `vi.clearAllMocks()` in `beforeEach` keeps this implementation.
+  getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
     return secureStore.get(key) ?? null;
-  },
+  }),
 };
 
 const subscriptions = new Set<string>();
@@ -1779,7 +1781,10 @@ describe('iosSink stray sweep', () => {
     // read the still-null snapshot as "nothing persisted": the record this read
     // is about to consult may name an owner.
     const gate = Promise.withResolvers<string | null>();
-    secureStoreMock.getItemAsync.mockImplementationOnce(async () => gate.promise);
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
     const restore = restorePersistedGlanceable();
     sweepStrayActivities();
 

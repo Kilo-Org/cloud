@@ -8,13 +8,15 @@
  *
  * Exports:
  *   parseMachODylibs(buffer)        pure Mach-O LC_LOAD_DYLIB/weak/reexport/upward reader
- *   readIpaComponents({ ipaPath })  unzip the IPA, walk the app executable and Frameworks/
+ *   readIpaComponents({ ipaPath })  unzip the IPA, walk the app and every embedded
+ *                                   app extension: each executable's load commands
+ *                                   and each bundle's Frameworks/ directory
  *   comparePodfileLock(...)         gap measurement against a real Podfile.lock (printed only)
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 // Mach-O magic numbers as read by readUInt32BE(0): the big-endian pair means
 // the file's fields are big-endian, the CIGAM pair means little-endian.
@@ -248,15 +250,92 @@ function toComponent(name, kind) {
 }
 
 /**
- * Read every CocoaPods component the IPA carries: the app executable's
- * LC_LOAD_DYLIB family install names plus the dynamic frameworks and dylibs
- * under `Payload/<App>.app/Frameworks/`. Both sources are merged by name so a
- * framework that is both linked and shipped appears once; the kind recorded is
- * the first one that discovered it (load command before on-disk bundle).
+ * The names of the embedded app extensions in `appPath`, sorted so the walk is
+ * deterministic. An extension is a `PlugIns/*.appex` directory.
+ */
+function embeddedExtensionNames(appPath) {
+  const plugInsDir = join(appPath, 'PlugIns');
+  if (!existsSync(plugInsDir)) {
+    return [];
+  }
+  return readdirSync(plugInsDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && entry.name.endsWith('.appex'))
+    .map(entry => entry.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Resolve one bundle's executable and prove it exists.
+ *
+ * `Info.plist` names it in `CFBundleExecutable`. A plist that cannot be read,
+ * or that omits the key, falls back to the bundle name without its extension,
+ * which is the layout Xcode writes — and because the result is checked against
+ * the file system, a wrong fallback fails here instead of silently reporting a
+ * bundle with no dependencies.
+ */
+function bundleExecutablePath(bundlePath, label) {
+  const bundleName = basename(bundlePath);
+  let executableName;
+  try {
+    const plist = parseInfoPlist(join(bundlePath, 'Info.plist'));
+    executableName = isNonEmptyString(plist.CFBundleExecutable)
+      ? plist.CFBundleExecutable
+      : bundleName.replace(/\.[^.]+$/, '');
+  } catch {
+    executableName = bundleName.replace(/\.[^.]+$/, '');
+  }
+  const executablePath = join(bundlePath, executableName);
+  if (!existsSync(executablePath)) {
+    throw new Error(`${label} has no ${executableName} executable (checked ${executablePath})`);
+  }
+  return executablePath;
+}
+
+/**
+ * Add the components one bundle ships: the load-command install names of its
+ * executable, then the dynamic frameworks and dylibs under its `Frameworks/`
+ * directory. Both sources merge through `add`, so a framework that is both
+ * linked and shipped appears once, with the kind of the first source that
+ * discovered it (load command before on-disk bundle).
  *
  * A load command naming an OS-provided library (`/usr/lib/`, `/System/Library/`)
- * is skipped: the OS supplies it, the IPA does not carry it, and counting it as
- * a pod would overstate the CocoaPods list.
+ * is skipped: the OS supplies it, the bundle does not carry it, and counting it
+ * as a pod would overstate the CocoaPods list.
+ */
+function addBundleComponents({ bundlePath, executablePath, add }) {
+  for (const installName of parseMachODylibs(readFileSync(executablePath))) {
+    if (isOsProvidedDylib(installName)) {
+      continue;
+    }
+    add(normalizeInstallName(installName), KIND_LOAD_COMMAND);
+  }
+
+  const frameworksDir = join(bundlePath, 'Frameworks');
+  if (!existsSync(frameworksDir)) {
+    return;
+  }
+  const entries = readdirSync(frameworksDir, { withFileTypes: true }).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.endsWith('.framework')) {
+      add(entry.name, KIND_DYNAMIC_FRAMEWORK);
+    } else if (entry.isFile() && entry.name.endsWith('.dylib')) {
+      add(entry.name, KIND_DYNAMIC_FRAMEWORK);
+    }
+  }
+}
+
+/**
+ * Read every CocoaPods component the IPA carries: the app executable's
+ * LC_LOAD_DYLIB family install names plus the dynamic frameworks and dylibs
+ * under `Payload/<App>.app/Frameworks/`, and the same two sources inside every
+ * embedded `Payload/<App>.app/PlugIns/*.appex` extension.
+ *
+ * The extensions are walked because their dependencies are invisible from the
+ * app: an extension links its own frameworks and can ship its own
+ * `Frameworks/` directory, and a framework used only by an extension appears
+ * nowhere in the app bundle.
  */
 export function readIpaComponents({ ipaPath } = {}) {
   if (!isNonEmptyString(ipaPath)) {
@@ -306,25 +385,18 @@ export function readIpaComponents({ ipaPath } = {}) {
       components.push(toComponent(name, kind));
     };
 
-    for (const installName of parseMachODylibs(readFileSync(executablePath))) {
-      if (isOsProvidedDylib(installName)) {
-        continue;
-      }
-      add(normalizeInstallName(installName), KIND_LOAD_COMMAND);
-    }
+    addBundleComponents({ bundlePath: appPath, executablePath, add });
 
-    const frameworksDir = join(appPath, 'Frameworks');
-    if (existsSync(frameworksDir)) {
-      const entries = readdirSync(frameworksDir, { withFileTypes: true }).sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.endsWith('.framework')) {
-          add(entry.name, KIND_DYNAMIC_FRAMEWORK);
-        } else if (entry.isFile() && entry.name.endsWith('.dylib')) {
-          add(entry.name, KIND_DYNAMIC_FRAMEWORK);
-        }
-      }
+    // An embedded app extension carries its own dependencies, none of which the
+    // app executable's load commands or the app's Frameworks/ directory can
+    // name, so every PlugIns/*.appex bundle is walked the same way.
+    for (const extensionName of embeddedExtensionNames(appPath)) {
+      const extensionPath = join(appPath, 'PlugIns', extensionName);
+      addBundleComponents({
+        bundlePath: extensionPath,
+        executablePath: bundleExecutablePath(extensionPath, `extension ${extensionName}`),
+        add,
+      });
     }
 
     let dylibs = 0;

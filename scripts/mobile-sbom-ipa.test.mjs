@@ -22,6 +22,11 @@ const INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+/** The same Info.plist for an embedded extension bundle: only the executable differs. */
+function extensionInfoPlist(executable) {
+  return INFO_PLIST.replace('<string>Kilo</string>', `<string>${executable}</string>`);
+}
+
 // Minimal ZIP writer (local headers + central directory + EOCD) copied from
 // scripts/inspect-mobile-artifacts.test.mjs so the test is self-contained and
 // only needs the system `unzip` that inspect-mobile-artifacts already relies on.
@@ -307,6 +312,84 @@ test('readIpaComponents excludes OS-provided dylibs and frameworks', () => {
     ['React.framework']
   );
   assert.deepEqual(result.counts, { dylibs: 0, frameworks: 1 });
+});
+
+test('readIpaComponents includes dependencies only an embedded extension carries', () => {
+  const appExecutable = buildThin({
+    is64: true,
+    littleEndian: true,
+    commands: [dylibCommand(LC_LOAD_DYLIB, '@rpath/AppOnly.framework/AppOnly', true)],
+  });
+  const extensionExecutable = buildThin({
+    is64: true,
+    littleEndian: true,
+    commands: [
+      dylibCommand(LC_LOAD_DYLIB, '@rpath/ExtensionOnly.framework/ExtensionOnly', true),
+      dylibCommand(LC_LOAD_DYLIB, '@executable_path/libExtOnly.dylib', true),
+      // The OS supplies this one, so the extension must not report it either.
+      dylibCommand(LC_LOAD_DYLIB, '/usr/lib/libSystem.B.dylib', true),
+    ],
+  });
+  const result = withZip(
+    [
+      ['Payload/Kilo.app/Info.plist', INFO_PLIST],
+      ['Payload/Kilo.app/Kilo', appExecutable],
+      [
+        'Payload/Kilo.app/PlugIns/NotificationService.appex/Info.plist',
+        extensionInfoPlist('NotificationService'),
+      ],
+      [
+        'Payload/Kilo.app/PlugIns/NotificationService.appex/NotificationService',
+        extensionExecutable,
+      ],
+      [
+        'Payload/Kilo.app/PlugIns/NotificationService.appex/Frameworks/NotifKit.framework/NotifKit',
+        'binary',
+      ],
+    ],
+    ipaPath => readIpaComponents({ ipaPath })
+  );
+
+  const byName = new Map(result.components.map(component => [component.name, component]));
+  assert.deepEqual([...byName.keys()].sort(), [
+    'AppOnly.framework',
+    'ExtensionOnly.framework',
+    'NotifKit.framework',
+    'libExtOnly.dylib',
+  ]);
+  assert.deepEqual(
+    byName.get('ExtensionOnly.framework').extraProperties,
+    [{ name: 'kilo:sbom:ios-kind', value: 'dylib-load-command' }]
+  );
+  assert.deepEqual(byName.get('NotifKit.framework').extraProperties, [
+    { name: 'kilo:sbom:ios-kind', value: 'dynamic-framework' },
+  ]);
+  assert.deepEqual(result.counts, { dylibs: 1, frameworks: 3 });
+});
+
+test('readIpaComponents falls back to the bundle name when an extension plist is unreadable', () => {
+  const extensionExecutable = buildThin({
+    is64: true,
+    littleEndian: true,
+    commands: [dylibCommand(LC_LOAD_DYLIB, '@rpath/ExtensionOnly.framework/ExtensionOnly', true)],
+  });
+  const result = withZip(
+    [
+      ['Payload/Kilo.app/Info.plist', INFO_PLIST],
+      ['Payload/Kilo.app/Kilo', buildFixtureImage()],
+      ['Payload/Kilo.app/PlugIns/NotificationService.appex/Info.plist', 'not a plist'],
+      [
+        'Payload/Kilo.app/PlugIns/NotificationService.appex/NotificationService',
+        extensionExecutable,
+      ],
+    ],
+    ipaPath => readIpaComponents({ ipaPath })
+  );
+
+  assert.deepEqual(
+    result.components.map(component => component.name),
+    ['libBeta.dylib', 'ExtensionOnly.framework']
+  );
 });
 
 test('readIpaComponents rejects an IPA without a Payload bundle', () => {

@@ -2601,7 +2601,7 @@
       "useSkillCommand": "/{{command}} ਹੁਨਰ ਵਰਤੋ",
       "skillBadge": "ਹੁਨਰ",
       "catalogFull": "ਕਮਾਂਡ ਸੂਚੀ ਭਰ ਗਈ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਕਮਾਂਡ ਲੁਕੇ ਹੋਏ ਹਨ।",
-      "catalogOverLimit": "ਸਕਿੱਲ ਸੂਚੀ ਆਕਾਰ ਸੀਮਾ ਤੋਂ ਵੱਧ ਹੈ, ਇਸ ਲਈ ਹਰ ਸਕਿੱਲ ਦਿਖਾਈ ਦਿੰਦਾ ਹੈ।",
+      "catalogOverLimit": "ਹੁਨਰ ਸੂਚੀ ਆਕਾਰ ਸੀਮਾ ਤੋਂ ਵੱਧ ਹੈ, ਇਸ ਲਈ ਹਰ ਹੁਨਰ ਦਿਖਾਈ ਦਿੰਦਾ ਹੈ।",
       "insert": "ਸ਼ਾਮਲ ਕਰੋ",
       "upgradeRequiredFallback": "ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਕਮਾਂਡ ਨੂੰ ਵਰਤਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਗਰੇਡ ਕਰੋ।",
       "exitCapabilityUnavailable": "ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਨਿਕਲਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਡੇਟ ਕਰੋ।",

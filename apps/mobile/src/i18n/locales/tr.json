@@ -2097,7 +2097,7 @@
       "useSkillCommand": "/{{command}} becerisini kullan",
       "skillBadge": "Beceri",
       "catalogFull": "Komut kataloğu dolu, bu yüzden bazı komutlar gizli.",
-      "catalogOverLimit": "Yetenek kataloğu boyut sınırını aşıyor, bu yüzden tüm yetenekler listeleniyor.",
+      "catalogOverLimit": "Beceri kataloğu boyut sınırını aşıyor, bu yüzden tüm beceriler listeleniyor.",
       "insert": "Ekle",
       "upgradeRequiredFallback": "Bu komutu kullanmak için CLI'yı güncelle.",
       "exitCapabilityUnavailable": "Oturumdan çıkmak için CLI'yı güncelle.",

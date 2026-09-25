@@ -2601,7 +2601,7 @@
       "useSkillCommand": "ใช้ทักษะ /{{command}}",
       "skillBadge": "ทักษะ",
       "catalogFull": "รายการคำสั่งเต็มแล้ว จึงมีบางคำสั่งถูกซ่อนไว้",
-      "catalogOverLimit": "รายการสกิลเกินขีดจำกัดขนาด จึงแสดงสกิลทั้งหมด",
+      "catalogOverLimit": "รายการทักษะเกินขีดจำกัดขนาด จึงแสดงทักษะทั้งหมด",
       "insert": "แทรก",
       "upgradeRequiredFallback": "กรุณาอัปเดต CLI เพื่อใช้คำสั่งนี้",
       "exitCapabilityUnavailable": "อัปเดต CLI ของคุณเพื่อออกจากเซสชัน",

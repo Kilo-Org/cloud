@@ -1,8 +1,10 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
+import { hasBestEffortGuessDataCollectionRequirement } from '@/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
@@ -110,4 +112,18 @@ export async function collectDeniedAutoRoutingModelIds(
     })
   );
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
+}
+
+export async function collectDataCollectionRequiredAutoRoutingModelIds(
+  owner: AutoRoutingOwner
+): Promise<string[]> {
+  const [candidateIds, dataCollectionRequiredModelIds] = await Promise.all([
+    loadAutoRoutingCandidateModelIds(owner),
+    getDataCollectionRequiredModelIds(),
+  ]);
+  return candidateIds.filter(
+    modelId =>
+      hasBestEffortGuessDataCollectionRequirement(modelId) ||
+      dataCollectionRequiredModelIds.has(modelId)
+  );
 }

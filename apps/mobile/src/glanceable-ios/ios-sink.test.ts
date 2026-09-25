@@ -1768,6 +1768,38 @@ describe('iosSink stray sweep', () => {
     await restore;
   });
 
+  it('sweeps again once the deferred restore lands, so an unowned card cannot survive it', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // Launch: the foreground edge reaches the sweep before the SecureStore read
+    // lands, so the sweep defers with the duplicates collapsed. That read is
+    // the only thing that will settle it, and it then reports an empty mirror,
+    // so no snapshot owns the surface and the card the sweep kept is unowned.
+    // The deferred sweep must run again instead of waiting for some later
+    // foreground or publisher update.
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
+
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+
+    gate.resolve(null);
+    await restore;
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
   it('keeps one card while a later restore is in flight, not only the first', async () => {
     const cards = [nativeStray(), nativeStray()];
     // The first restore settles against an empty mirror, so the in-memory

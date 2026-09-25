@@ -62,6 +62,11 @@ let restoreUnavailable = false;
 // until the last one lands.
 let restoresInFlight = 0;
 
+// Callers parked on the read window (see `whenGlanceableRestoresSettle`). A
+// caller that deferred work on an unsettled read waits here, so the last read
+// to land resumes it instead of dropping the work.
+let settleWaiters: (() => void)[] = [];
+
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
   return lastSnapshot;
 }
@@ -86,6 +91,26 @@ export function isGlanceableRestoreUnavailable(): boolean {
  */
 export function isGlanceableRestoreSettled(): boolean {
   return restoresInFlight === 0;
+}
+
+/**
+ * Resolve once no `restorePersistedGlanceable` read is in flight. A caller that
+ * had to defer work on an unsettled read — a sweep that must not retire cards
+ * on a null snapshot that only means "not read yet" — waits here and resumes
+ * when the last read lands, instead of dropping the work until some later
+ * foreground or publisher update happens to come by.
+ *
+ * Resolves at once when nothing is in flight, so the caller can await it on
+ * every path. A read that fails still settles, so a waiter always resumes and
+ * re-reads the state, including `isGlanceableRestoreUnavailable`.
+ */
+export function whenGlanceableRestoresSettle(): Promise<void> {
+  if (restoresInFlight === 0) {
+    return Promise.resolve();
+  }
+  return new Promise<void>(resolve => {
+    settleWaiters.push(resolve);
+  });
 }
 
 export function getLocalScopeKey(): string | null {
@@ -178,6 +203,13 @@ export async function restorePersistedGlanceable(): Promise<void> {
     // read, so a null snapshot stops meaning "the read has not finished" once
     // every in-flight read has consulted the record.
     restoresInFlight -= 1;
+    if (restoresInFlight === 0) {
+      const waiting = settleWaiters;
+      settleWaiters = [];
+      for (const resume of waiting) {
+        resume();
+      }
+    }
   }
 }
 
@@ -221,5 +253,6 @@ export function _resetGlanceablePersistForTests(): void {
   localScopeKey = null;
   restoreUnavailable = false;
   restoresInFlight = 0;
+  settleWaiters = [];
   secureStoreForTests = null;
 }

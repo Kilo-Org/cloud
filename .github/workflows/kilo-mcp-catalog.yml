@@ -119,9 +119,20 @@ jobs:
         if: steps.catalog_changes.outputs.catalog == 'true'
         run: node --test scripts/kilo-mcp-catalog.test.mjs
 
-      - name: Install web dependencies
+      # The dump enumerates apps/web's whole tRPC graph, and that graph imports
+      # other workspaces' source through relative paths (for example
+      # apps/web/src/routers/cloud-agent-next-schemas.ts imports
+      # services/cloud-agent-next/src/shared/sandbox-status.ts). A filtered
+      # install leaves those files without their own node_modules, so a bare
+      # import such as `zod` resolves to another version's hoisted copy: the
+      # service's sandbox schema is then built by zod 4.4.3 instead of its own
+      # zod 4.6.5, and the regenerated catalog drops the `format:
+      # "starts_with"` annotation the apps/web byte-equality suite and the
+      # deployed bundle carry. Install the whole workspace so every source file
+      # resolves the dependencies its own package.json declares.
+      - name: Install workspace dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile
 
       # Same dummies the jest suite already tolerates (ci.yml does the same for
       # the production build). The dump itself layers apps/web/.env.test under
@@ -352,9 +363,13 @@ jobs:
         if: steps.merge_changes.outputs.catalog == 'true'
         run: npm install -g @kilocode/cli
 
-      - name: Install web dependencies
+      # Whole-workspace install for the same reason as the PR job: the dump
+      # reads other workspaces' source through relative paths, so a filtered
+      # install would let a bare dependency import resolve to another version's
+      # hoisted copy and regenerate a catalog the committed file does not match.
+      - name: Install workspace dependencies
         if: steps.merge_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile
 
       - name: Setup dummy env
         if: steps.merge_changes.outputs.catalog == 'true'

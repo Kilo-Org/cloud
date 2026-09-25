@@ -33,8 +33,11 @@ export const messageInputKeyboardProps = {
   submitBehavior: 'newline',
 } satisfies Pick<TextInputProps, 'keyboardType' | 'returnKeyType' | 'submitBehavior'>;
 
-export function resolveMessageInputShouldScroll(inputHeight: number): boolean {
-  return inputHeight >= MESSAGE_INPUT_MAX_HEIGHT;
+export function resolveMessageInputShouldScroll(
+  inputHeight: number,
+  maxHeight: number = MESSAGE_INPUT_MAX_HEIGHT
+): boolean {
+  return inputHeight >= maxHeight;
 }
 
 export function resolveMessageInputHeight(contentHeight: number): number {

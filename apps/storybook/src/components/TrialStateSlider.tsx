@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getOrgTrialStatusFromDays } from '@/lib/organizations/trial-utils';
-import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
+import {
+  getOrgTrialStatusFromDays,
+  type OrganizationTrialDisplayStatus,
+} from '@/lib/organizations/trial-utils';
 
 type TrialStateSliderProps = {
   children: (props: {
     daysRemaining: number;
-    state: OrgTrialStatus;
+    state: OrganizationTrialDisplayStatus;
     isOwner: boolean;
   }) => React.ReactNode;
   minDays?: number;

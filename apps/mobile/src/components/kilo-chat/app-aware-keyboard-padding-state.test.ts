@@ -40,6 +40,29 @@ describe('platform-aware keyboard bottom occlusion', () => {
       resolveKeyboardBottomPadding({ platform: 'android', keyboardHeight: 0, bottomInset: 0 })
     ).toBe(48);
   });
+
+  it('reserves the same strip on both platforms for the same docked keyboard', () => {
+    // One docked keyboard hides one strip from the screen bottom. Android
+    // reports that strip minus the navigation bar and iOS reports the frame
+    // that reaches the screen bottom, so the two inputs differ while the
+    // reserved strip is the same number.
+    const occludedStrip = 767;
+    const navigationBar = 63;
+    expect(
+      resolveKeyboardBottomPadding({
+        platform: 'android',
+        keyboardHeight: occludedStrip - navigationBar,
+        bottomInset: navigationBar,
+      })
+    ).toBe(occludedStrip);
+    expect(
+      resolveKeyboardBottomPadding({
+        platform: 'ios',
+        keyboardHeight: occludedStrip,
+        bottomInset: 34,
+      })
+    ).toBe(occludedStrip);
+  });
 });
 
 describe('app-aware keyboard padding state', () => {

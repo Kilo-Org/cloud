@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
+import { ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
 
 // Every test re-imports the auth module graph after vi.resetModules() and the
 // failure-matrix tests wait out real 250/500/1000 ms retry backoffs. On a
@@ -152,6 +153,29 @@ const nativeLauncherSurfacesMock = vi.hoisted(() => ({
   clearLauncherSurfaces: vi.fn(),
 }));
 
+// Hoisted so the unauthorized-handler tests can capture the handler the
+// provider registers, across the vi.resetModules() re-imports every mount
+// performs: the mock factory closes over this object, so the captured handler
+// is the one the latest mount registered.
+const unauthorizedMock = vi.hoisted(() => {
+  let handler: (() => Promise<void> | void) | null = null;
+  return {
+    setTrpcUnauthorizedHandler: vi.fn((next: () => Promise<void> | void) => {
+      handler = next;
+      return () => {
+        handler = null;
+      };
+    }),
+    getHandler: () => handler,
+  };
+});
+
+// Hoisted so the unauthorized-handler tests can assert the branch record the
+// provider writes without loading the telemetry transport chain.
+const signOutTelemetryMock = vi.hoisted(() => ({
+  reportAuthBranch: vi.fn(),
+}));
+
 const ownerProducer = vi.hoisted(() => ({
   getMe: vi.fn<() => Promise<{ id: string }>>().mockResolvedValue({ id: 'user-a' }),
   ticket: vi.fn().mockResolvedValue({ token: 'ingest-ticket' }),
@@ -266,8 +290,10 @@ vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
 vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
-  setTrpcUnauthorizedHandler: vi.fn(),
+  setTrpcUnauthorizedHandler: unauthorizedMock.setTrpcUnauthorizedHandler,
 }));
+
+vi.mock('@/lib/auth/sign-out-telemetry', () => signOutTelemetryMock);
 
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
@@ -390,12 +416,14 @@ vi.mock('@/lib/storage-keys', () => ({
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
   LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
+  USER_SESSION_TITLES_KEY: 'user-session-titles',
 }));
 
 vi.mock('@/lib/config', () => ({
@@ -420,7 +448,7 @@ type AuthContextValue = {
   isSigningOut: boolean;
   restoreFailed: boolean;
   retryRestore: () => void;
-  signIn: (token: string) => Promise<void>;
+  signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -656,6 +684,12 @@ describe('sign-out teardown ordering', () => {
       expect.anything()
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    // The Personal-choice marker is account-scoped selection state too: if it
+    // outlived the account, the next account on this device would inherit the
+    // signed-out account's explicit Personal choice and skip its own default.
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      ORGANIZATION_PERSONAL_STORAGE_KEY
+    );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('live-session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
@@ -701,6 +735,22 @@ describe('sign-out teardown ordering', () => {
     // run on a plain sign-in.
     expect(logoutCleanupMock.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(1);
     expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('clears the prior account Personal-choice marker on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // A direct account switch must resolve the new account's own organization
+    // default; the prior account's explicit Personal choice must not leak.
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      ORGANIZATION_PERSONAL_STORAGE_KEY
+    );
 
     unmount();
   });
@@ -1481,6 +1531,139 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
+  it('regression: a refused refresh from a superseded epoch does not sign out the newer session', async () => {
+    const { getCtx, unmount } = await mountProvider();
+
+    // A session with a refresh token and an expiry inside the refresh margin,
+    // so a foreground event initiates a proactive refresh.
+    await act(async () => {
+      await getCtx().signIn('active-token', 'active-refresh', 3600);
+    });
+
+    const listeners = hoisted.appState.addEventListener.mock.calls;
+    const eventListener = listeners.at(-1)?.[1];
+
+    // Serve the foreground's expiry read and the refresh's refresh-token read.
+    // eslint-disable-next-line require-await -- mock returning a resolved promise
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'token-expires-at') {
+        return String(Date.now() + 60_000);
+      }
+      if (key === 'refresh-token') {
+        return 'active-refresh';
+      }
+      return null;
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 }));
+
+    // Hold the terminal clear open so the epoch can move inside it: this is the
+    // window where the refresh still returns refused for the session that
+    // owned it.
+    const { promise: clearGate, resolve: releaseClear } = Promise.withResolvers<undefined>();
+    hoisted.secureStore.deleteItemAsync.mockImplementationOnce(async () => {
+      await clearGate;
+    });
+
+    await act(async () => {
+      eventListener?.('active');
+      await Promise.resolve();
+    });
+
+    // Wait until the clear is in flight, then move the epoch: a newer session
+    // now owns the tree while the old refresh is still inside its clear.
+    const authEpoch = await import('@/lib/auth/auth-epoch');
+    let flushes = 0;
+    while (hoisted.secureStore.deleteItemAsync.mock.calls.length === 0 && flushes < 50) {
+      flushes += 1;
+      // eslint-disable-next-line no-await-in-loop -- sequential flush until the clear is in flight
+      await act(async () => {
+        await new Promise<void>(resolve => {
+          void setTimeout(resolve, 0);
+        });
+      });
+    }
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalled();
+
+    authEpoch.bumpAuthEpoch();
+    releaseClear(undefined);
+
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The stale refusal must not tear down the newer session.
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(getCtx().token).toBe('active-token');
+
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
+  it('regression: the refusal-triggered sign-out cleanup still authenticates with the owner token', async () => {
+    const { getCtx, unmount } = await mountProvider();
+
+    // A session with a refresh token and an expiry inside the refresh margin,
+    // so a foreground event initiates a proactive refresh.
+    await act(async () => {
+      await getCtx().signIn('active-token', 'active-refresh', 3600);
+    });
+
+    const listeners = hoisted.appState.addEventListener.mock.calls;
+    const eventListener = listeners.at(-1)?.[1];
+
+    // Serve the foreground's expiry read and the refresh's refresh-token read.
+    // eslint-disable-next-line require-await -- mock returning a resolved promise
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'token-expires-at') {
+        return String(Date.now() + 60_000);
+      }
+      if (key === 'refresh-token') {
+        return 'active-refresh';
+      }
+      return null;
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 }));
+
+    // The 401 clear runs before the refusal-triggered sign-out. The owner must
+    // still serve the token to runLogoutCleanup's revoke/unregister, which run
+    // before the epoch bump and read the Authorization header through
+    // `getAuthTokenForRequest`.
+    const tokens: typeof TokenOwnerModule = await import('./token-owner');
+    let cleanupToken: string | null | 'unset' = 'unset';
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      cleanupToken = await tokens.getAuthTokenForRequest();
+    });
+
+    await act(async () => {
+      eventListener?.('active');
+      await Promise.resolve();
+    });
+
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The remote cleanup authenticated with the session's own access token.
+    expect(cleanupToken).toBe('active-token');
+
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
   it('regression: a signed-out launch re-runs the OS search clear the teardown cannot await', async () => {
     // The beforeEach leaves every read null: the launch positively restored no
     // session, which is the retry for a teardown-time clear that failed or a
@@ -1512,6 +1695,128 @@ describe('bootstrap and foreground race fencing', () => {
 
     unmount();
   }, 60_000);
+
+  it('repro: an unreadable refresh-token read shows the restore error instead of signing out', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // Bootstrap consumes: preloadedToken, preloadedRefreshToken, the expiry
+    // read, then the credential re-read — all healthy, so the session restores.
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+    expect(getCtx().sessionEnded).toBe(false);
+
+    // Every refresh-token read — including `readStoredValueRetryingNull`'s
+    // retries — answers null while the stored token stays present.
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // The credential set is one unit: an unreadable refresh token is not a
+    // signed-out session, so the session stands and the retryable restore error
+    // takes over instead of the login screen. No teardown ran.
+    expect(getCtx().token).toBe(storedToken);
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(getCtx().restoreFailed).toBe(true);
+    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+    expect(hoisted.posthog.captureEvent).not.toHaveBeenCalledWith('logout');
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
+      cause: 'credentials_unreadable',
+      branch: 'refresh_token_unreadable',
+      keyNames: ['auth-token'],
+    });
+
+    unmount();
+  }, 30_000);
+
+  it('regression: an unreadable read with an empty credential set raises no restore error and no sign-out', async () => {
+    // The launch positively restored no session: every read answers null, so
+    // bootstrap left the person on the login route with no error surface.
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    // The request settles with zero credential members present: no stored
+    // token, no expiry, no active token. An empty set is genuinely no session,
+    // not a failed read of one member.
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // No false restore error over the correct login destination, and no
+    // teardown: the 401 belongs to no session.
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(signOutTelemetryMock.reportAuthBranch).not.toHaveBeenCalled();
+    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+    expect(hoisted.posthog.captureEvent).not.toHaveBeenCalledWith('logout');
+
+    unmount();
+  }, 30_000);
+
+  it('a server-refused refresh signs out with the session-ended cause', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // Bootstrap consumes: preloadedToken, preloadedRefreshToken, the expiry
+    // read, then the credential re-read — all healthy, so the session restores.
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    // The refresh token is present and the server refuses it with a 401: a
+    // genuine revocation, which must stay a sign-out.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('stored-refresh');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 401 }));
+    onTestFinished(() => {
+      fetchSpy.mockRestore();
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // A real 401 still signs out, is announced as a session end, and records
+    // the refresh_401 branch.
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
+      cause: 'session_ended',
+      branch: 'refresh_401',
+    });
+
+    unmount();
+  }, 30_000);
 });
 
 describe('reactive auth epoch', () => {

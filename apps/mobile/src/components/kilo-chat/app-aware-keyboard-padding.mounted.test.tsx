@@ -1,11 +1,10 @@
-// Mounted coverage for the shared keyboard-lift view. When the view's bottom
-// edge sits at the screen bottom, the reserved space is anchored there, so the
-// view must resolve the platform's own keyboard metric through
-// `resolveKeyboardBottomPadding` — the same rule the login screen and the
-// Toaster use — instead of padding by the raw height. Android's raw height
-// stops at the navigation bar, so reserving it left the bottom `bottomInset`
-// of the content (the manual review form's Start button) behind the IME's
-// navigation row (2026-09-20).
+// Mounted coverage for the shared keyboard-lift view: the two sides of the
+// merge that introduced it. When the view's bottom edge sits at the screen
+// bottom, the reserved space is anchored there, so the view pads by the whole
+// strip the IME hides — Android's raw height plus the navigation bar its metric
+// stops at, iOS's overlap measured from the keyboard top. Padding by the raw
+// Android height alone left the bottom `bottomInset` of the content (the manual
+// review form's Start button) behind the IME's navigation row (2026-09-20).
 //
 // Callers whose own container already reserves the bottom inset above the view
 // (the session screen's trailing chrome spacer, the new-session form's parent
@@ -19,12 +18,15 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as LoginScreenState from '@/components/login-screen-state';
+
 import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 
 const platform = vi.hoisted(() => ({ OS: 'android' }));
 const insets = vi.hoisted(() => ({ bottom: 0 }));
+const screen = vi.hoisted(() => ({ height: 900 }));
 const keyboard = vi.hoisted(() => ({
-  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
+  show: null as ((event: { endCoordinates: { height: number; screenY?: number } }) => void) | null,
   hide: null as (() => void) | null,
   appState: null as ((state: string) => void) | null,
 }));
@@ -32,21 +34,33 @@ const keyboard = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: platform,
+  Dimensions: { get: () => screen },
   Keyboard: {
     addListener: vi.fn((event: string, listener: (event?: unknown) => void) => {
       if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-        keyboard.show = listener as (event: { endCoordinates: { height: number } }) => void;
+        keyboard.show = listener as (event: {
+          endCoordinates: { height: number; screenY?: number };
+        }) => void;
       }
       if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
         keyboard.hide = listener as () => void;
       }
-      return { remove: vi.fn() };
+      return {
+        remove: () => {
+          keyboard.show = null;
+          keyboard.hide = null;
+        },
+      };
     }),
   },
   AppState: {
     addEventListener: vi.fn((_event: string, listener: (state: string) => void) => {
       keyboard.appState = listener;
-      return { remove: vi.fn() };
+      return {
+        remove: () => {
+          keyboard.appState = null;
+        },
+      };
     }),
   },
 }));
@@ -55,7 +69,32 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 
-type MountProps = { containerReservesBottomInset?: boolean; contentReservesBottomInset?: boolean };
+// Both platforms resolve the strip the keyboard hides through the one shared
+// implementation (`resolveKeyboardBottomPadding`). The spy delegates to the real
+// rule and records the platform it was asked for, so a case below can prove both
+// platforms route through it instead of a fork inside the module.
+const sharedResolver = vi.hoisted(() => ({
+  calls: [] as { platform: string; keyboardHeight: number; bottomInset: number }[],
+}));
+
+vi.mock('@/components/login-screen-state', async importOriginal => {
+  const actual = await importOriginal<typeof LoginScreenState>();
+  return {
+    ...actual,
+    resolveKeyboardBottomPadding: (
+      args: Parameters<typeof actual.resolveKeyboardBottomPadding>[0]
+    ) => {
+      sharedResolver.calls.push(args);
+      return actual.resolveKeyboardBottomPadding(args);
+    },
+  };
+});
+
+type MountProps = {
+  keyboardOffset?: number;
+  containerReservesBottomInset?: boolean;
+  contentReservesBottomInset?: boolean;
+};
 
 function mount(props: MountProps = {}) {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -81,12 +120,24 @@ function paddingBottom(renderer: TestRenderer.ReactTestRenderer): number {
   return padding.paddingBottom as number;
 }
 
+/** Fires the platform's show event; `screenY` is the keyboard top on iOS. */
+function showKeyboard(height: number, screenY?: number) {
+  act(() => {
+    keyboard.show?.({
+      endCoordinates: screenY === undefined ? { height } : { height, screenY },
+    });
+  });
+}
+
 describe('AppAwareKeyboardPaddingView', () => {
   beforeEach(() => {
     platform.OS = 'android';
-    insets.bottom = 0;
+    insets.bottom = 24;
+    screen.height = 900;
     keyboard.show = null;
     keyboard.hide = null;
+    keyboard.appState = null;
+    sharedResolver.calls.length = 0;
   });
 
   it('reserves nothing while the keyboard is down', () => {
@@ -102,9 +153,7 @@ describe('AppAwareKeyboardPaddingView', () => {
     insets.bottom = 63;
     const renderer = mount();
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 704 } });
-    });
+    showKeyboard(704);
     expect(paddingBottom(renderer)).toBe(767);
 
     act(() => {
@@ -115,16 +164,108 @@ describe('AppAwareKeyboardPaddingView', () => {
     renderer.unmount();
   });
 
-  it('passes the iOS frame height through, which already reaches the screen bottom', () => {
+  it.each([300, 324])('adds the Android system-bar inset to the reported height %i', height => {
+    const renderer = mount();
+    expect(paddingBottom(renderer)).toBe(0);
+    // Android edge-to-edge reports the nav-bar-excluded height, not the IME
+    // top; iOS reports the keyboard top, which on a docked keyboard sits its
+    // own height above the screen bottom.
+    showKeyboard(height, platform.OS === 'android' ? 876 : screen.height - height);
+    expect(paddingBottom(renderer)).toBe(
+      platform.OS === 'android' ? height + insets.bottom : height
+    );
+    renderer.unmount();
+  });
+
+  it('reserves the same strip on both platforms through the one shared implementation', () => {
+    // One docked keyboard hides one strip from the screen bottom. Android
+    // reports that strip minus the navigation bar, iOS the frame that reaches
+    // the screen bottom; both resolve the strip through the same shared rule.
+    const occludedStrip = 728;
+    platform.OS = 'android';
+    insets.bottom = 63;
+    const android = mount();
+    showKeyboard(occludedStrip - insets.bottom);
+    expect(paddingBottom(android)).toBe(occludedStrip);
+    android.unmount();
+
+    platform.OS = 'ios';
+    insets.bottom = 34;
+    const ios = mount();
+    showKeyboard(occludedStrip, screen.height - occludedStrip);
+    expect(paddingBottom(ios)).toBe(occludedStrip);
+    ios.unmount();
+
+    expect([...new Set(sharedResolver.calls.map(call => call.platform))]).toEqual([
+      'android',
+      'ios',
+    ]);
+  });
+
+  it('tracks a short keyboard and a changed screen size', () => {
+    const renderer = mount();
+    showKeyboard(24, 876);
+    expect(paddingBottom(renderer)).toBe(platform.OS === 'android' ? 24 + insets.bottom : 24);
+    screen.height = 600;
+    showKeyboard(200, platform.OS === 'android' ? 576 : 400);
+    expect(paddingBottom(renderer)).toBe(platform.OS === 'android' ? 200 + insets.bottom : 200);
+    renderer.unmount();
+  });
+
+  it('caps an undocked iOS keyboard at its frame height, not the screen below it', () => {
+    // An iPad floating/split keyboard reports its top at the floating position,
+    // so the distance to the screen bottom counts the uncovered screen under it
+    // (hundreds of points), not the strip it hides. The frame height is the
+    // occlusion there (2026-09-22 review finding).
+    platform.OS = 'ios';
+    insets.bottom = 34;
+    screen.height = 1024;
+    const renderer = mount();
+
+    // Docked at height 264 the top would be 760; floating it sits at 500.
+    showKeyboard(264, 500);
+    expect(paddingBottom(renderer)).toBe(264);
+
+    renderer.unmount();
+  });
+
+  it('passes the iOS frame height through when the event carries no screen position', () => {
     platform.OS = 'ios';
     insets.bottom = 34;
     const renderer = mount();
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 300 } });
-    });
+    showKeyboard(300);
     expect(paddingBottom(renderer)).toBe(300);
 
+    renderer.unmount();
+  });
+
+  it('clears on dismissal and app background, and removes listeners on unmount', () => {
+    const renderer = mount();
+    showKeyboard(324, 576);
+    act(() => {
+      keyboard.hide?.();
+    });
+    expect(paddingBottom(renderer)).toBe(0);
+    showKeyboard(324, 576);
+    act(() => keyboard.appState?.('background'));
+    expect(paddingBottom(renderer)).toBe(0);
+    renderer.unmount();
+    expect(keyboard.show).toBeNull();
+    expect(keyboard.hide).toBeNull();
+  });
+
+  it('applies a caller offset only while the keyboard has positive overlap', () => {
+    const renderer = mount({ keyboardOffset: 24 });
+    expect(paddingBottom(renderer)).toBe(0);
+    showKeyboard(300, platform.OS === 'android' ? 876 : 600);
+    expect(paddingBottom(renderer)).toBe(
+      platform.OS === 'android' ? 300 + 24 + insets.bottom : 324
+    );
+    showKeyboard(0, platform.OS === 'android' ? 876 : 900);
+    expect(paddingBottom(renderer)).toBe(0);
+    showKeyboard(-50, platform.OS === 'android' ? 876 : 950);
+    expect(paddingBottom(renderer)).toBe(0);
     renderer.unmount();
   });
 
@@ -139,9 +280,7 @@ describe('AppAwareKeyboardPaddingView', () => {
     insets.bottom = 63;
     const renderer = mount({ containerReservesBottomInset: true });
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 704 } });
-    });
+    showKeyboard(704);
     expect(paddingBottom(renderer)).toBe(704);
 
     renderer.unmount();
@@ -152,9 +291,7 @@ describe('AppAwareKeyboardPaddingView', () => {
     insets.bottom = 34;
     const renderer = mount({ containerReservesBottomInset: true });
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 300 } });
-    });
+    showKeyboard(300);
     expect(paddingBottom(renderer)).toBe(266);
 
     renderer.unmount();
@@ -177,9 +314,7 @@ describe('AppAwareKeyboardPaddingView', () => {
     insets.bottom = 63;
     const renderer = mount({ contentReservesBottomInset: true });
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 704 } });
-    });
+    showKeyboard(704);
     expect(paddingBottom(renderer)).toBe(704);
 
     act(() => {
@@ -195,9 +330,7 @@ describe('AppAwareKeyboardPaddingView', () => {
     insets.bottom = 34;
     const renderer = mount({ contentReservesBottomInset: true });
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 300 } });
-    });
+    showKeyboard(300);
     expect(paddingBottom(renderer)).toBe(300);
 
     renderer.unmount();

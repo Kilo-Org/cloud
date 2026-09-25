@@ -12,7 +12,6 @@ import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
 import { useAppAwareKeyboardPadding } from '@/components/kilo-chat/app-aware-keyboard-padding';
-import { resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -68,7 +67,8 @@ export function AppRootProviders({
               {languageReady ? <AppUnlockAnnouncements /> : null}
               <OrganizationProvider>
                 <ToolSummaryTranslationRuntimeBootstrap />
-                <ActionSheetProvider>
+                {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
+                <ActionSheetProvider useCustomActionSheet>
                   <>
                     {children}
                     <OfflineBanner />
@@ -113,26 +113,20 @@ export function AppRootProviders({
  * The offset is one platform-free rule (`lib/toast-offset.ts`): iOS and Android
  * run the same math, and the platform enters only through the values resolved
  * here for it — the tab bar's own rendered height, which the bar's helper owns,
- * and the keyboard occlusion's origin (`resolveKeyboardBottomPadding`).
+ * and the keyboard occlusion the shared hook already anchors to the screen
+ * bottom.
  */
 function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const keyboardHeight = useAppAwareKeyboardPadding();
-  // The hook's height is the platform's own keyboard metric, and the two
-  // platforms measure it from different origins: Android's stops at the
-  // navigation bar (`ReactRootView` reports `imeInsets.bottom − barInsets.bottom`),
-  // while iOS reports the keyboard frame, which reaches the screen bottom. The
-  // offset is anchored to the screen bottom, so the occlusion is resolved here
-  // with the same rule the screens reserve padding with
-  // (`resolveKeyboardBottomPadding`); passing the raw Android height left the
-  // toast's last line behind the IME's navigation row (2026-09-20 review
+  // The hook reports the whole strip the IME hides, anchored to the screen
+  // bottom: Android's raw height plus the navigation bar its metric stops at
+  // (`ReactRootView` reports `imeInsets.bottom − barInsets.bottom`), iOS's
+  // overlap measured from the keyboard top. Passing the raw Android height left
+  // the toast's last line behind the IME's navigation row (2026-09-20 review
   // finding). `lib/toast-offset.ts` stays platform-free.
-  const keyboardOcclusion =
-    keyboardHeight > 0
-      ? resolveKeyboardBottomPadding({ keyboardHeight, bottomInset: bottom, platform: Platform.OS })
-      : 0;
+  const keyboardOcclusion = useAppAwareKeyboardPadding();
   const segments = useSegments();
   const pathname = usePathname();
   // The floating tab bar is an absolute overlay over the screen bottom, so it

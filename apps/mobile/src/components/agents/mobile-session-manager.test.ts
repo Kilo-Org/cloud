@@ -1,6 +1,7 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- injectable query/sleep fakes settle without await */
 /* eslint-disable max-lines -- the manager suite pins retry cadence and attachment mints in one file. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createStore } from 'jotai';
 import { RequestDeadlineError } from '@kilocode/event-service';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
@@ -40,20 +41,13 @@ vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
   normalizeTransportPayload: vi.fn((x: unknown) => x),
 }));
 vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
-  formatSafeCloudAgentFailureDiagnostic: vi.fn(),
   withCloudAgentDiagnostics: vi.fn((_op: string, _org: unknown, fn: () => unknown) => fn()),
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
-// The transcript cache owns the encrypted KV (SQLCipher) chain; this suite is
-// pure and only needs the call seams.
-vi.mock('@/lib/persist/session-transcript-cache', () => ({
-  readSessionTranscriptPage: vi.fn(async () => null),
-  writeSessionTranscriptPage: vi.fn(async () => undefined),
-  clearSessionTranscriptPage: vi.fn(async () => undefined),
-}));
-// Same seam for the resolved-delivery-failure memory: it shares that chain.
+// The resolved-delivery-failure memory owns the encrypted KV (SQLCipher)
+// chain; this suite is pure and only needs the call seam.
 vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
   readResolvedDeliveryFailures: vi.fn(async () => []),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
@@ -114,6 +108,7 @@ const { buildRemoteAttachmentParts } =
 const { answerSessionPermission: mockedAnswerSessionPermission } =
   await import('@/lib/glanceable/approve-ask');
 const answerSessionPermissionMock = vi.mocked(mockedAnswerSessionPermission);
+const { toast: sonnerToast } = await import('sonner-native');
 const {
   createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
@@ -573,6 +568,38 @@ describe('createMobileAgentSessionManager api.send', () => {
   });
 });
 
+describe('createMobileAgentSessionManager onSendFailed', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    vi.mocked(sonnerToast.error).mockClear();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('leaves the failed send to the SDK status indicator instead of toasting developer text', () => {
+    const config = setup();
+    const error = Object.assign(new Error('Insufficient credits: $1 minimum required'), {
+      data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+    });
+
+    config.onSendFailed?.('hello', 'Insufficient credits: $1 minimum required', error);
+
+    expect(vi.mocked(sonnerToast.error)).not.toHaveBeenCalled();
+  });
+});
+
 describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
   beforeEach(() => {
     configHolder.current = null;
@@ -812,5 +839,47 @@ describe('createMobileAgentSessionManager metadata memo', () => {
       cloudAgentSessionId: 'agent_1',
     });
     expect(getSessionQuery).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createMobileAgentSessionManager cold open', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    getWithRuntimeStateQuery.mockReset();
+    getSessionQuery.mockReset();
+    getSessionMessagesQuery.mockReset();
+  });
+
+  it('omits the cached-snapshot reader so a cold open cannot paint stale rows', () => {
+    const options = { store: {}, userWebConnection: {} };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    expect(config.readCachedSnapshotPage).toBeUndefined();
+  });
+
+  it('leaves the transcript empty while the live page has not landed', async () => {
+    const store = createStore();
+    // The live metadata read never settles: the open is still in flight, so the
+    // screen keeps its full-page skeleton instead of painting rows.
+    const pending = Promise.withResolvers<unknown>();
+    getWithRuntimeStateQuery.mockReturnValue(pending.promise);
+    const options = { store, userWebConnection: {} };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    const { createSessionManager } = await import('@kilocode/cloud-agent-sdk/session-manager');
+    const manager = createSessionManager(config);
+
+    void manager.switchSession(SESSION_ID);
+
+    expect(store.get(manager.atoms.messagesList)).toHaveLength(0);
+    expect(store.get(manager.atoms.isLoading)).toBe(true);
+    expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(false);
   });
 });

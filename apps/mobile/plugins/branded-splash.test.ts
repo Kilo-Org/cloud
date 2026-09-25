@@ -5,7 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compileModsAsync, type ConfigPlugin, type ExportedConfig } from 'expo/config-plugins';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Each case runs expo-splash-screen's image pipeline through `compileModsAsync`,
+// and the idempotence case compiles twice. On a loaded machine (the full gate
+// saturates every core) that real filesystem work can stretch past the project's
+// 15 s budget and fail a healthy test. The file-wide timeout leaves that
+// headroom; a genuinely hung compile still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
 
 const require = createRequire(import.meta.url);
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -124,9 +131,23 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, so the run would no longer describe only this
+    // plugin's output. The colors array is asserted by containment for the same
+    // reason: the project's own other theme colors (iconBackground, colorPrimary,
+    // …) can ride along without failing this case.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(
@@ -136,7 +157,7 @@ describe('shared branded splash', () => {
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });
@@ -164,13 +185,22 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // Introspection reads the real `apps/mobile` project, so the colors the
-    // app's own config already generated (adaptive-icon and notification
-    // palette) are present too — and a worktree that has been prebuilt has
-    // them on disk while a clean checkout does not. Assert the splash color is
-    // written, not that it is the only color: `toMatchObject` on a bare array
-    // requires the same length, so the assertion flipped on the worktree's
-    // prebuild state alone.
+    // The compile root is the throwaway project `createAndroidProject()`
+    // returns, whose `res/values` holds no `colors.xml`, and `withBrandedSplash`
+    // reads and writes `config.modRequest.platformProjectRoot` under that same
+    // root; a worktree's prebuilt `android/` tree never reaches these
+    // modResults, so the splash color below is the only entry the run produces.
+    // The base `colors` mod resolves its file under `modRequest.projectRoot` —
+    // that throwaway root again — and introspection falls back to empty
+    // `resources` when the file is absent, so the project's own gitignored
+    // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
+    // worktree that prebuilt) cannot add its icon, notification or app-background
+    // entries to the array. The plugin's contract is that its own color is
+    // present, not that it is the only one: assert the splash color this plugin
+    // owns by containment, not by pinning the whole array or its exact length,
+    // and keep the exact `#FAF74F` value, the same way the styles assertion
+    // below pins its theme, so this case speaks only for the entry this plugin
+    // writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

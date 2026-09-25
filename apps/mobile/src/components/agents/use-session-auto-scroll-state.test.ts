@@ -169,6 +169,43 @@ describe('shouldScheduleSessionAutoScroll', () => {
       })
     ).toBe(false);
   });
+
+  it('does not schedule when only an older page was prepended (newest key unchanged)', () => {
+    // The item count grew, but the tail of the list did not move: an older
+    // page landed. Scheduling a scroll here would yank the viewport back to
+    // the newest message while the user is reading history.
+    expect(
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: false,
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        newestKeyChanged: false,
+      })
+    ).toBe(false);
+  });
+
+  it('schedules when the newest item key changed', () => {
+    expect(
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: false,
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        newestKeyChanged: true,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps scheduling for callers that do not track the newest key', () => {
+    // Layout and keyboard triggers have no item identity; omitting the new
+    // guard must preserve the previous behavior.
+    expect(
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: false,
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+      })
+    ).toBe(true);
+  });
 });
 
 describe('shouldRetrySessionAutoScroll', () => {

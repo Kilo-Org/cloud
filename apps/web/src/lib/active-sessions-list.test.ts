@@ -72,7 +72,8 @@ describe('listActiveSessions cloud candidates', () => {
     expect(chain.orderBy).toHaveBeenCalledTimes(1);
     expect(limitMock).toHaveBeenCalledTimes(1);
     expect(limitMock).toHaveBeenCalledWith(CLOUD_AGENT_CANDIDATE_LIMIT);
-    // The owner's target is 100 live agents; the ceiling may not drop one.
+    // The owner's target is 100 live agents; the ceiling sits far above it (a
+    // backstop, not a guarantee — see its doc comment).
     expect(CLOUD_AGENT_CANDIDATE_LIMIT).toBeGreaterThan(100);
   });
 

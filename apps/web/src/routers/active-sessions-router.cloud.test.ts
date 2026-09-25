@@ -793,9 +793,10 @@ describe('active-sessions-router.list cloud merge', () => {
   });
 
   it('returns all 60 live cloud candidates (no 50-row cap)', async () => {
-    // The candidate set is already bounded by the liveness predicate, so the
-    // query must not drop genuinely live agents: a `.limit(50)` here hid the
-    // 51st+ agent from the tray (the jank report's 100-agent measurement).
+    // The query must not drop the 60 live agents the tray shows: a
+    // `.limit(50)` here hid the 51st+ agent from the tray (the jank report's
+    // 100-agent measurement). `CLOUD_AGENT_CANDIDATE_LIMIT` (500) is a backstop
+    // far above that set, not a promise about the unbounded open-run branch.
     const oldestSessionId = nextId('cap-oldest');
     for (let i = 0; i < 60; i++) {
       await seedCloudSession({

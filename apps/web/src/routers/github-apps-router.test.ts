@@ -121,6 +121,9 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     mockSyncIntegrationInstallationDetails(integrationId, details),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
+  canUninstallGitHubInstallation: jest.fn(
+    async (integration: PlatformIntegration) => integration.github_connection_role === 'workflow'
+  ),
   disconnectGitHubInstallation: jest.fn(),
   bindGitHubIntegrationToCanonicalInstallation: (input: unknown) =>
     mockBindGitHubIntegrationToCanonicalInstallation(input),
@@ -232,6 +235,7 @@ function organizationIntegration(): PlatformIntegration {
     github_app_type: 'standard',
     github_installation_id: null,
     github_disconnected_at: null,
+    github_connection_role: 'workflow',
     github_authorized_by_user_id: null,
     github_authorized_user_id: null,
     github_authorized_at: null,
@@ -322,6 +326,33 @@ describe('githubAppsRouter organization install capability', () => {
 
     expect(listed.canAdd).toBe(false);
     expect(listed.installations).toHaveLength(1);
+  });
+
+  it('exposes local disconnect independently from upstream uninstall for an agent connection', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_connection_role: 'agent_only' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+    expect(listed.installations[0]).toMatchObject({
+      connectionRole: 'agent_only',
+      canDisconnect: true,
+      canUninstall: false,
+      canManageModel: true,
+    });
+  });
+
+  it('does not offer refresh for an unassigned connection role', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_connection_role: null },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.listOrganizationInstallations({ organizationId })).resolves.toMatchObject({
+      installations: [{ status: 'connected', connectionRole: null, canRefresh: false }],
+    });
   });
 
   it('does not let a locally disconnected connection block adding another installation', async () => {

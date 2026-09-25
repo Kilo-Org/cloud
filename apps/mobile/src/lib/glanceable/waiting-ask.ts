@@ -5,6 +5,7 @@ import {
 import { z } from 'zod';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 import { getLocalScopeKey } from './persist';
 
@@ -178,8 +179,10 @@ async function mirrorAskAfter(
     await (ask === null
       ? store.deleteItemAsync(WAITING_ASK_KEY)
       : store.setItemAsync(WAITING_ASK_KEY, JSON.stringify(ask)));
-  } catch {
-    // A missing mirror keeps the in-memory value authoritative.
+  } catch (error) {
+    // A missing mirror keeps the in-memory value authoritative. Reported at
+    // warning level so a locked-keychain failure is visible.
+    reportSecureStoreFailure(ask === null ? 'delete' : 'write', error);
   }
 }
 
@@ -261,8 +264,9 @@ async function hydrateStoredAsk(): Promise<void> {
         currentAsk = parsed;
       }
     }
-  } catch {
+  } catch (error) {
     // A malformed mirror is treated as absent; the next record repopulates it.
+    reportSecureStoreFailure('read', error);
   }
 }
 

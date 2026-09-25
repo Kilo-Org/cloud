@@ -174,6 +174,29 @@ describe('restorePersistedGlanceable', () => {
     expect(isGlanceableRestoreSettled()).toBe(true);
   });
 
+  it('reports a later in-flight read as unsettled, not only the first', async () => {
+    // The first read settles with nothing on disk, so a caller would read the
+    // null snapshot as "nothing persisted". A later read re-opens that window:
+    // the record it is about to consult may still name a card owner.
+    await restorePersistedGlanceable();
+    expect(isGlanceableRestoreSettled()).toBe(true);
+
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+
+    const restore = restorePersistedGlanceable();
+
+    expect(isGlanceableRestoreSettled()).toBe(false);
+
+    gate.resolve();
+    await restore;
+
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
   it('clears the unreadable flag after a read that succeeds', async () => {
     _setGlanceableRestoreUnavailableForTests(true);
 

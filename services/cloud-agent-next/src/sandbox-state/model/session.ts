@@ -13,6 +13,7 @@ import { z } from 'zod';
 import {
   CloudAgentAssistantFailureReasonSchema,
   CloudAgentProviderOwnershipSchema,
+  WorkspaceFailureSubtypeSchema,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export { CloudAgentAssistantFailureReasonSchema, CloudAgentProviderOwnershipSchema };
@@ -150,6 +151,8 @@ export const controlErrorSchema = z
     retryable: z.boolean(),
     /** Frozen from `shared/sandbox-control-protocol.ts`; preserved end to end. */
     admission: z.literal('not-admitted').optional(),
+    /** Git workspace failure subtype carried on a control rejection; optional/additive. */
+    subtype: WorkspaceFailureSubtypeSchema.optional().catch(undefined),
   })
   .strict();
 
@@ -179,6 +182,8 @@ export const sessionOperationProofSchema = z
     attachmentEpoch: timestamp.optional(),
     decision: sessionOperationDecisionSchema.optional(),
     rejectionReceived: z.literal(true).optional(),
+    /** Git workspace failure subtype recorded from a confirmed attach rejection. */
+    rejectionSubtype: WorkspaceFailureSubtypeSchema.optional(),
   })
   .strict();
 
@@ -281,6 +286,14 @@ export const queuedMessageStateSchema = z
      * original scope cannot be recovered from it.
      */
     deliveryRetryScope: z.enum(['message', 'runtime']).optional(),
+    /**
+     * Consecutive delivery-deadline deferrals granted while the control plane
+     * reported a runtime replacement in flight. Bounds a replacement that never
+     * completes so the head still reaches its terminal preparation timeout. The
+     * count resets when the head binds a replacement runtime: that closes the
+     * chain, so a later replacement gets its own budget.
+     */
+    replacementWaits: z.number().int().nonnegative().optional(),
   })
   .strict();
 

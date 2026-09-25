@@ -1143,6 +1143,7 @@ describe('findGitHubBotLinkIntegrations', () => {
           platform_installation_id: '881122',
           github_app_type: 'standard',
           github_installation_id: canonical.id,
+          github_connection_role: 'workflow',
           integration_status: 'active',
         },
         {
@@ -1152,6 +1153,7 @@ describe('findGitHubBotLinkIntegrations', () => {
           platform_installation_id: '881122',
           github_app_type: 'standard',
           github_installation_id: canonical.id,
+          github_connection_role: 'agent_only',
           integration_status: 'active',
         },
       ])
@@ -1166,6 +1168,13 @@ describe('findGitHubBotLinkIntegrations', () => {
     ).resolves.toEqual([expect.objectContaining({ id: associations[0]!.id })]);
     await expect(
       findGitHubBotLinkIntegrations({ installationId: '881122', appType: 'standard' })
+    ).resolves.toEqual([expect.objectContaining({ id: associations[0]!.id })]);
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[1]!.id,
+      })
     ).resolves.toEqual([]);
     await expect(
       findGitHubBotLinkIntegrations({
@@ -1250,6 +1259,7 @@ describe('findGitHubBotLinkIntegrations', () => {
         integration_type: 'app',
         platform_installation_id: '881123',
         github_app_type: null,
+        github_connection_role: 'workflow',
         integration_status: 'active',
       })
       .returning();

@@ -3,6 +3,8 @@ import {
   glanceableAgentsSnapshotSchema,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+
 import { type GlanceableSink } from './sink-registry';
 
 /**
@@ -52,11 +54,13 @@ let persistEpoch = 0;
 // snapshot has to check this first.
 let restoreUnavailable = false;
 
-// True once a restore has run to completion, whether or not its read succeeded.
-// Until then a null snapshot is "not read yet", not "nothing persisted": the
-// mirror may still name a card owner, so a caller that retires cards on a null
-// snapshot must wait for this before acting on it.
-let restoreSettled = false;
+// How many restores have a read in flight right now. While this is non-zero a
+// null snapshot is "not read yet", not "nothing persisted": the mirror may still
+// name a card owner, so a caller that retires cards on a null snapshot must wait
+// until every in-flight read has consulted the record. A count, not a one-way
+// latch: a later restore re-opens the window, and overlapping reads keep it open
+// until the last one lands.
+let restoresInFlight = 0;
 
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
   return lastSnapshot;
@@ -73,18 +77,33 @@ export function isGlanceableRestoreUnavailable(): boolean {
 }
 
 /**
- * True once a `restorePersistedGlanceable` has completed. Before the first
- * completion a null in-memory snapshot is not proof that nothing owns the
- * surface: the mirror read may still be in flight, and its record may name a
- * card owner. Distinct from `isGlanceableRestoreUnavailable`, which reports a
- * read that failed rather than one that has not finished.
+ * True when no `restorePersistedGlanceable` read is in flight. While one is, a
+ * null in-memory snapshot is not proof that nothing owns the surface: the
+ * mirror read may still fill it, and its record may name a card owner. Every
+ * read re-opens the window, not just the first. Distinct from
+ * `isGlanceableRestoreUnavailable`, which reports a read that failed rather
+ * than one that has not finished.
  */
 export function isGlanceableRestoreSettled(): boolean {
-  return restoreSettled;
+  return restoresInFlight === 0;
 }
 
 export function getLocalScopeKey(): string | null {
   return localScopeKey;
+}
+
+/**
+ * One fire-and-forget mirror write. The in-memory snapshot is authoritative,
+ * so a failed write is reported at warning level with the stable write
+ * fingerprint and never rejects: a `void`-ed native rejection here would
+ * surface as an unhandled error with no caller able to recover it.
+ */
+async function mirrorSnapshotWrite(operation: () => Promise<void>): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    reportSecureStoreFailure('write', error);
+  }
 }
 
 /** In-memory write plus a fire-and-forget SecureStore mirror. */
@@ -92,8 +111,12 @@ function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
   persistEpoch += 1;
   lastSnapshot = snapshot;
   localScopeKey = snapshot.scopeKey;
-  void getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, JSON.stringify(snapshot));
-  void getSecureStore().setItemAsync(GLANCEABLE_SCOPE_KEY, snapshot.scopeKey);
+  void mirrorSnapshotWrite(async () => {
+    await getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  });
+  void mirrorSnapshotWrite(async () => {
+    await getSecureStore().setItemAsync(GLANCEABLE_SCOPE_KEY, snapshot.scopeKey);
+  });
 }
 
 /** Parse a stored record with the shared schema; a malformed record is absent. */
@@ -117,6 +140,10 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
 export async function restorePersistedGlanceable(): Promise<void> {
   const startEpoch = persistEpoch;
   restoreUnavailable = false;
+  // Re-open the read window on every restore, not just the first: a later read
+  // can fill the snapshot just as the first one could, so a null snapshot is
+  // "not read yet" until this read lands too.
+  restoresInFlight += 1;
   try {
     const [rawSnapshot, rawScope] = await Promise.all([
       getSecureStore().getItemAsync(GLANCEABLE_SNAPSHOT_KEY),
@@ -138,16 +165,19 @@ export async function restorePersistedGlanceable(): Promise<void> {
     if (rawScope !== null && localScopeKey === null) {
       localScopeKey = rawScope;
     }
-  } catch {
+  } catch (error) {
     // A malformed mirror is treated as absent; the publisher repopulates it.
     // A read failure is different: the record may be there and own a card, so
-    // record the uncertainty for callers that act on a null snapshot.
+    // record the uncertainty for callers that act on a null snapshot. Reported
+    // at warning level so a keychain/keystore failure is visible instead of
+    // looking like an empty mirror.
     restoreUnavailable = true;
+    reportSecureStoreFailure('read', error);
   } finally {
     // Settled on every path, including the live-write early return and a failed
-    // read, so a null snapshot stops meaning "the read has not finished" only
-    // once the record has actually been consulted.
-    restoreSettled = true;
+    // read, so a null snapshot stops meaning "the read has not finished" once
+    // every in-flight read has consulted the record.
+    restoresInFlight -= 1;
   }
 }
 
@@ -178,7 +208,7 @@ export function _setLastGlanceableSnapshotForTests(
   localScopeKey = snapshot?.scopeKey ?? null;
   // Seeding the mirror models a completed restore: callers act on this state as
   // the read's result, the same way `restorePersistedGlanceable` would.
-  restoreSettled = true;
+  restoresInFlight = 0;
 }
 
 export function _setGlanceableRestoreUnavailableForTests(unavailable: boolean): void {
@@ -190,6 +220,6 @@ export function _resetGlanceablePersistForTests(): void {
   lastSnapshot = null;
   localScopeKey = null;
   restoreUnavailable = false;
-  restoreSettled = false;
+  restoresInFlight = 0;
   secureStoreForTests = null;
 }

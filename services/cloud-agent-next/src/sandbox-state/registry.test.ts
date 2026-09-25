@@ -536,6 +536,22 @@ const STATE_VARIANTS: Record<string, unknown[]> = {
     allocatedRecord(recoveringHealth(1), NOW - 1),
     allocatedRecord(recoveringHealth(POLICY.recoveryMaxAttempts - 1), NOW - 1),
   ],
+  'allocation:unknown:DEADLINE': [
+    allocationState('unknown'),
+    {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: null,
+        createIntent: null,
+        stopIntent: null,
+        attempts: 0,
+        reason: 'test',
+        deadlineAt: NOW,
+      },
+    },
+  ],
   'health:recovering:RECOVERY_STEP': [
     recoveringHealth(1),
     recoveringHealth(POLICY.recoveryMaxAttempts - 1),

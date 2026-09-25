@@ -155,6 +155,10 @@ describe('Text tracked labels in RTL', () => {
     expect(className).not.toContain('tracking-[1.5px]');
     expect(className).not.toContain('tracking');
     expect(hostText(root).props.className as string).not.toContain('tracking-');
+    // The mono family goes with them: JetBrains Mono ships no Arabic glyphs, so
+    // the RTL eyebrow drops `font-mono-medium` as well (`withoutMonoFamily`),
+    // matching the LTR-only display treatment it just lost.
+    expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 

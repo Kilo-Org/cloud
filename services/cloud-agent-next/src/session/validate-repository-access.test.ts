@@ -23,19 +23,15 @@ describe('GitHub session creation preflight', () => {
   });
 
   it('preflights a pinned GitHub repository against the exact integration', async () => {
-    const getTokenForRepo = vi.fn().mockResolvedValue({
+    const authorizeCloudAgentGitHubRepo = vi.fn().mockResolvedValue({
       success: true,
-      token: 'token',
-      installationId: '123',
-      accountLogin: 'acme',
-      appType: 'standard',
     });
     const orgId = '123e4567-e89b-12d3-a456-426614174030';
     const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
 
     await expect(
       assertRepositoryAccessBeforeSessionCreation({
-        env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
+        env: { GIT_TOKEN_SERVICE: { authorizeCloudAgentGitHubRepo } } as never,
         userId: 'user-1',
         orgId,
         repository: {
@@ -45,7 +41,8 @@ describe('GitHub session creation preflight', () => {
         },
       })
     ).resolves.toBeUndefined();
-    expect(getTokenForRepo).toHaveBeenCalledWith({
+    expect(authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
       githubRepo: 'acme/repo',
       userId: 'user-1',
       orgId,
@@ -54,14 +51,14 @@ describe('GitHub session creation preflight', () => {
   });
 
   it('rejects an integration mismatch before session allocation', async () => {
-    const getTokenForRepo = vi.fn().mockResolvedValue({
+    const authorizeCloudAgentGitHubRepo = vi.fn().mockResolvedValue({
       success: false,
       reason: 'integration_mismatch',
     });
 
     await expect(
       assertRepositoryAccessBeforeSessionCreation({
-        env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
+        env: { GIT_TOKEN_SERVICE: { authorizeCloudAgentGitHubRepo } } as never,
         userId: 'user-1',
         repository: {
           type: 'github',

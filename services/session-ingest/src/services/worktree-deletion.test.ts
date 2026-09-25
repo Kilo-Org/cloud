@@ -19,6 +19,7 @@ import {
   completeWorktreeDeletion,
   canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
+  retireWorktreeIfSoleMember,
 } from './worktree-deletion';
 import type { Env } from '../env';
 import type { SessionEventPayload } from '../types/user-connection-protocol';
@@ -1074,5 +1075,270 @@ describe('durable worktree deletion journal', () => {
     await expect(canDestroyWorktreeSandbox(env, { ...params, location })).resolves.toMatchObject({
       kind: 'unresolved',
     });
+  });
+});
+
+describe('retireWorktreeIfSoleMember', () => {
+  const retire = (f: ReturnType<typeof database>) => {
+    const worktreeWrites = () => f.events.filter(event => event === 'updateWorktree').length;
+    return {
+      call: (cloudAgentSessionId = cloudId(0)) =>
+        retireWorktreeIfSoleMember(env, { ...params, cloudAgentSessionId }),
+      worktreeWrites,
+    };
+  };
+
+  it('retires a sole member and writes the FULL deletion state under the row lock', async () => {
+    const f = database();
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
+    expect(f.events.indexOf('lockWorktree')).toBeLessThan(f.events.indexOf('updateWorktree'));
+    expect(f.worktrees[0].deletion_started_at).not.toBeNull();
+    expect(
+      cloudAgentWorktreeDeletionManifestSchema.parse(f.worktrees[0].deletion_manifest)
+    ).toEqual({
+      version: 1,
+      sessions: [{ sessionId: kiloId(0), cloudAgentSessionId: cloudId(0) }],
+    });
+    expect(f.worktrees[0].runtime_locations).toEqual([location]);
+  });
+
+  it('C1: retirement resumes through a later beginWorktreeDeletion and never leaves a marker without a manifest', async () => {
+    const f = database();
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
+    // A marker-only write would leave deletion_manifest null here and make the
+    // public deleteWorktree throw when it replays the manifest.
+    expect(f.worktrees[0].deletion_manifest).not.toBeNull();
+    await expect(beginWorktreeDeletion(env, params)).resolves.toMatchObject({
+      completed: false,
+      manifest: {
+        version: 1,
+        sessions: [{ sessionId: kiloId(0), cloudAgentSessionId: cloudId(0) }],
+      },
+      runtimeLocations: [location],
+    });
+  });
+
+  it('C1: retirement recovers runtime history from the allocation ledger and a later deletion parses it', async () => {
+    const f = database();
+    const originalCloudId =
+      `workspace_${worktreeId.slice('worktree_'.length)}` as `workspace_${string}`;
+    f.members[0].cloudAgentSessionId = originalCloudId;
+    f.worktrees[0].runtime_locations = [];
+    f.allocations.push({
+      kilo_user_id: userId,
+      organization_id: null,
+      intent: 'create_cloud',
+      resource_key: null,
+      canonical_result: {
+        cloudAgentSessionId: originalCloudId,
+        kiloSessionId: kiloId(0),
+        sandboxId: 'ses-recovered-original',
+        sandboxProvider: 'vercel',
+      },
+    });
+    await expect(retire(f).call(originalCloudId)).resolves.toEqual({ kind: 'exclusive' });
+    expect(f.worktrees[0].deletion_manifest).not.toBeNull();
+    expect(f.worktrees[0].runtime_locations).toEqual([
+      { sandboxId: 'ses-recovered-original', provider: 'vercel' },
+    ]);
+    await expect(beginWorktreeDeletion(env, params)).resolves.toMatchObject({
+      completed: false,
+      manifest: {
+        version: 1,
+        sessions: [{ sessionId: kiloId(0), cloudAgentSessionId: originalCloudId }],
+      },
+      runtimeLocations: [{ sandboxId: 'ses-recovered-original', provider: 'vercel' }],
+    });
+  });
+
+  it('race: a competing registration loses after the retirement marker and throws WORKTREE_DELETING', async () => {
+    const f = database();
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
+    await expect(
+      registerCloudAgentWorktree(f.tx as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: worktreeId,
+        cloudAgentWorktreeLocation: location,
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_deleting');
+    expect(f.worktrees[0].deletion_started_at).not.toBeNull();
+    expect(f.members).toHaveLength(1);
+  });
+
+  it('treats an already-set marker with exact nonempty membership as exclusive and writes nothing new', async () => {
+    const f = database();
+    await retire(f).call();
+    const writes = retire(f).worktreeWrites();
+    const started = f.worktrees[0].deletion_started_at;
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
+    expect(retire(f).worktreeWrites()).toBe(writes);
+    expect(f.worktrees[0].deletion_started_at).toBe(started);
+  });
+
+  it.each([
+    ['malformed', { version: 2 } as never],
+    ['empty', { version: 1, sessions: [] } as never],
+    [
+      'multi-member',
+      {
+        version: 1,
+        sessions: [
+          { sessionId: kiloId(0), cloudAgentSessionId: cloudId(0) },
+          { sessionId: kiloId(1), cloudAgentSessionId: cloudId(1) },
+        ],
+      } as never,
+    ],
+  ])('C1 negative: a %s manifest never authorizes a stop', async (_name, manifest) => {
+    const f = database();
+    f.worktrees[0].deletion_started_at = '2026-08-27 02:00:00+00';
+    f.worktrees[0].deletion_manifest = manifest;
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'unresolved' });
+    expect(retire(f).worktreeWrites()).toBe(0);
+  });
+
+  it('C1 negative: a completed receipt is unresolved and is not rewritten', async () => {
+    const f = database(0);
+    f.worktrees[0] = worktree({
+      deletion_started_at: '2026-08-27 02:00:00+00',
+      deletion_completed_at: '2026-08-27 02:01:00+00',
+      name: null,
+      deletion_manifest: null,
+      deleted_session_ids: [kiloId(0)],
+    });
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'unresolved' });
+    expect(retire(f).worktreeWrites()).toBe(0);
+  });
+
+  it.each([cloudId(0), cloudId(1)])(
+    'returns shared for the other member row when retiring %s and writes no marker',
+    async member => {
+      const f = database(2);
+      await expect(retire(f).call(member)).resolves.toEqual({ kind: 'shared' });
+      expect(f.worktrees[0].deletion_started_at).toBeNull();
+      expect(retire(f).worktreeWrites()).toBe(0);
+    }
+  );
+
+  it('fails closed with unresolved when the worktree has zero members', async () => {
+    const f = database(0);
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'unresolved' });
+    expect(f.worktrees[0].deletion_started_at).toBeNull();
+    expect(retire(f).worktreeWrites()).toBe(0);
+  });
+
+  it('propagates an owner or organization mismatch as WORKTREE_ACCESS_DENIED', async () => {
+    const f = database();
+    await expect(
+      retireWorktreeIfSoleMember(env, {
+        ...params,
+        kiloUserId: 'another-user',
+        cloudAgentSessionId: cloudId(0),
+      })
+    ).rejects.toThrow('worktree_access_denied');
+    await expect(
+      retireWorktreeIfSoleMember(env, {
+        ...params,
+        organizationId,
+        cloudAgentSessionId: cloudId(0),
+      })
+    ).rejects.toThrow('worktree_access_denied');
+    expect(f.worktrees[0].deletion_started_at).toBeNull();
+  });
+
+  it('retires a sole root that has a subagent child and journals the child in the manifest', async () => {
+    const f = database();
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: null,
+      cloudAgentSessionScopeId: cloudId(0),
+      organizationId: null,
+      worktreeId,
+      userId,
+      parentSessionId: kiloId(0),
+    });
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
+    expect(f.worktrees[0].deletion_started_at).not.toBeNull();
+    expect(
+      cloudAgentWorktreeDeletionManifestSchema.parse(f.worktrees[0].deletion_manifest)
+    ).toEqual({
+      version: 1,
+      sessions: [
+        { sessionId: kiloId(0), cloudAgentSessionId: cloudId(0) },
+        { sessionId: kiloId(1), cloudAgentSessionId: null },
+      ],
+    });
+  });
+
+  it('treats an already-set marker with a root and its child as exclusive', async () => {
+    const f = database();
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: null,
+      cloudAgentSessionScopeId: cloudId(0),
+      organizationId: null,
+      worktreeId,
+      userId,
+      parentSessionId: kiloId(0),
+    });
+    f.worktrees[0].deletion_started_at = '2026-08-27 02:00:00+00';
+    f.worktrees[0].deletion_manifest = {
+      version: 1,
+      sessions: [
+        { sessionId: kiloId(0), cloudAgentSessionId: cloudId(0) },
+        { sessionId: kiloId(1), cloudAgentSessionId: null },
+      ],
+    };
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
+    expect(retire(f).worktreeWrites()).toBe(0);
+  });
+
+  it('returns shared for two root owners and stops neither', async () => {
+    const f = database(2);
+    await expect(retire(f).call(cloudId(0))).resolves.toEqual({ kind: 'shared' });
+    await expect(retire(f).call(cloudId(1))).resolves.toEqual({ kind: 'shared' });
+    expect(f.worktrees[0].deletion_started_at).toBeNull();
+    expect(retire(f).worktreeWrites()).toBe(0);
+  });
+
+  it('returns unresolved and keeps the marker when a second owner appears before the manifest write', async () => {
+    const f = database();
+    const execute = f.tx.execute;
+    let discoveries = 0;
+    f.tx.execute = async query => {
+      discoveries += 1;
+      const result = await execute(query);
+      if (discoveries === 1)
+        f.members.push({
+          sessionId: kiloId(1),
+          cloudAgentSessionId: cloudId(1),
+          organizationId: null,
+          worktreeId,
+          userId,
+          parentSessionId: null,
+        });
+      return result;
+    };
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'unresolved' });
+    expect(f.worktrees[0].deletion_started_at).not.toBeNull();
+    expect(
+      cloudAgentWorktreeDeletionManifestSchema
+        .parse(f.worktrees[0].deletion_manifest)
+        .sessions.map(session => session.sessionId)
+    ).toEqual([kiloId(0), kiloId(1)]);
+  });
+
+  it('fails closed with unresolved when the manifest has zero owner rows', async () => {
+    const f = database();
+    f.worktrees[0].deletion_started_at = '2026-08-27 02:00:00+00';
+    f.worktrees[0].deletion_manifest = {
+      version: 1,
+      sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: null }],
+    };
+    await expect(retire(f).call()).resolves.toEqual({ kind: 'unresolved' });
+    expect(retire(f).worktreeWrites()).toBe(0);
+    expect(f.worktrees[0].deletion_started_at).toBe('2026-08-27 02:00:00+00');
   });
 });

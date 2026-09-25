@@ -1,44 +1,36 @@
 /**
- * Parallel deployed matrix runner.
+ * Parallel deployed matrix runner: the single deployed runner used by CI.
  *
- * Runs the same shared scenarios as `smoke-deployed.ts`, but one scenario per
- * child process with a bounded concurrency pool. Each child gets its own
- * `E2E_FAKE_SCOPE`; the shared fake attributes that child's completions to the
- * scope, so the `fetchFakeRequests` "unchanged"/"increased" assertions stay
- * meaningful while other shards dispatch to the same fake.
+ * Runs every entry in `SHARED_SCENARIOS` — one scenario per child process under
+ * one concurrency pool. Each child gets its own `E2E_FAKE_SCOPE`; the shared
+ * fake attributes that child's completions to the scope, so the
+ * `fetchFakeRequests` "unchanged"/"increased" assertions stay meaningful while
+ * other shards dispatch to the same fake.
  *
  * Usage:
- *   E2E_BATCH=<name> pnpm --filter cloud-agent-next run e2e:parallel
+ *   pnpm --filter cloud-agent-next run e2e:parallel
  *   E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
  *   E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
  *
- * `E2E_BATCH` selects one batch from `E2E_BATCHES` (declared order preserved);
- * unset runs every scenario, so job selection is unchanged. `E2E_PARALLEL`
- * accepts a positive integer or `all` (every selected scenario at once) and is
- * an explicit override; when it is unset, a selected batch uses its own
- * `parallel` and the all-scenarios mode defaults to 4.
- *
- * Batch membership is validated unconditionally against the real registry
- * before any scenario runs; an unknown batch, a duplicate or missing scenario,
- * or an out-of-range `parallel` prints every error and exits `2`. A scenario
- * added to `SHARED_SCENARIOS` without a batch therefore fails here (both modes)
- * until it is batched.
+ * `E2E_PARALLEL` accepts a positive integer or `all` (every scenario at once)
+ * and is an explicit override; when it is unset the pool defaults to 4.
  *
  * Capability-gated scenarios are filtered out up front and are not spawned, so
  * a child's non-zero exit is a failure: exit `1` when any scenario failed, else
  * `0`. A child that does not exit within its watchdog deadline is killed and
  * reported as a failure.
  *
- * End-of-run output (one `Batch:` header, one `unsupported:` line per
- * capability-filtered scenario, one `Summary:`, one `Wall time:`):
+ * End-of-run output (one `unsupported:` line per capability-filtered scenario,
+ * one `Summary:`, one `Wall time:`):
  *
- *   Batch: <name> (<n> scenarios, concurrency <p>)
  *   unsupported: <name>
  *   Summary: <pass> passed, <fail> failed, <unsupported> unsupported
  *   Wall time: <seconds>s
  *
- * `<n>` is the selected registry-key count before capability filtering; the
- * runner asserts `pass + fail + unsupported === n` and exits `2` otherwise.
+ * The runner asserts `pass + fail + unsupported` equals the registry-key count
+ * and exits `2` otherwise. When `GITHUB_STEP_SUMMARY` is set it appends the
+ * `Summary:` line to that file; a write failure is logged and never changes the
+ * run result.
  *
  * Cold boots contend on container provisioning, so `all` maximises the chance
  * of a container cold-start timeout (240 s/turn budget) showing up as a false
@@ -48,12 +40,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { appendFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { bootstrapDeployedProfile } from './deployed-auth.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import { isScenarioSupported } from './scenario-capabilities.js';
-import { E2E_BATCHES, resolveBatch, validateScenarioBatches } from './scenarios-batches.js';
 import { SHARED_SCENARIOS } from './scenarios-shared.js';
 import { requireScenarioApi } from './run.js';
 
@@ -81,9 +73,9 @@ type JobResult = {
   durationMs: number;
 };
 
-function resolveParallelism(total: number, batchParallel: number | undefined): number {
+function resolveParallelism(total: number): number {
   const raw = process.env.E2E_PARALLEL;
-  if (raw === undefined || raw === '') return Math.min(batchParallel ?? DEFAULT_PARALLEL, total);
+  if (raw === undefined || raw === '') return Math.min(DEFAULT_PARALLEL, total);
   const trimmed = raw.trim();
   if (trimmed.toLowerCase() === 'all') return total;
   const parsed = /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : Number.NaN;
@@ -215,43 +207,29 @@ function runScenario(job: Job, scope: string, total: number, index: number): Pro
   });
 }
 
+/**
+ * Append the run's `Summary:` line to the GitHub Actions job summary when
+ * `GITHUB_STEP_SUMMARY` names a file. A write failure is logged and ignored:
+ * the runner's exit code stays authoritative.
+ */
+async function appendSummaryToStepSummary(summary: string): Promise<void> {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath === undefined || summaryPath === '') return;
+  try {
+    await appendFile(summaryPath, `${summary}\n`);
+  } catch (error) {
+    console.warn(
+      `failed to append the summary to GITHUB_STEP_SUMMARY: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
 async function main(): Promise<void> {
-  const registryKeys = Object.keys(SHARED_SCENARIOS);
-
-  // Unconditional: a registry scenario that is not batched must fail both the
-  // batch and the all-scenarios mode instead of being silently skipped.
-  const validationErrors = validateScenarioBatches(E2E_BATCHES, registryKeys);
-  if (validationErrors.length > 0) {
-    for (const error of validationErrors) {
-      console.error(`scenario-batch validation error: ${error}`);
-    }
-    process.exit(2);
-  }
-
-  const requestedBatch = process.env.E2E_BATCH;
-  let batchName = 'all';
-  let selectedKeys = registryKeys;
-  let batchParallel: number | undefined;
-  // Only an absent `E2E_BATCH` selects every scenario. Any supplied value,
-  // including empty or whitespace-only, must name a known batch.
-  if (requestedBatch !== undefined) {
-    const resolved = resolveBatch(requestedBatch, registryKeys);
-    if (resolved === null || !resolved.ok) {
-      console.error(
-        `E2E_BATCH must be one of ${JSON.stringify(Object.keys(E2E_BATCHES))}; got ${JSON.stringify(requestedBatch)}`
-      );
-      if (resolved !== null) {
-        for (const error of resolved.errors) console.error(`batch resolution error: ${error}`);
-      }
-      process.exit(2);
-    }
-    batchName = resolved.name;
-    selectedKeys = [...resolved.scenarios];
-    batchParallel = resolved.parallel;
-  }
-
+  const selectedKeys = Object.keys(SHARED_SCENARIOS);
   const { jobs, unsupported } = buildJobs(selectedKeys);
-  const parallelism = resolveParallelism(jobs.length, batchParallel);
+  const parallelism = resolveParallelism(jobs.length);
   console.log(
     `Running ${jobs.length} scenarios with concurrency ${parallelism} against ${process.env.WORKER_URL ?? '(unset WORKER_URL)'}`
   );
@@ -275,17 +253,17 @@ async function main(): Promise<void> {
   const scenarios = selectedKeys.length;
   if (pass.length + failures.length + unsupported.length !== scenarios) {
     console.error(
-      `batch accounting error: ${pass.length} passed + ${failures.length} failed + ${unsupported.length} unsupported !== ${scenarios} selected`
+      `scenario accounting error: ${pass.length} passed + ${failures.length} failed + ${unsupported.length} unsupported !== ${scenarios} selected`
     );
     process.exit(2);
   }
 
-  console.log(`\nBatch: ${batchName} (${scenarios} scenarios, concurrency ${parallelism})`);
   for (const name of unsupported) console.log(`unsupported: ${name}`);
-  console.log(
-    `Summary: ${pass.length} passed, ${failures.length} failed, ${unsupported.length} unsupported`
-  );
+  const summary = `Summary: ${pass.length} passed, ${failures.length} failed, ${unsupported.length} unsupported`;
+  console.log(summary);
   console.log(`Wall time: ${wallSeconds}s`);
+
+  await appendSummaryToStepSummary(summary);
 
   process.exit(failures.length > 0 ? 1 : 0);
 }

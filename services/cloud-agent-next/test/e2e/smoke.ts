@@ -112,6 +112,7 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'kill-mid-flight', conversation: '_' },
   { lifecycle: 'wrapper-freeze-settled-reap', conversation: '_' },
   { lifecycle: 'wrapper-freeze-inflight-reap', conversation: '_' },
+  { lifecycle: 'control-socket-recycle-boot', conversation: '_' },
 ];
 
 function unknownLifecycleFailure(lifecycle: string, conversation: string): LifecycleResult {

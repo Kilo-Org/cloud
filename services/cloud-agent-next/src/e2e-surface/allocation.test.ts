@@ -20,6 +20,19 @@ describe('projectAllocationInspection', () => {
     });
   });
 
+  it('reports no live provider reference for a stopped record with a historical summary', () => {
+    expect(
+      projectAllocationInspection(
+        SANDBOX_ID,
+        record({ state: 'stopped', providerRef: 'provider-ref-9' })
+      )
+    ).toEqual({
+      logicalSandboxId: SANDBOX_ID,
+      physicalProviderRef: null,
+      physicalState: 'stopped',
+    });
+  });
+
   it('reports creating before a provider reference exists', () => {
     expect(
       projectAllocationInspection(SANDBOX_ID, record({ state: 'creating', createIntent: INTENT }))

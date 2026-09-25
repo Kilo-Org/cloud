@@ -10,6 +10,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 
@@ -129,8 +130,16 @@ export async function fetchGitLabRepositoriesForOrganization(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitLab on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const accessToken = await getValidGitLabToken(integration, {
         userId: actorUserId,
         organizationId,
@@ -148,7 +157,7 @@ export async function fetchGitLabRepositoriesForOrganization(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? []),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
@@ -183,8 +192,16 @@ export async function fetchGitLabRepositoriesForUser(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitLab on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const accessToken = await getValidGitLabToken(integration, { userId });
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
@@ -199,7 +216,7 @@ export async function fetchGitLabRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? []),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };

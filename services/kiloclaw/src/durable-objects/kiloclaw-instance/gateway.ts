@@ -264,9 +264,7 @@ async function callGatewayControllerBinary(
   };
 }
 
-// ──────────────────────────────────────────────────────────────────────
 // Convenience wrappers for specific gateway controller endpoints
-// ──────────────────────────────────────────────────────────────────────
 
 export function getGatewayProcessStatus(
   state: InstanceMutableState,
@@ -450,7 +448,6 @@ async function requireControllerCapability(
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────
 // Agent config CRUD wrappers (controller: /_kilo/config/agents*)
 // Each is capability-gated and fails closed on older controllers.
 //
@@ -459,7 +456,6 @@ async function requireControllerCapability(
 // boundary (only .message survives), so the platform route reconstructs the
 // HTTP response from the returned envelope. Unexpected non-controller errors
 // still throw (→ generic 500 at the route). Same pattern as kilo-cli-run.ts.
-// ──────────────────────────────────────────────────────────────────────
 
 /**
  * Run an agent gateway call, converting any GatewayControllerError (capability

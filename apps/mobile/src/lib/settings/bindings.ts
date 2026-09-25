@@ -28,11 +28,16 @@ export const NOTIFICATION_PREFERENCES_QUERY_KEY = [
 /** A missing cache entry is not the user's preference; fetch the server's value. */
 export function readNotificationPreferences(): Effect.Effect<NotificationPreferences, ToolFailure> {
   return Effect.tryPromise({
-    try: () =>
-      queryClient.ensureQueryData({
+    try: async () => {
+      const preferences = await queryClient.ensureQueryData({
         queryKey: NOTIFICATION_PREFERENCES_QUERY_KEY,
-        queryFn: () => trpcClient.user.getNotificationPreferences.query(),
-      }),
+        queryFn: async () => {
+          const result = await trpcClient.user.getNotificationPreferences.query();
+          return result;
+        },
+      });
+      return preferences;
+    },
     catch: error => failure(`Could not read notification preferences: ${String(error)}`),
   });
 }

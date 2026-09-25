@@ -124,15 +124,14 @@ export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer
     const urls = new Set<string>();
     for (const entry of parsed) {
       const result = storedRemoteMcpServerSchema.safeParse(entry);
-      if (!result.success) {
-        continue;
-      }
-      const server = result.data;
-      const url = normalizeStoredUrl(server.url);
-      if (url !== undefined && !ids.has(server.id) && !urls.has(url)) {
-        ids.add(server.id);
-        urls.add(url);
-        servers.push({ ...server, url });
+      if (result.success) {
+        const server = result.data;
+        const url = normalizeStoredUrl(server.url);
+        if (url !== undefined && !ids.has(server.id) && !urls.has(url)) {
+          ids.add(server.id);
+          urls.add(url);
+          servers.push({ ...server, url });
+        }
       }
     }
     return servers;

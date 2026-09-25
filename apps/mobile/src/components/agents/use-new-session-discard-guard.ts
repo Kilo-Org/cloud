@@ -73,9 +73,9 @@ const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_
  * `AlertDialog` paints every button with the theme accent, so `Alert.alert`'s
  * `style: 'destructive'` never reaches the screen there and the discarding
  * choice loses its red affordance. iOS honors `style: 'destructive'`, but one
- * cross-platform dialog keeps the affordance identical on both. This is the
- * same #6393 surface `profile-screen.tsx` uses for sign-out, rendered here with
- * `common.keepEditing` as the safe choice. The hook holds the intercepted leave
+ * cross-platform dialog keeps the affordance identical on both. It carries the
+ * destructive red fill and a neutral outline, with `common.keepEditing` as the
+ * safe choice here. The hook holds the intercepted leave
  * while the confirm is open and returns the `discardConfirm` node the caller
  * mounts; it is null while the confirm is closed.
  */

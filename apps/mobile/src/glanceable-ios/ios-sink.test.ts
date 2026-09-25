@@ -1772,14 +1772,23 @@ describe('iosSink stray sweep', () => {
     const cards = [nativeStray(), nativeStray()];
     // First restore: the locked keychain settles with nothing readable, so the
     // in-memory snapshot stays null.
-    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: () => Promise.reject(new Error('keychain locked')),
+    });
     await restorePersistedGlanceable();
 
     // A later restore re-opens the read window. A sweep landing in it must not
     // read the still-null snapshot as "nothing persisted": the record this read
     // is about to consult may name an owner.
-    const gate = Promise.withResolvers<string | null>();
-    secureStoreMock.getItemAsync.mockImplementationOnce(async () => gate.promise);
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
     const restore = restorePersistedGlanceable();
     sweepStrayActivities();
 

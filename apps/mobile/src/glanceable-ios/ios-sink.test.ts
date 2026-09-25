@@ -186,12 +186,10 @@ const secureStoreMock = {
     secureStore.set(key, value);
     await Promise.resolve();
   },
-  // `vi.fn` so a test can install a one-shot read failure or a read that stays
-  // in flight; `vi.clearAllMocks()` in `beforeEach` keeps this implementation.
-  getItemAsync: vi.fn(async (key: string) => {
+  getItemAsync: async (key: string) => {
     await Promise.resolve();
     return secureStore.get(key) ?? null;
-  }),
+  },
 };
 
 const subscriptions = new Set<string>();
@@ -1774,16 +1772,24 @@ describe('iosSink stray sweep', () => {
     const cards = [nativeStray(), nativeStray()];
     // First restore: the locked keychain settles with nothing readable, so the
     // in-memory snapshot stays null.
-    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        throw new Error('keychain locked');
+      },
+    });
     await restorePersistedGlanceable();
 
     // A later restore re-opens the read window. A sweep landing in it must not
     // read the still-null snapshot as "nothing persisted": the record this read
     // is about to consult may name an owner.
-    const gate = Promise.withResolvers<string | null>();
-    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
-      await gate.promise;
-      return null;
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
     });
     const restore = restorePersistedGlanceable();
     sweepStrayActivities();

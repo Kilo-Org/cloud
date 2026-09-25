@@ -23,7 +23,10 @@ import {
 import { accountForMicrodollarUsage, INVALID_TOKEN_CODE } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
-import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
+import {
+  collectDataCollectionRequiredAutoRoutingModelIds,
+  collectDeniedAutoRoutingModelIds,
+} from '@/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
@@ -104,6 +107,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
 jest.mock('@/lib/ai-gateway/auto-routing-decision');
 jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
+  collectDataCollectionRequiredAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('@/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
@@ -130,6 +134,9 @@ const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
+const mockedCollectDataCollectionRequiredAutoRoutingModelIds = jest.mocked(
+  collectDataCollectionRequiredAutoRoutingModelIds
+);
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
@@ -973,6 +980,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
+    mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([]);
     // Mock applyResolvedAutoModel to resolve the virtual model and invoke the efficientDecision thunk
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
@@ -1364,6 +1372,60 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect.objectContaining({
         deniedModelIds: ['google/gemini-2.5-flash'],
       })
+    );
+  });
+
+  it.each([
+    {
+      name: 'organization data collection deny',
+      settings: { data_collection: 'deny' },
+      provider: undefined,
+    },
+    { name: 'request data collection deny', settings: {}, provider: { data_collection: 'deny' } },
+    { name: 'request ZDR', settings: {}, provider: { zdr: true } },
+  ] as const)(
+    'denies models that require data collection to the efficient decision worker for $name',
+    async ({ settings, provider: requestProvider }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'user-123', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: 'org-123',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 1000, settings, plan: 'teams' });
+      mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([
+        'meta/muse-spark-1.3-contributor',
+      ]);
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest({
+          ...makeBody('kilo-auto/balanced'),
+          ...(requestProvider && { provider: requestProvider }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith({
+        userId: 'user-123',
+        organizationId: 'org-123',
+      });
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ deniedModelIds: ['meta/muse-spark-1.3-contributor'] })
+      );
+    }
+  );
+
+  it('does not deny data-collecting models when data collection is allowed', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).not.toHaveBeenCalled();
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ deniedModelIds: [] })
     );
   });
 

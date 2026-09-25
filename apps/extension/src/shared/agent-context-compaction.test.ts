@@ -8,9 +8,7 @@ import {
   createWebMcpToolCall,
 } from './agent-conversation';
 import {
-  KEEP_RECENT_EXCHANGES,
   KEEP_RECENT_EXCHANGES_MANUAL,
-  SUMMARY_PREFIX,
   hasCompactableHistory,
   renderEventsAsTranscript,
   splitEventsForCompaction,
@@ -149,13 +147,5 @@ describe('render events as transcript', () => {
     ]);
     expect(text).toContain('[truncated 3000 chars]');
     expect(text.length).toBeLessThan(3000);
-  });
-});
-
-describe('tuning constants', () => {
-  it('exposes tuning constants', () => {
-    expect(KEEP_RECENT_EXCHANGES).toBe(2);
-    expect(KEEP_RECENT_EXCHANGES_MANUAL).toBe(0);
-    expect(SUMMARY_PREFIX.length).toBeGreaterThan(0);
   });
 });

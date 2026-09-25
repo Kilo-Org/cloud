@@ -15,10 +15,6 @@ import {
   variantToStorage,
 } from './reasoning-effort';
 
-// ---------------------------------------------------------------------------
-// mapSummaryRow
-// ---------------------------------------------------------------------------
-
 describe('variant storage helpers', () => {
   it('round-trips null and empty as the D1 null/default convention', () => {
     expect(variantToStorage(null)).toBe('');
@@ -103,10 +99,6 @@ describe('mapSummaryRow', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// mapRunRow
-// ---------------------------------------------------------------------------
-
 describe('mapRunRow', () => {
   it('maps a RunRow and attaches its summaries', () => {
     const runRow = {
@@ -176,10 +168,6 @@ describe('mapRunRow', () => {
     expect(result.completedAt).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// routingTableToRows / rowsToRoutingTable round-trip
-// ---------------------------------------------------------------------------
 
 const candidate = (model: string): RankedCandidate => ({
   model,

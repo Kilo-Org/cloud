@@ -389,9 +389,10 @@ export function sweepStrayActivities(): void {
     // the only thing that will settle it, and without a rerun an unowned card
     // would stay on the Lock Screen until the next foreground or publisher
     // update. Wait for the last read to land and sweep again.
-    void whenGlanceableRestoresSettle().then(() => {
+    void (async () => {
+      await whenGlanceableRestoresSettle();
       sweepStrayActivities();
-    });
+    })();
     refreshActivity();
     return;
   }

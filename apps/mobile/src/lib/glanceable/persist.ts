@@ -104,11 +104,11 @@ export function isGlanceableRestoreSettled(): boolean {
  * every path. A read that fails still settles, so a waiter always resumes and
  * re-reads the state, including `isGlanceableRestoreUnavailable`.
  */
-export function whenGlanceableRestoresSettle(): Promise<void> {
+export async function whenGlanceableRestoresSettle(): Promise<void> {
   if (restoresInFlight === 0) {
-    return Promise.resolve();
+    return;
   }
-  return new Promise<void>(resolve => {
+  await new Promise<void>(resolve => {
     settleWaiters.push(resolve);
   });
 }

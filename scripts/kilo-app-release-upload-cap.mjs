@@ -137,8 +137,11 @@ function main() {
       return usage(`unknown argument: ${arg}`);
     }
   }
-  if (!Number.isFinite(cap) || cap <= 0) {
-    return usage('--cap must be a positive number');
+  // The cap counts uploads, so a fractional cap is a usage error: with
+  // `--cap 10.5` ten markers satisfy `count < cap` and the next upload raises
+  // the count to eleven, above the count the caller asked to hold.
+  if (!Number.isInteger(cap) || cap <= 0) {
+    return usage('--cap must be a positive whole number');
   }
   if (!Number.isFinite(windowHours) || windowHours <= 0) {
     return usage('--window-hours must be a positive number');

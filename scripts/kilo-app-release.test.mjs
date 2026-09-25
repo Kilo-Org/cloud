@@ -997,3 +997,22 @@ test('cap usage errors exit 2', () => {
   assert.equal(runScript(CAP, ['--now', 'not-a-date']).status, 2);
   assert.equal(runScript(CAP, ['--unknown']).status, 2);
 });
+
+// `--cap 9.5` would admit a run with nine markers and raise the count to ten,
+// above the count the caller asked to hold, so a fractional cap is a usage
+// error rather than a rounded one.
+test('a fractional cap exits 2 instead of admitting one upload too many', () => {
+  const dir = initRepo('kilo-cap-fraction-');
+  try {
+    commit(dir, { 'README.md': 'x\n' }, 'chore: seed');
+    for (let index = 0; index < 9; index += 1) {
+      tagAt(dir, `kilo-app-upload/marker-${index}`, NOW_S - 60);
+    }
+    const result = runScript(CAP, ['--cap', '9.5', '--now', NOW], { cwd: dir });
+    assert.equal(result.status, 2, result.stdout);
+    assert.match(result.stderr, /--cap must be a positive whole number/);
+    assert.equal(result.stdout.includes('allowed=true'), false);
+  } finally {
+    cleanup(dir);
+  }
+});

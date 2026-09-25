@@ -204,7 +204,6 @@ describe('createChatProcessor', () => {
       expect(storedFile.source?.text.value).toBe('');
     });
 
-
     it('calls onFilePart for a top-level FilePart with a non-blank url', () => {
       const storage = createMemoryStorage();
       const onFilePart = jest.fn();
@@ -264,7 +263,6 @@ describe('createChatProcessor', () => {
       const storedFile = stored[0] satisfies Part as FilePart;
       expect(storedFile.url).toBe('');
     });
-
 
     it('calls onToolAttachment for image attachments from any tool', () => {
       const storage = createMemoryStorage();

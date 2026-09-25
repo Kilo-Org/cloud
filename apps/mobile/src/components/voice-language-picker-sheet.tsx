@@ -2,7 +2,7 @@ import { type TFunction } from 'i18next';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FlatList, I18nManager, TextInput, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -10,6 +10,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic, Search, SearchX } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
@@ -27,8 +28,6 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
-
-const SEARCH_RTL = { textAlign: 'right' } as const;
 
 // Static skeleton rows: count and shape match the real ChoiceRow rows (name
 // line + caption; the trailing check is transparent unless selected, so the
@@ -226,7 +225,6 @@ export function VoiceLanguagePickerSheet() {
   const chosen = useVoiceInputLanguage();
   const chosenLoaded = useVoiceInputLanguageLoaded();
   const [query, setQuery] = useState('');
-  const isRtl = I18nManager.isRTL;
 
   const onSelect = useCallback(
     (tag: string | null) => {
@@ -290,21 +288,20 @@ export function VoiceLanguagePickerSheet() {
       scrollable={false}
       headerContent={
         // Same filled pill as the account language picker and the repository
-        // and share pickers: one search-field shape for the same control.
+        // and share pickers: one search-field shape for the same control. The
+        // field itself is the shared single-line `Input`, so the pill owns only
+        // the chrome while the field owns the height floor, the one line box for
+        // the placeholder and the value, and the RTL content alignment.
         <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
           <Search size={18} color={colors.mutedForeground} />
-          <TextInput
+          <Input
             accessibilityLabel={t('language.search')}
-            // leading-[normal] so no lineHeight reaches the style: iOS otherwise
-            // draws the placeholder below the typed text and clips it. The fixed
-            // h-* with p-0 sets the height without padding, so iOS centres the
-            // text rect the same way the repository picker's field does.
-            className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+            // The pill supplies the horizontal inset, so the field zeroes the
+            // shared box's `px-3` — the same `flex-1 px-0` the share and model
+            // pickers give the field in this pill.
+            className="flex-1 px-0 text-base text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
-            // textAlign is applied inline, not via a class: NativeWind maps it
-            // to a native prop for TextInput and crashes on it in this version.
-            style={isRtl ? SEARCH_RTL : undefined}
             // Uncontrolled: iOS drops keystrokes when state drives `value`;
             // `onChangeText` only feeds the filter.
             onChangeText={setQuery}

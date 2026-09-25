@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, type TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withUiDeadline } from '@/lib/ui-deadline';
@@ -108,7 +109,7 @@ export function RenameModal<TSaveResult>({
           }}
         >
           <Text className="text-base font-semibold">{title}</Text>
-          <TextInput
+          <Input
             ref={inputRef}
             accessible
             accessibilityLabel={placeholder}
@@ -118,8 +119,8 @@ export function RenameModal<TSaveResult>({
             // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
             // value soft-wraps into the field and scrolls vertically past the cap.
             className={cn(
-              'rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground',
-              multiline ? 'max-h-40 min-h-24 leading-5' : 'leading-[normal]',
+              'rounded-md border border-input bg-background px-3 text-sm text-foreground',
+              multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
               pending && 'opacity-50'
             )}
             placeholder={placeholder}

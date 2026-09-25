@@ -237,7 +237,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: await isFreeModel(usageContextInfo.requested_model),
+    is_free: isFreeModel(usageContextInfo.requested_model),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -1311,7 +1311,7 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
+  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1335,7 +1335,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    (await isFreeModel(usageContext.requested_model)) ||
+    isFreeModel(usageContext.requested_model) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);

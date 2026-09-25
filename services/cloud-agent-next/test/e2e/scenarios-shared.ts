@@ -310,6 +310,44 @@ export function echoPayloadMatches(observedText: string, payload: string): boole
   return new RegExp(`(?:^|[^A-Za-z0-9_-])${escapeRegExp(payload)}$`).test(observedText);
 }
 
+/**
+ * Per-assertion allowance for the correlated child text to arrive after the
+ * message reaches its terminal event. The observed lag is a fraction of a
+ * second; five seconds covers it and still fails a genuinely missing payload
+ * long before the rest of a scenario's budget is spent.
+ */
+export const CONTENT_CORRELATION_BUDGET_MS = 5_000;
+
+/**
+ * Return the correlated child text of `parentMessageId` once `ready` accepts it.
+ * Text is read with `collectChildMessageText` from the live event buffer, and
+ * `stream.waitFor` is used only to wake on newly appended events (its predicate
+ * re-reads the buffer, so it also satisfies an already-present value). When
+ * `ready` is still false after the bounded wait the call throws with the label,
+ * the timeout and the observed text, so a missing payload fails within the
+ * budget instead of racing the terminal event. The helper never closes the
+ * stream: the stream owner closes it on a throw.
+ */
+export async function awaitCorrelatedChildText(input: {
+  stream: StreamConnection;
+  parentMessageId: string;
+  timeoutMs: number;
+  label: string;
+  ready: (text: string) => boolean;
+}): Promise<string> {
+  const { stream, parentMessageId, timeoutMs, label, ready } = input;
+  const collect = (): string => collectChildMessageText(stream.events, parentMessageId);
+  const initial = collect();
+  if (ready(initial)) return initial;
+  await stream.waitFor(() => ready(collect()), timeoutMs);
+  const observed = collect();
+  if (ready(observed)) return observed;
+  throw new Error(
+    `${label}: correlated child text did not satisfy the predicate within ${timeoutMs}ms; ` +
+      `observed ${JSON.stringify(observed)} for ${parentMessageId}`
+  );
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -450,8 +488,6 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
 
     const coldResult = await collectUntilTerminal(coldStream, session.messageId, timeoutMs);
     events.push(...coldResult.events);
-    coldStream.close();
-    coldStream = undefined;
 
     const coldTerminalType = coldResult.terminal?.streamEventType ?? 'none';
     if (!isMessageCompleted(coldResult.terminal, session.messageId)) {
@@ -470,16 +506,22 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
     if (expectedColdText === null) {
       coldContentMarker = 'cold-content=skipped(not-echo:<token>)';
     } else {
-      const observedColdText = collectChildMessageText(coldResult.events, session.messageId);
-      const observedTail = trailingNonEmptyLine(observedColdText);
-      if (!echoPayloadMatches(observedColdText, expectedColdText)) {
-        return fail(
-          `cold turn: expected correlated child text ${JSON.stringify(expectedColdText)} but observed ` +
-            `${JSON.stringify(observedColdText)}; observed tail ${JSON.stringify(observedTail)} for ${session.messageId}`
-        );
-      }
-      coldContentMarker = `cold-content=${JSON.stringify(observedTail)}`;
+      // Wait while `coldStream` is still open and live; `coldResult.events` is a
+      // copy taken at the terminal, so content that arrives after it is missed.
+      const observedColdText = await awaitCorrelatedChildText({
+        stream: coldStream,
+        parentMessageId: session.messageId,
+        timeoutMs: Math.max(
+          1,
+          Math.min(CONTENT_CORRELATION_BUDGET_MS, startedAt + timeoutMs - Date.now())
+        ),
+        label: 'cold turn',
+        ready: text => echoPayloadMatches(text, expectedColdText),
+      });
+      coldContentMarker = `cold-content=${JSON.stringify(trailingNonEmptyLine(observedColdText))}`;
     }
+    coldStream.close();
+    coldStream = undefined;
 
     const hotSummaries: string[] = [];
     for (const directive of HOT_DIRECTIVES) {

@@ -13,6 +13,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -251,9 +252,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('codeReviewer.manualReview.pullRequestUrl')}
             </Text>
-            <TextInput
+            <Input
               key={platform}
-              className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
+              // The shared single-line box supplies the touch floor
+              // (`min-h-[44px]`, never a fixed height); the field keeps its
+              // own chrome, horizontal inset and line box.
+              className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
               placeholder={URL_PLACEHOLDER[platform]}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"

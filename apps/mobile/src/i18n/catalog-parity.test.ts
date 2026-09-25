@@ -27,9 +27,9 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons landed in all 86 catalogs,
- * and so did the accepted-empty Agents history label, so the set is empty. It
- * stays as the hook the next copy-adding slice fills.
+ * The notifications.category.*Unavailable reasons, accepted-empty Agents history
+ * label, and profile-editor validation copy landed in every catalog, so the set
+ * is empty. It stays as the hook the next copy-adding slice fills.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

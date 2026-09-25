@@ -355,6 +355,13 @@ const mutations = {
       1
     );
   },
+  'the iOS upload marker is pushed after Submit Android': workflow => {
+    const steps = workflow.jobs['build-and-submit'].steps;
+    const index = steps.findIndex(item => /kilo-app-upload\//.test(item.run ?? ''));
+    const [marker] = steps.splice(index, 1);
+    const android = steps.findIndex(item => item.name === 'Submit Android');
+    steps.splice(android + 1, 0, marker);
+  },
   'the iOS upload marker is pushed after Submit iOS': workflow => {
     const steps = workflow.jobs['build-and-submit'].steps;
     const index = steps.findIndex(item => /kilo-app-upload\//.test(item.run ?? ''));

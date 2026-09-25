@@ -53,7 +53,6 @@ import { SessionContextMetrics } from '@/components/agents/session-context-metri
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
-import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -1299,14 +1298,13 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the PR badge and the context pill, nothing
-    // else.
+    // past the slot edge. It holds the context pill and nothing else: the PR
+    // badge now shares the goal row instead.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
-    expect(cluster?.findAllByType(SessionPrBadge)).toHaveLength(1);
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
-    expect(cluster?.children).toHaveLength(2);
+    expect(cluster?.children).toHaveLength(1);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.

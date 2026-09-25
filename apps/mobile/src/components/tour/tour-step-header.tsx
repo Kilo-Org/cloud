@@ -20,9 +20,10 @@ type TourStepHeaderProps = {
 /**
  * The opening block for a tour step: icon tile, eyebrow, title, and body.
  *
- * The eyebrow is required and rendered here above the title. The tour's
- * screen header has no title, so placing the label there would separate it
- * from the heading it introduces.
+ * One component so the font-scale cap that keeps the subtitle whole above
+ * the scroll fold (see `tour-font-scale`) cannot drift between steps.
+ * The eyebrow is required and rendered here, above the title, rather than
+ * in `ScreenHeader`, so it stays with the heading it introduces.
  */
 export function TourStepHeader({ icon, eyebrow, title, body }: Readonly<TourStepHeaderProps>) {
   return (

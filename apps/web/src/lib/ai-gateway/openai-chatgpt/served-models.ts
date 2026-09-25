@@ -47,29 +47,39 @@ async function fetchServedModelIds(apiKey: string): Promise<ReadonlySet<string>>
   return new Set(ids);
 }
 
-const servedModelIdsByKey = new Map<string, () => Promise<ReadonlySet<string> | null>>();
+/**
+ * Callers pass the single deployment key, so only the most recent key's list is
+ * kept; a different key replaces it rather than growing the cache.
+ */
+let servedModelIds: {
+  apiKey: string;
+  get: () => Promise<ReadonlySet<string> | null>;
+} | null = null;
 
 function getServedModelIds(apiKey: string): Promise<ReadonlySet<string> | null> {
-  let get = servedModelIdsByKey.get(apiKey);
-  if (!get) {
-    get = createCachedFetch<ReadonlySet<string> | null>(
-      () => fetchServedModelIds(apiKey),
-      CACHE_TTL_MS,
-      null,
-      { failureTtlMs: FAILURE_TTL_MS }
-    );
-    servedModelIdsByKey.set(apiKey, get);
+  if (servedModelIds?.apiKey !== apiKey) {
+    servedModelIds = {
+      apiKey,
+      get: createCachedFetch<ReadonlySet<string> | null>(
+        () => fetchServedModelIds(apiKey),
+        CACHE_TTL_MS,
+        null,
+        { failureTtlMs: FAILURE_TTL_MS }
+      ),
+    };
   }
-  return get();
+  return servedModelIds.get();
 }
 
 /**
  * True when the project behind `apiKey` can serve `modelId`.
  *
- * A missing key, a failed request, or an unreadable body returns true: a
- * transient problem must not hide the route, and the upstream then answers
- * exactly as it does today. A failure is remembered for `FAILURE_TTL_MS` so a
- * burst of eligible requests does not each pay the lookup and its timeout.
+ * A missing key returns true. When a lookup fails (a failed request or an
+ * unreadable body), the last successfully fetched list keeps answering; with no
+ * such list yet, it returns true, so a transient problem does not hide the
+ * route and the upstream answers exactly as it does today. A failure is
+ * remembered for `FAILURE_TTL_MS` so a burst of eligible requests does not each
+ * pay the lookup and its timeout.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;
@@ -78,7 +88,7 @@ export async function isOpenAiModelServed(apiKey: string, modelId: string): Prom
   return ids?.has(modelId) ?? true;
 }
 
-/** Drops the cached lists. Tests call this between cases. */
+/** Drops the cached list. Tests call this between cases. */
 export function resetServedModelIdsCache(): void {
-  servedModelIdsByKey.clear();
+  servedModelIds = null;
 }

@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 // `AlertDialog` on Android, whose button bar inflates the actions with
 // `?attr/buttonBarPositiveButtonStyle` / `Negative` / `Neutral`, resolved by
 // the AppCompat theme to `Widget.AppCompat.Button.ButtonBar.AlertDialog` —
-// whose text appearance sets `android:textAllCaps=true`. So the discard-draft
-// confirm draws ALL-CAPS while every other button is sentence case
+// whose text appearance sets `android:textAllCaps=true`. So every native
+// alert action draws ALL-CAPS while every in-app button is sentence case
 // (DESIGN.md:350). The prebuild plugin this suite guards re-cases the actions
 // from the activity theme, keeping the stock parent so only the case changes.
 // AppTheme is the carrier: AppCompat resolves the three `buttonBar*ButtonStyle`

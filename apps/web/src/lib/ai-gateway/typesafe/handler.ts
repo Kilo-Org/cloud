@@ -29,6 +29,7 @@ import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { toMicrodollars } from '@/lib/utils';
 import { errorExceptInTest } from '@/lib/utils.server';
 import type { ProxyErrorType } from '@/lib/proxy-error-types';
+import { getEffectiveProviderPrivacy } from '../provider-privacy';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
@@ -72,7 +73,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
     organizationPlan: plan,
   });
   if (error) return error;
-  let providerPolicy = providerConfig;
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    parsed.data.provider,
+    settings?.data_collection
+  );
+  let providerPolicy =
+    Object.keys(effectivePrivacy).length > 0
+      ? { ...providerConfig, ...effectivePrivacy }
+      : providerConfig;
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -86,7 +94,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         ? providerConfig.only.filter(route => decision.eligibleProviderRoutes?.has(route))
         : [...decision.eligibleProviderRoutes];
       if (only.length === 0) return modelNotAllowedResponse();
-      providerPolicy = { ...providerConfig, only };
+      providerPolicy = { ...providerPolicy, only };
     }
   }
 

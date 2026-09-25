@@ -6,6 +6,7 @@ import {
   getCenteredStateLayout,
   getStateSurfaceInsets,
   intersectStateFrames,
+  isShortViewport,
 } from './centered-state-layout';
 
 describe('getCenteredStateLayout', () => {
@@ -208,6 +209,33 @@ describe('native keyboard clipping', () => {
     });
     const scrollRange = layout.paddingTop + 800 + layout.paddingBottom - layout.minHeight;
     expect(80 + layout.paddingTop + 800 - scrollRange).toBe(384);
+  });
+});
+
+describe('isShortViewport', () => {
+  it('reads a phone in landscape as short and the same phone in portrait as tall', () => {
+    expect(isShortViewport(914, 411)).toBe(true);
+    expect(isShortViewport(411, 914)).toBe(false);
+  });
+
+  it('reads a tablet in landscape as tall, so the state keeps its full stack', () => {
+    // Wide but not short: the band there is taller than the whole stack.
+    expect(isShortViewport(1024, 768)).toBe(false);
+    // A 600dp-short-edge tablet is Android's smallest (the `sw600dp`
+    // qualifier, the 1024x600 emulator). It is wide but still a tablet: its
+    // band is ~384dp against the ~167dp stack, so it keeps the full stack too.
+    expect(isShortViewport(1024, 600)).toBe(false);
+  });
+
+  it('reads a square window as tall, so the state keeps its full stack', () => {
+    expect(isShortViewport(500, 500)).toBe(false);
+  });
+
+  it('reads an unavailable dimension as tall', () => {
+    // A partial platform mock (the mounted-test harnesses) omits a dimension;
+    // treating it as short would silently change every state's layout there.
+    expect(isShortViewport(undefined as unknown as number, 844)).toBe(false);
+    expect(isShortViewport(390, Number.NaN)).toBe(false);
   });
 });
 

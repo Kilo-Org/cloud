@@ -9,7 +9,7 @@ import {
   isLocalFakeTranscriptionModel,
 } from '@/lib/ai-gateway/local-fake-llm';
 
-export async function isFreeModel(model: string): Promise<boolean> {
+export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
@@ -22,9 +22,9 @@ export async function isFreeModel(model: string): Promise<boolean> {
   );
 }
 
-export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
+export function hasBestEffortGuessDataCollectionRequirement(model: string): boolean {
   return (
-    (await isFreeModel(model)) ||
+    isFreeModel(model) ||
     kiloExclusiveModels.some(
       candidate =>
         candidate.public_id === model &&

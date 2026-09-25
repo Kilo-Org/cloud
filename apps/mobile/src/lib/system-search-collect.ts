@@ -15,7 +15,7 @@ import { type Query, type QueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { collectUnfilteredPages } from '@/lib/agent-session-pages';
-import { getRecentPrs } from '@/lib/pr-review/recent-prs';
+import { getRecentPrsForIndex } from '@/lib/pr-review/recent-prs';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
 import {
   activeSessionSearchDocument,
@@ -555,24 +555,23 @@ async function recentPrDocuments(): Promise<{
   documents: SystemSearchDocument[];
   observedSources: string[];
 }> {
-  try {
-    const recents = await getRecentPrs();
-    return {
-      documents: recents.map(entry => recentPrSearchDocument(entry)),
-      // The stored list is read whole, so every provider's recents scope is
-      // enumerated this run: an entry that is no longer in the list is
-      // genuinely gone, not a source the cache has not hydrated. No inbox
-      // query can stand in for this — Bitbucket's inbox is organization-only
-      // and GitLab's personal one is absent in an organization context — so a
-      // recents entry would otherwise never leave the index.
-      observedSources: recentPrSourceScopes(),
-    };
-  } catch {
-    // SecureStore can fail (locked device, corrupt entry); the index then
-    // simply carries no recents, and no recents scope is observed, so nothing
-    // is removed on the strength of a read that did not happen.
+  // SecureStore can fail (locked device, corrupt entry); `undefined` is that
+  // failed read, and the index then simply carries no recents and observes no
+  // recents scope, so nothing is removed on the strength of a read that did not
+  // happen. A read list is read whole, so every provider's recents scope is
+  // enumerated this run: an entry that is no longer in the list is genuinely
+  // gone, not a source the cache has not hydrated. No inbox query can stand in
+  // for this — Bitbucket's inbox is organization-only and GitLab's personal one
+  // is absent in an organization context — so a recents entry would otherwise
+  // never leave the index.
+  const recents = await getRecentPrsForIndex();
+  if (recents === undefined) {
     return { documents: [], observedSources: [] };
   }
+  return {
+    documents: recents.map(entry => recentPrSearchDocument(entry)),
+    observedSources: recentPrSourceScopes(),
+  };
 }
 
 function presentOrEmpty(document: SystemSearchDocument | null): SystemSearchDocument[] {

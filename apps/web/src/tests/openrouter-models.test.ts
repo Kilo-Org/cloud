@@ -765,7 +765,6 @@ describe('shared stats and catalog snapshot', () => {
 
 describe('final Enkrypt serialization boundaries', () => {
   const stages = [
-    ['direct', 'free'],
     ['direct', 'opencode'],
     ['anonymous', 'autoRouting'],
     ['authenticated', 'autoRouting'],
@@ -786,12 +785,6 @@ describe('final Enkrypt serialization boundaries', () => {
       await released.promise;
     }
     switch (stage) {
-      case 'free':
-        jest.mocked(isFreeModel).mockImplementationOnce(async (...args) => {
-          await pause();
-          return realFreeModel.isFreeModel(...args);
-        });
-        break;
       case 'opencode':
         jest.mocked(getGatewayOpenCodeSettings).mockImplementationOnce(async (...args) => {
           await pause();

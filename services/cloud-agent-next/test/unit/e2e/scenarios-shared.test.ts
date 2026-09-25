@@ -64,9 +64,11 @@ import type {
 } from '../../e2e/scenario-capabilities.js';
 import { AttachWindowMissedError } from '../../e2e/attach-window-evidence.js';
 import {
+  awaitCorrelatedChildText,
   buildAuthRejectProbes,
   classifyAuthProbe,
   collectChildMessageText,
+  CONTENT_CORRELATION_BUDGET_MS,
   correlatedProgressSummary,
   echoDirectivePayload,
   echoPayloadMatches,
@@ -381,7 +383,9 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
     expect(result.message).toContain('observed "not-hi"');
     // A failed cold assertion still cleans up the started session.
     expect(mocks.interruptSession).toHaveBeenCalledTimes(1);
@@ -438,8 +442,10 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
-    expect(result.message).toContain('observed tail "Initializing snapshot…"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
+    expect(result.message).toContain('observed "Initializing snapshot…"');
   });
 
   it('fails on empty observed text', async () => {
@@ -448,7 +454,9 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
   });
 
   it('fails when the correlated text merely contains the payload but does not end with it', async () => {
@@ -457,7 +465,9 @@ describe('cold-hot warm reuse', () => {
     const result = await coldHot({ config, conversation: 'echo:hi' });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('expected correlated child text "hi"');
+    expect(result.message).toContain(
+      'cold turn: correlated child text did not satisfy the predicate'
+    );
     expect(result.message).toContain('observed "hi\\ntrailing noise"');
   });
 
@@ -1058,6 +1068,88 @@ describe('echoPayloadMatches', () => {
   it('fails when the preceding character is inside the payload class', () => {
     expect(echoPayloadMatches('_hi', 'hi')).toBe(false);
     expect(echoPayloadMatches('-hi', 'hi')).toBe(false);
+  });
+});
+
+describe('awaitCorrelatedChildText', () => {
+  const PARENT_ID = 'message_parent';
+  const CHILD_ID = 'message_child';
+  const PART_ID = 'part_child_text';
+
+  function correlatedTextEvents(text: string): StreamEvent[] {
+    return [assistantMessageEvent(PARENT_ID, CHILD_ID), textPartEvent(PART_ID, CHILD_ID, text)];
+  }
+
+  it('returns already-present matching text without waiting', async () => {
+    const stream = fakeStream(correlatedTextEvents('hi'), completedEvent(PARENT_ID));
+    stream.waitFor = vi.fn(() => Promise.reject(new Error('waitFor must not be called')));
+
+    const text = await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: PARENT_ID,
+      timeoutMs: CONTENT_CORRELATION_BUDGET_MS,
+      label: 'test',
+      ready: candidate => echoPayloadMatches(candidate, 'hi'),
+    });
+
+    expect(text).toBe('hi');
+    expect(stream.waitFor).not.toHaveBeenCalled();
+  });
+
+  it('fails with the observed empty text when the payload never arrives', async () => {
+    const stream = fakeStream(
+      [assistantMessageEvent(PARENT_ID, CHILD_ID)],
+      completedEvent(PARENT_ID)
+    );
+
+    await expect(
+      awaitCorrelatedChildText({
+        stream,
+        parentMessageId: PARENT_ID,
+        timeoutMs: 50,
+        label: 'must-not-mask',
+        ready: candidate => echoPayloadMatches(candidate, 'hi'),
+      })
+    ).rejects.toThrow(/must-not-mask: correlated child text did not satisfy the predicate/);
+    await expect(
+      awaitCorrelatedChildText({
+        stream,
+        parentMessageId: PARENT_ID,
+        timeoutMs: 50,
+        label: 'must-not-mask',
+        ready: candidate => echoPayloadMatches(candidate, 'hi'),
+      })
+    ).rejects.toThrow(/observed ""/);
+  });
+
+  it('returns text delivered while the wait is pending', async () => {
+    const events: StreamEvent[] = [assistantMessageEvent(PARENT_ID, CHILD_ID)];
+    const stream = fakeStream(events, completedEvent(PARENT_ID));
+    stream.waitFor = vi.fn(
+      (predicate: (event: StreamEvent) => boolean) =>
+        new Promise<StreamEvent | null>(resolve => {
+          // The correlated part arrives only after the wait is registered. The
+          // wait resolves only when `predicate` accepts the updated buffer; a
+          // predicate over a snapshot taken once, before it is registered,
+          // never resolves and the await below hangs.
+          setTimeout(() => {
+            events.push(textPartEvent(PART_ID, CHILD_ID, 'hi'));
+            const match = events.find(predicate);
+            if (match) resolve(match);
+          }, 0);
+        })
+    );
+
+    const text = await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: PARENT_ID,
+      timeoutMs: CONTENT_CORRELATION_BUDGET_MS,
+      label: 'test',
+      ready: candidate => echoPayloadMatches(candidate, 'hi'),
+    });
+
+    expect(text).toBe('hi');
+    expect(stream.waitFor).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -2072,11 +2164,33 @@ function startQueueSession(messageId: string): void {
   });
 }
 
-function interruptedQueuedEvent(messageId: string): StreamEvent {
+function sentEvent(messageId: string): StreamEvent {
+  return streamEvent('cloud.message.sent', { messageId, delivery: 'sent' });
+}
+
+function interruptedDeliveryEvent(messageId: string, delivery: 'sent' | 'queued'): StreamEvent {
   return streamEvent('cloud.message.failed', {
     messageId,
     reason: 'interrupted',
-    delivery: 'queued',
+    delivery,
+  });
+}
+
+/**
+ * Run `queue-interrupt-clears` with the given follow-up stream events preloaded,
+ * so classification reads the settled buffer without a wait.
+ */
+function runInterruptClearsWith(extraEvents: StreamEvent[]): Promise<LifecycleResult> {
+  installPacedHold('message_boot', 'message_held', extraEvents);
+  mocks.sendMessage
+    .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
+    .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'queued' });
+  return runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
+    config,
+    conversation: '_',
+    api: 'unified',
+    timeoutMs: 5_000,
+    env: queueHttpEnvironment(),
   });
 }
 
@@ -2101,8 +2215,8 @@ describe('moved queue scenario run isolation', () => {
 
   it('queue-interrupt-clears boots before the hold and never touches the gate registry', async () => {
     installPacedHold('message_boot', 'message_held', [
-      interruptedQueuedEvent('message_second'),
-      interruptedQueuedEvent('message_third'),
+      interruptedDeliveryEvent('message_second', 'queued'),
+      interruptedDeliveryEvent('message_third', 'queued'),
     ]);
     mocks.sendMessage
       .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
@@ -2117,9 +2231,74 @@ describe('moved queue scenario run isolation', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.message).toContain('second=ok, third=ok');
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=queued expected=queued'
+    );
+    expect(result.message).toContain(
+      'message_third: reason=interrupted delivery=queued expected=queued'
+    );
     expect(mocks.releaseGate).not.toHaveBeenCalled();
     expect(mocks.waitForGateEngaged).not.toHaveBeenCalled();
+  }, 15_000);
+});
+
+describe('queue-interrupt-clears settlement contract', () => {
+  it('accepts an observed sent frame whose failure reports sent', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_second'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'queued'),
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=sent expected=sent'
+    );
+    expect(result.message).toContain(
+      'message_third: reason=interrupted delivery=queued expected=queued'
+    );
+  }, 15_000);
+
+  it('fails when a sent frame is observed but the failure reports queued', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_second'),
+      interruptedDeliveryEvent('message_second', 'queued'),
+      interruptedDeliveryEvent('message_third', 'queued'),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=queued expected=sent'
+    );
+  }, 15_000);
+
+  it('fails when no sent frame is observed but the failure reports sent', async () => {
+    const result = await runInterruptClearsWith([
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'queued'),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=sent expected=queued'
+    );
+  }, 15_000);
+
+  it('accepts both follow-ups accepted before the interrupt', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'sent'),
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain(
+      'message_second: reason=interrupted delivery=sent expected=sent'
+    );
+    expect(result.message).toContain(
+      'message_third: reason=interrupted delivery=sent expected=sent'
+    );
   }, 15_000);
 });
 

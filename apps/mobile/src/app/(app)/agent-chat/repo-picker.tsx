@@ -2,11 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
@@ -111,12 +112,12 @@ export default function RepoPickerScreen() {
           {/* The placeholder is a single-line Text overlay, not the input's own
               placeholder: Android lays the native hint out at the field's width
               with no line cap, so copy wider than a narrow field wraps onto a
-              second line that the field's fixed height clips against its
-              border. A tail-ellipsized Text truncates the copy at any width
-              instead. Both texts share leading-[normal] and a centred text rect
-              so the overlay sits exactly where the typed text will. */}
+              second line. A tail-ellipsized Text truncates the copy at any width
+              instead. The shared box draws the value on one line box and centres
+              it, and both texts share `px-0` so the overlay sits exactly where
+              the typed text will. */}
           <View className="relative flex-1">
-            <TextInput
+            <Input
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
               autoCapitalize="none"
               autoCorrect={false}

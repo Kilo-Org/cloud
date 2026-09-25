@@ -598,6 +598,10 @@ describe('LanguagePickerSheet search field', () => {
     if (!input) {
       throw new Error('language search input not found');
     }
+    // The field is the shared single-line `Input`, which renders the TextInput
+    // itself, so the pill is the input's wrapper row: walk up to it rather than
+    // stopping at the input's own node. The shared box is what keeps the
+    // placeholder and the value in one box.
     const field = findFieldContainer(input);
 
     expect((field.props.className as string).split(/\s+/)).toEqual(

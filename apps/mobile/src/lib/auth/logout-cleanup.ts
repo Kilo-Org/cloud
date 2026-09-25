@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 

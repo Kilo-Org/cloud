@@ -53,6 +53,7 @@ import {
 } from './retained-operation-notifications.js';
 
 import type { ControlHandlerResult } from './control-handler-result.js';
+import type { WrapperRestoreTelemetry } from '../../../src/shared/wrapper-bootstrap.js';
 export type { ControlHandlerResult } from './control-handler-result.js';
 
 type NativeCompletion = Awaited<ReturnType<WrapperKiloClient['sendPrompt']>>;
@@ -812,6 +813,13 @@ export class SessionOperation {
     if (!result.ok) return result;
     if (this.native.state === 'pending') this.native = { state: 'completed', result: true };
     work.onAttached();
+    // The attach handler may have restored the session from a snapshot and
+    // recorded a partial restore; forward that telemetry so the worker can name
+    // the incomplete outcome instead of only the wrapper log seeing it.
+    const restore =
+      typeof result.result === 'object' && result.result !== null && 'restore' in result.result
+        ? (result.result as { restore?: WrapperRestoreTelemetry }).restore
+        : undefined;
     return {
       ok: true,
       result: {
@@ -819,6 +827,7 @@ export class SessionOperation {
         ...(work.payload.captureNativeRuntimeId && this.target
           ? { nativeRuntimeId: this.target.runtimeId }
           : {}),
+        ...(restore ? { restore } : {}),
       },
     };
   }

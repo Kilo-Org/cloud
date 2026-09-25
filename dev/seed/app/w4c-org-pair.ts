@@ -7,7 +7,9 @@
  *
  * The fixture is idempotent: a rerun removes the organizations it created for
  * the same owner and inserts the pair again, so the mobile account sheet lists
- * one row per account instead of one row per seed run.
+ * one row per account instead of one row per seed run. Only rows the fixture
+ * marked for that owner count as its own; an organization the owner created
+ * through the app is never deleted, relabeled or joined, whatever its name.
  *
  * Usage: pnpm dev:seed app:w4c-org-pair <owner-email> <member-email>
  */
@@ -80,11 +82,14 @@ async function lookupUserId(email: string): Promise<string> {
  * same organization about thirteen times, one row per seeding round).
  *
  * Selection is the fixture's own recognition ({@link isPairOrganization}): the
- * settings marker naming the pair's owner, a legacy `[seed:w4c-org-pair] `
- * name, or a `SEEDED_ORGANIZATION_NAME` row the pair is a member of. The
- * creator column is never read: the app fills it for real organizations too
+ * settings marker naming the pair's owner, or a legacy `[seed:w4c-org-pair] `
+ * name carrying it. Nothing else qualifies. The creator column is never read:
+ * the app fills it for real organizations too
  * (`apps/web/src/lib/organizations/organizations.ts`), so it cannot tell a
- * fixture row from one the owner created through the app.
+ * fixture row from one the owner created through the app. Neither is the
+ * generic `Acme Corp` name plus a membership: an owner can create a real
+ * organization with that name, and deleting it would destroy the owner's own
+ * data, so an unmarked row is left alone even when the pair belongs to it.
  *
  * The query is scoped to organizations `ownerUserId` holds the `owner` role
  * in and that are not soft-deleted, so rerunning one pair never reaches
@@ -199,19 +204,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   // Recognition is scoped to this pair's owner: the marker names the owner a
   // row was created for, so a row belonging to another pair is never claimed.
-  // Rows created before the marker named an owner carry none, and the pair's
-  // existing memberships are the only evidence the fixture created them, so
-  // they are read first and passed in. The fixture therefore converges on the
-  // oldest organization it created for this owner and prunes only this pair's
-  // memberships elsewhere, so each of the two users ends with one fixture
-  // organization membership and the account sheet lists that organization once.
-  // The memberships are read before the reset, which deletes them with the
-  // organizations they point at.
+  // The fixture therefore converges on the oldest organization it marked for
+  // this owner and replaces only that one, so each of the two users ends with
+  // one fixture organization membership and the account sheet lists that
+  // organization once. An unmarked `Acme Corp` the owner created through the
+  // app is neither claimed nor replaced, whatever memberships it has.
+  const pair: FixturePair = { ownerEmail: normalizeSeedEmail(trimmedOwnerEmail) };
+
+  // The pair's memberships are read before the reset, which deletes the
+  // memberships of the organizations it removes with them.
   const membershipRows = await listMemberships(userIds);
-  const pair: FixturePair = {
-    ownerEmail: normalizeSeedEmail(trimmedOwnerEmail),
-    organizationIds: new Set(membershipRows.map(row => row.organization_id)),
-  };
 
   // Reset this fixture's own organizations for the owner, so a rerun replaces
   // the pair instead of accumulating another row in the account sheet.

@@ -668,6 +668,11 @@ describe('runSpendAlertSweep candidate set and batching', () => {
       'Spend alert sweep remainder outgrew the rollup window',
       expect.anything()
     );
+    // The remainder needs exactly the whole window here, which still fits.
+    expect(mockSweepLog).toHaveBeenCalledWith(
+      'Spend alert sweep phases completed',
+      expect.objectContaining({ remainderTicks: 36, rollupWindowTicks: 36 })
+    );
 
     mockSweepLog.mockClear();
     const overflows = pagedFiringDatabase(
@@ -810,6 +815,8 @@ describe('runSpendAlertSweep candidate set and batching', () => {
         rederivedScopes: 0,
         candidateScopes: 0,
         timings: expect.objectContaining({ deferredScopes: 0 }),
+        remainderTicks: 0,
+        rollupWindowTicks: 36,
       })
     );
   });

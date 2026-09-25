@@ -3,7 +3,7 @@ import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
@@ -142,9 +142,9 @@ function node(type: string, index = 0) {
   }
   return result;
 }
-async function render(sessions = settled) {
+async function render(sessions = settled, contextOverride = context) {
   await act(async () => {
-    const tree = createElement(AgentSessionsSection, { context, sessions });
+    const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
     if (renderer) {
       renderer.update(tree);
     } else {
@@ -187,6 +187,49 @@ describe('Home live section', () => {
     expect(nodes('Skeleton')).toHaveLength(0);
     (row.props.onPress as () => void)();
     expect(sessionDestination.id).toBe('a1');
+  });
+
+  it('renders the pending state as a row-shaped skeleton inside the reserved frame', async () => {
+    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    const skeletons = nodes('Skeleton');
+    expect(skeletons.length).toBeGreaterThan(0);
+    expect(
+      skeletons.some(skeleton => String(skeleton.props.className ?? '').includes('w-full'))
+    ).toBe(false);
+    expect(
+      nodes('View').some(view => {
+        const className = String(view.props.className ?? '');
+        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+      })
+    ).toBe(true);
+    expect(nodes('Text').some(text => text.children.includes(i18n.t('home.noLiveSessions')))).toBe(
+      false
+    );
+  });
+
+  it('places the pending placeholder on the real row geometry so the arriving row cannot reflow it', async () => {
+    await render({ ...settled, activeSessions: [session('a1')] });
+    const rowGeometry = String(
+      nodes('View').find(view => String(view.props.className ?? '').includes('py-[13px]'))?.props
+        .className
+    );
+    expect(rowGeometry).toContain('py-[13px]');
+
+    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    const placeholderRow = nodes('View').find(view =>
+      String(view.props.className ?? '').includes('py-[13px]')
+    );
+    expect(placeholderRow).toBeDefined();
+    // The same row box the incoming SessionRow draws: the copy lands on the
+    // same x-offset, so swapping the placeholder for the row cannot shift it.
+    expect(String(placeholderRow?.props.className)).toBe(rowGeometry);
+    // The leading mark is the row's own 3px edge strip, not a 32px circle.
+    expect(
+      nodes('Skeleton').some(skeleton => {
+        const className = String(skeleton.props.className ?? '');
+        return className.includes('absolute') && className.includes('w-[3px]');
+      })
+    ).toBe(true);
   });
 
   it.each([

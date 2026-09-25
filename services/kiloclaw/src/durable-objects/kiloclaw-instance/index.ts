@@ -842,9 +842,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return `fly_${err.status}_capacity_recovery`;
   }
 
-  // ========================================================================
   // Lifecycle methods (called by platform API routes via RPC)
-  // ========================================================================
 
   async provision(
     userId: string,
@@ -1876,8 +1874,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return { gmailNotificationsEnabled: enabled };
   }
 
-  // ── Pairing ─────────────────────────────────────────────────────────
-
   async listPairingRequests(forceRefresh = false) {
     await this.loadState();
     return pairing.listPairingRequests(this.s, this.env, forceRefresh);
@@ -1918,8 +1914,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return doctorRun.cancelDoctorViaController(this.s, this.env);
   }
 
-  // ── Kilo CLI Run ────────────────────────────────────────────────────
-
   async startKiloCliRun(prompt: string) {
     await this.loadState();
     return kiloCliRun.startKiloCliRun(this.s, this.env, prompt);
@@ -1934,8 +1928,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
     return kiloCliRun.cancelKiloCliRun(this.s, this.env);
   }
-
-  // ── Lifecycle ───────────────────────────────────────────────────────
 
   async forceRetryRecovery(): Promise<{ ok: true }> {
     await this.loadState();
@@ -2823,9 +2815,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return finalized;
   }
 
-  // ========================================================================
   // Read methods
-  // ========================================================================
 
   async getStatus(): Promise<{
     userId: string | null;
@@ -2994,7 +2984,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
     startFailurePushSentForAttempt: boolean;
-    // --- env key diagnostics ---
     envKeyAppDOKey: string | null;
     envKeyAppDOFlyAppName: string | null;
     envKeyAppDOKeySet: boolean | null;
@@ -3172,8 +3161,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return cleanupRecoveryPreviousVolume(this.recoveryRuntime());
   }
 
-  // ── Volume reassociation (admin) ───────────────────────────────────
-
   async listCandidateVolumes(): Promise<{
     currentVolumeId: string | null;
     volumes: (FlyVolume & { isCurrent: boolean })[];
@@ -3271,8 +3258,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       newRegion: volume.region,
     };
   }
-
-  // ── Machine resize (admin) ─────────────────────────────────────────
 
   async resizeMachine(input: {
     targetTierKey: InstanceTierKey;
@@ -3467,8 +3452,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
     }
   }
-
-  // ── Admin temporary CPU/RAM override ──────────────────────────────
 
   /**
    * Set a temporary admin override for the machine's CPU/RAM. Wins over
@@ -3669,8 +3652,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
-  // ── Snapshot restore (admin) ───────────────────────────────────────
-
   /**
    * Enqueue a snapshot restore job. Sets status to 'restoring' immediately
    * and sends a message to the CF Queue for async orchestration.
@@ -3865,8 +3846,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     console.log(`[DO] Snapshot restore failed, status restored to ${restoredStatus}`);
   }
-
-  // ── Gateway controller ─────────────────────────────────────────────
 
   async getGatewayProcessStatus(): Promise<GatewayProcessStatus> {
     await this.loadState();
@@ -4289,8 +4268,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.readMorningBriefing(this.s, this.env, day);
   }
 
-  // ── Restart machine (user-facing) ──────────────────────────────────
-
   async restartMachine(options?: {
     imageTag?: string;
   }): Promise<{ success: boolean; error?: string }> {
@@ -4586,9 +4563,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await runUnexpectedStopRecoveryInBackground(this.recoveryRuntime());
   }
 
-  // ========================================================================
   // Alarm (reconciliation loop)
-  // ========================================================================
 
   override async alarm(): Promise<void> {
     const pendingRegistryCleanup = await this.ctx.storage.get<PendingRegistryCleanup>(

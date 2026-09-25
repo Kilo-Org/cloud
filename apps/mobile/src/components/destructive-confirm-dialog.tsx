@@ -8,6 +8,8 @@ type DestructiveConfirmDialogProps = {
   title: string;
   message: string;
   confirmLabel: string;
+  /** The safe choice's label; defaults to the generic Cancel. */
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -16,10 +18,11 @@ type DestructiveConfirmDialogProps = {
  * In-app confirmation for a destructive action, rendered with the destructive
  * (red) button variant.
  *
- * One implementation for both platforms: Android's native `AlertDialog` paints
- * every button with the theme accent, so `Alert.alert`'s `style: 'destructive'`
- * never reaches the screen there, and the confirmation must behave the same on
- * iOS and Android. This surface carries the red affordance on both.
+ * The native `Alert.alert` cannot carry the affordance on Android: its
+ * `AlertDialog` paints every button with the theme accent, so
+ * `style: 'destructive'` never reaches the screen there. This surface renders
+ * the confirm in-app on both platforms instead — one implementation, so the
+ * destructive red fill and the neutral outline read the same everywhere.
  *
  * Mount it only while it should be open (e.g. `{confirming && <DestructiveConfirmDialog ... />}`),
  * the same lifecycle `RenameModal` uses.
@@ -28,6 +31,7 @@ export function DestructiveConfirmDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
@@ -50,7 +54,7 @@ export function DestructiveConfirmDialog({
           <Text className="text-sm text-muted-foreground">{message}</Text>
           <View className="flex-row justify-end gap-3">
             <Button variant="outline" onPress={onCancel}>
-              <Text>{t('common.cancel')}</Text>
+              <Text>{cancelLabel ?? t('common.cancel')}</Text>
             </Button>
             <Button variant="destructive" onPress={onConfirm}>
               <Text>{confirmLabel}</Text>

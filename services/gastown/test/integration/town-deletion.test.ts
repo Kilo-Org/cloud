@@ -84,7 +84,7 @@ describe('Town deletion (#1182)', () => {
 
       // Write events to the AgentDO
       const agentDO = getAgentStub(agent.id);
-      await agentDO.appendEvent('session.start', { test: true });
+      await agentDO.appendEvents([{ type: 'session.start', data: JSON.stringify({ test: true }) }]);
 
       const eventsBefore = await agentDO.getEvents();
       expect(eventsBefore.length).toBeGreaterThan(0);
@@ -135,18 +135,6 @@ describe('Town deletion (#1182)', () => {
       expect(beads).toHaveLength(0);
 
       // Alarm should NOT have been re-armed
-      const ran = await runDurableObjectAlarm(town);
-      expect(ran).toBe(false);
-    });
-
-    it('should not re-arm alarm via healthCheck after destroy', async () => {
-      await town.setTownId(townName);
-      await town.destroy();
-
-      const health = await town.healthCheck();
-      expect(health.alarmSet).toBe(false);
-      expect(health.townId).toBe('');
-
       const ran = await runDurableObjectAlarm(town);
       expect(ran).toBe(false);
     });

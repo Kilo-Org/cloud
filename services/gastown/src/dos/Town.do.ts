@@ -5311,14 +5311,7 @@ export class TownDO extends DurableObject<Env> {
     activeAgents: number;
     pendingBeads: number;
   }> {
-    // Same gate as armAlarmIfNeeded: destroy() wipes town:id. Re-arming
-    // here would resurrect a deleted town (the getter falls back to the
-    // Durable Object name, so a null _townId is not enough).
-    const storedId = await this.ctx.storage.get<string>('town:id');
-    if (!storedId) {
-      return { townId: '', alarmSet: false, activeAgents: 0, pendingBeads: 0 };
-    }
-    const townId = storedId;
+    const townId = this.townId;
 
     const currentAlarm = await this.ctx.storage.getAlarm();
     const alarmSet = currentAlarm !== null && currentAlarm > Date.now();
@@ -5899,12 +5892,6 @@ export class TownDO extends DurableObject<Env> {
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-    // deleteAll() drops SQLite tables. Reset init so a later RPC on this
-    // isolate recreates empty schema instead of throwing "no such table".
-    // armAlarmIfNeeded() no-ops without town:id, so the alarm stays dead.
-    this._townId = null;
-    this.initPromise = null;
-    await this.ensureInitialized();
   }
 }
 

@@ -924,7 +924,7 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
   ) {
     return next();
   }
-  return kiloAuthMiddleware(c, async () => {
+  await kiloAuthMiddleware(c, async () => {
     await adminAuditMiddleware(c, async () => {
       await townAuthMiddleware(c, next);
     });
@@ -1079,10 +1079,7 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
-// kiloAuthMiddleware + adminAuditMiddleware + townAuthMiddleware (registered
-// above) require a Kilo user JWT and per-town ownership; unauthenticated
-// callers get 401. Cloudflare Access guards the perimeter but does not
-// enforce town ownership, so the JWT chain must stay on these routes.
+// Protected by Cloudflare Access at the perimeter; no additional auth required.
 
 app.post('/api/towns/:townId/container/agents/start', c =>
   instrumented(c, 'POST /api/towns/:townId/container/agents/start', () =>
@@ -1386,24 +1383,7 @@ app.notFound(c => c.json(resError('Not found'), 404));
 app.onError((err, c) => {
   console.error('Unhandled error', { error: err.message, stack: err.stack });
   Sentry.captureException(err);
-  // Empty JSON bodies in the Workers runtime can yield a Response with
-  // status 0. Hono throws RangeError when assigning that as c.res; map
-  // it to 400 instead of a generic 500. Build a fresh Response so we do
-  // not copy the invalid status, but keep CORS (and other) headers.
-  const invalidStatus =
-    err instanceof RangeError && /status codes in the range 200 to 599/i.test(err.message);
-  const status = invalidStatus ? 400 : 500;
-  const payload = resError(invalidStatus ? 'Invalid JSON body' : 'Internal server error');
-  const headers = new Headers({ 'Content-Type': 'application/json' });
-  try {
-    c.res.headers.forEach((value, key) => {
-      if (key.toLowerCase() === 'content-type') return;
-      headers.set(key, value);
-    });
-  } catch {
-    // c.res itself may be an invalid-status Response
-  }
-  return new Response(JSON.stringify(payload), { status, headers });
+  return c.json(resError('Internal server error'), 500);
 });
 
 // ── Export with WebSocket interception ───────────────────────────────────

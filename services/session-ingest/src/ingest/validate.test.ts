@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { INGEST_CHUNK_MAX_BYTES, INGEST_CHUNK_MAX_ITEMS } from '../util/ingest-limits';
+import {
+  INGEST_CHUNK_MAX_BYTES,
+  INGEST_CHUNK_MAX_ITEMS,
+  MAX_SINGLE_ITEM_BYTES,
+} from '../util/ingest-limits';
 import { validateAndParseIngestPayload } from './validate';
 
 const encoder = new TextEncoder();
@@ -135,6 +139,21 @@ describe('validateAndParseIngestPayload', () => {
       validItemCount: 1,
       totalValidItemBytes: dataBytes,
       maxValidItemBytes: dataBytes,
+    });
+  });
+
+  it('reports parser-skipped oversized items as ineligible', () => {
+    const result = validate({
+      data: [
+        { type: 'message', data: { id: 'msg_huge', content: 'x'.repeat(MAX_SINGLE_ITEM_BYTES) } },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      validItemCount: 0,
+      skippedItemCount: 1,
+      maxValidItemBytes: MAX_SINGLE_ITEM_BYTES + 1,
     });
   });
 

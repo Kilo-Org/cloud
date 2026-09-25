@@ -27,9 +27,6 @@ describe('PR poll error discrimination (#3149)', () => {
     townName = `pr-poll-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
-    // New towns default to staged convoys; these tests exercise the lazy
-    // dispatch flow, so opt out explicitly.
-    await town.updateTownConfig({ staged_convoys_default: false });
   });
 
   async function setupMrBeadWithPrUrl(prUrl: string) {
@@ -53,13 +50,9 @@ describe('PR poll error discrimination (#3149)', () => {
     const agentId = bead!.assignee_agent_bead_id!;
     expect(agentId).toBeTruthy();
 
-    // Pass the PR URL through agentDone: it is stored on
-    // review_metadata.pr_url, which is what the reconciler's poll_pr rule
-    // reads (a bare beads.metadata.pr_url is not enough).
     await town.agentDone(agentId, {
       branch: 'gt/polecat/test-branch',
       summary: 'Completed task',
-      pr_url: prUrl,
     });
 
     await runDurableObjectAlarm(town);
@@ -68,8 +61,18 @@ describe('PR poll error discrimination (#3149)', () => {
     const mrBead = allMrs.find(b => b.metadata?.source_bead_id === beadId);
     expect(mrBead).toBeTruthy();
 
-    // Put the MR bead in progress so the reconciler schedules a poll_pr
-    // action on the next alarm tick.
+    // Set the PR URL and put the MR bead back to in_progress so the
+    // reconciler will schedule a poll_pr action on the next alarm tick.
+    await town.updateBead(
+      mrBead!.bead_id,
+      {
+        metadata: {
+          ...(mrBead!.metadata ?? {}),
+          pr_url: prUrl,
+        },
+      },
+      'system'
+    );
     await town.updateBeadStatus(mrBead!.bead_id, 'in_progress', 'system');
 
     return { beadId, mrBeadId: mrBead!.bead_id, agentId, convoyId: result.convoy.id };

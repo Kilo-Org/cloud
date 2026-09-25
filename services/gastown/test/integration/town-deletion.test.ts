@@ -84,7 +84,7 @@ describe('Town deletion (#1182)', () => {
 
       // Write events to the AgentDO
       const agentDO = getAgentStub(agent.id);
-      await agentDO.appendEvent('session.start', { test: true });
+      await agentDO.appendEvents([{ type: 'session.start', data: JSON.stringify({ test: true }) }]);
 
       const eventsBefore = await agentDO.getEvents();
       expect(eventsBefore.length).toBeGreaterThan(0);

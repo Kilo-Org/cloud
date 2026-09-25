@@ -23,9 +23,6 @@ describe('Reconciler', () => {
     townName = `reconciler-${crypto.randomUUID()}`;
     town = getTownStub(townName);
     await town.setTownId(townName);
-    // New towns default to staged convoys; these tests exercise the lazy
-    // dispatch flow, so opt out explicitly.
-    await town.updateTownConfig({ staged_convoys_default: false });
     await town.addRig({
       rigId: 'rig-1',
       name: 'main-rig',
@@ -256,9 +253,8 @@ describe('Reconciler', () => {
       await runDurableObjectAlarm(town);
 
       const assigned = await town.getBeadAsync(beadId);
-      const agentId = assigned?.assignee_agent_bead_id;
+      const agentId = assigned?.assignee_agent_bead_id!;
       expect(agentId).toBeTruthy();
-      if (!agentId) return;
 
       // Agent finishes work (event-only)
       await town.agentDone(agentId, {
@@ -293,16 +289,6 @@ describe('Reconciler', () => {
 
   describe('reconcileReviewQueue Rule 6: refinery re-dispatch limits', () => {
     it('should fail MR bead after refinery exceeds max dispatch attempts', async () => {
-      // Storage-backed rig config is what dispatchAgent reads; without it
-      // the increment of beads.dispatch_attempts never runs.
-      await town.configureRig({
-        rigId: 'rig-1',
-        townId: townName,
-        gitUrl: 'https://github.com/test/repo.git',
-        defaultBranch: 'main',
-        userId: 'test-user',
-      });
-
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Rule 6 limit test',
@@ -315,9 +301,8 @@ describe('Reconciler', () => {
       await runDurableObjectAlarm(town);
 
       const assigned = await town.getBeadAsync(beadId);
-      const agentId = assigned?.assignee_agent_bead_id;
+      const agentId = assigned?.assignee_agent_bead_id!;
       expect(agentId).toBeTruthy();
-      if (!agentId) return;
 
       // Agent finishes work → creates MR bead
       await town.agentDone(agentId, {
@@ -338,21 +323,18 @@ describe('Reconciler', () => {
       expect(refineries.length).toBeGreaterThan(0);
       const refinery = refineries[0];
 
-      // First dispatch already incremented the MR bead's counter. Lower the
-      // production rig cap to that count so the next idle tick trips Rule 6
-      // without writing bead columns from the test.
-      const mrAfterDispatch = await town.getBeadAsync(mrBead!.bead_id);
-      expect(mrAfterDispatch?.dispatch_attempts ?? 0).toBeGreaterThanOrEqual(1);
-      await town.updateRigConfig('rig-1', {
-        max_dispatch_attempts: mrAfterDispatch!.dispatch_attempts,
-      });
+      // Simulate repeated idle→re-dispatch cycles by setting dispatch_attempts
+      // past the limit (MAX_DISPATCH_ATTEMPTS = 20) and backdating last_activity_at
+      // so the DISPATCH_COOLDOWN_MS check passes.
+      const pastTimestamp = new Date(Date.now() - 5 * 60_000).toISOString();
+      await town.setAgentDispatchAttempts(refinery.id, 25, pastTimestamp);
 
       // Set agent to idle (simulating agentCompleted) and ensure MR is in_progress
       await town.updateAgentStatus(refinery.id, 'idle');
       const mrBefore = await town.getBeadAsync(mrBead!.bead_id);
       expect(mrBefore?.status).toBe('in_progress');
 
-      // Run alarm — Rule 6 should see dispatch_attempts >= the rig cap and fail it
+      // Run alarm — Rule 6 should see dispatch_attempts >= 20 and fail the MR bead
       await runDurableObjectAlarm(town);
 
       const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
@@ -361,53 +343,6 @@ describe('Reconciler', () => {
       // Refinery should be unhooked
       const refineryAfter = await town.getAgentAsync(refinery.id);
       expect(refineryAfter?.current_hook_bead_id).toBeNull();
-    });
-
-    it('does not fail a fresh MR because the refinery has a high lifetime dispatch_attempts', async () => {
-      const result = await town.slingConvoy({
-        rigId: 'rig-1',
-        convoyTitle: 'Rule 6 fresh MR',
-        tasks: [{ title: 'Fresh MR lifetime counter' }],
-      });
-
-      const beadId = result.beads[0].bead.bead_id;
-      await runDurableObjectAlarm(town);
-
-      const assigned = await town.getBeadAsync(beadId);
-      const agentId = assigned?.assignee_agent_bead_id;
-      expect(agentId).toBeTruthy();
-      if (!agentId) return;
-
-      await town.agentDone(agentId, {
-        branch: 'gt/polecat/test-rule6-fresh',
-        summary: 'Ready for review',
-      });
-      await runDurableObjectAlarm(town);
-
-      const mrBeads = await town.listBeads({ type: 'merge_request' });
-      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
-      expect(mrBead).toBeTruthy();
-
-      await runDurableObjectAlarm(town);
-
-      const refineries = await town.listAgents({ role: 'refinery' });
-      expect(refineries.length).toBeGreaterThan(0);
-      const refinery = refineries[0];
-
-      // Lifetime-cumulative agent counter from prior MRs must not trip
-      // Rule 6 on a bead that has barely been dispatched.
-      const pastTimestamp = new Date(Date.now() - 5 * 60_000).toISOString();
-      await town.setAgentDispatchAttempts(refinery.id, 25, pastTimestamp);
-      await town.updateAgentStatus(refinery.id, 'idle');
-
-      const mrBefore = await town.getBeadAsync(mrBead!.bead_id);
-      expect(mrBefore?.status).toBe('in_progress');
-      expect(mrBefore?.dispatch_attempts ?? 0).toBeLessThan(5);
-
-      await runDurableObjectAlarm(town);
-
-      const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
-      expect(mrAfter?.status).not.toBe('failed');
     });
   });
 

@@ -1830,9 +1830,6 @@ export function reconcileReviewQueue(
 
       // Per-bead dispatch cap — check before cooldown so max-attempt MR
       // beads are failed immediately rather than waiting for the cooldown.
-      // Use the MR bead's counter, not the refinery agent's: the agent
-      // counter is lifetime-cumulative for refineries (#1342) and would
-      // fail a fresh MR on the first idle-with-hook tick.
       if (mr.dispatch_attempts >= rigMaxDispatchAttempts(rigId)) {
         actions.push({
           type: 'transition_bead',
@@ -2322,17 +2319,12 @@ export function reconcileGC(sql: SqlStorage): Action[] {
         WHERE ${agent_metadata.status} IN ('idle', 'dead')
           AND ${agent_metadata.columns.role} IN ('polecat', 'refinery')
           AND ${agent_metadata.current_hook_bead_id} IS NULL
-          AND ${agent_metadata.last_activity_at} IS NOT NULL
       `,
       []
     ),
   ]);
 
   for (const agent of gcCandidates) {
-    // last_activity_at is set by hookBead and by heartbeats. A NULL value
-    // means the agent has never been active, so there is no evidence it has
-    // been idle for the retention window — staleMs() would treat NULL as
-    // infinitely old and delete a just-registered agent on the next tick.
     if (staleMs(agent.last_activity_at, AGENT_GC_RETENTION_MS)) {
       actions.push({
         type: 'delete_agent',

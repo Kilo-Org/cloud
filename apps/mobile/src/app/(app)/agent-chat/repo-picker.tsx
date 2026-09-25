@@ -13,7 +13,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
-import { withRtlInputAlignment } from '@/lib/rtl-text';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
@@ -124,13 +123,8 @@ export default function RepoPickerScreen() {
               clearButtonMode="while-editing"
               returnKeyType="search"
               textAlignVertical="center"
-              className="h-8 p-0 text-base leading-[normal] text-foreground"
-              // `textAlign: 'auto'` resolves against the query's first strong
-              // character, so a Latin query stays at the field's left edge in an
-              // RTL interface while the clear and search controls sit at the
-              // right. Naming the alignment keeps the query on the same side as
-              // the controls.
-              style={withRtlInputAlignment({ color: colors.foreground })}
+              className="px-0 text-base text-foreground"
+              style={{ color: colors.foreground }}
               onChangeText={setSearch}
             />
             {search.length === 0 ? (

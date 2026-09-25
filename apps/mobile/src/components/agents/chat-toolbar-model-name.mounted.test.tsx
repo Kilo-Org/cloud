@@ -155,7 +155,6 @@ function cliCatalogModelOptions(): SessionModelOption[] {
 function renderToolbar(
   model = 'deepseek/deepseek-v4.1-flash',
   modelOptions: SessionModelOption[] = MODEL_OPTIONS,
-  variant = 'low',
   overrides: Partial<ComponentProps<typeof ChatToolbar>> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -165,7 +164,7 @@ function renderToolbar(
         mode: 'code',
         onModeChange: vi.fn<(mode: string) => void>(),
         model,
-        variant,
+        variant: 'low',
         modelOptions,
         onModelSelect: vi.fn<(modelId: string, variant: string) => void>(),
         onPaste: vi.fn<() => void>(),
@@ -254,7 +253,9 @@ describe('ChatToolbar long model name', () => {
     const reportedOptions = reportedModelOptions();
     expect(reportedOptions[0]?.name).toBe(LONG_MODEL_NAME);
 
-    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', reportedOptions, 'low');
+    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', reportedOptions, {
+      variant: 'low',
+    });
 
     // The whole name, not `DeepSeek V4.1 F...`, and clipped to one line.
     const modelLabel = renderer.root.findAll(
@@ -319,7 +320,7 @@ describe('ChatToolbar long model name', () => {
       throw new Error('Expected one CLI catalog option');
     }
 
-    const renderer = renderToolbar(option.id, options, '');
+    const renderer = renderToolbar(option.id, options, { variant: '' });
 
     const labels = renderer.root
       .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
@@ -334,12 +335,9 @@ describe('ChatToolbar long model name', () => {
 
 describe('ChatToolbar model chip while the model list loads', () => {
   it('keeps the chip shell with the loading label instead of a blank pill', () => {
-    const renderer = renderToolbar(
-      'deepseek/deepseek-v4.1-flash',
-      MODEL_OPTIONS,
-      'low',
-      { isLoadingModels: true }
-    );
+    const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', MODEL_OPTIONS, {
+      isLoadingModels: true,
+    });
     const loadingLabel = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&

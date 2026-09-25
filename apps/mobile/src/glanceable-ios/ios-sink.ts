@@ -13,6 +13,7 @@ import {
   isGlanceableRestoreSettled,
   isGlanceableRestoreUnavailable,
   restorePersistedGlanceable,
+  whenGlanceableRestoresSettle,
 } from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
@@ -375,14 +376,31 @@ export function sweepStrayActivities(): void {
     return;
   }
   const snapshot = getLastGlanceableSnapshot();
-  if (snapshot === null && (isGlanceableRestoreUnavailable() || !isGlanceableRestoreSettled())) {
-    // The persisted owner could not be read, or its read has not finished yet,
-    // so a null snapshot means "unknown", not "nothing can own the surface".
-    // This runs at import in the headless push process, and on the foreground
-    // edge before the launch restore settles, where ending every instance would
-    // tear down the card a push-to-start just raised before this process can
-    // adopt it. Reconciliation still ends every instance but the one native
-    // discovery keeps, so the surface never holds more than one card.
+  if (snapshot === null && !isGlanceableRestoreSettled()) {
+    // The read has not finished yet, so a null snapshot means "unknown", not
+    // "nothing can own the surface". This runs at import in the headless push
+    // process, and on the foreground edge before the launch restore settles,
+    // where ending every instance would tear down the card a push-to-start just
+    // raised before this process can adopt it. Reconciliation still ends every
+    // instance but the one native discovery keeps, so the surface never holds
+    // more than one card.
+    //
+    // The deferral must not drop the sweep: the read this sweep waited for is
+    // the only thing that will settle it, and without a rerun an unowned card
+    // would stay on the Lock Screen until the next foreground or publisher
+    // update. Wait for the last read to land and sweep again.
+    void whenGlanceableRestoresSettle().then(() => {
+      sweepStrayActivities();
+    });
+    refreshActivity();
+    return;
+  }
+  if (snapshot === null && isGlanceableRestoreUnavailable()) {
+    // The persisted owner could not be read, so a null snapshot means
+    // "unknown", not "nothing can own the surface": the mirror may still name a
+    // card owner and this process cannot tell. Reconciliation ends every
+    // instance but the one native discovery keeps, and a later foreground or
+    // publisher update sweeps again.
     refreshActivity();
     return;
   }

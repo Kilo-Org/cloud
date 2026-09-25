@@ -16,6 +16,7 @@ import {
   isGlanceableRestoreUnavailable,
   persistGlanceableSink,
   restorePersistedGlanceable,
+  whenGlanceableRestoresSettle,
 } from './persist';
 
 const NOW = 1_750_000_000_000;
@@ -195,6 +196,55 @@ describe('restorePersistedGlanceable', () => {
     await restore;
 
     expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('resumes a waiter when the last in-flight read lands', async () => {
+    await restorePersistedGlanceable();
+    // Nothing in flight: a waiter parked after the fact resumes at once.
+    await whenGlanceableRestoresSettle();
+
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+    const restore = restorePersistedGlanceable();
+
+    let resumed = false;
+    const waiting = whenGlanceableRestoresSettle().then(() => {
+      resumed = true;
+    });
+    await Promise.resolve();
+    expect(resumed).toBe(false);
+
+    gate.resolve();
+    await restore;
+    await waiting;
+
+    expect(resumed).toBe(true);
+  });
+
+  it('resumes a waiter when a read that fails settles', async () => {
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      throw new Error('keychain locked');
+    });
+    const restore = restorePersistedGlanceable();
+
+    let resumed = false;
+    const waiting = whenGlanceableRestoresSettle().then(() => {
+      resumed = true;
+    });
+
+    gate.resolve();
+    await restore;
+    await waiting;
+
+    // The failure still settles the read, so the waiter resumes and reads the
+    // unreadable flag itself.
+    expect(resumed).toBe(true);
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
   });
 
   it('clears the unreadable flag after a read that succeeds', async () => {

@@ -225,19 +225,19 @@ export function RemoteSessionRow({
     }
   };
 
+  const handlePressIn = canManage
+    ? () => {
+        void prefetchSessionTranscript(
+          queryClient,
+          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
+        );
+      }
+    : undefined;
+
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={
-        canManage
-          ? () => {
-              void prefetchSessionTranscript(
-                queryClient,
-                trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
-              );
-            }
-          : undefined
-      }
+      onPressIn={handlePressIn}
       onLongPress={canManage ? handleLongPress : undefined}
       accessibilityRole="button"
       accessibilityLabel={sessionRowAccessibilityLabel({

@@ -199,19 +199,19 @@ export function StoredSessionRow({
       </View>
     ) : undefined;
 
+  const handlePressIn = canManage
+    ? () => {
+        void prefetchSessionTranscript(
+          queryClient,
+          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
+        );
+      }
+    : undefined;
+
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={
-        canManage
-          ? () => {
-              void prefetchSessionTranscript(
-                queryClient,
-                trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
-              );
-            }
-          : undefined
-      }
+      onPressIn={handlePressIn}
       onLongPress={canManage ? handleLongPress : undefined}
       accessibilityRole="button"
       accessibilityLabel={sessionRowAccessibilityLabel({

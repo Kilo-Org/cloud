@@ -54,10 +54,6 @@ export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 export { KiloClawApp } from './durable-objects/kiloclaw-app';
 export { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
 function transformErrorMessage(message: string): string {
   if (message.includes('gateway token missing') || message.includes('gateway token mismatch')) {
     return 'Gateway authentication failed. Please reconnect.';
@@ -311,10 +307,6 @@ async function proxyThroughTarget(opts: {
   }
 }
 
-// =============================================================================
-// Named middleware functions
-// =============================================================================
-
 async function logRequest(c: Context<AppEnv>, next: Next) {
   const url = new URL(c.req.url);
   const redactedSearch = redactSensitiveParams(url);
@@ -397,10 +389,6 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
   return next();
 }
 
-// =============================================================================
-// App assembly
-// =============================================================================
-
 export const app = new Hono<AppEnv>();
 let didLogGoogleBrokerConfig = false;
 
@@ -419,7 +407,6 @@ app.use('/api/controller/google/*', requireControllerGoogleEnvVars);
 // Controller check-in routes (machine-to-worker, custom auth)
 app.route('/api/controller', controller);
 
-// Debug routes are removed.
 app.all('/debug', c => c.notFound());
 app.all('/debug/*', c => c.notFound());
 
@@ -435,10 +422,6 @@ app.route('/api/kiloclaw', kiloclaw);
 // Platform routes (backend-to-backend, x-internal-api-key)
 app.use('/api/platform/*', internalApiMiddleware);
 app.route('/api/platform', platform);
-
-// =============================================================================
-// INSTANCE-ROUTED PROXY: /i/:instanceId/*
-// =============================================================================
 
 /**
  * Proxy route for instance-keyed requests.
@@ -522,7 +505,6 @@ app.all('/i/:instanceId/*', async c => {
     return c.json({ error: 'Instance has no sandboxId' }, 500);
   }
 
-  // Strip the /i/{instanceId} prefix to get the real path
   const url = new URL(c.req.raw.url);
   const prefix = `/i/${instanceId}`;
   const strippedPath = url.pathname.slice(prefix.length) || '/';
@@ -559,10 +541,6 @@ app.all('/i/:instanceId/*', async c => {
     logTag: '[PROXY /i]',
   });
 });
-
-// =============================================================================
-// CATCH-ALL: Proxy to per-user OpenClaw gateway via Fly Proxy
-// =============================================================================
 
 /**
  * Resolve the user's default personal instance DO stub via the registry.

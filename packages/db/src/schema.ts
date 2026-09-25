@@ -139,6 +139,8 @@ import type {
   KiloClawScheduledActionNotificationStatus,
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
+  CustomLlmMetadata,
+  CustomLlmApiConfig,
   DirectByokModel,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
@@ -10447,6 +10449,165 @@ export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferIn
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
 
 // ---------------------------------------------------------------------------
+// Model experiments (preview/experimental A/B testing)
+//
+// Scope: opt-in dedicated preview public model ids only. Never used for
+// production/general traffic. Users only reach this routing path by
+// explicitly selecting a dedicated preview public id (e.g.
+// `kilo/preview-experiment-foo`).
+// ---------------------------------------------------------------------------
+
+export const model_experiment = pgTable(
+  'model_experiment',
+  {
+    id: idPrimaryKeyColumn,
+    public_model_id: text().notNull(),
+    name: text().notNull(),
+    description: text(),
+    metadata: jsonb().$type<CustomLlmMetadata>(),
+    // status: draft | active | paused | completed
+    status: text().notNull().default('draft'),
+    is_archived: boolean().notNull().default(false),
+    created_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    ended_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    // Only one routing-relevant experiment per public_model_id at a time.
+    uniqueIndex('UQ_model_experiment_public_model_id_routing')
+      .on(table.public_model_id)
+      .where(sql`${table.status} IN ('active', 'paused')`),
+    index('IDX_model_experiment_status').on(table.status),
+    check(
+      'model_experiment_status_valid',
+      sql`${table.status} IN ('draft', 'active', 'paused', 'completed')`
+    ),
+    // Active experiments cannot be archived.
+    check(
+      'model_experiment_active_not_archived',
+      sql`${table.status} <> 'active' OR ${table.is_archived} = false`
+    ),
+  ]
+);
+
+export type ModelExperiment = typeof model_experiment.$inferSelect;
+export type NewModelExperiment = typeof model_experiment.$inferInsert;
+
+export const model_experiment_variant = pgTable(
+  'model_experiment_variant',
+  {
+    id: idPrimaryKeyColumn,
+    experiment_id: uuid()
+      .notNull()
+      .references(() => model_experiment.id, { onDelete: 'cascade' }),
+    label: text().notNull(),
+    weight: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_model_experiment_variant_experiment_label').on(table.experiment_id, table.label),
+    index('IDX_model_experiment_variant_experiment_id').on(table.experiment_id),
+    check('model_experiment_variant_weight_positive', sql`${table.weight} > 0`),
+  ]
+);
+
+export type ModelExperimentVariant = typeof model_experiment_variant.$inferSelect;
+export type NewModelExperimentVariant = typeof model_experiment_variant.$inferInsert;
+
+// Immutable per-variant version. New RC = new row. Never UPDATEd.
+// `upstream` is typed as CustomLlmApiConfig and validated with
+// CustomLlmApiConfigSchema at application boundaries. The api key is stored
+// separately in `encrypted_api_key` (same shape as
+// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the secret
+// and reporting/admin views can simply omit the column.
+export const model_experiment_variant_version = pgTable(
+  'model_experiment_variant_version',
+  {
+    id: idPrimaryKeyColumn,
+    variant_id: uuid()
+      .notNull()
+      .references(() => model_experiment_variant.id, { onDelete: 'cascade' }),
+    upstream: jsonb().$type<CustomLlmApiConfig>().notNull(),
+    encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
+    effective_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_by: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_model_experiment_variant_version_variant_effective').on(
+      table.variant_id,
+      table.effective_at.desc()
+    ),
+  ]
+);
+
+export type ModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferSelect;
+export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
+
+// One row per experimented request, linked 1:1 to microdollar_usage by usage_id.
+// The physical table is monthly range-partitioned on created_at; PostgreSQL
+// therefore requires the primary key to include created_at as well as usage_id.
+// Stores attribution + a single R2 prompt hash for the post-`transformRequest`
+// upstream body. `request_body_sha256` holds either a 64-char lowercase hex
+// digest pointing at an R2 object, or one of the reserved sentinels:
+// `__failed__` (R2 storage failed) or `__deleted__` (prompt content wiped
+// while retaining attribution). `request_kind` records which upstream API
+// shape the body was serialized for.
+export const model_experiment_request = pgTable(
+  'model_experiment_request',
+  {
+    usage_id: uuid()
+      .notNull()
+      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
+    variant_version_id: uuid()
+      .notNull()
+      .references(() => model_experiment_variant_version.id),
+    // 'user' | 'machine' | 'ip'
+    allocation_subject: text().notNull(),
+    client_request_id: text(),
+    // 'chat_completions' | 'messages' | 'responses'
+    request_kind: text().notNull(),
+    // 64-char lowercase hex sha256, or '__failed__' | '__deleted__'.
+    request_body_sha256: text().notNull(),
+    was_truncated: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.usage_id, table.created_at] }),
+    index('IDX_model_experiment_request_variant_version_created_at').on(
+      table.variant_version_id,
+      table.created_at
+    ),
+    index('IDX_model_experiment_request_client_request_id')
+      .on(table.client_request_id)
+      .where(isNotNull(table.client_request_id)),
+    check(
+      'model_experiment_request_allocation_subject_valid',
+      sql`${table.allocation_subject} IN ('user', 'machine', 'ip')`
+    ),
+    check(
+      'model_experiment_request_request_kind_valid',
+      sql`${table.request_kind} IN ('chat_completions', 'messages', 'responses')`
+    ),
+    check(
+      'model_experiment_request_request_body_sha256_format',
+      sql`${table.request_body_sha256} ~ '^[0-9a-f]{64}$' OR ${table.request_body_sha256} IN ('__failed__', '__deleted__')`
+    ),
+  ]
+);
+
+export type ModelExperimentRequest = typeof model_experiment_request.$inferSelect;
+
+// ---------------------------------------------------------------------------
 // MCP Gateway
 // ---------------------------------------------------------------------------
 
@@ -11159,6 +11320,7 @@ export const mcp_gateway_audit_events = pgTable(
 
 export type MCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferSelect;
 export type NewMCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferInsert;
+export type NewModelExperimentRequest = typeof model_experiment_request.$inferInsert;
 
 export type UserModelPreferenceLastSelected = {
   model: string;

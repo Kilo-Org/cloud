@@ -829,6 +829,255 @@ test('two failed lands accumulate in the pending branch, newest first', () => {
   }
 });
 
+// Two runs can fail to land in the same window. Each one carries the sections it
+// read and writes the whole pending branch, so without a compare-and-swap on the
+// commit it read, the second push would drop the section the first one just
+// carried there.
+test('a carry whose pending branch advanced under it keeps both sections', () => {
+  const root = tempDir('kilo-notes-carry-race-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    const seedBranch = git(seed, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+
+    // An earlier build already carried one section to the pending branch.
+    const carried = '## 1.0.11 (build 41)\n\n- older (#90)\n\n';
+    git(seed, ['checkout', '-q', '-b', 'carried']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.pending.md', carried);
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: carried']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:kilo-app-changelog-pending']);
+    git(seed, ['checkout', '-q', seedBranch]);
+
+    // A second run holds its own carry of another build's section, ready to land
+    // on the pending branch at the instant this run pushes its own.
+    const other = '## 1.0.13 (build 43)\n\n- other (#93)\n\n';
+    const writer = join(root, 'writer');
+    git(root, ['clone', '-q', remote, writer]);
+    git(writer, ['config', 'user.name', 'Kilo Test']);
+    git(writer, ['config', 'user.email', 'test@kilo.ai']);
+    git(writer, ['config', 'commit.gpgsign', 'false']);
+    git(writer, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    git(writer, ['checkout', '-q', '--detach', 'FETCH_HEAD']);
+    writeFixture(writer, 'apps/mobile/CHANGELOG.pending.md', `${other}${carried}`);
+    git(writer, ['add', '-A']);
+    git(writer, ['commit', '-q', '-m', 'chore: competing carry']);
+    const competing = git(writer, ['rev-parse', 'HEAD']).trim();
+
+    // This run's first push to the pending branch loses that race exactly as a
+    // stale compare-and-swap would: the other run's carry lands first and the
+    // push is refused. The push after the re-read sees the advanced branch and
+    // is allowed through.
+    const raced = join(root, 'raced');
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      [
+        '#!/bin/sh',
+        'while read -r _ _ remote_ref _; do',
+        '  case "$remote_ref" in',
+        '    refs/heads/bump) echo "kilo-test: bump is gone" >&2; exit 1 ;;',
+        '    refs/heads/kilo-app-changelog-pending)',
+        `      if [ ! -f "${raced}" ]; then`,
+        `        : > "${raced}"`,
+        `        git -C "${writer}" push -q --force origin "${competing}:refs/heads/kilo-app-changelog-pending" || exit 1`,
+        '        echo "kilo-test: the pending branch advanced under this run" >&2',
+        '        exit 1',
+        '      fi',
+        '      ;;',
+        '  esac',
+        'done',
+        'exit 0',
+        '',
+      ].join('\n')
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- mine (#92)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stdout,
+      /changelog: pending ## 1\.0\.12 \(build 42\) carried to kilo-app-changelog-pending/
+    );
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      `## 1.0.12 (build 42)\n\n- mine (#92)\n\n${other}${carried}`,
+      'the section this run carried and the one it raced must both survive'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+// A land reads the pending branch, incorporates its sections, and then deletes
+// the branch. A carry that lands in that window must not be deleted with it.
+test('a land keeps a pending branch that advanced after its snapshot', () => {
+  const root = tempDir('kilo-notes-clear-race-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(
+      seed,
+      'apps/mobile/CHANGELOG.md',
+      '# Kilo App Changelog\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
+    );
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    const seedBranch = git(seed, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+
+    const carried = '## 1.0.11 (build 41)\n\n- older (#90)\n\n';
+    git(seed, ['checkout', '-q', '-b', 'carried']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.pending.md', carried);
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: carried']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:kilo-app-changelog-pending']);
+    git(seed, ['checkout', '-q', seedBranch]);
+
+    const other = '## 1.0.13 (build 43)\n\n- other (#93)\n\n';
+    const writer = join(root, 'writer');
+    git(root, ['clone', '-q', remote, writer]);
+    git(writer, ['config', 'user.name', 'Kilo Test']);
+    git(writer, ['config', 'user.email', 'test@kilo.ai']);
+    git(writer, ['config', 'commit.gpgsign', 'false']);
+    git(writer, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    git(writer, ['checkout', '-q', '--detach', 'FETCH_HEAD']);
+    writeFixture(writer, 'apps/mobile/CHANGELOG.pending.md', `${other}${carried}`);
+    git(writer, ['add', '-A']);
+    git(writer, ['commit', '-q', '-m', 'chore: competing carry']);
+    const competing = git(writer, ['rev-parse', 'HEAD']).trim();
+
+    // The other run's carry lands on the pending branch while this run pushes
+    // its changelog onto the version-bump branch: after this run read the
+    // pending branch, before it clears it. The clear must then refuse.
+    const raced = join(root, 'raced');
+    const hook = join(seed, '.git', 'hooks', 'pre-push');
+    writeFileSync(
+      hook,
+      [
+        '#!/bin/sh',
+        'while read -r _ _ remote_ref _; do',
+        '  case "$remote_ref" in',
+        '    refs/heads/bump)',
+        `      if [ ! -f "${raced}" ]; then`,
+        `        : > "${raced}"`,
+        `        git -C "${writer}" push -q --force origin "${competing}:refs/heads/kilo-app-changelog-pending" || exit 1`,
+        '        echo "kilo-test: another run carried a section while this run landed" >&2',
+        '      fi',
+        '      ;;',
+        '  esac',
+        'done',
+        'exit 0',
+        '',
+      ].join('\n')
+    );
+    chmodSync(hook, 0o755);
+
+    writeFixture(seed, 'notes.md', '- mine (#92)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.12',
+        '--ios-build',
+        '42',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /changelog: landed ## 1\.0\.12 \(build 42\) on bump as [0-9a-f]+/);
+
+    const pendingRefs = git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']);
+    assert.notEqual(
+      pendingRefs,
+      '',
+      'the branch advanced after the read, so the clear must refuse'
+    );
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      `${other}${carried}`,
+      'the carry that landed in the window must stay on the branch'
+    );
+
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']),
+      '# Kilo App Changelog\n\n## 1.0.12 (build 42)\n\n- mine (#92)\n\n## 1.0.11 (build 41)\n\n- older (#90)\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
+    );
+
+    // The next build lands its own section, carries the section the refused
+    // clear left behind, and clears the branch because nothing advanced since
+    // it read them.
+    writeFileSync(hook, '#!/bin/sh\nexit 0\n');
+    writeFixture(seed, 'next.md', '- next (#94)\n');
+    const next = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.14',
+        '--ios-build',
+        '44',
+        '--body-file',
+        'next.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(next.status, 0, next.stderr);
+    assert.equal(
+      git(seed, ['ls-remote', '--heads', 'origin', 'kilo-app-changelog-pending']),
+      '',
+      'the branch matches the snapshot the next land read, so it is dropped'
+    );
+    git(seed, ['fetch', '-q', 'origin', 'bump']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.md']),
+      '# Kilo App Changelog\n\n## 1.0.14 (build 44)\n\n- next (#94)\n\n## 1.0.13 (build 43)\n\n- other (#93)\n\n## 1.0.12 (build 42)\n\n- mine (#92)\n\n## 1.0.11 (build 41)\n\n- older (#90)\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('a retry of a carried build writes its section once', () => {
   const root = tempDir('kilo-notes-carry-retry-');
   try {

@@ -22,14 +22,19 @@
  * writes it above its own section. The store submission already succeeded, so
  * the run stays green and the changelog line is not lost. A `--pending` branch
  * that exists but cannot be read is never overwritten: the carry is refused
- * instead, so a transient read failure cannot drop the sections it holds.
+ * instead, so a transient read failure cannot drop the sections it holds. Two
+ * runs can carry at the same time, so every write of the pending branch is a
+ * compare-and-swap on the commit it read: the run that loses the race re-reads
+ * the branch and merges, and a clear only deletes the branch the landed content
+ * already incorporated.
  *
  * Exit codes:
  *   0 - the section was composed, written, landed, was already present, or was
  *       carried to the pending branch
  *   1 - the store build identity cannot be resolved (the IPA is unreadable, has
- *       no CFBundleVersion, or disagrees with the configured version), or the
- *       section could be neither landed nor carried
+ *       no CFBundleVersion, or disagrees with the configured version; or a
+ *       supplied --build-json names no Android build), or the section could be
+ *       neither landed nor carried
  *   2 - usage error, or a --from ref that does not resolve
  */
 import { execFileSync } from 'node:child_process';
@@ -508,11 +513,18 @@ function isMissingRef(error) {
 }
 
 /**
- * The sections carried by the pending branch, newest first. `{ sections: [] }`
- * when the branch holds none, and a branch that does not exist yet is not an
- * error. Any other read failure is `{ sections: [], error }`: it is not the
- * same as "no carried sections", and the carry path force-pushes, so writing
- * over content that could not be read would drop those sections for ever.
+ * The sections carried by the pending branch, newest first, and the commit they
+ * were read from. `{ sections: [] }` when the branch holds none, and a branch
+ * that does not exist yet is not an error. Any other read failure is
+ * `{ sections: [], error }`: it is not the same as "no carried sections", and
+ * the carry path writes the branch, so overwriting content that could not be
+ * read would drop those sections for ever.
+ *
+ * `sha` is the pending tip those sections were read from. Every write of the
+ * branch is a compare-and-swap on it, so two runs that carry at the same time
+ * cannot overwrite each other: the writer that lost the race is refused and
+ * re-reads instead. `sha` is undefined when the branch does not exist, which the
+ * write path passes on as "must still not exist".
  */
 function readPending(remote, branch) {
   if (!branch) {
@@ -526,19 +538,27 @@ function readPending(remote, branch) {
     }
     return { sections: [], error: reasonOf(error) };
   }
+  const sha = git(['rev-parse', 'FETCH_HEAD']).trim();
   try {
-    return { sections: splitSections(git(['show', `FETCH_HEAD:${PENDING_FILE}`])) };
+    return { sections: splitSections(git(['show', `FETCH_HEAD:${PENDING_FILE}`])), sha };
   } catch (error) {
     const stderr = error && error.stderr ? String(error.stderr) : '';
     if (/does not exist in/i.test(stderr)) {
-      return { sections: [] };
+      return { sections: [], sha };
     }
     return { sections: [], error: reasonOf(error) };
   }
 }
 
-/** Replace the pending branch with `sections`, newest first. */
-function writePending(remote, branch, sections) {
+/**
+ * Replace the pending branch with `sections`, newest first.
+ *
+ * `expectedSha` is the pending tip the sections were read from. The push is a
+ * compare-and-swap on it, so a branch that advanced after that read is refused
+ * rather than overwritten: a concurrent carry that landed in the meantime keeps
+ * its section. `undefined` means the branch must still not exist.
+ */
+function writePending(remote, branch, sections, expectedSha) {
   const blob = git(['hash-object', '-w', '--stdin'], { input: sections.join('') }).trim();
   const work = mkdtempSync(join(tmpdir(), 'kilo-notes-pending-'));
   try {
@@ -559,22 +579,44 @@ function writePending(remote, branch, sections) {
       ],
       { env }
     ).trim();
-    git(['push', '--force', remote, `${sha}:refs/heads/${branch}`], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    git(
+      [
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${expectedSha ?? ''}`,
+        remote,
+        `${sha}:refs/heads/${branch}`,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
     return sha;
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
 }
 
-/** Drop the pending branch once its sections are in the changelog. */
-function clearPending(remote, branch) {
+/**
+ * Drop the pending branch once its sections are in the changelog.
+ *
+ * `expectedSha` is the pending tip whose sections the landed content already
+ * carries. The delete is a compare-and-swap on it, so a carry that landed after
+ * that read stays on the branch for the next build instead of being deleted
+ * with the sections this run incorporated.
+ */
+function clearPending(remote, branch, expectedSha) {
   try {
-    git(['push', remote, `:refs/heads/${branch}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+    git(
+      [
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${expectedSha ?? ''}`,
+        remote,
+        `:refs/heads/${branch}`,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
   } catch {
     // A stale pending branch is cosmetic: its sections are already in the
-    // changelog, and the next land writes it again.
+    // changelog, the next land re-reads the branch, and only the sections the
+    // changelog does not already carry are written again.
   }
 }
 
@@ -592,8 +634,8 @@ function landSection(options, heading, section) {
   // Sections an earlier build could not land ride along above their own, so a
   // branch that was merged during that build never loses its changelog line.
   // A pending branch that exists but cannot be read is not an empty one: the
-  // carry path below force-pushes, and overwriting content that could not be
-  // read would drop the sections an earlier build carried there.
+  // carry path below replaces the branch, and overwriting content that could
+  // not be read would drop the sections an earlier build carried there.
   const pendingRead = readPending(remote, options.pending);
   const pending = pendingRead.sections;
 
@@ -617,7 +659,7 @@ function landSection(options, heading, section) {
     if (block === '') {
       console.log(`changelog: landed ${heading} on ${branch} (already present)`);
       if (pending.length > 0) {
-        clearPending(remote, options.pending);
+        clearPending(remote, options.pending, pendingRead.sha);
       }
       return 0;
     }
@@ -626,7 +668,7 @@ function landSection(options, heading, section) {
       git(['push', remote, `${sha}:refs/heads/${branch}`]);
       console.log(`changelog: landed ${heading} on ${branch} as ${sha}`);
       if (pending.length > 0) {
-        clearPending(remote, options.pending);
+        clearPending(remote, options.pending, pendingRead.sha);
       }
       return 0;
     } catch (error) {
@@ -642,20 +684,39 @@ function landSection(options, heading, section) {
       `could not land ${heading} on ${branch}, and ${options.pending} could not be read (${pendingRead.error}); refusing to overwrite the sections it carries`
     );
   }
-  try {
-    writePending(remote, options.pending, [
-      section,
-      ...pending.filter(item => headingOf(item) !== heading),
-    ]);
-  } catch (error) {
-    return fail(
-      `could not land ${heading} on ${branch} or carry it to ${options.pending} (${reasonOf(error)})`
-    );
+
+  // Two runs can fail to land at the same time. Each one carries the sections it
+  // read, and its write is a compare-and-swap on that read, so the run that
+  // loses the race is refused and re-reads the branch instead of overwriting the
+  // section the other run just carried there.
+  let snapshot = pendingRead;
+  let carryFailure = 'unknown error';
+  for (let attempt = 1; attempt <= MAX_LAND_RETRIES + 1; attempt += 1) {
+    try {
+      writePending(
+        remote,
+        options.pending,
+        [section, ...snapshot.sections.filter(item => headingOf(item) !== heading)],
+        snapshot.sha
+      );
+      console.log(
+        `changelog: pending ${heading} carried to ${options.pending}; the next build writes it above its own section`
+      );
+      return 0;
+    } catch (error) {
+      carryFailure = reasonOf(error);
+      const reread = readPending(remote, options.pending);
+      if (reread.error) {
+        return fail(
+          `could not carry ${heading} to ${options.pending} (${carryFailure}), and it could not be re-read (${reread.error}); refusing to overwrite the sections it carries`
+        );
+      }
+      snapshot = reread;
+    }
   }
-  console.log(
-    `changelog: pending ${heading} carried to ${options.pending}; the next build writes it above its own section`
+  return fail(
+    `could not land ${heading} on ${branch} or carry it to ${options.pending} (${carryFailure})`
   );
-  return 0;
 }
 
 function runWrite(args) {

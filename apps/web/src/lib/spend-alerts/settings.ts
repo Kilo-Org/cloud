@@ -4,13 +4,14 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   kilocode_users,
   organization_memberships,
+  organizations,
   spend_alert_hourly,
   spend_alert_rule_state,
   spend_alert_rules,
   spend_alert_settings,
   user_notification_preferences,
 } from '@kilocode/db/schema';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import { ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES } from '@kilocode/app-shared/organizations';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
 
 /**
@@ -494,10 +495,22 @@ export async function saveSpendAlertSettings(
 
 /**
  * The users authorized to receive this scope's spend alerts, and their email
- * addresses. Organization scope: every member holding a billing role
- * ({@link ORGANIZATION_BILLING_ROLES}); personal scope: the owner alone. The
- * query is scoped to the one organization, so no other owner's contacts can
- * leak into the result.
+ * addresses. Organization scope: the organization's owners and the members
+ * holding a recipient role ({@link ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES}) —
+ * an `admin` with no billing duty is excluded. An owner is matched either by
+ * the `owner` membership role or by `organizations.created_by_kilo_user_id`
+ * while that creator still holds a membership of the organization, so a
+ * co-owner, and a creator whose membership is `member`, still receive the
+ * alert, while a creator whose membership was removed does not. Personal scope:
+ * the owner alone.
+ *
+ * The recipient ids come from one `IN (SELECT ... UNION SELECT ...)`: the
+ * planner can resolve the union from the organization's own rows, then
+ * nested-loop an index scan on the `kilocode_users` primary key, so the cost
+ * follows the organization's membership rather than the total user count. A
+ * user who is both the owner and a billing_manager is deduplicated by the
+ * `UNION`, and the query is scoped to the one organization, so no other
+ * owner's contacts can leak into the result.
  */
 export async function authorizedBillingContacts(
   database: DbOrTx,
@@ -514,19 +527,43 @@ export async function authorizedBillingContacts(
     };
   }
 
+  const recipientUserIds = database
+    .select({ userId: organizations.created_by_kilo_user_id })
+    .from(organizations)
+    // The creator counts as an owner only while they hold a membership row of
+    // this organization. `created_by_kilo_user_id` is history and is never
+    // cleared, so a removed creator would otherwise keep receiving the
+    // organization's spend; the row itself is the access
+    // (`ensureOrganizationAccess` reads memberships only). The role is
+    // deliberately not restricted here: the creator stays the organization's
+    // billing owner even when their membership says `member`.
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, organizations.id),
+        eq(organization_memberships.kilo_user_id, organizations.created_by_kilo_user_id)
+      )
+    )
+    .where(eq(organizations.id, scope.organizationId))
+    .union(
+      database
+        .select({ userId: organization_memberships.kilo_user_id })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, scope.organizationId),
+            inArray(organization_memberships.role, ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES)
+          )
+        )
+    );
+
   const rows = await database
     .select({
-      userId: organization_memberships.kilo_user_id,
+      userId: kilocode_users.id,
       email: kilocode_users.google_user_email,
     })
-    .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, scope.organizationId),
-        inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
-      )
-    );
+    .from(kilocode_users)
+    .where(inArray(kilocode_users.id, recipientUserIds));
   return {
     userIds: rows.map(row => row.userId),
     emails: rows.map(row => row.email),

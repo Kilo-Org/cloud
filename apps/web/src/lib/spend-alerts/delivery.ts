@@ -6,6 +6,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { sendSpendAlertEmail } from '@/lib/email';
 import { dispatchSpendAlertPush } from '@/lib/notifications-worker-client';
 import {
+  authorizedBillingContacts,
   parseSpendAlertScopeKey,
   type SpendAlertRecipients,
   type SpendAlertRuleKind,
@@ -345,6 +346,32 @@ async function rescheduleRetryableSpendAlertDelivery(
 }
 
 /**
+ * The recipients a claimed row may still reach. The sweep resolved them when it
+ * enqueued the alert, and the drain can send the row up to an hour later (the
+ * retry backoff), so an organization delivery re-resolves the scope's current
+ * contacts and keeps the intersection: a member removed in between must not
+ * receive the organization's spend. The snapshot is only narrowed, never
+ * widened — someone added after the alert was decided was not part of that
+ * decision. A personal scope has no access to lose, so its snapshot stands.
+ */
+async function currentRecipients(
+  database: Db,
+  scope: SpendAlertScope,
+  stored: SpendAlertRecipients
+): Promise<SpendAlertRecipients> {
+  if (scope.type !== 'organization') {
+    return stored;
+  }
+  const current = await authorizedBillingContacts(database, scope);
+  const userIds = new Set(current.userIds);
+  const emails = new Set(current.emails);
+  return {
+    userIds: stored.userIds.filter(userId => userIds.has(userId)),
+    emails: stored.emails.filter(email => emails.has(email)),
+  };
+}
+
+/**
  * Sends one claimed row on its channel. An email carries this scope's amount
  * and threshold; a push passes the same figures to the notifications worker,
  * whose lock-screen blob stays content-free (it names the scope only). Throws a
@@ -369,7 +396,7 @@ async function deliverClaimedSpendAlertDelivery(
     throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_missing_payload');
   }
 
-  const recipients = recipientsOf(row.recipients);
+  const recipients = await currentRecipients(database, scope, recipientsOf(row.recipients));
   const scopeName = await resolveSpendAlertScopeName(database, scope);
   const amountUsd = usdFromMicrodollars(row.payload.valueMicrodollars);
   const thresholdUsd = usdFromMicrodollars(row.payload.thresholdMicrodollars);

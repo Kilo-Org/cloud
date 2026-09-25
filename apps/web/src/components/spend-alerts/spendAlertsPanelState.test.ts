@@ -4,10 +4,13 @@ import {
   MIN_MULTIPLIER_BASIS_POINTS,
   MOBILE_APP_SETUP_HREF,
   MULTIPLIER_FIELD_ERROR,
+  SPEND_ALERTS_CTA_SLOT_CLASS,
   SPEND_ALERTS_FORBIDDEN,
   SPEND_ALERTS_LOAD_ERROR,
   SPEND_ALERTS_OFF_IN_NOTIFICATIONS,
+  SPEND_ALERTS_ORGANIZATION_SCOPE_LABEL,
   SPEND_ALERTS_PANEL_SLOT_CLASS,
+  SPEND_ALERTS_PERSONAL_SCOPE_LABEL,
   SPEND_ALERTS_PUSH_NEEDS_DEVICE,
   SPEND_ALERTS_SAVE_ERROR,
   THRESHOLD_FIELD_ERROR,
@@ -18,6 +21,7 @@ import {
   panelControlsVisible,
   pushChannelNote,
   pushControlDisabled,
+  scopeLine,
   toDraft,
   toSaveInput,
   type SpendAlertRuleDraft,
@@ -274,6 +278,30 @@ describe('channel agreement note', () => {
     expect(pushChannelNote(true, false, pushRule)).toBeNull();
     expect(pushChannelNote(false, false, quietRule)).toBeNull();
     expect(pushChannelNote(true, false, quietRule)).toBeNull();
+  });
+});
+
+describe('scope line', () => {
+  it('names the caller account for a personal scope', () => {
+    expect(scopeLine({ scope: 'personal', scopeName: 'Ada Lovelace' })).toBe(
+      `${SPEND_ALERTS_PERSONAL_SCOPE_LABEL}: Ada Lovelace`
+    );
+  });
+
+  it('names the organization for an organization scope', () => {
+    expect(scopeLine({ scope: 'organization', scopeName: 'Kilocode Local' })).toBe(
+      `${SPEND_ALERTS_ORGANIZATION_SCOPE_LABEL}: Kilocode Local`
+    );
+  });
+
+  it('renders nothing when the query carries no name to show', () => {
+    expect(scopeLine({})).toBeNull();
+    expect(scopeLine({ scope: 'personal' })).toBeNull();
+    expect(scopeLine({ scope: 'organization', scopeName: '   ' })).toBeNull();
+  });
+
+  it('falls back to the account label when the scope is absent', () => {
+    expect(scopeLine({ scopeName: 'Ada' })).toBe(`${SPEND_ALERTS_PERSONAL_SCOPE_LABEL}: Ada`);
   });
 });
 
@@ -589,37 +617,44 @@ describe('saved settings vs the never-configured empty state', () => {
 });
 
 /**
- * The tallest ready form measured in each band, by CDP probe on the personal
- * and organization spend views with the settings saved and the push channel
- * blocked (the tallest state: every rule carries the "Get the mobile app"
- * note). The form's height is a step function of the card width because its
- * copy wraps, so a band has to cover its whole range's worst case, not the
- * common one.
+ * The tallest ready form measured in each band, by a headless-Chromium CDP
+ * probe of this worktree's web stack on 2026-09-23, on the personal and the
+ * organization spend views with the settings saved, both rules enabled, the
+ * push channel blocked (the "Get the mobile app" note on both rules) and a
+ * failing `spendAlerts.save` (a route intercept) showing its error row — the
+ * tallest ready state, since the error row is taller than the Save it replaces.
+ * The form's height is a step function of the card width because its copy wraps,
+ * so a band has to cover its whole range's worst case, not the common one; the
+ * bands are cut at the measured steps so the floor stays close to the form and no
+ * dead space opens below the call to action.
  *
- * The `>= 580px` row is the reviewed e3/e8 evidence rather than a single
- * measurement: the e3 run reported the loading slot at 752px and the saved,
- * enabled form at 804px on the organization usage-details view at a 1024px
- * viewport, and the e8 sweep recorded 816px for the blocked-push form at
- * 1024-1080px viewports. Both numbers have to fit under one floor because the
- * element query that picks the band can resolve to `>= 580px` for either.
+ * A card 380-592px wide is taller at a < 640px viewport, where the threshold
+ * rule's fields are still one column, than at a wider one; the floor covers the
+ * taller resolution because the element query sees only the card width. Above a
+ * 592px card the wider viewport is the only one that produces that width, so the
+ * step drops to 788.5px.
  *
- * The band below a 310px card is deliberately absent: there the form's height
- * grows without bound as the copy wraps one word per line (1101px at a 238px
- * card, 1354px at 138px), so no finite floor closes it. That band keeps the
- * pre-existing 66rem; the narrower spend views are a phone-width web layout
- * this panel does not target for shift-free reservation.
+ * The band below a 300px card is deliberately absent: there the form's height
+ * grows without bound as the copy wraps one word per line (1111.09px at a 298px
+ * card, 1261.09px at a 243px card), so no finite floor closes it. That band and
+ * the 300px step share the 68rem base floor; the narrower spend views are a
+ * phone-width web layout this panel does not target for shift-free reservation.
  */
 const WORST_READY_FORM_HEIGHT_BY_CARD_WIDTH = [
-  { fromPx: 310, toPx: 380, worstPx: 892.5 },
-  { fromPx: 380, toPx: 580, worstPx: 871.5 },
-  { fromPx: 580, toPx: Number.POSITIVE_INFINITY, worstPx: 816 },
+  { fromPx: 300, toPx: 307, worstPx: 1087.09 },
+  { fromPx: 307, toPx: 341, worstPx: 1037.5 },
+  { fromPx: 341, toPx: 380, worstPx: 962.5 },
+  { fromPx: 380, toPx: 416, worstPx: 941.5 },
+  { fromPx: 416, toPx: 528, worstPx: 877.5 },
+  { fromPx: 528, toPx: 593, worstPx: 856.5 },
+  { fromPx: 593, toPx: Number.POSITIVE_INFINITY, worstPx: 788.5 },
 ];
 
 type SlotBand = { minCardWidthPx: number; minHeightPx: number };
 
-/** `min-h-[66rem] @min-[310px]:min-h-[58rem] ...` → the bands it reserves. */
+/** `min-h-[66rem] @min-[300px]:min-h-[65rem] ...` → the bands it reserves. */
 function parseSlotBands(classText: string): SlotBand[] {
-  const matches = classText.matchAll(/(?:@min-\[(\d+)px\]:)?min-h-\[(\d+)rem\]/g);
+  const matches = classText.matchAll(/(?:@min-\[(\d+)px\]:)?min-h-\[(\d+(?:\.\d+)?)rem\]/g);
   return [...matches].map(match => ({
     minCardWidthPx: match[1] === undefined ? 0 : Number(match[1]),
     minHeightPx: Number(match[2]) * 16,
@@ -660,14 +695,24 @@ describe('panel slot reservation', () => {
     }
   });
 
-  it('covers the e3 form height at every card width that view reported', () => {
-    // The e3 probe measured an 804px saved form on the organization
-    // usage-details view at a 1024px viewport, with the loading slot at 752px.
-    // The card widths that view produces are 370px (with the organization
-    // sidebar) and 786px (wide), and whichever band the element query lands on
-    // has to be at least as tall as that form.
-    expect(reserveAt(bands, 370)).toBeGreaterThanOrEqual(804);
-    expect(reserveAt(bands, 786)).toBeGreaterThanOrEqual(804);
+  it('covers the measured form height at the card widths the spend views produce', () => {
+    // The organization usage-details view squeezes the card to 385px at a
+    // 1024px viewport and 441px at 1080px; the personal view is wide. Each of
+    // those widths is checked against the worst form height measured for it.
+    expect(reserveAt(bands, 385)).toBeGreaterThanOrEqual(941.5);
+    expect(reserveAt(bands, 441)).toBeGreaterThanOrEqual(877.5);
+    expect(reserveAt(bands, 786)).toBeGreaterThanOrEqual(767.5);
+  });
+
+  it('reserves the save-error row height in the call-to-action slot', () => {
+    // The wrapper holds either the 36px Save row or the 58px save-error row.
+    // Reserving the taller one is what keeps the panel's height the same when a
+    // save fails instead of succeeding.
+    const cta = parseSlotBands(SPEND_ALERTS_CTA_SLOT_CLASS);
+    expect(cta).toHaveLength(1);
+    expect(cta[0]!.minCardWidthPx).toBe(0);
+    // `p-3` (12+12) + max(type-body 21px, size="sm" h-8 32px) + 1+1 border.
+    expect(cta[0]!.minHeightPx).toBeGreaterThanOrEqual(58);
   });
 });
 

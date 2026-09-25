@@ -106,7 +106,7 @@ describe('PreparationGroup phase label', () => {
 const INCOMPLETE_TEXT =
   'Session restore incomplete: 2 of 5 files were not restored (binary file). Missing: a.ts, b.ts';
 
-function step(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnapshot {
+function incompleteStep(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnapshot {
   return {
     id: 'step-1',
     key: 'workspace_setup',
@@ -119,7 +119,7 @@ function step(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnaps
   };
 }
 
-function attempt(overrides: Partial<PreparationAttempt>): PreparationAttempt {
+function restoreAttempt(overrides: Partial<PreparationAttempt>): PreparationAttempt {
   return {
     id: 'attempt-1',
     triggerMessageId: 'message-1',
@@ -131,12 +131,12 @@ function attempt(overrides: Partial<PreparationAttempt>): PreparationAttempt {
   };
 }
 
-const INCOMPLETE_ATTEMPT = attempt({
+const INCOMPLETE_ATTEMPT = restoreAttempt({
   status: 'completed',
   completedAt: 13_400,
   steps: [
-    step({ id: 'restore', key: 'workspace_restore', status: 'completed' }),
-    step({
+    incompleteStep({ id: 'restore', key: 'workspace_restore', status: 'completed' }),
+    incompleteStep({
       id: 'incomplete',
       key: 'restore_incomplete',
       label: 'Session restore incomplete',
@@ -159,12 +159,12 @@ async function mount(candidate: PreparationAttempt) {
     }
     return node;
   };
-  const textValues = () =>
+  const renderedTextValues = () =>
     mounted.renderer.root
       .findAllByType('Text')
       .flatMap(node => node.children)
       .filter((child): child is string => typeof child === 'string');
-  const update = (next: PreparationAttempt) => {
+  const updateGroup = (next: PreparationAttempt) => {
     act(() => {
       mounted.renderer.update(
         createElement(
@@ -175,7 +175,7 @@ async function mount(candidate: PreparationAttempt) {
       );
     });
   };
-  return { ...mounted, group, textValues, update };
+  return { ...mounted, group, renderedTextValues, update: updateGroup };
 }
 
 describe('PreparationGroup incomplete restore', () => {
@@ -190,14 +190,14 @@ describe('PreparationGroup incomplete restore', () => {
   it('expands the completed incomplete attempt so the detail is visible without a tap', async () => {
     const mounted = await mount(INCOMPLETE_ATTEMPT);
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: true });
-    expect(mounted.textValues()).toContain(INCOMPLETE_TEXT);
-    expect(mounted.textValues()).not.toContain('Preparation complete');
+    expect(mounted.renderedTextValues()).toContain(INCOMPLETE_TEXT);
+    expect(mounted.renderedTextValues()).not.toContain('Preparation complete');
     mounted.unmount();
   });
 
   it('keeps a completed attempt without the step collapsed under the green completion', async () => {
     const mounted = await mount(
-      attempt({ status: 'completed', completedAt: 13_400, steps: [step({})] })
+      restoreAttempt({ status: 'completed', completedAt: 13_400, steps: [incompleteStep({})] })
     );
     expect(mounted.group().props.accessibilityLabel).toBe('Preparation complete');
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: false });
@@ -206,25 +206,25 @@ describe('PreparationGroup incomplete restore', () => {
   });
 
   it('keeps the running and failed titles and icons', async () => {
-    const running = await mount(attempt({ status: 'running' }));
+    const running = await mount(restoreAttempt({ status: 'running' }));
     expect(running.group().props.accessibilityLabel).toBe('Preparing environment');
     expect(running.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
     running.unmount();
 
-    const failed = await mount(attempt({ status: 'failed', safeError: 'clone failed' }));
+    const failed = await mount(restoreAttempt({ status: 'failed', safeError: 'clone failed' }));
     expect(failed.group().props.accessibilityLabel).toBe('Preparation failed');
     expect(failed.renderer.root.findAllByType('Check')).toHaveLength(0);
-    expect(failed.textValues()).toContain('clone failed');
+    expect(failed.renderedTextValues()).toContain('clone failed');
     failed.unmount();
   });
 
   it('lets a terminal failure outrank the incomplete step', async () => {
     const mounted = await mount(
-      attempt({
+      restoreAttempt({
         status: 'failed',
         safeError: 'Setup command failed',
         steps: [
-          step({
+          incompleteStep({
             id: 'incomplete',
             key: 'restore_incomplete',
             label: 'Session restore incomplete',
@@ -240,7 +240,7 @@ describe('PreparationGroup incomplete restore', () => {
 
   it('opens the group when the incomplete step arrives after completion', async () => {
     const mounted = await mount(
-      attempt({ status: 'completed', completedAt: 13_400, steps: [step({})] })
+      restoreAttempt({ status: 'completed', completedAt: 13_400, steps: [incompleteStep({})] })
     );
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: false });
     mounted.update(INCOMPLETE_ATTEMPT);

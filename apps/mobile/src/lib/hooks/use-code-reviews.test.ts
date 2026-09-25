@@ -8,9 +8,11 @@ import {
   cancelReviewMutationFn,
   createManualReviewMutationFn,
   mergeReviewFirstPage,
+  nextReviewPollFailureStreak,
   retriggerReviewMutationFn,
   REVIEW_LIST_MAX_PAGES,
   REVIEW_PAGE_SIZE,
+  REVIEW_POLL_MAX_CONSECUTIVE_FAILURES,
   selectReviewFirstPageAction,
   useCancelReview,
   useCreateManualReview,
@@ -542,7 +544,7 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
   it('keys the probe under the list key so prefix invalidation still matches', () => {
     const trpc = createReviewTrpcStub();
     const listKey = buildReviewListQueryKey(trpc, 'personal');
-    const options = buildReviewFirstPageQueryOptions(trpc, 'personal', true);
+    const options = buildReviewFirstPageQueryOptions(trpc, 'personal', { enabled: true });
 
     expect(listKey).toEqual(['codeReviews', 'listForUser']);
     expect(options.queryKey.slice(0, listKey.length)).toEqual(listKey);
@@ -552,7 +554,7 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
   it('keys the org probe under the org list key', () => {
     const trpc = createReviewTrpcStub();
     const listKey = buildReviewListQueryKey(trpc, 'org_42');
-    const options = buildReviewFirstPageQueryOptions(trpc, 'org_42', true);
+    const options = buildReviewFirstPageQueryOptions(trpc, 'org_42', { enabled: true });
 
     expect(listKey).toEqual(['codeReviews', 'listForOrganization', { organizationId: 'org_42' }]);
     expect(options.queryKey.slice(0, listKey.length)).toEqual(listKey);
@@ -561,11 +563,13 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
 
   it('fetches offset 0 only, with the caller enabled flag and a zero staleTime', async () => {
     const trpc = createReviewTrpcStub();
-    const options = buildReviewFirstPageQueryOptions(trpc, 'personal', true);
+    const options = buildReviewFirstPageQueryOptions(trpc, 'personal', { enabled: true });
 
     expect(options.staleTime).toBe(0);
     expect(options.enabled).toBe(true);
-    expect(buildReviewFirstPageQueryOptions(trpc, 'personal', false).enabled).toBe(false);
+    expect(buildReviewFirstPageQueryOptions(trpc, 'personal', { enabled: false }).enabled).toBe(
+      false
+    );
 
     listForUserQueryMock.mockResolvedValueOnce(makePage(1));
     await options.queryFn();
@@ -575,7 +579,9 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
   });
 
   it('polls page one every 5s only while that page holds a running review', () => {
-    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', true);
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+    });
     const refetchInterval = readProbeRefetchInterval(options);
 
     expect(refetchInterval({ state: { data: makePage(50, true, 'running') } })).toBe(5000);
@@ -584,7 +590,9 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
   });
 
   it('keeps polling through a transient failure instead of clearing the interval', () => {
-    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', true);
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+    });
     const refetchInterval = readProbeRefetchInterval(options);
 
     // No page delivered yet (the first probe fetch failed): the review may still
@@ -598,8 +606,42 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
     expect(refetchInterval({ state: { data: makePage(50, true, 'running') } })).toBe(5000);
   });
 
+  it('stops polling once the consecutive-failure bound is reached', () => {
+    const withoutPage = { state: {} };
+    const withRunningReview = { state: { data: makePage(50, true, 'running') } };
+    const belowBound = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+      failedPolls: REVIEW_POLL_MAX_CONSECUTIVE_FAILURES - 1,
+    });
+    const atBound = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+      failedPolls: REVIEW_POLL_MAX_CONSECUTIVE_FAILURES,
+    });
+
+    // Below the bound a running review keeps re-arming, with or without a page.
+    expect(readProbeRefetchInterval(belowBound)(withoutPage)).toBe(5000);
+    expect(readProbeRefetchInterval(belowBound)(withRunningReview)).toBe(5000);
+    // At the bound every poll has failed: stop the loop until a refresh restarts it.
+    expect(readProbeRefetchInterval(atBound)(withoutPage)).toBe(false);
+    expect(readProbeRefetchInterval(atBound)(withRunningReview)).toBe(false);
+  });
+
+  it('counts consecutive failed polls and clears them on a delivered page', () => {
+    // No failure has settled yet: the streak stays empty.
+    expect(nextReviewPollFailureStreak(0, { dataUpdatedAt: 0, errorUpdatedAt: 0 })).toBe(0);
+    // A delivered page is the newer settle: the streak restarts even though the
+    // probe still holds the page it delivered before.
+    expect(nextReviewPollFailureStreak(2, { dataUpdatedAt: 200, errorUpdatedAt: 100 })).toBe(0);
+    // A failed poll is the newer settle: advance. This is the retained-page case
+    // — `dataUpdatedAt` stays put on a failed refetch.
+    expect(nextReviewPollFailureStreak(0, { dataUpdatedAt: 100, errorUpdatedAt: 200 })).toBe(1);
+    expect(nextReviewPollFailureStreak(1, { dataUpdatedAt: 100, errorUpdatedAt: 300 })).toBe(2);
+  });
+
   it('rejects a resolved failure page like the list builder so a handler error never becomes probe data', async () => {
-    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', true);
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+    });
     listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
 
     await expect(options.queryFn()).rejects.toThrow('boom');

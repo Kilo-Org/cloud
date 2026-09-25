@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type InfiniteData,
   useInfiniteQuery,
@@ -42,6 +42,37 @@ export const REVIEW_LIST_MAX_PAGES = 10;
 
 /** Poll cadence for page one while a review on it is still running. */
 const REVIEW_POLL_INTERVAL_MS = 5000;
+
+/**
+ * Consecutive failed polls the page-one probe tolerates before its interval
+ * stops.
+ *
+ * The interval must survive a failed poll: one transient error must not stop
+ * live updates for the rest of the review. It must not re-arm forever either —
+ * `probing` is derived from the list's cached page one, and only a delivered
+ * probe page updates that page, so a probe whose endpoint keeps failing can
+ * never turn itself off. Past this bound the poll stops until an external
+ * refresh (foreground/route invalidate, pull-to-refresh, cancel/retrigger)
+ * brings it back. See AGENTS.md "Failure UX": retry within a bound.
+ */
+export const REVIEW_POLL_MAX_CONSECUTIVE_FAILURES = 3;
+
+/**
+ * Next consecutive-failed-poll count for the page-one probe. A poll that settled
+ * with a delivered page clears the count; a poll that settled with an error
+ * advances it.
+ *
+ * The settle timestamps decide, not the presence of `data`: a failed refetch
+ * keeps the last delivered page (and its `dataUpdatedAt`), so "has data" is not
+ * the same as "the last poll delivered". `dataUpdatedAt >= errorUpdatedAt` means
+ * the last settle delivered a page, or nothing has failed yet.
+ */
+export function nextReviewPollFailureStreak(
+  previous: number,
+  probe: { dataUpdatedAt: number; errorUpdatedAt: number }
+): number {
+  return probe.dataUpdatedAt >= probe.errorUpdatedAt ? 0 : previous + 1;
+}
 
 /** Child segment that keeps the page-one probe under the list's invalidate prefix. */
 const REVIEW_FIRST_PAGE_KEY = 'firstPage';
@@ -123,12 +154,19 @@ export function buildReviewListQueryOptions(trpc: ReturnType<typeof useTRPC>, sc
  * The key is a child of the list key, so `useInvalidateReviews` and the
  * route-level `[['codeReviews']]` foreground invalidate still refresh the probe
  * along with the list.
+ *
+ * @param probe.enabled Whether a running review on the cached page one makes the
+ *   probe worth running at all.
+ * @param probe.failedPolls Consecutive failed polls so far, counted by
+ *   `useReviewList`; the interval stops at
+ *   `REVIEW_POLL_MAX_CONSECUTIVE_FAILURES`.
  */
 export function buildReviewFirstPageQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
   scope: string,
-  enabled: boolean
+  probe: { enabled: boolean; failedPolls?: number }
 ) {
+  const { enabled, failedPolls = 0 } = probe;
   return {
     queryKey: [...buildReviewListQueryKey(trpc, scope), REVIEW_FIRST_PAGE_KEY],
     queryFn: async (): Promise<ReviewListPage> => {
@@ -146,6 +184,15 @@ export function buildReviewFirstPageQueryOptions(
     staleTime: 0,
     enabled,
     refetchInterval: (query: { state: { data?: ReviewListPage } }) => {
+      // Bounded retry: this probe is the only writer of the list's page one, so
+      // an endpoint that keeps failing would otherwise keep one request (plus
+      // this query's own retries) going every interval for the life of the
+      // screen. `useReviewList` counts consecutive failed polls and restarts the
+      // count on a delivered list or probe page, on a scope change, and on a
+      // review starting or ending.
+      if (failedPolls >= REVIEW_POLL_MAX_CONSECUTIVE_FAILURES) {
+        return false;
+      }
       // Poll until a successful page one with no running review arrives: the
       // interval must survive a transient failure (no page delivered yet, or
       // the last successful page still held after a failed refetch) instead of
@@ -240,7 +287,46 @@ export function useReviewList(scope: string) {
   // request instead of one per retained page.
   const firstPage = list.data?.pages[0];
   const probing = firstPage?.success === true && hasInFlightReview(firstPage.reviews);
-  const probe = useQuery(buildReviewFirstPageQueryOptions(trpc, scope, probing));
+
+  // Consecutive failed polls for the probe. The interval survives a failed poll
+  // (one transient error must not stop live updates for the rest of the review)
+  // but stops at the bound, so a permanently failing endpoint cannot leave a
+  // request loop running for the life of the screen. React Query keeps no
+  // consecutive-failure counter (`fetchFailureCount` restarts with every fetch),
+  // so the count is advanced here off the probe's own settle signals.
+  //
+  // The budget restarts whenever the surface behind the poll is refreshed: a
+  // delivered list page (a foreground or pull-to-refresh list refetch), the
+  // probe turning on or off (a review starting or ending), or a new scope. A
+  // restart lets a poll that hit the bound recover without remounting.
+  const [failedProbePolls, setFailedProbePolls] = useState(0);
+  const probe = useQuery(
+    buildReviewFirstPageQueryOptions(trpc, scope, {
+      enabled: probing,
+      failedPolls: failedProbePolls,
+    })
+  );
+  const probeBudgetKey = `${scope}|${probing}|${list.dataUpdatedAt}`;
+  const probeBudgetRef = useRef(probeBudgetKey);
+  // Read the settle signals as primitives for the same reason as `listRefetch`
+  // below: the query result object is fresh each render, and an effect that ran
+  // on every render would advance the streak on every render too.
+  const probeDataUpdatedAt = probe.dataUpdatedAt;
+  const probeErrorUpdatedAt = probe.errorUpdatedAt;
+  useEffect(() => {
+    const budgetChanged = probeBudgetRef.current !== probeBudgetKey;
+    probeBudgetRef.current = probeBudgetKey;
+    // Settle deps: `dataUpdatedAt` moves when the probe delivers a page,
+    // `errorUpdatedAt` when a poll fails.
+    setFailedProbePolls(previous =>
+      budgetChanged
+        ? 0
+        : nextReviewPollFailureStreak(previous, {
+            dataUpdatedAt: probeDataUpdatedAt,
+            errorUpdatedAt: probeErrorUpdatedAt,
+          })
+    );
+  }, [probeBudgetKey, probeDataUpdatedAt, probeErrorUpdatedAt]);
 
   // Memoised: the builder returns a fresh array on every call, and the effect
   // below must not re-run every render because of a new key reference.

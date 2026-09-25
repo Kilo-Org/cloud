@@ -15,6 +15,10 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
@@ -270,10 +274,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Captured before auto-model resolution and provider transforms mutate the
-  // parsed body; efficient routing classifies the original user request.
-  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
-
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) ||
       determineFallbackFeature(requestBodyParsed, request.headers.get('user-agent'))
@@ -339,6 +339,21 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   } else {
     request.signal.addEventListener('abort', logClientDisconnect, { once: true });
   }
+
+  const { settings: privacySettings } = await balanceAndSettingsPromise;
+  const requestProvider = requestBodyParsed.body.provider;
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    privacySettings?.data_collection
+  );
+  if (Object.keys(effectivePrivacy).length > 0) {
+    requestBodyParsed.body.provider = { ...requestProvider, ...effectivePrivacy };
+  }
+
+  // Snapshot normalized privacy before model-specific provider transforms.
+  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
   let autoModel: string | null = null;
   // Organization Auto can resolve through an intermediate route target before
@@ -678,7 +693,9 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     return {
       balance,
       balanceLimitedByUserAllowance,
-      effectiveProviderConfig,
+      effectiveProviderConfig: effectiveProviderConfig
+        ? { ...effectiveProviderConfig, ...effectivePrivacy }
+        : undefined,
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,

@@ -23,7 +23,6 @@ import {
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
@@ -272,10 +271,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  // The resolved org policy follows the request shape: merged into the JSON
-  // body, or appended to the multipart form (OpenRouter accepts the provider
-  // field on both).
-  let providerPolicy: OpenRouterProviderConfig | undefined;
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -283,18 +278,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       modelId: requestedModelLowerCased,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes) {
+    const eligibleRoutes = decision.eligibleProviderRoutes;
+    if (eligibleRoutes) {
       const currentOnly = providerConfig?.only;
-      const only = currentOnly
-        ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
-        : [...decision.eligibleProviderRoutes];
-      if (only.length === 0) return modelNotAllowedResponse();
-      providerPolicy = { ...providerConfig, only };
-    } else if (providerConfig) {
-      providerPolicy = providerConfig;
+      const hasEligibleRoute = currentOnly
+        ? currentOnly.some(route => eligibleRoutes.has(route))
+        : eligibleRoutes.size > 0;
+      if (!hasEligibleRoute) return modelNotAllowedResponse();
     }
-  } else if (providerConfig) {
-    providerPolicy = providerConfig;
   }
 
   sentryRootSpan()?.setAttribute(
@@ -313,16 +304,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const safetyIdentifier = generateProviderSpecificHash(user.id, provider);
     upstreamForm.append('safety_identifier', safetyIdentifier);
     upstreamForm.append('user', safetyIdentifier);
-    if (providerPolicy) {
-      upstreamForm.append('provider', JSON.stringify(providerPolicy));
-    }
     upstreamBody = upstreamForm;
   } else {
     parsedRequest.body.safety_identifier = generateProviderSpecificHash(user.id, provider);
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
-    if (providerPolicy) {
-      parsedRequest.body.provider = { ...parsedRequest.body.provider, ...providerPolicy };
-    }
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
 

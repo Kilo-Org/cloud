@@ -155,7 +155,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.user).toBe(upstream.safety_identifier);
   });
 
-  it('forwards organization provider policy through the OpenRouter provider field', async () => {
+  it('does not add organization provider policy to JSON requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -180,7 +180,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     const [, init] = mockedFetch.mock.calls[0];
     const upstream = JSON.parse(init?.body as string);
-    expect(upstream.provider).toEqual({ only: ['openai'], data_collection: 'deny' });
+    expect(upstream).not.toHaveProperty('provider');
   });
 
   it('rejects malformed transcription bodies before proxying without reporting to Sentry', async () => {
@@ -335,7 +335,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstreamFile.size).toBe(8);
   });
 
-  it('forwards the organization provider policy on multipart requests', async () => {
+  it('does not add organization provider policy to multipart requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -360,10 +360,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     const [, init] = mockedFetch.mock.calls[0];
     const upstreamForm = init?.body as FormData;
-    expect(JSON.parse(upstreamForm.get('provider') as string)).toEqual({
-      only: ['openai'],
-      data_collection: 'deny',
-    });
+    expect(upstreamForm.has('provider')).toBe(false);
   });
 
   it('attaches the safety identifier to multipart upstream requests', async () => {

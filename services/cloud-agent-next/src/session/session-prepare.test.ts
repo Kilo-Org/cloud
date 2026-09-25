@@ -1544,6 +1544,7 @@ describe('createSessionWithLedger admission ladder', () => {
         USER_ID,
         expect.any(Object),
         undefined,
+        undefined,
         'cloud-agent-web',
         expect.any(String),
         'https://github.com/acme/repo',
@@ -1604,7 +1605,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
       expect(result.cloudAgentSessionId).toBe(WORKSPACE_SESSION_ID);
       expect(generateSessionIdMock).toHaveBeenCalledWith('control');
-      expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+      expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
           finalization: { autoCommit: true },
@@ -1830,7 +1831,7 @@ describe('createSessionWithLedger admission ladder', () => {
         })
       );
 
-      expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+      expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
           finalization: { autoCommit: true },
@@ -1868,7 +1869,7 @@ describe('createSessionWithLedger admission ladder', () => {
         })
       );
 
-      expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+      expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
           finalization: { autoCommit: true },
@@ -1893,7 +1894,7 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
 
-    expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+    expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({ finalization: { autoCommit: true } })
     );
@@ -1916,7 +1917,7 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
 
-    expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+    expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({ finalization: { autoCommit: true } })
     );
@@ -1938,6 +1939,7 @@ describe('createSessionWithLedger admission ladder', () => {
       CLOUD_AGENT_SESSION_ID,
       USER_ID,
       expect.any(Object),
+      undefined,
       undefined,
       'cloud-agent',
       expect.any(String),
@@ -1962,6 +1964,7 @@ describe('createSessionWithLedger admission ladder', () => {
       CLOUD_AGENT_SESSION_ID,
       USER_ID,
       expect.any(Object),
+      undefined,
       undefined,
       'cloud-agent',
       expect.any(String),
@@ -1991,6 +1994,7 @@ describe('createSessionWithLedger admission ladder', () => {
       CLOUD_AGENT_SESSION_ID,
       USER_ID,
       expect.any(Object),
+      undefined,
       undefined,
       'cloud-agent',
       expect.any(String),
@@ -3472,7 +3476,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
     });
 
     expect(createCliSessionMock).toHaveBeenCalledTimes(1);
-    expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+    expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
     expect(generateSessionIdMock).toHaveBeenCalledTimes(1);
     expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
@@ -3540,6 +3544,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
           WORKSPACE_SESSION_ID,
           USER_ID,
           expect.any(Object),
+          undefined,
           undefined,
           'cloud-agent-web',
           expect.any(String),
@@ -4273,6 +4278,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       USER_ID,
       expect.any(Object),
       undefined,
+      undefined,
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
@@ -4522,6 +4528,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       CLOUD_AGENT_SESSION_ID,
       USER_ID,
       expect.any(Object),
+      undefined,
       undefined,
       'cloud-agent',
       expect.any(String),
@@ -4817,6 +4824,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         USER_ID,
         expect.any(Object),
         undefined,
+        undefined,
         'cloud-agent',
         expect.any(String),
         'https://github.com/acme/repo',
@@ -5029,6 +5037,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       USER_ID,
       expect.any(Object),
       undefined,
+      undefined,
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
@@ -5138,6 +5147,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       USER_ID,
       expect.any(Object),
       undefined,
+      undefined,
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
@@ -5191,6 +5201,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       USER_ID,
       expect.any(Object),
       undefined,
+      undefined,
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
@@ -5231,6 +5242,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       FRESH_CLOUD_ID,
       USER_ID,
       expect.any(Object),
+      undefined,
       undefined,
       'cloud-agent',
       expect.any(String),

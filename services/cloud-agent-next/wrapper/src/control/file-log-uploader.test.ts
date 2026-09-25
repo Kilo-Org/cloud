@@ -79,6 +79,29 @@ describe('control file log uploader', () => {
     expect(capturedArchive).toContain('kilo log');
   });
 
+  it('includes the incomplete-restore rules file from the session home', async () => {
+    const files = await createFixture();
+    const rulesPath = path.join(
+      files.homeRoot,
+      'home-a',
+      '.kilocode',
+      'rules',
+      'restore-incomplete.md'
+    );
+    await fsp.mkdir(path.dirname(rulesPath), { recursive: true });
+    await fsp.writeFile(rulesPath, '## Session restore incomplete\n');
+    let capturedArchive: string | undefined;
+    const uploader = createUploader(files, async (_url, init) => {
+      capturedArchive = await readArchive(init);
+      return new Response(null, { status: 204 });
+    });
+
+    await uploader.uploadNow();
+
+    expect(capturedArchive).toContain('home-a/.kilocode/rules/restore-incomplete.md');
+    expect(capturedArchive).toContain('## Session restore incomplete');
+  });
+
   it('keeps shutdown from waiting on a failed upload', async () => {
     const files = await createFixture();
     const uploader = createUploader(files, async () => {

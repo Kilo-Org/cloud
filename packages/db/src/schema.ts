@@ -6386,6 +6386,14 @@ export const cli_sessions_v2 = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'set null',
     }),
+    // The profile the session was prepared with, resolved server-side (an
+    // explicit pick, the effective default, or a repository binding). Null on
+    // rows created before this column existed and on sessions whose create
+    // origin resolved no profile. `set null` so deleting a profile keeps the
+    // session history readable.
+    profile_id: uuid().references(() => agent_environment_profiles.id, {
+      onDelete: 'set null',
+    }),
     cloud_agent_session_id: text(),
     cloud_agent_session_scope_id: text(),
     cloud_agent_worktree_id: text(),
@@ -6416,6 +6424,10 @@ export const cli_sessions_v2 = pgTable(
       table.parent_session_id,
       table.kilo_user_id
     ),
+    // Supports the ON DELETE SET NULL scan when a profile is deleted. Built
+    // concurrently — `cli_sessions_v2` is large, so a plain build blocks writes
+    // for the whole scan, the same reason the `user_*` indexes below do.
+    index('IDX_cli_sessions_v2_profile_id').on(table.profile_id).concurrently(),
     uniqueIndex('UQ_cli_sessions_v2_public_id')
       .on(table.public_id)
       .where(isNotNull(table.public_id)),
@@ -7035,22 +7047,47 @@ export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
  * either that person's personal account (`organization_id` null) or one
  * organization they belong to. The same person can connect the same ChatGPT
  * subscription to several accounts by connecting each one separately, so the
- * owner is the `(kilo_user_id, organization_id)` pair.
+ * owner is the `(kilo_user_id, organization_id)` pair. The one exception is the
+ * organization's shared-services row, which belongs to the organization rather
+ * than to the person who connected it.
  */
 export const openai_chatgpt_connections = pgTable(
   'openai_chatgpt_connections',
   {
     id: idPrimaryKeyColumn,
-    kilo_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, {
-        onDelete: 'cascade',
-      }),
+    /**
+     * The person who connected this row. Only the organization's shared-services
+     * row is nullable here: that row belongs to the organization, so deleting the
+     * connector's account clears the reference instead of taking the connection
+     * with it — the foreign key clears it when the account row is deleted and
+     * `softDeleteUser` clears it on the anonymization path. `created_by` keeps
+     * the record, and every other row names its owner.
+     */
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
     encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
     is_enabled: boolean().default(true).notNull(),
+    /**
+     * True for the organization's shared-services connection: one row per
+     * organization, used by the platform's own callers (code reviewer, Slack
+     * bot, auto-triage) instead of any member's personal connection. The
+     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     */
+    is_shared_services: boolean().default(false).notNull(),
+    /**
+     * The last time OpenAI answered a delegated request with a plan usage
+     * limit. The gateway writes it and a reconnect clears it. It is request
+     * state, not credential state, so it stays out of the encrypted payload. A
+     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
+     * hides it once the reset time OpenAI reported has passed.
+     */
+    usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** The reset time OpenAI reported with the limit, when it reported one. */
+    usage_limit_resets_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -7064,7 +7101,10 @@ export const openai_chatgpt_connections = pgTable(
       .where(sql`${table.organization_id} IS NULL`),
     uniqueIndex('UQ_openai_chatgpt_connections_org_member')
       .on(table.kilo_user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.is_shared_services} = false`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.is_shared_services} = true`),
     index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
   ]
 );

@@ -14,7 +14,12 @@ import {
   type CodingPlanCredentialValidationResult,
   validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
-import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import {
+  getCodingPlanPrice,
+  isCodingPlanDisabledForNewSignups,
+  isCodingPlanId,
+  type CodingPlanId,
+} from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
@@ -219,6 +224,10 @@ export async function subscribeToCodingPlan(
         subscriptionId: priorTerm.subscriptionId,
         charged: false,
       } satisfies SubscriptionOutcome;
+    }
+
+    if (isCodingPlanDisabledForNewSignups(plan.planId)) {
+      throw new Error(`${plan.providerName} ${plan.name} is not currently accepting new signups.`);
     }
 
     const [liveSubscription] = await tx
@@ -760,6 +769,9 @@ export async function requestCodingPlanAvailabilityNotification(
   const plan = getCodingPlanPrice(planId);
   if (!plan) {
     throw new Error(`Plan "${planId}" is not available as a coding plan.`);
+  }
+  if (isCodingPlanDisabledForNewSignups(plan.planId)) {
+    throw new Error(`${plan.providerName} ${plan.name} is not currently accepting new signups.`);
   }
 
   return db.transaction(async tx => {

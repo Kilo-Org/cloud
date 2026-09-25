@@ -920,14 +920,11 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
     path.includes('/container-registry') ||
     path.includes('/db-snapshot') ||
     path.includes('/mayor-id') ||
-    path.includes('/container-events') ||
-    // Town Container control-plane routes are Cloudflare Access at the
-    // perimeter, not kilo JWT (see the Town Container route block).
-    path.includes('/container/')
+    path.includes('/container-events')
   ) {
     return next();
   }
-  await kiloAuthMiddleware(c, async () => {
+  return kiloAuthMiddleware(c, async () => {
     await adminAuditMiddleware(c, async () => {
       await townAuthMiddleware(c, next);
     });
@@ -1082,7 +1079,10 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
-// Protected by Cloudflare Access at the perimeter; no additional auth required.
+// kiloAuthMiddleware + adminAuditMiddleware + townAuthMiddleware (registered
+// above) require a Kilo user JWT and per-town ownership; unauthenticated
+// callers get 401. Cloudflare Access guards the perimeter but does not
+// enforce town ownership, so the JWT chain must stay on these routes.
 
 app.post('/api/towns/:townId/container/agents/start', c =>
   instrumented(c, 'POST /api/towns/:townId/container/agents/start', () =>

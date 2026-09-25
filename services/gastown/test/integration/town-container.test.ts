@@ -18,27 +18,28 @@ describe('Town Container Routes', () => {
   // ── Container start agent route ─────────────────────────────────────────
 
   describe('POST /agents/start', () => {
-    it('should reject start-agent without body', async () => {
+    it('should reject start-agent without authentication', async () => {
       const id = townId();
       const res = await SELF.fetch(api(`/api/towns/${id}/container/agents/start`), {
         method: 'POST',
         headers: headers(),
       });
-      // Should get 400 (invalid body) rather than 401
-      expect(res.status).toBe(400);
+      // kiloAuthMiddleware runs before the handler: a missing bearer token is
+      // rejected with 401, not a 400 from body validation.
+      expect(res.status).toBe(401);
     });
   });
 
   // ── Container message route ─────────────────────────────────────────────
 
   describe('POST /agents/:agentId/message', () => {
-    it('should reject message without body', async () => {
+    it('should reject message without authentication', async () => {
       const id = townId();
       const res = await SELF.fetch(api(`/api/towns/${id}/container/agents/some-agent/message`), {
         method: 'POST',
         headers: headers(),
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(401);
     });
   });
 });

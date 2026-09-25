@@ -1,16 +1,13 @@
 import { Search, X } from '@/components/ui/icons';
 import { type RefObject, useMemo } from 'react';
-import { I18nManager, Pressable, TextInput, View } from 'react-native';
+import { Pressable, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { Input } from '@/components/ui/input';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-// In RTL the field's start edge is its physical right; TextInput maps
-// textAlign to a physical gravity (unlike Text), so it must be set explicitly.
-const SEARCH_RTL = { textAlign: 'right' } as const;
 
 // The row's `gap-2` compiles to 7pt, not 8pt: NativeWind v5 fixes 1rem at
 // 14pt. The clear control's left slop is capped at that gap, so its touch
@@ -50,7 +47,6 @@ export function SessionListSearchHeader({
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const isRtl = I18nManager.isRTL;
   // The landscape side insets keep the field's rounded border and left tap
   // area clear of the sensor housing; portrait insets are 0, keeping the
   // fixed 22px margin unchanged.
@@ -61,14 +57,18 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
-      {/* One `min-height` floor, not two: `min-h-[51px]` is the height the row
-          must already hold for the clear control's 38pt box plus the field's
-          own 10.5pt vertical padding (`py-1.5` is 0.375rem at the app's 14pt
-          rem) and its 2pt vertical `border` (1pt a side, inside the border box
-          React Native lays out), so the first keystroke cannot grow the row and
-          shift the list below. A second `min-h-*` class would set the same
-          property, leaving which floor wins to the order Tailwind emits its
-          rules rather than to this intent. */}
+      {/* The row's height comes from the shared field box, not from this row:
+          the field's 44pt floor plus this row's 10.5pt vertical padding
+          (`py-1.5` is 0.375rem at the app's 14pt rem) and its 2pt vertical
+          `border` (1pt a side, inside the border box React Native lays out) is
+          56.5pt, the same whether the clear control is showing or not, so the
+          first keystroke cannot grow the row and shift the list below. The
+          row's own `min-h-[51px]` (the clear control's 38pt box plus that same
+          padding and border, 50.5pt) stays as a lower bound the field's floor
+          dominates, so the row never shrinks below the control's own box. A
+          second `min-h-*` class would set the same property, leaving which
+          floor wins to the order Tailwind emits its rules rather than to this
+          intent. */}
       <View
         style={fieldMargins}
         className="my-2 min-h-[51px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
@@ -85,16 +85,15 @@ export function SessionListSearchHeader({
             <Search size={18} color={colors.mutedForeground} />
           )}
         </View>
-        <TextInput
+        <Input
           key={inputKey}
           ref={inputRef}
           accessibilityLabel={t('agents.search.searchSessions')}
-          // Height comes from `min-h`, never `py`: iOS insets the already-centered
-          // text rect by the padding and draws the placeholder low.
-          className="min-h-[26px] flex-1 text-[15px] leading-[normal] text-foreground"
-          // textAlign is applied inline, not via a class: NativeWind maps it
-          // to a native prop for TextInput and crashes on it in this version.
-          style={isRtl ? SEARCH_RTL : undefined}
+          // The shared box supplies the height (`min-h-[44px]`, never `py`: iOS
+          // insets the already-centered text rect by padding and draws the
+          // placeholder low) and the RTL content alignment, so this field keeps
+          // only its own size and text size.
+          className="flex-1 text-[15px] text-foreground"
           // One line, always: at a narrow width with a large font scale the
           // placeholder wrapped inside the field and the field grew with it.
           numberOfLines={1}

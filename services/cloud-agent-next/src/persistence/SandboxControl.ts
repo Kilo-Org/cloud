@@ -1,9 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   cloudAgentWorktreeIdSchema,
+  retireCloudAgentWorktreeIfSoleMemberResultSchema,
+  retireCloudAgentWorktreeIfSoleMemberSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
 } from '@kilocode/session-ingest-contracts';
 import {
+  RECONCILIATION_CALL_TIMEOUT_MS,
   RECONCILIATION_LIMITS,
   reconcileSandboxReferences,
 } from '../sandbox-control/worktree-ownership.js';
@@ -104,7 +107,10 @@ import {
   type SessionRoute,
 } from '../sandbox-control/session-routes.js';
 import { projectStatusSnapshot } from '../sandbox-control/status-snapshot.js';
-import { legacyPhysicalState } from '../sandbox-state/project/physical-label.js';
+import {
+  legacyPhysicalState,
+  isTerminalLaunchFailure,
+} from '../sandbox-state/project/physical-label.js';
 import { projectStatus, type StatusProjection } from '../sandbox-state/project/status.js';
 import {
   type AllocationController,
@@ -245,6 +251,7 @@ import {
   deriveSandboxAllocationId,
   getManagedOutboundContainerId,
   getSandboxNamespace,
+  isIsolatedSandboxId,
 } from '../sandbox-id.js';
 import {
   validateContainersTerminalBillingRuntime,
@@ -508,6 +515,12 @@ export type SandboxControlStatus = StatusProjection & {
   operationResults?: true;
   runtimeRecovery?: true;
   runtimeReplacementInFlight?: true;
+  /**
+   * The canonical allocation is `unknown` because its confirmed launch failed.
+   * A projection of the allocation reason, distinct from a physical `'failed'`
+   * whose environment state is still unresolved.
+   */
+  launchFailed?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -2301,14 +2314,132 @@ export class SandboxControl extends DurableObject<Env> {
     return { existed };
   }
 
-  async forgetSessionReference(sessionId: string): Promise<void> {
+  async forgetSessionReference(input: {
+    sessionId: string;
+    kiloUserId: string;
+    worktreeId?: string;
+    organizationId?: string;
+  }): Promise<void> {
     await this.ensureOperationalInitialized();
-    await this.ctx.storage.transaction(async () => {
+    const soleOwner = await this.ctx.storage.transaction(async () => {
       const references = await loadSessionReferences(this.ctx.storage);
-      if (removeSessionReference(references, sessionId).changed) {
+      if (removeSessionReference(references, input.sessionId).changed) {
         await saveSessionReferences(this.ctx.storage, references);
       }
+      return (
+        references.overflowed === false &&
+        references.entries.length === 0 &&
+        (await loadRouteTable(this.ctx.storage)).size === 0
+      );
     });
+    if (!soleOwner || !isIsolatedSandboxId(this.sandboxId) || this.exclusiveDeletionWorktreeId) {
+      return;
+    }
+    try {
+      const worktreeId = input.worktreeId;
+      if (!worktreeId) {
+        if ((await this.readCanonicalAllocation()).state.kind !== 'allocated') {
+          this.logSessionDeletedStop({
+            sessionId: input.sessionId,
+            worktreeId: input.worktreeId,
+            result: 'not_attempted',
+            reason: 'allocation_not_allocated',
+          });
+          return;
+        }
+      } else {
+        const retired = await this.retireSoleMemberWorktree({
+          sessionId: input.sessionId,
+          kiloUserId: input.kiloUserId,
+          worktreeId,
+          ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        });
+        if (!retired) {
+          this.logSessionDeletedStop({
+            sessionId: input.sessionId,
+            worktreeId,
+            result: 'not_attempted',
+            reason: 'retirement_not_exclusive',
+          });
+          return;
+        }
+        const allocation = (await this.readCanonicalAllocation()).state;
+        if (allocation.kind === 'creating' || allocation.kind === 'unknown') {
+          this.logSessionDeletedStop({
+            sessionId: input.sessionId,
+            worktreeId,
+            result: 'not_attempted',
+            reason: allocation.kind === 'creating' ? 'allocation_creating' : 'allocation_unknown',
+          });
+          return;
+        }
+      }
+      const record = await this.stopFor('session_deleted');
+      this.logSessionDeletedStop({
+        sessionId: input.sessionId,
+        worktreeId: input.worktreeId,
+        result: record.state.kind === 'stopped' ? 'stopped' : 'unconfirmed',
+        kind: record.state.kind,
+      });
+    } catch {
+      this.logSessionDeletedStop(
+        {
+          sessionId: input.sessionId,
+          worktreeId: input.worktreeId,
+          result: 'error',
+        },
+        'warn'
+      );
+    }
+  }
+
+  /**
+   * One shape for every `session_deleted_stop` diagnostic, so a query can always
+   * tell a confirmed stop (`result: 'stopped'`) from a skip (`not_attempted`),
+   * an unconfirmed stop (`unconfirmed`) or a failure (`error`).
+   */
+  private logSessionDeletedStop(
+    fields: {
+      sessionId: string;
+      worktreeId?: string;
+      result: 'stopped' | 'unconfirmed' | 'not_attempted' | 'error';
+      kind?: string;
+      reason?: string;
+    },
+    level: 'info' | 'warn' = 'info'
+  ): void {
+    this.logDiagnostic('session_deleted_stop', fields, level);
+  }
+
+  /**
+   * Ask session-ingest to retire the worktree when this session is its only
+   * member. Bounded so a stalled caller cannot hold the deletion open; a
+   * timeout or an unparseable reply is `unresolved` (fail closed, no stop).
+   */
+  private async retireSoleMemberWorktree(input: {
+    sessionId: string;
+    kiloUserId: string;
+    worktreeId: string;
+    organizationId?: string;
+  }): Promise<boolean> {
+    try {
+      const result = await withTimeout(
+        this.env.SESSION_INGEST.retireCloudAgentWorktreeIfSoleMember(
+          retireCloudAgentWorktreeIfSoleMemberSchema.parse({
+            worktreeId: input.worktreeId,
+            kiloUserId: input.kiloUserId,
+            ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+            cloudAgentSessionId: input.sessionId,
+          })
+        ),
+        RECONCILIATION_CALL_TIMEOUT_MS,
+        'retireCloudAgentWorktreeIfSoleMember timed out'
+      );
+      const parsed = retireCloudAgentWorktreeIfSoleMemberResultSchema.safeParse(result);
+      return parsed.success && parsed.data.kind === 'exclusive';
+    } catch {
+      return false;
+    }
   }
 
   deleteWorktreeResources(
@@ -2450,7 +2581,11 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async stopDeletedWorktreeRuntime(): Promise<AllocationRecord> {
-    const record = await this.beginStop('worktree_deleted');
+    return this.stopFor('worktree_deleted');
+  }
+
+  private async stopFor(reason: string): Promise<AllocationRecord> {
+    const record = await this.beginStop(reason);
     if (record.state.kind === 'stopped') return record;
     return this.recordStopAttempt();
   }
@@ -2889,6 +3024,7 @@ export class SandboxControl extends DurableObject<Env> {
         : {}),
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
       ...(runtimeReplacementInFlight ? { runtimeReplacementInFlight: true as const } : {}),
+      ...(isTerminalLaunchFailure(record) ? { launchFailed: true as const } : {}),
     };
   }
 

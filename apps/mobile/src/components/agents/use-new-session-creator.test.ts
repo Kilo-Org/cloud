@@ -336,6 +336,8 @@ function runCreator(args: {
   selectedRepository?: NewSessionRepository | null;
   autoCommit?: boolean;
   profileId?: string | null;
+  manualEnvVars?: Record<string, string>;
+  setupCommands?: string[];
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
   const refs: { current: unknown }[] = [];
@@ -384,6 +386,8 @@ function runCreator(args: {
       variant: args.variant ?? 'v1',
       autoCommit: args.autoCommit ?? false,
       profileId: args.profileId,
+      manualEnvVars: args.manualEnvVars,
+      setupCommands: args.setupCommands,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -1074,6 +1078,36 @@ describe('useNewSessionCreator profileId', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('profileId');
+  });
+});
+
+describe('useNewSessionCreator manual configuration', () => {
+  it('sends the manual env vars and setup commands with the create', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      manualEnvVars: { API_KEY: 'sk-1' },
+      setupCommands: ['pnpm install'],
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      envVars: { API_KEY: 'sk-1' },
+      setupCommands: ['pnpm install'],
+    });
+  });
+
+  it('omits the manual config fields when the draft is empty', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ manualEnvVars: {}, setupCommands: [] });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('envVars');
+    expect(payload).not.toHaveProperty('setupCommands');
   });
 });
 

@@ -20,8 +20,9 @@ import {
   type StreamEvent,
 } from './client.js';
 import {
+  awaitCorrelatedChildText,
   cleanupRemoteSession,
-  collectChildMessageText,
+  CONTENT_CORRELATION_BUDGET_MS,
   echoDirectivePayload,
   echoPayloadMatches,
   type SharedScenario,
@@ -253,12 +254,16 @@ async function runLongConversation(
     }
     const coldPayload = echoDirectivePayload(coldDirective);
     if (coldPayload !== null) {
-      const coldText = collectChildMessageText(coldStream.events, session.messageId);
-      if (!echoPayloadMatches(coldText, coldPayload)) {
-        throw new Error(
-          `cold turn ${session.messageId} did not complete with ${JSON.stringify(coldPayload)}; observed ${JSON.stringify(coldText)}`
-        );
-      }
+      await awaitCorrelatedChildText({
+        stream: coldStream,
+        parentMessageId: session.messageId,
+        timeoutMs: Math.max(
+          1,
+          Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('cold turn content'))
+        ),
+        label: 'cold turn',
+        ready: text => echoPayloadMatches(text, coldPayload),
+      });
     }
     coldStream = foldStream(events, coldStream);
 
@@ -297,21 +302,30 @@ async function runLongConversation(
             `${label}: unexpected preparing event with triggerMessageId=${hot.messageId}; a hot turn must reuse the warm dispatch path`
           );
         }
-        const text = collectChildMessageText(hot.stream.events, hot.messageId);
         const payload = echoDirectivePayload(directive);
         if (payload !== null) {
-          if (!echoPayloadMatches(text, payload)) {
-            throw new Error(
-              `${label}: expected correlated child text ${JSON.stringify(payload)} but observed ${JSON.stringify(text)}`
-            );
-          }
+          await awaitCorrelatedChildText({
+            stream: hot.stream,
+            parentMessageId: hot.messageId,
+            timeoutMs: Math.max(
+              1,
+              Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining(`${label} content`))
+            ),
+            label,
+            ready: text => echoPayloadMatches(text, payload),
+          });
           hotSummaries.push(`${directive}:complete`);
         } else if (directive.startsWith('file:write:')) {
-          if (!text.includes(`file-write:${filePath}`)) {
-            throw new Error(
-              `${label}: expected the file-write marker for ${filePath}; observed ${JSON.stringify(text)}`
-            );
-          }
+          await awaitCorrelatedChildText({
+            stream: hot.stream,
+            parentMessageId: hot.messageId,
+            timeoutMs: Math.max(
+              1,
+              Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining(`${label} content`))
+            ),
+            label,
+            ready: text => text.includes(`file-write:${filePath}`),
+          });
           const status = await deadline.within(`${label} status`, signal =>
             fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, `write-${runId}`, signal)
           );
@@ -322,6 +336,16 @@ async function runLongConversation(
           }
           hotSummaries.push(`file:write:complete`);
         } else if (directive.startsWith('file:read:')) {
+          const text = await awaitCorrelatedChildText({
+            stream: hot.stream,
+            parentMessageId: hot.messageId,
+            timeoutMs: Math.max(
+              1,
+              Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining(`${label} content`))
+            ),
+            label,
+            ready: candidate => parseFileReadEcho(candidate, filePath) !== null,
+          });
           const body = parseFileReadEcho(text, filePath);
           assertReaderCannotDeriveNonce({
             body,
@@ -466,12 +490,16 @@ async function runLeaveAndReturn(
       )
     );
     if (bootStatus !== 'completed') throw new Error(`boot turn durable status=${bootStatus}`);
-    const bootText = collectChildMessageText(bootStream.events, session.messageId);
-    if (!echoPayloadMatches(bootText, bootMarker)) {
-      throw new Error(
-        `boot turn ${session.messageId} did not complete with ${JSON.stringify(bootMarker)}; observed ${JSON.stringify(bootText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: bootStream,
+      parentMessageId: session.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+      ),
+      label: 'boot turn',
+      ready: text => echoPayloadMatches(text, bootMarker),
+    });
     const bootMessageId = session.messageId;
     bootStream = foldStream(events, bootStream);
 
@@ -570,23 +598,31 @@ async function runLeaveAndReturn(
         `resume did not expose a replacement allocation: P1=${providerRef}; P2=${replacement ?? 'none'}`
       );
     }
-    const resumeText = collectChildMessageText(resume.stream.events, resume.messageId);
-    if (!echoPayloadMatches(resumeText, resumeMarker)) {
-      throw new Error(
-        `resume turn ${resume.messageId} did not complete with ${JSON.stringify(resumeMarker)}; observed ${JSON.stringify(resumeText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: resume.stream,
+      parentMessageId: resume.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('resume turn content'))
+      ),
+      label: 'resume turn',
+      ready: text => echoPayloadMatches(text, resumeMarker),
+    });
     resumeStream = foldStream(events, resumeStream);
 
     replayStream = await deadline.within('replay stream', signal =>
       openConnectedStream(scenarioConfig, sessionId, true, undefined, signal)
     );
-    const replayText = collectChildMessageText(replayStream.events, bootMessageId);
-    if (!echoPayloadMatches(replayText, bootMarker)) {
-      throw new Error(
-        `replayed transcript lost the boot marker ${JSON.stringify(bootMarker)} for ${bootMessageId}; observed ${JSON.stringify(replayText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: replayStream,
+      parentMessageId: bootMessageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('replay content'))
+      ),
+      label: 'replay transcript',
+      ready: text => echoPayloadMatches(text, bootMarker),
+    });
 
     result = {
       name: scenarioName,

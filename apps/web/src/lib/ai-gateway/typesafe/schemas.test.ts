@@ -21,7 +21,44 @@ describe('systemOneRequestSchema', () => {
         api_key: 'test-key',
         user: 'attacker',
       })
-    ).toEqual({ ...request, model: TYPESAFE_MODEL });
+    ).toEqual({ ...request, model: TYPESAFE_MODEL, provider: {} });
+  });
+
+  it('accepts only provider privacy fields', () => {
+    const provider = { data_collection: 'deny', zdr: false };
+    const request = { state: null, questions: { relevant: { type: 'noul' } } };
+
+    expect(
+      systemOneRequestSchema.parse({
+        ...request,
+        provider: {
+          ...provider,
+          only: ['attacker'],
+          api_key: 'test-key',
+          user_byok: [{ providerId: 'typesafe', apiKey: 'test-key' }],
+        },
+      })
+    ).toEqual({ ...request, model: TYPESAFE_MODEL, provider });
+  });
+
+  it('does not default provider privacy', () => {
+    const request = { state: null, questions: { relevant: { type: 'noul' } } };
+
+    expect(systemOneRequestSchema.parse(request)).toEqual({ ...request, model: TYPESAFE_MODEL });
+  });
+
+  it.each([
+    { provider: null },
+    { provider: { data_collection: 'invalid' } },
+    { provider: { zdr: 'true' } },
+  ])('rejects malformed provider privacy: %j', ({ provider }) => {
+    expect(
+      systemOneRequestSchema.safeParse({
+        state: null,
+        questions: { relevant: { type: 'noul' } },
+        provider,
+      }).success
+    ).toBe(false);
   });
 
   it.each(['text', { nested: [true, 1, null] }, ['text', 1, false], null])(

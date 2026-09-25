@@ -61,10 +61,8 @@ const TEST_CONFIG_ROWS = {
   excludedAutoDeciderModels: [],
 };
 
-// ---------------------------------------------------------------------------
 // Stubs: the db module is mocked at its function boundary (drizzle generates
 // the SQL, so statement-level stubbing would couple tests to its internals).
-// ---------------------------------------------------------------------------
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
@@ -165,10 +163,6 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
   });
 }
 
-// ---------------------------------------------------------------------------
-// Setup
-// ---------------------------------------------------------------------------
-
 beforeEach(() => {
   vi.clearAllMocks();
   tokenGet.mockResolvedValue('bench-token');
@@ -201,10 +195,6 @@ beforeEach(() => {
   queueSendBatch.mockResolvedValue(undefined);
 });
 
-// ---------------------------------------------------------------------------
-// Auth guard
-// ---------------------------------------------------------------------------
-
 describe('auth middleware', () => {
   it('rejects requests without a bearer token', async () => {
     const res = await request('/admin/config');
@@ -219,10 +209,6 @@ describe('auth middleware', () => {
     expect(res.status).toBe(401);
   });
 });
-
-// ---------------------------------------------------------------------------
-// GET /admin/config
-// ---------------------------------------------------------------------------
 
 describe('GET /admin/config', () => {
   it('returns a null config when the DB rows are absent', async () => {
@@ -272,10 +258,6 @@ describe('GET /admin/config', () => {
     expect(body.config.updatedBy).toBe('admin@example.com');
   });
 });
-
-// ---------------------------------------------------------------------------
-// PUT /admin/config
-// ---------------------------------------------------------------------------
 
 describe('PUT /admin/config', () => {
   it('rejects a non-JSON body', async () => {
@@ -358,10 +340,6 @@ describe('PUT /admin/config', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// GET /admin/runs
-// ---------------------------------------------------------------------------
-
 describe('GET /admin/runs', () => {
   it('returns an empty runs array when the table is empty', async () => {
     const res = await authedGet('/admin/runs');
@@ -375,10 +353,6 @@ describe('GET /admin/runs', () => {
     expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
   });
 });
-
-// ---------------------------------------------------------------------------
-// POST /admin/runs
-// ---------------------------------------------------------------------------
 
 describe('POST /admin/runs', () => {
   it('rejects a non-JSON body', async () => {
@@ -622,10 +596,6 @@ describe('POST /admin/runs', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// GET /admin/routing-table
-// ---------------------------------------------------------------------------
-
 describe('GET /admin/routing-table', () => {
   it('returns {table: null, publishedAt: null} when no rows exist', async () => {
     const res = await authedGet('/admin/routing-table');
@@ -663,10 +633,6 @@ describe('GET /admin/routing-table', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// GET /admin/classifier-winner
-// ---------------------------------------------------------------------------
-
 describe('GET /admin/classifier-winner', () => {
   it('returns {winner: null} when no completed classifier run exists', async () => {
     const res = await authedGet('/admin/classifier-winner');
@@ -689,10 +655,6 @@ describe('GET /admin/classifier-winner', () => {
     await expect(res.json()).resolves.toEqual({ winner });
   });
 });
-
-// ---------------------------------------------------------------------------
-// POST /admin/profiles/register + /admin/profiles/status
-// ---------------------------------------------------------------------------
 
 describe('POST /admin/profiles/register', () => {
   it('returns 400 when benchmark config is not set', async () => {

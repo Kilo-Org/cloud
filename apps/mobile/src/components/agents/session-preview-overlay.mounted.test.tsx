@@ -178,6 +178,21 @@ describe('SessionPreviewOverlay', () => {
     expect(textWith(renderer, i18n.t('agents.sessionRow.needsInput'))).toHaveLength(1);
   });
 
+  it('shows cost without a working state for a finished session', () => {
+    const renderer = mountOverlay();
+    openPreview(
+      targetWith({
+        live: false,
+        statusKind: 'running',
+        needsInput: false,
+        totalCostMicrodollars: 120_000,
+      })
+    );
+
+    expect(textWith(renderer, `${i18n.t('common.working')} · $0.12`)).toHaveLength(0);
+    expect(textWith(renderer, '$0.12')).toHaveLength(1);
+  });
+
   it('contains VoiceOver in the card and menu column on open', () => {
     const renderer = mountOverlay();
     openPreview(

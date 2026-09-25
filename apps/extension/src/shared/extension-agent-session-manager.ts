@@ -615,6 +615,7 @@ export function createExtensionAgentSessionManager({
           !rs
         ),
         organizationId: sessionResult.organization_id,
+        profileId: sessionResult.profile_id,
         prompt: rs?.prompt ?? null,
         repository: rs?.githubRepo ?? null,
         ...(rs?.runtimeAgents === undefined ? {} : { runtimeAgents: rs.runtimeAgents }),

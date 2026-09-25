@@ -102,20 +102,15 @@ export function StoredSessionRow({
   const trpc = useTRPC();
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
-  // should see, so the row falls back to the localized unnamed name the same
-  // way the session header does. `namedSessionTitle` makes that judgement
-  // through the shared `sessionDisplayTitle` helper and additionally excludes a
-  // placeholder-shaped title the user's own rename wrote; the subscription
-  // repaints the row once the durable record hydrates after a cold start.
+  // should see. `namedSessionTitle` uses the shared display helper and keeps
+  // a placeholder-shaped title saved by a user. The subscription repaints
+  // the row once the durable record hydrates after a cold start.
   useUserSessionTitlesRevision();
   const title =
     namedSessionTitle(session.title, session.session_id) ?? t('agents.sessionRow.untitled');
-  // The rename field seeds the name a person wrote, never the backend default
-  // or the display fallback: a session still carrying `New session - <ISO>`
-  // opens an empty field (the "Session name" placeholder prompts for a name)
-  // instead of the machine string the row hides. Both save paths already
-  // refuse an unchanged or blank value, so a no-edit confirm cannot persist
-  // the empty seed. A title the user's own rename wrote is still seeded.
+  // Seed Rename with the same visible title. The server's creation-default
+  // title is hidden; a placeholder-shaped title saved by a user is retained.
+  // Both save paths refuse an unchanged or blank value.
   const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -207,11 +202,15 @@ export function StoredSessionRow({
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() =>
-        void prefetchSessionTranscript(
-          queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
-        )
+      onPressIn={
+        canManage
+          ? () => {
+              void prefetchSessionTranscript(
+                queryClient,
+                trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
+              );
+            }
+          : undefined
       }
       onLongPress={canManage ? handleLongPress : undefined}
       accessibilityRole="button"

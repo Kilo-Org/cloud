@@ -33,11 +33,9 @@ type SessionPreviewHeaderMetaProps = {
 };
 
 /**
- * The card's header text: the row's title, and the session state the row shows
- * — needs-input, else working/idle — with the session's cost. The polled row
- * is preferred while it exists so working / needs input / cost keep updating
- * while the session runs; a non-live target renders exactly what the row
- * carried at open.
+ * The header shows the row's title and cost. Live sessions show working,
+ * idle, or needs input. Finished sessions do not show a live state.
+ * Polling updates the state and cost while the session remains live.
  */
 export function SessionPreviewHeaderMeta({
   target,
@@ -61,12 +59,11 @@ export function SessionPreviewHeaderMeta({
     liveStatus === null ? null : glanceableStatusKind(liveStatus);
   const statusKind = rowStatusKind ?? target.statusKind;
 
-  let stateLabel = t('common.working');
-  if (needsInput) {
-    stateLabel = t('agents.sessionRow.needsInput');
-  } else if (statusKind === 'idle') {
-    stateLabel = t('common.idle');
-  }
+  const stateLabel = needsInput
+    ? t('agents.sessionRow.needsInput')
+    : target.live
+      ? t(statusKind === 'idle' ? 'common.idle' : 'common.working')
+      : null;
   const cost = formatSessionTotalCost(
     liveRow?.total_cost_microdollars ?? target.totalCostMicrodollars
   );
@@ -76,9 +73,11 @@ export function SessionPreviewHeaderMeta({
       <Text numberOfLines={1} className="text-sm font-medium tracking-tight text-foreground">
         {target.title}
       </Text>
-      <Text variant="mono" numberOfLines={1} className="mt-0.5 text-xs text-ink2">
-        {cost ? `${stateLabel} · ${cost}` : stateLabel}
-      </Text>
+      {stateLabel || cost ? (
+        <Text variant="mono" numberOfLines={1} className="mt-0.5 text-xs text-ink2">
+          {stateLabel && cost ? `${stateLabel} · ${cost}` : (stateLabel ?? cost)}
+        </Text>
+      ) : null}
     </View>
   );
 }

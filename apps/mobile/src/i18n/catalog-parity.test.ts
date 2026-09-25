@@ -27,28 +27,10 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * No key is pending today, and the set stays as the mechanism for the next
- * English-first slice. List a key here only while its translation slice is
- * scheduled; delete the entry once every catalog carries the key. A
- * feature-specific test below reads its catalog directly rather than through
- * this set, so re-listing a landed key as pending cannot make an untranslated
- * catalog pass again.
+ * No key is pending. Every catalog has the profile-editor and preview copy.
+ * Keep the missing-key assertion strict.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
-
-/**
- * The three copy keys the feature-flag row renders: `<value> · <reason>` under
- * `preferences`. The row's value word comes from `common.enabled`/`common.off`,
- * which every catalog already translates, so a catalog that keeps the English
- * reason string leaves half the row untranslated — the explorer capture
- * `language-switch-blank` read `مفعّل · default · not loaded`. A loanword equal
- * to the English string does not count here: each catalog renders its own words.
- */
-const FEATURE_FLAG_ROW_KEYS = [
-  'preferences.featureFlagApplied',
-  'preferences.featureFlagSkipped',
-  'preferences.featureFlagNotLoaded',
-];
 
 /**
  * The preview card's empty-state description. English added it for the
@@ -72,15 +54,6 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
   return out;
 }
 
-/** The value at a dotted key path, so a nested copy value can be compared. */
-function readPath(value: unknown, path: string): unknown {
-  let node: unknown = value;
-  for (const part of path.split('.')) {
-    node = (node as Record<string, unknown> | undefined)?.[part];
-  }
-  return node;
-}
-
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
 describe('catalog keys', () => {
@@ -97,23 +70,21 @@ describe('catalog keys', () => {
   });
 
   it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
-    '%s translates the feature-flag row copy',
-    tag => {
-      for (const key of FEATURE_FLAG_ROW_KEYS) {
-        expect(readPath(CATALOG_LOADERS[tag](), key), `${tag} leaves ${key} in English`).not.toBe(
-          readPath(CATALOG_LOADERS.en(), key)
-        );
-      }
-    }
-  );
-
-  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
     '%s translates the preview empty-state description',
     tag => {
-      const value = readPath(CATALOG_LOADERS[tag](), PREVIEW_EMPTY_DESCRIPTION_KEY);
-      expect(value, `${tag} lacks ${PREVIEW_EMPTY_DESCRIPTION_KEY}`).toBeTypeOf('string');
-      expect(value, `${tag} leaves ${PREVIEW_EMPTY_DESCRIPTION_KEY} in English`).not.toBe(
-        readPath(CATALOG_LOADERS.en(), PREVIEW_EMPTY_DESCRIPTION_KEY)
+      const catalog = CATALOG_LOADERS[tag]();
+      const english = CATALOG_LOADERS.en();
+      const description =
+        typeof catalog === 'string'
+          ? undefined
+          : catalog.agentChat?.session?.emptyTranscriptDescription;
+      const englishDescription =
+        typeof english === 'string'
+          ? undefined
+          : english.agentChat?.session?.emptyTranscriptDescription;
+      expect(description, `${tag} lacks ${PREVIEW_EMPTY_DESCRIPTION_KEY}`).toBeTypeOf('string');
+      expect(description, `${tag} leaves ${PREVIEW_EMPTY_DESCRIPTION_KEY} in English`).not.toBe(
+        englishDescription
       );
     }
   );

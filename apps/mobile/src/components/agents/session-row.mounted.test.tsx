@@ -22,29 +22,28 @@ import {
 } from './session-preview-state';
 import { StoredSessionRow } from './session-row';
 
-vi.mock('react-native', async () => {
-  const React = await import('react');
-  return {
-    View: 'View',
-    Pressable: 'Pressable',
-    TextInput: 'TextInput',
-    Platform: { OS: 'ios' },
-    FlatList: ({
-      data,
-      renderItem,
-    }: {
-      data: ShareDestinationRow[];
-      renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
-    }) =>
-      React.createElement(
-        'FlatList',
-        null,
-        data.map(item =>
-          React.createElement('Cell', { key: item.session_id }, renderItem({ item }))
-        )
-      ),
-  };
-});
+// The share destination list renders through FlashList v2; the stub feeds the
+// real `renderItem` every row, exactly as the old react-native FlatList stub did.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: ({
+    data,
+    renderItem,
+  }: {
+    data: ShareDestinationRow[];
+    renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
+  }) =>
+    createElement(
+      'FlashList',
+      null,
+      data.map(item => createElement('Cell', { key: item.session_id }, renderItem({ item })))
+    ),
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  TextInput: 'TextInput',
+  Platform: { OS: 'ios' },
+}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
@@ -314,6 +313,19 @@ describe('StoredSessionRow live speech', () => {
     expect(texts(renderer)).toContain('Verifier Rename Check');
   });
 
+  it('does not prefetch a transcript for a row without preview actions', () => {
+    vi.mocked(prefetchSessionTranscript).mockClear();
+    const renderer = mount(
+      row({ interactive: false, onDelete: () => undefined, onRename: () => undefined })
+    );
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.onLongPress).toBeUndefined();
+    act(() => {
+      button?.props.onPressIn?.();
+    });
+    expect(prefetchSessionTranscript).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])('keeps Home/card speech unchanged for live=%s', live => {
     const renderer = mount(
       row({
@@ -369,6 +381,63 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+
+  it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {
+    const renderer = mount(
+      row({
+        session: {
+          ...session,
+          title: 'New session - 2026-09-22T17:26:31.465Z',
+          git_branch: null,
+          total_cost_microdollars: null,
+        },
+      })
+    );
+    expect(texts(renderer)).toContain(i18n.t('agents.sessionRow.untitled'));
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-22');
+  });
+
+  const placeholderTitle = 'New session - 2026-09-21T15:44:47.176Z';
+
+  it('renders the generic untitled label for the server creation-default title', () => {
+    const renderer = mount(row({ session: { ...session, title: placeholderTitle } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(placeholderTitle);
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain('Untitled session');
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-21');
+  });
+
+  it('passes a blank rename value for the server creation-default title', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: placeholderTitle },
+        onRename: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row button');
+    }
+    act(() => {
+      (button.props as { onLongPress?: () => void }).onLongPress?.();
+    });
+    expect(getSessionPreviewSnapshot().target?.initialRenameValue).toBe('');
+    act(() => {
+      closeSessionPreviewStore();
+      releaseSessionPreviewStore();
+    });
+  });
+
+  it('keeps a real title that merely starts with "New session"', () => {
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session plan for the login redirect' } })
+    );
+    expect(texts(renderer)).toContain('New session plan for the login redirect');
+  });
 });
 
 describe('StoredSessionRow long-press preview', () => {
@@ -612,5 +681,13 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
+  });
+
+  it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {
+    const renderer = mountRemote({ title: 'New session - 2026-09-22T17:26:31.465Z' });
+    expect(texts(renderer)).toContain(i18n.t('agents.sessionRow.untitled'));
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-22');
   });
 });

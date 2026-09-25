@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyAnthropicThinkingDefault,
@@ -26,7 +27,7 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   status: 'public',
   context_length: 8_192,
   max_completion_tokens: 4_096,
-  gateway: 'openrouter',
+  provider: OPENROUTER,
   flags: [],
   pricing: null,
   inference_provider_restriction: [],
@@ -464,6 +465,26 @@ describe('applyPreferredProvider', () => {
     applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
 
     expect(request.body.provider).toEqual({ order: ['novita'] });
+  });
+
+  it.each(['moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast', 'kimi-k3', 'moonshotai/kimi-k2.5'])(
+    'prefers Bedrock then Alibaba for Kimi model %s',
+    model => {
+      const request = makeRequest(model);
+
+      applyPreferredProvider(model, request.body);
+
+      expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'alibaba'] });
+    }
+  );
+
+  it('preserves explicit Kimi provider order and allowed providers', () => {
+    const request = makeRequest('moonshotai/kimi-k3');
+    request.body.provider = { only: ['alibaba'], order: ['alibaba'] };
+
+    applyPreferredProvider('moonshotai/kimi-k3', request.body);
+
+    expect(request.body.provider).toEqual({ only: ['alibaba'], order: ['alibaba'] });
   });
 
   it('prefers Friendli then Novita for GLM models', () => {

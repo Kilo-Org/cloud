@@ -9,11 +9,6 @@ vi.hoisted(() => {
   vi.stubGlobal('__DEV__', false);
 });
 const push = vi.hoisted(() => vi.fn());
-// The screen tree imports the development-only feature-flag section; that
-// surface is covered in preferences-screen.feature-flags.mounted.test.tsx.
-vi.mock('@/lib/analytics/posthog', () => ({
-  useFeatureFlagStatuses: () => [],
-}));
 vi.mock('react-native', () => ({
   View: 'View',
 }));
@@ -133,5 +128,27 @@ describe('PreferencesScreen hub', () => {
       { value: 'dark', label: 'Dark' },
     ]);
     expect(control[0]?.props.value).toBe('system');
+  });
+
+  it('renders no developer feature-flag rows in a development build', async () => {
+    // Every device round runs a dev client pointed at Metro, so `__DEV__` is
+    // true there; the product screen must carry only the navigation rows.
+    vi.stubGlobal('__DEV__', true);
+    const renderer = await mountPreferences();
+
+    const lines = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .map(node => [node.props.children].flat().join(''));
+    expect(lines).not.toContain('Feature flags');
+    expect(lines).not.toContain('mobile-pr-review');
+    expect(lines).not.toContain('Enabled · default · not loaded');
+
+    // The product rows still render.
+    expect(row(renderer, i18n.t('preferences.general')).props.title).toBe(
+      i18n.t('preferences.general')
+    );
+    expect(row(renderer, i18n.t('preferences.account')).props.title).toBe(
+      i18n.t('preferences.account')
+    );
   });
 });

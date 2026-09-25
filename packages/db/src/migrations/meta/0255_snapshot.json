@@ -38989,12 +38989,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "superseded_at": {
-          "name": "superseded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {

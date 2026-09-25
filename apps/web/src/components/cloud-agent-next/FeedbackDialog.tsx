@@ -135,7 +135,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
           <MessageSquareWarning className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
           <DialogDescription>

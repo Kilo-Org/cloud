@@ -2,7 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { cloud_agent_feedback } from '@kilocode/db/schema';
-import { inArray } from 'drizzle-orm';
+import { inArray, eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 
 let regularUser: User;
@@ -136,5 +136,31 @@ describe('cloudAgentNextFeedback.list', () => {
     const caller = await createCallerForUser(regularUser.id);
 
     await expect(caller.cloudAgentNextFeedback.list()).resolves.toEqual([]);
+  });
+
+  it('excludes orphaned rows whose owning user was deleted', async () => {
+    const [orphan] = await db
+      .insert(cloud_agent_feedback)
+      .values({
+        kilo_user_id: null,
+        feedback_text: 'orphaned owner',
+        created_at: '2026-02-01 00:00:00.000+00',
+      })
+      .returning({ id: cloud_agent_feedback.id });
+
+    try {
+      await db.insert(cloud_agent_feedback).values({
+        kilo_user_id: regularUser.id,
+        feedback_text: 'kept',
+        created_at: '2026-01-01 00:00:00.000+00',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cloudAgentNextFeedback.list();
+
+      expect(result.map(row => row.feedback_text)).toEqual(['kept']);
+    } finally {
+      await db.delete(cloud_agent_feedback).where(eq(cloud_agent_feedback.id, orphan.id));
+    }
   });
 });

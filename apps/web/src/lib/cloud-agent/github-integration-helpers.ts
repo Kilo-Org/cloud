@@ -19,6 +19,7 @@ import {
 } from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 
@@ -190,7 +191,16 @@ export async function fetchGitHubRepositoriesForOrganization(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitHub on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
         integration.github_app_type || 'standard',
@@ -205,7 +215,7 @@ export async function fetchGitHubRepositoriesForOrganization(
     }
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? []),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {
@@ -241,7 +251,13 @@ async function fetchRepositoriesForIntegrations(
       integrations.map(async integration => {
         if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
         const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-        if (forceRefresh || !cachedRepositories?.length) {
+        if (
+          shouldSyncProviderRepositories({
+            forceRefresh,
+            cachedRepositories,
+            repositoriesSyncedAt: integration.repositories_synced_at,
+          })
+        ) {
           const repositories = await fetchGitHubRepositories(
             integration.platform_installation_id,
             integration.github_app_type || 'standard',
@@ -255,7 +271,7 @@ async function fetchRepositoriesForIntegrations(
           };
         }
         return {
-          repositories: mapRepositories(cachedRepositories, integration),
+          repositories: mapRepositories(cachedRepositories ?? [], integration),
           syncedAt: integration.repositories_synced_at,
         };
       })
@@ -316,8 +332,16 @@ export async function fetchGitHubRepositoriesForUser(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitHub and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitHub on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const appType = integration.github_app_type || 'standard';
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
@@ -335,7 +359,7 @@ export async function fetchGitHubRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories, integration),
+      repositories: mapRepositories(cachedRepositories ?? [], integration),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {

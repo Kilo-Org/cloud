@@ -103,21 +103,12 @@ vi.mock('@shopify/flash-list', async () => {
 });
 
 vi.mock('react-native', () => ({
-<<<<<<< HEAD
-  // The search field aligns its own content through `withRtlInputAlignment`,
-  // which reads the interface direction; the mock needs the export to exist.
+  // `withRtlInputAlignment` reads I18nManager on every render.
   I18nManager: { isRTL: false },
   FlatList: flatListMock,
-||||||| 2f0d76d5d8
-  FlatList: flatListMock,
-=======
->>>>>>> origin/main
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
-  // `@/components/ui/input` reads `I18nManager.isRTL` through
-  // `withRtlInputAlignment` on every render.
-  I18nManager: { isRTL: false },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack, push: vi.fn() }),
@@ -397,14 +388,22 @@ describe('ModelPickerContent deferred search', () => {
     // same way.
     const clearActions = findByType(renderer.root, 'Button');
     expect(clearActions).toHaveLength(1);
-    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-    expect(clearActions[0]?.props.children?.props.children).toBe('Clear search');
-    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    const clearAction = clearActions[0];
+    if (!clearAction) {
+      throw new Error('clear search action not found');
+    }
+    const buttonProps = clearAction.props as unknown as {
+      children?: { props?: { children?: ReactNode } };
+      onPress?: unknown;
+    };
+    expect(buttonProps.children?.props?.children).toBe('Clear search');
+    const onPress = buttonProps.onPress;
+    if (typeof onPress !== 'function') {
+      throw new Error('clear search action is not pressable');
+    }
 
     await act(async () => {
-      /* eslint-disable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-      clearActions[0]?.props.onPress();
-      /* eslint-enable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access */
+      (onPress as () => void)();
       await Promise.resolve();
     });
 

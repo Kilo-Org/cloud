@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the model and repository picker direction cases share a mount harness. */
 import {
   act,
   createElement,

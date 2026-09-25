@@ -211,9 +211,10 @@ describe('restorePersistedGlanceable', () => {
     const restore = restorePersistedGlanceable();
 
     let resumed = false;
-    const waiting = whenGlanceableRestoresSettle().then(() => {
+    const waiting = (async () => {
+      await whenGlanceableRestoresSettle();
       resumed = true;
-    });
+    })();
     await Promise.resolve();
     expect(resumed).toBe(false);
 
@@ -233,9 +234,10 @@ describe('restorePersistedGlanceable', () => {
     const restore = restorePersistedGlanceable();
 
     let resumed = false;
-    const waiting = whenGlanceableRestoresSettle().then(() => {
+    const waiting = (async () => {
+      await whenGlanceableRestoresSettle();
       resumed = true;
-    });
+    })();
 
     gate.resolve();
     await restore;

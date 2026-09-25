@@ -147,6 +147,7 @@ function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscrip
     parsed = JSON.parse(requestBodyText);
   } catch (error) {
     captureException(error, {
+      extra: { requestBodyText },
       tags: { source: 'transcription-proxy' },
     });
     return null;
@@ -155,6 +156,7 @@ function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscrip
   const result = TranscriptionRequestSchema.safeParse(parsed);
   if (!result.success) {
     captureException(result.error, {
+      extra: { requestBodyText },
       tags: { source: 'transcription-proxy' },
     });
     return null;

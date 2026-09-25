@@ -11599,6 +11599,16 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForWrapperReady(fixture);
       await runInDurableObject(session, instance => instance.alarm());
       await waitForAccepted(session, 'msg_model_less');
+      // The queue drains one message per alarm pass, so the second admission is
+      // dispatched by a later pass and can still be queued here. Drive passes
+      // until it is accepted rather than racing the dispatch that promotes it.
+      await waitFor(async () => {
+        await runInDurableObject(session, instance => instance.alarm());
+        await expect(session.getMessageResult('msg_selected')).resolves.toMatchObject({
+          type: 'found',
+          result: { status: 'running' },
+        });
+      });
       const delivered = await admissionState(session);
       expect(delivered.messages[0]).toMatchObject({
         messageId: 'msg_invalid_model',

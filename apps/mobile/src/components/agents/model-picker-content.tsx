@@ -24,7 +24,6 @@ import {
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
-import { withRtlInputAlignment } from '@/lib/rtl-text';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -227,7 +226,6 @@ export function ModelPickerContent() {
               autoCorrect={false}
               returnKeyType="search"
               className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
-              style={withRtlInputAlignment(undefined)}
               onChangeText={setSearch}
             />
             {/* In-field clear, on every platform: `clearButtonMode` is iOS

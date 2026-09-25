@@ -1774,7 +1774,9 @@ describe('iosSink stray sweep', () => {
     // in-memory snapshot stays null.
     _setSecureStoreForTests({
       setItemAsync: secureStoreMock.setItemAsync,
-      getItemAsync: () => Promise.reject(new Error('keychain locked')),
+      getItemAsync: async () => {
+        throw new Error('keychain locked');
+      },
     });
     await restorePersistedGlanceable();
 

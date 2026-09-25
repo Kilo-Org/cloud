@@ -12,9 +12,6 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: jest.fn(),
-}));
 jest.mock('@/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
@@ -36,9 +33,6 @@ jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
 const { getUserFromAuth } = jest.requireMock('@/lib/user/server');
 const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
 const { getDirectByokModelsForUser } = jest.requireMock('@/lib/ai-gateway/providers/direct-byok');
-const { listAvailableExperimentModels } = jest.requireMock(
-  '@/lib/ai-gateway/experiments/list-available-experiment-models'
-);
 const { addUserByokAvailability, getUserByokProviderIds } =
   jest.requireMock('@/lib/ai-gateway/byok');
 const { tagOpenAiChatGptByokModels } = jest.requireMock('@/lib/ai-gateway/openai-chatgpt/routing');
@@ -51,7 +45,6 @@ const { getAutoFreeCandidates } = jest.requireMock('@/lib/ai-gateway/auto-model/
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
-const mockedListAvailableExperimentModels = jest.mocked(listAvailableExperimentModels);
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels);
@@ -90,7 +83,6 @@ describe('GET /api/openrouter/models', () => {
     } as never);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [makeModel('public/model')] });
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
-    mockedListAvailableExperimentModels.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
     mockedTagOpenAiChatGptByokModels.mockImplementation(
       (_userId: string, models: OpenRouterModel[]) => models
@@ -118,14 +110,12 @@ describe('GET /api/openrouter/models', () => {
   test('returns BYOK availability for regular and direct authenticated models', async () => {
     const publicModel = makeModel('public/model');
     const directModel = { ...makeModel('direct/model'), hasUserByokAvailable: true };
-    const experimentModel = makeModel('experiment/model');
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-id' },
       organizationId: null,
       authFailedResponse: null,
     } as never);
     mockedGetDirectByokModelsForUser.mockResolvedValue([directModel] as never);
-    mockedListAvailableExperimentModels.mockResolvedValue([experimentModel]);
     mockedGetUserByokProviderIds.mockResolvedValue(['anthropic']);
     mockedAddUserByokAvailability.mockResolvedValue([
       { ...publicModel, hasUserByokAvailable: true },
@@ -135,7 +125,7 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: [{ ...publicModel, hasUserByokAvailable: true }, directModel, experimentModel],
+      data: [{ ...publicModel, hasUserByokAvailable: true }, directModel],
     });
   });
 

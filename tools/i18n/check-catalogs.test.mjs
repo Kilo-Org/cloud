@@ -181,6 +181,19 @@ test('rejects an empty translated value', context => {
   assert.match(result.stderr, /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('rejects a translated $TOKEN expansion token', context => {
+  const result = runChecker(context, {
+    english: { agents: { template: 'Explain $ARGUMENTS' } },
+    translated: { agents: { template: 'Explique $ARGUMENTOS' } },
+    source: "t('agents.template');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.template" \$TOKEN expansion tokens differ from English \(\$ARGUMENTS\)/
+  );
+});
+
 test('rejects changed placeholders in an English plural sibling', context => {
   const result = runChecker(context, {
     translated: { agents: { ...TRANSLATED.agents, liveCount_one: '{{total}} localized session' } },

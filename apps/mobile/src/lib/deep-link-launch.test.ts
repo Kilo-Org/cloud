@@ -36,6 +36,7 @@ import {
   captureLaunchDeepLink,
   clearAccountBoundPendingDeepLink,
   clearPendingDeepLink,
+  consumePendingDeepLink,
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
   restorePersistedPendingDeepLink,
@@ -330,6 +331,78 @@ describe('deep-link-launch', () => {
       const second = getPendingDeepLink();
       expect(first).toBe('/(app)/(tabs)/(3_profile)');
       expect(second).toBeNull();
+    });
+  });
+
+  describe('consumePendingDeepLink', () => {
+    it('returns the organization a notification-sourced destination carried', () => {
+      setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification', { organizationId: 'org-2' });
+
+      expect(consumePendingDeepLink()).toEqual({
+        href: '/(app)/agent-chat/ses_1',
+        organizationId: 'org-2',
+      });
+      // Get-and-clear: a second consume finds nothing.
+      expect(consumePendingDeepLink()).toBeNull();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('returns null for a destination that carries no organization', () => {
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+
+      expect(consumePendingDeepLink()).toEqual({
+        href: '/(app)/(tabs)/(3_profile)',
+        organizationId: null,
+      });
+    });
+
+    it('drops the organization when a later capture without one wins the slot', () => {
+      setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification', { organizationId: 'org-2' });
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'universal-link');
+
+      expect(consumePendingDeepLink()).toEqual({
+        href: '/(app)/(tabs)/(3_profile)',
+        organizationId: null,
+      });
+    });
+
+    it('round-trips the organization through the persisted record', async () => {
+      setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification', { organizationId: 'org-7' });
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+        organizationId: string | null;
+      };
+      expect(record.organizationId).toBe('org-7');
+
+      _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+      expect(consumePendingDeepLink()).toEqual({
+        href: '/(app)/agent-chat/ses_1',
+        organizationId: 'org-7',
+      });
+    });
+
+    it('restores a record written before the organization rode with the slot as none', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/agent-chat/ses_1',
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+
+      expect(consumePendingDeepLink()).toEqual({
+        href: '/(app)/agent-chat/ses_1',
+        organizationId: null,
+      });
     });
   });
 

@@ -102,6 +102,9 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
+  // The header reads the window to decide whether its actions share the title
+  // row; this phone is wide enough for them to.
+  useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
@@ -214,6 +217,7 @@ vi.mock('@/lib/hooks/use-session-mutations', () => ({
 vi.mock('@/components/agents/session-detail-content', async () => {
   const { mergeSessionTranscript } = await import('@/components/agents/session-transcript');
   const { MessageBubble } = await import('@/components/agents/message-bubble');
+  const { displaySessionTitle } = await import('@/components/agents/session-detail-rename-state');
   return {
     SessionDetailContent: function SessionDetailContent(
       props: Readonly<{ sessionId: KiloSessionId; cachedTitle?: string }>
@@ -233,7 +237,7 @@ vi.mock('@/components/agents/session-detail-content', async () => {
       const rename = useSessionDetailRename({
         sessionId,
         isLoaded: isSessionLoaded,
-        serverTitle: isSessionLoaded ? (fetchedData.title ?? undefined) : undefined,
+        serverTitle: isSessionLoaded ? displaySessionTitle(fetchedData.title) : undefined,
         fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
       });
       if (realTranscriptProbe.active) {

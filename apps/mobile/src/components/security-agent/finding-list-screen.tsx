@@ -7,10 +7,11 @@ import {
   type SecurityFindingRouteParams,
   toSecurityFindingQuery,
 } from '@kilocode/app-shared/security-agent';
+import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
-import { useMemo, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +32,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { getSecurityAgentPath } from '@/lib/security-agent';
+import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,23 @@ function FindingsListFooter({
   return null;
 }
 
+// FlashList takes `contentContainerStyle` (no className), so the FlatList's
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
+// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
+// `gap` references), so the 12px inter-row gap rides on the measured item
+// separator instead of `contentContainerStyle.gap`. The old container `gap` also
+// sat between the header and the first row and between the last row and the
+// footer; FlashList's separator only spans items, so those two boundaries carry
+// the same 12px as a pad on the header (`pb-3`) and on the footer (`pt-3`).
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  flexGrow: 1,
+  paddingHorizontal: 24,
+  paddingTop: 16,
+} satisfies ViewStyle;
+
+const FindingRowSeparator = () => <View className="h-3" />;
+
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -88,8 +106,31 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     capacity.concurrencyLimit !== undefined &&
     capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
-  const items = findings.data?.pages.flatMap(page => page.findings) ?? [];
+  // Memoized so a pull-to-refresh (`refreshing`) or a filter change does not
+  // hand the list a new `data` identity while `pages` is unchanged.
+  const items = useMemo(
+    () => findings.data?.pages.flatMap(page => page.findings) ?? [],
+    [findings.data?.pages]
+  );
   const hasListContent = items.length > 0 || findings.isFetchNextPageError;
+  // Hoisted so the list keeps one renderer identity across unrelated screen
+  // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
+  // `renderItem` and `extraData` by identity before re-rendering a row.
+  const renderItem = useCallback(
+    ({ item }: { item: SecurityFinding }) => (
+      <FindingRow
+        finding={item}
+        scope={scope}
+        slaEnabled={slaEnabled}
+        hasAnalysisCapacity={hasAnalysisCapacity}
+      />
+    ),
+    [scope, slaEnabled, hasAnalysisCapacity]
+  );
+  const rowExtraData = useMemo(
+    () => ({ scope, slaEnabled, hasAnalysisCapacity }),
+    [scope, slaEnabled, hasAnalysisCapacity]
+  );
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken repository list.
@@ -191,19 +232,22 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       )}
 
       {!findings.isLoading && hasListContent && (
-        <FlatList
+        <FlashList<SecurityFinding>
+          style={listStyle}
           data={items}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <FindingRow
-              finding={item}
-              scope={scope}
-              slaEnabled={slaEnabled}
-              hasAnalysisCapacity={hasAnalysisCapacity}
-            />
-          )}
-          contentContainerClassName="grow gap-3 px-6 pt-4"
-          ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
+          renderItem={renderItem}
+          getItemType={() => 'finding'}
+          ItemSeparatorComponent={FindingRowSeparator}
+          extraData={rowExtraData}
+          contentContainerStyle={listContentContainerStyle}
+          ListHeaderComponent={
+            // The former container gap also separated the header from the first
+            // row, which the item separator does not cover.
+            <View className="pb-3">
+              <RefreshProgress refreshControl={refreshControl} />
+            </View>
+          }
           refreshControl={refreshControl}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {
@@ -212,14 +256,16 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            <>
+            // The former container gap also separated the last row from the
+            // footer (skeleton / error / bottom spacer).
+            <View className="pt-3">
               <FindingsListFooter
                 loading={findings.isFetchingNextPage}
                 error={findings.isFetchNextPageError}
                 onRetry={() => void findings.fetchNextPage()}
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
-            </>
+            </View>
           }
         />
       )}

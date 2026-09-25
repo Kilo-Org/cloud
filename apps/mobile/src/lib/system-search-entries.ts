@@ -27,7 +27,7 @@ import {
 } from '@/lib/pr-review/provider-pr-ref';
 import { providerRefFromRecentPr, type RecentPrRef } from '@/lib/pr-review/recent-prs';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { isPlaceholderSessionTitle } from '@/lib/session-display-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 import {
   APP_SCHEME,
@@ -150,12 +150,13 @@ export type SystemSearchActiveSessionRow = {
 };
 
 /**
- * The stored-history document for one session, or null when its title is a
- * placeholder (blank, or the backend's `New session - <ISO timestamp>`).
+ * The stored-history document for one session, or null when it has no title.
  *
- * The app paints `agents.sessionRow.untitled` for a title-less session, so
- * indexing it would add one identical translated label per untitled row, and
- * the creation placeholder is a machine string the user never typed.
+ * A session still carrying the backend's `New session - ${ISO}` placeholder
+ * counts as title-less too (see `sessionDisplayTitle`). The app paints
+ * `agents.sessionRow.untitled` for a title-less session, so indexing it would
+ * add one identical label per untitled row — and, without the placeholder
+ * check, one identical machine string per fresh session.
  */
 export function storedSessionSearchDocument(
   row: SystemSearchStoredSessionRow
@@ -168,7 +169,7 @@ export function storedSessionSearchDocument(
   });
 }
 
-/** The live-session document for one session, or null when its title is a placeholder. */
+/** The live-session document for one session, or null when it has no title. */
 export function activeSessionSearchDocument(
   row: SystemSearchActiveSessionRow
 ): SystemSearchDocument | null {
@@ -195,14 +196,14 @@ function sessionSearchDocument(input: {
   organizationId?: string | null;
   gitBranch?: string | null;
 }): SystemSearchDocument | null {
-  // A title-less session indexes nothing (one identical label per row is not a
-  // search result), and the backend's creation placeholder
-  // (`New session - <ISO timestamp>`) is machine copy: a system-search result
-  // must never carry either.
-  if (isPlaceholderSessionTitle(input.title)) {
+  // A backend default title (`New session - <ISO>`) is machine output, so the
+  // entry is treated like a title-less row and stays out of the index. The
+  // helper trims a padded title, so it indexes and fingerprints identically to
+  // the unpadded value.
+  const title = sessionDisplayTitle(input.title);
+  if (title === undefined) {
     return null;
   }
-  const title = (input.title ?? '').trim();
   return buildDocument({
     // The route builder carries the organization context, so an org-scoped
     // session keeps its `organizationId` in the id.

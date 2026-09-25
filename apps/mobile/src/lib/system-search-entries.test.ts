@@ -73,25 +73,45 @@ describe('session documents', () => {
     expect(storedSessionSearchDocument({ session_id: 'c', title: null })).toBeNull();
   });
 
-  it('skips a session whose title is the backend creation placeholder', () => {
-    // The placeholder is machine copy the user never typed, so a system-search
-    // result must not carry it — exactly like a title-less row.
+  it('indexes a title with surrounding whitespace trimmed', () => {
+    // The indexed title and its fingerprint must stay byte-identical to the
+    // pre-fallback behaviour: a padded title is normalized, not stored raw.
+    const document = sessionDocument('sess-trim', '  Fix login  ');
+    expect(document.title).toBe('Fix login');
+    expect(document.fingerprint).toContain('"title":"Fix login"');
+  });
+
+  it('skips the backend default title instead of indexing a raw timestamp', () => {
+    // Explorer session-question: `New session - <ISO>` is machine output, so a
+    // Spotlight result must not carry it as the session's name.
     expect(
       storedSessionSearchDocument({
-        session_id: 'x',
-        title: 'New session - 2026-09-22T04:17:22.503Z',
-      })
-    ).toBeNull();
-    expect(
-      storedSessionSearchDocument({
-        session_id: 'y',
-        title: 'Child session - 2026-09-22T04:17:22.503Z',
+        session_id: 'd',
+        title: 'New session - 2026-09-20T08:10:35.172Z',
       })
     ).toBeNull();
     expect(
       activeSessionSearchDocument({
         id: 'live-5',
-        title: 'New session - 2026-09-22T04:17:22.503Z',
+        title: 'Child session - 2026-09-20T08:10:35.172Z',
+        organizationId: null,
+      })
+    ).toBeNull();
+  });
+
+  it('skips a session that still carries the backend placeholder', () => {
+    // Indexing the placeholder would put one identical machine string per
+    // fresh session into the system search.
+    expect(
+      storedSessionSearchDocument({
+        session_id: 'd',
+        title: 'New session - 2026-09-22T01:09:45.623Z',
+      })
+    ).toBeNull();
+    expect(
+      activeSessionSearchDocument({
+        id: 'live-5',
+        title: 'New session - 2026-09-22T01:09:45.623Z',
         organizationId: null,
       })
     ).toBeNull();

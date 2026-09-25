@@ -1,10 +1,15 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type {
+  GitHubRepositoryAuthorizationFailureReason,
+  GitHubRepositoryAuthorizationResult,
+} from '@kilocode/worker-utils/github-authorization';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControl } from './persistence/SandboxControl.js';
 import type { SandboxSession } from './sandbox-session/SandboxSession.js';
+import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at
 // build time, so it cannot make the e2e sink reachable or ship e2e code.
@@ -136,7 +141,9 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export type AgentSandboxProvider = 'cloudflare' | 'vercel';
+export const agentSandboxProviderSchema = z.enum(['cloudflare', 'vercel', 'cloudflare-containers']);
+
+export type AgentSandboxProvider = z.infer<typeof agentSandboxProviderSchema>;
 
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}` | `workspace_${string}`;
@@ -190,13 +197,7 @@ type GetTokenForRepoResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'repository_not_installed'
-        | 'integration_mismatch'
-        | 'invalid_org_id';
+      reason: GitHubRepositoryAuthorizationFailureReason;
     };
 
 export type ManagedGitHubFallbackReason =
@@ -214,6 +215,7 @@ export type GitAuthorConfig = {
 };
 
 type ManagedGitHubAuthParams = {
+  accessPurpose?: 'workflow' | 'agent';
   githubRepo: string;
   userId: string;
   orgId?: string;
@@ -235,13 +237,7 @@ type GetCloudAgentAuthForRepoResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'repository_not_installed'
-        | 'integration_mismatch'
-        | 'invalid_org_id';
+      reason: GitHubRepositoryAuthorizationFailureReason;
     };
 
 type IssueGitHubSessionCapabilityResult =
@@ -258,14 +254,7 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'repository_not_installed'
-        | 'integration_mismatch'
-        | 'invalid_org_id'
-        | 'capability_configuration_error';
+      reason: GitHubRepositoryAuthorizationFailureReason | 'capability_configuration_error';
     };
 
 type RedeemGitHubSessionCapabilityResult =
@@ -440,6 +429,9 @@ type RedeemKiloSessionCapabilityResult =
     };
 
 export type GitTokenService = {
+  authorizeCloudAgentGitHubRepo?(
+    params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
+  ): Promise<GitHubRepositoryAuthorizationResult>;
   getTokenForRepo(params: {
     githubRepo: string;
     userId: string;
@@ -543,6 +535,8 @@ export type Env = {
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
+  /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
+  SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -635,6 +629,8 @@ export type Env = {
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
   /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
   VERCEL_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
+  CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

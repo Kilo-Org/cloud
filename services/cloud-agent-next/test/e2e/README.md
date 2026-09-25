@@ -16,7 +16,7 @@ cloud-agent-next refactor.
    For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
    The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
    `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
-   `interrupt-then-continue`, `question-idle-resume`, and the four `sandboxFaults`
+   `interrupt-then-continue`, `question-idle-resume`, and the five `sandboxFaults`
    scenarios) additionally
    require `WORKTREE_CREATION_ENABLED_IDS`; use the seeded enrolled user
    (`E2E_USER_EMAIL`) rather than a fresh per-run user.
@@ -146,6 +146,7 @@ tsx services/cloud-agent-next/test/e2e/run.ts hot echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts external-kill echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts kill-mid-flight hang
 tsx services/cloud-agent-next/test/e2e/run.ts wrapper-freeze-settled-reap _
+tsx services/cloud-agent-next/test/e2e/run.ts control-socket-recycle-boot _
 tsx services/cloud-agent-next/test/e2e/run.ts question-idle-resume _
 
 # Queue semantics — the hold is a bounded `slow:60:1000:16` turn (no parked
@@ -184,7 +185,8 @@ Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
 `worktree-multi-chat`, `long-conversation`, `leave-and-return`, `large-stream`,
 `concurrent-chats`, `question-idle-resume`) and the `sandboxFaults` scenarios
 (`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
-`wrapper-freeze-inflight-reap`) are included in `smoke.ts`'s `DEFAULT_MATRIX`:
+`wrapper-freeze-inflight-reap`, `control-socket-recycle-boot`) are included in
+`smoke.ts`'s `DEFAULT_MATRIX`:
 the worktree flows need an enrolled driver user, and the fault flows stop or
 freeze a real container, so they run last. They stay name-runnable
 (`run.ts <name> _`) for focused runs; `smoke-deployed` runs the shared
@@ -231,6 +233,7 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
 | `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
 | `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
+| `E2E_FAKE_SCOPE` | unset. `[A-Za-z0-9_-]{1,64}` attribution token prepended to every prompt as `__e2e_scope__:<token>`. `fetchFakeRequests` then reads `GET /test/requests?scope=<token>` instead of the global total, so a parallel shard asserts only on its own completions. The fake strips the marker before parsing the directive or echoing, so it never reaches scenario-visible content. A malformed value fails the run. |
 | `E2E_INTERNAL_API_SECRET` | unset. Required in the launcher shell for the local HTTP e2e profile (`cloud-agent-next-http`): the render command writes it into the generated `.wrangler/.dev.vars` as the Worker's `INTERNAL_API_SECRET`. The shared rules (`requireE2eInternalSecret`) reject the development default, values shorter than 16 characters, and whitespace; the renderer additionally rejects values outside `[A-Za-z0-9._~-]`, because only it writes a dotenv line. Must differ from production's `INTERNAL_API_SECRET`. The local-HTTP driver resolves it like the deployed driver — the exported value or the auth file's `e2eInternalApiSecret` — so both ends must agree. |
 | `DATABASE_URL` | Optional direct database URL override for this harness |
 | `POSTGRES_URL` | Repo database fallback loaded from root `.env.local` / `.env` |
@@ -270,10 +273,10 @@ deploy reference.
 
 Two Workers, in deploy order:
 
-1. `fake-llm-e2e-test` — Worker + `FakeLlmState` Durable Object running the
+1. `fake-llm` — Worker + `FakeLlmState` Durable Object running the
    shared `fake-llm-core.ts`; deploy first with
    `test/e2e/deploy/deploy-fake-llm.sh deploy`.
-2. `cloud-agent-next-e2e-test` — private render of this package's Worker;
+2. `cloud-agent-e2e-test` — private render of this package's Worker;
    deploy second with
    `E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
    Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
@@ -350,12 +353,13 @@ Capabilities a scenario declares but a profile does not provide make it
 `unsupported`: the run reports `ok: false, unsupported: true` with the missing
 capability names, and it never runs with the assertion dropped. `auth-reject`
 requires `deployedHttpAuthBoundary`, so it is `unsupported` under the local
-profile; the four `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
-`wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`) are `unsupported`
+profile; the five `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
+`wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`,
+`control-socket-recycle-boot`) are `unsupported`
 deployed, and `kill-mid-flight` also needs the local-only `gates` marker.
 Only `cold-hot` and `unknown-model` declare no capability. Every other scenario
 that runs under both declares `sessionSandbox`, which both profiles provide;
-`auth-reject` and the four `sandboxFaults` scenarios are the exceptions named
+`auth-reject` and the five `sandboxFaults` scenarios are the exceptions named
 above. Container identity stays a capability-gated assertion.
 
 Scenario matrix:
@@ -391,9 +395,12 @@ uses it.
 
 Honest limits, recorded deliberately:
 
-- `fetchFakeRequests` is a global counter on a shared fake, so the lazy-create
-  evidence holds only while no other run is dispatching. In `worktree-multi-chat`
-  a bounded increase in that same counter is the paced-readiness gate; it is
+- `fetchFakeRequests` reads the global counter on a shared fake when no
+  `E2E_FAKE_SCOPE` is set, so a single focused run's lazy-create evidence holds
+  only while no other run is dispatching. The parallel runner sets a per-shard
+  scope, which attributes only that shard's labeled requests; a request the shard
+  dials without its prompt marker is unattributed. In `worktree-multi-chat`
+  a bounded increase in that counter is the paced-readiness gate; it is
   **not** an authoritative paced-request signal. It is attributed to the paced
   request only under the assumption that no auxiliary/title request is in flight
   in that window, and the fake's aggregate `/test/requests` surface cannot
@@ -447,10 +454,10 @@ never reads `.dev.vars`, root env files, or Postgres. It is a separate runner,
 not a profile switch in `smoke.ts`: the local matrix inserts a Postgres user,
 loads `.dev.vars`, and stops Docker sandboxes.
 
-Each scenario owns its own cleanup. The runner tracks session ids through
-`onSessionCreated` and, after each scenario, repeats `interruptSession` and
-`deleteSession` as a tolerant backstop; a backstop failure is logged, never
-thrown, so one stuck session cannot hide the remaining scenarios.
+Under the deployed profile the shared gate owns session teardown: the scenario
+runs with a config whose `onSessionCreated` records every id a create reports,
+and the gate releases them after the run (interrupt then delete, newest first,
+delete bounded at 45 s). The runner adds no backstop of its own.
 
 The summary reports passed / failed / unsupported as distinct categories.
 Exit policy: `1` if any scenario failed, else `2` if any unsupported result is
@@ -460,13 +467,66 @@ derived per run from `isScenarioSupported(definition, env)`, so a declared
 capability gap is a reported skip, not a failure. The unsupported lines name the
 missing capabilities. Local expected-unsupported is exactly `auth-reject`.
 
-The `e2e-deployed` GitHub workflow (`.github/workflows/e2e-deployed.yml`) is a
-`workflow_dispatch`-only runner around this script. It maps the `worker_url`,
-`fake_llm_url` and `backend_url` inputs to `WORKER_URL`, `FAKE_LLM_URL` and
-`E2E_BACKEND_URL`, passes `E2E_USER_TOKEN` and `FAKE_LLM_ADMIN_TOKEN` only as
-environment variables, tees the log, uploads it, and writes the counts plus the
-unsupported scenarios and missing capabilities to the job summary even when the
-runner fails.
+`e2e:deployed` is the serial reference runner; use `run.ts <name> _` for a
+focused single scenario. It is not what CI runs: the `cloud-agent-e2e-tests` GitHub
+workflow (`.github/workflows/cloud-agent-e2e-tests.yml`) is `workflow_dispatch`-only and
+runs the parallel runner described in the next section as one job.
+
+### Parallel deployed runner
+
+```bash
+pnpm --filter cloud-agent-next run e2e:parallel
+E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
+E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
+```
+
+`smoke-parallel.ts` is the single deployed runner CI uses. It runs every entry in
+`SHARED_SCENARIOS`, one scenario per child process under one concurrency pool.
+`E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario at
+once) and overrides the pool size; when it is unset the pool defaults to `4`.
+Each child gets a unique `E2E_FAKE_SCOPE`, so its completions are counted
+separately on the shared fake and its `fetchFakeRequests`
+"unchanged"/"increased" assertions stay meaningful while other shards dispatch.
+
+Capability-gated scenarios are filtered out up front and are never spawned. The
+end-of-run output is a machine-readable contract:
+
+```
+unsupported: <name>
+Summary: <pass> passed, <fail> failed, <unsupported> unsupported
+Wall time: <seconds>s
+```
+
+The registry-key count **before** capability filtering must equal
+`pass + fail + unsupported`; the runner asserts this and exits `2`
+otherwise. Because unsupported scenarios are filtered before spawn, a non-zero
+child exit is a failure: exit `1` if any scenario failed, else `0`. A child that
+exceeds its watchdog deadline (its scenario budget plus ten minutes) is killed
+and reported as a failure. When `GITHUB_STEP_SUMMARY` is set the runner appends
+its `Summary:` line to that file.
+
+The `cloud-agent-e2e-tests` GitHub workflow runs this as ONE job — no `plan`,
+matrix, or `aggregate` jobs — with `E2E_PARALLEL=4`, and uploads `e2e.log`. Job
+failure is the runner's exit code. The workflow keeps its workflow-level
+`concurrency` only.
+
+Under the deployed profile the shared gate owns session teardown, so scenarios
+that never deleted their own sessions now release them too: `interruptSession`
+(15 s bound) then `deleteSession` (45 s bound), newest first. The 45 s delete
+bound is a CLIENT budget, not proof the container was destroyed — a returned
+teardown can leave the allocation `stopping`. Capability gaps are reported as
+`unsupported`, not failures: the deployed profile marks a Docker-only flow
+(`sandboxFaults`, `gates`) `unsupported` and does not spawn it.
+
+Cold boots contend on container provisioning, so `all` maximises the chance of a
+container cold-start timeout showing up as a false failure; the default trades
+wall time for stability. The pool size is an experiment to recalibrate after an
+operator run, not a proven live-allocation bound: a finished scenario can retain
+its allocation until the idle stop, so peak live allocations can exceed the
+active-child count. The scoped counter attributes a completion only when its
+prompt carries that shard's marker; a request the harness dials without the
+scenario's prompt (for example a buggy lazy create) is not attributed and stays a
+documented limit.
 
 Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
 Worker names keep the stack addressable separately from production; they do
@@ -490,29 +550,36 @@ Docker-only flow (`sandboxFaults`/`gates`) `unsupported` rather than skipping it
 assertions. Long `gate`/`hang` directives remain outside the supported deployed
 profile (short streams only).
 
-The deployed profile does **not** send `x-skip-balance-check`: the enrolled user
-must have positive balance, and a 403 at `start` means fund the user.
+The deployed profile sends `x-skip-balance-check`, so the enrolled user needs no
+funding: the deterministic fake LLM performs no billable inference, and the e2e
+render disables container billing. Balance admission is not part of the deployed
+e2e contract.
 
 Honest caveat: `cold-hot` proves the warm dispatch path, not physical
 container identity. The absence of hot-turn preparation events is not proof that
 the same container served the turns; identity stays a local-only assertion.
 
-The four `sandboxFaults` scenarios' deployed statements are inference, not
-proof: the deployed matrix was not run for this change. The workflow's
-`timeout-minutes: 300` is an operational ceiling, not a certified or
+The five `sandboxFaults` scenarios' deployed statements are inference, not
+proof: the deployed matrix was not run for this change. The single workflow job's
+`timeout-minutes: 180` is an operational ceiling, not a certified or
 registry-derived bound; the scenarios mix per-turn and overall budgets, so no
-whole-matrix total is derivable. Their `sessionSandbox` capability over HTTP reports the
+whole-run total is derivable. Their `sessionSandbox` capability over HTTP reports the
 persisted control-plane allocation reference, so "the same container" is
 allocation-reference stability, not a live runtime observation, and the HTTP
 surface cannot enumerate containers.
 
-Cleanup and retained artifacts: cleanup against the e2e Worker runs first —
-`interruptSession` and `deleteSession`, each attempted independently and bounded
-by an abort timeout. The public `deleteSession` does not delete live
-`cli_sessions_v2` rows, so one retained row per started session survives for the
-enrolled user. The user-runnable web `cliSessionsV2.delete` flow (which targets
-the PRODUCTION Worker) is the later cleanup for those rows, not a fallback for
-failed e2e cleanup.
+Cleanup and retained artifacts: under the deployed profile the shared gate owns
+session teardown, so scenarios that never deleted their own sessions now release
+them too. Cleanup against the e2e Worker runs first — `interruptSession` (15 s
+bound) then `deleteSession` (45 s bound, newest first), each attempted
+independently and bounded by an abort timeout. The 45 s delete bound is a CLIENT
+budget, not proof the container was destroyed: a returned teardown can still
+leave the allocation `stopping`, and the abort does not roll back a committed
+retirement. The public `deleteSession` does not delete live `cli_sessions_v2`
+rows, so one retained row per started session survives for the enrolled user. The
+user-runnable web `cliSessionsV2.delete` flow (which targets the PRODUCTION
+Worker) is the later cleanup for those rows, not a fallback for failed e2e
+cleanup.
 
 Troubleshooting:
 
@@ -522,11 +589,9 @@ Troubleshooting:
   mode-600 JSON file with a `token` field; the failure names both.
 - **`WORKER_URL`/`FAKE_LLM_URL`/`E2E_BACKEND_URL` must be `https://`** — the
   deployed profile refuses plain HTTP.
-- **403 at `start`** — fund the enrolled user; the deployed profile does not
-  bypass balance admission.
 - **Container cold-start timeout** — `cold-hot` defaults to 240s per
   turn; a first real container boot can exceed two minutes.
-- **Fake Worker `/health`** — `curl https://fake-llm-e2e-test.<sub>.workers.dev/health`
+- **Fake Worker `/health`** — `curl https://fake-llm.engineering-e11.workers.dev/health`
   confirms the container Worker is up.
 
 ## Gateway contract
@@ -591,6 +656,9 @@ the insecure development default `local-fake-llm-admin`:
   so scenarios can detect leaked fake-server waiters after a terminal turn.
 - `GET /test/requests` — returns chat completion request counts so model
   preflight scenarios can prove that rejected models did not reach dispatch.
+  `?scope=<token>` returns that scope's count instead of the global total (400
+  for a malformed token); the token is the `__e2e_scope__:<token>` marker a
+  prompt carried.
 
 These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 `fetchFakeWaiters()`, and `fetchFakeRequests()` in `client.ts`, which attach the
@@ -623,8 +691,9 @@ reusable catalog of planned and existing scenarios, see
 | `question-idle-resume` | Leaves a real `question:<tag>:<text>` unanswered; requires `toolResults.question=0`, the allocation to disappear inside the 15-minute idle window, the parked message to be terminal before the continuation, and a follow-up completing on a distinct non-null allocation (~30-minute budget). |
 | `external-kill` | After a completed turn, kills the identity-matched owned container via `sandboxFaults`; requires the same session to complete a follow-up on a distinct allocation reference. |
 | `kill-mid-flight` | Kills the identity-matched owned container while a parked `gate:<tag>` turn runs; requires a durable failure and a follow-up on a distinct allocation. Needs `gates` + `sandboxFaults`. |
-| `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `recovery_settled_reap` `physical_committed running→stopping` cause and stopCause, a terminal `provider_stop`, the heartbeat-expiry recovery outcome, no re-ready wrapper — plus a distinct replacement. |
+| `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `health_unhealthy_unresponsive` `allocation_transition` into `stopping.destroying`, a terminal `native_stop`, the heartbeat-expiry recovery start, no re-ready wrapper — plus a distinct replacement. |
 | `wrapper-freeze-inflight-reap` | Freezes the identity-matched control-wrapper process while a paced turn is held; requires the held message to terminalise `runtime_unhealthy`, an identity-matched `accepted_reconciliation` and still-active route, the settled-reap stop evidence, and a distinct replacement. |
+| `control-socket-recycle-boot` | Drops the identity-matched control wrapper's control socket during the first attach (`SIGUSR1`) and requires, from a cursor captured immediately before the signal, `socket_closed` (this attach connection, handshake complete) → `handshake_committed` (a new connection) → `wrapper_ready` (that connection) with the same wrapper identity. The initial turn must complete with the echo intact and exactly one prompt dispatch; a no-op signal fails. |
 | `queue-while-busy` | Hold a bounded `slow:60:1000:16` turn, enqueue two echoes, and assert FIFO delivery through `cloud.message.*` events as the hold completes. |
 | `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |
 | `queue-overflow` | Hold a paced turn and fill the pending queue until enqueue fails with HTTP 429, then drain. |

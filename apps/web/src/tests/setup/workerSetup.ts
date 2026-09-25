@@ -10,7 +10,6 @@ import {
   provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
-import { provisionModelExperimentRequestPartitions } from '@/lib/model-experiment-request-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { shutdownPosthog } from '@/lib/posthog';
@@ -73,15 +72,6 @@ beforeAll(async () => {
       const [{ name, error }] = chargePartitionErrors;
       throw new Error(
         `Failed to create compute usage charge partition ${name}: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-
-    const { errors: modelExperimentPartitionErrors } =
-      await provisionModelExperimentRequestPartitions(testDb);
-    if (modelExperimentPartitionErrors.length > 0) {
-      const [{ name, error }] = modelExperimentPartitionErrors;
-      throw new Error(
-        `Failed to create model experiment request partition ${name}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   } finally {

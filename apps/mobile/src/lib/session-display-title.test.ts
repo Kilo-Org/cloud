@@ -1,57 +1,51 @@
 import { describe, expect, it } from 'vitest';
 
-import { isPlaceholderSessionTitle, resolveSessionDisplayTitle } from './session-display-title';
+import { sessionDisplayTitle } from './session-display-title';
 
-describe('isPlaceholderSessionTitle', () => {
-  it('treats null, undefined and blank titles as placeholders', () => {
-    expect(isPlaceholderSessionTitle(null)).toBe(true);
-    expect(isPlaceholderSessionTitle(undefined)).toBe(true);
-    expect(isPlaceholderSessionTitle('')).toBe(true);
-    expect(isPlaceholderSessionTitle('   ')).toBe(true);
+describe('sessionDisplayTitle', () => {
+  it('returns a real title unchanged', () => {
+    expect(sessionDisplayTitle('Fix the flaky test')).toBe('Fix the flaky test');
+    expect(sessionDisplayTitle('Implementation plan')).toBe('Implementation plan');
   });
 
-  it('treats both machine placeholder forms as placeholders', () => {
-    expect(isPlaceholderSessionTitle('New session - 2026-09-22T04:17:22.503Z')).toBe(true);
-    expect(isPlaceholderSessionTitle('Child session - 2026-09-22T04:17:22.503Z')).toBe(true);
+  it('trims surrounding whitespace from a real title', () => {
+    expect(sessionDisplayTitle('  Fix the flaky test  ')).toBe('Fix the flaky test');
+    expect(sessionDisplayTitle('  Implementation plan  ')).toBe('Implementation plan');
   });
 
-  it('treats a real title as user copy', () => {
-    expect(isPlaceholderSessionTitle('New session - my plan')).toBe(false);
-    expect(isPlaceholderSessionTitle('Refactor the parser')).toBe(false);
-  });
-});
-
-describe('resolveSessionDisplayTitle', () => {
-  const fallback = 'Session';
-
-  it('returns the fallback for null and undefined', () => {
-    expect(resolveSessionDisplayTitle(null, fallback)).toBe(fallback);
-    expect(resolveSessionDisplayTitle(undefined, fallback)).toBe(fallback);
+  it('treats the backend placeholder as no title', () => {
+    expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45.623Z')).toBeUndefined();
+    expect(sessionDisplayTitle('Child session - 2026-09-22T01:09:45.623Z')).toBeUndefined();
+    expect(sessionDisplayTitle('New session - 2026-09-22T16:37:00.000Z')).toBeUndefined();
   });
 
-  it('returns the fallback for empty and whitespace-only titles', () => {
-    expect(resolveSessionDisplayTitle('', fallback)).toBe(fallback);
-    expect(resolveSessionDisplayTitle('   ', fallback)).toBe(fallback);
+  it('treats a placeholder with surrounding whitespace as no title', () => {
+    expect(sessionDisplayTitle('  New session - 2026-09-22T01:09:45.623Z  ')).toBeUndefined();
   });
 
-  it('returns the fallback for both machine placeholder forms', () => {
-    expect(resolveSessionDisplayTitle('New session - 2026-09-22T04:17:22.503Z', fallback)).toBe(
-      fallback
+  it('treats null, undefined, and blank titles as no title', () => {
+    expect(sessionDisplayTitle(null)).toBeUndefined();
+    expect(sessionDisplayTitle(undefined)).toBeUndefined();
+    expect(sessionDisplayTitle('')).toBeUndefined();
+    expect(sessionDisplayTitle('   ')).toBeUndefined();
+  });
+
+  it('keeps a title that only resembles the placeholder', () => {
+    // Not the exact shape the backend writes: a different separator, no
+    // milliseconds, or a name after the prefix is a title a person wrote.
+    expect(sessionDisplayTitle('New session - planning')).toBe('New session - planning');
+    expect(sessionDisplayTitle('New session - implementation plan')).toBe(
+      'New session - implementation plan'
     );
-    expect(resolveSessionDisplayTitle('Child session - 2026-09-22T04:17:22.503Z', fallback)).toBe(
-      fallback
+    expect(sessionDisplayTitle('New session plan for the login redirect')).toBe(
+      'New session plan for the login redirect'
     );
-  });
-
-  it('returns a real title verbatim', () => {
-    expect(resolveSessionDisplayTitle('New session - my plan', fallback)).toBe(
-      'New session - my plan'
+    expect(sessionDisplayTitle('New session - next week')).toBe('New session - next week');
+    expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45.623Z notes')).toBe(
+      'New session - 2026-09-22T01:09:45.623Z notes'
     );
-  });
-
-  it('trims leading and trailing whitespace on a real title', () => {
-    expect(resolveSessionDisplayTitle('  Refactor the parser  ', fallback)).toBe(
-      'Refactor the parser'
+    expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45Z')).toBe(
+      'New session - 2026-09-22T01:09:45Z'
     );
   });
 });

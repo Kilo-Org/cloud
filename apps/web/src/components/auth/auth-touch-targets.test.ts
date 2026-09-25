@@ -23,6 +23,7 @@ import type {
 import type { AuthErrorNotification as AuthErrorNotificationType } from './AuthErrorNotification';
 import type { MagicLinkSentConfirmation as MagicLinkSentConfirmationType } from './MagicLinkSentConfirmation';
 import type { SignInForm as SignInFormType } from './SignInForm';
+import type { SsoAccountMismatchNotice as SsoAccountMismatchNoticeType } from './SsoAccountMismatchNotice';
 import type { SignInButton as SignInButtonType } from './SigninButton';
 import type { AuthProviderButtons as AuthProviderButtonsType } from './sign-in/AuthProviderButtons';
 import type { EmailInputForm as EmailInputFormType } from './sign-in/EmailInputForm';
@@ -117,6 +118,9 @@ const { MagicLinkSentConfirmation } = require('./MagicLinkSentConfirmation') as 
   MagicLinkSentConfirmation: typeof MagicLinkSentConfirmationType;
 };
 const { SignInForm } = require('./SignInForm') as { SignInForm: typeof SignInFormType };
+const { SsoAccountMismatchNotice } = require('./SsoAccountMismatchNotice') as {
+  SsoAccountMismatchNotice: typeof SsoAccountMismatchNoticeType;
+};
 const { DeviceAuthClient } = require('@/app/device-auth/DeviceAuthClient') as {
   DeviceAuthClient: typeof DeviceAuthClientType;
 };
@@ -295,6 +299,18 @@ describe('sign-in touch targets', () => {
 
     expect(html).toContain('Account Blocked');
     expect(controlsWithoutTouchTarget(html)).toEqual([]);
+  });
+
+  it('leaves no control under the touch target on the account-mismatch notice', () => {
+    const html = render(
+      createElement(SsoAccountMismatchNotice, {
+        mismatch: { expectedEmail: 'ada@kilo.ai', signedInEmail: 'grace@kilo.ai' },
+        searchParams: {},
+      })
+    );
+
+    expect(html).toContain('Sign out and continue as ada@kilo.ai');
+    expect(controlsWithoutTouchTarget(html)).toHaveLength(0);
   });
 
   it('clears the touch bar on every error notification the page can show', () => {

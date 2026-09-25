@@ -1,31 +1,27 @@
 import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
 
 /**
- * True when a session title is machine copy rather than a user-facing title:
- * it is empty, or it is the creation placeholder
- * `New session - <ISO timestamp>` / `Child session - <ISO timestamp>` written
- * by the backend at
- * `services/cloud-agent-next/src/session/session-registration.ts:763` and only
- * replaced once the agent's generated title is promoted by ingest
- * (`services/session-ingest/src/ingest/metadata.ts:159-175`).
+ * The user-facing title for a session, or undefined when the row carries no
+ * name a person wrote.
+ *
+ * `packages/session-ingest-contracts/src/index.ts` owns the placeholder
+ * pattern (`DEFAULT_SESSION_TITLE_PATTERN` / `isDefaultSessionTitle`). The
+ * backend seeds every fresh session with `New session - ${ISO}` —
+ * `services/cloud-agent-next/src/session/session-registration.ts`,
+ * `services/cloud-agent-next/src/session-service.ts`, and
+ * `services/cloud-agent-next/wrapper/src/session-bootstrap.ts` — and
+ * `services/session-ingest/src/ingest/metadata.ts` promotes the first user
+ * message's real title over it. A session that still carries the placeholder
+ * has no name yet, so every surface treats it exactly like a title-less one
+ * and never paints the machine string.
+ *
+ * The session-detail header and its live `session.updated` handler call these
+ * same rules, so every surface shares this one name.
  */
-export function isPlaceholderSessionTitle(title: string | null | undefined): boolean {
-  const trimmed = title?.trim() ?? '';
-  return trimmed.length === 0 || isDefaultSessionTitle(trimmed);
-}
-
-/**
- * Resolves the title to paint in the UI: `fallback` for any placeholder (see
- * {@link isPlaceholderSessionTitle}), otherwise the trimmed server title. The
- * placeholder is written by the backend at
- * `services/cloud-agent-next/src/session/session-registration.ts:763` and
- * promoted by `services/session-ingest/src/ingest/metadata.ts:159-175`, so the
- * client must never paint it.
- */
-export function resolveSessionDisplayTitle(
-  title: string | null | undefined,
-  fallback: string
-): string {
-  const trimmed = title?.trim() ?? '';
-  return isPlaceholderSessionTitle(trimmed) ? fallback : trimmed;
+export function sessionDisplayTitle(title: string | null | undefined): string | undefined {
+  const trimmed = title?.trim();
+  if (!trimmed || isDefaultSessionTitle(trimmed)) {
+    return undefined;
+  }
+  return trimmed;
 }

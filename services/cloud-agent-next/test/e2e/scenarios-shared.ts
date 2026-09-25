@@ -50,8 +50,16 @@ import { FAULT_SHARED_SCENARIOS } from './scenarios-shared-faults.js';
 
 /** Generous default per-turn budget for a real first container cold start. */
 const DEFAULT_TURN_TIMEOUT_MS = 240_000;
-/** Bound for each cleanup tRPC request so a wedged cleanup cannot hang the run. */
+/** Bound for the `interruptSession` cleanup request so a wedged interrupt cannot hang the run. */
 const CLEANUP_TIMEOUT_MS = 15_000;
+/**
+ * `deleteSession` client budget. Chunk A's stop can await up to
+ * DEADLINE_MS.stopAttempt (30s), so 45s exceeds it. This is a CLIENT budget,
+ * not proof the container is gone: a returned teardown can still leave the
+ * allocation `stopping`, and the abort does not roll back a committed
+ * retirement.
+ */
+const DELETE_SESSION_TIMEOUT_MS = 45_000;
 /** Bound for each direct HTTPS auth probe in `auth-reject`. */
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 /** Wrong secret for the bad-signature probe; never the deployed `NEXTAUTH_SECRET`. */
@@ -302,6 +310,44 @@ export function echoPayloadMatches(observedText: string, payload: string): boole
   return new RegExp(`(?:^|[^A-Za-z0-9_-])${escapeRegExp(payload)}$`).test(observedText);
 }
 
+/**
+ * Per-assertion allowance for the correlated child text to arrive after the
+ * message reaches its terminal event. The observed lag is a fraction of a
+ * second; five seconds covers it and still fails a genuinely missing payload
+ * long before the rest of a scenario's budget is spent.
+ */
+export const CONTENT_CORRELATION_BUDGET_MS = 5_000;
+
+/**
+ * Return the correlated child text of `parentMessageId` once `ready` accepts it.
+ * Text is read with `collectChildMessageText` from the live event buffer, and
+ * `stream.waitFor` is used only to wake on newly appended events (its predicate
+ * re-reads the buffer, so it also satisfies an already-present value). When
+ * `ready` is still false after the bounded wait the call throws with the label,
+ * the timeout and the observed text, so a missing payload fails within the
+ * budget instead of racing the terminal event. The helper never closes the
+ * stream: the stream owner closes it on a throw.
+ */
+export async function awaitCorrelatedChildText(input: {
+  stream: StreamConnection;
+  parentMessageId: string;
+  timeoutMs: number;
+  label: string;
+  ready: (text: string) => boolean;
+}): Promise<string> {
+  const { stream, parentMessageId, timeoutMs, label, ready } = input;
+  const collect = (): string => collectChildMessageText(stream.events, parentMessageId);
+  const initial = collect();
+  if (ready(initial)) return initial;
+  await stream.waitFor(() => ready(collect()), timeoutMs);
+  const observed = collect();
+  if (ready(observed)) return observed;
+  throw new Error(
+    `${label}: correlated child text did not satisfy the predicate within ${timeoutMs}ms; ` +
+      `observed ${JSON.stringify(observed)} for ${parentMessageId}`
+  );
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -350,9 +396,11 @@ async function runHotTurn(
 
 /**
  * Cleanup for one started session. Both requests are attempted independently
- * and each is bounded; a failure is reported but never thrown. `label` names
- * the caller in the diagnostic. Callers that no longer hold the `kiloSessionId`
- * (the matrix runner backstop) pass `sessionId` alone.
+ * and each is bounded; a failure is reported but never thrown, so it never
+ * changes the caller's `result.ok`. `interruptSession` is bounded by
+ * `CLEANUP_TIMEOUT_MS`; `deleteSession` gets the larger
+ * `DELETE_SESSION_TIMEOUT_MS` (see that constant for the client-budget caveat).
+ * `label` names the caller in the diagnostic.
  */
 export async function cleanupRemoteSession(
   config: DriverConfig,
@@ -367,7 +415,7 @@ export async function cleanupRemoteSession(
     failures.push(`interruptSession: ${errorMessage(error)}`);
   }
   try {
-    await deleteSession(config, sessionId, AbortSignal.timeout(CLEANUP_TIMEOUT_MS));
+    await deleteSession(config, sessionId, AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS));
   } catch (error) {
     failures.push(`deleteSession: ${errorMessage(error)}`);
   }
@@ -440,8 +488,6 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
 
     const coldResult = await collectUntilTerminal(coldStream, session.messageId, timeoutMs);
     events.push(...coldResult.events);
-    coldStream.close();
-    coldStream = undefined;
 
     const coldTerminalType = coldResult.terminal?.streamEventType ?? 'none';
     if (!isMessageCompleted(coldResult.terminal, session.messageId)) {
@@ -460,16 +506,22 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
     if (expectedColdText === null) {
       coldContentMarker = 'cold-content=skipped(not-echo:<token>)';
     } else {
-      const observedColdText = collectChildMessageText(coldResult.events, session.messageId);
-      const observedTail = trailingNonEmptyLine(observedColdText);
-      if (!echoPayloadMatches(observedColdText, expectedColdText)) {
-        return fail(
-          `cold turn: expected correlated child text ${JSON.stringify(expectedColdText)} but observed ` +
-            `${JSON.stringify(observedColdText)}; observed tail ${JSON.stringify(observedTail)} for ${session.messageId}`
-        );
-      }
-      coldContentMarker = `cold-content=${JSON.stringify(observedTail)}`;
+      // Wait while `coldStream` is still open and live; `coldResult.events` is a
+      // copy taken at the terminal, so content that arrives after it is missed.
+      const observedColdText = await awaitCorrelatedChildText({
+        stream: coldStream,
+        parentMessageId: session.messageId,
+        timeoutMs: Math.max(
+          1,
+          Math.min(CONTENT_CORRELATION_BUDGET_MS, startedAt + timeoutMs - Date.now())
+        ),
+        label: 'cold turn',
+        ready: text => echoPayloadMatches(text, expectedColdText),
+      });
+      coldContentMarker = `cold-content=${JSON.stringify(trailingNonEmptyLine(observedColdText))}`;
     }
+    coldStream.close();
+    coldStream = undefined;
 
     const hotSummaries: string[] = [];
     for (const directive of HOT_DIRECTIVES) {
@@ -616,10 +668,6 @@ async function runUnknownModel(
     return fail(`threw: ${errorMessage(error)}`);
   }
 }
-
-// ---------------------------------------------------------------------------
-// auth-reject: direct HTTPS probes against the deployed fake Worker
-// ---------------------------------------------------------------------------
 
 export type AuthProbeMethod = 'GET' | 'POST';
 

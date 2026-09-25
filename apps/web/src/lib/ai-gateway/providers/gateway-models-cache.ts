@@ -40,6 +40,15 @@ export const getOpenRouterModelsMetadataFromDatabase = createStoredModelsFromDat
   'OpenRouter'
 );
 
+export async function resolveOpenRouterModelAlias(modelId: string): Promise<string> {
+  if (!modelId.startsWith('~')) {
+    return modelId;
+  }
+
+  const models = await getOpenRouterModelsMetadataFromDatabase();
+  return models[modelId]?.alias_target?.slug ?? modelId;
+}
+
 /** The ids of language models, including those with no endpoints. */
 export function getLanguageModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
@@ -99,7 +108,6 @@ const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
   'anthropic/claude-sonnet-4-5',
   'anthropic/claude-sonnet-4-6',
   'anthropic/claude-sonnet-5-20260630',
-  'claude-opus-5',
   'claude-sonnet-4',
   'claude-sonnet-4.5',
   'claude-sonnet-5',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+import { NETWORK_BODY_CONTEXT, scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
 describe('scrubEvent', () => {
   it('strips query strings from request.url', () => {
@@ -169,6 +169,25 @@ describe('scrubEvent', () => {
     const result = scrubEvent(event);
 
     expect(result.contexts.TRPCClientError.data.token).toBe('[redacted]');
+  });
+
+  it('redacts the app payload context the exception integration does not own', () => {
+    const event = {
+      // The integration replaces `contexts[error.name]`; the payload lives
+      // under a different key, so it survives to be redacted here.
+      exception: { values: [{ type: 'NetworkError' }] },
+      contexts: {
+        NetworkError: {},
+        [NETWORK_BODY_CONTEXT]: {
+          data: { code: 'UNAUTHORIZED', token: 'abcdefghijklmnopqrst' },
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts[NETWORK_BODY_CONTEXT].data.code).toBe('UNAUTHORIZED');
+    expect(result.contexts[NETWORK_BODY_CONTEXT].data.token).toBe('[redacted]');
   });
 
   it('leaves structured network and trace contexts intact', () => {

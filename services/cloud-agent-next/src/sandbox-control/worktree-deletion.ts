@@ -5,9 +5,10 @@ import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
-import type { ProviderAdapter } from './provider';
-import { loadPhysicalRecord, loadRouteTable } from './durable-state';
-import { sameAllocation, type PhysicalRecord } from './physical-lifecycle';
+import type { ProviderAdapter, ProviderAllocationIntent } from './provider';
+import { loadRouteTable } from './durable-state';
+import { loadAllocation as loadAllocationResult } from '../sandbox-state/persist/load.js';
+import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
 import { DEADLINE_MS } from './deadlines';
 import { logControlDiagnostic } from './diagnostics';
 import type { SandboxControlOutboundRequest } from './socket';
@@ -44,15 +45,51 @@ export async function isUnallocatedControlRuntime(
   storage: DurableObjectStorage,
   hasConnection: () => boolean
 ): Promise<boolean> {
-  const physical = await loadPhysicalRecord(storage);
-  return (
-    physical.state === 'stopped' &&
-    physical.providerRef === null &&
-    physical.createIntent === null &&
-    physical.stopTombstone === null &&
-    (await loadRouteTable(storage)).size === 0 &&
-    !hasConnection()
-  );
+  const record = await loadAllocationRecord(storage);
+  return isUnallocated(record) && (await loadRouteTable(storage)).size === 0 && !hasConnection();
+}
+
+/** A terminal record with no bound reference is an unallocated runtime. */
+function isUnallocated(record: AllocationRecord): boolean {
+  const state = record.state;
+  return state.kind === 'stopped' && (state.summary?.providerRef ?? null) === null;
+}
+
+/** Canonical allocation read for the live path; never reads the removed flat key. */
+async function loadAllocationRecord(storage: DurableObjectStorage): Promise<AllocationRecord> {
+  const loaded = await loadAllocationResult(storage);
+  if (!loaded.ok) throw new Error(`Sandbox allocation is unavailable (${loaded.reason})`);
+  return loaded.value;
+}
+
+function providerRefOf(record: AllocationRecord): string | null {
+  const state = record.state;
+  if (state.kind === 'stopped') return state.summary?.providerRef ?? null;
+  return state.target?.providerRef ?? null;
+}
+
+/** The provider intent for an outstanding create, rebuilt from canonical state. */
+function providerIntentOf(record: AllocationRecord): ProviderAllocationIntent | null {
+  const state = record.state;
+  if (state.kind === 'stopped' || state.createIntent === null || state.target === null) return null;
+  return {
+    intentId: state.createIntent.intentId,
+    createdAt: state.createIntent.createdAt,
+    ...(state.target.allocationName === undefined
+      ? {}
+      : { allocationName: state.target.allocationName }),
+    ...(state.target.vercel === undefined ? {} : { vercel: state.target.vercel }),
+    ...(state.target.containment === undefined ? {} : { containment: state.target.containment }),
+  };
+}
+
+/** Same canonical allocation: the create intent id, else the provider reference. */
+function sameAllocationIdentity(left: AllocationRecord, right: AllocationRecord): boolean {
+  const identity = (record: AllocationRecord) =>
+    (record.state.kind === 'stopped' ? null : record.state.createIntent?.intentId) ??
+    providerRefOf(record);
+  const leftId = identity(left);
+  return leftId !== null && leftId === identity(right);
 }
 
 export async function loadWorktreeDeletionJournal(
@@ -82,7 +119,7 @@ export async function cleanWorktreeRuntime(input: {
   directory: string;
   storage: DurableObjectStorage;
   getProvider: () => Promise<ProviderAdapter>;
-  stopRuntime: () => Promise<PhysicalRecord>;
+  stopRuntime: () => Promise<AllocationRecord>;
   hasConnection: () => boolean;
   sendRequest: (request: SandboxControlOutboundRequest) => Promise<ResponseFrame>;
   exclusive: boolean;
@@ -130,8 +167,8 @@ export async function cleanWorktreeRuntime(input: {
       result = 'resources_cleaned';
       return journal;
     }
-    const physical = await loadPhysicalRecord(input.storage);
-    if (physical.state === 'stopped') {
+    const record = await loadAllocationRecord(input.storage);
+    if (record.state.kind === 'stopped') {
       cleanupMode = 'already_stopped';
       journal.resourcesCleaned = true;
       journal.destroyed = input.exclusive;
@@ -145,7 +182,7 @@ export async function cleanWorktreeRuntime(input: {
     if (input.exclusive) {
       cleanupMode = 'exclusive_stop';
       stage = 'stop_provider';
-      if ((await input.stopRuntime()).state !== 'stopped') {
+      if ((await input.stopRuntime()).state.kind !== 'stopped') {
         throw new Error('Worktree provider stop is unconfirmed');
       }
       journal.destroyed = true;
@@ -184,7 +221,7 @@ export async function cleanWorktreeRuntime(input: {
       cleanupMode = 'terminal_observation';
       stage = 'observe_provider';
       const observed = await withTimeout(
-        provider.observe(physical.providerRef, physical.createIntent),
+        provider.observe(providerRefOf(record), providerIntentOf(record)),
         DEADLINE_MS.stopAttempt,
         'Worktree provider observation timed out'
       );
@@ -193,8 +230,12 @@ export async function cleanWorktreeRuntime(input: {
       }
     }
     stage = 'allocation_fence';
-    const current = await loadPhysicalRecord(input.storage);
-    if (!input.exclusive && current.state !== 'stopped' && !sameAllocation(physical, current)) {
+    const current = await loadAllocationRecord(input.storage);
+    if (
+      !input.exclusive &&
+      current.state.kind !== 'stopped' &&
+      !sameAllocationIdentity(record, current)
+    ) {
       throw new Error('Worktree provider allocation changed during cleanup');
     }
     journal.resourcesCleaned = true;

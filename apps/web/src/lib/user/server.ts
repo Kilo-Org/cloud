@@ -57,14 +57,17 @@ import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
+  getOrganizationById,
   getProfileOrganizations,
   getSingleUserOrganization,
+  getUserOrgMemberships,
   getUserOrganizationsWithSeats,
   isOrganizationMember,
 } from '@/lib/organizations/organizations';
 import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
 import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
@@ -84,7 +87,10 @@ import {
   OPENAI_RESOURCE,
   isOpenAiTokenSharingGrant,
 } from '@/lib/auth/openai/config';
-import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import {
+  openAiChatGptSharedServicesOwner,
+  saveOpenAiChatGptConnection,
+} from '@/lib/ai-gateway/openai-chatgpt/store';
 import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   GITHUB_CLIENT_ID,
@@ -311,11 +317,14 @@ async function persistOpenAiChatGptConnection(
     if (!isOpenAiTokenSharingGrant(account)) return;
 
     const email = (profile as { email?: unknown } | undefined)?.email;
-    const organizationId = (profile as ExtendedProfile | undefined)?.openAiChatGptOrganizationId;
-    const owner: OpenAiChatGptOwner = {
-      kiloUserId: userId,
-      organizationId: organizationId ?? null,
-    };
+    const extendedProfile = profile as ExtendedProfile | undefined;
+    const organizationId = extendedProfile?.openAiChatGptOrganizationId;
+    // A shared-services link stores the organization's single row instead of the
+    // linking person's own connection.
+    const owner: OpenAiChatGptOwner =
+      organizationId && extendedProfile?.openAiChatGptSharedServices === true
+        ? openAiChatGptSharedServicesOwner(organizationId)
+        : { kiloUserId: userId, organizationId: organizationId ?? null };
     await saveOpenAiChatGptConnection(
       owner,
       {
@@ -338,6 +347,44 @@ async function persistOpenAiChatGptConnection(
       tags: { operation: 'openai_chatgpt_connection_persist' },
     });
   }
+}
+
+/**
+ * Whether the person completing a shared-services authorization may still
+ * connect the organization's connection. The link start authorized the role,
+ * but the consent round-trip can outlive it, so the callback re-reads the
+ * current membership: an owner or admin of the organization, an owner or admin
+ * of the parent organization whose access it inherits, or a Kilo platform admin
+ * (elevated and audited by the link start's own access check) may persist the
+ * connection. `canManageOrganization` is the rule every other organization
+ * management surface uses.
+ */
+async function mayConnectOpenAiChatGptSharedServices(
+  user: Pick<User, 'id' | 'is_admin'>,
+  organizationId: string
+): Promise<boolean> {
+  if (user.is_admin) return true;
+
+  const memberships = await getUserOrgMemberships(user.id);
+  const organization = await getOrganizationById(organizationId);
+  const roleIn = (id: string | null | undefined) =>
+    memberships.find(membership => membership.orgId === id)?.role;
+
+  return (
+    canManageOrganization(roleIn(organizationId)) ||
+    canManageOrganization(roleIn(organization?.parent_organization_id))
+  );
+}
+
+/**
+ * Where a refused shared-services authorization returns: the organization's
+ * BYOK page, whose card renders the `openai_error` code. The generic
+ * account-linking failure page cannot carry the organization, so the refusal
+ * would land on a page with no card to show it.
+ */
+function openAiChatGptConnectFailureUrl(organizationId: string, error: AuthErrorType): string {
+  const query = new URLSearchParams({ openai_error: error });
+  return `/organizations/${organizationId}/byok?${query.toString()}`;
 }
 
 function createAppleAccountInfo(
@@ -719,6 +766,8 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
 type ExtendedProfile = Profile & {
   isNewUser?: boolean; // Add isNewUser to the user type
   openAiChatGptOrganizationId?: string;
+  /** Set when the authorization connected the organization's shared services. */
+  openAiChatGptSharedServices?: boolean;
 };
 
 const posthogClient = PostHogClient();
@@ -1013,6 +1062,9 @@ export const authOptions: NextAuthOptions = {
           profile
         ) {
           (profile as ExtendedProfile).openAiChatGptOrganizationId = linkingSession.organizationId;
+          if (linkingSession.chatGptScope === 'shared_services') {
+            (profile as ExtendedProfile).openAiChatGptSharedServices = true;
+          }
         }
 
         // if a user's email domain matches any organization's SSO domain and they are not logging in with SSO, force them to use SSO immediately
@@ -1213,6 +1265,21 @@ export const authOptions: NextAuthOptions = {
 
         if (result.user.blocked_reason) {
           return redirectUrlForCode(`BLOCKED`);
+        }
+
+        // The link start authorized the connect, but the authorization can be
+        // consented to after that role is revoked: the callback re-reads the
+        // current membership before the jwt callback stores the organization's
+        // shared-services connection, and a refusal returns to the card that
+        // started the connect instead of failing silently.
+        if (
+          account.provider === 'openai' &&
+          linkingSession?.targetProvider === 'openai' &&
+          linkingSession.chatGptScope === 'shared_services' &&
+          linkingSession.organizationId &&
+          !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
+        ) {
+          return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
         }
 
         if (!isAccountLinking && autoLinkToExistingUser) {

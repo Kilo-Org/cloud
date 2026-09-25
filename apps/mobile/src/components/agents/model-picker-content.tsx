@@ -1,14 +1,17 @@
+import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -21,6 +24,10 @@ import {
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export function ModelPickerContent() {
   const router = useRouter();
@@ -94,6 +101,15 @@ export function ModelPickerContent() {
     [bridge, deferredSearch, favoriteIds]
   );
 
+  // Shared by the in-field X and the "No matches" empty state's CTA: drops the
+  // query and the input's visible text in one step, so the full list returns
+  // without backspacing. The field carries its own control because Android has
+  // no native `clearButtonMode` counterpart.
+  const handleClearSearch = useCallback(() => {
+    searchInputRef.current?.clear();
+    setSearch('');
+  }, []);
+
   // The favorite star button in ModelPickerOptionRow already fires its own
   // selection haptic on press — this callback must not fire a second one.
   const handleToggleFavorite = useCallback(
@@ -151,13 +167,36 @@ export function ModelPickerContent() {
     [bridge, closePicker]
   );
 
-  // In-field X: `clearButtonMode` only ever drew a control on iOS, so on
-  // Android the query had no way back. This empties the native text and drops
-  // the query the rows derive from, leaving the keyboard up to retype.
-  const handleClearSearch = useCallback(() => {
-    searchInputRef.current?.clear();
-    setSearch('');
-  }, []);
+  // Hoisted out of the list body: the inline arrow gave the virtualized list a
+  // new renderer on every render, which re-rendered every mounted row. Height
+  // differs between the group header and a model row, so `getItemType` lets
+  // FlashList recycle the two apart.
+  const renderItem = useCallback(
+    ({ item }: { item: ModelPickerRow }) => {
+      if (item.type === 'header') {
+        return (
+          <View className="bg-secondary px-4 py-2">
+            <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {item.title}
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <ModelPickerOptionRow
+          option={item.model}
+          selected={item.model.id === selectedModel}
+          selectedVariant={selectedVariant}
+          isFavorite={item.isFavorite}
+          onSelectModel={handleSelectModel}
+          onSelectVariant={handleSelectVariant}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      );
+    },
+    [handleSelectModel, handleSelectVariant, handleToggleFavorite, selectedModel, selectedVariant]
+  );
 
   if (!bridge) {
     return (
@@ -179,14 +218,14 @@ export function ModelPickerContent() {
         <View>
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
-            <TextInput
+            <Input
               ref={searchInputRef}
               placeholder={t('common.searchModels')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
-              className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+              className="flex-1 px-0 text-base text-foreground"
               onChangeText={setSearch}
             />
             {/* In-field clear, on every platform: `clearButtonMode` is iOS
@@ -225,38 +264,35 @@ export function ModelPickerContent() {
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.modelPicker.noModelsDescription')
           }
+          action={
+            // The in-field X is one way back; the no-matches body offers the
+            // same recovery the Agents search empty state does, so the only
+            // exit from "No matches" is not backspacing the query away.
+            deferredSearch.trim() ? (
+              <Button variant="outline" onPress={handleClearSearch}>
+                <Text>{t('common.clearSearch')}</Text>
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
-        <FlatList
-          className="flex-1 bg-background"
+        // No wrapping View: react-native-screens honors the formSheet header
+        // only when [header, scroll view] are the content's direct children,
+        // so the list itself carries the sheet background.
+        //
+        // The bottom inset rides on the list's frame, not its content: a content
+        // inset only cleared the end of the list, so a row at the viewport bottom
+        // (the picker's last row) was drawn under the opaque Android navigation
+        // bar. Ending the viewport above the bar is the same frame inset
+        // `session-list-screen` uses for its FAB band.
+        <FlashList<ModelPickerRow>
+          style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
           data={rows}
           keyExtractor={item => item.key}
+          getItemType={item => item.type}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingBottom: bottom }}
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <View className="bg-secondary px-4 py-2">
-                  <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {item.title}
-                  </Text>
-                </View>
-              );
-            }
-
-            return (
-              <ModelPickerOptionRow
-                option={item.model}
-                selected={item.model.id === selectedModel}
-                selectedVariant={selectedVariant}
-                isFavorite={item.isFavorite}
-                onSelectModel={handleSelectModel}
-                onSelectVariant={handleSelectVariant}
-                onToggleFavorite={handleToggleFavorite}
-              />
-            );
-          }}
+          renderItem={renderItem}
         />
       )}
     </PickerSheet>

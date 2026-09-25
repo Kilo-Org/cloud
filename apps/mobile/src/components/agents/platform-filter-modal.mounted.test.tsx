@@ -1,4 +1,7 @@
+/* eslint-disable max-lines -- the sheet's rows, window bounds, dismissal paths, and derived-list memoization share one mounted harness */
+/* eslint-disable max-lines -- cohesive mounted-test suite for the session filter sheet */
 import { act, type ComponentProps } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Modal, Pressable, ScrollView } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +10,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { renderWithProviders } from '@/test/render-with-providers';
+import * as PlatformFilterRows from './platform-filter-rows';
 import { SessionFilterModal } from './platform-filter-modal';
 
 let windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
@@ -28,6 +32,17 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#1a1a10' }),
 }));
+// Spies around the real derivations: the modal must build them only when the
+// props they read change, so the tests count the builds instead of inspecting
+// the private memos.
+vi.mock('./platform-filter-rows', async importOriginal => {
+  const actual = await importOriginal<typeof PlatformFilterRows>();
+  return {
+    ...actual,
+    mergePlatformOptions: vi.fn(actual.mergePlatformOptions),
+    buildProjectRows: vi.fn(actual.buildProjectRows),
+  };
+});
 
 const firstProject = {
   gitUrl: 'https://github.com/iscekic/kilo-workflow.git',
@@ -53,7 +68,7 @@ async function renderModal(overrides: Partial<ComponentProps<typeof SessionFilte
   };
   const view = await renderWithProviders(<SessionFilterModal {...props} />);
   mounted.push(view);
-  return { renderer: view.renderer, props };
+  return { renderer: view.renderer, queryClient: view.queryClient, props };
 }
 
 function findCheckbox(renderer: RenderedView['renderer'], label: string) {
@@ -88,11 +103,21 @@ function findSheetCard(renderer: RenderedView['renderer']) {
   return card;
 }
 
+/** Project rows only, in render order, so a toggle's reorder would show up. */
+function projectRowLabels(renderer: RenderedView['renderer']) {
+  return renderer.root
+    .findAllByProps({ accessibilityRole: 'checkbox' })
+    .map(row => row.findByType(Text).props.children)
+    .filter(label => label === firstProject.displayName || label === secondProject.displayName);
+}
+
 describe('SessionFilterModal', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
     insets = { top: 0, bottom: 0, left: 0, right: 0 };
+    vi.mocked(PlatformFilterRows.mergePlatformOptions).mockClear();
+    vi.mocked(PlatformFilterRows.buildProjectRows).mockClear();
   });
 
   afterEach(() => {
@@ -234,6 +259,82 @@ describe('SessionFilterModal', () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
+  it('renders one platform row per bucket and collapses a persisted variant', async () => {
+    const { renderer } = await renderModal({
+      platformOptions: ['cloud-agent', 'extension'],
+      selectedPlatforms: ['cloud-agent-web', 'vscode'],
+      projectOptions: [],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      i18n.t('agentChat.sessionFilter.platformExtension'),
+    ]);
+    expect(
+      checkboxes.map(
+        row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
+      )
+    ).toEqual([true, true]);
+  });
+
+  it('renders one project row per visible label and stores every alias on toggle', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [],
+    });
+    const labels = renderer.root
+      .findAllByProps({ accessibilityRole: 'checkbox' })
+      .map(row => row.findByType(Text).props.children);
+    expect(labels.filter(label => label === firstProject.displayName)).toHaveLength(1);
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    act(() => {
+      (findCheckbox(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [firstProject.gitUrl, sshAlias.gitUrl],
+    });
+  });
+
+  it('toggles off every alias of a merged project when any is stored', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [sshAlias.gitUrl],
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    act(() => {
+      (findCheckbox(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [],
+    });
+  });
+
   it('applies empty filters after deselecting both dimensions', async () => {
     const { renderer, props } = await renderModal({
       selectedPlatforms: ['cli'],
@@ -298,5 +399,71 @@ describe('SessionFilterModal', () => {
     const scrollView = renderer.root.findByType(ScrollView);
     expect(scrollView.props.className).toContain('shrink');
     expect(scrollView.parent?.props.className).toContain('max-h-[80%]');
+  });
+
+  // The sheet re-derives its rows only when the props they read change. A
+  // re-render with unchanged props must hand the list the same platform array
+  // identity, so no mounted platform row re-renders.
+  it('hands the list the same merged platform array identity on an unchanged re-render', async () => {
+    const platformOptions = ['cli', 'future-platform'];
+    const { renderer, queryClient, props } = await renderModal({
+      platformOptions,
+      selectedPlatforms: ['future-platform'],
+    });
+    const merge = vi.mocked(PlatformFilterRows.mergePlatformOptions);
+    expect(merge).toHaveBeenCalledTimes(1);
+    const labelsBefore = renderer.root
+      .findAllByProps({ accessibilityRole: 'checkbox' })
+      .map(row => row.findByType(Text).props.children);
+
+    act(() => {
+      renderer.update(
+        <QueryClientProvider client={queryClient}>
+          <SessionFilterModal {...props} />
+        </QueryClientProvider>
+      );
+    });
+
+    // The merge derivation is memoized on its props, so an unchanged re-render
+    // must not run it again: that is what keeps the list's array identity (and
+    // therefore every mounted row) stable. The labels stay put as a result.
+    expect(merge).toHaveBeenCalledTimes(1);
+    expect(
+      renderer.root
+        .findAllByProps({ accessibilityRole: 'checkbox' })
+        .map(row => row.findByType(Text).props.children)
+    ).toEqual(labelsBefore);
+  });
+
+  // A checkbox toggle changes the draft selection only. The memoized rows are
+  // keyed on the props, so toggling must neither rebuild the project map nor
+  // reorder the rows: the selected project keeps its (first) row.
+  it('keeps the selected project sorting first after toggling another project checkbox', async () => {
+    const { renderer } = await renderModal({
+      selectedProjects: [firstProject.gitUrl],
+      projectOptions: [firstProject, secondProject],
+    });
+    const build = vi.mocked(PlatformFilterRows.buildProjectRows);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(projectRowLabels(renderer)).toEqual([
+      firstProject.displayName,
+      secondProject.displayName,
+    ]);
+
+    act(() => {
+      (findCheckbox(renderer, secondProject.displayName).props.onPress as () => void)();
+    });
+
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(projectRowLabels(renderer)).toEqual([
+      firstProject.displayName,
+      secondProject.displayName,
+    ]);
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+    expect(findCheckbox(renderer, secondProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
   });
 });

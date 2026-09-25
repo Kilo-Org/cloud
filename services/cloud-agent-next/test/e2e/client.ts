@@ -13,6 +13,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
+import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
 import type { FakeScenarioStatus } from './fake-llm-server.js';
 
 /**
@@ -55,8 +56,9 @@ export type DriverConfig = {
   /** Deployed profile: fetches a fresh stream ticket for a session. */
   fetchStreamTicket?: (sessionId: string) => Promise<string>;
   /**
-   * When explicitly `false`, omit `x-skip-balance-check` (the deployed profile
-   * must exercise real balance admission). Undefined keeps the local default.
+   * When explicitly `false`, omit `x-skip-balance-check`. Both e2e profiles
+   * send it: the deterministic fake LLM performs no billable inference, so the
+   * driver never needs a funded user.
    */
   skipBalanceCheck?: boolean;
   /**
@@ -99,10 +101,6 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   model: 'kilo/fake-deterministic',
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
 };
-
-// ---------------------------------------------------------------------------
-// tRPC helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Minimal tRPC HTTP-link client. The cloud-agent-next server mounts tRPC
@@ -171,9 +169,8 @@ export async function trpcCall<T>(
   };
   if (config.skipBalanceCheck !== false) {
     // cloud-agent-client.ts sends this for App Builder callers; it cleanly
-    // skips dev billing checks. The local driver sends it by default; the
-    // deployed profile sets `skipBalanceCheck: false` to exercise real
-    // balance admission.
+    // skips dev billing checks. Both e2e profiles send it, because the fake
+    // LLM performs no billable inference.
     headers['x-skip-balance-check'] = 'true';
   }
   if (opts?.internalApiSecret) {
@@ -196,10 +193,6 @@ export async function trpcCall<T>(
   const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
   return envelope.result.data as T;
 }
-
-// ---------------------------------------------------------------------------
-// High-level session operations
-// ---------------------------------------------------------------------------
 
 export type StartSessionResult = {
   cloudAgentSessionId: string;
@@ -390,7 +383,7 @@ export async function prepareBrowserSession(
   input: { prompt: string; operationKey?: string; autoCommit?: boolean },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  return prepareSessionCall<WorktreeSessionResult>(
+  const prepared = await prepareSessionCall<WorktreeSessionResult>(
     config,
     {
       prompt: input.prompt,
@@ -409,6 +402,11 @@ export async function prepareBrowserSession(
     },
     signal
   );
+  // Success only: a rejected prepare never produced a session to clean up. The
+  // local `smoke.ts` already supplies this hook, so its cleanup now also
+  // releases browser-created sessions it previously missed.
+  config.onSessionCreated?.(prepared.cloudAgentSessionId);
+  return prepared;
 }
 
 export async function createWorktreeChat(
@@ -420,7 +418,7 @@ export async function createWorktreeChat(
   },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  return trpcCall<WorktreeSessionResult>(
+  const created = await trpcCall<WorktreeSessionResult>(
     config,
     'createWorktreeChat',
     {
@@ -434,6 +432,11 @@ export async function createWorktreeChat(
     },
     { internalApiSecret: config.internalApiSecret, signal }
   );
+  // Success only, matching the legacy/unified start pattern. As with
+  // `prepareBrowserSession`, the local `smoke.ts` cleanup now also captures
+  // worktree-chat sessions it previously missed.
+  config.onSessionCreated?.(created.cloudAgentSessionId);
+  return created;
 }
 
 export type SessionSnapshot = {
@@ -520,10 +523,6 @@ export async function sendMessage(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Control-plane helpers
-// ---------------------------------------------------------------------------
-
 const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
@@ -600,10 +599,6 @@ export async function deleteSession(
   return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId }, { signal });
 }
 
-// ---------------------------------------------------------------------------
-// Fake-LLM gate helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Headers for the fake LLM `/test/*` side channel.
  *
@@ -652,13 +647,17 @@ export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersS
 
 export type FakeRequestSnapshot = {
   chatCompletions: number;
+  /** Present when the query was scoped; echoes the requested scope. */
+  scope?: string;
 };
 
 export async function fetchFakeRequests(
   fakeLlmUrl: string,
   signal?: AbortSignal
 ): Promise<FakeRequestSnapshot> {
-  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
+  const scope = resolveFakeScope();
+  const query = scope === undefined ? '' : `?scope=${encodeURIComponent(scope)}`;
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests${query}`;
   const res = await fetch(url, { headers: fakeControlHeaders(), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
@@ -749,10 +748,6 @@ export async function waitForGateEngaged(
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// WebSocket stream
-// ---------------------------------------------------------------------------
-
 export const streamEventSchema = z.object({
   eventId: z.number(),
   executionId: z.string().nullable().default(null),
@@ -778,6 +773,12 @@ export type StreamConnection = {
   get receivedCount(): number;
   /** Whether the socket is still open. */
   get isOpen(): boolean;
+  /**
+   * Close code/reason of the first socket close observed on this connection, or
+   * `null` while no close frame has been seen. It lets a caller tell an observed
+   * transport drop from a wait that simply timed out on a live socket.
+   */
+  closeInfo: { code: number; reason: string } | null;
 };
 
 export type StreamOptions = {
@@ -883,6 +884,7 @@ export function openStream(
   let retryPending = false;
   let currentGeneration = 0;
   let currentWs: WebSocket | undefined;
+  let closeInfo: { code: number; reason: string } | null = null;
   const listeners: Array<{
     predicate: (event: StreamEvent) => boolean;
     resolve: (event: StreamEvent | null) => void;
@@ -955,12 +957,15 @@ export function openStream(
       handleMessage(raw);
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       if (generation !== currentGeneration) return;
       // `ws` emits `error` then `close` for a rejected handshake. While the
       // single retry is pending, this socket's close must not end the shared
       // connection or drop pending waits.
       if (retryPending) return;
+      // First cause wins: a later close (an explicit close after the server
+      // already closed, or a stale socket) must not overwrite the drop evidence.
+      if (closeInfo === null) closeInfo = { code, reason: reason.toString('utf8') };
       finalizeClose();
     });
 
@@ -1110,6 +1115,9 @@ export function openStream(
     get isOpen() {
       return !closed;
     },
+    get closeInfo() {
+      return closeInfo;
+    },
   };
 }
 
@@ -1142,12 +1150,24 @@ export async function openConnectedStream(
   return requireConnected(stream, sessionId);
 }
 
-// ---------------------------------------------------------------------------
-// Scenario helpers
-// ---------------------------------------------------------------------------
-
 export function fakeDirective(conversation: string): string {
-  return `__fake__:${conversation}`;
+  const scope = resolveFakeScope();
+  const directive = `__fake__:${conversation}`;
+  return scope === undefined ? directive : `${FAKE_SCOPE_MARKER_PREFIX}${scope}\n${directive}`;
+}
+
+/**
+ * Parallel matrix shards set `E2E_FAKE_SCOPE` to a unique token so the shared
+ * fake attributes that shard's completions to it. Absent means the global
+ * counters, which is what a single focused run uses.
+ */
+export function resolveFakeScope(): string | undefined {
+  const raw = process.env.E2E_FAKE_SCOPE;
+  if (raw === undefined || raw === '') return undefined;
+  if (!isFakeScopeToken(raw)) {
+    throw new Error(`E2E_FAKE_SCOPE must match [A-Za-z0-9_-]{1,64}; got ${JSON.stringify(raw)}`);
+  }
+  return raw;
 }
 
 export function hasPreparationForMessage(events: StreamEvent[], messageId: string): boolean {
@@ -1180,10 +1200,6 @@ export function waitForOpen(ws: WebSocket, timeoutMs = 5_000): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Assertions
-// ---------------------------------------------------------------------------
 
 export type AssertionResult = { ok: boolean; message: string };
 

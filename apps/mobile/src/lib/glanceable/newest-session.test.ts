@@ -52,11 +52,13 @@ describe('newestSessionTitle', () => {
     expect(newestSessionTitle(rows)).toBeNull();
   });
 
-  it('returns null when the newest row is still the backend creation placeholder', () => {
+  it('returns null when the newest row still carries the backend placeholder', () => {
+    // The backend seeds a fresh session with `New session - ${ISO}`; the
+    // widget shows nothing rather than the machine string.
     const rows = [
       { title: 'Named row', status: 'busy', updatedAt: '2026-01-01T00:00:00.000Z' },
       {
-        title: 'New session - 2026-09-22T04:17:22.503Z',
+        title: 'New session - 2026-01-06T00:00:00.000Z',
         status: 'busy',
         updatedAt: '2026-01-06T00:00:00.000Z',
       },
@@ -64,21 +66,27 @@ describe('newestSessionTitle', () => {
     expect(newestSessionTitle(rows)).toBeNull();
   });
 
-  it('keeps a real newest title beside an older placeholder', () => {
-    const rows = [
-      {
-        title: 'Child session - 2026-09-22T04:17:22.503Z',
-        status: 'busy',
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-      { title: 'Fix the flaky test', status: 'busy', updatedAt: '2026-01-06T00:00:00.000Z' },
-    ];
-    expect(newestSessionTitle(rows)).toBe('Fix the flaky test');
-  });
-
   it('accepts the minimal shared row, which carries no title', () => {
     // The snapshot contract's own row type: the publisher may be handed rows
     // that were never enriched, and the line then shows nothing.
     expect(newestSessionTitle([{ status: 'question' }])).toBeNull();
+  });
+
+  it('hides the backend default title so the newest line is not a timestamp', () => {
+    // Explorer session-question/typed-kb-up: the widget line showed the raw
+    // `New session - <ISO>` stamp as machine output rather than human copy.
+    const rows = [
+      {
+        title: 'New session - 2026-09-20T08:10:35.172Z',
+        status: 'question',
+        updatedAt: '2026-01-05T00:00:00.000Z',
+      },
+      {
+        title: 'Refactor the billing webhook',
+        status: 'busy',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    expect(newestSessionTitle(rows)).toBeNull();
   });
 });

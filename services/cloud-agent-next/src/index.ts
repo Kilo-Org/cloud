@@ -9,8 +9,10 @@ export {
   SandboxCodeReviewContainment,
   ContainerProxy,
 } from './sandbox-outbound.js';
+export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { SandboxControl } from './persistence/SandboxControl.js';
 export { SandboxSession } from './sandbox-session/SandboxSession.js';
+export { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

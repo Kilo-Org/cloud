@@ -1,6 +1,6 @@
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { isPlaceholderSessionTitle } from '@/lib/session-display-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -45,15 +45,11 @@ function titleOf(row: NewestSessionRow | null): string | null {
   if (row === null) {
     return null;
   }
-  const title = row.title;
-  // A blank title would draw an empty newest line; the surface shows nothing
-  // rather than a label with no name after it. The backend's creation
-  // placeholder (`New session - <ISO timestamp>`) is machine copy, so it must
-  // never reach the native snapshot either.
-  if (title === null || title === undefined || isPlaceholderSessionTitle(title)) {
-    return null;
-  }
-  return title;
+  // A backend default title (`New session - <ISO>`) is machine output, and a
+  // blank title would draw an empty newest line; a session with no name a
+  // person wrote shows nothing rather than a label with no name (or the
+  // machine string) after it.
+  return sessionDisplayTitle(row.title) ?? null;
 }
 
 /**

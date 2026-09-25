@@ -6,7 +6,7 @@ import { and, asc, eq, like, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/expo-sqlite/driver';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as SQLite from 'expo-sqlite';
 import migrations from '../../../drizzle/migrations';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';

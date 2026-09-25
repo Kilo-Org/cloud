@@ -39,7 +39,7 @@ import {
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
-import { resolveSessionDisplayTitle } from '@/lib/session-display-title';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { i18n } from '@/i18n';
 
@@ -186,7 +186,10 @@ function toNotificationRow(
 ): NeedsInputNotificationRow {
   return {
     sessionId: row.id,
-    title: resolveSessionDisplayTitle(row.title, i18n.t('agents.sessionRow.untitled')),
+    // The backend's `New session - <ISO>` is machine output, so the notification
+    // shows the same 'Untitled session' fallback the session list rows use
+    // instead of the raw identifier (SPOT-DEFECT e7.png).
+    title: sessionDisplayTitle(row.title) ?? i18n.t('agents.sessionRow.untitled'),
     kind,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,
@@ -283,6 +286,7 @@ function pushDataForRow(
     category: 'attention',
     attentionKind: row.kind,
     ...(row.prUrl === null ? {} : { prUrl: row.prUrl }),
+    ...(row.organizationId === null ? {} : { organizationId: row.organizationId }),
   };
 }
 

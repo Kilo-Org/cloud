@@ -55,6 +55,13 @@ import {
 } from './worktree-runtime.js';
 import { runDirectoryOperation } from './worktree-operations';
 import type { NativeRetirement } from './session-operation-cleanup.js';
+import { rememberWorktreeStateEndpoint } from './worktree-state-endpoints.js';
+import {
+  logWorktreeState,
+  restoreWorktreeState,
+  type WorktreeStateRestoreResult,
+} from '../worktree-state.js';
+import { WORKTREE_STATE_RESTORE_BUDGET_MS } from '../../../src/shared/worktree-state.js';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
@@ -95,6 +102,7 @@ export type ApplyAttachDeps = {
     signal?: AbortSignal
   ) => Promise<ExecResult>;
   restoreSession?: typeof restoreSession;
+  restoreWorktreeState?: typeof restoreWorktreeState;
   sessionExists?: (
     kiloSessionId: string,
     directory: string,
@@ -588,6 +596,28 @@ async function executeSessionAttach(
             }
             progress.complete('setup_commands', stepId);
           }
+          // A rebuilt sandbox starts from a clean clone, so this is the one
+          // moment where the previous sandbox's uncommitted work can be put
+          // back before the agent is asked to redo it.
+          if (attach.worktreeState) {
+            stage = 'worktree_state_restore';
+            signal.throwIfAborted();
+            const restored: WorktreeStateRestoreResult = await (
+              deps.restoreWorktreeState ?? restoreWorktreeState
+            )({
+              directory,
+              endpoint: attach.worktreeState,
+              env,
+              // Composed with the attach signal so the restore cannot spend the
+              // attachment deadline it is only a best-effort step of.
+              signal: AbortSignal.any([
+                signal,
+                AbortSignal.timeout(WORKTREE_STATE_RESTORE_BUDGET_MS),
+              ]),
+            });
+            logWorktreeState('restore', directory, restored);
+            signal.throwIfAborted();
+          }
           stage = 'bootstrap_marker';
           signal.throwIfAborted();
           await writeBootstrapMarker(directory);
@@ -709,6 +739,7 @@ async function executeSessionAttach(
     signal.throwIfAborted();
     const alreadyAttached = rootForSession(session.kiloSessionId) === session.kiloSessionId;
     rememberAttachedRoot(session.kiloSessionId, directory);
+    rememberWorktreeStateEndpoint(directory, attach.worktreeState);
     try {
       if (kiloSessionId === session.kiloSessionId)
         deps.terminalRuntime?.rememberAttachedSession(session);

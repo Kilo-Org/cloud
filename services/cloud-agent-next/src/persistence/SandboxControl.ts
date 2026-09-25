@@ -40,6 +40,8 @@ import {
   vercelSandboxResourcesSchema,
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { mintWorktreeStateGrant } from '../sandbox-control/worktree-state-grant.js';
+import { worktreeStateEndpointUrl, worktreeStateIdentitySchema } from '../shared/worktree-state.js';
 import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
@@ -288,6 +290,12 @@ const sandboxAcquisitionSchema = z.object({
 });
 
 export type SandboxAcquisition = z.infer<typeof sandboxAcquisitionSchema>;
+
+/** Runs `factory` at most once, handing every caller the same in-flight promise. */
+function memoize<T>(factory: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | undefined;
+  return () => (pending ??= factory());
+}
 
 function assertAcquisitionDeadline(acquisition: SandboxAcquisition): void {
   if (Date.now() >= acquisition.deadlineAt) throw new Error('Sandbox acquisition expired');
@@ -1146,7 +1154,8 @@ export class SandboxControl extends DurableObject<Env> {
             payload: {
               ...adaptSessionAttachPayloadForWrapper(
                 sessionAttachPayloadSchema.parse(input.payload),
-                this.socketHandler.supportsWorkingBranches?.() === true
+                this.socketHandler.supportsWorkingBranches?.() === true,
+                this.socketHandler.supportsWorktreeState?.() === true
               ),
               ...(this.supportsNativeRuntimeIdCapture()
                 ? { captureNativeRuntimeId: true as const }
@@ -1490,6 +1499,18 @@ export class SandboxControl extends DurableObject<Env> {
     input: Parameters<SandboxControl['ensureReady']>[0]
   ): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
     await this.ensureOperationalInitialized();
+    // One lookup per readiness pass, shared by the diagnostic launch env and
+    // the worktree-state grant. Deliberately a local rather than instance
+    // state: passes run concurrently, so an instance-wide memo would let one
+    // pass reset another's and reintroduce the double lookup it exists to
+    // avoid, while a transient failure still retries on the next pass.
+    const signingSecret = memoize(() =>
+      withTimeout(
+        resolveSecret(this.env.NEXTAUTH_SECRET),
+        1_000,
+        'Signing secret lookup timed out'
+      ).catch(() => null)
+    );
     this.assertWorktreeAdmission(input.worktreeId);
     const acquisition =
       input.acquisition === undefined
@@ -1762,7 +1783,11 @@ export class SandboxControl extends DurableObject<Env> {
       }
       return this.statusForAllocation(current, this.allocationIncarnationOf(current));
     });
-    return { ...status, attachment };
+    // Decorated here rather than during credential preparation: the grant is
+    // only read once the wrapper is attached, so minting it must not sit in
+    // front of the sandbox launch.
+    const worktreeState = await this.worktreeStateAttachment(metadata, signingSecret);
+    return { ...status, attachment: worktreeState ? { ...attachment, worktreeState } : attachment };
   }
 
   private async acquireCanonicalAllocation(
@@ -3487,6 +3512,34 @@ export class SandboxControl extends DurableObject<Env> {
     };
     await this.ctx.storage.put(BILLING_INPUT_KEY, billing);
     return billing;
+  }
+
+  /**
+   * Endpoint and grant the wrapper uses to persist this worktree's uncommitted
+   * changes and put them back on a rebuilt sandbox. Absent when the worker
+   * cannot issue one, which leaves the wrapper on its prior behaviour.
+   */
+  private async worktreeStateAttachment(
+    metadata: SessionMetadata,
+    signingSecret: () => Promise<string | null>
+  ): Promise<SessionAttachPayload['worktreeState']> {
+    const workerUrl = this.env.WORKER_URL;
+    if (!workerUrl) return undefined;
+    const secret = await signingSecret();
+    if (!secret) return undefined;
+    const parsed = worktreeStateIdentitySchema.safeParse({
+      userId: metadata.identity.userId,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    });
+    if (!parsed.success) return undefined;
+    try {
+      return {
+        url: worktreeStateEndpointUrl(workerUrl, parsed.data),
+        grant: mintWorktreeStateGrant(parsed.data, secret),
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   private async wrapperLaunchEnv(

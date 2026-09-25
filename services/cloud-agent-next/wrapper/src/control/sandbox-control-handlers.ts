@@ -45,6 +45,12 @@ import { gateResultFromProperties } from '../../../src/shared/kilo-event-propert
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import type { materializeMessageAttachments } from '../session-bootstrap.js';
 import type { runAutoCommit } from '../auto-commit.js';
+import type { captureWorktreeState } from '../worktree-state.js';
+import { discardWorktreeState } from '../worktree-state.js';
+import {
+  forgetWorktreeStateEndpoint,
+  worktreeStateEndpointFor,
+} from './worktree-state-endpoints.js';
 import { rejectBeforeAdmission, type ControlHandlerResult } from './control-handler-result.js';
 import {
   createOperationRegistry,
@@ -266,6 +272,8 @@ export type HandlerDeps = {
   applyAttach?: typeof applySessionAttach;
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
+  captureWorktreeState?: typeof captureWorktreeState;
+  discardWorktreeState?: typeof discardWorktreeState;
   collectWorktreeChanges?: typeof collectWorktreeChanges;
   collectWorktreeSnapshot?: typeof collectWorktreeSnapshot;
 };
@@ -600,6 +608,11 @@ export async function handleControlRequest(
           await deps.terminalRuntime?.detachDirectory(directory);
         },
         retireDirectory: async (directory: string) => {
+          // The worktree is going away, so its captured work must not linger in
+          // object storage until the bundle's own TTL expires.
+          const endpoint = worktreeStateEndpointFor(directory);
+          forgetWorktreeStateEndpoint(directory);
+          if (endpoint) await (deps.discardWorktreeState ?? discardWorktreeState)(endpoint);
           await kiloRuntimes.deleteDirectory(directory);
         },
       };
@@ -1119,6 +1132,7 @@ function handlePrompt(
       runtime,
       materializeAttachments: deps.materializeAttachments,
       runAutoCommit: deps.runAutoCommit,
+      captureWorktreeState: deps.captureWorktreeState,
     },
     operationEffects(session, deps)
   );

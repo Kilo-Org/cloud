@@ -306,8 +306,17 @@ repository.
 3. If the environment dies, the next prompt MUST recover in the same chat. The
    user MUST NOT be forced to start a new session.
 4. Recovery MUST preserve each worktree chat, its transcript, and its grouping.
-   Uncommitted files are not guaranteed to survive replacement of the shared
-   physical environment.
+5. Uncommitted work MUST be captured after every turn and MUST be restored into
+   the rebuilt worktree when the shared physical environment is replaced. The
+   capture covers tracked modifications and the untracked files Git reports;
+   ignored paths such as dependency and build directories are recreated by
+   setup commands rather than carried. A capture that cannot be taken or
+   applied — an unreadable HEAD, a worktree rebuilt onto a different commit, a
+   patch that conflicts with setup output, a bundle beyond the size ceiling, an
+   expired capture grant on a wrapper that has been continuously busy beyond the
+   grant lifetime — MUST leave the rebuilt worktree untouched, MUST NOT fail
+   the attach, and MUST NOT leave conflict markers or unmerged index entries
+   behind.
 
 ### Continuity
 

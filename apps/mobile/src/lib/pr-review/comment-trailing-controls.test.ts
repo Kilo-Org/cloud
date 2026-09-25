@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { MIN_TAP_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
@@ -10,6 +10,8 @@ import {
   FIX_WITH_KILO_HIT_SLOP,
   FIX_WITH_KILO_VISUAL_DP,
 } from '@/lib/pr-review/comment-trailing-controls';
+
+vi.mock('react-native', () => ({ I18nManager: { isRTL: false } }));
 
 describe('comment trailing controls tap areas', () => {
   it('keeps the pill and the overflow hit areas apart', () => {

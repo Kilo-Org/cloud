@@ -83,6 +83,10 @@ describe('sandbox image versions', () => {
       fileURLToPath(new URL('../../Dockerfile.dind', import.meta.url).href),
       'utf8'
     );
+    const containersDockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile.containers', import.meta.url).href),
+      'utf8'
+    );
     const wranglerConfig = readFileSync(
       fileURLToPath(new URL('../../wrangler.jsonc', import.meta.url).href),
       'utf8'
@@ -96,7 +100,8 @@ describe('sandbox image versions', () => {
     expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(wranglerConfig.split(imageVar)).toHaveLength(15);
+    expect(containersDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
+    expect(wranglerConfig.split(imageVar)).toHaveLength(17);
     expect(DEFAULT_SLASH_COMMANDS_SOURCE).toBe(`kilo@${KILO_CLI_VERSION}`);
   });
 });

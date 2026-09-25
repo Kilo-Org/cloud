@@ -317,6 +317,38 @@ test('skips a partial Android SDK root when a later root has all required tools'
   assert.equal(env.emulator, '/opt/homebrew/share/android-commandlinetools/emulator/emulator');
 });
 
+test('finds the Android SDK at a Linux dev-host home root', () => {
+  const env = resolveAndroidEnvironment({
+    home: '/home/test',
+    path: '/usr/bin:/bin',
+    existingPaths: new Set([
+      '/home/test/Android/sdk/platform-tools/adb',
+      '/home/test/Android/sdk/emulator/emulator',
+      '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java',
+    ]),
+    javaMajor: () => 17,
+  });
+
+  assert.equal(env.sdkRoot, '/home/test/Android/sdk');
+  assert.equal(env.adb, '/home/test/Android/sdk/platform-tools/adb');
+  assert.equal(env.emulator, '/home/test/Android/sdk/emulator/emulator');
+});
+
+test('finds the Android SDK at the Linux system root', () => {
+  const env = resolveAndroidEnvironment({
+    home: '/home/test',
+    path: '/usr/bin:/bin',
+    existingPaths: new Set([
+      '/usr/local/lib/android/sdk/platform-tools/adb',
+      '/usr/local/lib/android/sdk/emulator/emulator',
+      '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java',
+    ]),
+    javaMajor: () => 17,
+  });
+
+  assert.equal(env.sdkRoot, '/usr/local/lib/android/sdk');
+});
+
 test('serializes stale Android claim replacement with concurrent claim attempts', () => {
   const serial = `test-${process.pid}-${Date.now()}`;
   const claimRoot = path.join(os.tmpdir(), 'kilo-mobile-android-claims');

@@ -112,6 +112,31 @@ describe('planNeedsInputNotifications', () => {
     });
   });
 
+  it('falls back to the localized untitled copy for a backend default title', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'New session - 2026-09-22T18:52:16.946Z',
+          status: 'question',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.publish).toEqual([
+      {
+        sessionId: 'ses_1',
+        title: 'Untitled session',
+        kind: 'question',
+        prUrl: null,
+        organizationId: null,
+      },
+    ]);
+  });
+
   it('publishes a classified permission with the PR that can be opened', () => {
     const plan = planNeedsInputNotifications({
       previous: [],
@@ -575,6 +600,35 @@ describe('applyNeedsInputNotifications', () => {
       2,
       expect.objectContaining({ content: expect.not.objectContaining({ sound: false }) })
     );
+  });
+
+  it('carries the organization on the posted raise so a tap switches context', async () => {
+    await applyNeedsInputNotifications({
+      publish: [notifiedRow({ organizationId: 'org-a' })],
+      dismiss: [],
+      updates: [],
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          data: expect.objectContaining({ organizationId: 'org-a' }),
+        }),
+      })
+    );
+  });
+
+  it('omits organizationId from a Personal raise so the absent key switches nothing', async () => {
+    await applyNeedsInputNotifications({
+      publish: [notifiedRow({ organizationId: null })],
+      dismiss: [],
+      updates: [],
+    });
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: Record<string, unknown> } },
+    ];
+    expect(request.content.data).not.toHaveProperty('organizationId');
   });
 
   it('reports and swallows a rejected schedule so the mount never crashes', async () => {

@@ -4,7 +4,6 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNo
 import {
   getFiletypeFromFileName,
   getHighlighterOptions,
-  parsePatchFiles,
   preloadHighlighter,
   type FileDiffMetadata,
   type FileOptions,
@@ -14,10 +13,11 @@ import { File, FileDiff } from '@pierre/diffs/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { FoldVertical, UnfoldVertical } from 'lucide-react';
+import { Columns2, FoldVertical, UnfoldVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -25,7 +25,11 @@ import {
   isWorktreeMarkdownPath,
   worktreeFileOmissionMessages,
 } from './worktree-file';
-import { getWorktreeDiffExpansion } from './worktree-file-diff';
+import {
+  getWorktreeDiffExpansion,
+  parseSavedWorktreePatch,
+  selectWorktreeRenderedDiff,
+} from './worktree-file-diff';
 import type { WorktreeReviewDiffProps } from './WorktreeReviewEditor';
 import type { WorktreeReviewCapture } from './worktree-review';
 import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
@@ -80,6 +84,17 @@ const fileOptions = {
   unsafeCSS: rendererCSS,
 } satisfies FileOptions<undefined>;
 
+export type WorktreeDiffStyle = 'unified' | 'split';
+
+export function parseWorktreeDiffStyle(value: string): WorktreeDiffStyle {
+  try {
+    const style: unknown = JSON.parse(value);
+    return style === 'unified' || style === 'split' ? style : 'unified';
+  } catch {
+    return 'unified';
+  }
+}
+
 export type WorktreeFileHighlighterResult =
   | { status: 'ready'; lang: SupportedLanguages }
   | { status: 'error' };
@@ -130,76 +145,6 @@ function WorktreeFileHighlighter({
     );
   }
   return children(result.lang);
-}
-
-const canonicalGitHeader =
-  /^diff --git [^\n]+\n(?:(?:old mode|new mode|new file mode|deleted file mode) 100(?:644|755)\n|index [0-9a-f]+\.\.[0-9a-f]+(?: 100(?:644|755))?\n)*(?:--- [^\n]+\n\+\+\+ [^\n]+\n)?$/;
-const emptyGitBlobIds = [
-  'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391',
-  '473a0f4c3be8a93681a267e3b1e9a7dcda1185436fe141f7749120a303721813',
-];
-
-export function parseSavedWorktreePatch(patch: string, path: string): FileDiffMetadata | null {
-  try {
-    if (!patch.endsWith('\n')) return null;
-    const firstHunk = patch.indexOf('\n@@ ');
-    const header = firstHunk < 0 ? patch : patch.slice(0, firstHunk + 1);
-    if (!canonicalGitHeader.test(header)) return null;
-    const patches = parsePatchFiles(patch, undefined, true);
-    const parsed = patches[0];
-    const file = parsed?.files[0];
-    if (patches.length !== 1 || parsed?.patchMetadata || parsed?.files.length !== 1 || !file) {
-      return null;
-    }
-    if (file.hunks.length === 0) {
-      if (header.includes('\n--- ')) return null;
-      const modeChange =
-        file.type === 'change' &&
-        file.prevMode &&
-        file.mode &&
-        file.prevMode !== file.mode &&
-        !file.prevObjectId &&
-        !file.newObjectId;
-      const objectId = file.type === 'new' ? file.newObjectId : file.prevObjectId;
-      const missingObjectId = file.type === 'new' ? file.prevObjectId : file.newObjectId;
-      const emptyFileChange =
-        (file.type === 'new' || file.type === 'deleted') &&
-        file.mode &&
-        objectId &&
-        missingObjectId &&
-        /^0+$/.test(missingObjectId) &&
-        emptyGitBlobIds.some(emptyId => emptyId.startsWith(objectId));
-      if (!modeChange && !emptyFileChange) return null;
-    } else if (!/\n--- [^\n]+\n\+\+\+ [^\n]+\n$/.test(header)) {
-      return null;
-    }
-    let parsedLines = header.split('\n').length - 1;
-    for (const hunk of file.hunks) {
-      if (
-        !Number.isSafeInteger(hunk.additionStart + hunk.additionCount) ||
-        !Number.isSafeInteger(hunk.deletionStart + hunk.deletionCount) ||
-        (hunk.additionCount > 0 && hunk.additionStart === 0) ||
-        (hunk.deletionCount > 0 && hunk.deletionStart === 0)
-      ) {
-        return null;
-      }
-      const newlineMarkers =
-        hunk.hunkContent.at(-1)?.type === 'context'
-          ? Number(hunk.noEOFCRAdditions || hunk.noEOFCRDeletions)
-          : Number(hunk.noEOFCRAdditions) + Number(hunk.noEOFCRDeletions);
-      parsedLines += 1 + hunk.unifiedLineCount + newlineMarkers;
-    }
-    const lines = patch.split('\n');
-    if (
-      parsedLines !== lines.length - 1 ||
-      lines.some(line => line.startsWith('\\') && line !== '\\ No newline at end of file')
-    ) {
-      return null;
-    }
-    return { ...file, name: path, prevName: undefined };
-  } catch {
-    return null;
-  }
 }
 
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -255,12 +200,14 @@ function HighlightedWorktreeDiff({
   revision,
   expanded,
   reviewProps,
+  diffStyle,
 }: {
   diff: FileDiffMetadata;
   lang: SupportedLanguages;
   revision: number;
   expanded: boolean;
   reviewProps?: WorktreeReviewDiffProps;
+  diffStyle: WorktreeDiffStyle;
 }) {
   const fileDiff = useMemo(() => ({ ...diff, lang }), [diff, lang]);
   const reviewPostRender = reviewProps?.options?.onPostRender;
@@ -284,7 +231,7 @@ function HighlightedWorktreeDiff({
         unsafeCSS: [fileOptions.unsafeCSS, reviewProps?.options?.unsafeCSS]
           .filter(Boolean)
           .join('\n'),
-        diffStyle: 'unified',
+        diffStyle,
         diffIndicators: 'none',
         hunkSeparators: 'line-info-basic',
         expandUnchanged: expanded,
@@ -321,8 +268,14 @@ export default function WorktreeFileRenderer({
   const requestedMode = getWorktreeFileViewMode(file, mode);
   const viewMode = requestedMode === 'expanded' && !canExpand ? 'diff' : requestedMode;
   const expanded = viewMode === 'expanded';
+  const [diffStyle, setDiffStyle] = useLocalStorage<WorktreeDiffStyle>(
+    'cloud-agent:worktree-diff-style',
+    'unified',
+    { initializeWithValue: false, deserializer: parseWorktreeDiffStyle }
+  );
   const canPreview = file.content.status === 'available';
   const expandLabel = expanded ? 'Hide unchanged lines' : 'Show all lines';
+  const diffStyleLabel = diffStyle === 'split' ? 'Show unified diff' : 'Show side-by-side diff';
   const expansionHint =
     expansion?.status === 'unavailable'
       ? `Full content unavailable. ${worktreeFileOmissionMessages[expansion.reason]}`
@@ -338,7 +291,7 @@ export default function WorktreeFileRenderer({
         ? 'Show changes'
         : 'Preview Markdown';
   const highlighterKey = JSON.stringify([file.path, file.revision]);
-  const renderedDiff = expansion?.status === 'available' ? expansion.diff : parsed;
+  const renderedDiff = parsed === null ? null : selectWorktreeRenderedDiff(parsed, expansion);
   const needsHighlighter = parsed !== null && (parsed.hunks.length > 0 || expanded);
   const [highlighter, setHighlighter] = useState<{
     key: string;
@@ -417,11 +370,12 @@ export default function WorktreeFileRenderer({
         <WorktreeFileHighlighter result={highlighterResult}>
           {lang => (
             <HighlightedWorktreeDiff
-              diff={expansion?.status === 'available' ? expansion.diff : parsed}
+              diff={renderedDiff ?? parsed}
               lang={lang}
               revision={file.revision}
               expanded={expanded}
               reviewProps={reviewProps}
+              diffStyle={diffStyle}
             />
           )}
         </WorktreeFileHighlighter>
@@ -471,6 +425,24 @@ export default function WorktreeFileRenderer({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
             {canExpand ? expandLabel : expansionHint}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant={diffStyle === 'split' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="text-muted-foreground h-11 w-11 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent motion-reduce:transition-none sm:h-8 sm:w-8"
+              aria-label={diffStyleLabel}
+              aria-pressed={diffStyle === 'split'}
+              onClick={() => setDiffStyle(diffStyle === 'split' ? 'unified' : 'split')}
+            >
+              <Columns2 aria-hidden="true" className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs">
+            {diffStyleLabel}
           </TooltipContent>
         </Tooltip>
         {isWorktreeMarkdownPath(file.path) && (

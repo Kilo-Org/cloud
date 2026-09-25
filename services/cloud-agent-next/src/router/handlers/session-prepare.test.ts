@@ -205,7 +205,12 @@ describe('prepareSession operation-ledger admission gate', () => {
 
     expect(startNewSessionMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+          githubAccessPurpose: 'workflow',
+        },
       }),
       expect.any(Object),
       expect.any(Object)
@@ -223,11 +228,13 @@ describe('prepareSession operation-ledger admission gate', () => {
       autoInitiate: true,
       operationKey: OPERATION_KEY,
       createdOnPlatform: 'cloud-agent-web',
+      githubAccessPurpose: 'agent',
       clientProvenance: 'mobile',
     });
 
     expect(createSessionWithLedgerMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        repository: expect.objectContaining({ githubAccessPurpose: 'agent' }),
         options: expect.objectContaining({ clientProvenance: 'mobile' }),
       }),
       expect.anything(),

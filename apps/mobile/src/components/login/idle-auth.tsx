@@ -12,12 +12,13 @@ import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
-  INLINE_LINK_HIT_SLOP,
   INLINE_LINK_ROW_CLASS,
+  inlineLinkHitSlop,
 } from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
@@ -25,6 +26,13 @@ import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
+
+// One fixed slot per provider row. It reserves the same width in all three
+// rows, so the flex-1 label starts from the same x, and it holds whichever of
+// the mark or the inline spinner the row has - swapping an 18pt mark for the
+// spinner cannot move the label. All three rows draw a mark in the slot (the
+// passkey row included), so the three provider options read as one group.
+export const PROVIDER_GLYPH_SLOT_CLASS = 'h-[18px] w-[18px] items-center justify-center';
 
 export function IdleAuth({
   start,
@@ -218,26 +226,37 @@ export function IdleAuth({
       )}
 
       {showApple && (
-        // The app's own outlined Button, exactly like Google and the passkey:
-        // one border colour and width, one fill, radius, height and label
-        // weight across the three. The native AppleAuthenticationButton draws
+        // The provider row is ours, not Apple's native control: the native
+        // button titles itself in the device language, which left English
+        // "Sign in with Apple" next to the translated Google and passkey rows
+        // when the app language differed from the device language, and it draws
         // its own dark border (about twice the design system hairline) that no
-        // buttonStyle can match, so the mark is drawn here beside the label.
-        // Apple's HIG requires the mark and the exact "Sign in with Apple"
-        // wording; a custom control satisfies it, as does the Google button.
+        // buttonStyle can match. The label comes from the catalog
+        // (`login.signInWithApple`), and the mark and outline chrome match the
+        // two rows below it: one border colour and width, one fill, radius,
+        // height and label weight across the three. Apple's HIG requires the
+        // mark and the exact "Sign in with Apple" wording; a custom control
+        // satisfies it, as does the Google button.
         <Button
           variant="outline"
           size="lg"
+          // Same chrome and no-flex-wrap row as the Google and passkey rows
+          // below: the label must stay on the icon's line at the shared 44pt
+          // floor, so all three provider rows keep one height.
           className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
-          onPress={() => void signInWithApple()}
+          onPress={() => {
+            void signInWithApple();
+          }}
           accessibilityLabel={t('login.signInWithApple')}
         >
-          {busy === 'apple' ? (
-            <ActivityIndicator size="small" />
-          ) : (
-            <AppleLogo size={18} color={colors.foreground} />
-          )}
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'apple' ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <AppleLogo size={18} color={colors.foreground} />
+            )}
+          </View>
           <Text className="flex-1 text-center text-[17px] font-medium">
             {t('login.signInWithApple')}
           </Text>
@@ -256,7 +275,9 @@ export function IdleAuth({
           onPress={() => void signInWithGoogle()}
           accessibilityLabel={t('login.signInWithGoogle')}
         >
-          {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
+          </View>
           <Text className="flex-1 text-center text-[17px] font-medium">
             {t('login.signInWithGoogle')}
           </Text>
@@ -281,7 +302,15 @@ export function IdleAuth({
             }}
             accessibilityLabel={t('login.signInWithPasskey')}
           >
-            {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
+            <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+              {busy === 'passkey' ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                // Same leading-glyph slot as the Apple and Google rows, so the
+                // three provider options read as one group.
+                <KeyRound size={18} color={colors.foreground} />
+              )}
+            </View>
             <Text className="flex-1 text-center text-[17px] font-medium">
               {t('login.signInWithPasskey')}
             </Text>
@@ -343,21 +372,23 @@ export function IdleAuth({
       <View className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}>
         {/* The sentence is a row of nodes, not one Text with nested handlers: an
             inline link's own box is what the control-size audit measures, so
-            each link carries the shared inline-link box and its own reach. The
-            box adds no height to the line (its 28dp floor is cancelled by the
-            shared layout-neutral form), so the only gaps between the words are
-            the sentence's own spaces, and the connector's min-width keeps both
-            facing slops apart in a catalog with a short conjunction. The links'
-            44pt vertical reach needs `(28 - 14) / 2 + 8 = 15dp` of free space
-            above and below the `text-xs` line, which the screen's `gap-3`
-            gutter (10.5dp) cannot give it, so the row carries the extra 5dp
-            margin: both regions then stay clear of the Continue button above
-            and the ghost button below. */}
+            each link carries the shared inline-link box and its own per-side
+            reach — 4dp toward the connector, 12dp away — which still adds to
+            44pt from the 28dp floor. The box adds no height to the line (its
+            28dp floor is cancelled by the shared layout-neutral form), so the
+            only gaps between the words are the sentence's own spaces, and the
+            connector's min-width keeps both 4dp facing reaches apart in a
+            catalog with a short conjunction. The links' 44pt vertical reach
+            needs `(28 - 14) / 2 + 8 = 15dp` of free space above and below the
+            `text-xs` line, which the screen's `gap-3` gutter (10.5dp) cannot
+            give it, so the row carries the extra 5dp margin: both regions then
+            stay clear of the Continue button above and the ghost button
+            below. */}
 
         <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
         <Pressable
           className={INLINE_LINK_BOX_CLASS}
-          hitSlop={INLINE_LINK_HIT_SLOP}
+          hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
           accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
@@ -369,7 +400,7 @@ export function IdleAuth({
         </Text>
         <Pressable
           className={INLINE_LINK_BOX_CLASS}
-          hitSlop={INLINE_LINK_HIT_SLOP}
+          hitSlop={inlineLinkHitSlop('end')}
           accessibilityRole="link"
           accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
@@ -379,14 +410,19 @@ export function IdleAuth({
         <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
       </View>
       <Button
-        variant="ghost"
+        // A text action that opens the browser sign-in options. It wears the
+        // same underlined primary link treatment as the Terms and Privacy
+        // Policy links above, so it reads as tappable rather than as plain bold
+        // text with no affordance.
+        variant="link"
+        className="active:opacity-60"
         disabled={authBusy}
         onPress={() => {
           void startBrowserAuth();
         }}
         accessibilityLabel={t('login.moreSignInOptions')}
       >
-        <Text>{t('login.moreSignInOptions')}</Text>
+        <Text className="underline">{t('login.moreSignInOptions')}</Text>
       </Button>
     </View>
   );

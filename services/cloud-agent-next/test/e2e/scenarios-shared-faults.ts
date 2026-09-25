@@ -15,9 +15,9 @@
  * The freeze scenarios additionally prove the mechanism with
  * identity-correlated `sandbox_control` evidence (the local `sandboxFaults`
  * capability reads the local worker log; the deployed profile provides no
- * `sandboxFaults`): the settled-reap `physical_committed running -> stopping`
- * cause and stopCause, the terminal `provider_stop`, the heartbeat-expiry
- * recovery outcome, no re-ready wrapper, and for the inflight variant the
+ * `sandboxFaults`): the settled-reap `allocation_transition` into
+ * `stopping.destroying`, the terminal `native_stop`, the heartbeat-expiry
+ * recovery start, no re-ready wrapper, and for the inflight variant the
  * `runtime_unhealthy` accepted-reconciliation plus the still-active route. A
  * missing cause fails; a run that merely lost the allocation and got a
  * replacement does not pass.
@@ -31,6 +31,7 @@ import {
   fakeDirective,
   getMessageResult,
   getSessionSnapshot,
+  isMessageCompleted,
   messageIdFromEvent,
   openConnectedStream,
   prepareBrowserSession,
@@ -42,12 +43,14 @@ import {
   type WorktreeSessionResult,
 } from './client.js';
 import {
+  awaitCorrelatedChildText,
+  CONTENT_CORRELATION_BUDGET_MS,
   cleanupRemoteSession,
-  collectChildMessageText,
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
 import {
+  awaitDurableTerminal,
   bootToCompletion,
   createOwnedSessionRegistry,
   createScenarioDeadline,
@@ -63,7 +66,8 @@ import {
 } from './scenarios-shared-runtime.js';
 import { assertScenarioPreconditions } from './public-surface-support.js';
 import { assertReapOutcome } from './sandbox-fault-evidence.js';
-import { RECOVERY_SETTLED_REAP_REASON } from '../../src/sandbox-control/recovery-cleanup.js';
+import { AttachWindowMissedError, type AttachWindowResult } from './attach-window-evidence.js';
+import { healthUnhealthyReason } from '../../src/sandbox-state/allocation/reduce.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type {
   SandboxFaultObservation,
@@ -72,6 +76,7 @@ import type {
   SessionSandboxObservation,
 } from './scenario-capabilities.js';
 
+const SETTLED_REAP_REASON = healthUnhealthyReason('unresponsive');
 /** Whole-scenario budget for the fault scenarios. */
 const FAULT_TIMEOUT_MS = 15 * 60_000;
 const CONTAINER_BUDGET_MS = 240_000;
@@ -93,9 +98,53 @@ const INFLIGHT_HOLD_DIRECTIVE = 'slow:120:1000:16';
 const PACED_PROGRESS_BUDGET_MS = 90_000;
 /** Bound for the `runtime_unhealthy` terminal after an inflight freeze. */
 const UNHEALTHY_TERMINAL_BUDGET_MS = 8 * 60_000;
+/**
+ * Bounded retry for `control-socket-recycle-boot`. Only a positively established
+ * window miss retries, each on a fresh session with one signal, because discovery
+ * before the signal can let a fast echo finish first.
+ */
+const MAX_ATTACH_WINDOW_ATTEMPTS = 3;
+/** Poll interval while waiting for a discarded attempt's turn to settle. */
+const BOOT_SETTLE_POLL_MS = 500;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** True when the stream history already holds a `cloud.message.failed` for the turn. */
+function hasMessageFailed(events: StreamEvent[], messageId: string): boolean {
+  return events.some(
+    event =>
+      event.streamEventType === 'cloud.message.failed' && messageIdFromEvent(event) === messageId
+  );
+}
+
+/**
+ * True when the turn already has a terminal failure for the same message. A
+ * genuine post-fault failure must fail the scenario even when the capability
+ * reports a window miss, so a later attempt cannot pass over it. The stream
+ * history is checked first; the durable status catches a failure written but not
+ * yet streamed. A miss can be observed while the discarded attempt's turn is
+ * still running, so the durable status is observed until the turn settles or the
+ * scenario deadline expires; a single non-terminal sample would let a failure
+ * that materializes later be retried away.
+ */
+async function attachWindowTurnFailed(
+  deadline: ScenarioDeadline,
+  config: DriverConfig,
+  session: WorktreeSessionResult,
+  messageId: string,
+  events: StreamEvent[]
+): Promise<boolean> {
+  if (hasMessageFailed(events, messageId)) return true;
+  for (;;) {
+    const result = await deadline.within('boot durable', signal =>
+      getMessageResult(config, session.cloudAgentSessionId, messageId, signal)
+    );
+    if (result.status === 'failed' || result.status === 'interrupted') return true;
+    if (result.status === 'completed') return false;
+    await sleep(BOOT_SETTLE_POLL_MS);
+  }
 }
 
 async function prepareSession(
@@ -258,12 +307,11 @@ async function runExternalKill(
       fakeDirective(`echo:boot-${runId}`)
     );
     owned.register(session);
-    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+      echoPayloadMatches(text, `boot-${runId}`)
+    );
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!echoPayloadMatches(boot.text, `boot-${runId}`)) {
-      return fail(`boot turn did not echo boot-${runId}`);
-    }
 
     const { allocation, target } = await captureFaultTarget(
       deadline,
@@ -285,10 +333,16 @@ async function runExternalKill(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-kill-${runId}`)) {
-      return fail(`recovery turn did not echo after-kill-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('recovery turn content'))
+      ),
+      label: 'recovery turn',
+      ready: text => echoPayloadMatches(text, `after-kill-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -433,10 +487,16 @@ async function runKillMidFlight(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-kill-${runId}`)) {
-      return fail(`recovery turn did not echo after-kill-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('recovery turn content'))
+      ),
+      label: 'recovery turn',
+      ready: text => echoPayloadMatches(text, `after-kill-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -529,12 +589,11 @@ async function runWrapperFreezeSettledReap(
       fakeDirective(`echo:boot-${runId}`)
     );
     owned.register(session);
-    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+      echoPayloadMatches(text, `boot-${runId}`)
+    );
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!echoPayloadMatches(boot.text, `boot-${runId}`)) {
-      return fail(`boot turn did not echo boot-${runId}`);
-    }
 
     const { allocation, target } = await captureFaultTarget(
       deadline,
@@ -562,10 +621,16 @@ async function runWrapperFreezeSettledReap(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-freeze-${runId}`)) {
-      return fail(`replacement turn did not echo after-freeze-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('replacement turn content'))
+      ),
+      label: 'replacement turn',
+      ready: text => echoPayloadMatches(text, `after-freeze-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -591,7 +656,7 @@ async function runWrapperFreezeSettledReap(
       evidence: reapEvidence,
       reapedAllocationRef: allocation,
       replacementAllocationRef: replacement,
-      settledReapReason: RECOVERY_SETTLED_REAP_REASON,
+      settledReapReason: SETTLED_REAP_REASON,
       inflight: false,
     });
 
@@ -679,12 +744,11 @@ async function runWrapperFreezeInflightReap(
       fakeDirective(`echo:boot-${runId}`)
     );
     owned.register(session);
-    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot');
+    const boot = await bootToCompletion(deadline, scenarioConfig, session, 'boot', text =>
+      echoPayloadMatches(text, `boot-${runId}`)
+    );
     streams.push(boot.stream);
     events.push(...boot.stream.events);
-    if (!echoPayloadMatches(boot.text, `boot-${runId}`)) {
-      return fail(`boot turn did not echo boot-${runId}`);
-    }
 
     const { allocation, target } = await captureFaultTarget(
       deadline,
@@ -750,10 +814,16 @@ async function runWrapperFreezeInflightReap(
     );
     streams.push(recovery.stream);
     events.push(...recovery.stream.events);
-    const recoveryText = collectChildMessageText(recovery.stream.events, recovery.messageId);
-    if (!echoPayloadMatches(recoveryText, `after-freeze-${runId}`)) {
-      return fail(`replacement turn did not echo after-freeze-${runId}`);
-    }
+    await awaitCorrelatedChildText({
+      stream: recovery.stream,
+      parentMessageId: recovery.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('replacement turn content'))
+      ),
+      label: 'replacement turn',
+      ready: text => echoPayloadMatches(text, `after-freeze-${runId}`),
+    });
     const replacement = await waitForDistinctAllocation(
       deadline,
       sandbox,
@@ -780,7 +850,7 @@ async function runWrapperFreezeInflightReap(
       evidence: reapEvidence,
       reapedAllocationRef: allocation,
       replacementAllocationRef: replacement,
-      settledReapReason: RECOVERY_SETTLED_REAP_REASON,
+      settledReapReason: SETTLED_REAP_REASON,
       inflight: true,
     });
 
@@ -807,6 +877,210 @@ async function runWrapperFreezeInflightReap(
         console.warn(`wrapper-freeze-inflight-reap unfreeze skipped: ${errorMessage(error)}`);
       }
     }
+    for (const stream of streams) {
+      try {
+        stream.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    for (const late of await creations.settleAll(LATE_CREATE_SETTLE_MS)) {
+      owned.register(late);
+    }
+    await owned.cleanup(scenarioName);
+  }
+  return result;
+}
+
+/**
+ * `control-socket-recycle-boot`: after preparing a session but before its first
+ * turn completes, drop the control-plane wrapper's control socket during the
+ * first attach and require the production reconnect owner to bring up a new
+ * one. The initial message must still complete with the echo intact and exactly
+ * one prompt dispatch.
+ *
+ * The induction is not a deterministic attach gate. The capability fails closed
+ * unless the signal is followed by the close/reconnect sequence and no
+ * `socket_response` for the attach `requestId` appears before the selected close.
+ * A positively established miss (a matching response before that close) is
+ * retried on a fresh session with one signal, at most three times; every other
+ * capability outcome fails. A `cloud.message.failed` or a durable
+ * `failed`/`interrupted` after the capability returns fails the scenario and is
+ * never retried as a miss. It can pass on a base tree, because a close that lands
+ * while `session.attach` is outstanding is recovered by the already-present
+ * unconfirmed-attach release; the unit tests are the discriminator for the
+ * prompt-reconcile and prompt-budget branches.
+ */
+async function runControlSocketRecycleBoot(
+  args: LifecycleArgs,
+  env: ScenarioEnvironment
+): Promise<LifecycleResult> {
+  const startedAt = Date.now();
+  const { config, conversation, timeoutMs = FAULT_TIMEOUT_MS } = args;
+  const scenarioName = 'control-socket-recycle-boot';
+  const sandbox = sessionSandboxObservation(env);
+  const faults = env.sandboxFaults;
+  if (!faults) throw new Error('sandboxFaults capability is required');
+  const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
+  const scenarioConfig = owned.config;
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
+  const creations = trackCreations<WorktreeSessionResult>(deadline, owned, scenarioName);
+  const runId = randomUUID().slice(0, 8);
+  const events: StreamEvent[] = [];
+  const streams: StreamConnection[] = [];
+
+  const fail = (message: string): LifecycleResult => ({
+    name: scenarioName,
+    conversation,
+    ok: false,
+    message,
+    events,
+    durationMs: Date.now() - startedAt,
+  });
+  // Every attempt missed, or the pre-signal completion bound was reached.
+  let result: LifecycleResult = fail('attach window missed');
+
+  try {
+    assertScenarioPreconditions(scenarioConfig, args.api);
+    for (let attempt = 1; attempt <= MAX_ATTACH_WINDOW_ATTEMPTS; attempt += 1) {
+      const evidenceCursor = await faults.captureWorkerLogCursor();
+      const session = await prepareSession(
+        creations,
+        scenarioConfig,
+        fakeDirective(`echo:boot-${runId}`)
+      );
+      owned.register(session);
+
+      const { allocation, target } = await captureFaultTarget(
+        deadline,
+        sandbox,
+        faults,
+        session,
+        'boot'
+      );
+
+      const snapshot = await deadline.within('boot snapshot', signal =>
+        getSessionSnapshot(scenarioConfig, session.cloudAgentSessionId, signal)
+      );
+      const messageId = snapshot.initialMessageId;
+      if (!messageId) throw new Error('boot did not expose an initial message id');
+      const stream = await deadline.within('boot stream', signal =>
+        openConnectedStream(scenarioConfig, session.cloudAgentSessionId, true, undefined, signal)
+      );
+      streams.push(stream);
+
+      // A failure already in history fails; a completion already in history is a
+      // miss (it finished before any fault evidence), so do not signal.
+      if (hasMessageFailed(stream.events, messageId)) {
+        throw new Error(`boot turn ${messageId} failed before the attach-window signal`);
+      }
+      if (stream.events.some(event => isMessageCompleted(event, messageId))) {
+        stream.close();
+        continue;
+      }
+
+      let observed: AttachWindowResult;
+      try {
+        observed = await faults.dropControlSocketDuringAttach({
+          fromByte: evidenceCursor,
+          sessionId: session.cloudAgentSessionId,
+          kiloSessionId: session.kiloSessionId,
+          containerId: allocation,
+          expectedWrapperInstanceId: target.expectedWrapperInstanceId,
+          waitForAttachMs: Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('attach drop'))),
+        });
+      } catch (error) {
+        // Only a positively established window miss retries. A post-signal
+        // failure takes precedence over the miss: a failed or interrupted turn
+        // must fail the scenario rather than be discarded and retried.
+        if (error instanceof AttachWindowMissedError) {
+          if (
+            await attachWindowTurnFailed(
+              deadline,
+              scenarioConfig,
+              session,
+              messageId,
+              stream.events
+            )
+          ) {
+            throw new Error(`boot turn ${messageId} failed after the attach-window signal`);
+          }
+          stream.close();
+          continue;
+        }
+        throw error;
+      }
+
+      // After induction, a failure is terminal: never retried as a miss.
+      if (hasMessageFailed(stream.events, messageId)) {
+        throw new Error(`boot turn ${messageId} failed after the attach-window signal`);
+      }
+
+      const terminal = await stream.waitForTerminal(
+        Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('boot terminal'))),
+        messageId
+      );
+      if (
+        terminal !== null &&
+        terminal.streamEventType === 'cloud.message.failed' &&
+        messageIdFromEvent(terminal) === messageId
+      ) {
+        throw new Error(`boot turn ${messageId} failed after the attach-window signal`);
+      }
+      if (!isMessageCompleted(terminal, messageId)) {
+        throw new Error(`boot turn ${messageId} did not complete after the control-socket recycle`);
+      }
+      const status = await deadline.within('boot durable', signal =>
+        awaitDurableTerminal(
+          scenarioConfig,
+          session.cloudAgentSessionId,
+          messageId,
+          deadline.remaining('boot durable'),
+          signal
+        )
+      );
+      if (status !== 'completed') throw new Error(`boot durable status=${status}`);
+      try {
+        await awaitCorrelatedChildText({
+          stream,
+          parentMessageId: messageId,
+          timeoutMs: Math.max(
+            1,
+            Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+          ),
+          label: 'boot turn',
+          ready: text => echoPayloadMatches(text, `boot-${runId}`),
+        });
+      } catch {
+        result = fail(`boot turn did not echo boot-${runId}`);
+        break;
+      }
+
+      const promptDispatches = await faults.countPromptDispatches({
+        fromByte: evidenceCursor,
+        sessionId: session.cloudAgentSessionId,
+      });
+      if (promptDispatches !== 1) {
+        throw new Error(`expected exactly 1 prompt dispatch, observed ${promptDispatches}`);
+      }
+
+      events.push(...stream.events);
+      result = {
+        name: scenarioName,
+        conversation,
+        ok: true,
+        message:
+          `session=${session.cloudAgentSessionId}; attachRequestId=${observed.attachRequestId}; ` +
+          `closed=${observed.closedConnectionId}; ready=${observed.readyConnectionId}; ` +
+          `promptDispatches=${promptDispatches}; boot=${messageId}/completed; attempts=${attempt}`,
+        events,
+        durationMs: Date.now() - startedAt,
+      };
+      break;
+    }
+  } catch (error) {
+    result = fail(errorMessage(error));
+  } finally {
     for (const stream of streams) {
       try {
         stream.close();
@@ -858,5 +1132,14 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
     requiresWorktreeCreation: true,
     run: runWrapperFreezeInflightReap,
+  },
+  'control-socket-recycle-boot': {
+    name: 'control-socket-recycle-boot',
+    requires: ['sessionSandbox', 'sandboxFaults'],
+    defaultApi: 'unified',
+    defaultConversation: '_',
+    defaultTimeoutMs: FAULT_TIMEOUT_MS,
+    requiresWorktreeCreation: true,
+    run: runControlSocketRecycleBoot,
   },
 };

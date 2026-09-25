@@ -50,6 +50,9 @@ vi.mock('react-native', () => ({
     },
   },
   Dimensions: { get: () => ({ height: 900 }) },
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -63,7 +66,9 @@ vi.mock('react-native', () => ({
 // resolves to its untransformed `react-native` entry (`src/index.tsx`): the
 // CommonJS entry requires a Flow react-native subpath this node project cannot
 // load, and every mounted suite mocks it. So stub the module's only native
-// dependency instead of the module itself, and keep the real footer and lift.
+// dependency instead of the module itself, and keep the real footer and lift:
+// a whole-module mock of `app-aware-keyboard-padding` strips the hook the
+// footer reads and the lift assertions below fail.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
 }));

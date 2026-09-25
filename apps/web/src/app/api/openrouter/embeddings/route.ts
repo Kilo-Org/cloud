@@ -29,6 +29,10 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@/lib/ai-gateway/provider-privacy';
+import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
@@ -41,6 +45,7 @@ import {
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 
 export const maxDuration = 300;
@@ -103,6 +108,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return invalidRequestResponse();
   }
 
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestBodyParsed.provider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return invalidTokenResponse();
     }
 
-    if (!(await isFreeModel(requestedModelLowerCased))) {
+    if (!isFreeModel(requestedModelLowerCased)) {
       return NextResponse.json(
         {
           error: {
@@ -208,12 +216,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   setTag('ui.ai_model', requestBodyParsed.model);
 
+  let organizationDataCollection: OrganizationSettings['data_collection'];
+
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan, balanceLimitedByUserAllowance } =
       await getBalanceAndOrgSettings(organizationId, user);
+    organizationDataCollection = settings?.data_collection;
 
-    if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
+    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,
@@ -283,10 +294,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const effectiveProvider = provider;
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
-    requestBodyParsed.model = mapModelIdToVercel(requestBodyParsed.model);
+    requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
-  const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    organizationDataCollection
+  );
+  const upstreamBody = buildUpstreamBody(
+    {
+      ...requestBodyParsed,
+      ...(Object.keys(effectivePrivacy).length > 0 && {
+        provider: { ...requestBodyParsed.provider, ...effectivePrivacy },
+      }),
+    },
+    requestedModelLowerCased
+  );
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
     const byokProviders: Record<string, unknown[]> = {};
@@ -298,6 +321,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       gateway: {
         only: Object.keys(byokProviders),
         byok: byokProviders,
+        zeroDataRetention: effectivePrivacy.zdr,
+        disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
       },
     };
   }

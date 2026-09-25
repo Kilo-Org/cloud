@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
-import { createElement, Fragment, type ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,7 +15,7 @@ import { ModelPickerContent } from './model-picker-content';
 // rows look right.
 const buildSearchCalls = vi.hoisted(() => ({ values: [] as string[] }));
 
-// The data length of every FlatList commit, in order. A keystroke burst must
+// The data length of every FlashList commit, in order. A keystroke burst must
 // commit the held (pre-typing) list and then the settled list — never an
 // intermediate query's rows.
 const listCommitLengths = vi.hoisted(() => ({ values: [] as number[] }));
@@ -66,43 +66,49 @@ vi.mock('@/lib/hooks/use-model-preferences', () => ({
   }),
 }));
 
-// FlatList renders through a callback; this mock mirrors the real list (rows
-// via renderItem, key via keyExtractor) so row assertions see real content,
-// and records each commit's data length.
-const flatListMock = vi.hoisted(
-  () =>
-    (props: {
+// FlashList renders through a callback; this mock mirrors the real list (rows
+// via renderItem, key via keyExtractor, item type via getItemType) so row
+// assertions see real content, and records each commit's data length.
+vi.mock('@shopify/flash-list', async () => {
+  const React = await import('react');
+  return {
+    FlashList: (props: {
       data: readonly ModelPickerRow[];
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow) => string;
+      getItemType?: (item: ModelPickerRow) => string;
       style?: unknown;
       contentContainerStyle?: unknown;
     }) => {
       listCommitLengths.values.push(props.data.length);
       const rows = props.data.map((item, index) =>
-        createElement(
-          Fragment,
+        React.createElement(
+          React.Fragment,
           { key: props.keyExtractor ? props.keyExtractor(item) : String(index) },
           props.renderItem ? props.renderItem({ item, index }) : null
         )
       );
-      return createElement(
-        'FlatList',
+      return React.createElement(
+        'FlashList',
         {
           data: props.data,
+          getItemType: props.getItemType,
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
         },
         ...rows
       );
-    }
-);
+    },
+  };
+});
 
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack, push: vi.fn() }),
@@ -184,13 +190,24 @@ function findByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
-function listRows(renderer: TestRenderer.ReactTestRenderer): ModelPickerRow[] {
-  const list = findByType(renderer.root, 'FlatList')[0];
+function listHost(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const list = findByType(renderer.root, 'FlashList')[0];
   if (!list) {
-    throw new Error('FlatList not found');
+    throw new Error('FlashList not found');
   }
+  return list;
+}
+
+function listRows(renderer: TestRenderer.ReactTestRenderer): ModelPickerRow[] {
   /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-  return list.props.data as ModelPickerRow[];
+  return listHost(renderer).props.data as ModelPickerRow[];
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+/** The item-type selector FlashList uses to recycle headers apart from rows. */
+function getItemType(renderer: TestRenderer.ReactTestRenderer): (item: ModelPickerRow) => string {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return listHost(renderer).props.getItemType as (item: ModelPickerRow) => string;
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
 
@@ -346,7 +363,7 @@ describe('ModelPickerContent deferred search', () => {
       await Promise.resolve();
     });
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
@@ -438,6 +455,26 @@ describe('ModelPickerContent deferred search', () => {
     });
   });
 
+  it('gives a group header and a model row different item types', async () => {
+    const renderer = await mount();
+
+    const rows = listRows(renderer);
+    const header = rows.find(row => row.type === 'header');
+    const model = rows.find(row => row.type === 'model');
+    if (!header || !model) {
+      throw new Error('expected both a header and a model row in the catalog');
+    }
+
+    // The two rows differ in height, so recycling them under one item type
+    // would measure one as the other. Pin the split.
+    expect(getItemType(renderer)(header)).toBe('header');
+    expect(getItemType(renderer)(model)).toBe('model');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('ends the list viewport above the bottom system bar', async () => {
     // A device with a navigation bar: the viewport must end above it, or the
     // last row is drawn under the opaque bar (a content inset only cleared the
@@ -445,16 +482,51 @@ describe('ModelPickerContent deferred search', () => {
     safeAreaInsets.bottom = 24;
     const renderer = await mount();
 
-    const [list] = findByType(renderer.root, 'FlatList');
+    const [list] = findByType(renderer.root, 'FlashList');
     if (!list) {
-      throw new Error('FlatList not found');
+      throw new Error('FlashList not found');
     }
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-    expect((list.props.style as { marginBottom?: number }).marginBottom).toBe(24);
+    const frameStyle = (
+      Array.isArray(list.props.style)
+        ? Object.assign({}, ...(list.props.style as Record<string, unknown>[]))
+        : list.props.style
+    ) as { marginBottom?: number };
+    expect(frameStyle.marginBottom).toBe(24);
     // The inset lives on the frame alone; leaving it on the content as well
     // would double the reserved space.
     expect(list.props.contentContainerStyle).toBeUndefined();
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// The composer's current model arrives as the bridge's `currentValue`. The row
+// for that id must carry `selected`, or the picker shows no visible selected
+// state for the model the composer is editing (model-selected finding: the
+// DeepSeek V4.1 Flash row read as star-only). `selected` is what renders the
+// trailing Check (see model-selector.mounted.test.tsx).
+describe('ModelPickerContent selected row', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    slotState.bridge = { ...makeBridge(), currentValue: 'remote-model-17' };
+  });
+
+  it('marks exactly the bridge current model as the selected row', async () => {
+    const renderer = await mount();
+
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    const selectedIds = findByType(renderer.root, 'ModelPickerOptionRow')
+      .filter(node => node.props.selected === true)
+      .map(node => (node.props.option as SessionModelOption).id);
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    expect(selectedIds).toEqual(['remote-model-17']);
 
     act(() => {
       renderer.unmount();

@@ -1265,7 +1265,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       token: 'scoped-token',
     });
     expect(serviceMocks.findInstallationId).toHaveBeenCalledTimes(2);
-    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params, 'generic');
     expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
       params.expectedIntegrationId,
       'acme'
@@ -1446,11 +1446,54 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ).resolves.toMatchObject({ success: true });
     expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenLastCalledWith({
       userId: 'user_1',
+      accessPurpose: 'workflow',
       orgId,
       expectedIntegrationId,
       githubRepo: 'acme/repo',
     });
   });
+
+  it.each([false, true])(
+    'seals agent purpose and rechecks the pinned role at redemption (user auth=%s)',
+    async allowUserAuthorization => {
+      const service = createService();
+      const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+      const issued = await service.issueGitHubSessionCapability({
+        userId: 'oauth/github-actor',
+        orgId: '00000000-0000-4000-8000-000000000001',
+        githubRepo: 'acme/repo',
+        expectedIntegrationId,
+        accessPurpose: 'agent',
+        outboundContainerId,
+        allowUserAuthorization,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+        success: false,
+        reason: 'integration_mismatch',
+      });
+      serviceMocks.findRefreshCandidates.mockResolvedValue({ success: true, candidates: [] });
+      serviceMocks.getTokenForRepo.mockClear();
+      serviceMocks.selectUserAuthorization.mockClear();
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'GET',
+          requestUrl: 'https://api.github.com/repos/acme/repo',
+        })
+      ).resolves.toMatchObject({ success: false, reason: 'integration_mismatch' });
+      expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          accessPurpose: 'agent',
+          expectedIntegrationId,
+          userId: 'oauth/github-actor',
+        })
+      );
+      expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
 
   it('returns integration_mismatch when repair cannot restore a capability fence', async () => {
     const service = createService();
@@ -1480,12 +1523,16 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
     expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
-    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith({
-      userId: 'user_1',
-      orgId: '00000000-0000-4000-8000-000000000001',
-      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
-      githubRepo: 'acme/repo',
-    });
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(
+      {
+        userId: 'user_1',
+        accessPurpose: 'workflow',
+        orgId: '00000000-0000-4000-8000-000000000001',
+        expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+        githubRepo: 'acme/repo',
+      },
+      'managed'
+    );
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 

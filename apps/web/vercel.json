@@ -25,6 +25,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/cleanup-webhook-events",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
       "schedule": "0 * * * *"
     },
@@ -118,10 +122,6 @@
     },
     {
       "path": "/api/cron/usage-partition-maintenance",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/model-experiment-request-partition-maintenance",
       "schedule": "0 0 1 * *"
     },
     {

@@ -146,6 +146,11 @@ async function dispatchSessionPush(
         type: 'cloud_agent_session',
         cliSessionId,
         category: content.category,
+        // The session's organization rides on every push, attention or
+        // status, so a tap can switch the app before it opens the session.
+        // Absent for a Personal session (the session row has no
+        // organization_id), which leaves the app on Personal.
+        ...(session.organizationId != null && { organizationId: session.organizationId }),
         // Raise detail rides only on an attention push: an ordinary status
         // push keeps the exact pre-existing `data` shape. An old producer
         // that omits `attentionKind` still sends `category`, and the extras

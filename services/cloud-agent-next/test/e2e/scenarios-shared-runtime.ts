@@ -30,7 +30,8 @@ import {
 } from './client.js';
 import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
 import {
-  collectChildMessageText,
+  awaitCorrelatedChildText,
+  CONTENT_CORRELATION_BUDGET_MS,
   correlatedProgressSummary,
   hasCorrelatedStreamProgress,
 } from './scenarios-shared.js';
@@ -49,6 +50,13 @@ const DURABLE_BUDGET_MS = 15_000;
  * the caller's "no reference" hard failure.
  */
 const ALLOCATION_WAIT_SLACK_MS = 1_000;
+
+/**
+ * Attempt cap for recovering an observed post-open stream drop while booting.
+ * The boot budget is the other bound; the cap keeps a session whose socket
+ * drops repeatedly from reconnecting without limit.
+ */
+const MAX_BOOT_RECONNECTS = 5;
 
 export type ScenarioDeadline = {
   /** Absolute epoch milliseconds at which the scenario budget expires. */
@@ -142,10 +150,11 @@ export type OwnedSessionRegistry = {
    * before delegating to any pre-existing handler, so a create that registers a
    * session and then throws still leaves the id owned by this scenario.
    *
-   * Only `startSession` invokes that hook. `prepareBrowserSession` and
-   * `createWorktreeChat` never do, so a runner that uses either must call
-   * `register()` with the returned session immediately after the create
-   * resolves, before any assertion; dropping it leaks the worktree session.
+   * `startSession` invokes that hook, and so do `prepareBrowserSession` and
+   * `createWorktreeChat` on success. An id from either create helper is
+   * therefore owned even if a later assertion throws; the caller still calls
+   * `register()` to attach the `kiloSessionId` (a repeat registration only fills
+   * an undefined `kiloSessionId`).
    */
   config: DriverConfig;
   /**
@@ -510,18 +519,20 @@ export async function sendTurn(
 }
 
 /**
- * Boot a prepared session to a completed initial turn and return its stream,
- * message id and child text. A completed real turn is the readiness proof. The
- * stream is acquired here and closed on every failure path; the caller owns it
- * on success.
+ * Boot a prepared session to a completed initial turn and return its identity
+ * and stream. A completed real turn is the readiness proof. The correlated child
+ * text is awaited with `ready` inside the `try`, so a missing payload throws and
+ * this function closes the stream it owns. The stream is acquired here and
+ * closed on every failure path; the caller owns it on success.
  */
 export async function bootToCompletion(
   deadline: ScenarioDeadline,
   config: DriverConfig,
   session: OwnedSession,
   label: string,
+  ready: (text: string) => boolean,
   budgetMs = 240_000
-): Promise<{ messageId: string; stream: StreamConnection; text: string }> {
+): Promise<{ messageId: string; stream: StreamConnection }> {
   const snapshot = await deadline.within(`${label} snapshot`, signal =>
     getSessionSnapshot(config, session.cloudAgentSessionId, signal)
   );
@@ -548,13 +559,101 @@ export async function bootToCompletion(
       )
     );
     if (status !== 'completed') throw new Error(`${label} boot durable status=${status}`);
-    return { messageId, stream, text: collectChildMessageText(stream.events, messageId) };
+    await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining(`${label} content`))
+      ),
+      label: `${label} turn`,
+      ready,
+    });
+    return { messageId, stream };
   } catch (error) {
     // This stream was acquired here, so this function owns closing it. The
     // caller never receives it to close on a failure path.
     stream.close();
     throw error;
   }
+}
+
+/**
+ * Recover a boot turn from an observed post-open stream drop.
+ *
+ * `waitForTerminal` resolves `null` both on a genuine timeout and when the
+ * socket finalizes, so the caller cannot otherwise tell a dropped transport from
+ * a slow turn. This helper waits for the terminal within one absolute boot
+ * budget, and when the socket has actually finalized (`isOpen === false`) it
+ * reconnects with replay, bounded by that same budget and
+ * `MAX_BOOT_RECONNECTS`; any observed close on a finalized socket triggers that
+ * path, and the close code/reason is attached when one was observed. A healthy
+ * socket that reaches the timeout is reported as a missing terminal and is never
+ * reconnected. Only a failure to establish a replacement stream aborts recovery:
+ * the error is rethrown with the accumulated close evidence attached, never
+ * retried and never swallowed.
+ */
+export async function waitForBootTerminal(input: {
+  deadline: ScenarioDeadline;
+  config: DriverConfig;
+  sessionId: string;
+  messageId: string;
+  stream: StreamConnection;
+  budgetMs: number;
+  label: string;
+}): Promise<{ terminal: StreamEvent | null; stream: StreamConnection; transport: string }> {
+  const { deadline, config, sessionId, messageId, budgetMs, label } = input;
+  const bootDeadlineAt = Date.now() + Math.max(1, Math.min(budgetMs, deadline.remaining(label)));
+  let stream = input.stream;
+  let attempts = 0;
+  let transport = '';
+
+  while (Date.now() < bootDeadlineAt) {
+    const terminal = await stream.waitForTerminal(bootDeadlineAt - Date.now(), messageId);
+    if (terminal !== null) return { terminal, stream, transport };
+    if (stream.isOpen) {
+      // A live socket that reached the budget is a genuine missing terminal, not
+      // a transport loss: report it without reconnecting.
+      return { terminal: null, stream, transport };
+    }
+    transport = appendClose(transport, stream.closeInfo);
+    if (Date.now() >= bootDeadlineAt || attempts >= MAX_BOOT_RECONNECTS) break;
+    const remaining = bootDeadlineAt - Date.now();
+    if (remaining <= 0) break;
+    attempts += 1;
+    try {
+      stream = await deadline.within(
+        `${label} reconnect`,
+        signal => openConnectedStream(config, sessionId, true, undefined, signal),
+        remaining
+      );
+    } catch (error) {
+      throw attachTransport(error, transport);
+    }
+  }
+  return { terminal: null, stream, transport };
+}
+
+/** Append one observed close to the accumulated transport evidence. */
+function appendClose(transport: string, closeInfo: StreamConnection['closeInfo']): string {
+  const described =
+    closeInfo === null
+      ? 'stream closed without a close frame'
+      : `stream closed code=${closeInfo.code} reason=${closeInfo.reason || 'none'}`;
+  return transport === '' ? described : `${transport}; ${described}`;
+}
+
+/**
+ * Attach the accumulated close evidence to a reconnect failure and return it for
+ * immediate rethrow. The original error object is kept so its identity and
+ * message survive; the failure is not classified and no retry follows.
+ */
+function attachTransport(error: unknown, transport: string): unknown {
+  if (error instanceof Error) {
+    error.message = `${error.message}; transport: ${transport}`;
+    return error;
+  }
+  return new Error(`${String(error)}; transport: ${transport}`);
 }
 
 /**

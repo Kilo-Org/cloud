@@ -31,6 +31,49 @@ export function getStateSurfaceInsets({
   };
 }
 
+/**
+ * The smallest short edge a tablet can have: Android's `sw600dp` qualifier. A
+ * phone's short edge tops out around 480dp, so this sits above every phone; a
+ * landscape window at or above it is a tablet, whose band between the page
+ * header and the fixed tab bar is taller than any centered state's full stack
+ * and nothing needs to give. The boundary is exclusive — a 600dp-short-edge
+ * tablet (the 1024x600 emulator) is a tablet, not a phone held sideways.
+ */
+const TABLET_SHORT_EDGE_MIN = 600;
+
+/**
+ * Whether the window is a short one — a phone held sideways.
+ *
+ * A centered state is centered in the band the surface leaves between the page
+ * header and the fixed bottom tab bar, and that band is only tall while the
+ * window is taller than it is wide. On a 411dp-tall landscape window the band
+ * is ~120dp — and ~49dp once the FAB's own 72dp strip is reserved as well —
+ * against the ~167dp the Agents no-match state's icon bubble, its copy and its
+ * action need stacked, so `getCenteredStateLayout` cannot fit it: the body is
+ * pinned to the top of the band and the copy and the action spill under the
+ * tab bar, which owns the taps there, and only a scroll brings them back.
+ * Callers that can drop decoration for a short window ask this.
+ *
+ * Both halves matter: a portrait window is tall even when the keyboard shortens
+ * it, and a tablet in landscape is wide but tall enough to keep the full stack.
+ * A landscape window whose short edge reaches the tablet qualifier is a tablet,
+ * not a short phone window. An unavailable dimension (a partial platform mock)
+ * is never a short window.
+ *
+ * `CenteredState` owns the band, so it is the one that asks this and publishes
+ * the answer as the short-centered-band flag; a state that can drop decoration
+ * for a short band reads that (`useShortCenteredBand`). Nothing outside a
+ * centered scroller is short.
+ */
+export function isShortViewport(width: number, height: number): boolean {
+  return (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > height &&
+    height < TABLET_SHORT_EDGE_MIN
+  );
+}
+
 export function intersectStateFrames(frame: StateFrame, clip: StateFrame): StateFrame {
   const top = Math.max(clip.top, Math.min(frame.top, clip.bottom));
   return { top, bottom: Math.max(top, Math.min(frame.bottom, clip.bottom)) };
@@ -57,6 +100,23 @@ export function getCenteredStateBand({
   const top = Math.max(visible.top, surface.top + topInset);
   const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
   return { top, bottom, band: Math.max(0, bottom - top) };
+}
+
+/**
+ * The bottom reserve a nested surface resolves: the larger of the inherited
+ * reserve and the inset the nested surface asks for, so a nested reservation
+ * can never shrink a surface's clearance. The tabs layout reserves the tab bar
+ * alone (its 16dp content gap is content-only), so the Agents screen's centered
+ * states resolve exactly the bar plus the FAB band they ask for.
+ */
+export function getBottomReservation({
+  inherited,
+  bottomInset,
+}: {
+  inherited: number;
+  bottomInset: number;
+}) {
+  return Math.max(inherited, bottomInset);
 }
 
 export function getCenteredStateLayout({

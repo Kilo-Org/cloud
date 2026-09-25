@@ -33,8 +33,9 @@ import {
   type WorktreeSessionResult,
 } from './client.js';
 import {
+  awaitCorrelatedChildText,
   cleanupRemoteSession,
-  collectChildMessageText,
+  CONTENT_CORRELATION_BUDGET_MS,
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
@@ -48,6 +49,7 @@ import {
   sendTurn,
   sessionSandboxObservation,
   trackCreations,
+  waitForBootTerminal,
   waitForPacedProgress,
   waitForPresentAllocation,
   type InFlightCreations,
@@ -65,6 +67,11 @@ const WORKTREE_CHAT_TIMEOUT_MS = 10 * 60_000;
 const WORKTREE_MULTI_CHAT_TIMEOUT_MS = 25 * 60_000;
 /** Generous budget for a real first container cold start. */
 const BOOT_TERMINAL_BUDGET_MS = 240_000;
+/**
+ * Bounded durable-status read used only to enrich a missing-boot-terminal
+ * failure. It must stay small so the diagnostic cannot stretch the scenario.
+ */
+const DURABLE_DIAGNOSTIC_MS = 15_000;
 /**
  * Bound for the first allocation reference of a fresh worktree session. It
  * matches the cold-turn budget: container discovery can be slow while a cold
@@ -117,6 +124,41 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Fail the boot turn when the reported terminal is not a completion.
+ *
+ * The bounded durable diagnostic exists only to name the status on the failure
+ * line: its failure is swallowed so it cannot replace the close evidence, and
+ * `within` keeps it inside the scenario deadline. `label` names both the
+ * diagnostic phase and the failure line, so the two worktree boot waits cannot
+ * drift.
+ */
+async function throwIfBootIncomplete(input: {
+  deadline: ScenarioDeadline;
+  config: DriverConfig;
+  sessionId: string;
+  messageId: string;
+  terminal: StreamEvent | null;
+  transport: string;
+  label: string;
+}): Promise<void> {
+  const { deadline, config, sessionId, messageId, terminal, transport, label } = input;
+  if (isMessageCompleted(terminal, messageId)) return;
+  let durable = 'unknown';
+  try {
+    durable = await deadline.within(
+      `${label} diagnostic`,
+      signal => awaitDurableTerminal(config, sessionId, messageId, DURABLE_DIAGNOSTIC_MS, signal),
+      DURABLE_DIAGNOSTIC_MS
+    );
+  } catch {
+    /* diagnostic only */
+  }
+  throw new Error(
+    `${label} turn ${messageId} did not complete: ${transport || 'no stream drop observed'}; durable status=${durable}`
+  );
+}
+
+/**
  * The owning chat's open question, parsed from its own stream. The session id
  * is the root `ses_*` identity, so a sibling's question never matches.
  */
@@ -156,13 +198,19 @@ async function assertToolEvidence(
   }
 }
 
-/** Run one real file write/read turn and return its collected assistant text. */
+/**
+ * Run one real file write/read turn and return its collected assistant text.
+ * The correlated text is awaited here, and the stream `sendTurn` returned is
+ * closed if that wait throws: the caller only receives the stream on success, so
+ * it cannot close a stream it never got.
+ */
 async function runFileTurn(
   config: DriverConfig,
   deadline: ScenarioDeadline,
   sessionId: string,
   label: string,
-  directive: string
+  directive: string,
+  ready: (text: string) => boolean
 ): Promise<{ messageId: string; stream: StreamConnection; text: string }> {
   const turn = await sendTurn(
     deadline,
@@ -172,8 +220,19 @@ async function runFileTurn(
     label,
     FILE_TURN_BUDGET_MS
   );
-  const text = collectChildMessageText(turn.stream.events, turn.messageId);
-  return { messageId: turn.messageId, stream: turn.stream, text };
+  try {
+    const text = await awaitCorrelatedChildText({
+      stream: turn.stream,
+      parentMessageId: turn.messageId,
+      timeoutMs: Math.max(1, Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining(label))),
+      label,
+      ready,
+    });
+    return { messageId: turn.messageId, stream: turn.stream, text };
+  } catch (error) {
+    turn.stream.close();
+    throw error;
+  }
 }
 
 /**
@@ -378,13 +437,25 @@ async function runWorktreeChat(
     bootStream = await deadline.within('boot stream', signal =>
       openConnectedStream(scenarioConfig, cloudAgentSessionId, true, undefined, signal)
     );
-    const bootTerminal = await bootStream.waitForTerminal(
-      Math.max(1, Math.min(BOOT_TERMINAL_BUDGET_MS, deadline.remaining('boot terminal'))),
-      bootMessageId
-    );
-    if (!isMessageCompleted(bootTerminal, bootMessageId)) {
-      throw new Error(`boot turn ${bootMessageId} did not complete`);
-    }
+    const boot = await waitForBootTerminal({
+      deadline,
+      config: scenarioConfig,
+      sessionId: cloudAgentSessionId,
+      messageId: bootMessageId,
+      stream: bootStream,
+      budgetMs: BOOT_TERMINAL_BUDGET_MS,
+      label: 'boot',
+    });
+    bootStream = boot.stream;
+    await throwIfBootIncomplete({
+      deadline,
+      config: scenarioConfig,
+      sessionId: cloudAgentSessionId,
+      messageId: bootMessageId,
+      terminal: boot.terminal,
+      transport: boot.transport,
+      label: 'boot',
+    });
     const bootStatus = await deadline.within('boot durable', signal =>
       awaitDurableTerminal(
         scenarioConfig,
@@ -395,12 +466,16 @@ async function runWorktreeChat(
       )
     );
     if (bootStatus !== 'completed') throw new Error(`boot turn durable status=${bootStatus}`);
-    const bootText = collectChildMessageText(bootStream.events, bootMessageId);
-    if (!echoPayloadMatches(bootText, bootMarker)) {
-      throw new Error(
-        `boot turn ${bootMessageId} did not complete with ${JSON.stringify(bootMarker)}; observed ${JSON.stringify(bootText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: bootStream,
+      parentMessageId: bootMessageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+      ),
+      label: 'boot turn',
+      ready: text => echoPayloadMatches(text, bootMarker),
+    });
     bootStream = foldStream(events, bootStream);
 
     // Acquire the boot allocation only after the boot turn completed: the
@@ -455,12 +530,16 @@ async function runWorktreeChat(
         `hot turn reported a preparing event for ${hot.messageId}; a hot turn must reuse the warm dispatch path`
       );
     }
-    const hotText = collectChildMessageText(hot.stream.events, hot.messageId);
-    if (!echoPayloadMatches(hotText, hotMarker)) {
-      throw new Error(
-        `hot turn ${hot.messageId} did not complete with ${JSON.stringify(hotMarker)}; observed ${JSON.stringify(hotText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: hot.stream,
+      parentMessageId: hot.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('hot turn content'))
+      ),
+      label: 'hot turn',
+      ready: text => echoPayloadMatches(text, hotMarker),
+    });
     const after = await waitForPresentAllocation(
       deadline,
       sandbox,
@@ -611,13 +690,25 @@ async function runWorktreeMultiChat(
     rootBootStream = await deadline.within('root boot stream', signal =>
       openConnectedStream(scenarioConfig, rootId, true, undefined, signal)
     );
-    const rootBootTerminal = await rootBootStream.waitForTerminal(
-      Math.max(1, Math.min(BOOT_TERMINAL_BUDGET_MS, deadline.remaining('root boot terminal'))),
-      rootBootMessageId
-    );
-    if (!isMessageCompleted(rootBootTerminal, rootBootMessageId)) {
-      throw new Error(`root boot turn ${rootBootMessageId} did not complete`);
-    }
+    const rootBoot = await waitForBootTerminal({
+      deadline,
+      config: scenarioConfig,
+      sessionId: rootId,
+      messageId: rootBootMessageId,
+      stream: rootBootStream,
+      budgetMs: BOOT_TERMINAL_BUDGET_MS,
+      label: 'root boot',
+    });
+    rootBootStream = rootBoot.stream;
+    await throwIfBootIncomplete({
+      deadline,
+      config: scenarioConfig,
+      sessionId: rootId,
+      messageId: rootBootMessageId,
+      terminal: rootBoot.terminal,
+      transport: rootBoot.transport,
+      label: 'root boot',
+    });
     const rootBootStatus = await deadline.within('root boot durable', signal =>
       awaitDurableTerminal(
         scenarioConfig,
@@ -630,12 +721,16 @@ async function runWorktreeMultiChat(
     if (rootBootStatus !== 'completed') {
       throw new Error(`root boot turn durable status=${rootBootStatus}`);
     }
-    const rootBootText = collectChildMessageText(rootBootStream.events, rootBootMessageId);
-    if (!echoPayloadMatches(rootBootText, rootBootMarker)) {
-      throw new Error(
-        `root boot turn ${rootBootMessageId} did not complete with ${JSON.stringify(rootBootMarker)}; observed ${JSON.stringify(rootBootText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: rootBootStream,
+      parentMessageId: rootBootMessageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('root boot content'))
+      ),
+      label: 'root boot turn',
+      ready: text => echoPayloadMatches(text, rootBootMarker),
+    });
     rootEvents.push(...rootBootStream.events);
 
     // Acquire the root allocation only after its boot turn completed, so the
@@ -833,15 +928,16 @@ async function runWorktreeMultiChat(
         `sibling first turn ${siblingFirst.messageId} did not report its own preparing event`
       );
     }
-    const siblingFirstText = collectChildMessageText(
-      siblingFirst.stream.events,
-      siblingFirst.messageId
-    );
-    if (!echoPayloadMatches(siblingFirstText, siblingFirstMarker)) {
-      throw new Error(
-        `sibling first turn ${siblingFirst.messageId} did not complete with ${JSON.stringify(siblingFirstMarker)}; observed ${JSON.stringify(siblingFirstText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: siblingFirst.stream,
+      parentMessageId: siblingFirst.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('sibling first turn content'))
+      ),
+      label: 'sibling first turn',
+      ready: text => echoPayloadMatches(text, siblingFirstMarker),
+    });
     siblingEvents.push(...siblingFirst.stream.events);
 
     const rootSecond = await sendTurn(
@@ -854,12 +950,16 @@ async function runWorktreeMultiChat(
     );
     rootSecondStream = rootSecond.stream;
     rootMessageIds.push(rootSecond.messageId);
-    const rootSecondText = collectChildMessageText(rootSecond.stream.events, rootSecond.messageId);
-    if (!echoPayloadMatches(rootSecondText, rootSecondMarker)) {
-      throw new Error(
-        `root second turn ${rootSecond.messageId} did not complete with ${JSON.stringify(rootSecondMarker)}; observed ${JSON.stringify(rootSecondText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: rootSecond.stream,
+      parentMessageId: rootSecond.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('root second turn content'))
+      ),
+      label: 'root second turn',
+      ready: text => echoPayloadMatches(text, rootSecondMarker),
+    });
     rootEvents.push(...rootSecond.stream.events);
 
     const siblingSecond = await sendTurn(
@@ -872,15 +972,16 @@ async function runWorktreeMultiChat(
     );
     siblingSecondStream = siblingSecond.stream;
     siblingMessageIds.push(siblingSecond.messageId);
-    const siblingSecondText = collectChildMessageText(
-      siblingSecond.stream.events,
-      siblingSecond.messageId
-    );
-    if (!echoPayloadMatches(siblingSecondText, siblingSecondMarker)) {
-      throw new Error(
-        `sibling second turn ${siblingSecond.messageId} did not complete with ${JSON.stringify(siblingSecondMarker)}; observed ${JSON.stringify(siblingSecondText)}`
-      );
-    }
+    await awaitCorrelatedChildText({
+      stream: siblingSecond.stream,
+      parentMessageId: siblingSecond.messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('sibling second turn content'))
+      ),
+      label: 'sibling second turn',
+      ready: text => echoPayloadMatches(text, siblingSecondMarker),
+    });
     siblingEvents.push(...siblingSecond.stream.events);
 
     // --- Shared-checkout file proof: A writes an uncommitted file, B reads it.
@@ -897,12 +998,10 @@ async function runWorktreeMultiChat(
       deadline,
       rootId,
       'root file write one',
-      `file:write:wa1-${runId}:${sharedPath}:${firstNonce}`
+      `file:write:wa1-${runId}:${sharedPath}:${firstNonce}`,
+      text => text.includes(`file-write:${sharedPath}`)
     );
     try {
-      if (!write1.text.includes(`file-write:${sharedPath}`)) {
-        throw new Error(`root file write did not report the write marker for ${sharedPath}`);
-      }
       await assertToolEvidence(
         scenarioConfig,
         deadline,
@@ -921,7 +1020,8 @@ async function runWorktreeMultiChat(
       deadline,
       siblingId,
       'sibling file read one',
-      `file:read:rb1-${runId}:${sharedPath}`
+      `file:read:rb1-${runId}:${sharedPath}`,
+      text => parseFileReadEcho(text, sharedPath) !== null
     );
     try {
       const body = parseFileReadEcho(read1.text, sharedPath);
@@ -949,12 +1049,10 @@ async function runWorktreeMultiChat(
       deadline,
       rootId,
       'root file write two',
-      `file:write:wa2-${runId}:${sharedPath}:${secondNonce}`
+      `file:write:wa2-${runId}:${sharedPath}:${secondNonce}`,
+      text => text.includes(`file-write:${sharedPath}`)
     );
     try {
-      if (!write2.text.includes(`file-write:${sharedPath}`)) {
-        throw new Error(`root overwrite did not report the write marker for ${sharedPath}`);
-      }
       await assertToolEvidence(
         scenarioConfig,
         deadline,
@@ -973,7 +1071,8 @@ async function runWorktreeMultiChat(
       deadline,
       siblingId,
       'sibling file read two',
-      `file:read:rb2-${runId}:${sharedPath}`
+      `file:read:rb2-${runId}:${sharedPath}`,
+      text => parseFileReadEcho(text, sharedPath) !== null
     );
     try {
       const body = parseFileReadEcho(read2.text, sharedPath);
@@ -1277,15 +1376,16 @@ async function runWorktreeMultiChat(
       TURN_BUDGET_MS
     );
     try {
-      const afterDeleteText = collectChildMessageText(
-        afterDelete.stream.events,
-        afterDelete.messageId
-      );
-      if (!echoPayloadMatches(afterDeleteText, `survived-${runId}`)) {
-        throw new Error(
-          'the surviving root did not complete another turn after the sibling delete'
-        );
-      }
+      await awaitCorrelatedChildText({
+        stream: afterDelete.stream,
+        parentMessageId: afterDelete.messageId,
+        timeoutMs: Math.max(
+          1,
+          Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('after-delete turn content'))
+        ),
+        label: 'root after delete',
+        ready: text => echoPayloadMatches(text, `survived-${runId}`),
+      });
       rootEvents.push(...afterDelete.stream.events);
     } finally {
       afterDelete.stream.close();

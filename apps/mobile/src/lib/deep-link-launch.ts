@@ -15,7 +15,7 @@ type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
 type GetLinkingURL = () => string | null;
 
 /** Per-capture flags the precedence and account rules read back. */
-type PendingDeepLinkOptions = {
+export type PendingDeepLinkOptions = {
   /** Only the cold-launch capture sets this; see the module flag below. */
   fromLaunchAppScheme?: boolean;
   /**
@@ -25,6 +25,12 @@ type PendingDeepLinkOptions = {
    * indexed result is delivered.
    */
   sessionBound?: boolean;
+  /**
+   * The organization the destination belongs to, when its source knew one
+   * (a notification tap for a session in an organization). `null` means the
+   * destination carries no organization: Personal, or a source that has none.
+   */
+  organizationId?: string | null;
 };
 
 /** Minimal SecureStore surface used by the durable mirror. */
@@ -34,16 +40,12 @@ type SecureStoreLike = {
   getItemAsync: (key: string) => Promise<string | null>;
 };
 
-/** Persisted shape of the pending slot, mirroring the in-memory slot. */
-type PendingDeepLinkRecord = {
-  href: string;
-  source: DeepLinkSource;
-  storedAt: number;
-  /** Signed-in user id at persist time, or null when captured while signed out. */
-  userId: string | null;
-  /** Whether the destination is bound to the session that produced it. */
-  sessionBound: boolean;
-};
+/**
+ * Persisted shape of the pending slot, mirroring the in-memory slot. Derived
+ * from `pendingDeepLinkRecordSchema` (declared with the parser below) so the
+ * durable record and the shape read back can never drift.
+ */
+type PendingDeepLinkRecord = z.infer<typeof pendingDeepLinkRecordSchema>;
 
 /** A persisted record older than this is discarded on restore. */
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -81,6 +83,14 @@ let pendingDeepLinkSessionBound = false;
 // (one that belongs to the account being signed out) while keeping a
 // signed-out destination (which any later sign-in may still want).
 let pendingDeepLinkUserId: string | null = null;
+
+// The organization the CURRENT in-memory slot's destination belongs to, or
+// null when it carries none. Mirrors the persisted record's `organizationId`
+// field so a notification tap can switch the app to the session's
+// organization before the destination navigates. The transport is the same as
+// `pendingDeepLinkUserId`: it rides with the pending slot and never switches
+// anything on its own.
+let pendingDeepLinkOrganizationId: string | null = null;
 
 // Whether an account identity is known yet. A cold launch captures a
 // system-search tap at module scope, before auth restores, so `currentDeepLinkUserId`
@@ -179,6 +189,7 @@ function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
     storedAt: Date.now(),
     userId: currentDeepLinkUserId,
     sessionBound: pendingDeepLinkSessionBound,
+    organizationId: pendingDeepLinkOrganizationId,
   };
   enqueuePendingDeepLinkWrite(async () => {
     await getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record));
@@ -264,6 +275,7 @@ function applyPendingDeepLink(
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
   pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
+  pendingDeepLinkOrganizationId = options?.organizationId ?? null;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
@@ -283,9 +295,23 @@ function withoutQuery(href: string): string {
 
 /** Get-and-clear. Single consumer is `_layout.tsx`. */
 export function getPendingDeepLink(): string | null {
-  const href = pendingDeepLink;
+  return consumePendingDeepLink()?.href ?? null;
+}
+
+/**
+ * Get-and-clear of the pending destination together with the organization it
+ * belongs to. The single gated consumer in `_layout.tsx` reads both: the
+ * organization switches the app before the href navigates, so the route's
+ * first fetch runs in the session's context. `organizationId` is null when the
+ * destination carries none (Personal, or a source that never had one).
+ */
+export function consumePendingDeepLink(): { href: string; organizationId: string | null } | null {
+  const result =
+    pendingDeepLink === null
+      ? null
+      : { href: pendingDeepLink, organizationId: pendingDeepLinkOrganizationId };
   clearPendingDeepLink();
-  return href;
+  return result;
 }
 
 /**
@@ -300,6 +326,7 @@ export function clearPendingDeepLink(): void {
   pendingDeepLinkUserId = null;
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
+  pendingDeepLinkOrganizationId = null;
   deferredSystemSearchHref = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
@@ -390,7 +417,8 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
     return;
   }
 
-  setPendingDeepLink(record.href, record.source, { sessionBound: record.sessionBound });
+  const { href, source, sessionBound, organizationId } = record;
+  setPendingDeepLink(href, source, { sessionBound, organizationId });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -408,11 +436,16 @@ const pendingDeepLinkRecordSchema = z.object({
   href: z.string(),
   source: z.enum(['universal-link', 'notification', 'system-search']),
   storedAt: z.number(),
+  // Signed-in user id at persist time, or null when captured while signed out.
   userId: z.string().nullable(),
   // Absent in a record written before the session binding existed: such a
   // record can only be an account-independent destination (a link or a
   // notification), which is what the default restores as.
   sessionBound: z.boolean().default(false),
+  // Absent in a record written before the organization rode with the pending
+  // slot: such a record restores as no organization, which leaves the
+  // selection unchanged on the tap.
+  organizationId: z.string().nullable().default(null),
 });
 
 function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
@@ -503,6 +536,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLinkUserId = null;
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
+  pendingDeepLinkOrganizationId = null;
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();

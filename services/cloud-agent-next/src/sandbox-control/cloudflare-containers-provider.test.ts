@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { parseSandboxBillingInput } from '../container-usage-context.js';
+import {
+  parseSandboxBillingInput,
+  type SandboxBillingAdmissionResult,
+} from '../container-usage-context.js';
 import type {
   ContainerInstanceSize,
   ContainersObservation,
@@ -10,7 +13,7 @@ import { createCloudflareContainersProviderAdapter } from './cloudflare-containe
 import { decodeCloudflareProviderRef, encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS } from './deadlines.js';
-import { getWorktreeCredentialContainment } from './physical-lifecycle.js';
+import { getWorktreeCredentialContainment } from '../sandbox-state/model/allocation.js';
 import type { ObserveResult, ProviderCreateIntent } from './provider.js';
 
 const LOGICAL_ID = 'ses-00000000000000000000000001';
@@ -65,6 +68,16 @@ function createStub() {
     stop: vi.fn(async (_ref: string): Promise<'terminal' | 'retryable'> => 'terminal'),
     ensureLeaseAtLeast: vi.fn(async (_ref: string, _ms: number): Promise<void> => undefined),
     readLog: vi.fn(async (_ref: string, _path: string, _bytes: number): Promise<string> => ''),
+    isBillingBlocked: vi.fn(async (): Promise<boolean> => false),
+    ensureBillingAdmission: vi.fn(
+      async (
+        _input: unknown,
+        _instance?: ContainerInstanceSize
+      ): Promise<SandboxBillingAdmissionResult> => ({ success: true })
+    ),
+    configureBilling: vi.fn(
+      async (_input: unknown, _instance?: ContainerInstanceSize): Promise<void> => undefined
+    ),
   };
 }
 
@@ -131,25 +144,91 @@ describe('cloudflare containers provider create', () => {
     ['worktree containment', getWorktreeCredentialContainment(true)],
     ['kilocode requirement', { kilocode: true, github: false }],
     ['github requirement', { kilocode: false, github: true }],
-  ])('rejects %s with a capability failure', async (_label, containment) => {
+  ])('encodes %s into the provider reference', async (_label, containment) => {
     const { adapter, getContainer } = setup();
 
-    await expect(adapter.create(makeIntent({ containment }))).rejects.toMatchObject({
-      name: 'AgentSandboxUnavailableError',
-      failure: 'capability_unavailable',
-    });
+    const created = await adapter.create(makeIntent({ containment }));
+    if (!('providerRef' in created)) throw new Error('expected an allocation');
 
+    expect(decodeCloudflareProviderRef(created.providerRef)).toEqual({
+      sandboxId: ALLOCATION_A,
+      containment: true,
+      instanceId: INTENT_ID,
+    });
     expect(getContainer).not.toHaveBeenCalled();
   });
 
-  it('fails closed when billing enforcement is requested', async () => {
-    const { adapter, getContainer } = setup();
+  it('resolved default instance admits standard-4 through the DO and startup uses standard-4', async () => {
+    const { adapter, stub } = setup();
 
     await expect(
       adapter.create(makeIntent({ billing: { ...billing, enforcementRequested: true } }))
-    ).rejects.toMatchObject({ failure: 'billing_blocked' });
+    ).resolves.toEqual({ providerRef: REF_A });
 
-    expect(getContainer).not.toHaveBeenCalled();
+    expect(stub.ensureBillingAdmission).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sandboxId: LOGICAL_ID, enforcementRequested: true }),
+      CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+    );
+    expect(stub.configureBilling).not.toHaveBeenCalled();
+
+    await adapter.launch(REF_A, {});
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({ instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE })
+    );
+  });
+
+  it('a real insufficient_credits rejection surfaces as billing_blocked', async () => {
+    const { adapter, stub } = setup();
+    stub.ensureBillingAdmission.mockResolvedValue({
+      success: false,
+      code: 'insufficient_credits',
+      message: 'Insufficient credits',
+    });
+
+    await expect(
+      adapter.create(makeIntent({ billing: { ...billing, enforcementRequested: true } }))
+    ).rejects.toMatchObject({
+      name: 'AgentSandboxUnavailableError',
+      failure: 'billing_blocked',
+    });
+  });
+
+  it('normalizes a rejected admission RPC to a temporary unavailability failure', async () => {
+    const { adapter, stub } = setup();
+    stub.ensureBillingAdmission.mockRejectedValue(new Error('meter rpc exploded'));
+
+    await expect(
+      adapter.create(makeIntent({ billing: { ...billing, enforcementRequested: true } }))
+    ).rejects.toMatchObject({
+      name: 'AgentSandboxUnavailableError',
+      failure: 'billing_blocked',
+      message: 'Container billing admission is temporarily unavailable',
+    });
+  });
+
+  it('configures shadow billing when enforcement is not requested', async () => {
+    const { adapter, stub } = setup();
+
+    await expect(adapter.create(makeIntent({ billing }))).resolves.toEqual({ providerRef: REF_A });
+
+    expect(stub.configureBilling).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sandboxId: LOGICAL_ID }),
+      CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+    );
+    expect(stub.ensureBillingAdmission).not.toHaveBeenCalled();
+  });
+
+  it('admits through the DO when a persisted billing block is set without enforcement', async () => {
+    const { adapter, stub } = setup();
+    stub.isBillingBlocked.mockResolvedValue(true);
+
+    await expect(adapter.create(makeIntent({ billing }))).resolves.toEqual({ providerRef: REF_A });
+
+    expect(stub.ensureBillingAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({ sandboxId: LOGICAL_ID }),
+      CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+    );
+    expect(stub.configureBilling).not.toHaveBeenCalled();
   });
 
   it('resolves when billing enforcement is not requested', async () => {
@@ -168,6 +247,7 @@ describe('cloudflare containers provider launch', () => {
     expect(getContainer).toHaveBeenCalledWith(LOGICAL_ID);
     expect(stub.launchWrapper).toHaveBeenCalledWith({
       allocationRef: REF_A,
+      containment: false,
       instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: {
         FOO: 'bar',
@@ -197,7 +277,7 @@ describe('cloudflare containers provider launch', () => {
     expect(stub.launchWrapper).not.toHaveBeenCalled();
   });
 
-  it('rejects a contained reference', async () => {
+  it('launches a contained reference with outbound containment', async () => {
     const { adapter, stub } = setup();
     const contained = encodeCloudflareProviderRef({
       sandboxId: ALLOCATION_A,
@@ -205,11 +285,11 @@ describe('cloudflare containers provider launch', () => {
       instanceId: INTENT_ID,
     });
 
-    await expect(adapter.launch(contained, {})).rejects.toThrow(
-      'Invalid Cloudflare containers allocation'
-    );
+    await adapter.launch(contained, {});
 
-    expect(stub.launchWrapper).not.toHaveBeenCalled();
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({ allocationRef: contained, containment: true })
+    );
   });
 
   it('propagates a DO allocation conflict', async () => {
@@ -390,18 +470,17 @@ describe('cloudflare containers provider stop', () => {
     expect(stub.stop).not.toHaveBeenCalled();
   });
 
-  it('returns retryable without a DO call for a contained reference', async () => {
-    const { adapter, stub, getContainer } = setup();
+  it('stops a contained reference through the container', async () => {
+    const { adapter, stub } = setup();
     const contained = encodeCloudflareProviderRef({
       sandboxId: ALLOCATION_A,
       containment: true,
       instanceId: INTENT_ID,
     });
 
-    await expect(adapter.stop(contained)).resolves.toBe('retryable');
+    await expect(adapter.stop(contained)).resolves.toBe('terminal');
 
-    expect(getContainer).not.toHaveBeenCalled();
-    expect(stub.stop).not.toHaveBeenCalled();
+    expect(stub.stop).toHaveBeenCalledWith(contained);
   });
 
   it('resolves a null reference through the retained intent', async () => {

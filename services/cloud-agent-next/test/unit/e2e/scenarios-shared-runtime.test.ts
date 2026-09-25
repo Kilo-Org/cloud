@@ -25,7 +25,7 @@ vi.mock('../../e2e/client.js', () => ({
   isMessageCompleted: mocks.isMessageCompleted,
 }));
 
-import type { DriverConfig, StreamEvent } from '../../e2e/client.js';
+import type { DriverConfig, StreamConnection, StreamEvent } from '../../e2e/client.js';
 import type { SessionSandboxObservation } from '../../e2e/scenario-capabilities.js';
 import {
   bootToCompletion,
@@ -37,6 +37,7 @@ import {
   startPacedHoldTurn,
   trackCreations,
   trackStartedSession,
+  waitForBootTerminal,
   waitForPresentAllocation,
   type ScenarioDeadline,
 } from '../../e2e/scenarios-shared-runtime.js';
@@ -77,8 +78,18 @@ function fakeStream(terminal: StreamEvent | null = null) {
     waitFor: vi.fn(async () => null),
     receivedCount: 0,
     isOpen: true,
+    closeInfo: null as StreamConnection['closeInfo'],
     close: vi.fn(),
   };
+}
+
+type FakeStream = ReturnType<typeof fakeStream>;
+
+/** A stream that already finalized with close evidence, as after a transport drop. */
+function droppedStream(
+  closeInfo: { code: number; reason: string } = { code: 1006, reason: 'transport loss' }
+): FakeStream {
+  return { ...fakeStream(), isOpen: false, closeInfo };
 }
 
 beforeEach(() => {
@@ -232,10 +243,178 @@ describe('bootToCompletion', () => {
     mocks.getMessageResult.mockResolvedValue({ status: 'failed' });
 
     const deadline = createScenarioDeadline(Date.now(), 30_000);
-    await expect(bootToCompletion(deadline, CONFIG, SESSION, 'boot')).rejects.toThrow(
+    await expect(bootToCompletion(deadline, CONFIG, SESSION, 'boot', () => true)).rejects.toThrow(
       /boot durable status=failed/
     );
     expect(stream.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * These tests prove helper wiring against a mocked stream and client. They do
+ * not exercise a real socket drop, real replayed history or real replayed text;
+ * only an operator run against the deployed Worker does that.
+ */
+describe('waitForBootTerminal', () => {
+  function bootInput(stream: FakeStream, budgetMs: number) {
+    return {
+      deadline: createScenarioDeadline(Date.now(), 60_000),
+      config: CONFIG,
+      sessionId: 'workspace_1',
+      messageId: 'message_1',
+      stream,
+      budgetMs,
+      label: 'boot',
+    };
+  }
+
+  it('reconnects with replay after an observed drop and returns the replayed terminal', async () => {
+    const completed = fakeStream(completedEvent('message_1'));
+    mocks.openConnectedStream.mockResolvedValue(completed);
+
+    const result = await waitForBootTerminal(bootInput(droppedStream(), 60_000));
+
+    expect(mocks.openConnectedStream).toHaveBeenCalledTimes(1);
+    // The replayed history repopulates the replacement stream's events.
+    expect(mocks.openConnectedStream.mock.calls[0]?.[2]).toBe(true);
+    expect(result.stream).toBe(completed);
+    expect(result.terminal).toMatchObject({ streamEventType: 'cloud.message.completed' });
+    expect(result.transport).toContain('code=1006');
+  });
+
+  it('does not reconnect a healthy socket that reached the boot budget', async () => {
+    const healthy = fakeStream(null);
+
+    const result = await waitForBootTerminal(bootInput(healthy, 60_000));
+
+    expect(result.terminal).toBeNull();
+    expect(result.stream).toBe(healthy);
+    expect(mocks.openConnectedStream).not.toHaveBeenCalled();
+  });
+
+  it('stops by the attempt cap and by the boot budget, recording every close', async () => {
+    // Attempt-bound: a large boot budget, but every replacement socket drops.
+    mocks.openConnectedStream.mockImplementation(async () => droppedStream());
+    const capped = await waitForBootTerminal(bootInput(droppedStream(), 60_000));
+    expect(mocks.openConnectedStream).toHaveBeenCalledTimes(5);
+    expect(capped.terminal).toBeNull();
+    // The original stream plus one close per reconnect: every drop is recorded.
+    expect(capped.transport.match(/code=1006/g)).toHaveLength(6);
+
+    // Budget-bound: each drop resolves no later than the timeout the helper
+    // passes (and on the drop delay only when that is sooner), so the loop stops
+    // by the absolute boot deadline after three reconnects, before the cap.
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    const budgetMs = 1_000;
+    const dropDelayMs = 300;
+    const timeouts: number[] = [];
+    const delayedDrop = (): FakeStream => {
+      const stream = droppedStream();
+      stream.waitForTerminal.mockImplementation(
+        (timeoutMs: number) =>
+          new Promise<StreamEvent | null>(resolve => {
+            timeouts.push(timeoutMs);
+            setTimeout(() => resolve(null), Math.min(dropDelayMs, timeoutMs));
+          })
+      );
+      return stream;
+    };
+    mocks.openConnectedStream.mockImplementation(async () => delayedDrop());
+
+    const startedAt = Date.now();
+    let settledAt: number | undefined;
+    const pending = waitForBootTerminal(bootInput(delayedDrop(), budgetMs)).then(result => {
+      settledAt = Date.now();
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(1_500);
+    const budgeted = await pending;
+
+    expect(budgeted.terminal).toBeNull();
+    expect(mocks.openConnectedStream).toHaveBeenCalledTimes(3);
+    expect(budgeted.transport.match(/code=1006/g)).toHaveLength(4);
+
+    // Each phase receives the budget that remains, not a fresh full budget.
+    const firstTimeout = timeouts[0];
+    const secondTimeout = timeouts[1];
+    if (firstTimeout === undefined || secondTimeout === undefined) {
+      throw new Error(`expected at least two boot waits; got ${timeouts.length}`);
+    }
+    expect(secondTimeout).toBeLessThan(firstTimeout);
+    expect(timeouts.slice(2).every((value, index) => value < (timeouts[index + 1] ?? 0))).toBe(
+      true
+    );
+    // It settles at the absolute boot deadline, not one full budget per phase.
+    expect(settledAt).toBe(startedAt + budgetMs);
+  });
+
+  it('bounds a hanging reconnect by the absolute boot deadline, not one full budget', async () => {
+    vi.useFakeTimers();
+    const budgetMs = 1_000;
+    const initialDropDelayMs = 400;
+    // The initial stream finalizes only after consuming part of the boot budget,
+    // so the hanging reconnect starts with less than a full budget remaining.
+    const initial = droppedStream();
+    initial.waitForTerminal.mockImplementation(
+      (timeoutMs: number) =>
+        new Promise<StreamEvent | null>(resolve =>
+          setTimeout(() => resolve(null), Math.min(initialDropDelayMs, timeoutMs))
+        )
+    );
+    mocks.openConnectedStream.mockImplementation(() => new Promise<StreamConnection>(() => {}));
+
+    const startedAt = Date.now();
+    let rejectedAt: number | undefined;
+    const failure = waitForBootTerminal(bootInput(initial, budgetMs)).then(
+      () => {
+        throw new Error('expected the helper to reject');
+      },
+      (reason: unknown) => {
+        rejectedAt = Date.now();
+        return reason as Error;
+      }
+    );
+    await vi.advanceTimersByTimeAsync(1_500);
+    const error = await failure;
+
+    expect(mocks.openConnectedStream).toHaveBeenCalledTimes(1);
+    expect(error.message).toContain('boot reconnect');
+    expect(error.message).toContain('code=1006');
+    // Rejected at the original absolute boot deadline, not one full budget after
+    // the hanging reconnect began (startedAt + initialDropDelayMs + budgetMs).
+    expect(rejectedAt).toBe(startedAt + budgetMs);
+  });
+
+  it('fails fast when the reconnected stream cannot be established', async () => {
+    const establishment = new Error('Stream did not connect for workspace_1');
+    mocks.openConnectedStream.mockRejectedValue(establishment);
+
+    const error = await waitForBootTerminal(bootInput(droppedStream(), 60_000)).then(
+      () => null,
+      (reason: unknown) => reason as Error
+    );
+
+    // No retry and no swallow: the establishment failure is rethrown with the
+    // accumulated close evidence attached to the original error.
+    expect(mocks.openConnectedStream).toHaveBeenCalledTimes(1);
+    expect(error).toBe(establishment);
+    expect(error.message).toContain('Stream did not connect for workspace_1');
+    expect(error.message).toContain('code=1006');
+  });
+
+  it('uses the terminal from the stream after two reconnects', async () => {
+    const completed = fakeStream(completedEvent('message_1'));
+    mocks.openConnectedStream
+      .mockResolvedValueOnce(droppedStream())
+      .mockResolvedValueOnce(completed);
+
+    const result = await waitForBootTerminal(bootInput(droppedStream(), 60_000));
+
+    expect(mocks.openConnectedStream).toHaveBeenCalledTimes(2);
+    expect(result.stream).toBe(completed);
+    expect(result.terminal).toMatchObject({ streamEventType: 'cloud.message.completed' });
+    expect(result.transport.match(/code=1006/g)).toHaveLength(2);
   });
 });
 

@@ -1,30 +1,46 @@
 /**
- * Parallel deployed matrix runner.
+ * Parallel deployed matrix runner: the single deployed runner used by CI.
  *
- * Runs the same shared scenarios as `smoke-deployed.ts`, but one scenario per
- * child process with a bounded concurrency pool. Each child gets its own
- * `E2E_FAKE_SCOPE`; the shared fake attributes that child's completions to the
- * scope, so the `fetchFakeRequests` "unchanged"/"increased" assertions stay
- * meaningful while other shards dispatch to the same fake.
+ * Runs every entry in `SHARED_SCENARIOS` — one scenario per child process under
+ * one concurrency pool. Each child gets its own `E2E_FAKE_SCOPE`; the shared
+ * fake attributes that child's completions to the scope, so the
+ * `fetchFakeRequests` "unchanged"/"increased" assertions stay meaningful while
+ * other shards dispatch to the same fake.
  *
  * Usage:
+ *   pnpm --filter cloud-agent-next run e2e:parallel
  *   E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
  *   E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
  *
- * `E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario
- * at once); it defaults to 4. Capability-gated scenarios are filtered out up
- * front and are not spawned, so a child's non-zero exit is a failure: exit `1`
- * when any scenario failed, else `0`. A child that does not exit within its
- * watchdog deadline is killed and reported as a failure.
+ * `E2E_PARALLEL` accepts a positive integer or `all` (every scenario at once)
+ * and is an explicit override; when it is unset the pool defaults to 4.
+ *
+ * Capability-gated scenarios are filtered out up front and are not spawned, so
+ * a child's non-zero exit is a failure: exit `1` when any scenario failed, else
+ * `0`. A child that does not exit within its watchdog deadline is killed and
+ * reported as a failure.
+ *
+ * End-of-run output (one `unsupported:` line per capability-filtered scenario,
+ * one `Summary:`, one `Wall time:`):
+ *
+ *   unsupported: <name>
+ *   Summary: <pass> passed, <fail> failed, <unsupported> unsupported
+ *   Wall time: <seconds>s
+ *
+ * The runner asserts `pass + fail + unsupported` equals the registry-key count
+ * and exits `2` otherwise. When `GITHUB_STEP_SUMMARY` is set it appends the
+ * `Summary:` line to that file; a write failure is logged and never changes the
+ * run result.
  *
  * Cold boots contend on container provisioning, so `all` maximises the chance
  * of a container cold-start timeout (240 s/turn budget) showing up as a false
- * failure. A modest default (4) trades wall time for stability.
+ * failure. A modest default trades wall time for stability.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { appendFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { bootstrapDeployedProfile } from './deployed-auth.js';
@@ -85,7 +101,13 @@ function killTree(child: ChildProcess): void {
   }
 }
 
-function buildJobs(): Job[] {
+type JobSelection = {
+  jobs: Job[];
+  /** Selected scenarios this profile cannot run, in selection order. */
+  unsupported: string[];
+};
+
+function buildJobs(selectedKeys: readonly string[]): JobSelection {
   const profile = bootstrapDeployedProfile();
   const env = createDeployedScenarioEnvironment({
     surfaceUrl: profile.workerUrl,
@@ -94,9 +116,15 @@ function buildJobs(): Job[] {
   });
 
   const jobs: Job[] = [];
-  for (const [name, definition] of Object.entries(SHARED_SCENARIOS)) {
+  const unsupported: string[] = [];
+  for (const name of selectedKeys) {
+    const definition = SHARED_SCENARIOS[name];
+    if (definition === undefined) {
+      // Selection is derived from the registry, so this is a programming error.
+      throw new Error(`selected scenario "${name}" is not in SHARED_SCENARIOS`);
+    }
     if (!isScenarioSupported(definition, env)) {
-      console.log(`skipping unsupported on this profile: ${name}`);
+      unsupported.push(name);
       continue;
     }
     jobs.push({
@@ -106,7 +134,7 @@ function buildJobs(): Job[] {
       timeoutMs: definition.defaultTimeoutMs,
     });
   }
-  return jobs;
+  return { jobs, unsupported };
 }
 
 function runScenario(job: Job, scope: string, total: number, index: number): Promise<JobResult> {
@@ -179,12 +207,28 @@ function runScenario(job: Job, scope: string, total: number, index: number): Pro
   });
 }
 
-async function main(): Promise<void> {
-  const jobs = buildJobs();
-  if (jobs.length === 0) {
-    console.log('No supported scenarios to run.');
-    process.exit(0);
+/**
+ * Append the run's `Summary:` line to the GitHub Actions job summary when
+ * `GITHUB_STEP_SUMMARY` names a file. A write failure is logged and ignored:
+ * the runner's exit code stays authoritative.
+ */
+async function appendSummaryToStepSummary(summary: string): Promise<void> {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath === undefined || summaryPath === '') return;
+  try {
+    await appendFile(summaryPath, `${summary}\n`);
+  } catch (error) {
+    console.warn(
+      `failed to append the summary to GITHUB_STEP_SUMMARY: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
+}
+
+async function main(): Promise<void> {
+  const selectedKeys = Object.keys(SHARED_SCENARIOS);
+  const { jobs, unsupported } = buildJobs(selectedKeys);
   const parallelism = resolveParallelism(jobs.length);
   console.log(
     `Running ${jobs.length} scenarios with concurrency ${parallelism} against ${process.env.WORKER_URL ?? '(unset WORKER_URL)'}`
@@ -206,11 +250,20 @@ async function main(): Promise<void> {
 
   const pass = results.filter(result => result.outcome === 'pass');
   const failures = results.filter(result => result.outcome === 'failure');
-  console.log(
-    `\nSummary: ${pass.length} passed, ${failures.length} failed (wall time ${wallSeconds}s)`
-  );
-  for (const result of failures)
-    console.log(`failed: ${result.job.name} (exit=${result.exitCode})`);
+  const scenarios = selectedKeys.length;
+  if (pass.length + failures.length + unsupported.length !== scenarios) {
+    console.error(
+      `scenario accounting error: ${pass.length} passed + ${failures.length} failed + ${unsupported.length} unsupported !== ${scenarios} selected`
+    );
+    process.exit(2);
+  }
+
+  for (const name of unsupported) console.log(`unsupported: ${name}`);
+  const summary = `Summary: ${pass.length} passed, ${failures.length} failed, ${unsupported.length} unsupported`;
+  console.log(summary);
+  console.log(`Wall time: ${wallSeconds}s`);
+
+  await appendSummaryToStepSummary(summary);
 
   process.exit(failures.length > 0 ? 1 : 0);
 }

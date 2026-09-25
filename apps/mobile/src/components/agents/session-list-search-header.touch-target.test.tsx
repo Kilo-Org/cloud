@@ -50,6 +50,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+// `@/components/ui/input` merges its box with `cn`, which imports `@/i18n`;
+// this pure suite does not mount the app's i18n instance.
+vi.mock('@/lib/utils', () => ({
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
+}));
 
 function mount(hasText: boolean): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | null = null;

@@ -951,6 +951,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // before clearing the active session id.
   const resolvedDeliveryFailuresRevisionAtom = atom(0);
   /**
+   * Memo for the read-only projection below, keyed by the session and revision
+   * it was derived from, so the returned Set keeps a stable identity between
+   * bumps (see the derivation for why the identity must change on a bump).
+   */
+  let resolvedDeliveryProjectionCache: {
+    sessionId: KiloSessionId;
+    revision: number;
+    value: ReadonlySet<string>;
+  } | null = null;
+  /**
    * Ids whose delivery failure the user resolved by retrying, for the active
    * session. A superseded row must stay hidden after the screen that hosted
    * the retry unmounts: only a client-materialised ghost is deleted from
@@ -960,13 +970,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * filter reaches it.
    */
   const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get => {
-    get(resolvedDeliveryFailuresRevisionAtom);
+    const revision = get(resolvedDeliveryFailuresRevisionAtom);
     if (activeSessionId === null) {
       return EMPTY_RESOLVED_DELIVERY_FAILURES;
     }
-    return (
-      resolvedDeliveryFailuresBySession.get(activeSessionId) ?? EMPTY_RESOLVED_DELIVERY_FAILURES
-    );
+    if (
+      resolvedDeliveryProjectionCache !== null &&
+      resolvedDeliveryProjectionCache.sessionId === activeSessionId &&
+      resolvedDeliveryProjectionCache.revision === revision
+    ) {
+      return resolvedDeliveryProjectionCache.value;
+    }
+    // The record is mutated in place (the live session predicate holds the same
+    // Set), and jotai compares a derived value with `Object.is`: returning the
+    // mutated Set would leave its identity unchanged and notify no subscriber.
+    // A fresh Set per revision keeps the identity stable between bumps while
+    // making a bump observable.
+    const recorded = resolvedDeliveryFailuresBySession.get(activeSessionId);
+    const value =
+      recorded === undefined || recorded.size === 0
+        ? EMPTY_RESOLVED_DELIVERY_FAILURES
+        : new Set(recorded);
+    resolvedDeliveryProjectionCache = { sessionId: activeSessionId, revision, value };
+    return value;
   });
 
   // Memoized per-row StoredMessage objects. Reused while both `info` and the
@@ -2813,7 +2839,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // transcript's id applied to its state or atom.
     const owner = ownerSessionId ?? activeSessionId;
     if (owner === null) return;
-    if (owner === activeSessionId) {
+    const ownerIsActive = owner === activeSessionId;
+    if (ownerIsActive) {
       currentSession?.state.clearFailedMessage(messageId);
       // A client-materialised row is a local ghost: the accepted re-send
       // supersedes its content and materialises its own row, so leaving the
@@ -2838,10 +2865,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // keeps the clear across a relaunch.
     resolvedFailuresForSession(owner).add(messageId);
     config.persistResolvedDeliveryFailure?.(owner, messageId);
-    store.set(
-      resolvedDeliveryFailuresRevisionAtom,
-      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
-    );
+    // Only the active session's projection is on screen; a resolution recorded
+    // for another session changes nothing a reader can see here, and the switch
+    // back re-derives anyway.
+    if (ownerIsActive) {
+      store.set(
+        resolvedDeliveryFailuresRevisionAtom,
+        store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+      );
+    }
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {

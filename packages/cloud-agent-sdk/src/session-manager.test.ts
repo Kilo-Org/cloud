@@ -6136,6 +6136,34 @@ describe('createSessionManager', () => {
         atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures)
       ).toEqual(new Set(['m-two']));
     });
+
+    it('gives a recorded retry a new projection identity, then keeps it stable', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const before = atomValue<ReadonlySet<string>>(
+        config.store,
+        mgr.atoms.resolvedDeliveryFailures
+      );
+
+      mgr.clearFailedMessage('m-confirmed');
+      const after = atomValue<ReadonlySet<string>>(
+        config.store,
+        mgr.atoms.resolvedDeliveryFailures
+      );
+
+      // The record is mutated in place, and jotai notifies a derived atom's
+      // subscribers on identity change alone: an unchanged reference would
+      // leave the transcript filter seeing the pre-retry set forever.
+      expect(after.has('m-confirmed')).toBe(true);
+      expect(after).not.toBe(before);
+      // Between bumps the identity stays put, so an unrelated render does not
+      // recompute the transcript filter.
+      expect(atomValue<ReadonlySet<string>>(config.store, mgr.atoms.resolvedDeliveryFailures)).toBe(
+        after
+      );
+    });
   });
 
   describe('cancelQueuedMessage', () => {

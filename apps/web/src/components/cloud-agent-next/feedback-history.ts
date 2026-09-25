@@ -4,8 +4,9 @@ import { formatDistance } from 'date-fns';
  * Human-readable relative time for a feedback submission ("3 days ago").
  * Takes `now` so the output is deterministic in tests.
  *
- * The `list` query returns `created_at` as UTC ISO. Older rows may still
- * carry raw Postgres `timestamptz` text, so accept that shape too.
+ * The `list` query normalizes `created_at` to UTC ISO. Accept the raw Postgres
+ * `timestamptz` text shape too, so the formatter stays usable if a caller
+ * passes a value straight from a `mode: 'string'` column.
  */
 export function formatFeedbackTimestamp(value: string | null, now: Date = new Date()): string {
   const date = parseFeedbackTimestamp(value);

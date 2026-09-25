@@ -1171,7 +1171,6 @@ export class SessionService {
     userId: string,
     sessionId: SessionId
   ): Promise<SandboxId> {
-    // Fetch and store metadata
     const fetchedMetadata = await fetchSessionMetadata(env, userId, sessionId);
 
     if (!fetchedMetadata) {
@@ -1347,7 +1346,6 @@ export class SessionService {
     // Bitbucket Code Reviewer sessions use only trusted worker-owned environment values.
     let baseEnvVars = isBitbucketCodeReview ? {} : { ...userEnvVars };
 
-    // Decrypt and merge encrypted secrets if present
     if (!isBitbucketCodeReview && encryptedSecrets && Object.keys(encryptedSecrets).length > 0) {
       const privateKey = env.AGENT_ENV_VARS_PRIVATE_KEY;
       if (!privateKey) {
@@ -1366,7 +1364,6 @@ export class SessionService {
     }
 
     const envVars: Record<string, string> = {
-      // Spread user-provided env vars (including decrypted secrets) first
       ...baseEnvVars,
       // Then set reserved variables to ensure they always take precedence
       HOME: sessionHome,
@@ -1564,7 +1561,6 @@ export class SessionService {
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
-    // Set GH_TOKEN for GitHub repos only, respecting user overrides
     if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;
@@ -1573,7 +1569,6 @@ export class SessionService {
       }
     }
 
-    // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
     const effectivePlatform = platform ?? inferGitPlatformFromCloneUrl(gitUrl);
 
     if (effectivePlatform === 'bitbucket' && bitbucketTokenManaged === true) {
@@ -1639,7 +1634,6 @@ export class SessionService {
         .info('[GITLAB] Configured GitLab CLI environment for GitLab session');
     }
 
-    // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
     if (kilocodeOrganizationId) {
       envVars.KILOCODE_ORGANIZATION_ID = kilocodeOrganizationId;
     }
@@ -1742,6 +1736,7 @@ export class SessionService {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        accessPurpose: github.githubAccessPurpose ?? 'workflow',
         ...(github.githubIntegrationId
           ? { expectedIntegrationId: github.githubIntegrationId }
           : {}),
@@ -3017,6 +3012,7 @@ export class SessionService {
     kiloUserId: string,
     env: PersistenceEnv,
     organizationId: string | undefined,
+    profileId: string | null | undefined,
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
@@ -3033,6 +3029,7 @@ export class SessionService {
         createdOnPlatform,
         title,
         gitUrl,
+        profileId,
         cloneFromKiloSessionId,
         ...(cloudAgentWorktreeId ? { cloudAgentWorktreeId } : {}),
         ...(cloudAgentWorktreeLocation ? { cloudAgentWorktreeLocation } : {}),

@@ -49,6 +49,7 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
@@ -57,7 +58,7 @@ import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
-import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
+import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -91,12 +92,13 @@ import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission
 import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
-  getPendingDeepLink,
+  consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
+import { useOrganization } from '@/lib/organization-context';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -211,6 +213,9 @@ function RootLayoutNav({
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  // The gated pending-deep-link consumer below switches to the tapped
+  // notification's organization through this provider before it navigates.
+  const { setOrganizationId } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
@@ -375,13 +380,13 @@ function RootLayoutNav({
       if (returnTarget === 'login') {
         router.replace('/(auth)/login');
       } else if (returnTarget === 'profile') {
-        router.replace('/(app)/(tabs)/(3_profile)');
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
       } else if (returnTarget === 'preferences') {
         // Two steps, not one `replace`: the relaunched stack has no entry
         // below the reopened screen, so a lone `replace` leaves the header's
         // back control with nothing to pop.
-        router.replace('/(app)/(tabs)/(3_profile)');
-        router.push('/(app)/(tabs)/(3_profile)/preferences');
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
+        router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
       }
       try {
         // The plural-rules polyfill must be in place before the first render in the new language.
@@ -787,11 +792,23 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady) {
       return;
     }
-    const navigation = resolvePendingNavigation(getPendingDeepLink());
+    const pending = consumePendingDeepLink();
+    if (!pending) {
+      return;
+    }
+    // Switch to the destination's organization before navigating, in the same
+    // effect body with nothing awaited between: the route reads the new
+    // organization on its first render instead of fetching the old scope and
+    // showing an empty list. A destination with no organization (Personal)
+    // leaves the selection unchanged.
+    if (pending.organizationId !== null) {
+      setOrganizationId(pending.organizationId);
+    }
+    const navigation = resolvePendingNavigation(pending.href);
     if (navigation) {
       router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, router]);
+  }, [pendingDeepLink, isShellReady, router, setOrganizationId]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady) {
@@ -862,6 +879,12 @@ function RootLayoutNav({
     languageReloadFailed,
     restoreFailed,
   });
+
+  // Post-startup hidden windows (a sign-in's redirect + consent check, a
+  // sign-out's redirect to login) have no splash over them, so the hidden
+  // wrapper would otherwise paint an empty background. Keep one spinner up
+  // for exactly those windows (app-blank-after-oauth).
+  const showBootstrapLoading = shouldShowBootstrapLoading({ startupFinished, hidden });
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
@@ -1010,6 +1033,7 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
+      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen

@@ -42,7 +42,14 @@ function mountAutoScroll(itemCount: number) {
   const probe: { current: AutoScrollApi | null } = { current: null };
 
   function Probe({ count }: Readonly<{ count: number }>) {
-    probe.current = useSessionListAutoScroll<string>({ itemCount: count, resetKey: 'session-1' });
+    probe.current = useSessionListAutoScroll<string>({
+      itemCount: count,
+      // The hook gates the item-count follow on the newest key changing. This
+      // test only exercises viewport resize, but the param is required and a
+      // constant list has a constant newest key.
+      newestItemKey: `item-${count}`,
+      resetKey: 'session-1',
+    });
     return createElement('View', null);
   }
 

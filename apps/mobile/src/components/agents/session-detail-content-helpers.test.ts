@@ -7,6 +7,7 @@ import {
   resolveRetryPrompt,
   retryFailedMessage,
 } from './session-detail-content-helpers';
+import { getSessionTranscriptItemKey, mergeSessionTranscript } from './session-transcript';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
 
 describe('countInFlightMessages', () => {
@@ -37,16 +38,107 @@ describe('countInFlightMessages', () => {
 describe('retryFailedMessage', () => {
   it('re-sends the failed submission', async () => {
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    await retryFailedMessage(send);
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await retryFailedMessage({
+      message: userMessage('m1'),
+      send,
+      clearFailedMessage,
+    });
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('swallows a rejected re-send so the failed row keeps its footer', async () => {
+  it('clears the original delivery failure once the re-send is accepted', async () => {
+    const message = userMessage('m-failed');
+    const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await retryFailedMessage({ message, send, clearFailedMessage });
+    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('m-failed');
+  });
+
+  it('leaves the failed delivery state alone when the re-send rejects', async () => {
+    const message = userMessage('m-failed');
     const send = vi
       .fn<() => Promise<void>>()
       .mockRejectedValue(new Error('Failed to send message'));
-    await expect(retryFailedMessage(send)).resolves.toBeUndefined();
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await expect(
+      retryFailedMessage({ message, send, clearFailedMessage })
+    ).resolves.toBeUndefined();
     expect(send).toHaveBeenCalledTimes(1);
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not clear an assistant failure row, which stays marked', async () => {
+    const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await retryFailedMessage({
+      message: assistantMessage('m-asst'),
+      send,
+      clearFailedMessage,
+    });
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+  });
+
+  it('swallows a rejected re-send so the caller never sees the rejection', async () => {
+    const send = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValue(new Error('Failed to send message'));
+    const clearFailedMessage = vi.fn<(messageId: string) => void>();
+    await expect(
+      retryFailedMessage({ message: userMessage('m1'), send, clearFailedMessage })
+    ).resolves.toBeUndefined();
+  });
+
+  it('stops the delivery failure showing in the transcript once the retry lands', async () => {
+    // A client-materialised submission with no renderable parts appears at all
+    // only because its run failed; clearing the entry drops it, and no row
+    // keeps a failure footer.
+    const submission = userMessage('m-retried');
+    submission.parts = [];
+    (submission.info as { synthetic?: boolean }).synthetic = true;
+    const deliveryStates = new Map<string, MessageDeliveryState>([
+      ['m-retried', { status: 'failed', error: 'boom', reason: 'execution' }],
+    ]);
+
+    // The marker folds onto the message row as `timeMarker`, so the failed
+    // submission is the only item and its key no longer carries a `time:` row.
+    expect(
+      mergeSessionTranscript([submission], [], deliveryStates).map(item =>
+        getSessionTranscriptItemKey(item)
+      )
+    ).toEqual(['m-retried']);
+
+    await retryFailedMessage({
+      message: submission,
+      send: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      clearFailedMessage: messageId => {
+        deliveryStates.delete(messageId);
+      },
+    });
+
+    expect(deliveryStates.has('m-retried')).toBe(false);
+    expect(mergeSessionTranscript([submission], [], deliveryStates)).toEqual([]);
+  });
+
+  it('keeps the failure showing when the re-send itself fails', async () => {
+    const submission = userMessage('m-kept');
+    const deliveryStates = new Map<string, MessageDeliveryState>([
+      ['m-kept', { status: 'failed', error: 'boom', reason: 'execution' }],
+    ]);
+
+    await retryFailedMessage({
+      message: submission,
+      send: vi.fn<() => Promise<void>>().mockRejectedValue(new Error('Failed to send message')),
+      clearFailedMessage: messageId => {
+        deliveryStates.delete(messageId);
+      },
+    });
+
+    expect(deliveryStates.get('m-kept')).toEqual({
+      status: 'failed',
+      error: 'boom',
+      reason: 'execution',
+    });
   });
 });
 

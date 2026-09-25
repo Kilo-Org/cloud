@@ -40,8 +40,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/use-new-session-repos.ts': 'repo key normalization',
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
-  'lib/auth/passkey-client.ts':
-    'native passkey error and credential-API error classification key; not display text, display copy uses catalog keys',
+  'lib/agent-profile-forms.ts': 'environment-variable key normalization',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
@@ -66,6 +65,9 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/agents/session-terminal-error.ts': 'service-message classification',
   'components/agents/tool-card-image-cache.ts': 'mime-subtype normalization',
   'components/agents/tool-list-model.ts': 'status-note comparison',
+  'components/profiles/agent-form-sheet.tsx': 'agent-slug normalization',
+  'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
+  'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
   'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
 };
 
@@ -124,5 +126,12 @@ describe('case guard', () => {
       ).toEqual([]);
       expect(code, `${relativePath} must not re-case a label`).not.toContain('capitalize');
     }
+  });
+
+  it('classifies passkey errors without a bare case call or a file-wide exemption', () => {
+    const path = 'lib/auth/passkey-client.ts';
+    expect(Object.hasOwn(ALLOWED_NON_DISPLAY, path)).toBe(false);
+    const code = stripComments(readFileSync(join(SRC, path), 'utf8'));
+    expect([...code.matchAll(BARE_CASE_CALL)]).toEqual([]);
   });
 });

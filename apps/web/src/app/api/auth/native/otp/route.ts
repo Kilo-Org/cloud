@@ -5,6 +5,7 @@ import { createSignInCode, deleteSignInCode } from '@/lib/auth/magic-link-tokens
 import { sendSignInCodeEmail } from '@/lib/email';
 import * as z from 'zod';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const requestSchema = z.object({
   email: z.string().email(),
@@ -34,7 +35,7 @@ async function enforceResponseFloor(startTime: number): Promise<void> {
  * row and verifies as INVALID_CODE, identical to an eligible-but-wrong-code
  * attempt.
  */
-export async function POST(request: NextRequest) {
+export const POST = withRestTiming('/api/auth/native/otp', async (request: Request) => {
   const startTime = Date.now();
 
   const body = await request.json().catch(() => undefined);
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
   const { email } = validation.data;
 
-  const eligibility = await checkEmailSignInEligibility(email, request);
+  const eligibility = await checkEmailSignInEligibility(email, request as NextRequest);
   if (!eligibility.ok) {
     if (eligibility.errorCode === 'INVALID_EMAIL') {
       await enforceResponseFloor(startTime);
@@ -87,4 +88,4 @@ export async function POST(request: NextRequest) {
 
   await enforceResponseFloor(startTime);
   return NextResponse.json({ success: true, challengeId });
-}
+});

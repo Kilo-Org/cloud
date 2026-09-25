@@ -12,6 +12,7 @@ import {
   mountTab,
   pushMock,
   replyScrollFns,
+  rerenderTab,
   resetState,
 } from './pr-review-discussion-tab.test-helpers';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -132,6 +133,31 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 
+  it.each(['load-more', 'loading', 'retry'] as const)(
+    'keeps the %s footer reachable when normalization leaves no discussion rows',
+    state => {
+      discussionState.query.hasNextPage = state !== 'retry';
+      discussionState.query.isFetchingNextPage = state === 'loading';
+      discussionState.laterPageError = state === 'retry';
+      const renderer = mountTab();
+      const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+      expect(list.props.listItems).toEqual([]);
+      expect(list.props.hasNextPage).toBe(state !== 'retry');
+      expect(list.props.isFetchingNextPage).toBe(state === 'loading');
+      expect(list.props.laterPageError).toBe(state === 'retry');
+      expectCtaPresence(renderer, true);
+      if (state !== 'loading') {
+        act(() => {
+          (list.props[state === 'retry' ? 'onRetryLoadMore' : 'onLoadMore'] as () => void)();
+        });
+        expect(
+          state === 'retry' ? discussionState.query.refetch : discussionState.query.fetchNextPage
+        ).toHaveBeenCalledOnce();
+      }
+      renderer.unmount();
+    }
+  );
+
   it('keeps permission denial ahead of retained comments', () => {
     discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
     discussionState.firstPageErrorState = { kind: 'permission' };
@@ -175,6 +201,16 @@ describe('PrReviewDiscussionTab full-body states', () => {
       renderer.root.findAll(node => String(node.type) === 'PrReviewDiscussionList')
     ).toHaveLength(1);
     expectCtaPresence(renderer, true);
+  });
+
+  it('hands the list the empty state a fully hidden discussion falls back to', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const list = mountTab().root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    // The list's blocked / muted filter can remove every row the page
+    // returned; the tab hands it the empty state so the body never renders
+    // blank, and the copy stays on one surface.
+    expect(list.props.emptyState).toBeDefined();
   });
 
   it('renders the comment CTA bar on the empty view and opens the composer', () => {
@@ -307,5 +343,57 @@ describe('PrReviewDiscussionTab keyboard-lift gating and reply-scroll wiring', (
     // content-position settle, the pre-existing behavior).
     listProps.onScrollBeginDrag?.();
     expect(replyScrollFns.invalidate).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Fix 11: the merge is memoized on its two identity-stable inputs, so a
+// re-render with unchanged data hands FlashList the same array instead of a
+// freshly merged and sorted one (which would re-diff the whole list).
+describe('PrReviewDiscussionTab merged list memoization (Fix 11)', () => {
+  it('reuses the same listItems array across a re-render with unchanged inputs', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+
+    const first = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const firstItems = first.props.listItems;
+
+    rerenderTab(renderer);
+
+    const second = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(second.props.listItems).toBe(firstItems);
+
+    renderer.unmount();
+  });
+
+  it('reuses the same listItems array when the hook hands back a fresh empty conversation each render', () => {
+    // The real hook returns a brand-new `[]` for a PR whose first page carries
+    // no conversation comments: `retainConversationAcrossMounts` falls back to
+    // a fresh literal per call. A memo keyed on that raw array never hits, so
+    // the tab substitutes a stable empty reference.
+    discussionState.threads = [{ threadId: 'T1', isResolved: false, comments: [] }];
+    discussionState.conversation = [];
+    const renderer = mountTab();
+
+    const first = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const firstItems = first.props.listItems;
+
+    // A NEW empty array, exactly like the hook's next call.
+    discussionState.conversation = [];
+    rerenderTab(renderer);
+
+    const second = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(second.props.listItems).toBe(firstItems);
+
+    renderer.unmount();
+  });
+
+  it('mounts the happy list inside the shared comment-moderation provider', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+
+    const provider = renderer.root.find(node => String(node.type) === 'CommentModerationProvider');
+    expect(provider.find(node => String(node.type) === 'PrReviewDiscussionList')).toBeDefined();
+
+    renderer.unmount();
   });
 });

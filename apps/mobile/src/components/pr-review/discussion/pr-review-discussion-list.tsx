@@ -4,14 +4,16 @@
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { type RefObject, useMemo } from 'react';
+import { type ReactNode, type RefObject, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
 import { Button } from '@/components/ui/button';
+import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   type DiscussionListItem,
@@ -19,6 +21,7 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
@@ -54,6 +57,14 @@ type PrReviewDiscussionListProps = {
    * (useReplyFocusScroll). Optional; absent = no viewport reporting.
    */
   readonly onViewportLayout?: (height: number) => void;
+  /**
+   * The tab's empty state, rendered instead of the rows when the blocked /
+   * muted filter removes every loaded row. The tab decides "empty" from the
+   * unfiltered page, so without this the body would render nothing at all.
+   * The copy stays the tab's: it is the same surface, and a distinct message
+   * needs a catalog key the translation slice owns.
+   */
+  readonly emptyState?: ReactNode;
 };
 
 export function PrReviewDiscussionList({
@@ -73,8 +84,14 @@ export function PrReviewDiscussionList({
   onRetryLoadMore,
   onReplyInputFocus,
   onViewportLayout,
+  emptyState,
 }: Readonly<PrReviewDiscussionListProps>) {
+  const { t } = useTranslation();
   const trpc = useTRPC();
+  // Provider noun for the empty message below (GitLab calls it a merge
+  // request); the same scope the tab reads for its own copy.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const isMergeRequest = ref.platform === 'gitlab';
   // Account-local hidden users (blocked + muted GitHub logins) filter rows.
   const hiddenUsers = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
   // Viewer login for self-target gating on the comment overflow menu. The
@@ -130,6 +147,26 @@ export function PrReviewDiscussionList({
     () => ({ paddingTop: 12, paddingLeft: insets.left, paddingRight: insets.right }),
     [insets.left, insets.right]
   );
+
+  // Every loaded row belongs to a blocked or muted author. An empty FlashList
+  // draws nothing, so the body would read as blank with no explanation. The
+  // tab hands down the empty state it already owns for this surface; the
+  // footer stays mounted so later pages (whose rows may be visible) and a
+  // later-page retry stay reachable from the filtered body.
+  if (visibleItems.length === 0 && emptyState) {
+    return (
+      <View className="flex-1">
+        {emptyState}
+        <ListFooter
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          laterPageError={laterPageError}
+          onLoadMore={onLoadMore}
+          onRetryLoadMore={onRetryLoadMore}
+        />
+      </View>
+    );
+  }
 
   return (
     <FlashList
@@ -190,6 +227,23 @@ export function PrReviewDiscussionList({
       onLayout={event => {
         onViewportLayout?.(event.nativeEvent.layout.height);
       }}
+      ListEmptyComponent={
+        // Every loaded row can be hidden (blocked/muted authors) while the
+        // tab still counts the discussion as content. Without this the list
+        // renders an empty body under the pinned Comment bar: no rows, no
+        // loading, no message (spot check e7). The copy is the discussion's
+        // existing empty copy — new copy belongs to the translation slice.
+        <EmptyState
+          placement="top"
+          icon={MessageSquarePlus}
+          title={t('prReview.discussion.noDiscussion')}
+          description={
+            isMergeRequest
+              ? t('prReview.terms.noDiscussionDescription')
+              : t('prReview.discussion.noDiscussionDescription')
+          }
+        />
+      }
       ListFooterComponent={
         <ListFooter
           hasNextPage={hasNextPage}

@@ -16,6 +16,7 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
+  glanceableScopeRefreshRequestSchema,
   internalDispatchRequestSchema,
   markBadgeReadInputSchema,
   refreshGlanceableSessionsInputSchema,
@@ -127,8 +128,9 @@ async function hasValidInternalSecret(c: {
   return timingSafeEqual(provided, expected);
 }
 
-// Internal service-to-service dispatch (low-balance + security-finding).
-// Intentionally outside `/v1/*` so user-JWT auth middleware does not apply.
+// Internal service-to-service dispatch (low-balance + spend-alert +
+// security-finding). Intentionally outside `/v1/*` so user-JWT auth
+// middleware does not apply.
 app.post('/internal/v1/dispatch', async c => {
   if (!(await hasValidInternalSecret(c))) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -153,6 +155,31 @@ app.post('/internal/v1/dispatch', async c => {
     readPreferences: async userId => readPreferencesRow(db, userId),
   });
   return c.json(result);
+});
+
+// Registering a replacement iOS activity token retires the previous live
+// `ios_activity` row; the retired card is only sent its `end` by a delivery
+// pass, and those are otherwise driven by agent-session transitions. The web
+// router asks for one here so an orphan card the client cannot see after
+// process death is dismissed at registration instead of staying stacked under
+// the new card for as long as the current agent state does not change. Same
+// internal-secret auth as the dispatch route; the DO owns the rate limit, so a
+// refresh inside the delivery window is deferred rather than dropped.
+app.post('/internal/v1/glanceable-refresh', async c => {
+  if (!(await hasValidInternalSecret(c))) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = glanceableScopeRefreshRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid body' }, 400);
+  }
+
+  const { userId, organizationId } = parsed.data;
+  const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
+  await stub.refreshGlanceableSnapshot({ userId, organizationId });
+  return c.json({ ok: true });
 });
 
 type RecipientDOStub = {
@@ -559,6 +586,7 @@ async function readPreferencesRow(
       sessionStatusEnabled: user_notification_preferences.session_status_enabled,
       kiloclawActivityEnabled: user_notification_preferences.kiloclaw_activity_enabled,
       balanceAlertsEnabled: user_notification_preferences.balance_alerts_enabled,
+      spendAlertsEnabled: user_notification_preferences.spend_alerts_enabled,
       securityFindingsEnabled: user_notification_preferences.security_findings_enabled,
     })
     .from(user_notification_preferences)

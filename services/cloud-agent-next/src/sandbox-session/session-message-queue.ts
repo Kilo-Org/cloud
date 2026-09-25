@@ -8,6 +8,11 @@ import {
   type SessionMessageIntent,
   type TurnFinalization,
 } from '../execution/types.js';
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+  WorkspaceFailureSubtype,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 import {
@@ -19,9 +24,25 @@ import {
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
 } from '../shared/sandbox-control-protocol.js';
+import {
+  decideSession,
+  headQueuedMessageId,
+  terminalMessageState,
+} from '../sandbox-state/session/reduce.js';
+import type {
+  AcceptedTurn,
+  MessageProofs,
+  QueuedMessageState,
+  SessionAggregate,
+  SessionMessage,
+  SessionMessageStateName,
+  SessionMessageTerminalSource,
+  SessionOperationProof,
+} from '../sandbox-state/model/session.js';
 
-export type SessionMessageState = 'queued' | 'accepted' | 'completed' | 'failed' | 'cancelled';
-export type SessionMessageTerminalSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
+export type { SessionMessage, SessionAggregate, SessionOperationProof };
+export type SessionMessageState = SessionMessageStateName;
+export type { SessionMessageTerminalSource };
 
 export type ControlCommandAgentSelection = Omit<AgentSelection, 'model'> & { model?: string };
 
@@ -36,80 +57,134 @@ export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'fi
   agent?: AgentSelectionOverride;
 };
 
-export type SessionOperationProof = {
-  authorization: SessionOperationAuthorization;
-  dispatched: boolean;
-  executionDeadlineAt?: number;
-  executionDeadlineSource?: 'dispatch' | 'wrapper';
-  result?: SessionOperationDelivery['result'];
-  resultHash?: string;
-  completedAt?: number;
-  attachmentEpoch?: number;
-  decision?: SessionOperationAck['decision'];
-  rejectionReceived?: true;
-};
-
-type SessionMessageLifecycle = {
-  messageId: string;
-  state: SessionMessageState;
-  queuedAt?: number;
-  acceptedAt?: number;
-  lastActivityAt?: number;
-  deliveryDeadlineAt?: number;
-  deliveryRetryScope?: 'message' | 'runtime';
-  unresolvedDispatch?: true;
-  wrapperInstanceId?: string;
-  terminalAt?: number;
-  terminalSource?: SessionMessageTerminalSource;
-  failedReason?: string;
-  failedDetail?: string;
-  attachFailures?: number;
-  promptFailures?: number;
-  preparationAttemptId?: string;
-  /**
-   * Durable wait reason for a head whose preparation attempt is finalized but
-   * still bound to an unreleased operation proof. `onProgress` cannot write to
-   * a finalized attempt, so reconnect reads this instead. Cleared whenever the
-   * attempt identity rotates or the binding is released.
-   */
-  preparationWait?: { step: string; message: string };
-  retryNotBefore?: number;
-  executionDeadlineAt?: number;
-  cancellation?: { operationId: string; deadlineAt: number };
-  /**
-   * PR gate verdict reported by a code-review turn. Present only on a completed
-   * terminal record whose wrapper observed a gate result; absent otherwise.
-   */
-  gateResult?: 'pass' | 'fail';
-  operations?: {
-    attach?: SessionOperationProof;
-    retiredAttach?: SessionOperationProof;
-    prompt?: SessionOperationProof;
-  };
-};
-
-export type SessionMessageRecordV2 = SessionMessageLifecycle & {
-  readonly version: 2;
-  readonly intent: ControlSessionMessageIntent;
-  turn?: never;
-  prompt?: never;
-  finalization?: never;
-  legacyIntentInvalid?: never;
-};
-
-type LegacySessionMessageRecord = SessionMessageLifecycle & {
-  version?: undefined;
-  intent?: ControlSessionMessageIntent;
-  turn?: AcceptedExecutionTurn;
-  prompt?: string;
-  finalization?: TurnFinalization;
-  legacyIntentInvalid?: true;
-};
-
-export type SessionMessageRecord = SessionMessageRecordV2 | LegacySessionMessageRecord;
-
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
+const NO_OUTPUT_RECOVERY_LIMIT = 1;
+
+/**
+ * Whether one more no-output recovery may be spent on an accepted turn.
+ *
+ * Both producers of `wrapper_no_output` share this bound: the accepted-message
+ * inactivity timeout in `SandboxSession.failOverdueAcceptedMessage` here, and
+ * the wrapper no-output watchdog in `src/session/wrapper-supervisor.ts`. Each
+ * plane owns its recovery lifecycle, so the same bound is duplicated on purpose:
+ * a turn gets at most one automatic re-dispatch before a second identical
+ * detection terminalizes with the attempt count recorded.
+ */
+export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
+  return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
+}
+
+/**
+ * Deferral budget for a head whose preparation deadline lands while the control
+ * plane reports a runtime replacement in flight. Each deferral grants a fresh
+ * delivery window, so the budget caps the wait inside one replacement cycle and
+ * leaves the existing terminal path to run when a replacement never completes.
+ * Binding the replacement runtime ends the cycle and starts the next budget.
+ */
+export const RUNTIME_REPLACEMENT_WAIT_LIMIT = 6;
+
+// ---------------------------------------------------------------------------
+// Canonical field access. The wire model nests per-state fields under `state`;
+// these helpers keep the one mapping in one place.
+// ---------------------------------------------------------------------------
+
+function findMessage(aggregate: SessionAggregate, messageId: string): SessionMessage | undefined {
+  return aggregate.messages.find(message => message.messageId === messageId);
+}
+
+function isActive(message: SessionMessage): boolean {
+  return message.state.kind === 'queued' || message.state.kind === 'accepted';
+}
+
+export function activeWrapperInstanceId(message: SessionMessage): string | undefined {
+  return message.state.kind === 'queued' || message.state.kind === 'accepted'
+    ? message.state.wrapperInstanceId
+    : undefined;
+}
+
+/**
+ * The message's retained delivery/settlement identity, union-wide. Ordinary
+ * terminalization preserves it; allocation-loss terminalization clears it. Fences
+ * that must reject a stale event after any terminalization read this; the
+ * `activeWrapperInstanceId` prerequisite is only for checks that explicitly
+ * require a live `queued`/`accepted` state.
+ */
+export function deliveryWrapperInstanceId(message: SessionMessage): string | undefined {
+  return message.state.wrapperInstanceId;
+}
+
+export function deliveryPreparationAttemptId(message: SessionMessage): string | undefined {
+  return message.state.preparationAttemptId;
+}
+
+export function acceptedAtOf(message: SessionMessage): number | undefined {
+  return message.state.kind === 'queued' ? undefined : message.state.acceptedAt;
+}
+
+export function queuedAtOf(message: SessionMessage): number | undefined {
+  return message.state.queuedAt;
+}
+
+export function terminalAtOf(message: SessionMessage): number | undefined {
+  return message.state.kind === 'completed' ||
+    message.state.kind === 'failed' ||
+    message.state.kind === 'cancelled'
+    ? message.state.at
+    : undefined;
+}
+
+export function terminalSourceOf(
+  message: SessionMessage
+): SessionMessageTerminalSource | undefined {
+  return message.state.kind === 'completed' ||
+    message.state.kind === 'failed' ||
+    message.state.kind === 'cancelled'
+    ? message.state.source
+    : undefined;
+}
+
+export function failedReasonOf(message: SessionMessage): string | undefined {
+  return message.state.kind === 'failed' || message.state.kind === 'cancelled'
+    ? message.state.reason
+    : undefined;
+}
+
+export function failedDetailOf(message: SessionMessage): string | undefined {
+  return message.state.kind === 'failed' ? message.state.detail : undefined;
+}
+
+export function assistantReasonOf(
+  message: SessionMessage
+): CloudAgentAssistantFailureReason | undefined {
+  return message.state.kind === 'failed' ? message.state.assistantReason : undefined;
+}
+
+export function providerOwnershipOf(
+  message: SessionMessage
+): CloudAgentProviderOwnership | undefined {
+  return message.state.kind === 'failed' ? message.state.providerOwnership : undefined;
+}
+
+function withoutFields<T extends object>(value: T, fields: readonly string[]): T {
+  const next = { ...value } as Record<string, unknown>;
+  for (const field of fields) delete next[field];
+  return next as T;
+}
+
+function withoutProofs(message: SessionMessage): SessionMessage {
+  const { proofs: _proofs, ...rest } = message;
+  return rest;
+}
+
+function withProofs(message: SessionMessage, proofs: MessageProofs | undefined): SessionMessage {
+  return proofs === undefined ? withoutProofs(message) : { ...message, proofs };
+}
+
+/** The canonical intent turns and the execution turns are the same validated shape. */
+function toExecutionTurn(turn: AcceptedTurn): AcceptedExecutionTurn {
+  return turn as AcceptedExecutionTurn;
+}
 
 export function resolveSessionMessageIntent(
   input: ControlSessionMessageInput,
@@ -149,27 +224,28 @@ export function resolveSessionMessageIntent(
   };
 }
 
-export function createSessionMessageRecord(
-  intent: ControlSessionMessageIntent
-): SessionMessageRecordV2 {
+export function createSessionMessageRecord(intent: ControlSessionMessageIntent): SessionMessage {
   return {
-    version: 2,
     messageId: intent.turn.messageId,
-    state: 'queued',
-    intent: structuredClone(intent),
+    state: {
+      kind: 'queued',
+      intent: structuredClone(intent),
+      deliveryStep: 'waiting',
+      deadlineAt: null,
+      attachFailures: 0,
+      promptFailures: 0,
+    },
   };
 }
 
-export function getSessionMessageTurn(
-  message: SessionMessageRecord
-): AcceptedExecutionTurn | undefined {
-  return (
-    message.intent?.turn ??
-    message.turn ??
-    (message.prompt !== undefined
-      ? { type: 'prompt', messageId: message.messageId, prompt: message.prompt }
-      : undefined)
-  );
+export function getSessionMessageTurn(message: SessionMessage): AcceptedExecutionTurn | undefined {
+  const state = message.state;
+  if (state.intent) return toExecutionTurn(state.intent.turn);
+  const legacy = state.legacy;
+  if (legacy?.turn) return toExecutionTurn(legacy.turn);
+  return legacy?.prompt !== undefined
+    ? { type: 'prompt', messageId: message.messageId, prompt: legacy.prompt }
+    : undefined;
 }
 
 function sameExecutionTurn(left: AcceptedExecutionTurn, right: AcceptedExecutionTurn): boolean {
@@ -190,16 +266,16 @@ function sameExecutionTurn(left: AcceptedExecutionTurn, right: AcceptedExecution
 }
 
 export function matchesSessionMessageReplay(
-  message: SessionMessageRecord,
+  message: SessionMessage,
   input: ControlSessionMessageInput
 ): boolean {
-  if (message.state !== 'queued' && message.state !== 'accepted') return false;
-  if (message.messageId !== input.turn.messageId || message.legacyIntentInvalid) return false;
+  if (!isActive(message)) return false;
+  if (message.messageId !== input.turn.messageId || message.state.legacyInvalidIntent) return false;
   const turn = getSessionMessageTurn(message);
   if (turn && !sameExecutionTurn(turn, input.turn)) return false;
   const requestedModelId = dispatchedKilocodeModelId(input.agent?.model);
   if (input.agent?.model !== undefined && !requestedModelId) return false;
-  const intent = message.intent;
+  const intent = message.state.intent;
   if (!intent) return true;
   return (
     (input.agent?.model === undefined ||
@@ -214,89 +290,122 @@ export function matchesSessionMessageReplay(
 }
 
 export function freezeLegacyQueuedMessages(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   defaults?: AgentSelectionOverride,
   defaultFinalization?: TurnFinalization
-): SessionMessageRecord[] {
-  return messages.map((message): SessionMessageRecord => {
-    if (message.version === 2 || message.state !== 'queued' || message.intent) return message;
-    const { turn, prompt, finalization, legacyIntentInvalid, ...record } = message;
-    if (legacyIntentInvalid) return message;
+): SessionMessage[] {
+  return messages.map((message): SessionMessage => {
+    const state = message.state;
+    // Resolved and permanently invalid rows are never re-resolved; only an
+    // unresolved row (no intent, no marker, with a legacy payload) is attempted.
+    if (state.kind !== 'queued' || state.intent !== null || state.legacyInvalidIntent === true) {
+      return message;
+    }
+    const legacy = state.legacy;
     const legacyTurn =
-      turn ??
-      (prompt !== undefined
-        ? { type: 'prompt' as const, messageId: message.messageId, prompt }
+      legacy?.turn ??
+      (legacy?.prompt !== undefined
+        ? { type: 'prompt' as const, messageId: message.messageId, prompt: legacy.prompt }
         : undefined);
     const intent = legacyTurn
       ? resolveSessionMessageIntent(
           {
-            turn: legacyTurn,
-            ...(finalization || defaultFinalization
-              ? { finalization: { ...defaultFinalization, ...finalization } }
+            turn: toExecutionTurn(legacyTurn),
+            ...(legacy?.finalization || defaultFinalization
+              ? { finalization: { ...defaultFinalization, ...legacy?.finalization } }
               : {}),
           },
           defaults
         )
       : undefined;
-    return intent
-      ? { ...record, ...createSessionMessageRecord(intent) }
-      : { ...message, legacyIntentInvalid: true };
+    if (!intent) {
+      // A failed resolution is permanent: mark the row invalid and keep its
+      // legacy payload, so a later freeze with a valid model cannot promote it.
+      return { ...message, state: { ...state, legacyInvalidIntent: true as const } };
+    }
+    const { legacyInvalidIntent: _invalid, legacy: _legacy, ...rest } = state;
+    return { ...message, state: { ...rest, intent } };
   });
 }
 
 export function assignPreparationAttemptId(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   messageId: string,
   mint: () => string
-): { messages: SessionMessageRecord[]; attemptId: string } | undefined {
+): { messages: SessionMessage[]; attemptId: string } | undefined {
   const message = messages.find(item => item.messageId === messageId);
   if (!message) return undefined;
-  if (message.preparationAttemptId) {
-    return {
-      messages: messages as SessionMessageRecord[],
-      attemptId: message.preparationAttemptId,
-    };
+  const state = message.state.kind === 'queued' ? message.state : undefined;
+  if (state?.preparationAttemptId) {
+    return { messages: messages as SessionMessage[], attemptId: state.preparationAttemptId };
   }
   const attemptId = mint();
   return {
     messages: messages.map(item =>
-      item.messageId === messageId
-        ? { ...item, preparationAttemptId: attemptId, preparationWait: undefined }
+      item.messageId === messageId && item.state.kind === 'queued'
+        ? {
+            ...item,
+            state: withoutFields({ ...item.state, preparationAttemptId: attemptId }, [
+              'preparationWait',
+            ]),
+          }
         : item
     ),
     attemptId,
   };
 }
 
+/**
+ * Terminal kind for a waiting message. A durable `cancellation` records an
+ * admitted user stop intent, so the message settles as `cancelled` regardless
+ * of the internal reason that reached the coordinator; otherwise it is a
+ * failure.
+ */
+export function terminalizeWaitingMessage(
+  message: SessionMessage,
+  reason: string,
+  at: number
+): SessionMessage {
+  if (message.cancellation !== undefined) {
+    return {
+      ...message,
+      state: terminalMessageState(message.state, 'cancelled', at, 'coordinator', {}),
+    };
+  }
+  return {
+    ...message,
+    state: terminalMessageState(message.state, 'failed', at, 'coordinator', { reason }),
+  };
+}
+
 export function failWaitingMessages(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   reason: string,
   wrapperInstanceId?: string,
-  includeUnassigned = true
-): { messages: SessionMessageRecord[]; failedIds: string[] } {
+  includeUnassigned = true,
+  at: number = Date.now()
+): { messages: SessionMessage[]; failedIds: string[] } {
   const head =
-    messages.find(message => message.state === 'accepted') ??
-    messages.find(message => message.state === 'queued');
+    messages.find(message => message.state.kind === 'accepted') ??
+    messages.find(message => message.state.kind === 'queued');
   const failUnassigned =
     wrapperInstanceId === undefined ||
-    (includeUnassigned && head?.wrapperInstanceId === wrapperInstanceId);
+    (includeUnassigned &&
+      head !== undefined &&
+      activeWrapperInstanceId(head) === wrapperInstanceId);
   const failedIds: string[] = [];
   return {
     messages: messages.map(message => {
-      if (message.state !== 'queued' && message.state !== 'accepted') return message;
+      if (!isActive(message)) return message;
       if (
         wrapperInstanceId !== undefined &&
-        message.wrapperInstanceId !== wrapperInstanceId &&
-        !(message.wrapperInstanceId === undefined && failUnassigned)
+        activeWrapperInstanceId(message) !== wrapperInstanceId &&
+        !(activeWrapperInstanceId(message) === undefined && failUnassigned)
       ) {
         return message;
       }
       failedIds.push(message.messageId);
-      return {
-        ...message,
-        state: 'failed',
-        failedReason: reason,
-      };
+      return terminalizeWaitingMessage(message, reason, at);
     }),
     failedIds,
   };
@@ -311,9 +420,9 @@ export function failWaitingMessages(
  * preparation attempt/acquisition or dispatch a new authorization, or the
  * operation identity is split and the reconcile is rejected as changed.
  */
-export function hasUnreleasedOperationProof(message: SessionMessageRecord): boolean {
-  const attach = message.operations?.attach;
-  const prompt = message.operations?.prompt;
+export function hasUnreleasedOperationProof(message: SessionMessage): boolean {
+  const attach = message.proofs?.attach;
+  const prompt = message.proofs?.prompt;
   return (
     (attach !== undefined && attach.dispatched === true) ||
     (prompt !== undefined && prompt.dispatched !== false)
@@ -324,8 +433,8 @@ export function hasUnreleasedOperationProof(message: SessionMessageRecord): bool
  * Release queued messages bound to a dying wrapper that never reached a
  * committed prompt. These are safe to retry on a replacement runtime.
  *
- * A never-dispatched message keeps its original `deliveryDeadlineAt`; only its
- * wrapper binding and in-flight preparation state are cleared. A completed (or
+ * A never-dispatched message keeps its original deadline; only its wrapper
+ * binding and in-flight preparation state are cleared. A completed (or
  * authoritatively retired) attach proof is moved to `retiredAttach` so a late
  * result for the old authorization cannot restore it and the message can bind a
  * new wrapper. Messages with an ambiguous attach (dispatched without a
@@ -333,48 +442,98 @@ export function hasUnreleasedOperationProof(message: SessionMessageRecord): bool
  * invalidation as an authoritative matching retirement.
  */
 export function releaseUnadmittedWaitingMessages(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   wrapperInstanceId: string,
   options?: { releaseDispatchedAttach?: boolean }
-): { messages: SessionMessageRecord[]; releasedIds: string[] } {
+): { messages: SessionMessage[]; releasedIds: string[] } {
   const releasedIds: string[] = [];
   const releaseDispatchedAttach = options?.releaseDispatchedAttach === true;
   return {
     messages: messages.map(message => {
-      if (message.state !== 'queued' || message.wrapperInstanceId !== wrapperInstanceId) {
+      if (
+        message.state.kind !== 'queued' ||
+        message.state.wrapperInstanceId !== wrapperInstanceId
+      ) {
         return message;
       }
       // A dispatched (or ambiguous) prompt may already have executed; never
       // release it here. A prompt authoritatively rejected before admission
       // (`dispatched === false`) never executed, so it is releasable.
-      const prompt = message.operations?.prompt;
+      const prompt = message.proofs?.prompt;
       if (prompt !== undefined && prompt.dispatched !== false) return message;
 
-      const attach = message.operations?.attach;
+      const attach = message.proofs?.attach;
       const completedAttach = attach?.dispatched === true && attach.completedAt !== undefined;
       const ambiguousAttach = attach?.dispatched === true && !completedAttach;
       const releaseAttach = completedAttach || (ambiguousAttach && releaseDispatchedAttach);
       if (ambiguousAttach && !releaseAttach) return message;
-      if (message.unresolvedDispatch === true && !releaseDispatchedAttach) return message;
-      if (!releaseAttach && (message.attachFailures ?? 0) >= ATTACH_FAILURE_LIMIT) return message;
+      if (message.state.unresolvedDispatch === true && !releaseDispatchedAttach) return message;
+      if (!releaseAttach && message.state.attachFailures >= ATTACH_FAILURE_LIMIT) return message;
 
       releasedIds.push(message.messageId);
-      return {
-        ...message,
-        wrapperInstanceId: undefined,
-        preparationAttemptId: undefined,
-        preparationWait: undefined,
-        retryNotBefore: undefined,
-        unresolvedDispatch: undefined,
-        // Preserve intent and deliveryDeadlineAt: the head keeps its original
-        // preparation bound. A released attach proof is retained for late results.
-        ...(releaseAttach && attach
-          ? { operations: { retiredAttach: attach } }
-          : { operations: undefined }),
-      };
+      const cleared = withoutFields(message.state, [
+        'wrapperInstanceId',
+        'preparationAttemptId',
+        'preparationWait',
+        'retryNotBefore',
+        'unresolvedDispatch',
+      ]);
+      // Preserve intent and deadline: the head keeps its original preparation
+      // bound. A released attach proof is retained for late results.
+      const proofs =
+        releaseAttach && attach
+          ? { retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach) }
+          : undefined;
+      return withProofs({ ...message, state: cleared }, proofs);
     }),
     releasedIds,
   };
+}
+
+/**
+ * Re-queue an accepted turn whose runtime produced no output, so the alarm can
+ * re-dispatch the same durable turn on a fresh runtime. The immutable `intent`
+ * (the user's typed message) is preserved, which is what makes the recovery
+ * lossless. Every ambiguous dispatch proof is dropped: a late operation result
+ * for the retired authorization must not revive it, and the cleared prompt
+ * proof is what lets the delivery start a new acquisition instead of
+ * reconciling the old one. Only the matching record changes; every other record
+ * is returned untouched. Returns `undefined` when no accepted record matches.
+ *
+ * The acceptance, activity and execution bounds are cleared with the dispatch
+ * state: all of them were measured against the runtime that just went silent, so
+ * keeping any would fail the replacement delivery immediately or hand the fresh
+ * prompt a bound that belongs to the retired authorization. The recovery count
+ * is the one piece of the retired lifecycle that survives; it is what bounds
+ * both `wrapper_no_output` producers to a single automatic recovery before a
+ * second identical detection terminalizes.
+ */
+export function redispatchAcceptedMessage(
+  messages: readonly SessionMessage[],
+  messageId: string
+): SessionMessage[] | undefined {
+  const message = messages.find(item => item.messageId === messageId);
+  if (!message || message.state.kind !== 'accepted') return undefined;
+  const accepted = message.state;
+  return messages.map(item =>
+    item.messageId !== messageId
+      ? item
+      : {
+          ...withoutProofs(item),
+          state: {
+            kind: 'queued',
+            intent: accepted.intent,
+            ...(accepted.legacyInvalidIntent ? { legacyInvalidIntent: true as const } : {}),
+            ...(accepted.legacy !== undefined ? { legacy: accepted.legacy } : {}),
+            ...(accepted.queuedAt !== undefined ? { queuedAt: accepted.queuedAt } : {}),
+            deliveryStep: 'waiting',
+            deadlineAt: null,
+            attachFailures: 0,
+            promptFailures: 0,
+            recoveryAttempts: (accepted.recoveryAttempts ?? 0) + 1,
+          },
+        }
+  );
 }
 
 /**
@@ -383,37 +542,65 @@ export function releaseUnadmittedWaitingMessages(
  * new attempt id is legal while the prompt has not been dispatched.
  */
 export function replacePreparationAttemptId(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   messageId: string,
   attemptId: string
-): SessionMessageRecord[] {
+): SessionMessage[] {
   return messages.map(message =>
-    message.messageId === messageId
-      ? { ...message, preparationAttemptId: attemptId, preparationWait: undefined }
+    message.messageId === messageId && message.state.kind === 'queued'
+      ? {
+          ...message,
+          state: withoutFields({ ...message.state, preparationAttemptId: attemptId }, [
+            'preparationWait',
+          ]) as QueuedMessageState,
+        }
       : message
   );
 }
 
 export function releaseCompletedRetryableAttach(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   messageId: string,
   retryNotBefore: number
-): SessionMessageRecord[] {
+): SessionMessage[] {
   return messages.map(message => {
-    const attach = message.messageId === messageId ? message.operations?.attach : undefined;
+    const attach = message.messageId === messageId ? message.proofs?.attach : undefined;
     if (!attach?.dispatched || attach.result?.ok !== false) return message;
-    const operations = { ...message.operations };
-    operations.retiredAttach = attach;
-    delete operations.attach;
-    return {
-      ...message,
-      unresolvedDispatch: undefined,
-      preparationAttemptId: undefined,
-      preparationWait: undefined,
-      retryNotBefore,
-      ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
+    const proofs: MessageProofs = {
+      ...message.proofs,
+      retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
     };
+    delete proofs.attach;
+    return withProofs(
+      {
+        ...message,
+        state: withoutFields({ ...message.state, retryNotBefore }, [
+          'unresolvedDispatch',
+          'preparationAttemptId',
+          'preparationWait',
+        ]) as QueuedMessageState,
+      },
+      Object.keys(proofs).length > 0 ? proofs : undefined
+    );
   });
+}
+
+/**
+ * Retire an attach proof into the single `retiredAttach` slot without letting
+ * the slot's attach epoch drop. A dispatched attach carries no `attachmentEpoch`
+ * until its result arrives, and every other retired proof's epoch was already
+ * counted by `nextAttachmentEpoch`. Replacing the slot with an epoch-less proof
+ * would drop the pool to the epochs of the proofs that remain, so the next attach
+ * is minted at or below the epoch the native-runtime fence holds and looks like a
+ * stale result — refusing the in-place rebind the head is waiting for. Carry the
+ * highest epoch either proof has carried so the pool never falls below the fence.
+ */
+export function retireAttachProof(
+  attach: SessionOperationProof,
+  previous: SessionOperationProof | undefined
+): SessionOperationProof {
+  const attachmentEpoch = Math.max(attach.attachmentEpoch ?? 0, previous?.attachmentEpoch ?? 0);
+  return { ...attach, ...(attachmentEpoch > 0 ? { attachmentEpoch } : {}) };
 }
 
 /**
@@ -423,11 +610,11 @@ export function releaseCompletedRetryableAttach(
  * consulted only when the live slot no longer matches.
  */
 export function releaseUnconfirmedAttach(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   authorization: SessionOperationAuthorization
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   const message = messages.find(item => item.messageId === authorization.messageId);
-  const attach = message?.operations?.attach;
+  const attach = message?.proofs?.attach;
   if (
     !message ||
     !attach?.dispatched ||
@@ -435,207 +622,223 @@ export function releaseUnconfirmedAttach(
     !sameSessionOperation(attach.authorization, authorization)
   )
     return undefined;
-  const operations = { ...message.operations, retiredAttach: attach };
-  delete operations.attach;
+  const proofs: MessageProofs = {
+    ...message.proofs,
+    retiredAttach: retireAttachProof(attach, message.proofs?.retiredAttach),
+  };
+  delete proofs.attach;
   return messages.map(item =>
     item.messageId !== message.messageId
       ? item
-      : { ...item, unresolvedDispatch: undefined, operations }
+      : {
+          ...withProofs(item, proofs),
+          state: withoutFields(item.state, ['unresolvedDispatch']) as QueuedMessageState,
+        }
   );
 }
 
 export function rotateLostPreparationAttempt(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   messageId: string,
   retryNotBefore: number
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   const message = messages.find(item => item.messageId === messageId);
   if (
     !message ||
-    message.state !== 'queued' ||
-    message.preparationAttemptId === undefined ||
-    message.unresolvedDispatch ||
-    message.operations?.attach?.dispatched === true ||
-    message.operations?.prompt?.dispatched === true
+    message.state.kind !== 'queued' ||
+    message.state.preparationAttemptId === undefined ||
+    message.state.unresolvedDispatch ||
+    message.proofs?.attach?.dispatched === true ||
+    message.proofs?.prompt?.dispatched === true
   )
     return undefined;
   return messages.map(item => {
-    if (item.messageId !== messageId) return item;
-    const operations = { ...item.operations };
+    if (item.messageId !== messageId || item.state.kind !== 'queued') return item;
+    const proofs: MessageProofs = { ...item.proofs };
     // Drop only definitively unadmitted proofs (dispatched === false after an
     // authoritative not-admitted rejection). Retain retiredAttach: it is consulted
     // only for late results of the old authorization and cannot block re-dispatch.
-    if (operations.attach?.dispatched !== true) delete operations.attach;
-    if (operations.prompt?.dispatched !== true) delete operations.prompt;
-    return {
-      ...item,
-      preparationAttemptId: undefined,
-      preparationWait: undefined,
-      deliveryRetryScope: undefined,
-      retryNotBefore,
-      ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
-    };
+    if (proofs.attach?.dispatched !== true) delete proofs.attach;
+    if (proofs.prompt?.dispatched !== true) delete proofs.prompt;
+    return withProofs(
+      {
+        ...item,
+        state: withoutFields({ ...item.state, retryNotBefore }, [
+          'preparationAttemptId',
+          'preparationWait',
+          'deliveryRetryScope',
+        ]) as QueuedMessageState,
+      },
+      Object.keys(proofs).length > 0 ? proofs : undefined
+    );
   });
 }
 
 export function incrementDeliveryFailure(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   messageId: string,
   kind: 'attach' | 'prompt'
-): { messages: SessionMessageRecord[]; exhausted: boolean } {
+): { messages: SessionMessage[]; exhausted: boolean } {
   const field = kind === 'attach' ? 'attachFailures' : 'promptFailures';
   const limit = kind === 'attach' ? ATTACH_FAILURE_LIMIT : PROMPT_FAILURE_LIMIT;
   let failures = 0;
   return {
     messages: messages.map(message => {
-      if (message.messageId !== messageId || message.state !== 'queued') return message;
-      failures = (message[field] ?? 0) + 1;
-      return { ...message, [field]: failures };
+      if (message.messageId !== messageId || message.state.kind !== 'queued') return message;
+      failures = message.state[field] + 1;
+      return { ...message, state: { ...message.state, [field]: failures } };
     }),
     exhausted: failures >= limit,
   };
 }
 
-export function nextQueuedMessageId(messages: readonly SessionMessageRecord[]): string | undefined {
-  if (messages.some(message => message.state === 'accepted')) return undefined;
-  return messages.find(message => message.state === 'queued')?.messageId;
+export function nextQueuedMessageId(messages: readonly SessionMessage[]): string | undefined {
+  return headQueuedMessageId(messages);
 }
 
 export function applyMessageOutcome(
-  messages: readonly SessionMessageRecord[],
+  aggregate: SessionAggregate,
   outcome: SessionMessageOutcome,
   wrapperInstanceId: string,
   now: number,
   terminalSource: SessionMessageTerminalSource = 'wrapper_outcome'
-): SessionMessageRecord[] | undefined {
-  const message = messages.find(item => item.messageId === outcome.messageId);
+): SessionAggregate | undefined {
+  const message = findMessage(aggregate, outcome.messageId);
   if (
     !message ||
-    (message.state !== 'queued' && message.state !== 'accepted') ||
-    message.wrapperInstanceId !== wrapperInstanceId ||
-    (message.state === 'queued' && nextQueuedMessageId(messages) !== message.messageId)
+    !isActive(message) ||
+    activeWrapperInstanceId(message) !== wrapperInstanceId ||
+    (message.state.kind === 'queued' &&
+      headQueuedMessageId(aggregate.messages) !== message.messageId)
   ) {
     return undefined;
   }
-  return messages.map(item =>
-    item.messageId === outcome.messageId
-      ? {
-          ...item,
-          state: outcome.status,
-          unresolvedDispatch: undefined,
-          acceptedAt: item.acceptedAt ?? now,
-          terminalAt: now,
-          terminalSource,
-          ...(outcome.reason ? { failedReason: outcome.reason } : {}),
-          ...(outcome.gateResult !== undefined ? { gateResult: outcome.gateResult } : {}),
-        }
-      : item
-  );
+  return decideSession(
+    aggregate,
+    {
+      type: 'OUTCOME',
+      messageId: outcome.messageId,
+      status: outcome.status,
+      at: now,
+      source: terminalSource,
+      ...(outcome.reason ? { reason: outcome.reason } : {}),
+      ...(outcome.gateResult !== undefined ? { gateResult: outcome.gateResult } : {}),
+      ...(outcome.assistantReason !== undefined
+        ? { assistantReason: outcome.assistantReason }
+        : {}),
+      ...(outcome.providerOwnership !== undefined
+        ? { providerOwnership: outcome.providerOwnership }
+        : {}),
+    },
+    now
+  )?.state;
 }
 
-export function hasAcceptedMessage(messages: readonly SessionMessageRecord[]): boolean {
-  return messages.some(message => message.state === 'accepted');
+export function hasAcceptedMessage(messages: readonly SessionMessage[]): boolean {
+  return messages.some(message => message.state.kind === 'accepted');
 }
 
 export function failQueuedMessage(
-  messages: readonly SessionMessageRecord[],
+  aggregate: SessionAggregate,
   messageId: string,
   reason?: string,
-  detail?: string
-): SessionMessageRecord[] | undefined {
-  if (!messages.some(message => message.messageId === messageId && message.state === 'queued')) {
+  detail?: string,
+  at: number = Date.now()
+): SessionAggregate | undefined {
+  const message = findMessage(aggregate, messageId);
+  if (
+    !message ||
+    message.state.kind !== 'queued' ||
+    headQueuedMessageId(aggregate.messages) !== messageId
+  ) {
     return undefined;
   }
-  return messages.map(message =>
-    message.messageId === messageId && message.state === 'queued'
-      ? {
-          ...message,
-          state: 'failed',
-          ...(reason ? { failedReason: reason } : {}),
-          ...(detail ? { failedDetail: detail } : {}),
-        }
-      : message
-  );
+  return decideSession(
+    aggregate,
+    {
+      type: 'OUTCOME',
+      messageId,
+      status: 'failed',
+      at,
+      source: 'coordinator',
+      ...(reason ? { reason } : {}),
+      ...(detail ? { detail } : {}),
+    },
+    at
+  )?.state;
 }
 
 export function failAcceptedMessage(
-  messages: readonly SessionMessageRecord[],
+  aggregate: SessionAggregate,
   messageId: string,
   reason?: string,
-  detail?: string
-): SessionMessageRecord[] | undefined {
-  if (!messages.some(message => message.messageId === messageId && message.state === 'accepted')) {
-    return undefined;
-  }
-  return messages.map(message =>
-    message.messageId === messageId && message.state === 'accepted'
-      ? {
-          ...message,
-          state: 'failed',
-          ...(reason ? { failedReason: reason } : {}),
-          ...(detail ? { failedDetail: detail } : {}),
-        }
-      : message
-  );
+  detail?: string,
+  at: number = Date.now()
+): SessionAggregate | undefined {
+  const message = findMessage(aggregate, messageId);
+  if (!message || message.state.kind !== 'accepted') return undefined;
+  return decideSession(
+    aggregate,
+    {
+      type: 'OUTCOME',
+      messageId,
+      status: 'failed',
+      at,
+      source: 'coordinator',
+      ...(reason ? { reason } : {}),
+      ...(detail ? { detail } : {}),
+    },
+    at
+  )?.state;
 }
 
 export function cancelPendingMessage(
-  messages: readonly SessionMessageRecord[],
-  messageId: string
-): { dropped: boolean; messages?: SessionMessageRecord[] } {
-  const target = messages.find(message => message.messageId === messageId);
+  aggregate: SessionAggregate,
+  messageId: string,
+  at: number = Date.now()
+): { dropped: boolean; messages?: SessionMessage[] } {
+  const target = findMessage(aggregate, messageId);
   if (!target) return { dropped: false };
-  if (target.state === 'cancelled' && target.failedReason === 'queued_message_cancelled') {
+  if (target.state.kind === 'cancelled' && target.state.reason === 'queued_message_cancelled') {
     return { dropped: true };
   }
-  // A queued message whose prompt was never dispatched is always cancellable,
-  // even with a preparation attempt, wrapper binding, head deadline, or an
-  // incomplete attach proof. An unresolved dispatch or a dispatched prompt is
-  // ambiguous with the agent and must be reconciled instead of silently dropped.
-  if (
-    target.state !== 'queued' ||
-    target.acceptedAt !== undefined ||
-    target.unresolvedDispatch ||
-    target.operations?.prompt?.dispatched === true
-  ) {
-    return { dropped: false };
+  // The legacy contract drops only a queued message; the canonical `CANCEL`
+  // would otherwise cancel an accepted message.
+  if (target.state.kind !== 'queued') return { dropped: false };
+  // The ambiguity predicate stays in the reducer: an unresolved dispatch or a
+  // dispatched prompt records a bounded cancellation marker instead of dropping.
+  const decision = decideSession(
+    aggregate,
+    { type: 'CANCEL', scope: 'message', messageId, at },
+    at
+  );
+  if (!decision) return { dropped: false };
+  const decided = decision.state.messages.find(message => message.messageId === messageId);
+  if (decided?.state.kind === 'cancelled') {
+    return { dropped: true, messages: decision.state.messages };
   }
-  return {
-    dropped: true,
-    messages: messages.map(message =>
-      message.messageId === messageId
-        ? { ...message, state: 'cancelled', failedReason: 'queued_message_cancelled' }
-        : message
-    ),
-  };
+  // Ambiguous: the reducer recorded the marker but the legacy refusal must be
+  // preserved, so the marker is not persisted by this path.
+  return { dropped: false };
 }
 
 export function acceptQueuedMessage(
-  messages: readonly SessionMessageRecord[],
+  aggregate: SessionAggregate,
   messageId: string,
   acceptedAt: number
-): SessionMessageRecord[] | undefined {
-  if (nextQueuedMessageId(messages) !== messageId) return undefined;
-  return messages.map(message =>
-    message.messageId === messageId
-      ? {
-          ...message,
-          state: 'accepted',
-          acceptedAt,
-          lastActivityAt: acceptedAt,
-          unresolvedDispatch: undefined,
-        }
-      : message
-  );
+): SessionAggregate | undefined {
+  return decideSession(aggregate, { type: 'ACCEPT', messageId, acceptedAt }, acceptedAt)?.state;
 }
 
 export function recordAcceptedMessageActivity(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   lastActivityAt: number
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   if (!hasAcceptedMessage(messages)) return undefined;
   return messages.map(message =>
-    message.state === 'accepted' ? { ...message, lastActivityAt } : message
+    message.state.kind === 'accepted'
+      ? { ...message, state: { ...message.state, lastActivityAt } }
+      : message
   );
 }
 
@@ -648,43 +851,54 @@ export type StreamQueuedSnapshot = {
 };
 
 export function failedMessageSnapshot(
-  message: SessionMessageRecord,
+  message: SessionMessage,
   now: number
 ): CloudMessageFailedPayload & { timestamp: number } {
-  const accepted = message.acceptedAt !== undefined;
-  const cancelled = message.state === 'cancelled';
+  const acceptedAt = acceptedAtOf(message);
+  const accepted = acceptedAt !== undefined;
+  const cancelled = message.state.kind === 'cancelled';
+  const reason = message.state.kind === 'failed' ? message.state.reason : undefined;
+  const detail = message.state.kind === 'failed' ? message.state.detail : undefined;
   return {
     messageId: message.messageId,
     status: cancelled ? 'interrupted' : 'failed',
     delivery: accepted ? 'sent' : 'queued',
     accepted,
-    reason: cancelled ? 'interrupted' : message.failedReason,
+    reason: cancelled ? 'interrupted' : reason,
+    // Record the attempt count only once a no-output recovery was spent on this
+    // turn: a first-attempt failure has no recovery to account for, and emitting
+    // `attempts: 1` there would change every other terminal failure payload.
+    ...(message.state.recoveryAttempts !== undefined
+      ? { attempts: message.state.recoveryAttempts + 1 }
+      : {}),
     ...(cancelled
       ? { error: 'The message was interrupted' }
-      : message.failedDetail || message.failedReason
-        ? { error: message.failedDetail ?? message.failedReason }
+      : detail || reason
+        ? { error: detail ?? reason }
         : {}),
-    timestamp: message.acceptedAt ?? now,
+    timestamp: acceptedAt ?? now,
   };
 }
 
 export function streamQueuedSnapshots(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   now: number
 ): StreamQueuedSnapshot[] {
   return messages
     .filter(
       message =>
-        message.state === 'queued' || message.state === 'accepted' || message.state === 'failed'
+        message.state.kind === 'queued' ||
+        message.state.kind === 'accepted' ||
+        message.state.kind === 'failed'
     )
     .map(message => {
       const turn = getSessionMessageTurn(message);
       return {
         messageId: message.messageId,
         content: turn ? renderExecutionTurnContent(turn) : '',
-        timestamp: message.acceptedAt ?? now,
-        ...(message.state === 'accepted' ? { delivery: 'sent' as const } : {}),
-        ...(message.state === 'failed'
+        timestamp: acceptedAtOf(message) ?? now,
+        ...(message.state.kind === 'accepted' ? { delivery: 'sent' as const } : {}),
+        ...(message.state.kind === 'failed'
           ? { terminalFailure: failedMessageSnapshot(message, now) }
           : {}),
       };
@@ -692,29 +906,48 @@ export function streamQueuedSnapshots(
 }
 
 export function streamCloudStatus(
-  messages: readonly SessionMessageRecord[]
+  messages: readonly SessionMessage[]
 ): { type: 'preparing' } | { type: 'ready' } | null {
   if (hasAcceptedMessage(messages)) return { type: 'ready' };
-  if (messages.some(message => message.state === 'queued')) return { type: 'preparing' };
+  if (messages.some(message => message.state.kind === 'queued')) return { type: 'preparing' };
   return messages.length > 0 ? { type: 'ready' } : null;
 }
 
+/**
+ * Mint the next attach epoch. A retired proof keeps its epoch in the pool: the
+ * native-runtime fence rejects an in-place rebind recorded at an epoch it
+ * already holds, and the retired proof's epoch is the one that fence carries, so
+ * re-minting it would make the replacement attach look like a stale result.
+ */
+function nextAttachmentEpoch(messages: readonly SessionMessage[]): number {
+  return (
+    Math.max(
+      0,
+      ...messages.flatMap(message => [
+        message.proofs?.attach?.attachmentEpoch ?? 0,
+        message.proofs?.retiredAttach?.attachmentEpoch ?? 0,
+      ])
+    ) + 1
+  );
+}
+
 export function applySessionOperationResult(
-  messages: readonly SessionMessageRecord[],
+  aggregate: SessionAggregate,
   delivery: SessionOperationDelivery,
   resultHash: string,
   now: number
 ):
   | {
-      messages: SessionMessageRecord[];
+      messages: SessionMessage[];
       disposition: SessionOperationAck['disposition'];
       decision: SessionOperationAck['decision'];
     }
   | undefined {
   const authorization = delivery.authorization;
+  const messages = aggregate.messages;
   const message = messages.find(item => item.messageId === authorization.messageId);
   const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
-  let proof = message?.operations?.[kind];
+  let proof = message?.proofs?.[kind];
   let proofSlot: 'attach' | 'retiredAttach' | 'prompt' = kind;
   let storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
   if (
@@ -723,29 +956,35 @@ export function applySessionOperationResult(
       !storedAuthorization.success ||
       !sameSessionOperation(storedAuthorization.data, authorization))
   ) {
-    proof = message?.operations?.retiredAttach;
+    proof = message?.proofs?.retiredAttach;
     proofSlot = 'retiredAttach';
     storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
   }
+  const state = message?.state;
+  // The message owns its delivery identity, union-wide and before the terminal
+  // branch, exactly as HEAD compared `message.wrapperInstanceId`. A terminal
+  // message whose retained dispatched proof matches still fences on its
+  // retained wrapper, so a post-STOPPED late result is refused (its identity was
+  // cleared) rather than acknowledged through the proof.
   if (
     !message ||
+    !state ||
     !proof?.dispatched ||
     !storedAuthorization.success ||
-    message.wrapperInstanceId !== authorization.wrapperInstanceId ||
-    !sameSessionOperation(storedAuthorization.data, authorization)
+    !sameSessionOperation(storedAuthorization.data, authorization) ||
+    deliveryWrapperInstanceId(message) !== authorization.wrapperInstanceId
   )
     return undefined;
-  if (message.state !== 'queued' && message.state !== 'accepted') {
-    if (message.terminalAt === undefined) return undefined;
+  if (state.kind !== 'queued' && state.kind !== 'accepted') {
     return {
       messages: [...messages],
       disposition:
         proof.resultHash === resultHash
           ? 'identical'
-          : message.terminalSource === 'coordinator'
+          : state.source === 'coordinator'
             ? 'superseded'
             : 'already_final',
-      decision: { state: message.state, at: message.terminalAt },
+      decision: { state: state.kind, at: state.at },
     };
   }
   if (proof.resultHash !== undefined) {
@@ -755,32 +994,35 @@ export function applySessionOperationResult(
   }
   const applied = delivery.outcome
     ? applyMessageOutcome(
-        messages,
+        aggregate,
         delivery.outcome,
         authorization.wrapperInstanceId,
         now,
         'operation_result'
-      )
+      )?.messages
     : [...messages];
   if (!applied) return undefined;
   const resultMessage = applied.find(item => item.messageId === message.messageId);
   if (!resultMessage) return undefined;
+  const resultState = resultMessage.state;
   const decision = {
-    state: resultMessage.state,
-    at: resultMessage.terminalAt ?? delivery.completedAt,
+    state: resultState.kind,
+    at:
+      resultState.kind === 'completed' ||
+      resultState.kind === 'failed' ||
+      resultState.kind === 'cancelled'
+        ? resultState.at
+        : delivery.completedAt,
   };
   const attachmentEpoch =
-    kind === 'attach'
-      ? (proof.attachmentEpoch ??
-        Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1)
-      : undefined;
+    kind === 'attach' ? (proof.attachmentEpoch ?? nextAttachmentEpoch(messages)) : undefined;
   return {
     messages: applied.map(item =>
       item.messageId === message.messageId
         ? {
             ...item,
-            operations: {
-              ...item.operations,
+            proofs: {
+              ...item.proofs,
               [proofSlot]: {
                 ...proof,
                 result: delivery.result,
@@ -799,64 +1041,64 @@ export function applySessionOperationResult(
 }
 
 export function recordSessionOperationDispatch(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   authorization: SessionOperationAuthorization,
   dispatched = true
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   const message = messages.find(item => item.messageId === authorization.messageId);
   const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
-  const proof = message?.operations?.[kind];
+  const proof = message?.proofs?.[kind];
   const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
   if (
     !message ||
     message.cancellation ||
     nextQueuedMessageId(messages) !== message.messageId ||
-    message.wrapperInstanceId !== authorization.wrapperInstanceId ||
+    activeWrapperInstanceId(message) !== authorization.wrapperInstanceId ||
     (proof &&
       (!storedAuthorization.success ||
         !sameSessionOperation(storedAuthorization.data, authorization)))
   )
     return undefined;
-  return messages.map(item =>
-    item.messageId === message.messageId
-      ? {
-          ...item,
-          unresolvedDispatch: dispatched ? true : undefined,
-          deliveryRetryScope: undefined,
-          operations: {
-            ...item.operations,
-            [kind]: {
-              authorization: structuredClone(authorization),
-              dispatched,
-              ...(kind === 'prompt' && dispatched
-                ? {
-                    executionDeadlineAt:
-                      item.executionDeadlineAt ??
-                      authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
-                    executionDeadlineSource: proof?.executionDeadlineSource ?? 'dispatch',
-                  }
-                : {}),
-            },
-          },
+  return messages.map(item => {
+    if (item.messageId !== message.messageId) return item;
+    const cleared = withoutFields(item.state, ['unresolvedDispatch', 'deliveryRetryScope']);
+    // A dispatched queued message is ambiguous until its outcome settles: keep
+    // the legacy marker so `releaseUnadmittedWaitingMessages` cannot release work
+    // that may already have executed.
+    const state =
+      cleared.kind === 'queued' && dispatched
+        ? { ...cleared, unresolvedDispatch: true as const }
+        : cleared;
+    return {
+      ...item,
+      state,
+      proofs: {
+        ...item.proofs,
+        [kind]: {
+          authorization: structuredClone(authorization),
+          dispatched,
           ...(kind === 'prompt' && dispatched
             ? {
                 executionDeadlineAt:
-                  item.executionDeadlineAt ??
+                  proof?.executionDeadlineAt ??
                   authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+                executionDeadlineSource: proof?.executionDeadlineSource ?? 'dispatch',
               }
             : {}),
-        }
-      : item
-  );
+        },
+      },
+    };
+  });
 }
 
 export function markSessionOperationRejection(
-  messages: readonly SessionMessageRecord[],
-  authorization: SessionOperationAuthorization
-): SessionMessageRecord[] | undefined {
+  messages: readonly SessionMessage[],
+  authorization: SessionOperationAuthorization,
+  subtype?: WorkspaceFailureSubtype
+): SessionMessage[] | undefined {
   if (authorization.operation !== 'session.attach') return [...messages];
   const message = messages.find(item => item.messageId === authorization.messageId);
-  const proof = message?.operations?.attach;
+  const proof = message?.proofs?.attach;
   const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
   if (
     !message ||
@@ -865,14 +1107,20 @@ export function markSessionOperationRejection(
     !sameSessionOperation(storedAuthorization.data, authorization)
   )
     return undefined;
-  if (proof.rejectionReceived) return [...messages];
+  if (proof.rejectionReceived && (subtype === undefined || proof.rejectionSubtype === subtype)) {
+    return [...messages];
+  }
   return messages.map(item =>
     item.messageId === message.messageId
       ? {
           ...item,
-          operations: {
-            ...item.operations,
-            attach: { ...proof, rejectionReceived: true },
+          proofs: {
+            ...item.proofs,
+            attach: {
+              ...proof,
+              rejectionReceived: true,
+              ...(subtype === undefined ? {} : { rejectionSubtype: subtype }),
+            },
           },
         }
       : item
@@ -880,12 +1128,12 @@ export function markSessionOperationRejection(
 }
 
 export function recordSessionOperationExecutionDeadline(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   authorization: SessionOperationAuthorization,
   executionDeadlineAt: number
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   const message = messages.find(item => item.messageId === authorization.messageId);
-  const prompt = message?.operations?.prompt;
+  const prompt = message?.proofs?.prompt;
   const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(prompt?.authorization);
   if (
     authorization.operation !== 'session.prompt' ||
@@ -902,14 +1150,9 @@ export function recordSessionOperationExecutionDeadline(
     item.messageId === message.messageId
       ? {
           ...item,
-          executionDeadlineAt,
-          operations: {
-            ...item.operations,
-            prompt: {
-              ...prompt,
-              executionDeadlineAt,
-              executionDeadlineSource: 'wrapper',
-            },
+          proofs: {
+            ...item.proofs,
+            prompt: { ...prompt, executionDeadlineAt, executionDeadlineSource: 'wrapper' },
           },
         }
       : item
@@ -917,11 +1160,11 @@ export function recordSessionOperationExecutionDeadline(
 }
 
 export function completeSessionOperationAttachment(
-  messages: readonly SessionMessageRecord[],
+  messages: readonly SessionMessage[],
   authorization: SessionOperationAuthorization
-): SessionMessageRecord[] | undefined {
+): SessionMessage[] | undefined {
   const message = messages.find(item => item.messageId === authorization.messageId);
-  const proof = message?.operations?.attach;
+  const proof = message?.proofs?.attach;
   const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
   if (
     authorization.operation !== 'session.attach' ||
@@ -932,18 +1175,15 @@ export function completeSessionOperationAttachment(
     nextQueuedMessageId(messages) !== message.messageId
   )
     return undefined;
-  const attachmentEpoch =
-    proof.attachmentEpoch ??
-    Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1;
+  const attachmentEpoch = proof.attachmentEpoch ?? nextAttachmentEpoch(messages);
   return messages.map(item =>
     item.messageId === message.messageId
       ? {
-          ...item,
-          unresolvedDispatch: undefined,
-          operations: {
-            ...item.operations,
+          ...withProofs(item, {
+            ...item.proofs,
             attach: { ...proof, completedAt: proof.completedAt ?? Date.now(), attachmentEpoch },
-          },
+          }),
+          state: withoutFields(item.state, ['unresolvedDispatch']) as QueuedMessageState,
         }
       : item
   );

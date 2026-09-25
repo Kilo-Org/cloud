@@ -75,6 +75,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
+  Wallet: 'Wallet',
   WandSparkles: 'WandSparkles',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
@@ -87,9 +88,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/offline-banner-space', () => ({ useOfflineBannerSpace: () => false }));
-// The development-only flag surface pulls the Expo application module, which a
-// node environment cannot load; it renders no control on these screens.
-vi.mock('@/components/feature-flags-section', () => ({ FeatureFlagsSection: () => null }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => themeColors }));
 vi.mock('@/lib/hooks/use-theme-preference', () => ({
   setThemePreference: vi.fn(),

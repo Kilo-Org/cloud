@@ -15,6 +15,10 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
@@ -26,7 +30,7 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -48,7 +52,6 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
-  temporarilyBlockedModelResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -77,7 +80,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -111,10 +113,19 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;
+
+/**
+ * The shared gateway/openrouter handler, wrapped so each call emits one
+ * `api_timing` line. The gateway catch-all imports this wrapped handler and
+ * wraps it again with the gateway pattern; the prefix check in
+ * `withRestTiming` keeps this inner line silent for a gateway pathname.
+ */
+export const POST = withRestTiming('/api/openrouter/[...path]', (request: Request) =>
+  openRouterPost(request as NextRequest)
+);
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -172,7 +183,7 @@ async function resolveRateLimit(
   };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
+async function openRouterPost(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
 
   const url = new URL(request.url);
@@ -263,12 +274,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Captured before auto-model resolution and provider transforms mutate the
-  // parsed body; efficient routing classifies the original user request.
-  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
-
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
+    request.headers.get(FEATURE_HEADER) ||
+      determineFallbackFeature(requestBodyParsed, request.headers.get('user-agent'))
   );
 
   const balanceAndSettingsPromise = authPromise.then(res =>
@@ -331,6 +339,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   } else {
     request.signal.addEventListener('abort', logClientDisconnect, { once: true });
   }
+
+  const { settings: privacySettings } = await balanceAndSettingsPromise;
+  const requestProvider = requestBodyParsed.body.provider;
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    privacySettings?.data_collection
+  );
+  if (Object.keys(effectivePrivacy).length > 0) {
+    requestBodyParsed.body.provider = { ...requestProvider, ...effectivePrivacy };
+  }
+
+  // Snapshot normalized privacy before model-specific provider transforms.
+  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
   let autoModel: string | null = null;
   // Organization Auto can resolve through an intermediate route target before
@@ -482,7 +505,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
 
     // No valid auth
-    if (!(await isFreeModel(effectiveModelIdLowerCased))) {
+    if (!isFreeModel(effectiveModelIdLowerCased)) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -670,7 +693,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return {
       balance,
       balanceLimitedByUserAllowance,
-      effectiveProviderConfig,
+      effectiveProviderConfig: effectiveProviderConfig
+        ? { ...effectiveProviderConfig, ...effectivePrivacy }
+        : undefined,
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
@@ -696,19 +721,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request: requestBodyParsed,
     user,
     organizationId,
+    botId,
     taskId,
-    clientIp: ipAddress ?? null,
-    machineId: machineIdHeader,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
-  if (providerResult.kind === 'not-found') {
-    // Paused experiment for this public id — return a local model-unavailable
-    // response instead of silently falling through to default routing.
-    return modelDoesNotExistResponse();
-  }
-  if (providerResult.kind === 'unavailable') {
-    return temporarilyUnavailableResponse();
-  }
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
@@ -749,18 +765,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    !autoModel &&
-    (isFableModel(effectiveModelIdLowerCased) ||
-      isOpus5Model(effectiveModelIdLowerCased) ||
-      effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS)
-  ) {
-    console.warn(
-      `User requested temporarily blocked model ${effectiveModelIdLowerCased}; rejecting.`
-    );
-    return temporarilyBlockedModelResponse();
-  }
-
-  if (
     isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
     (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
@@ -777,12 +781,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
-      settings,
     } = await accessCheckResolver.get();
 
     if (
       balance <= 0 &&
-      !(await isFreeModel(effectiveModelIdLowerCased)) &&
+      !isFreeModel(effectiveModelIdLowerCased) &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -805,29 +808,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
 
-    // Experiment traffic captures prompts to R2 for partner evaluation, which
-    // is a form of data collection that the gateway-pinned `data_collection`
-    // setting cannot enforce on a direct partner upstream. If the org has
-    // explicitly disabled data collection, refuse the experimented public id
-    // here rather than routing through and silently capturing prompts.
-    if (effectiveProviderContext.experiment && settings?.data_collection === 'deny') {
-      return dataCollectionRequiredResponse();
-    }
-
-    // OpenRouter's `body.provider.only` does not reach a direct experiment
-    // partner, so enforce any effective provider routes locally instead.
-    if (
-      effectiveProviderContext.experiment &&
-      effectiveProviderConfig?.only &&
-      !effectiveProviderConfig.only.includes(effectiveProviderContext.provider.id)
-    ) {
-      return modelNotAllowedResponse();
-    }
-
-    // Direct experiment upstreams must not have a Vercel/OpenRouter
-    // provider config pinned onto them — the partner endpoint is selected
-    // by the variant version.
-    if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
+    if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
   }
@@ -868,7 +849,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
+    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
@@ -879,15 +860,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.body.provider
   );
   if (providerNotAllowedError) return providerNotAllowedError;
-
-  if (effectiveProviderContext.experiment) {
-    usageContext.modelExperimentVariantVersionId =
-      effectiveProviderContext.experiment.variantVersionId;
-    usageContext.modelExperimentAllocationSubject =
-      effectiveProviderContext.experiment.allocationSubject;
-    // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
-    // returns true for experimented public ids.
-  }
 
   sentryRootSpan()?.setAttribute(
     'openrouter.time_to_request_start_ms',
@@ -921,8 +893,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   if (attempt.type === 'error') return attempt.response;
 
-  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
-  if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
+  const { response } = attempt;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',
@@ -934,25 +905,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!effectiveProviderContext.userByok,
-      mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
-      toolsAvailable,
-      toolsUsed,
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
   usageContext.status_code = response.status;
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.

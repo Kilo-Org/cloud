@@ -6,7 +6,10 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 function isAvailableForBot(integration: PlatformIntegration): boolean {
-  return integration.platform !== 'github' || isPlatformIntegrationHealthy(integration);
+  return (
+    integration.platform !== 'github' ||
+    (integration.github_connection_role === 'workflow' && isPlatformIntegrationHealthy(integration))
+  );
 }
 
 export class PlatformIntegrationUnavailableError extends Error {
@@ -28,12 +31,15 @@ export class PlatformIntegrationNotFoundError extends Error {
  * Platform-agnostic: queries by identity.platform + identity.teamId.
  */
 export async function getPlatformIntegration(identity: PlatformIdentity) {
-  const [integration] = await db
+  const integrations = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         eq(platform_integrations.platform, identity.platform),
+        identity.platform === 'github'
+          ? eq(platform_integrations.github_connection_role, 'workflow')
+          : undefined,
         eq(platform_integrations.platform_installation_id, identity.teamId),
         identity.platform === 'github'
           ? identity.githubAppType === 'lite'
@@ -45,8 +51,9 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
           : undefined
       )
     )
-    .limit(1);
+    .limit(identity.platform === 'github' ? 2 : 1);
 
+  const integration = integrations.length === 1 ? integrations[0] : undefined;
   return integration && isAvailableForBot(integration) ? integration : null;
 }
 

@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { DEV_CLIENT_PLUGIN_OPTIONS } from './src/lib/dev-client-plugin';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
 import { buildFocusFilterStringsFiles } from './src/i18n/focus-filter-locales.ts';
 import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
@@ -107,6 +108,21 @@ const config: ExpoConfig = {
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
+  // iOS and Android only (apps/mobile/AGENTS.md): there is no web target, and
+  // the dev server's web page is not a product surface. Left undeclared, Expo
+  // *detects* the set (getSupportedPlatforms): `react-native` resolving adds
+  // ios and android, and `react-dom` resolving adds web. The dev server that
+  // produced dev/logs/mobile.log had web in its manifest platforms, so it
+  // answered a browser request with the web index.html, and that page requests
+  // a web bundle of this entry: babel-preset-expo rewrites `react-native` to
+  // `react-native-web` (not installed), and Metro logged
+  // `Unable to resolve "react-native-web/dist/exports/AppRegistry"` into the
+  // app console — a JavaScript error the app never caused. Naming the two
+  // platforms makes ManifestMiddleware.checkBrowserRequestAsync false, so a
+  // browser request falls through to the manifest response instead of the web
+  // page whether or not the workspace resolves `react-dom`.
+  // Asserted in scripts/assert-expo-config.mjs.
+  platforms: ['ios', 'android'],
   // Per-locale native strings. Expo's built-in `withLocales` writes a
   // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
   // usage-description keys (the plugin options below stay as the base Info.plist
@@ -226,14 +242,14 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
-    ['expo-dev-client', { toolsButton: false }],
+    ['expo-dev-client', DEV_CLIENT_PLUGIN_OPTIONS],
     [
       'expo-build-properties',
       {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Old release AABs shipped without resource shrinking. Keep this on so
-          // the unused kilo_shrink_sentinel_unused raw resource is stripped and
+          // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
           enableShrinkResourcesInReleaseBuilds: true,
           usePrecompiledHeaders: true,
@@ -309,8 +325,11 @@ const config: ExpoConfig = {
         options: SENTRY_NATIVE_OPTIONS,
       },
     ],
+    // One native splash configuration and shared AnimatedSplashOverlay lifecycle
+    // for iOS and Android. The wrapper documents the native backing-surface
+    // capability exception and owns its mod ordering with expo-splash-screen.
     [
-      'expo-splash-screen',
+      './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
         backgroundColor: '#FAF74F',
@@ -364,6 +383,19 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // One implementation for iOS and Android: the discard confirm is the same
+    // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
+    // already draws that copy as given (it exposes no casing transform to
+    // override). Android is the one platform that lacks the capability —
+    // AppCompat's stock button-bar text appearance forces ALL-CAPS — so the
+    // plugin's single platform piece is the AppTheme override it writes, and it
+    // is registered once here for both prebuilds.
+    './plugins/withAndroidAlertDialogButtonCase',
+    // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
+    // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
+    // by capability — iOS's UIAlertController already follows the system
+    // appearance and takes no app-token override (see the plugin's doc comment).
+    './plugins/withAndroidAlertDialogTheme',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their
@@ -401,13 +433,14 @@ const config: ExpoConfig = {
             displayName: WIDGET_GALLERY_COPY.en.displayName,
             description: WIDGET_GALLERY_COPY.en.description,
             contentMarginsDisabled: false,
-            // Home Screen: the small square and the medium row. `systemLarge`
-            // is deliberately absent — three counts cannot fill a card that
-            // tall, and the whitespace read as an unfinished widget. Add it
-            // back only with a layout that earns the extra area.
+            // Home Screen: the small square, the medium row, and the large
+            // StandBy card. The large family carries the three counts plus the
+            // newest result below them, so its extra height is used rather
+            // than left as the whitespace that read as unfinished.
             supportedFamilies: [
               'systemSmall',
               'systemMedium',
+              'systemLarge',
               'accessoryCircular',
               'accessoryRectangular',
               'accessoryInline',

@@ -42,6 +42,8 @@ const snapshot: ActiveAgentsGlanceable = {
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
   needsInputSince: '2026-08-27T09:00:00.000Z',
+  newestResultKind: 'needsInput',
+  newestResultAt: '2026-08-27T09:00:00.000Z',
 };
 
 function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {
@@ -98,7 +100,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       response?: (scope: Scope) => Response | Promise<Response>;
       beforeIosTokens?: () => Promise<void>;
       iosTokenKind?: IosActivityToken['kind'];
-      iosTokens?: Array<IosActivityToken & Partial<Scope>>;
+      iosTokens?: Array<
+        IosActivityToken & Partial<Scope> & { updated_at?: string; superseded_at?: string | null }
+      >;
       privateKey?: () => Promise<string>;
       beforeApnsDelivery?: (token: string) => Promise<void>;
       beforeApnsResponse?: (token: string) => Promise<void>;
@@ -112,20 +116,26 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const requestedScopes: Scope[] = [];
     const activityRows = new Map<
       string,
-      Partial<Scope> & { id: string; kind: IosActivityToken['kind']; updated_at: string }
+      Partial<Scope> & {
+        id: string;
+        kind: IosActivityToken['kind'];
+        updated_at: string;
+        superseded_at?: string | null;
+      }
     >(
       (
         options.iosTokens ??
         (options.privateKey
           ? [{ token: 'activity-token', kind: options.iosTokenKind ?? 'ios_activity' }]
           : [])
-      ).map(({ token, kind, ...scope }, index) => [
+      ).map(({ token, kind, updated_at, superseded_at, ...scope }, index) => [
         token,
         {
           ...scope,
           id: `row-${index}`,
           kind,
-          updated_at: '2026-08-27 10:00:00+00',
+          updated_at: updated_at ?? '2026-08-27 10:00:00+00',
+          superseded_at: superseded_at ?? null,
         },
       ])
     );
@@ -188,13 +198,24 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         if (params.includes('android_ongoing')) return { rows: [['subscription']] };
         await options.beforeIosTokens?.();
         return {
+          // The real read is ordered `updated_at DESC, id DESC`; honor it so the
+          // singleton survivor is deterministic instead of insertion-ordered.
           rows: [...activityRows]
             .filter(
               ([, row]) =>
                 matches('user_id', row.userId ?? 'usr_1') &&
                 matches('organization_id', row.organizationId ?? null)
             )
-            .map(([token, row]) => [token, row.kind, row.id, row.updated_at]),
+            .sort(
+              ([, a], [, b]) => b.updated_at.localeCompare(a.updated_at) || b.id.localeCompare(a.id)
+            )
+            .map(([token, row]) => [
+              token,
+              row.kind,
+              row.id,
+              row.updated_at,
+              row.superseded_at ?? null,
+            ]),
         };
       }
       if (sql.includes('from "user_notification_preferences"')) {
@@ -1736,6 +1757,63 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     expect(queries).toEqual([]);
     expect(messages).toEqual([]);
   });
+
+  it('never updates two activity rows: the newest is updated and the older is ended and retired', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { service, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [
+        { token: 'old-activity', kind: 'ios_activity', updated_at: '2026-08-27 09:59:00+00' },
+        { token: 'new-activity', kind: 'ios_activity', updated_at: '2026-08-27 10:00:00+00' },
+      ],
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    await service.refreshGlanceableSessions(personalRefresh);
+    // Two rows must never leave two stacked cards: one update, one end.
+    expect(apns.map(({ token, aps }) => `${token}:${aps.event}`).sort()).toEqual([
+      'new-activity:update',
+      'old-activity:end',
+    ]);
+    // The confirmed end retires the older row, so the next pass sees one target.
+    expect([...activityRows.keys()]).toEqual(['new-activity']);
+  });
+
+  it('keeps a single activity row on exactly one update and no end', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { service, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [{ token: 'activity-token', kind: 'ios_activity' }],
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    await service.refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
+      ['activity-token', 'update'],
+    ]);
+    expect([...activityRows.keys()]).toEqual(['activity-token']);
+  });
+
+  it('updates the live target behind a superseded row instead of the superseded one', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { service, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [
+        {
+          token: 'replaced-activity',
+          kind: 'ios_activity',
+          updated_at: '2026-08-27 10:00:00+00',
+          superseded_at: '2026-08-27 10:00:01+00',
+        },
+        { token: 'live-activity', kind: 'ios_activity', updated_at: '2026-08-27 09:59:00+00' },
+      ],
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    await service.refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => `${token}:${aps.event}`).sort()).toEqual([
+      'live-activity:update',
+      'replaced-activity:end',
+    ]);
+    expect([...activityRows.keys()]).toEqual(['live-activity']);
+  });
 });
 
 describe('apnsSendsForTokens', () => {
@@ -1759,11 +1837,11 @@ describe('apnsSendsForTokens', () => {
   });
 
   it.each([
-    [true, 'update'],
-    [false, 'end'],
+    [true, ['update', 'end']],
+    [false, ['end', 'end']],
   ] as const)(
-    'sends the eligible=%s event to every activity without starting another',
-    (eligible, event) => {
+    'updates only the newest activity and ends the rest without starting another (eligible: %s)',
+    (eligible, events) => {
       expect(
         apnsSendsForTokens(
           [
@@ -1775,11 +1853,40 @@ describe('apnsSendsForTokens', () => {
           eligible
         )
       ).toEqual([
-        { token: 'activity-token-1', event },
-        { token: 'activity-token-2', event },
+        { token: 'activity-token-1', event: events[0] },
+        { token: 'activity-token-2', event: events[1] },
       ]);
     }
   );
+
+  it('skips a superseded newest row and updates the live target behind it', () => {
+    expect(
+      apnsSendsForTokens(
+        [
+          { token: 'replaced-activity', kind: 'ios_activity', superseded: true },
+          { token: 'live-activity', kind: 'ios_activity' },
+        ],
+        true,
+        true
+      )
+    ).toEqual([
+      { token: 'replaced-activity', event: 'end' },
+      { token: 'live-activity', event: 'update' },
+    ]);
+  });
+
+  it('ends every activity when all of them are superseded and starts nothing', () => {
+    expect(
+      apnsSendsForTokens(
+        [
+          { token: 'ptt-token', kind: 'ios_push_to_start' },
+          { token: 'replaced-activity', kind: 'ios_activity', superseded: true },
+        ],
+        true,
+        true
+      )
+    ).toEqual([{ token: 'replaced-activity', event: 'end' }]);
+  });
 
   it('does not start an activity for empty work', () => {
     expect(
@@ -2074,5 +2181,35 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends[0][0].priority).toBe('default');
     expect(calls.expoSends[0][0].title).toBeUndefined();
     expect(calls.expoSends[0][0].body).toBeUndefined();
+  });
+
+  it('sends one update to the newest activity and ends the older duplicate', async () => {
+    const { deps, calls } = fakeDeps({
+      listIosActivityTokens: vi.fn(async () => [
+        {
+          token: 'new-activity',
+          kind: 'ios_activity' as const,
+          id: 'row-1',
+          updated_at: '2026-08-27 10:00:00+00',
+        },
+        {
+          token: 'old-activity',
+          kind: 'ios_activity' as const,
+          id: 'row-0',
+          updated_at: '2026-08-27 09:00:00+00',
+        },
+      ]),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+    const [tokens] = calls.iosSends[0] as [
+      { token: string; event: string }[],
+      GlanceableApnsContentState,
+    ];
+    expect(tokens).toEqual([
+      { token: 'new-activity', event: 'update' },
+      { token: 'old-activity', event: 'end' },
+    ]);
   });
 });

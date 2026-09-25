@@ -300,6 +300,8 @@ describe('useDeviceAuth hook', () => {
     expect(resultRef.current?.code).toBe('UC-1234');
     expect(resultRef.current?.resumed).toBe(true);
     expect(startDeviceAuthPoll).toHaveBeenCalledTimes(1);
+    // The resumed poll closes whatever the flow opened for this URL.
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('plain-browser');
   });
 
   it('lets a start() that runs during the restore read win without a second poll', async () => {
@@ -383,6 +385,9 @@ describe('useDeviceAuth hook', () => {
     await startSignin(url);
     expect(vi.mocked(openBrowserAsync)).toHaveBeenCalledExactlyOnceWith(url);
     expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+    // Approval ends the flow from the poll, so it must know which page to close:
+    // `dismissAuthSession` does nothing to this one.
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('plain-browser');
   });
 
   it('keeps the native auth session for a product auth host', async () => {
@@ -390,5 +395,6 @@ describe('useDeviceAuth hook', () => {
     await startSignin(url);
     expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledExactlyOnceWith(url);
     expect(vi.mocked(openBrowserAsync)).not.toHaveBeenCalled();
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('auth-session');
   });
 });

@@ -77,6 +77,26 @@ describe('cloudAgentNextFeedback.list', () => {
     ]);
   });
 
+  it('returns ISO timestamps without internal context fields', async () => {
+    await db.insert(cloud_agent_feedback).values({
+      kilo_user_id: regularUser.id,
+      feedback_text: 'shaped submission',
+      cloud_agent_session_id: 'agent_123',
+      session_type: 'cloud-agent',
+      model: 'test-model',
+      repository: 'org/repo',
+      recent_messages: [{ role: 'user', text: 'hello', ts: 1 }],
+      created_at: '2026-01-01 00:00:00.000+00',
+    });
+
+    const caller = await createCallerForUser(regularUser.id);
+    const [row] = await caller.cloudAgentNextFeedback.list();
+
+    expect(row?.created_at).toBe('2026-01-01T00:00:00.000Z');
+    expect(row).not.toHaveProperty('recent_messages');
+    expect(row).not.toHaveProperty('session_type');
+  });
+
   it('honours an explicit limit', async () => {
     await db.insert(cloud_agent_feedback).values(
       Array.from({ length: 3 }, (_, index) => ({
@@ -90,6 +110,18 @@ describe('cloudAgentNextFeedback.list', () => {
     const result = await caller.cloudAgentNextFeedback.list({ limit: 2 });
 
     expect(result.map(row => row.feedback_text)).toEqual(['limited 2', 'limited 1']);
+  });
+
+  it('accepts the maximum limit and rejects out-of-range input', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.cloudAgentNextFeedback.list({ limit: 20 })).resolves.toEqual([]);
+    await expect(caller.cloudAgentNextFeedback.list({ limit: 0 })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller.cloudAgentNextFeedback.list({ limit: 1.5 })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
   });
 
   it('rejects a limit above the maximum', async () => {

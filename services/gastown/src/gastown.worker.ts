@@ -17,9 +17,7 @@ import {
   townIdMiddleware,
   type AuthVariables,
 } from './middleware/auth.middleware';
-import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
-import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { resolveSecret } from './util/secret.util';
+import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import { validateCfAccessRequest } from '@kilocode/worker-utils/cf-access';
 
 import { trpcServer } from '@hono/trpc-server';
@@ -142,6 +140,7 @@ import { timingMiddleware, instrumented } from './middleware/analytics.middlewar
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
+import { handleReauthorizeTownRuntime } from './handlers/town-runtime-authorization.handler';
 import {
   handleGetMoleculeCurrentStep,
   handleAdvanceMoleculeStep,
@@ -173,12 +172,6 @@ export type GastownEnv = {
 };
 
 const app = new Hono<GastownEnv>();
-
-const kiloAuthMiddleware = createKiloAuthMiddleware<GastownEnv>({
-  resolveSecret,
-  audiencePolicy: { audience: GASTOWN_AUDIENCE, mode: 'allow-legacy' },
-  onAuthenticated: payload => logger.setTags({ userId: payload.kiloUserId }),
-});
 
 const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -1039,6 +1032,11 @@ app.get('/api/towns/:townId/config', c =>
 app.patch('/api/towns/:townId/config', c =>
   instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
 );
+app.post('/api/towns/:townId/runtime-authorization/reauthorize', c =>
+  instrumented(c, 'POST /api/towns/:townId/runtime-authorization/reauthorize', () =>
+    handleReauthorizeTownRuntime(c, c.req.param())
+  )
+);
 
 // ── Cloudflare Debug ────────────────────────────────────────────────
 // Returns DO IDs and namespace IDs for constructing Cloudflare dashboard URLs.
@@ -1366,6 +1364,8 @@ app.use(
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
       gastownAccess: c.get('kiloGastownAccess') ?? false,
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
+      controlToken: c.get('kiloControlToken') ?? '',
+      usesModernToken: c.get('kiloUsesModernToken') ?? false,
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
       console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);

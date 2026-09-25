@@ -199,6 +199,37 @@ function modernToken(
 }
 
 describe('resource delegation authority', () => {
+  test.each([false, true])(
+    'excludes deleted organizations from Gastown claims when shared issuance is %s',
+    async enabled => {
+      shared.enabled = enabled;
+      const current = await user();
+      const active = await organizationFor(current.id);
+      const deleted = await organizationFor(current.id);
+      const billing = await organizationFor(current.id);
+      await db.insert(organization_memberships).values([
+        { organization_id: active.id, kilo_user_id: current.id, role: 'member' },
+        { organization_id: deleted.id, kilo_user_id: current.id, role: 'owner' },
+        { organization_id: billing.id, kilo_user_id: current.id, role: 'billing_manager' },
+      ]);
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, deleted.id));
+      jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+        user: current,
+        authFailedResponse: null,
+      });
+
+      const result = await createControlTokenForRequest(current, 'gastown', {
+        headers: new Headers(),
+      });
+      const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+      expect(claims.orgMemberships).toEqual([{ orgId: active.id, role: 'member' }]);
+      expect(claims.aud).toBe(enabled ? 'gastown' : undefined);
+    }
+  );
+
   test.each([true, false])(
     'accepts direct billing_manager membership when shared issuance is %s',
     async enabled => {
@@ -397,10 +428,36 @@ describe('resource delegation authority', () => {
     });
 
     shared.enabled = false;
-    const rollback = await createControlTokenForRequest(current, 'gastown', { headers });
+    await expect(
+      createControlTokenForRequest(current, 'gastown', { headers })
+    ).rejects.toMatchObject({
+      status: 503,
+      delegationCode: 'MIGRATION_UNAVAILABLE',
+    });
+    shared.enabled = true;
+    shared.family = 'cloud-agent-next';
+    await expect(
+      createControlTokenForRequest(current, 'gastown', { headers })
+    ).rejects.toMatchObject({
+      status: 503,
+      delegationCode: 'MIGRATION_UNAVAILABLE',
+    });
+    shared.family = 'gastown';
+    const enabledGastown = await createControlTokenForRequest(current, 'gastown', { headers });
+    expect(jwt.verify(enabledGastown.token, secret)).toMatchObject({
+      aud: 'gastown',
+      tokenPurpose: 'device-access',
+    });
+    shared.enabled = false;
+    const wasteland = await createControlTokenForRequest(current, 'wasteland', { headers });
+    expect(jwt.verify(wasteland.token, secret)).toMatchObject({
+      aud: 'wasteland',
+      tokenPurpose: 'device-access',
+    });
+    const rollback = await createControlTokenForRequest(current, 'cloud-agent-next', { headers });
     const claims = jwt.verify(rollback.token, secret) as jwt.JwtPayload;
     expect(claims).toMatchObject({
-      aud: 'gastown',
+      aud: 'cloud-agent-next',
       tokenPurpose: 'device-access',
       credentialExchange: false,
       deviceSessionId: session.id,

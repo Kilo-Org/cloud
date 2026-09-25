@@ -1553,6 +1553,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),
         cloud_agent_worktree_id: cloudAgentWorktreeIdSchema.nullable(),
+        profile_id: z.string().nullable(),
         organization_id: z.string().nullable(),
         git_url: z.string().nullable(),
         git_branch: z.string().nullable(),
@@ -1678,6 +1679,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           ? cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id)
           : null,
         organization_id: session.organization_id ?? null,
+        profile_id: session.profile_id ?? null,
         git_url: session.git_url ?? null,
         git_branch: session.git_branch ?? null,
         created_on_platform: session.created_on_platform,

@@ -3,6 +3,11 @@ import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import {
+  CONTAINERS_INTERCEPT_CA_PATH,
+  SANDBOX_INTERCEPT_HTTPS_ENABLED,
+  SANDBOX_INTERCEPT_HTTPS_ENV,
+} from '../shared/container-intercept.js';
+import {
   CONTROL_WRAPPER_LOG_PATH,
   CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
@@ -28,6 +33,7 @@ export type ContainersLaunchInput = {
   allocationRef: string;
   env: Record<string, string>;
   instance: ContainerInstanceSize;
+  containment?: boolean;
 };
 
 export type ContainersObservation = {
@@ -65,6 +71,18 @@ type DelayedSchedule<T> = {
 
 const RECORD_KEY = 'containers:record:v1';
 const CONTAINER_IMAGE = 'app';
+
+function containedProcessEnv(env: Record<string, string>): Record<string, string> {
+  // Bun reads NODE_EXTRA_CA_CERTS only at process start, so the injected CA file must be
+  // readable before this exec for the wrapper's own TLS; cert.ts only completes the bundle
+  // append and the child env afterwards.
+  return {
+    ...env,
+    [SANDBOX_INTERCEPT_HTTPS_ENV]: SANDBOX_INTERCEPT_HTTPS_ENABLED,
+    NODE_EXTRA_CA_CERTS: CONTAINERS_INTERCEPT_CA_PATH,
+  };
+}
+
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 const WRAPPER_EXEC_TIMEOUT_MS = 60_000;
@@ -110,9 +128,16 @@ export class SandboxContainers extends DurableObject<Env> {
         return { started: false };
       }
       if (record.state === 'launching' && record.allocationRef === ref) {
-        return this.resumeLaunch(record, ref, input.env, input.instance);
+        return this.resumeLaunch(
+          record,
+          ref,
+          input.env,
+          input.instance,
+          input.containment === true
+        );
       }
       const container = this.requiredContainer();
+      if (input.containment) await this.installContainmentProxy(container);
       // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
       await this.writeRecord({ ...record, state: 'launching', allocationRef: ref, stopOpId: null });
       await this.startContainerAndActivateBilling(
@@ -120,7 +145,7 @@ export class SandboxContainers extends DurableObject<Env> {
         record,
         this.startOptions(input.instance, record.lastSnapshot?.id)
       );
-      await this.execWrapper(container, input.env);
+      await this.execWrapper(container, input.env, input.containment === true);
       await this.writeRecord({
         ...record,
         state: 'running',
@@ -322,9 +347,11 @@ export class SandboxContainers extends DurableObject<Env> {
     record: ContainersRecord,
     ref: string,
     env: Record<string, string>,
-    instance: ContainerInstanceSize
+    instance: ContainerInstanceSize,
+    containment: boolean
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
+    if (containment) await this.installContainmentProxy(container);
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
       // A wrapper probe cannot confirm the running container, so activate before
@@ -341,7 +368,7 @@ export class SandboxContainers extends DurableObject<Env> {
         record,
         this.startOptions(instance, record.lastSnapshot?.id)
       );
-      await this.execWrapper(container, env);
+      await this.execWrapper(container, env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
     }
@@ -369,12 +396,26 @@ export class SandboxContainers extends DurableObject<Env> {
     }
   }
 
-  private async execWrapper(container: Container, env: Record<string, string>): Promise<void> {
+  private async execWrapper(
+    container: Container,
+    env: Record<string, string>,
+    containment: boolean
+  ): Promise<void> {
     await withTimeout(
-      container.exec(['bun', 'run', CONTROL_WRAPPER_PATH], { env, cwd: '/' }),
+      container.exec(['bun', 'run', CONTROL_WRAPPER_PATH], {
+        env: containment ? containedProcessEnv(env) : env,
+        cwd: '/',
+      }),
       WRAPPER_EXEC_TIMEOUT_MS,
       'wrapper exec timed out'
     );
+  }
+
+  private async installContainmentProxy(container: Container): Promise<void> {
+    const outbound = this.ctx.exports.ContainersOutbound;
+    const worker = outbound({ props: { containerId: this.ctx.id.toString() } });
+    await container.interceptOutboundHttps('*', worker);
+    await container.interceptAllOutboundHttp(worker);
   }
 
   private requiredContainer(): Container {

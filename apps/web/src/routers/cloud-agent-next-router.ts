@@ -233,6 +233,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
           ...gitParams,
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
+          githubAccessPurpose: 'agent',
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
 

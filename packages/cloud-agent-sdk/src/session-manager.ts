@@ -284,6 +284,12 @@ type FetchedSessionData = {
   totalCostMicrodollars?: number | null;
   /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
   createdOnPlatform?: string | null;
+  /**
+   * The profile the session was prepared with, as recorded on the session row.
+   * Null for a session created before profile recording, or one whose create
+   * origin resolved no profile. Populated by the mobile and extension adapters.
+   */
+  profileId?: string | null;
 };
 
 type PrepareInput = {
@@ -2604,7 +2610,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);
       config.onSendFailed?.(messageText, detail.message, err);
-      if (store.get(agentStatusAtom).type !== 'disconnected') {
+      // A connection-level failure is what the "Agent connection lost" line
+      // already states, so a disconnected agent keeps that line instead of
+      // restating the same thing. A classified failure (credits, authorization,
+      // service) is an answer from the server, so it must replace the stale
+      // line: the reader needs that reason, and the server just proved the
+      // connection is not the problem. Suppressing it left the failed send
+      // silent on mobile, whose only failed-send surface is this indicator.
+      const connectionFailure =
+        detail.code === 'connection-failed' || detail.code === 'connection-lost';
+      if (store.get(agentStatusAtom).type !== 'disconnected' || !connectionFailure) {
         setIndicator({
           type: 'error',
           message: detail.message,

@@ -102,6 +102,17 @@ describe('buildAgentSessionNotificationContent', () => {
     });
     expect(content.title).toBe('Agent session');
   });
+
+  it('carries the session organization for an organization session and omits it for Personal', () => {
+    const orgContent = buildAgentSessionNotificationContent(baseParams, {
+      title: 'Org session',
+      organizationId: 'org-1',
+    });
+    expect(orgContent.organizationId).toBe('org-1');
+
+    const personalContent = buildAgentSessionNotificationContent(baseParams, session);
+    expect('organizationId' in personalContent).toBe(false);
+  });
 });
 
 describe('buildAgentSessionNotificationDispatchInput', () => {
@@ -141,6 +152,26 @@ describe('buildAgentSessionNotificationDispatchInput', () => {
     expect(agentNotificationKindForPushData(data)).toBe('needs-input');
     expect(androidChannelIdForPushData(data)).toBe('needs-input');
     expect(iosInterruptionLevelForPushData(data)).toBe('time-sensitive');
+  });
+
+  it('puts the session organization in the cloud_agent_session data and omits it for Personal', () => {
+    const orgContent = buildAgentSessionNotificationContent(baseParams, {
+      title: 'Org session',
+      organizationId: 'org-1',
+    });
+    const orgInput = buildAgentSessionNotificationDispatchInput(baseParams, orgContent);
+    expect(orgInput.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_abc',
+      category: 'attention',
+      organizationId: 'org-1',
+    });
+    // The emitted data must still validate and keep the organization value.
+    expect(pushDataSchema.parse(orgInput.push.data)).toMatchObject({ organizationId: 'org-1' });
+
+    const personalContent = buildAgentSessionNotificationContent(baseParams, session);
+    const personalInput = buildAgentSessionNotificationDispatchInput(baseParams, personalContent);
+    expect(Object.keys(personalInput.push.data)).not.toContain('organizationId');
   });
 });
 
@@ -248,6 +279,21 @@ describe('dispatchAgentSessionNotificationPush', () => {
       type: 'cloud_agent_session',
       cliSessionId: 'ses_abc',
       category: 'attention',
+    });
+  });
+
+  it('carries the session organization into the dispatched push data', async () => {
+    const { deps, calls } = fakeDeps({
+      session: { title: 'Org session', organizationId: 'org-1' },
+    });
+    const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
+    expect(result).toEqual({ dispatched: true });
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+    expect(calls.dispatchPushInputs[0]!.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_abc',
+      category: 'attention',
+      organizationId: 'org-1',
     });
   });
 

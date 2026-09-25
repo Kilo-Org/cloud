@@ -1,15 +1,13 @@
 import { describe, test, expect } from '@jest/globals';
+import { autoFreeModels, preferredModels, selectAutoFreeCandidate } from './models';
 import {
-  autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
-  preferredModels,
-  selectAutoFreeCandidate,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
-} from './models';
+} from './kilo-exclusive-models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { getAiSdkProvider } from './providers/model-settings';
@@ -17,8 +15,8 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-} from './providers/anthropic.constants';
-import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+} from './kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -33,6 +31,11 @@ describe('rate-limited Kilo-exclusive models', () => {
 });
 
 describe('isFreeModel', () => {
+  test('returns a boolean synchronously', () => {
+    expect(isFreeModel('openrouter/free')).toBe(true);
+    expect(isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
+  });
+
   describe('free models', () => {
     test('should return true for models ending with :free', async () => {
       expect(await isFreeModel('gpt-4:free')).toBe(true);
@@ -154,15 +157,15 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('hardcodes the most aggressive reasoning for every Auto Free model', () => {
+    test('hardcodes high reasoning effort for every Auto Free model', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
+        'stealth/space-bunny-alpha': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
         'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
         'nex-agi/nex-n2.5-pro:free': { enabled: true, effort: 'high' },
-        'inclusionai/ling-3.0-flash-vl:free': { enabled: true, effort: 'high' },
       });
     });
 
@@ -171,11 +174,11 @@ describe('isFreeModel', () => {
         autoFreeModels.map(({ model, weight }) => [model, weight])
       );
       expect(weights).toEqual({
+        'stealth/space-bunny-alpha': 1,
         'poolside/laguna-s-2.1:free': 1,
         'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
         'dots-studio/dots-3-note-preview:free': 1,
         'nex-agi/nex-n2.5-pro:free': 1,
-        'inclusionai/ling-3.0-flash-vl:free': 1,
       });
     });
 
@@ -287,10 +290,6 @@ describe('shouldRedactErrorResponse', () => {
     expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
   });
 
-  test('redacts errors for experiment provider', () => {
-    expect(shouldRedactErrorResponse('experiment', 'some-experiment-model')).toBe(true);
-  });
-
   test('redacts errors for stealth models regardless of provider', () => {
     expect(shouldRedactErrorResponse('openrouter', claude_opus_4_7_stealth_model.public_id)).toBe(
       true
@@ -306,12 +305,6 @@ describe('shouldRedactErrorResponse', () => {
 describe('shouldRedactModelNameInMicrodollarUsage', () => {
   test('redacts model name for custom provider', () => {
     expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
-      true
-    );
-  });
-
-  test('redacts model name for experiment provider', () => {
-    expect(shouldRedactModelNameInMicrodollarUsage('experiment', 'some-experiment-model')).toBe(
       true
     );
   });

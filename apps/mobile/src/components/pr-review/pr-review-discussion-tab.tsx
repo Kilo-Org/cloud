@@ -7,6 +7,13 @@
 //                   "Load more" paginates threads. Full re-sort of
 //                   the entire loaded set on every update (R4: a
 //                   later page can insert rows mid-list).
+//   - filtered-empty: every row the page returned belongs to a
+//                   blocked or muted author (the list owns the
+//                   hidden-user filter). The list body renders the
+//                   empty state this tab hands it and keeps its
+//                   Load more / later-page retry footer, so the body
+//                   never reads as blank. A distinct message needs a
+//                   catalog key the translation slice owns.
 //   - loading:      first page in flight; render `Skeleton`
 //                   placeholders matching the row dimensions. A first
 //                   page that is pending but PAUSED (offline, or a fetch
@@ -388,6 +395,33 @@ export function PrReviewDiscussionTab({
     </View>
   );
 
+  // The tab owns the empty copy for both the empty view and the list, whose
+  // blocked / muted filter can remove every row the page returned. The list
+  // renders this node instead of its rows when that happens, so the body never
+  // reads as blank.
+  const emptyState = (
+    <EmptyState
+      icon={MessageSquarePlus}
+      title={t('prReview.discussion.noDiscussion')}
+      description={
+        isMergeRequest
+          ? t('prReview.terms.noDiscussionDescription')
+          : t('prReview.discussion.noDiscussionDescription')
+      }
+      action={
+        onRequestFiles ? (
+          <Button
+            variant="outline"
+            onPress={onRequestFiles}
+            accessibilityLabel={t('prReview.discussion.reviewFiles')}
+          >
+            <Text>{t('prReview.discussion.reviewFiles')}</Text>
+          </Button>
+        ) : null
+      }
+    />
+  );
+
   if (view.kind === 'permission') {
     return (
       <QueryError
@@ -460,29 +494,10 @@ export function PrReviewDiscussionTab({
 
   // An empty normalized page can still have more discussion to load. Keep
   // the list's empty message and pagination footer reachable in that case.
+  // The node is the same `emptyState` this tab owns and hands to the list, so
+  // the copy stays on one surface instead of being duplicated inline.
   if (view.kind === 'empty' && !query.hasNextPage && !query.isFetchingNextPage && !laterPageError) {
-    return withCommentCta(
-      <EmptyState
-        icon={MessageSquarePlus}
-        title={t('prReview.discussion.noDiscussion')}
-        description={
-          isMergeRequest
-            ? t('prReview.terms.noDiscussionDescription')
-            : t('prReview.discussion.noDiscussionDescription')
-        }
-        action={
-          onRequestFiles ? (
-            <Button
-              variant="outline"
-              onPress={onRequestFiles}
-              accessibilityLabel={t('prReview.discussion.reviewFiles')}
-            >
-              <Text>{t('prReview.discussion.reviewFiles')}</Text>
-            </Button>
-          ) : null
-        }
-      />
-    );
+    return withCommentCta(emptyState);
   }
 
   // ── Happy / paginated list ─────────────────────────────────────────
@@ -494,6 +509,7 @@ export function PrReviewDiscussionTab({
         number={number}
         listItems={listItems}
         listRef={listRef}
+        emptyState={emptyState}
         expansion={expansion}
         suppressContentPosition={suppressContentPosition}
         onToggleExpand={handleToggleExpand}

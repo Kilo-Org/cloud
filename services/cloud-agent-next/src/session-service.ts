@@ -1736,6 +1736,7 @@ export class SessionService {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        accessPurpose: github.githubAccessPurpose ?? 'workflow',
         ...(github.githubIntegrationId
           ? { expectedIntegrationId: github.githubIntegrationId }
           : {}),
@@ -3011,6 +3012,7 @@ export class SessionService {
     kiloUserId: string,
     env: PersistenceEnv,
     organizationId: string | undefined,
+    profileId: string | null | undefined,
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
@@ -3027,6 +3029,7 @@ export class SessionService {
         createdOnPlatform,
         title,
         gitUrl,
+        profileId,
         cloneFromKiloSessionId,
         ...(cloudAgentWorktreeId ? { cloudAgentWorktreeId } : {}),
         ...(cloudAgentWorktreeLocation ? { cloudAgentWorktreeLocation } : {}),

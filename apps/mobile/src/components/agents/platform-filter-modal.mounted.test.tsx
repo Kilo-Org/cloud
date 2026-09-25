@@ -193,6 +193,27 @@ describe('SessionFilterModal', () => {
     );
   });
 
+  it('omits an empty platform section instead of rendering an orphaned label', async () => {
+    // A live list whose rows all have an unknown origin offers no platform
+    // option (`buildLiveFilterOptions` only offers the origins that are
+    // running), so the section must be omitted exactly as PROJECT already is
+    // when it has no rows — otherwise the sheet shows a bare PLATFORM label
+    // with nothing under it (spot defect e4-filter).
+    const { renderer } = await renderModal({
+      platformOptions: [],
+      selectedPlatforms: [],
+      projectOptions: [firstProject],
+    });
+    const labels = renderer.root.findAllByType(Text).map(text => text.props.children);
+    expect(labels).not.toContain(i18n.t('common.platform'));
+    expect(labels).toContain(i18n.t('agentChat.sessionFilter.project'));
+    expect(
+      renderer.root
+        .findAllByProps({ accessibilityRole: 'checkbox' })
+        .map(row => row.findByType(Text).props.children)
+    ).toEqual([firstProject.displayName]);
+  });
+
   it('commits both draft arrays only on Apply and preserves unavailable selections', async () => {
     const selectedPlatforms = ['cli', 'future-platform'];
     const selectedProjects = [firstProject.gitUrl, unavailable];

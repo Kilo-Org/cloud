@@ -451,6 +451,49 @@ test('identity exits 1 when the IPA cannot be read', () => {
   }
 });
 
+// build.json is the only source of the Android build number, so an unreadable,
+// partial or versionless one is an identity error: the run must fail before the
+// submission instead of labelling the Android store build `unknown`.
+test('identity exits 1 when build.json cannot name the Android build', () => {
+  const cases = [
+    ['unparseable JSON', '{ not json', /cannot read build\.json/],
+    ['not a JSON array', JSON.stringify({ platform: 'ANDROID' }), /not a JSON array/],
+    ['no ANDROID build', JSON.stringify([{ platform: 'IOS' }]), /has no ANDROID build/],
+    [
+      'no appBuildVersion',
+      JSON.stringify([{ platform: 'ANDROID', metadata: {} }]),
+      /has no appBuildVersion/,
+    ],
+    [
+      'empty appBuildVersion',
+      JSON.stringify([{ platform: 'ANDROID', metadata: { appBuildVersion: '' } }]),
+      /has no appBuildVersion/,
+    ],
+  ];
+  for (const [label, contents, expected] of cases) {
+    const dir = initRepo('kilo-notes-android-');
+    try {
+      writeFixture(dir, 'app.config.ts', "const config = {\n  version: '1.0.12',\n};\n");
+      ipaFixture(dir, plistWith({ bundleVersion: '42', shortVersion: '1.0.12' }));
+      writeFixture(dir, 'build.json', contents);
+      const result = runScript(
+        NOTES,
+        ['identity', '--config', 'app.config.ts', '--ipa', 'app.ipa', '--build-json', 'build.json'],
+        { cwd: dir }
+      );
+      assert.equal(result.status, 1, `${label}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stderr, expected, label);
+      assert.equal(
+        result.stdout.includes('android_build='),
+        false,
+        `${label} must print no store identity for the submission to read`
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
 test('write --land retries a rejected push once and lands one section', () => {
   const root = tempDir('kilo-notes-land-');
   try {

@@ -316,22 +316,37 @@ function readIpaInfoPlist(ipaPath) {
   }
 }
 
-/** The appBuildVersion of the ANDROID entry in build.json, or ''. */
+/**
+ * The appBuildVersion of the ANDROID entry in build.json: `{ build }` when the
+ * file names one, otherwise `{ error }`.
+ *
+ * The heading this feeds labels both store builds, so a build.json that cannot
+ * be read, has no ANDROID entry, or carries no appBuildVersion for it is an
+ * identity error: returning '' would let the run succeed with an empty Android
+ * build number and the changelog would credit the Android submission to no
+ * build at all.
+ */
 function androidBuildFrom(buildJsonPath) {
   let builds;
   try {
     builds = JSON.parse(readFileSync(buildJsonPath, 'utf8'));
-  } catch {
-    return '';
+  } catch (error) {
+    return { error: `cannot read ${buildJsonPath}: ${reasonOf(error)}` };
   }
   if (!Array.isArray(builds)) {
-    return '';
+    return { error: `${buildJsonPath} is not a JSON array of build objects` };
   }
   const android = builds.find(build => build && build.platform === 'ANDROID');
   if (!android) {
-    return '';
+    return { error: `${buildJsonPath} has no ANDROID build` };
   }
-  return String(android.appBuildVersion ?? android.metadata?.appBuildVersion ?? '');
+  const build = String(android.appBuildVersion ?? android.metadata?.appBuildVersion ?? '');
+  if (!build) {
+    return {
+      error: `the ANDROID build in ${buildJsonPath} has no appBuildVersion`,
+    };
+  }
+  return { build };
 }
 
 function fail(message) {
@@ -428,7 +443,16 @@ function runIdentity(args) {
     );
   }
 
-  const androidBuild = options.buildJson ? androidBuildFrom(options.buildJson) : '';
+  // The heading and the store identity both promise the Android build number:
+  // fail before the submission rather than label the run with `unknown`.
+  let androidBuild = '';
+  if (options.buildJson) {
+    const android = androidBuildFrom(options.buildJson);
+    if (android.error) {
+      return fail(android.error);
+    }
+    androidBuild = android.build;
+  }
   process.stdout.write(`version=${version}\n`);
   process.stdout.write(`kilo-app marketing version ${version} (${options.config})\n`);
   process.stdout.write(`ios_build=${iosBuild}\n`);

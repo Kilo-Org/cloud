@@ -5,25 +5,62 @@ const TAB_BAR_BASE_HEIGHT = 50;
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 export const TAB_LABEL_WRAP_FONT_SCALE = 1.8;
 /**
- * Above this font scale the tab bar drops visible labels and switches to an
- * icon-forward presentation. The label height (which scales with fontScale) is
+ * At or above this font scale the tab bar drops visible labels and switches to
+ * an icon-forward presentation. The label height (which scales with fontScale) is
  * removed from the overlay height calculation, so the bar stays at the base
  * 50pt instead of ballooning. Labels remain available to assistive tech via
  * `tabBarAccessibilityLabel`. Picked above the label-wrap threshold so
  * moderate-to-large text still keeps a visible word label.
  */
 export const TAB_ICON_FORWARD_FONT_SCALE = 2;
+/**
+ * Floor for a tab label's shrink-to-fit, honoured on iOS only: RN implements
+ * `Text`'s `minimumFontScale` on iOS, while Android's `adjustsFontSizeToFit`
+ * floors at RN's own platform minimum. The cap is a residual guard, not the
+ * legibility rule — `shouldShowTabLabel` drops the labels as soon as one
+ * full-size label would not fit its tab, so a label that renders never needs to
+ * shrink that far on either platform, and the one-line/tail-truncate behaviour
+ * is the same on both.
+ */
+export const TAB_LABEL_MINIMUM_FONT_SCALE = 0.75;
 const TAB_ICON_BASE_SIZE = 22;
 const TAB_ICON_MAX_SIZE = 26;
 
+// Label metrics mirrored from `TabBarLabel`
+// (`apps/mobile/src/components/tab-bar-label.tsx`): `font-mono-medium text-[11px]
+// leading-4 uppercase tracking-[0.2px]`. Keep these in step with that style.
+const TAB_LABEL_FONT_SIZE = 11;
+const TAB_LABEL_LETTER_SPACING = 0.2;
+/** JetBrains Mono (the `font-mono-medium` label) advances 0.6em per glyph. */
+const MONO_ADVANCE_EM = 0.6;
+/** CJK/Kana/Hangul/fullwidth glyphs render one em wide in the same stack. */
+const FULL_WIDTH_ADVANCE_EM = 1;
+/**
+ * react-navigation's vertical tab item (`tabVerticalUiKit: { padding: 5 }` in
+ * `BottomTabItem`), so a tab's label box is `tabWidth - 10`.
+ */
+const TAB_ITEM_HORIZONTAL_PADDING = 10;
+
 type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
+
+/**
+ * Number of label lines the bar reserves and the label may use. Below the wrap
+ * threshold the bar is sized for one line, so the label must stay on one line
+ * and shrink to fit it: a word wider than its tab would otherwise wrap into a
+ * second line the bar has no room for, and be clipped at the bar's edge
+ * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
+ * bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
+ */
+export function tabLabelLineCount(fontScale = 1): 1 | 2 {
+  return fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
+}
 
 export function getTabBarOverlayHeight(
   bottomInset: number,
   platform: TabBarPlatform,
   fontScale = 1
 ): number {
-  const labelLines = fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
+  const labelLines = tabLabelLineCount(fontScale);
   const tabContentHeight = 34 + 16 * fontScale * labelLines;
   return (
     Math.max(TAB_BAR_BASE_HEIGHT, tabContentHeight) +
@@ -59,18 +96,24 @@ export function getTabBarIconSize(fontScale = 1): number {
  * Effective rendered tab bar height for the current platform/font scale. This
  * is the single source of truth for both the tab bar itself and the content
  * clearance below it: it switches to the compact icon-forward height once labels
- * are hidden, and otherwise uses the label-inclusive overlay height.
+ * are hidden, and otherwise uses the label-inclusive overlay height. Callers
+ * that already decided the label state (from the window width) pass it as
+ * `showLabel`; the default keeps the font-scale-only answer. Tab screens use
+ * `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which supplies the tab
+ * layout's decision so the clearance cannot drift from the rendered height.
  */
 export function getEffectiveTabBarHeight({
   bottomInset,
   platform,
   fontScale = 1,
+  showLabel = shouldShowTabLabel(fontScale),
 }: {
   bottomInset: number;
   platform: TabBarPlatform;
   fontScale?: number;
+  showLabel?: boolean;
 }): number {
-  return shouldShowTabLabel(fontScale)
+  return showLabel
     ? getTabBarOverlayHeight(bottomInset, platform, fontScale)
     : getTabBarIconForwardHeight(bottomInset, platform);
 }
@@ -94,8 +137,73 @@ export function getTabBarHorizontalInset({
   };
 }
 
-export function shouldShowTabLabel(fontScale = 1): boolean {
-  return fontScale < TAB_ICON_FORWARD_FONT_SCALE;
+/**
+ * Whether the tab bar shows visible labels. Labels are dropped at and above
+ * `TAB_ICON_FORWARD_FONT_SCALE` (the bar would balloon with the scaled label),
+ * and when any label is too wide for its tab at the current window width (RN
+ * would tail-ellipsize it, or wrap a `\n` line mid-word). With no `labels` the
+ * per-tab width is unknown, so only the font-scale rule applies — the previous
+ * behaviour, unchanged for callers that do not pass a tab width.
+ */
+export function shouldShowTabLabel(
+  fontScale = 1,
+  tabWidth = Number.POSITIVE_INFINITY,
+  labels: readonly string[] = []
+): boolean {
+  if (fontScale >= TAB_ICON_FORWARD_FONT_SCALE) {
+    return false;
+  }
+  if (labels.length === 0) {
+    return true;
+  }
+  return labels.every(label => tabLabelFits(label, tabWidth, fontScale));
+}
+
+/**
+ * Characters the tab label's monospace stack draws one em wide: CJK
+ * ideographs, Kana, Hangul and fullwidth forms/punctuation. A conservative
+ * class — it only bounds the glyph advance, so a stray match over-estimates
+ * the width and hides the labels slightly earlier rather than leaving a
+ * mid-word break on screen. Ranges mirror the `is-fullwidth-code-point` class.
+ */
+const FULL_WIDTH_CHARACTER =
+  /[\u1100-\u115F\u2329\u232A\u2E80-\u3247\u3250-\u4DBF\u4E00-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6\u{1F200}-\u{1F251}\u{20000}-\u{3FFFD}]/u;
+
+function isFullWidthCharacter(character: string): boolean {
+  return FULL_WIDTH_CHARACTER.test(character);
+}
+
+/**
+ * Estimated rendered width (dp) of the widest line of a tab label. A label is
+ * one line (`tabLabelNumberOfLines`), except copy that carries its own break
+ * (`Kilo\nClaw`), whose wider line is the one that has to fit. Only an explicit
+ * break starts a new line: an ordinary space stays on the same one line and
+ * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
+ * space). The estimate is deliberately conservative: it only decides whether
+ * the labels are dropped, so over-estimating hides them slightly early and
+ * never leaves a clipped label on screen.
+ */
+export function tabLabelWidth(label: string, fontScale = 1): number {
+  let widest = 0;
+  for (const line of label.split('\n')) {
+    let lineWidth = 0;
+    for (const character of line) {
+      const advanceEm = isFullWidthCharacter(character) ? FULL_WIDTH_ADVANCE_EM : MONO_ADVANCE_EM;
+      lineWidth += advanceEm * TAB_LABEL_FONT_SIZE * fontScale + TAB_LABEL_LETTER_SPACING;
+    }
+    widest = Math.max(widest, lineWidth);
+  }
+  return widest;
+}
+
+/**
+ * Whether `label` fits a tab item `tabWidth` dp wide without wrapping mid-word.
+ * The item's own horizontal padding is removed first, matching
+ * react-navigation's tab item (`padding: 5` on each side).
+ */
+export function tabLabelFits(label: string, tabWidth: number, fontScale = 1): boolean {
+  const available = Math.max(tabWidth - TAB_ITEM_HORIZONTAL_PADDING, 0);
+  return tabLabelWidth(label, fontScale) <= available;
 }
 
 /**

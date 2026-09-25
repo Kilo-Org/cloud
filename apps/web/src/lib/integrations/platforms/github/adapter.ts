@@ -68,9 +68,15 @@ export function verifyGitHubWebhookSignature(
 export async function generateGitHubInstallationToken(
   installationId: string,
   appType: GitHubAppType = 'standard',
-  expectedIntegrationId?: string
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
 ): Promise<InstallationToken> {
-  await assertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId);
+  await assertGitHubInstallationRuntimeAuthorized(
+    installationId,
+    appType,
+    expectedIntegrationId,
+    purpose
+  );
   return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
 }
 
@@ -195,12 +201,14 @@ type GitHubBranch = {
 export async function fetchGitHubRepositories(
   installationId: string,
   appType: GitHubAppType = 'standard',
-  expectedIntegrationId?: string
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
 ): Promise<GitHubRepository[]> {
   const tokenData = await generateGitHubInstallationToken(
     installationId,
     appType,
-    expectedIntegrationId
+    expectedIntegrationId,
+    purpose
   );
   const octokit = new Octokit({ auth: tokenData.token });
 
@@ -270,12 +278,14 @@ export async function fetchGitHubBranches(
   installationId: string,
   repositoryFullName: string,
   appType: GitHubAppType = 'standard',
-  expectedIntegrationId?: string
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<GitHubBranch[]> {
   const tokenData = await generateGitHubInstallationToken(
     installationId,
     appType,
-    expectedIntegrationId
+    expectedIntegrationId,
+    purpose
   );
   const octokit = new Octokit({ auth: tokenData.token });
 

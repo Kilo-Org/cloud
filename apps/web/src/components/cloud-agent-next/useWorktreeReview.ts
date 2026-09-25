@@ -12,12 +12,15 @@ import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { WorktreeReviewSendApi } from './worktree-review-send';
 import {
   getWorktreeReviewFreshness,
-  rebaseWorktreeReviewComment,
   sameWorktreeReviewCapture,
   serializeWorktreeReview,
+  type WorktreeReviewCapture,
   type WorktreeReviewComment,
 } from './worktree-review';
-import { parsePatchFiles } from '../../../node_modules/@pierre/diffs/dist/utils/parsePatchFiles.js';
+import {
+  verifyWorktreeReviewComment,
+  type WorktreeReviewVerification,
+} from './worktree-review-verify';
 import {
   createWorktreeReviewDraft,
   createWorktreeReviewStore,
@@ -35,6 +38,69 @@ export type WorktreeReviewDestination = {
   cloudAgentSessionId: string;
   title: string;
 };
+
+const WORKTREE_REVIEW_UNVERIFIED_RETRY_DELAYS_MS = [1_000, 3_000];
+
+type WorktreeReviewVerificationRecord = {
+  signature: string;
+  phase: 'inflight' | 'settled';
+};
+
+function worktreeReviewVerificationSignature(
+  comment: WorktreeReviewComment,
+  capture: WorktreeReviewCapture
+): string {
+  return JSON.stringify([
+    comment.id,
+    comment.anchor.path,
+    comment.anchor.capture,
+    comment.anchor.range,
+    comment.anchor.quote,
+    capture.revision,
+    capture.capturedAt,
+    capture.comparison,
+  ]);
+}
+
+function worktreeReviewSnapshotVerificationKey(
+  snapshot: {
+    revision: number;
+    capturedAt: string;
+    comparison: { baseRef: string; mergeBase: string; head: string };
+    files: readonly { path: string; revision: number }[];
+  } | null
+): string {
+  if (!snapshot) return '';
+  return JSON.stringify([
+    snapshot.revision,
+    snapshot.capturedAt,
+    snapshot.comparison.baseRef,
+    snapshot.comparison.mergeBase,
+    snapshot.comparison.head,
+    snapshot.files.map(file => [file.path, file.revision]),
+  ]);
+}
+
+function deleteAbsentIds<T>(entries: Map<string, T>, liveIds: ReadonlySet<string>) {
+  for (const id of entries.keys()) {
+    if (!liveIds.has(id)) entries.delete(id);
+  }
+}
+
+function pruneUnappliedVerifications(
+  previous: ReadonlyMap<string, string>,
+  liveIds: ReadonlySet<string>
+): ReadonlyMap<string, string> {
+  for (const id of previous.keys()) {
+    if (liveIds.has(id)) continue;
+    const next = new Map(previous);
+    for (const staleId of next.keys()) {
+      if (!liveIds.has(staleId)) next.delete(staleId);
+    }
+    return next;
+  }
+  return previous;
+}
 
 export function useWorktreeReview({
   userId,
@@ -165,7 +231,7 @@ export function useWorktreeReview({
       };
     }),
   });
-  const captures = new Map(
+  const latestSnapshots = new Map(
     sources.map((source, index) => {
       const query = savedCaptures[index];
       const accessible = destinations.some(
@@ -173,25 +239,16 @@ export function useWorktreeReview({
       );
       return [
         source,
-        scope && accessible && query?.isSuccess
-          ? currentWorktreeReviewCapture(scope, source, query.data?.snapshot)
-          : null,
+        scope && accessible && query?.isSuccess ? (query.data?.snapshot ?? null) : null,
       ] as const;
     })
   );
-  const freshness = new Map(
-    draft?.comments.map(comment => [
-      comment.id,
-      getWorktreeReviewFreshness(
-        comment,
-        captures.get(comment.anchor.capture.sourceCloudAgentSessionId) ?? null
-      ),
+  const captures = new Map(
+    sources.map(source => [
+      source,
+      scope ? currentWorktreeReviewCapture(scope, source, latestSnapshots.get(source)) : null,
     ])
   );
-  const olderCommentIds =
-    draft?.comments
-      .filter(comment => freshness.get(comment.id) !== 'current')
-      .map(comment => comment.id) ?? [];
   const locked = Boolean(draft && draft.delivery.phase !== 'idle');
   const disabledReason = !enabled
     ? 'Reviews are available only in your editable worktree chats.'
@@ -233,6 +290,189 @@ export function useWorktreeReview({
       if (scope && !locked) store.replacePathComments(scope, path, comments);
     },
   };
+
+  const fetchWorktreeReviewFile = async (
+    source: string,
+    { path, revision }: { path: string; revision: number }
+  ) => {
+    const options = organizationId
+      ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({
+          organizationId,
+          cloudAgentSessionId: source,
+          path,
+          expectedRevision: revision,
+        })
+      : trpc.cloudAgentNext.getWorktreeFile.queryOptions({
+          cloudAgentSessionId: source,
+          path,
+          expectedRevision: revision,
+        });
+    return queryClient.fetchQuery(options);
+  };
+
+  const applyWorktreeReviewRebase = (
+    dispatched: WorktreeReviewComment,
+    rebased: WorktreeReviewComment
+  ) => {
+    if (!scope) return;
+    const current = store.getDraft(scope);
+    const existing = current.comments.find(comment => comment.id === dispatched.id);
+    if (!existing || existing.anchor.path !== dispatched.anchor.path) return;
+    if (!sameWorktreeReviewCapture(existing.anchor.capture, dispatched.anchor.capture)) return;
+    const group = current.comments.filter(comment => comment.anchor.path === rebased.anchor.path);
+    if (!group.some(comment => comment.id === rebased.id)) return;
+    store.replacePathComments(
+      scope,
+      rebased.anchor.path,
+      group.map(comment =>
+        comment.id === rebased.id ? { ...comment, anchor: rebased.anchor } : comment
+      )
+    );
+  };
+
+  const verificationRecords = useRef(new Map<string, WorktreeReviewVerificationRecord>());
+  const verificationScopeKey = useRef<string | null>(null);
+  const capturesRef = useRef(captures);
+  const snapshotsRef = useRef(latestSnapshots);
+  const fetchFileRef = useRef(fetchWorktreeReviewFile);
+  const applyRebaseRef = useRef(applyWorktreeReviewRebase);
+  const isOpenRef = useRef(isOpen);
+  const scopeKeyRef = useRef<string | null>(scope ? worktreeReviewScopeKey(scope) : null);
+  const commentIdsRef = useRef(new Set((draft?.comments ?? []).map(comment => comment.id)));
+  capturesRef.current = captures;
+  snapshotsRef.current = latestSnapshots;
+  fetchFileRef.current = fetchWorktreeReviewFile;
+  applyRebaseRef.current = applyWorktreeReviewRebase;
+  isOpenRef.current = isOpen;
+  scopeKeyRef.current = scope ? worktreeReviewScopeKey(scope) : null;
+  commentIdsRef.current = new Set((draft?.comments ?? []).map(comment => comment.id));
+  const [unappliedVerifications, setUnappliedVerifications] = useState<ReadonlyMap<string, string>>(
+    new Map()
+  );
+  const verificationInputKey = [...latestSnapshots.entries()]
+    .map(([source, snapshot]) => `${source}\0${worktreeReviewSnapshotVerificationKey(snapshot)}`)
+    .join('\n');
+  useEffect(() => {
+    const comments = draft?.comments ?? [];
+    const liveIds = new Set(comments.map(comment => comment.id));
+    const scopeKey = scope ? worktreeReviewScopeKey(scope) : null;
+    if (verificationScopeKey.current !== scopeKey) {
+      verificationScopeKey.current = scopeKey;
+      verificationRecords.current.clear();
+      setUnappliedVerifications(previous => (previous.size === 0 ? previous : new Map()));
+    }
+    deleteAbsentIds(verificationRecords.current, liveIds);
+    setUnappliedVerifications(previous => pruneUnappliedVerifications(previous, liveIds));
+    if (!isOpen || !scope || hydration !== 'ready') return;
+
+    let cancelled = false;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const pendingRetries: Array<(retry: boolean) => void> = [];
+    const started = new Map<string, string>();
+    const releaseInflight = (id: string, signature: string) => {
+      const current = verificationRecords.current.get(id);
+      if (current?.phase === 'inflight' && current.signature === signature) {
+        verificationRecords.current.delete(id);
+      }
+    };
+    const forgetUnapplied = (id: string) => {
+      setUnappliedVerifications(previous => {
+        if (!previous.has(id)) return previous;
+        const next = new Map(previous);
+        next.delete(id);
+        return next;
+      });
+    };
+    const stillCurrent = (
+      id: string,
+      signature: string,
+      source: string,
+      capture: WorktreeReviewCapture
+    ) => {
+      if (cancelled || scopeKeyRef.current !== scopeKey || !commentIdsRef.current.has(id)) {
+        return false;
+      }
+      const record = verificationRecords.current.get(id);
+      if (!record || record.signature !== signature) return false;
+      const currentCapture = capturesRef.current.get(source) ?? null;
+      return currentCapture !== null && sameWorktreeReviewCapture(currentCapture, capture);
+    };
+
+    for (const comment of comments) {
+      const source = comment.anchor.capture.sourceCloudAgentSessionId;
+      const capture = capturesRef.current.get(source) ?? null;
+      if (!capture || getWorktreeReviewFreshness(comment, capture) !== 'stale') continue;
+      const snapshot = snapshotsRef.current.get(source);
+      if (!snapshot) continue;
+      const signature = worktreeReviewVerificationSignature(comment, capture);
+      if (verificationRecords.current.get(comment.id)?.signature === signature) continue;
+      verificationRecords.current.set(comment.id, { signature, phase: 'inflight' });
+      started.set(comment.id, signature);
+      const commentId = comment.id;
+      void (async () => {
+        for (let attempt = 0; ; attempt += 1) {
+          if (!stillCurrent(commentId, signature, source, capture)) return;
+          const fetchFile = fetchFileRef.current;
+          const result: WorktreeReviewVerification = await verifyWorktreeReviewComment({
+            comment,
+            scope,
+            snapshot,
+            fetchFile: input => fetchFile(source, input),
+          }).catch(() => ({ status: 'unverified' }));
+          if (!stillCurrent(commentId, signature, source, capture)) return;
+          if (result.status === 'applied') {
+            verificationRecords.current.set(commentId, { signature, phase: 'settled' });
+            applyRebaseRef.current(comment, result.comment);
+            forgetUnapplied(commentId);
+            return;
+          }
+          if (result.status === 'unapplied') {
+            verificationRecords.current.set(commentId, { signature, phase: 'settled' });
+            setUnappliedVerifications(previous =>
+              previous.get(commentId) === signature
+                ? previous
+                : new Map(previous).set(commentId, signature)
+            );
+            return;
+          }
+          const delay = WORKTREE_REVIEW_UNVERIFIED_RETRY_DELAYS_MS[attempt];
+          if (delay === undefined || !isOpenRef.current) {
+            releaseInflight(commentId, signature);
+            forgetUnapplied(commentId);
+            return;
+          }
+          const retry = await new Promise<boolean>(resolve => {
+            pendingRetries.push(resolve);
+            const timer = setTimeout(() => {
+              timers.delete(timer);
+              resolve(!cancelled && isOpenRef.current);
+            }, delay);
+            timers.add(timer);
+          });
+          if (!retry || !stillCurrent(commentId, signature, source, capture)) {
+            if (!cancelled) releaseInflight(commentId, signature);
+            return;
+          }
+        }
+      })();
+    }
+
+    return () => {
+      cancelled = true;
+      for (const timer of timers) clearTimeout(timer);
+      for (const resolve of pendingRetries) resolve(false);
+      for (const [id, signature] of started) releaseInflight(id, signature);
+    };
+  }, [draft?.comments, hydration, isOpen, scope, verificationInputKey]);
+  const unappliedCommentIds = new Set<string>();
+  for (const comment of draft?.comments ?? []) {
+    const signature = unappliedVerifications.get(comment.id);
+    if (signature === undefined) continue;
+    const capture = captures.get(comment.anchor.capture.sourceCloudAgentSessionId) ?? null;
+    if (!capture || getWorktreeReviewFreshness(comment, capture) !== 'stale') continue;
+    if (worktreeReviewVerificationSignature(comment, capture) !== signature) continue;
+    unappliedCommentIds.add(comment.id);
+  }
 
   const pending = [...drafts.values()].some(hasPendingWorktreeReview);
   useEffect(() => {
@@ -319,58 +559,26 @@ export function useWorktreeReview({
               'The selected chat is no longer available. Choose an eligible chat in this worktree.',
           };
         }
+        const latestSnapshotFor = (source: string) => {
+          const index = sources.indexOf(source);
+          const latest = index < 0 ? undefined : latestCaptures[index];
+          const accessible =
+            latestSessions.isSuccess &&
+            latestSessions.data?.cliSessions.some(
+              session => session.cloud_agent_session_id === source
+            );
+          return accessible && latest?.isSuccess ? (latest.data?.snapshot ?? null) : null;
+        };
         const rebased: WorktreeReviewComment[] = [];
         for (const comment of frozenDraft.comments) {
           const source = comment.anchor.capture.sourceCloudAgentSessionId;
-          const latest = latestCaptures[sources.indexOf(source)];
-          const snapshot =
-            latest?.isSuccess &&
-            latestSessions.data?.cliSessions.some(
-              session => session.cloud_agent_session_id === source
-            )
-              ? latest.data?.snapshot
-              : undefined;
-          const listed = snapshot?.files?.find(file => file.path === comment.anchor.path);
-          if (!snapshot) continue;
-          const capture = listed
-            ? {
-                ...scope,
-                sourceCloudAgentSessionId: source,
-                revision: listed.revision,
-                capturedAt: snapshot.capturedAt,
-                comparison: snapshot.comparison,
-              }
-            : currentWorktreeReviewCapture(scope, source, snapshot);
-          if (!capture) continue;
-          if (sameWorktreeReviewCapture(comment.anchor.capture, capture)) {
-            rebased.push(comment);
-            continue;
-          }
-          if (!listed) continue;
-          const fileQuery = organizationId
-            ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({
-                organizationId,
-                cloudAgentSessionId: source,
-                path: comment.anchor.path,
-                expectedRevision: listed.revision,
-              })
-            : trpc.cloudAgentNext.getWorktreeFile.queryOptions({
-                cloudAgentSessionId: source,
-                path: comment.anchor.path,
-                expectedRevision: listed.revision,
-              });
-          const fileResult = await queryClient.fetchQuery(fileQuery);
-          if (fileResult.status !== 'available' && fileResult.status !== 'omitted') continue;
-          const parsed =
-            fileResult.file.diff.status === 'available'
-              ? parsePatchFiles(fileResult.file.diff.patch, undefined, true)[0]?.files[0]
-              : undefined;
-          const diff = parsed
-            ? { ...parsed, name: comment.anchor.path, prevName: undefined }
-            : null;
-          if (!diff) continue;
-          const next = rebaseWorktreeReviewComment(comment, capture, fileResult.file, diff);
-          if (next) rebased.push(next);
+          const result = await verifyWorktreeReviewComment({
+            comment,
+            scope,
+            snapshot: latestSnapshotFor(source),
+            fetchFile: input => fetchWorktreeReviewFile(source, input),
+          });
+          if (result.status === 'applied') rebased.push(result.comment);
         }
         if (rebased.length !== frozenDraft.comments.length) {
           return {
@@ -421,8 +629,7 @@ export function useWorktreeReview({
     draft,
     bindings,
     destinations,
-    freshness,
-    olderCommentIds,
+    unappliedCommentIds,
     locked,
     disabledReason,
     canSubmit,

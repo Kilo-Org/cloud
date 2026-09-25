@@ -3,6 +3,8 @@ import {
   glanceableAgentsSnapshotSchema,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+
 import { type GlanceableSink } from './sink-registry';
 
 /**
@@ -54,13 +56,31 @@ export function getLocalScopeKey(): string | null {
   return localScopeKey;
 }
 
+/**
+ * One fire-and-forget mirror write. The in-memory snapshot is authoritative,
+ * so a failed write is reported at warning level with the stable write
+ * fingerprint and never rejects: a `void`-ed native rejection here would
+ * surface as an unhandled error with no caller able to recover it.
+ */
+async function mirrorSnapshotWrite(operation: () => Promise<void>): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    reportSecureStoreFailure('write', error);
+  }
+}
+
 /** In-memory write plus a fire-and-forget SecureStore mirror. */
 function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
   persistEpoch += 1;
   lastSnapshot = snapshot;
   localScopeKey = snapshot.scopeKey;
-  void getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, JSON.stringify(snapshot));
-  void getSecureStore().setItemAsync(GLANCEABLE_SCOPE_KEY, snapshot.scopeKey);
+  void mirrorSnapshotWrite(async () => {
+    await getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  });
+  void mirrorSnapshotWrite(async () => {
+    await getSecureStore().setItemAsync(GLANCEABLE_SCOPE_KEY, snapshot.scopeKey);
+  });
 }
 
 /** Parse a stored record with the shared schema; a malformed record is absent. */
@@ -104,8 +124,11 @@ export async function restorePersistedGlanceable(): Promise<void> {
     if (rawScope !== null && localScopeKey === null) {
       localScopeKey = rawScope;
     }
-  } catch {
+  } catch (error) {
     // A malformed mirror is treated as absent; the publisher repopulates it.
+    // Reported at warning level so a keychain/keystore failure is visible
+    // instead of looking like an empty mirror.
+    reportSecureStoreFailure('read', error);
   }
 }
 

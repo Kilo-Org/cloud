@@ -558,21 +558,31 @@ export async function foldPendingGlanceableRefreshDeadline(
 /**
  * Drop the push-to-start tokens that already raised a card nobody has adopted.
  *
- * An `ios_activity` row proves the app adopted its card, so it owns duplicate
- * retirement from here and every fence in the scope is released. Otherwise a
- * push-to-start whose fence has not lapsed is removed from the list, which
- * leaves `apnsSendsForTokens` with no start to send.
+ * Exactly one live (non-superseded) `ios_activity` row proves the app adopted
+ * its single card, so it owns duplicate retirement from here and every fence in
+ * the scope is released. Zero live rows leave no adopted card, and two or more
+ * are an unsettled stack, so neither releases the fences: a push-to-start whose
+ * fence has not lapsed is removed from the list, which leaves
+ * `apnsSendsForTokens` with no start to send while that ambiguity stands.
  *
  * Every read also drops the lapsed fences, including those of tokens the device
  * has since rotated away and will never present again.
  */
-async function dropFencedStarts<T extends { token: string; kind: string }>(
+async function dropFencedStarts<T extends { token: string; kind: string; superseded?: boolean }>(
   tokens: readonly T[],
   storage: DurableObjectStorage,
   fence: { prefix: string; key: (token: string) => string }
 ): Promise<T[]> {
   const held = await storage.list<number>({ prefix: fence.prefix });
-  if (tokens.some(({ kind }) => kind === 'ios_activity')) {
+  // Only exactly one live (non-superseded) `ios_activity` row means the scope is
+  // settled and its card owns duplicate retirement. Two live rows are an
+  // unsettled stack, and zero leaves no adopted card, so neither may release the
+  // push-to-start fences: a release there would let a later refresh raise
+  // another card beside a card that already exists.
+  const liveActivityCount = tokens.filter(
+    ({ kind, superseded }) => kind === 'ios_activity' && superseded !== true
+  ).length;
+  if (liveActivityCount === 1) {
     if (held.size > 0) {
       await storage.delete([...held.keys()]);
     }

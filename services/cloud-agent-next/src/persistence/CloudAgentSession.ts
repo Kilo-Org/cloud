@@ -217,10 +217,6 @@ import {
 } from '../agent-sandbox/vercel/vercel-runtime-state.js';
 import { updateProviderRuntime } from './session-metadata.js';
 
-// ---------------------------------------------------------------------------
-// Alarm Constants
-// ---------------------------------------------------------------------------
-
 /** Reaper alarm interval: 5 minutes */
 const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
 /** Longer reaper interval when idle: 1 hour */
@@ -294,6 +290,7 @@ type GroupedRegisterSessionInput = {
         type: 'github';
         repo: string;
         githubIntegrationId?: string;
+        githubAccessPurpose?: 'workflow' | 'agent';
         branch?: string;
       }
     | {
@@ -346,6 +343,7 @@ function repositoryMetadataFromRegistrationInput(
       return {
         type: 'github',
         repo: repository.repo,
+        githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
           : {}),
@@ -433,6 +431,8 @@ function isSameRegistrationRepository(
         stored.type === 'github' &&
         stored.repo === submitted.repo &&
         stored.githubIntegrationId === submitted.githubIntegrationId &&
+        (stored.githubAccessPurpose ?? 'workflow') ===
+          (submitted.githubAccessPurpose ?? 'workflow') &&
         stored.upstreamBranch === submitted.branch
       );
     case 'gitlab':
@@ -1253,7 +1253,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private async getIngestHandler(): Promise<IngestHandler> {
     const sessionId = await this.requireSessionId();
     if (!this.ingestHandler || this.ingestHandlerSessionId !== sessionId) {
-      // Create DO context for the ingest handler to call back into the DO
       const doContext: IngestDOContext = {
         updateKiloSessionId: (id: string) => this.updateKiloSessionId(id),
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
@@ -1312,18 +1311,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.keepContainerAlive();
   }
 
-  // ---------------------------------------------------------------------------
-  // HTTP/WebSocket Routing
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Handle incoming HTTP requests and WebSocket upgrades.
-   * Routes to appropriate handler based on URL pathname.
-   */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Route WebSocket upgrade requests
     if (url.pathname === '/stream') {
       const sessionIdParam = url.searchParams.get('cloudAgentSessionId') as SessionId | null;
       const ticket = url.searchParams.get('ticket');
@@ -1375,13 +1365,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return ingestHandler.handleIngestRequest(request);
     }
 
-    // No matching route
     return new Response('Not Found', { status: 404 });
   }
-
-  // ---------------------------------------------------------------------------
-  // WebSocket Lifecycle Methods (Hibernation API)
-  // ---------------------------------------------------------------------------
 
   /**
    * Handle incoming messages from WebSocket clients.
@@ -1390,7 +1375,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const tags = this.ctx.getTags(ws);
 
-    // Check if this is an ingest connection
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
@@ -1414,7 +1398,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<void> {
     const tags = this.ctx.getTags(ws);
 
-    // Clean up ingest connection tracking
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
@@ -1459,10 +1442,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       })
       .error('WebSocket error');
   }
-
-  // ---------------------------------------------------------------------------
-  // Event Broadcasting
-  // ---------------------------------------------------------------------------
 
   /**
    * Broadcast a new event to all connected /stream clients.
@@ -1679,9 +1658,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return closed;
   }
 
-  // ---------------------------------------------------------------------------
-  // Metadata RPC Methods
-  // ---------------------------------------------------------------------------
   /**
    * Get session metadata.
    * Returns null if no metadata has been written yet (e.g., before first CLI execution).
@@ -2219,7 +2195,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
     await this.ctx.storage.put('metadata', newMetadata);
 
-    // Track activity for session TTL
     await this.updateLastActivity();
   }
 
@@ -2360,10 +2335,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     await this.updateMetadata(updated);
   }
-
-  // ---------------------------------------------------------------------------
-  // Wrapper Communication Methods
-  // ---------------------------------------------------------------------------
 
   /**
    * Send a command to the wrapper via its ingest WebSocket connection.
@@ -3165,7 +3136,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     await this.ctx.storage.put('metadata', serialized);
 
-    // Track activity for session TTL
     await this.updateLastActivity();
 
     return { success: true };
@@ -3289,10 +3259,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.updateLastActivity();
   }
 
-  // ---------------------------------------------------------------------------
-  // Alarm Reaper
-  // ---------------------------------------------------------------------------
-
   /**
    * Alarm handler for periodic cleanup tasks.
    * Runs periodic retention/TTL cleanup and schedules nearer deadlines for
@@ -3325,7 +3291,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
       await this.getSandboxLifecycle().reconcileCreateIntent(now);
 
-      // Check if session should be deleted due to inactivity (90 days)
       const lastActivity = await this.ctx.storage.get<number>(LAST_ACTIVITY_KEY);
       if (lastActivity && now - lastActivity > Limits.SESSION_TTL_MS) {
         logger
@@ -3355,7 +3320,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await this.interruptAcceptedWrapperMessages();
       });
 
-      // Run cleanup tasks
       this.cleanupOldEvents(now);
       this.cleanupExpiredLeases(now);
       await this.cleanupIdleKiloServer(now);
@@ -3535,7 +3499,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     const lastActivity = metadata.lifecycle.kiloServerLastActivity;
     if (!lastActivity) {
-      // No kilo server activity recorded, nothing to clean up
       return;
     }
 
@@ -3543,7 +3506,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
 
     if (idleMs < idleTimeoutMs) {
-      // Server is still within idle threshold
       return;
     }
 
@@ -3558,7 +3520,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return;
     }
 
-    // Server has been idle too long and no wrapper/pending work remains, stop it
     logger
       .withTags({ logTag: 'idle_kilo_server_stopped' })
       .withFields({
@@ -3594,10 +3555,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (await this.hasDeletionIntent()) return;
     await this.getAgentRuntime().keepSandboxAlive();
   }
-
-  // ---------------------------------------------------------------------------
-  // Execution Management RPC Methods
-  // ---------------------------------------------------------------------------
 
   /**
    * Add a new execution with initial 'pending' status.
@@ -3839,7 +3796,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     // The RPC remains for public execution compatibility; current wrapper-run
     // cleanup is owned by message supervision rather than legacy execution IDs.
 
-    // 1. Update status (enqueues callback notification on terminal unless suppressed)
     const statusResult = await this.updateExecutionStatus(
       {
         executionId,
@@ -3857,7 +3813,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return false;
     }
 
-    // 2. Broadcast to /stream clients
     const sessionId = await this.requireSessionId();
     this.insertAndBroadcastEvent({
       executionId,
@@ -4056,10 +4011,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.executionQueries.clearInterrupt();
   }
 
-  // ---------------------------------------------------------------------------
-  // Lease Management RPC Methods
-  // ---------------------------------------------------------------------------
-
   /**
    * Try to acquire a lease for an execution.
    * Used by queue consumers for idempotent processing.
@@ -4100,10 +4051,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   releaseLease(executionId: ExecutionId, leaseId: string): boolean {
     return this.leaseQueries.release(executionId, leaseId);
   }
-
-  // ---------------------------------------------------------------------------
-  // Direct Execution Methods
-  // ---------------------------------------------------------------------------
 
   async hasMessageAdmission(messageId: string): Promise<boolean> {
     return this.getSessionMessageQueue().hasMessageAdmission(messageId);

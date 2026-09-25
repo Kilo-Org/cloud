@@ -1,10 +1,5 @@
 import type { ExecutionSession } from '../types.js';
 
-// ---------------------------------------------------------------------------
-// Kilo API types (subset needed by worker-side code)
-// Previously imported from shared/kilo-types.ts which has been deleted.
-// ---------------------------------------------------------------------------
-
 export type Session = {
   id: string;
   parentID?: string;
@@ -25,10 +20,6 @@ export type FilePartInput = {
 };
 
 export type SessionCommandResponse = unknown;
-
-// ---------------------------------------------------------------------------
-// Client options
-// ---------------------------------------------------------------------------
 
 export interface KiloClientOptions {
   session: ExecutionSession;

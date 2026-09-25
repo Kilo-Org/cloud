@@ -1,4 +1,5 @@
 import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+import { z } from 'zod';
 
 export type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 
@@ -193,10 +194,56 @@ export type WrapperCloneTelemetry = {
   receivedBytes?: number;
 };
 
-export type WrapperRestoreTelemetry = {
-  path: 'warm' | 'cold' | 'backup';
-  diffs?: { applied: number; skipped: number; total: number };
+export const wrapperRestoreTelemetrySchema = z
+  .object({
+    path: z.enum(['warm', 'cold', 'backup']),
+    diffs: z
+      .object({
+        applied: z.number().int().nonnegative(),
+        skipped: z.number().int().nonnegative(),
+        total: z.number().int().nonnegative(),
+        /** Named skip reasons, first-seen order, capped by the wrapper. Optional for older wrappers. */
+        skippedDiffs: z.array(z.object({ file: z.string(), reason: z.string() })).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export type WrapperRestoreTelemetry = z.infer<typeof wrapperRestoreTelemetrySchema>;
+
+/** Paths and reasons logged for one restore before the remainder is dropped. */
+export const MAX_LOGGED_SKIPPED_DIFFS = 50;
+
+export type RestoreIncompleteLogFields = {
+  restorePath: WrapperRestoreTelemetry['path'];
+  diffsApplied: number;
+  diffsSkipped: number;
+  diffsTotal: number;
+  skippedPaths: string[];
+  skippedReasons: string[];
 };
+
+/**
+ * Named fields for the `cloud_agent_restore_incomplete` event, or `undefined`
+ * when the restore applied every diff. Shared by the `/session/ready` telemetry
+ * path and the runtime-replacement attach result so both emit the same shape.
+ */
+export function restoreIncompleteLogFields(
+  restore: WrapperRestoreTelemetry | undefined
+): RestoreIncompleteLogFields | undefined {
+  const diffs = restore?.diffs;
+  if (!restore || !diffs || diffs.skipped <= 0) return undefined;
+  const skippedDiffs = diffs.skippedDiffs ?? [];
+  return {
+    restorePath: restore.path,
+    diffsApplied: diffs.applied,
+    diffsSkipped: diffs.skipped,
+    diffsTotal: diffs.total,
+    skippedPaths: skippedDiffs.slice(0, MAX_LOGGED_SKIPPED_DIFFS).map(diff => diff.file),
+    skippedReasons: [...new Set(skippedDiffs.map(diff => diff.reason))],
+  };
+}
 
 /**
  * Non-sensitive bootstrap diagnostics, kept as a sibling of `workspaceReady` rather

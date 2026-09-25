@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
-import { TextInput, type TextInputProps, View } from 'react-native';
+import { type TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type FormFieldProps = Omit<TextInputProps, 'value'> &
@@ -46,11 +46,11 @@ function FormField({
   ref,
   validate,
   defaultValue,
+  style,
   onChangeText,
   onBlur,
   ...props
 }: Readonly<FormFieldProps>) {
-  const colors = useThemeColors();
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
   const displayedError = validate ? validationError : error;
@@ -58,12 +58,16 @@ function FormField({
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{label}</Text>
-      <TextInput
+      <Input
         ref={ref}
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}
-        placeholderTextColor={colors.mutedForeground}
+        // A field's content follows the interface direction, not the script of
+        // its own value, so an email address stays on the same side as its
+        // label in an RTL catalog. `Input` applies the alignment; the caller's
+        // own style passes through untouched.
+        style={style}
         accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
         accessibilityState={{ disabled }}
         onChangeText={value => {
@@ -80,11 +84,12 @@ function FormField({
           }
         }}
         className={cn(
-          // min-h-[44px] with no vertical padding: the 44pt height meets the
-          // Apple HIG touch floor and centers the text, while the padding
-          // draws the single-line text below the middle. min-h (not h) still
-          // lets Dynamic Type grow the field past the floor.
-          'min-h-[44px] rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground',
+          // The box (min-h-[44px] px-3 leading-[normal]) lives in
+          // `@/components/ui/input`, so every single-line field shares it and
+          // the class cannot be copied back wrong. No vertical padding: iOS
+          // insets the already-centered text rect by it, drawing the value and
+          // the placeholder below the middle (apps/mobile/AGENTS.md).
+          'rounded-md border border-input bg-background text-sm text-foreground',
           'focus:border-ring',
           displayedError && 'border-destructive',
           disabled && 'opacity-50',

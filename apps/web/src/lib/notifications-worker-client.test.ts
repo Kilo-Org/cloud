@@ -11,6 +11,7 @@ import {
   dispatchSecurityFindingPush,
   dispatchSecurityLifecyclePush,
   dispatchSpendAlertPush,
+  refreshGlanceableScope,
 } from './notifications-worker-client';
 
 const fetchMock = jest.fn();
@@ -158,5 +159,81 @@ describe('notifications-worker-client internal dispatch', () => {
     // it would never deliver, so the dispatch counts as accepted.
     await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(true);
     expect(captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe('notifications-worker-client glanceable refresh', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it('posts the scope to the internal glanceable-refresh endpoint', async () => {
+    fetchMock.mockResolvedValue(okResponse());
+
+    await refreshGlanceableScope({ userId: 'user-1', organizationId: 'org-1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://notifications.test/internal/v1/glanceable-refresh');
+    expect(options).toMatchObject({
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-Internal-Secret': 'internal-secret',
+      },
+    });
+    expect(JSON.parse(options.body as string)).toEqual({
+      userId: 'user-1',
+      organizationId: 'org-1',
+    });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('sends the personal scope as a null organization', async () => {
+    fetchMock.mockResolvedValue(okResponse());
+
+    await refreshGlanceableScope({ userId: 'user-1', organizationId: null });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({
+      userId: 'user-1',
+      organizationId: null,
+    });
+  });
+
+  it('never rejects when the worker call fails', async () => {
+    fetchMock.mockRejectedValue(new Error('socket hang up'));
+
+    await expect(
+      refreshGlanceableScope({ userId: 'user-1', organizationId: null })
+    ).resolves.toBeUndefined();
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ endpoint: 'glanceable-refresh' }),
+      })
+    );
+  });
+
+  it('never rejects when the worker rejects the refresh', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: async () => 'boom',
+    });
+
+    await expect(
+      refreshGlanceableScope({ userId: 'user-1', organizationId: null })
+    ).resolves.toBeUndefined();
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ endpoint: 'glanceable-refresh' }),
+        extra: expect.objectContaining({ status: 500 }),
+      })
+    );
   });
 });

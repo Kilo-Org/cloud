@@ -186,7 +186,12 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             </AlertDescription>
           </Alert>
 
-          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border p-3 max-[22rem]:flex-col max-[22rem]:items-stretch max-[22rem]:p-2">
+          {/* A narrow card has no room for the avatar, the identity, and Sign
+              out on one line: the row overflowed the card and crushed the
+              name. Stack until there is room for the inline row; a very narrow
+              card also tightens its padding and stacks the identity under the
+              avatar. */}
+          <div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-3 max-[22rem]:flex-col max-[22rem]:items-stretch max-[22rem]:p-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-1 items-center gap-3 max-[22rem]:flex-col max-[22rem]:items-stretch">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.imageUrl} alt={displayName} />
@@ -203,7 +208,7 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             <Button
               variant="ghost"
               size="sm"
-              className="shrink-0 max-[22rem]:w-full pointer-coarse:min-h-11"
+              className="shrink-0 self-start pointer-coarse:min-h-11 sm:self-auto max-[22rem]:w-full"
               onClick={handleSignOut}
               disabled={isSigningOut || status === 'loading'}
             >

@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { Alert } from 'react-native';
 
-import { copySessionLink, showSessionActionMenu } from './session-row-actions';
+import { copySessionLink, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -16,7 +18,7 @@ vi.mock('react-native', () => ({
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
-  NotificationFeedbackType: { Warning: 'warning', Success: 'success' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning' },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -24,7 +26,19 @@ type SheetOptions = {
   options: string[];
   cancelButtonIndex?: number;
   destructiveButtonIndex?: number | number[];
-  containerStyle?: { paddingBottom?: number };
+  containerStyle?: { paddingBottom?: number; backgroundColor?: string };
+  textStyle?: { color: string };
+  titleTextStyle?: { color: string };
+  messageTextStyle?: { color: string };
+  destructiveColor?: string;
+};
+
+const themedSheet: ThemedActionSheetOptions = {
+  containerStyle: { backgroundColor: '#17171A', paddingBottom: 12 },
+  textStyle: { color: '#F2F0EB' },
+  titleTextStyle: { color: '#8A8680' },
+  messageTextStyle: { color: '#8A8680' },
+  destructiveColor: '#F28B7A',
 };
 
 type Captured = {
@@ -36,7 +50,7 @@ function openMenu(args: {
   onRename?: () => void;
   onExit?: () => void;
   onDelete?: () => void;
-  bottomInset?: number;
+  themedSheet?: ThemedActionSheetOptions;
 }): Captured & {
   onCopySessionId: ReturnType<typeof vi.fn>;
   onRename: ReturnType<typeof vi.fn> | undefined;
@@ -60,7 +74,7 @@ function openMenu(args: {
     ...(onRename ? { onRename } : {}),
     ...(onExit ? { onExit } : {}),
     ...(onDelete ? { onDelete } : {}),
-    bottomInset: args.bottomInset ?? 12,
+    themedSheet: args.themedSheet ?? themedSheet,
   });
 
   if (!captured.current) {
@@ -86,7 +100,12 @@ describe('showSessionActionMenu', () => {
     expect(sheetOptions.options).toEqual(['Copy session ID', 'Cancel']);
     expect(sheetOptions.cancelButtonIndex).toBe(1);
     expect(sheetOptions.destructiveButtonIndex).toBeUndefined();
-    expect(sheetOptions.containerStyle).toEqual({ paddingBottom: 12 });
+    expect(sheetOptions.containerStyle).toEqual({
+      backgroundColor: '#17171A',
+      paddingBottom: 12,
+    });
+    expect(sheetOptions.textStyle).toEqual({ color: '#F2F0EB' });
+    expect(sheetOptions.destructiveColor).toBe('#F28B7A');
   });
 
   it('includes rename when onRename is provided', () => {
@@ -109,13 +128,19 @@ describe('showSessionActionMenu', () => {
     const { sheetOptions } = openMenu({
       onRename: () => undefined,
       onDelete: () => undefined,
-      bottomInset: 34,
+      themedSheet: {
+        ...themedSheet,
+        containerStyle: { backgroundColor: '#17171A', paddingBottom: 34 },
+      },
     });
 
     expect(sheetOptions.options).toEqual(['Copy session ID', 'Rename', 'Delete session', 'Cancel']);
     expect(sheetOptions.cancelButtonIndex).toBe(3);
     expect(sheetOptions.destructiveButtonIndex).toBe(2);
-    expect(sheetOptions.containerStyle).toEqual({ paddingBottom: 34 });
+    expect(sheetOptions.containerStyle).toEqual({
+      backgroundColor: '#17171A',
+      paddingBottom: 34,
+    });
   });
 
   it('dispatches copy / rename / delete by index and ignores cancel', () => {
@@ -248,5 +273,51 @@ describe('copySessionLink', () => {
     await expect(copySessionLink('ses-1', null)).resolves.toBe(false);
 
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+type PromptButton = {
+  text?: string;
+  style?: string;
+  onPress?: (value?: string) => void;
+};
+
+/** Invoke the confirm button of the last `Alert.prompt` with `value`. */
+function confirmWith(value: string) {
+  const call = vi.mocked(Alert.prompt).mock.calls.at(-1);
+  if (!call) {
+    throw new Error('Alert.prompt was not called');
+  }
+  const buttons = call[2] as unknown as PromptButton[];
+  const rename = buttons.find(button => button.style !== 'cancel');
+  rename?.onPress?.(value);
+}
+
+describe('showRenamePrompt', () => {
+  afterEach(() => {
+    vi.mocked(Alert.prompt).mockClear();
+  });
+
+  it('does not rename when the prefilled title is confirmed unchanged', () => {
+    // Confirming the seeded value without editing must be a no-op, not a
+    // rename to that value.
+    const onRename = vi.fn<(newTitle: string) => void>();
+    showRenamePrompt('Untitled session', onRename);
+    confirmWith('Untitled session');
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it('renames with the trimmed value when the title changed', () => {
+    const onRename = vi.fn<(newTitle: string) => void>();
+    showRenamePrompt('Untitled session', onRename);
+    confirmWith('  Fix login  ');
+    expect(onRename).toHaveBeenCalledWith('Fix login');
+  });
+
+  it('does not rename to a blank value', () => {
+    const onRename = vi.fn<(newTitle: string) => void>();
+    showRenamePrompt('Untitled session', onRename);
+    confirmWith('   ');
+    expect(onRename).not.toHaveBeenCalled();
   });
 });

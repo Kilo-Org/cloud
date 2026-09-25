@@ -72,6 +72,7 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   minimax: 'MiniMax',
   mistral: 'Mistral AI',
   moonshotai: 'Moonshot AI',
+  nebius: 'Nebius',
   novita: 'Novita',
   perplexity: 'Perplexity',
   vertex: 'Google Vertex AI',

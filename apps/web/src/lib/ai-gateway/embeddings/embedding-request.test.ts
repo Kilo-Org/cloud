@@ -30,10 +30,10 @@ describe('buildUpstreamBody', () => {
 
   it.each([
     ['mistralai/codestral-embed-2505', 1536],
-    ['mistralai/mistral-embed-2312', 1024],
     ['openai/text-embedding-ada-002', 1536],
     ['baai/bge-large-en-v1.5', 1024],
     ['baai/bge-base-en-v1.5', 768],
+    ['sentence-transformers/all-mpnet-base-v2', 768],
   ])('should omit catalog dimensions for fixed model %s', (model, dimensions) => {
     const result = buildUpstreamBody({
       model,
@@ -104,6 +104,30 @@ describe('buildUpstreamBody', () => {
     ).toBeUndefined();
   });
 
+  it('should reject a stale custom dimensions value carried over from the removed mistral-embed-2312 model, against the previous default (all-mpnet-base-v2)', () => {
+    expect(
+      validateEmbeddingDimensions({
+        model: 'sentence-transformers/all-mpnet-base-v2',
+        input: 'hello',
+        dimensions: 1024,
+      })
+    ).toContain('fixed 768-dimensional embeddings');
+    expect(
+      validateEmbeddingDimensions({
+        model: 'sentence-transformers/all-mpnet-base-v2',
+        input: 'hello',
+        dimensions: 768,
+      })
+    ).toBeUndefined();
+    expect(
+      buildUpstreamBody({
+        model: 'sentence-transformers/all-mpnet-base-v2',
+        input: 'hello',
+        dimensions: 1024,
+      })
+    ).toEqual({ model: 'sentence-transformers/all-mpnet-base-v2', input: 'hello' });
+  });
+
   it('should not reject a catalog dimension for a model without a fixed policy', () => {
     expect(
       validateEmbeddingDimensions({
@@ -114,15 +138,43 @@ describe('buildUpstreamBody', () => {
     ).toBeUndefined();
   });
 
+  it('should reject a stale dimensions value that exceeds the resolved default model max', () => {
+    // A client that saved the removed mistralai/mistral-embed-2312 model
+    // (1024-dimensional) resolves to the new default. text-embedding-3-small
+    // supports truncation up to 1536, so 1024 is valid, but a value above its
+    // max must be rejected rather than blindly forwarded upstream.
+    expect(
+      validateEmbeddingDimensions({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        dimensions: 1024,
+      })
+    ).toBeUndefined();
+    expect(
+      validateEmbeddingDimensions({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        dimensions: 4096,
+      })
+    ).toContain('supports up to 1536-dimensional embeddings');
+    expect(
+      validateEmbeddingDimensions({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        dimensions: 0,
+      })
+    ).toContain('supports up to 1536-dimensional embeddings');
+  });
+
   it('should strip output_dtype and output_dimension even when other optional fields are absent', () => {
     const result = buildUpstreamBody({
-      model: 'mistralai/mistral-embed-2312',
+      model: 'mistralai/codestral-embed-2505',
       input: 'hello',
       output_dtype: 'float',
       output_dimension: 512,
     });
 
-    expect(result).toEqual({ model: 'mistralai/mistral-embed-2312', input: 'hello' });
+    expect(result).toEqual({ model: 'mistralai/codestral-embed-2505', input: 'hello' });
     expect(result).not.toHaveProperty('output_dtype');
     expect(result).not.toHaveProperty('output_dimension');
   });

@@ -973,7 +973,7 @@ export function generateBaseConfig(
     // `services/kiloclaw/src/schemas/instance-config.ts` → DEFAULT_VECTOR_MEMORY_MODEL.
     // Duplicated here because the controller bundle is built from an isolated
     // COPY of `controller/` and cannot import from the worker tree.
-    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'mistralai/mistral-embed-2312';
+    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'openai/text-embedding-3-small';
     const baseUrl = env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
 
     config.agents = config.agents ?? {};

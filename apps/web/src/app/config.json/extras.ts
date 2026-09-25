@@ -91,6 +91,11 @@ export const kiloExtras = {
         'Blur personally identifiable information (account email, balance, team name, etc.) in the TUI and require confirmation before showing profile details',
       type: 'boolean',
     },
+    require_approval_for_config_edits: {
+      description:
+        'Require extra approval before the agent edits protected Kilo config files (defaults to true). Global config supplies the fallback and governs global config directories and protected config targets outside the project. Project config can override this only within its project boundary, including re-enabling protection when globally disabled. Disabling this does not bypass other permission rules or independent safeguards.',
+      type: 'boolean',
+    },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',
       type: 'object',

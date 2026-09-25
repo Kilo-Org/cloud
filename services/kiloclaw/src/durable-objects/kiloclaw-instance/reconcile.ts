@@ -241,8 +241,6 @@ export async function reconcileWithFly(
   return result;
 }
 
-// ---- API key proactive refresh ----
-
 const MINT_TIMEOUT_MS = 15_000;
 
 async function reconcileApiKeyExpiry(
@@ -399,8 +397,6 @@ async function reconcileApiKeyExpiry(
     label: pushed ? 'refreshed+pushed' : flyConfigUpdated ? 'refreshed+fly-config' : 'refreshed',
   });
 }
-
-// ---- Starting reconciliation ----
 
 /**
  * Reconcile a 'starting' instance.
@@ -761,8 +757,6 @@ async function reconcileRestarting(
   }
 }
 
-// ---- Volume reconciliation ----
-
 async function reconcileVolume(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
@@ -834,8 +828,6 @@ async function reconcileVolume(
     }
   }
 }
-
-// ---- Machine reconciliation ----
 
 /**
  * @returns true if machine state was conclusively determined.
@@ -1395,9 +1387,7 @@ async function handleMachineGone(
   );
 }
 
-// ========================================================================
 // Two-phase destroy helpers
-// ========================================================================
 
 const MACHINE_ID_RE = /^[a-z0-9]+$/;
 

@@ -17,7 +17,7 @@ import { shouldEnableComposerInputScroll } from '@/components/agents/chat-compos
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { COMPOSER_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { COMPOSER_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
@@ -27,7 +27,7 @@ const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 /**
  * Leading gap between the controls of this row, as a class: `ms-3` is the
- * `COMPOSER_CONTROL_GAP_DP` of `@/lib/a11y/touch-target` (0.75rem at
+ * `COMPOSER_CONTROL_GAP_DP` of `@/lib/a11y/tap-target` (0.75rem at
  * NativeWind's 14pt rem). It is a START-side margin, not a physical `ml-`,
  * so it stays on the side a control faces its neighbour on when the row
  * mirrors under RTL (`marginInlineStart` resolves to Yoga Start in both
@@ -62,6 +62,12 @@ type ChatComposerInputRowProps = {
   onInputBlur: () => void;
   onInputFocus: () => void;
   onInputLayout: (event: LayoutChangeEvent) => void;
+  /**
+   * Report the input's own rendered content height in dp. The composer uses it
+   * as the one faithful measure of the pitch this input lays lines out at (see
+   * `useTextHeight`).
+   */
+  onInputContentSizeChange: (contentHeight: number) => void;
   onInsertNewline: () => void;
   onSelectionChange: (event: TextInputSelectionChangeEvent) => void;
   onStop: () => void;
@@ -100,6 +106,7 @@ export function ChatComposerInputRow({
   onChangeText,
   onInputBlur,
   onInputFocus,
+  onInputContentSizeChange,
   onInputLayout,
   onInsertNewline,
   onSelectionChange,
@@ -153,6 +160,9 @@ export function ChatComposerInputRow({
           multiline
           maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
           onChangeText={onChangeText}
+          onContentSizeChange={event => {
+            onInputContentSizeChange(event.nativeEvent.contentSize.height);
+          }}
           onFocus={onInputFocus}
           onBlur={onInputBlur}
           onSelectionChange={onSelectionChange}

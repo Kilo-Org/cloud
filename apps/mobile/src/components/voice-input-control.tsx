@@ -4,7 +4,7 @@ import { Pressable } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';

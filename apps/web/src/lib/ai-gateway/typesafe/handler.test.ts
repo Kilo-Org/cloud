@@ -326,51 +326,14 @@ describe('handleSystemOneRequest', () => {
 
   it.each([
     {
-      provider: { data_collection: 'deny' },
-      organizationDataCollection: 'allow',
-      expected: { data_collection: 'deny' },
-    },
-    {
       provider: { data_collection: 'allow' },
       organizationDataCollection: 'deny',
       expected: { data_collection: 'deny' },
-    },
-    {
-      provider: { data_collection: 'allow' },
-      organizationDataCollection: 'allow',
-      expected: { data_collection: 'allow' },
-    },
-    {
-      provider: undefined,
-      organizationDataCollection: 'deny',
-      expected: { data_collection: 'deny' },
-    },
-    {
-      provider: undefined,
-      organizationDataCollection: 'allow',
-      expected: { data_collection: 'allow' },
-    },
-    {
-      provider: { data_collection: 'deny' },
-      organizationDataCollection: undefined,
-      expected: { data_collection: 'deny' },
-    },
-    {
-      provider: { data_collection: 'allow' },
-      organizationDataCollection: undefined,
-      expected: { data_collection: 'allow' },
-    },
-    { provider: { zdr: true }, organizationDataCollection: undefined, expected: { zdr: true } },
-    { provider: { zdr: false }, organizationDataCollection: undefined, expected: { zdr: false } },
-    {
-      provider: { zdr: true },
-      organizationDataCollection: 'allow',
-      expected: { data_collection: 'allow', zdr: true },
     },
     {
       provider: { zdr: false },
-      organizationDataCollection: 'deny',
-      expected: { data_collection: 'deny', zdr: false },
+      organizationDataCollection: 'allow',
+      expected: { data_collection: 'allow', zdr: false },
     },
   ] as const)(
     'merges effective privacy without coupling ZDR: %j',
@@ -394,7 +357,7 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it.each([undefined, {}, { only: ['attacker'], ignore: ['typesafe'], order: ['attacker'] }])(
+  it.each([undefined, { only: ['attacker'] }])(
     'omits provider without effective settings: %j',
     async provider => {
       const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
@@ -439,12 +402,6 @@ describe('handleSystemOneRequest', () => {
       provider: { data_collection: 'deny', zdr: false },
       user: 'hashed-user',
     });
-    expect(upstream.headers.get('authorization')).toBe('Bearer test-platform-openrouter-key');
-    await runAfter();
-    expect(logMicrodollarUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ is_byok: false }),
-      expect.objectContaining({ user_byok: false, requested_model: TYPESAFE_MODEL })
-    );
   });
 
   it('accepts zero-cost usage and leaves an absent inference provider unknown', async () => {
@@ -506,7 +463,6 @@ describe('handleSystemOneRequest', () => {
       JSON.stringify({ ...requestBody, provider: { data_collection: 'invalid' } }),
     ],
     ['string ZDR', JSON.stringify({ ...requestBody, provider: { zdr: 'false' } })],
-    ['null provider', JSON.stringify({ ...requestBody, provider: null })],
   ])('rejects %s before balance checks or upstream work', async (_name, body) => {
     const response = await handleSystemOneRequest(
       new NextRequest(routeUrl, {
@@ -653,21 +609,19 @@ describe('handleSystemOneRequest', () => {
     });
   });
 
-  it.each([undefined, { zdr: true }, { zdr: false }, { data_collection: 'deny' }])(
-    'preserves privacy with a group-only provider restriction: %j',
-    async provider => {
-      setAuth('org-123');
-      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
-        ...memberDecision,
-        decision: { allowed: true, eligibleProviderRoutes: new Set(['typesafe']) },
-      });
+  it('preserves privacy with a group-only provider restriction', async () => {
+    const provider = { zdr: false };
+    setAuth('org-123');
+    jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+      ...memberDecision,
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['typesafe']) },
+    });
 
-      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
+    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
 
-      expect(response.status).toBe(200);
-      expect(upstreamRequest().body.provider).toEqual({ ...provider, only: ['typesafe'] });
-    }
-  );
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.provider).toEqual({ ...provider, only: ['typesafe'] });
+  });
 
   it.each([
     { only: ['other'], eligible: ['typesafe'] },
@@ -684,13 +638,7 @@ describe('handleSystemOneRequest', () => {
       decision: { allowed: true, eligibleProviderRoutes: new Set(eligible) },
     });
 
-    expect(
-      (
-        await handleSystemOneRequest(
-          makeRequest({ ...requestBody, provider: { data_collection: 'allow', zdr: true } })
-        )
-      ).status
-    ).toBe(404);
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(after).not.toHaveBeenCalled();

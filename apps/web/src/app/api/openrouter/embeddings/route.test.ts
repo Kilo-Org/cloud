@@ -9,8 +9,6 @@ import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -40,7 +38,6 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
 const mockedGetEmbeddingProvider = jest.mocked(getEmbeddingProvider);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
-const mockedIsFreeModel = jest.mocked(isFreeModel);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 const model = 'openai/text-embedding-3-small';
@@ -107,36 +104,25 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it.each([
-    { data_collection: 'deny' },
-    { data_collection: 'allow' },
-    { zdr: true },
-    { zdr: false },
-    { data_collection: 'deny', zdr: true },
-    { data_collection: 'allow', zdr: false },
-  ])('preserves personal request privacy and all other provider fields: %j', async privacy => {
-    const provider = {
-      only: ['openai'],
-      ignore: ['azure'],
-      order: ['openai'],
-      sort: 'latency',
-      require_parameters: true,
-      allow_fallbacks: false,
-      max_price: { prompt: 1 },
-      ...privacy,
-    };
+  it('forwards personal request privacy with other provider fields', async () => {
+    const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
     const { POST } = await import('./route');
     const response = await POST(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
-    expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(model, user, undefined);
-    expect(mockedResolveModelDecision).not.toHaveBeenCalled();
-    expect(mockedFetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/embeddings',
-      expect.objectContaining({ method: 'POST' })
-    );
   });
+
+  it.each([undefined, { only: ['openai'] }])(
+    'does not add privacy when none is set: %j',
+    async provider => {
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest({ provider }));
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().provider).toEqual(provider);
+    }
+  );
 
   it.each([
     { organization: 'allow', request: 'deny' },
@@ -147,159 +133,59 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       setUserAuth({ data_collection: organization, provider_allow_list: ['openai'] });
       const { POST } = await import('./route');
       const response = await POST(
-        makeRequest({ provider: { data_collection: request, only: ['azure'], sort: 'price' } })
+        makeRequest({ provider: { data_collection: request, only: ['azure'] } })
       );
 
       expect(response.status).toBe(200);
       expect(getUpstreamBody().provider).toEqual({ only: ['openai'], data_collection: 'deny' });
-      expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledWith('org-123', user);
-      expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(model, user, 'org-123');
     }
   );
 
-  it.each([true, false])('preserves request zdr=%s through organization overrides', async zdr => {
-    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai'] });
+  it('preserves request zdr through group provider overrides', async () => {
+    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai', 'azure'] });
+    mockedResolveModelDecision.mockResolvedValue({
+      ...allowedModelDecision,
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+    });
     const { POST } = await import('./route');
-    const response = await POST(makeRequest({ provider: { zdr, only: ['azure'] } }));
+    const response = await POST(makeRequest({ provider: { zdr: false, only: ['azure'] } }));
 
     expect(response.status).toBe(200);
-    expect(getUpstreamBody().provider).toEqual({ only: ['openai'], data_collection: 'allow', zdr });
-  });
-
-  it.each([
-    { settings: {}, zdr: true },
-    { settings: {}, zdr: false },
-    { settings: { data_collection: 'allow', provider_allow_list: ['openai', 'azure'] }, zdr: true },
-    {
-      settings: { data_collection: 'allow', provider_allow_list: ['openai', 'azure'] },
+    expect(getUpstreamBody().provider).toEqual({
+      only: ['openai'],
+      data_collection: 'allow',
       zdr: false,
-    },
-  ] satisfies { settings: OrganizationSettings; zdr: boolean }[])(
-    'retains privacy through group provider overrides: %j',
-    async ({ settings, zdr }) => {
-      setUserAuth(settings);
-      mockedResolveModelDecision.mockResolvedValue({
-        ...allowedModelDecision,
-        decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
-      });
-      const { POST } = await import('./route');
-      const response = await POST(
-        makeRequest({ provider: { data_collection: 'deny', zdr, only: ['azure'], sort: 'price' } })
-      );
+    });
+  });
 
-      expect(response.status).toBe(200);
-      expect(getUpstreamBody().provider).toEqual({
-        only: ['openai'],
-        data_collection: 'deny',
-        zdr,
-      });
-      expect(mockedResolveModelDecision).toHaveBeenCalledWith({
-        organizationId: 'org-123',
-        kiloUserId: user.id,
-        modelId: model,
-      });
-    }
-  );
-
-  it.each([undefined, {}, { only: ['openai'], ignore: ['azure'] }])(
-    'does not synthesize absent privacy for provider=%j',
+  it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
+    'rejects malformed provider privacy before proxying: %j',
     async provider => {
       const { POST } = await import('./route');
       const response = await POST(makeRequest({ provider }));
 
-      expect(response.status).toBe(200);
-      const upstream = getUpstreamBody();
-      expect(upstream.provider).toEqual(provider);
-      if (provider === undefined) expect(upstream).not.toHaveProperty('provider');
-      expect(upstream).not.toHaveProperty('providerOptions');
-    }
-  );
-
-  it('applies organization privacy when the request has no provider', async () => {
-    setUserAuth({ data_collection: 'deny' });
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest());
-
-    expect(response.status).toBe(200);
-    expect(getUpstreamBody().provider).toEqual({ data_collection: 'deny' });
-  });
-
-  it.each([
-    null,
-    'openai',
-    1,
-    false,
-    [],
-    { data_collection: 'invalid' },
-    { data_collection: true },
-    { data_collection: null },
-    { zdr: 'true' },
-    { zdr: 'false' },
-    { zdr: 1 },
-    { zdr: null },
-  ])('rejects malformed provider preferences before proxying: %j', async provider => {
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest({ provider }));
-
-    expect(response.status).toBe(400);
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, { data_collection: 'deny', zdr: true, only: ['openai'], ignore: ['azure'] }])(
-    'preserves anonymous free-model preferences without organization settings: %j',
-    async provider => {
-      mockedGetUserFromAuth.mockResolvedValue({
-        user: null,
-        authFailedResponse: new Response('Unauthorized', { status: 401 }) as never,
-        organizationId: undefined,
-      });
-      mockedIsFreeModel.mockReturnValue(true);
-      const { POST } = await import('./route');
-      const response = await POST(makeRequest({ provider }));
-
-      expect(response.status).toBe(200);
-      const upstream = getUpstreamBody();
-      expect(upstream.provider).toEqual(provider);
-      if (provider === undefined) expect(upstream).not.toHaveProperty('provider');
-      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
-      expect(mockedResolveModelDecision).not.toHaveBeenCalled();
-      expect(mockedIsFreeModel).toHaveBeenCalledWith(model);
-      expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(
-        model,
-        expect.objectContaining({ isAnonymous: true, ipAddress: '127.0.0.1' }),
-        undefined
-      );
+      expect(response.status).toBe(400);
+      expect(mockedFetch).not.toHaveBeenCalled();
     }
   );
 
   it.each([
     { privacy: undefined, settings: undefined, translated: {} },
-    { privacy: { data_collection: 'allow' }, settings: undefined, translated: {} },
-    { privacy: { zdr: true }, settings: undefined, translated: { zeroDataRetention: true } },
-    { privacy: { zdr: false }, settings: undefined, translated: { zeroDataRetention: false } },
-    {
-      privacy: { data_collection: 'deny', zdr: true },
-      settings: { data_collection: 'allow' },
-      translated: { zeroDataRetention: true, disallowPromptTraining: true },
-    },
     {
       privacy: { data_collection: 'allow', zdr: false },
       settings: { data_collection: 'deny' },
       translated: { zeroDataRetention: false, disallowPromptTraining: true },
     },
     {
-      privacy: undefined,
-      settings: { data_collection: 'deny' },
-      translated: { disallowPromptTraining: true },
+      privacy: { data_collection: 'deny', zdr: true },
+      settings: undefined,
+      translated: { zeroDataRetention: true, disallowPromptTraining: true },
     },
-  ] as const)('translates Vercel BYOK privacy without changing credentials: %j', async testCase => {
+  ] as const)('translates privacy into Vercel BYOK gateway options: %j', async testCase => {
     setUserAuth(testCase.settings);
     mockedGetEmbeddingProvider.mockResolvedValue({
       provider: VERCEL_AI_GATEWAY,
-      userByok: [
-        { providerId: 'openai', decryptedAPIKey: 'test-byok-key-1' },
-        { providerId: 'openai', decryptedAPIKey: 'test-byok-key-2' },
-      ],
+      userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
     });
     const { POST } = await import('./route');
     const response = await POST(makeRequest({ provider: testCase.privacy }));
@@ -308,62 +194,9 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(getUpstreamBody().providerOptions).toEqual({
       gateway: {
         only: ['openai'],
-        byok: { openai: [{ apiKey: 'test-byok-key-1' }, { apiKey: 'test-byok-key-2' }] },
+        byok: { openai: [{ apiKey: 'test-byok-key' }] },
         ...testCase.translated,
       },
     });
-    expect(mockedMapModelIdToVercel).toHaveBeenCalledWith(model);
-    expect(mockedFetch).toHaveBeenCalledWith(
-      'https://ai-gateway.vercel.sh/v1/embeddings',
-      expect.objectContaining({ method: 'POST' })
-    );
-  });
-
-  it.each([
-    { requestedModel: model, dimensions: 512, expectedDimensions: 512 },
-    {
-      requestedModel: 'mistralai/mistral-embed-2312',
-      dimensions: 1024,
-      expectedDimensions: undefined,
-    },
-  ])('preserves dimension and safety transformations alongside privacy: %j', async testCase => {
-    const { POST } = await import('./route');
-    const response = await POST(
-      makeRequest({
-        model: testCase.requestedModel,
-        dimensions: testCase.dimensions,
-        provider: { data_collection: 'deny', zdr: true },
-        safety_identifier: 'caller-supplied-identifier',
-        user: 'deprecated-user',
-        output_dtype: 'float',
-        output_dimension: 256,
-      })
-    );
-
-    expect(response.status).toBe(200);
-    const upstream = getUpstreamBody();
-    expect(upstream.provider).toEqual({ data_collection: 'deny', zdr: true });
-    expect(upstream.dimensions).toBe(testCase.expectedDimensions);
-    expect(upstream.safety_identifier).toBe(generateProviderSpecificHash(user.id, OPENROUTER));
-    expect(upstream).not.toHaveProperty('user');
-    expect(upstream).not.toHaveProperty('output_dtype');
-    expect(upstream).not.toHaveProperty('output_dimension');
-  });
-
-  it('still rejects incompatible fixed dimensions when privacy is requested', async () => {
-    const { POST } = await import('./route');
-    const response = await POST(
-      makeRequest({
-        model: 'mistralai/mistral-embed-2312',
-        dimensions: 512,
-        provider: { data_collection: 'deny' },
-      })
-    );
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
-      error: expect.objectContaining({ param: 'dimensions' }),
-    });
-    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

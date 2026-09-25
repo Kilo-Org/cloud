@@ -5,10 +5,11 @@ import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.type
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { debugSaveLog, debugSaveProxyRequest } from '@/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@/lib/getRootSpan';
+import { errorExceptInTest } from '@/lib/utils.server';
 import {
   captureProxyError,
   checkOrganizationModelRestrictions,
@@ -103,9 +104,9 @@ async function parseMultipartTranscriptionRequest(
     formData = await request.formData();
   } catch (error) {
     // A malformed body or a missing boundary rejects instead of returning form
-    // data. Treat it as an invalid request so POST answers the controlled 400
-    // rather than surfacing an unhandled 500. Never log the body: it is audio.
-    captureException(error, { tags: { source: 'transcription-proxy' } });
+    // data. This is client input, so answer the controlled 400 without
+    // reporting it to Sentry. Never log the body: it is audio.
+    errorExceptInTest('[transcription-proxy] Invalid multipart body:', error);
     return null;
   }
   const modelField = formData.get('model');
@@ -125,19 +126,13 @@ function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscrip
   try {
     parsed = JSON.parse(requestBodyText);
   } catch (error) {
-    captureException(error, {
-      extra: { requestBodyText },
-      tags: { source: 'transcription-proxy' },
-    });
+    errorExceptInTest('[transcription-proxy] Invalid JSON body:', error);
     return null;
   }
 
   const result = TranscriptionRequestSchema.safeParse(parsed);
   if (!result.success) {
-    captureException(result.error, {
-      extra: { requestBodyText },
-      tags: { source: 'transcription-proxy' },
-    });
+    errorExceptInTest('[transcription-proxy] Invalid request body:', result.error.issues);
     return null;
   }
 

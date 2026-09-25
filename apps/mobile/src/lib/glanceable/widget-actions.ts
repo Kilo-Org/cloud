@@ -17,6 +17,7 @@ import {
   AGENT_MODEL_PREFERENCE_KEY,
   ORGANIZATION_STORAGE_KEY,
 } from '@/lib/storage-keys';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -173,11 +174,18 @@ export function oldestPendingPermissionId(permissions: readonly unknown[]): stri
 }
 
 async function readStoredScope(): Promise<WidgetScope> {
-  const [organizationId, userId] = await Promise.all([
-    readStoredValue(ORGANIZATION_STORAGE_KEY),
-    readStoredValue(ACTIVE_USER_ID_KEY),
-  ]);
-  return { organizationId: organizationId ?? null, userId: userId ?? null };
+  try {
+    const [organizationId, userId] = await Promise.all([
+      readStoredValue(ORGANIZATION_STORAGE_KEY),
+      readStoredValue(ACTIVE_USER_ID_KEY),
+    ]);
+    return { organizationId: organizationId ?? null, userId: userId ?? null };
+  } catch (error) {
+    // Reported at warning level and rethrown: the widget action must settle on
+    // `failed` rather than act on a scope it could not read.
+    reportSecureStoreFailure('read', error);
+    throw error;
+  }
 }
 
 /**
@@ -304,9 +312,18 @@ async function resolveRecentRepository(
 async function readPersistedModel(
   organizationId: string | null
 ): Promise<{ model: string; variant: string } | null> {
-  const raw = await readStoredValue(AGENT_MODEL_PREFERENCE_KEY);
+  const raw = await readPersistedModelRaw();
   const entry = parseStoredModelPreference(raw)[contextKey(organizationId ?? undefined)];
   return entry ?? null;
+}
+
+async function readPersistedModelRaw(): Promise<string | null> {
+  try {
+    return await readStoredValue(AGENT_MODEL_PREFERENCE_KEY);
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    throw error;
+  }
 }
 
 /**

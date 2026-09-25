@@ -20,6 +20,7 @@ import {
 import {
   git,
   isTimeoutTermination,
+  logToFile,
   runProcess,
   withTimeoutAndAbort,
   type ExecResult,
@@ -38,6 +39,8 @@ import { createOutputRedactor, createSecretRedactor } from '../redact-output';
 import { stripAnsi } from '../event-parser';
 import type { ControlHandlerResult } from './sandbox-control-handlers';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
+import { reportRestoreIncomplete } from '../restore-incomplete.js';
+import type { WrapperRestoreTelemetry } from '../../../src/shared/wrapper-bootstrap.js';
 import { configureWorkspaceGitAuthor } from '../session-bootstrap.js';
 import { withKiloRequestDeadline } from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
@@ -100,8 +103,8 @@ export type ApplyAttachDeps = {
   emitPreparing?: AttachPreparingEmitter;
 };
 
-function ok(): ControlHandlerResult {
-  return { ok: true, result: { attached: true } };
+function ok(restore?: WrapperRestoreTelemetry): ControlHandlerResult {
+  return { ok: true, result: { attached: true, ...(restore ? { restore } : {}) } };
 }
 
 function fail(
@@ -358,6 +361,7 @@ async function executeSessionAttach(
   let stage: ControlDiagnosticRecord['fields']['stage'] = 'attach_validation';
   let workspaceAction: ControlDiagnosticRecord['fields']['workspaceAction'];
   let sessionResolution: ControlDiagnosticRecord['fields']['sessionResolution'];
+  let restoreTelemetry: WrapperRestoreTelemetry | undefined;
   let attachment: WorktreeKiloAttachment | undefined;
   const diagnostic = (
     phase: 'completed' | 'failed',
@@ -667,6 +671,26 @@ async function executeSessionAttach(
           sessionResolution = 'created';
         } else {
           sessionResolution = 'restored';
+          // A runtime replacement restores the worktree from the session
+          // snapshot. A skipped diff must be a named outcome here too — not only
+          // in the cold/backup bootstrap — so report it, write the agent rules
+          // file, and carry the telemetry back to the worker.
+          const incomplete = await reportRestoreIncomplete({
+            diffs: restored.diffs,
+            sessionHome: env.HOME ?? directory,
+            identity: `kiloSessionId=${kiloSessionId}`,
+            log: logToFile,
+            step: {
+              started: label =>
+                progress.start('restore_incomplete', 'phase:restore_incomplete', label, {
+                  kind: 'phase',
+                  label,
+                }),
+              failed: safeError =>
+                progress.fail('restore_incomplete', 'phase:restore_incomplete', safeError),
+            },
+          });
+          if (incomplete) restoreTelemetry = { path: 'backup', diffs: restored.diffs };
         }
       }
       signal.throwIfAborted();
@@ -694,7 +718,7 @@ async function executeSessionAttach(
       throw error;
     }
     diagnostic('completed');
-    return ok();
+    return ok(restoreTelemetry);
   } catch (error) {
     deps.onError?.(error);
     const result =

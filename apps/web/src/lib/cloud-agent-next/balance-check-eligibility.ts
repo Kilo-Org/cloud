@@ -42,7 +42,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   modelId: string;
   organizationId?: string;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = await isFreeModel(params.modelId);
+  const isFree = isFreeModel(params.modelId);
   if (isFree) {
     return { isFree: true, hasUserByokAvailable: false };
   }

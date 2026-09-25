@@ -106,6 +106,9 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack, push: vi.fn() }),

@@ -1821,13 +1821,6 @@
       "when": 1790187043975,
       "tag": "0259_github_connection_role_indexes",
       "breakpoints": true
-    },
-    {
-      "idx": 260,
-      "version": "7",
-      "when": 1790256176572,
-      "tag": "0260_spend_alerts_rollup_covering_index",
-      "breakpoints": true
     }
   ]
 }

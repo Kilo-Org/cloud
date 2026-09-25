@@ -53,6 +53,13 @@ const BOOT_TERMINAL_BUDGET_MS = 120_000;
 const PACED_PROGRESS_BUDGET_MS = 60_000;
 /** Total budget for filling the pending queue before the 429 must appear. */
 const FILL_BUDGET_MS = 90_000;
+/**
+ * Concurrent fill wave size. The DO serializes admissions, so a burst closes the
+ * capacity window before delivery can drain the queue between sends.
+ */
+const FILL_WAVE_SIZE = 10;
+/** Bound on total fill attempts so a pathological drain cannot enqueue without limit. */
+const FILL_MAX_ATTEMPTS = 60;
 /** Bounded cleanup after a failed body. */
 const CLEANUP_TIMEOUT_MS = 15_000;
 
@@ -147,22 +154,67 @@ async function startPacedHold(
 }
 
 /**
- * Every message in `messageIds` reaches a completed terminal, in that exact
- * order, with no failed terminal interleaved.
+ * Wait for every expected message to settle, then assert the FIFO contract the
+ * queue scenarios own: each message reaches a `completed` terminal and the
+ * `cloud.message.sent` frames appear in the expected order.
+ *
+ * Completion frames are settled by per-message deliveries the wrapper dispatches
+ * concurrently (#6660), so their arrival order is not a contract and is not
+ * asserted. In-order *delivery* is the contract, and the DO emits
+ * `cloud.message.sent` head-first, so that order is stable.
  */
-function successfulMessageOrder(events: StreamEvent[], messageIds: string[]): boolean {
-  const terminal = events.filter(event => {
-    const messageId = messageIdFromEvent(event);
-    return (
-      messageId !== undefined &&
-      messageIds.includes(messageId) &&
-      (messagePhase(event) === 'completed' || messagePhase(event) === 'failed')
-    );
-  });
-  return (
-    terminal.length === messageIds.length &&
-    terminal.every((event, index) => isMessageCompleted(event, messageIds[index]))
+async function awaitFifoDelivery(input: {
+  stream: StreamConnection;
+  expected: string[];
+  budgetMs: number;
+  label: string;
+}): Promise<{ ok: boolean; detail: string }> {
+  const { stream, expected, budgetMs, label } = input;
+  await Promise.all(
+    expected.map(messageId =>
+      stream.waitFor(
+        event =>
+          (messagePhase(event) === 'completed' || messagePhase(event) === 'failed') &&
+          messageIdFromEvent(event) === messageId,
+        Math.max(1, budgetMs)
+      )
+    )
   );
+  const events = stream.events;
+  const incomplete = expected.filter(
+    messageId => !events.some(event => isMessageCompleted(event, messageId))
+  );
+  if (incomplete.length > 0) {
+    const failed = expected.filter(messageId =>
+      events.some(
+        event =>
+          event.streamEventType === 'cloud.message.failed' &&
+          messageIdFromEvent(event) === messageId
+      )
+    );
+    return {
+      ok: false,
+      detail: `${label}: no completed terminal for ${incomplete.join(', ')}${
+        failed.length > 0 ? `; failed for ${failed.join(', ')}` : ''
+      }`,
+    };
+  }
+  const sentOrder = events
+    .filter(event => event.streamEventType === 'cloud.message.sent')
+    .map(event => messageIdFromEvent(event))
+    .filter(
+      (messageId): messageId is string => messageId !== undefined && expected.includes(messageId)
+    );
+  const expectedSent = expected.filter(messageId => sentOrder.includes(messageId));
+  const orderOk =
+    sentOrder.length === expectedSent.length &&
+    sentOrder.every((messageId, index) => messageId === expectedSent[index]);
+  return orderOk
+    ? { ok: true, detail: `${label}: completed in delivery order ${expectedSent.join(' -> ')}` }
+    : {
+        ok: false,
+        detail: `${label}: delivery order ${sentOrder.join(' -> ') || '(none)'} did not match ${expected.join(' -> ')}`,
+      };
 }
 
 /**
@@ -261,37 +313,25 @@ async function queueWhileBusyBody(
       );
     }
 
-    // Wait for the last queued message to terminate; by then the held turn and
-    // the second follow-up must have terminated too (strict FIFO). Filter out
-    // the initial `cloud.message.queued` event, which is not a terminal state.
-    const thirdTerminal = await stream.waitFor(
-      e =>
-        messagePhase(e) !== null &&
-        messagePhase(e) !== 'queued' &&
-        messageIdFromEvent(e) === third.messageId,
-      deadline.remaining('third terminal')
-    );
-    if (!thirdTerminal) {
-      return fail(
-        `third message ${third.messageId} did not terminate; owned container=${hold.container}`
-      );
-    }
-
+    const expectedOrder = [hold.held.messageId, second.messageId, third.messageId];
+    const settlement = await awaitFifoDelivery({
+      stream,
+      expected: expectedOrder,
+      budgetMs: deadline.remaining('settlement'),
+      label: scenarioName,
+    });
     const events = [...stream.events];
     stream.close();
     stream = undefined;
-
-    const expectedOrder = [hold.held.messageId, second.messageId, third.messageId];
-    const fifoOk = successfulMessageOrder(events, expectedOrder);
-    terminalized = fifoOk;
+    terminalized = settlement.ok;
 
     return {
       name: scenarioName,
       conversation,
-      ok: fifoOk,
-      message: fifoOk
+      ok: settlement.ok,
+      message: settlement.ok
         ? `session=${hold.boot.cloudAgentSessionId}; successful FIFO: ${expectedOrder.join(' -> ')}`
-        : `expected successful FIFO completion for ${expectedOrder.join(' -> ')}`,
+        : `${settlement.detail}; owned container=${hold.container}`,
       events,
       durationMs: Date.now() - startedAt,
     };
@@ -384,33 +424,24 @@ async function queueRapidFireBody(
     );
     if (container === null) return fail('new sandbox did not appear');
 
-    const thirdTerminal = await stream.waitFor(
-      e =>
-        messagePhase(e) !== null &&
-        messagePhase(e) !== 'queued' &&
-        messageIdFromEvent(e) === third.messageId,
-      deadline.remaining('third terminal')
-    );
-    if (!thirdTerminal) {
-      return fail(
-        `third message ${third.messageId} did not terminate (first=${first.messageId} second=${second.messageId})`
-      );
-    }
-
+    const expectedOrder = [first.messageId, second.messageId, third.messageId];
+    const settlement = await awaitFifoDelivery({
+      stream,
+      expected: expectedOrder,
+      budgetMs: deadline.remaining('settlement'),
+      label: scenarioName,
+    });
     const events = [...stream.events];
     stream.close();
     stream = undefined;
 
-    const expectedOrder = [first.messageId, second.messageId, third.messageId];
-    const fifoOk = successfulMessageOrder(events, expectedOrder);
-
     return {
       name: scenarioName,
       conversation,
-      ok: fifoOk,
-      message: fifoOk
+      ok: settlement.ok,
+      message: settlement.ok
         ? `session=${first.cloudAgentSessionId}; successful FIFO: ${expectedOrder.join(' -> ')}; container=${container}`
-        : `expected successful FIFO completion for ${expectedOrder.join(' -> ')}`,
+        : settlement.detail,
       events,
       durationMs: Date.now() - startedAt,
     };
@@ -467,12 +498,14 @@ async function queueOverflowBody(
     const sessionId = hold.boot.cloudAgentSessionId;
 
     // Fill the queue until enqueue starts failing with 429. The limit is
-    // server-enforced (PENDING_SESSION_MESSAGE_LIMIT); the exact boundary
-    // depends on whether the held turn counts toward it, so we just drain until
-    // we hit the wall rather than guessing the count. Each fill call is bounded
-    // by the remaining fill budget, the whole loop leaves the scenario deadline
-    // room for the interrupt and drain below, and a rejection observed after the
-    // budget is not accepted as evidence.
+    // server-enforced (PENDING_SESSION_MESSAGE_LIMIT). Post-#6660 a ready runtime
+    // accepts queued follow-ups without waiting for the running turn, so the DO
+    // drains the pending queue between sequential sends and the limit is seldom
+    // reached. Admission is serialized inside the DO, so fire each wave
+    // concurrently: a burst closes the capacity window before delivery can drain
+    // it, and the overflow admission reliably returns 429. The wave loop stays
+    // bounded by the fill budget and an attempt cap, and a rejection observed
+    // after the budget is not accepted as evidence.
     const fillBudget = Math.max(
       500,
       Math.min(FILL_BUDGET_MS, deadline.remaining('fill budget') - 2_000)
@@ -481,42 +514,56 @@ async function queueOverflowBody(
     const queuedIds: string[] = [];
     let overflowOk = false;
     let overflowMessage = `no 429 within ${fillBudget}ms fill budget`;
-    for (let i = 0; i < 20; i++) {
+    let fillAttempt = 0;
+    while (!overflowOk && fillAttempt < FILL_MAX_ATTEMPTS) {
       const fillRemaining = fillDeadlineAt - Date.now();
       if (fillRemaining <= 0) {
         overflowMessage = `no 429 within ${fillBudget}ms fill budget (${queuedIds.length} queued)`;
         break;
       }
-      try {
-        const ack = await deadline.within(
-          `fill-${i}`,
-          signal =>
-            sendMessage(
-              config,
-              {
-                cloudAgentSessionId: sessionId,
-                prompt: fakeDirective(`echo:q${i}`),
-                signal,
-              },
-              api
-            ),
-          fillRemaining
-        );
-        if (ack.delivery !== 'queued') {
-          return fail(`fill-${i}: expected delivery=queued, got ${ack.delivery}`);
+      const waveSize = Math.min(FILL_WAVE_SIZE, FILL_MAX_ATTEMPTS - fillAttempt);
+      const results = await Promise.all(
+        Array.from({ length: waveSize }, (_, offset) => {
+          const attempt = fillAttempt + offset;
+          return deadline
+            .within(
+              `fill-${attempt}`,
+              signal =>
+                sendMessage(
+                  config,
+                  {
+                    cloudAgentSessionId: sessionId,
+                    prompt: fakeDirective(`echo:q${attempt}`),
+                    signal,
+                  },
+                  api
+                ),
+              fillRemaining
+            )
+            .then(ack => ({ kind: 'admitted' as const, ack }))
+            .catch((err: unknown) => ({ kind: 'error' as const, err }));
+        })
+      );
+      fillAttempt += waveSize;
+      for (const result of results) {
+        if (result.kind === 'admitted') {
+          if (result.ack.delivery !== 'queued') {
+            return fail(
+              `fill-${fillAttempt}: expected delivery=queued, got ${result.ack.delivery}`
+            );
+          }
+          queuedIds.push(result.ack.messageId);
+          continue;
         }
-        queuedIds.push(ack.messageId);
-      } catch (err) {
-        const msg = errorMessage(err);
+        const msg = errorMessage(result.err);
         const is429 = msg.includes('429') || /TOO_MANY_REQUESTS|PENDING_QUEUE_FULL/.test(msg);
-        if (!is429) throw err;
+        if (!is429) throw result.err;
         if (Date.now() > fillDeadlineAt) {
           overflowMessage = `queue rejection observed after the ${fillBudget}ms fill budget`;
-          break;
+          continue;
         }
         overflowOk = true;
         overflowMessage = `filled ${queuedIds.length} before rejection: ${msg.split('—').slice(-1)[0]?.trim() ?? '429'}`;
-        break;
       }
     }
 

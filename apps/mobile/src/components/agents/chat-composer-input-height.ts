@@ -295,8 +295,8 @@ export function resolveComposerMaxHeight({
  *
  * The result never falls below `minHeight`, and a degenerate geometry
  * (non-positive line height or vertical padding) returns the height unchanged
- * rather than dividing by zero. The caller passes the font-scaled line height
- * and the input's own unscaled vertical padding.
+ * rather than dividing by zero. The caller passes the measured line pitch and
+ * the input's own unscaled vertical padding.
  */
 export function alignComposerInputHeightToLines({
   height,

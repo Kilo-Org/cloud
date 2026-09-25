@@ -27,16 +27,18 @@ type Published = { height: number; maxHeight: number };
 
 let published: Published = { height: 0, maxHeight: 0 };
 let nativeContentHeight: number | null = null;
+let cap = OPTIONS.maxHeight;
 
 function Harness() {
-  const measure = useTextHeight({ ...OPTIONS, nativeContentHeight });
+  const measure = useTextHeight({ ...OPTIONS, maxHeight: cap, nativeContentHeight });
   published = { height: measure.height, maxHeight: measure.maxHeight };
   return measure.measureElement;
 }
 
-async function mount() {
+async function mount(capOverride?: number) {
   published = { height: 0, maxHeight: 0 };
   nativeContentHeight = null;
+  cap = capOverride ?? OPTIONS.maxHeight;
   const holder: { current?: TestRenderer.ReactTestRenderer } = {};
   await act(async () => {
     await Promise.resolve();
@@ -101,6 +103,31 @@ describe('useTextHeight pitch snapping', () => {
     // The mirror honors the requested 20pt line height: six lines measure 120.
     layoutMirror(renderer, 120);
     expect(published.height).toBeCloseTo(24 + 5 * 18.667, 2);
+    renderer.unmount();
+  });
+
+  it('keeps a cap that lands on the minimum a whole native line', async () => {
+    // The smallest remaining-space cap is the caller's 44pt minimum, which is
+    // a requested 20pt line box rather than a native one. Publishing it as is
+    // would scroll a two-line draft by 17.33 - a partial line - and clip the
+    // first visible line again, so the floor is snapped to the same pitch.
+    const renderer = await mount(44);
+    reportNativeContentSize(renderer, 24 + 6 * 18.667);
+    layoutMirror(renderer, 120);
+    expect(published.maxHeight).toBeCloseTo(24 + 18.667, 2);
+    expect(published.height).toBeCloseTo(24 + 18.667, 2);
+    renderer.unmount();
+  });
+
+  it('never snaps the cap past the space the composer has', async () => {
+    // A reported pitch (24dp) above the requested line box cannot fit a whole
+    // native line in the 44dp cap: the cap stays the caller's own, inflated by
+    // neither the snap nor the pitch-aligned floor.
+    const renderer = await mount(44);
+    reportNativeContentSize(renderer, 24 + 6 * 24);
+    layoutMirror(renderer, 120);
+    expect(published.maxHeight).toBe(44);
+    expect(published.height).toBe(44);
     renderer.unmount();
   });
 

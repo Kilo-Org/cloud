@@ -46,7 +46,8 @@ const NATIVE_PITCH_MAX_RATIO = 1.4;
  * this composer's 16dp Roboto at 420dpi the real input reports 49px per line,
  * 18.67dp against a requested 20dp — so the snap uses the pitch measured from
  * the real input's reported content height over the mirror's line count, not
- * the requested line height.
+ * the requested line height. The floor is snapped to that same pitch, so a cap
+ * that lands on the minimum stays a whole number of native lines too.
  */
 export function useTextHeight({
   minHeight,
@@ -88,6 +89,20 @@ export function useTextHeight({
     nativeContentHeight != null && nativeContentHeight > verticalPadding
       ? (nativeContentHeight - verticalPadding) / mirrorLineCount
       : null;
+  // `minHeight` is the caller's one-line floor in the requested line box
+  // (`scaledLineHeight + padding`), while the snap floors to the pitch the
+  // native input really renders. A cap that lands on the minimum would publish
+  // that unaligned minimum and clip the first visible line again, so the floor
+  // is re-expressed in whole native lines. It is clamped to the cap, which
+  // keeps the snapped height from ever exceeding the space the composer has.
+  const alignedMinHeight =
+    nativePitch !== null
+      ? Math.min(
+          verticalPadding +
+            Math.max(1, Math.floor((minHeight - verticalPadding) / nativePitch)) * nativePitch,
+          maxHeight
+        )
+      : minHeight;
   const effectiveMaxHeight =
     nativePitch !== null &&
     nativePitch >= scaledLineHeight * NATIVE_PITCH_MIN_RATIO &&
@@ -96,7 +111,7 @@ export function useTextHeight({
           height: maxHeight,
           lineHeight: nativePitch,
           verticalPadding,
-          minHeight,
+          minHeight: alignedMinHeight,
         })
       : maxHeight;
 

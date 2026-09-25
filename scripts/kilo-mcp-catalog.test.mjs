@@ -9,6 +9,8 @@ const testPath = 'scripts/kilo-mcp-catalog.test.mjs';
 const prJobName = 'catalog-pr';
 const mergeJobName = 'catalog-merge';
 const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
+const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
+const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
 const kiloInstallCommand = 'npm install -g @kilocode/cli';
 const mintCommand = 'api/internal/mcp-catalog/token';
@@ -20,13 +22,22 @@ const changeGate = "steps.catalog_changes.outputs.catalog == 'true'";
 const mergeChangeGate = "steps.merge_changes.outputs.catalog == 'true'";
 // The paths the change-detection step must recognise. The workflow-path
 // entries tolerate the grep escaping (`\.yml`, `\.test\.mjs`) so the required
-// check keeps running the dump whenever the catalog can actually change.
+// check keeps running the dump whenever the catalog can actually change, and
+// the skill entry keeps `.kilo/skills/kilo-mcp/SKILL.md` inside the detected
+// set so a hand-edited skill re-runs the pipeline.
 const catalogPathFragments = [
   /apps\/web\/src\//,
   /services\/kilo-mcp\//,
+  /kilo-mcp\/SKILL|\.kilo\/skills\//,
   /kilo-mcp-catalog\\?\.yml/,
   /kilo-mcp-catalog\\?\.test\\?\.mjs/,
 ];
+// A `git diff --exit-code` that covers both committed artifacts in the order
+// the workflow writes them (catalog first, then the generated skill), so
+// dropping either path from the drift command fails the check.
+const driftDiffCommand = new RegExp(
+  `git diff --exit-code -- services/kilo-mcp/catalog\\.json ${skillPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+);
 
 function readWorkflow() {
   return load(readFileSync(new URL(`../${workflowPath}`, import.meta.url), 'utf8'));
@@ -123,6 +134,24 @@ function validate(workflow) {
     'PR job installs the Kilo CLI the dump shells out to'
   );
 
+  // The PR job regenerates the skill from the catalog.json the dump just
+  // wrote, on the same change gate and with no credentials (s1's generator
+  // command; the workflow never imports the generator itself).
+  const prSkill = findStep(
+    pr,
+    step => step.run === skillCommand,
+    'PR job regenerates the kilo-mcp skill'
+  );
+  assert.equal(
+    prSkill.if,
+    changeGate,
+    'PR skill regeneration is gated on catalog-relevant changes'
+  );
+  assert.ok(
+    pr.steps.indexOf(prDump) < pr.steps.indexOf(prSkill),
+    'PR skill regeneration must run after the dump, so it reads the refreshed catalog.json'
+  );
+
   // Fork PRs never receive the mint secret (GitHub withholds secrets from
   // fork pull_request events), so a fork that adds a query cannot run the dump
   // at all. Requirement 6 must still fire: the dump is continue-on-error on
@@ -153,6 +182,16 @@ function validate(workflow) {
     pr.steps.indexOf(dumpGuidance) < pr.steps.indexOf(drift),
     'dump-failure guidance must run before drift detection, or a failed fork dump could pass silently'
   );
+  assert.match(
+    drift.run ?? '',
+    /git diff --exit-code/,
+    'PR drift detection diffs the committed artifacts'
+  );
+  assert.match(
+    drift.run ?? '',
+    driftDiffCommand,
+    'PR drift detection must also diff the generated skill, so a hand edit marks the PR stale'
+  );
 
   // PR jobs never touch Vectorize or the embed script (requirement 10).
   for (const step of pr.steps) {
@@ -163,14 +202,15 @@ function validate(workflow) {
     );
   }
 
-  // Same-repo drift is committed back under the bot identity, catalog.json
-  // only (requirement 5).
+  // Same-repo drift is committed back under the bot identity: the catalog and
+  // the generated skill (requirement 5).
   const commit = findStep(
     pr,
     step => (step.if ?? '').includes(sameRepoCondition),
     'same-repo commit step'
   );
-  assert.match(commit.run, /git add services\/kilo-mcp\/catalog\.json/, 'commit only catalog.json');
+  assert.match(commit.run, /git add services\/kilo-mcp\/catalog\.json/, 'commit the catalog.json');
+  assert.ok(commit.run.includes(skillPath), 'commit-back must include the generated skill');
   assert.match(commit.run, /github-actions\[bot\]/, 'bot identity on the commit');
   assert.match(commit.run, /git push/, 'the commit is pushed to the PR branch');
 
@@ -182,6 +222,7 @@ function validate(workflow) {
     'fork catalog.patch export step'
   );
   assert.match(patch.run, /catalog\.patch/, 'diff is written to catalog.patch');
+  assert.ok(patch.run.includes(skillPath), 'fork patch export must include the generated skill');
   const artifact = findStep(
     pr,
     step => (step.uses ?? '').startsWith('actions/upload-artifact@'),
@@ -209,8 +250,9 @@ function validate(workflow) {
   );
   assert.ok(fail, 'fork drift exits non-zero');
 
-  // Merge job: dump fills stragglers (requirement 8), then the embed script
-  // upserts Vectorize with the Cloudflare credentials (requirement 9).
+  // Merge job: dump fills stragglers (requirement 8), the skill is regenerated
+  // from it, then the embed script upserts Vectorize with the Cloudflare
+  // credentials (requirement 9).
   const mergeDump = findStep(merge, step => step.run === dumpCommand, 'merge job runs the dump');
   const mergeMint = findStep(merge, step => step.id === 'mint', 'merge job mints a catalog token');
   assert.equal(
@@ -228,6 +270,16 @@ function validate(workflow) {
     step => step.run === kiloInstallCommand,
     'merge job installs the Kilo CLI the dump shells out to'
   );
+  const mergeSkill = findStep(
+    merge,
+    step => step.run === skillCommand,
+    'merge job regenerates the kilo-mcp skill'
+  );
+  assert.equal(
+    mergeSkill.if,
+    mergeChangeGate,
+    'merge skill regeneration is gated on catalog-relevant changes'
+  );
   const upsert = findStep(merge, step => step.run === embedCommand, 'merge job upserts Vectorize');
   const mergeDrift = findStep(
     merge,
@@ -238,6 +290,16 @@ function validate(workflow) {
     merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeDrift) &&
       merge.steps.indexOf(mergeDrift) < merge.steps.indexOf(upsert),
     'the merge drift check must run between the dump and the Vectorize upsert'
+  );
+  assert.ok(
+    merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeSkill) &&
+      merge.steps.indexOf(mergeSkill) < merge.steps.indexOf(mergeDrift),
+    'the merge skill must be regenerated after the dump and before the stale check'
+  );
+  assert.match(
+    mergeDrift.run ?? '',
+    driftDiffCommand,
+    'merge stale check must cover the generated skill, not only the catalog'
   );
   assert.match(
     mergeDrift.run ?? '',
@@ -435,6 +497,72 @@ for (const [name, defect] of [
     workflow => {
       const step = workflow.jobs[mergeJobName].steps.find(item => item.run === dumpCommand);
       delete step.if;
+    },
+  ],
+  [
+    'skill regeneration removed from the PR job',
+    workflow => dropStep(workflow, prJobName, step => step.run === skillCommand),
+  ],
+  [
+    'skill regeneration removed from the merge job',
+    workflow => dropStep(workflow, mergeJobName, step => step.run === skillCommand),
+  ],
+  [
+    'skill path dropped from the PR change detection',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'catalog_changes');
+      step.run = step.run.replace('^\\.kilo/skills/', '^\\.kilo/other/');
+    },
+  ],
+  [
+    'skill path dropped from the merge change detection',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item => item.id === 'merge_changes');
+      step.run = step.run.replace('^\\.kilo/skills/', '^\\.kilo/other/');
+    },
+  ],
+  [
+    'skill dropped from PR drift detection',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'drift');
+      step.run = step.run.replace(` ${skillPath}`, '');
+    },
+  ],
+  [
+    'skill dropped from the commit-back',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        (item.if ?? '').includes(sameRepoCondition)
+      );
+      step.run = step.run.replaceAll(skillPath, 'services/kilo-mcp/catalog.json');
+    },
+  ],
+  [
+    'skill dropped from the fork patch export',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(
+        item => (item.if ?? '').includes(forkCondition) && /git diff/.test(item.run ?? '')
+      );
+      step.run = step.run.replace(` ${skillPath}`, '');
+    },
+  ],
+  [
+    'skill dropped from the merge stale check',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item =>
+        /git diff --exit-code[\s\S]*services\/kilo-mcp\/catalog\.json/.test(item.run ?? '')
+      );
+      step.run = step.run.replace(` ${skillPath}`, '');
+    },
+  ],
+  [
+    'skill step moved before the dump',
+    workflow => {
+      const steps = workflow.jobs[prJobName].steps;
+      const skill = steps.find(step => step.run === skillCommand);
+      const dumpIndex = steps.findIndex(step => step.run === dumpCommand);
+      steps.splice(steps.indexOf(skill), 1);
+      steps.splice(dumpIndex, 0, skill);
     },
   ],
 ]) {

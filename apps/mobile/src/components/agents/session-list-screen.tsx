@@ -238,18 +238,19 @@ export function AgentSessionListScreen() {
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text
+        {/* An eyebrow-scale label, with the same LTR-only treatment: the
+            letterspaced capitals break a cursive script's joins, so an RTL
+            label drops them (home-ar-loading) while the variant and
+            `SectionHeader` keep the identical class string. */}
+        <Eyebrow
+          numberOfLines={1}
           className={cn(
-            'shrink text-center font-mono-medium text-[11px] text-primary',
-            // LTR-only: the letterspaced capitals break a cursive script's
-            // joins, so an RTL action label drops them (home-ar-loading).
-            // The class string is the eyebrow variant's, so the two labels
-            // cannot drift apart.
+            'shrink text-center text-[11px] text-primary',
             !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
           )}
         >
           {historyLabel}
-        </Text>
+        </Eyebrow>
       </Pressable>
       {query.canFilter ? (
         <SessionFilterButton

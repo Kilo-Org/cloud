@@ -125,8 +125,9 @@ describe('ActiveAgentsLiveUpdate native bridge arity', () => {
 /**
  * The durable write path — a prefs fsync plus one or more binder round-trips —
  * must not run on the JavaScript thread, and the JS bridge declares these
- * entry points `void`, so a rejection would reach nobody. The module owns one
- * single-thread executor and runs every write on it.
+ * entry points `void`, so a rejection would reach nobody. Every write runs on
+ * one single-thread executor, shared by every module instance in the process
+ * so no instance's queued write can land after a replacement's newer write.
  */
 describe('ActiveAgentsLiveUpdate durable write queue', () => {
   it('owns one single-thread executor, not a pool or the UI thread', () => {
@@ -156,7 +157,7 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
       /^Function\("setWidgetSnapshot"\)/
     );
     expect(write, 'setWidgetSnapshot must submit its durable body to the module queue').toContain(
-      'executor.execute'
+      'durableQueue.execute'
     );
     expect(write, 'the JS thread must not run the prefs commit itself').not.toContain('.commit()');
     expect(write, 'setWidgetSnapshot must not stay on the default or main queue').not.toContain(
@@ -202,10 +203,20 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
     }
   });
 
-  it('shuts the executor down with the module', () => {
-    const destroy = MODULE_SOURCE.slice(MODULE_SOURCE.indexOf('OnDestroy {'));
-    expect(destroy, 'the module must release its executor on destroy').toContain(
-      'executor.shutdown()'
+  it('keeps the queue process-wide so a replacement module cannot race it', () => {
+    // Destroying a module cannot drain its queue, so a per-instance executor
+    // would let a replaced module's already-queued write land after the
+    // replacement's newer write. One shared queue keeps every durable write in
+    // submission order across instances, and nothing may stop it on destroy:
+    // the work a replacement instance queued would otherwise never run.
+    expect(MODULE_SOURCE, 'the queue must be one shared executor').toContain(
+      'val durableQueue: ExecutorService'
+    );
+    expect(MODULE_SOURCE, 'the queue must live in the companion object').toMatch(
+      /private companion object \{[\s\S]*val durableQueue: ExecutorService/
+    );
+    expect(MODULE_SOURCE, 'no lifecycle hook may stop the shared queue').not.toContain(
+      '.shutdown()'
     );
   });
 });

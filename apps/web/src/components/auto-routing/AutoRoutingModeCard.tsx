@@ -417,28 +417,6 @@ export function isDirectByokOnlyModel(model: {
   return DIRECT_BYOK_PROVIDER_PREFIXES.has(prefix);
 }
 
-/**
- * Experiment public ids appear in the selector list with ordinary partner ids
- * (not `experiment/…`). `listAvailableExperimentModels` always sets zero
- * pricing and omits `isFree`; managed free models set `isFree: true`. Combined
- * with zero prompt pricing this is the client-visible experiment signal.
- * Server remains authoritative.
- */
-export function isExperimentSelectorModel(model: {
-  id: string;
-  isFree?: boolean;
-  pricing?: { prompt?: string } | null;
-}): boolean {
-  const id = model.id;
-  if (!id) return false;
-  if (id.includes('/experiment') || id.startsWith('experiment/')) return true;
-  if (model.isFree === true) return false;
-  const prompt = model.pricing?.prompt;
-  if (typeof prompt !== 'string') return false;
-  const amount = Number.parseFloat(prompt);
-  return Number.isFinite(amount) && amount === 0;
-}
-
 /** Client-side usability filter; server revalidates on save. */
 export function isEligiblePoolModel(model: {
   id: string;
@@ -452,7 +430,6 @@ export function isEligiblePoolModel(model: {
   if (isVirtualAutoModelId(id)) return false;
   if (id.startsWith(CUSTOM_LLM_PREFIX)) return false;
   if (isDirectByokOnlyModel(model)) return false;
-  if (isExperimentSelectorModel(model)) return false;
   return true;
 }
 

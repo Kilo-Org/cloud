@@ -7,6 +7,7 @@ import {
   JOINED_SCRIPT,
   NATURAL_LETTER_SPACING,
   textLetterSpacing,
+  withoutMonoFamily,
 } from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
@@ -53,6 +54,31 @@ describe('hasRtlScript', () => {
 
   it('leaves Latin copy alone', () => {
     expect(hasRtlScript('Live now')).toBe(false);
+  });
+
+  // The script detection the RTL label treatment was first built on: a plain
+  // string, a mixed array, and a nested element all reach the copy, so a label
+  // that mixes scripts counts as RTL script.
+  it('detects an Arabic string', () => {
+    expect(hasRtlScript('الجلسات الجارية الآن')).toBe(true);
+  });
+
+  it('detects Arabic inside a mixed array of strings', () => {
+    expect(hasRtlScript(['LIVE NOW', 'عرض الكل'])).toBe(true);
+  });
+
+  it('checks every item of an array', () => {
+    expect(hasRtlScript(['LIVE', 'NOW'])).toBe(false);
+  });
+
+  it('recurses into a nested element', () => {
+    expect(hasRtlScript(createElement('Text', null, 'استكشاف'))).toBe(true);
+  });
+
+  it('is false for a number, a boolean and null', () => {
+    expect(hasRtlScript(42)).toBe(false);
+    expect(hasRtlScript(true)).toBe(false);
+    expect(hasRtlScript(null)).toBe(false);
   });
 });
 
@@ -141,6 +167,22 @@ describe('containsJoinedScript', () => {
   it('leaves a nested element to its own run', () => {
     // A nested Text is a separate run and applies its own letter spacing.
     expect(containsJoinedScript(createElement('Text', null, 'التفصيلات'))).toBe(false);
+  });
+});
+
+describe('withoutMonoFamily', () => {
+  it('drops the mono family and preserves the remaining order', () => {
+    expect(withoutMonoFamily('font-mono-medium text-[10px] uppercase text-muted-foreground')).toBe(
+      'text-[10px] uppercase text-muted-foreground'
+    );
+  });
+
+  it('drops a variant-prefixed mono family', () => {
+    expect(withoutMonoFamily('dark:font-mono-semibold text-sm')).toBe('text-sm');
+  });
+
+  it('keeps an unrelated token that merely starts with font-mono', () => {
+    expect(withoutMonoFamily('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
   });
 });
 

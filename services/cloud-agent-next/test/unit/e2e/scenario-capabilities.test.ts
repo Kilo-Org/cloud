@@ -282,6 +282,16 @@ function sandboxFaultsStub(): SandboxFaultObservation {
     freezeWrapperProcess: vi.fn(async () => ({ frozen: true, pid: 1, detail: '' })),
     unfreezeWrapperProcess: vi.fn(async () => {}),
     captureEvidenceCursor: vi.fn(async () => 0),
+    captureWorkerLogCursor: vi.fn(async () => 0),
+    dropControlSocketDuringAttach: vi.fn(async () => ({
+      attachRequestId: 'req_attach',
+      attachConnectionId: 'conn_attach',
+      closedConnectionId: 'conn_attach',
+      readyConnectionId: 'conn_ready',
+      wrapperInstanceId: 'wrapper_1',
+      signaledPid: 1,
+    })),
+    countPromptDispatches: vi.fn(async () => 1),
     observeReapEvidence: vi.fn(async input => ({
       reapedAllocationRef: input.reapedAllocationRef,
       physicalStopCause: 'recovery_settled_reap',

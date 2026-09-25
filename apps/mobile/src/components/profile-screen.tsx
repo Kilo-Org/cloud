@@ -42,6 +42,7 @@ import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
+  getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { useScreenSideInsets } from '@/lib/screen-insets';
@@ -188,11 +189,20 @@ export function ProfileScreen() {
             hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
-            last
             onPress={() => {
               if (agentScope) {
                 router.push(getSecurityAgentPath(agentScope));
               }
+            }}
+          />
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('profiles.title')}
+            subtitle={t('profiles.entrySubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getProfilesPath());
             }}
           />
         </View>

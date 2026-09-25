@@ -250,3 +250,24 @@ describe('Text eyebrow letterspacing', () => {
     }
   });
 });
+
+describe('Text mono variant in an RTL interface', () => {
+  // The mono variant carries a font that ships no RTL-script glyphs, so RTL
+  // copy loses the family in RTL while a Latin run such as a session id keeps
+  // it.
+  it('drops the mono family for an Arabic mono variant in RTL', () => {
+    i18nManager.isRTL = true;
+    const classes = hostClasses(
+      mount(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
+    );
+
+    expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
+  });
+
+  it('keeps the mono family for a session id in RTL', () => {
+    i18nManager.isRTL = true;
+    const classes = hostClasses(mount(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b')));
+
+    expect(classes).toContain('font-mono-medium');
+  });
+});

@@ -1,4 +1,8 @@
 import { logger } from '../logger.js';
+import {
+  githubRepositoryAuthorizationResultSchema,
+  type GitHubRepositoryAuthorizationFailureReason,
+} from '@kilocode/worker-utils/github-authorization';
 import type {
   BitbucketTokenFailureReason,
   GitAuthorConfig,
@@ -19,7 +23,14 @@ export type ResolvedGitHubToken = {
 };
 
 export type ResolveGitHubTokenError = {
-  reason: string;
+  reason:
+    | GitHubRepositoryAuthorizationFailureReason
+    | 'capability_configuration_error'
+    | 'invalid_targets'
+    | 'invalid_capability'
+    | 'expired_capability'
+    | 'service_not_configured'
+    | 'rpc_error';
   message: string;
 };
 
@@ -102,6 +113,7 @@ export type ResolvedCloudAgentGitHubCapability = {
 };
 
 type IssueCloudAgentGitHubSessionCapabilityParams = {
+  accessPurpose?: 'workflow' | 'agent';
   githubRepo: string;
   userId: string;
   outboundContainerId: string;
@@ -147,6 +159,7 @@ async function resolveLegacyInstallationAuthForRepo(
 export async function resolveCloudAgentGitHubAuthForRepo(
   env: GitTokenServiceEnv,
   params: {
+    accessPurpose?: 'workflow' | 'agent';
     githubRepo: string;
     userId: string;
     orgId?: string;
@@ -164,6 +177,14 @@ export async function resolveCloudAgentGitHubAuthForRepo(
     };
   }
   if (!env.GIT_TOKEN_SERVICE.getCloudAgentAuthForRepo) {
+    if (params.accessPurpose === 'agent')
+      return {
+        success: false,
+        error: {
+          reason: 'service_not_configured',
+          message: 'Managed GitHub authorization is unavailable',
+        },
+      };
     return resolveLegacyInstallationAuthForRepo(env, params);
   }
 
@@ -202,6 +223,52 @@ export async function resolveCloudAgentGitHubAuthForRepo(
     };
   } catch {
     logger.error('Failed to call git-token-service getCloudAgentAuthForRepo');
+    return {
+      success: false,
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
+    };
+  }
+}
+
+export async function authorizeCloudAgentGitHubRepo(
+  env: GitTokenServiceEnv,
+  params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+    expectedIntegrationId: string;
+    accessPurpose?: 'workflow' | 'agent';
+  }
+): Promise<{ success: true } | { success: false; error: ResolveGitHubTokenError }> {
+  if (!env.GIT_TOKEN_SERVICE?.authorizeCloudAgentGitHubRepo) {
+    return {
+      success: false,
+      error: {
+        reason: 'service_not_configured',
+        message: 'Managed GitHub authorization is unavailable',
+      },
+    };
+  }
+  try {
+    const response = await env.GIT_TOKEN_SERVICE.authorizeCloudAgentGitHubRepo(params);
+    const parsed = githubRepositoryAuthorizationResultSchema.safeParse(response);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: {
+          reason: 'rpc_error',
+          message: 'GitHub credential service returned an invalid authorization response',
+        },
+      };
+    }
+    const result = parsed.data;
+    return result.success
+      ? { success: true }
+      : {
+          success: false,
+          error: { reason: result.reason, message: 'GitHub repository authorization failed' },
+        };
+  } catch {
     return {
       success: false,
       error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },

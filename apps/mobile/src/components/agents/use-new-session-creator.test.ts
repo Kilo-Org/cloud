@@ -214,6 +214,40 @@ function requireResult(resultRef: { current: CreatorResult | null }): CreatorRes
   return result;
 }
 
+// The same mount as `mountCreator`, but it hands back the renderer so a test
+// can re-render the harness with a changed attachment list while a create is
+// still in flight (the composer's strip stays interactive during a create).
+function mountCreatorWithRenderer(input: CreatorInput): {
+  renderer: TestRenderer.ReactTestRenderer | undefined;
+  resultRef: { current: CreatorResult | null };
+} {
+  const resultRef: { current: CreatorResult | null } = { current: null };
+  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  act(() => {
+    renderer = TestRenderer.create(React.createElement(Harness, { input, resultRef }));
+  });
+  return { renderer, resultRef };
+}
+
+type AttachmentChip = CreatorInput['attachments']['attachments'][number];
+
+/** A minimal uploaded chip: only its `id` and order reach the create guard. */
+function attachmentChip(id: string): AttachmentChip {
+  return {
+    id,
+    filename: `${id}.png`,
+    remoteFilename: `${id}.png`,
+    remoteKey: `user-1/cloud-agent/msg-1/${id}.png`,
+    kind: 'image',
+    extension: 'png',
+    mimeType: 'image/png',
+    size: 10,
+    localUri: `file:///tmp/${id}.png`,
+    status: 'uploaded',
+    progress: 1,
+  };
+}
+
 // Counts the frames the hook schedules and fires them synchronously. The
 // creator must not defer any navigation work to a frame boundary — a stack
 // mutation dispatched one frame after the push crashed Fabric on Android. The
@@ -302,6 +336,8 @@ function runCreator(args: {
   selectedRepository?: NewSessionRepository | null;
   autoCommit?: boolean;
   profileId?: string | null;
+  manualEnvVars?: Record<string, string>;
+  setupCommands?: string[];
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
   const refs: { current: unknown }[] = [];
@@ -350,6 +386,8 @@ function runCreator(args: {
       variant: args.variant ?? 'v1',
       autoCommit: args.autoCommit ?? false,
       profileId: args.profileId,
+      manualEnvVars: args.manualEnvVars,
+      setupCommands: args.setupCommands,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -697,6 +735,330 @@ describe('useNewSessionCreator upload gate', () => {
   });
 });
 
+describe('useNewSessionCreator in-flight draft edit', () => {
+  // The composer stays editable while a create is in flight (locking a focused
+  // Android input drops the IME and collapses the pinned footer), so the
+  // attempt must not silently discard a draft the user changed behind it.
+  it('cancels the attempt before dispatch when the draft changes during the upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', setIsCreating, attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // The create is still in flight; the user keeps typing.
+    promptRef.current = 'first draft, plus detail';
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    // The attempt never reached the server, so no session was created from the
+    // stale snapshot, and the edited draft is still the composer's text.
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+    expect(promptRef.current).toBe('first draft, plus detail');
+  });
+
+  it('creates normally when the draft is unchanged across the in-flight upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cancel a create whose trimmed body is unchanged by a whitespace-only edit', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // An IME/autocorrect composition commit that only adds trailing
+    // whitespace leaves the dispatched (trimmed) prompt identical, so it must
+    // not cancel a create whose body did not change.
+    promptRef.current = 'first draft ';
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the unsent attempt when the draft changes during the outbox load', async () => {
+    // The guard before dispatch only covers the upload; `prepareAgentSession`
+    // then awaits the outbox load and the safe-retry write while the composer
+    // stays editable. An edit in that window must abandon the still-unsent
+    // request instead of creating from the stale snapshot and clearing it.
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const setIsCreating = vi.fn(() => undefined);
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1', setIsCreating }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    // Let the immediate upload settle so the flow parks on the gated load.
+    await flushMicrotasks();
+
+    promptRef.current = 'first draft, plus detail';
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+    // The edited draft is the composer's text for the next Start.
+    expect(promptRef.current).toBe('first draft, plus detail');
+  });
+
+  it('does not abandon the unsent attempt for a whitespace-only edit during the outbox load', async () => {
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1' }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    await flushMicrotasks();
+
+    promptRef.current = 'first draft ';
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  // The strip keeps taking removes, reorders and (through an already-open
+  // picker) adds while a create is in flight, exactly like the prompt stays
+  // editable. `uploadPending()` builds its wire from the chip list it read
+  // *before* its awaits, so the create must re-check the visible chips before
+  // dispatching: an attachment the user removed must never ride the wire.
+  it('cancels the attempt before dispatch when the visible attachments change during the upload', async () => {
+    const uploadGate = deferred<{
+      ok: true;
+      wire: { path: string; files: string[] } | undefined;
+      submission: undefined;
+    }>();
+    const firstChip = attachmentChip('chip-1');
+    const secondChip = attachmentChip('chip-2');
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      attachments: [firstChip, secondChip],
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const input = createInput({
+      organizationId: 'org-1',
+      setIsCreating,
+      attachments: gatedAttachments,
+    });
+    const { renderer, resultRef } = mountCreatorWithRenderer(input);
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // The create is parked on the upload; the user removes the second chip.
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: {
+            ...input,
+            attachments: { ...gatedAttachments, attachments: [firstChip] },
+          },
+          resultRef,
+        })
+      );
+    });
+
+    await act(async () => {
+      // The snapshot the upload read still carries both files.
+      uploadGate.resolve({
+        ok: true,
+        wire: { path: 'p-1', files: ['chip-1.png', 'chip-2.png'] },
+        submission: undefined,
+      });
+      await attempt;
+    });
+
+    // No session may be created from a payload that disagrees with the chips
+    // the user is looking at; their strip stays for the next Start.
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+  });
+
+  it('cancels the unsent attempt when the visible attachments change during the outbox load', async () => {
+    const whenLoadedGate = deferred<boolean>();
+    outboxMock.whenLoaded.mockImplementationOnce(async () => whenLoadedGate.promise);
+    const firstChip = attachmentChip('chip-1');
+    const secondChip = attachmentChip('chip-2');
+    const attachmentsInput: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      attachments: [firstChip, secondChip],
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const input = createInput({
+      organizationId: 'org-1',
+      setIsCreating,
+      attachments: attachmentsInput,
+    });
+    const { renderer, resultRef } = mountCreatorWithRenderer(input);
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    // Let the immediate upload settle so the flow parks on the gated load.
+    await flushMicrotasks();
+
+    // The request is still unsent: the user reorders down to one chip.
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: {
+            ...input,
+            attachments: { ...attachmentsInput, attachments: [secondChip] },
+          },
+          resultRef,
+        })
+      );
+    });
+
+    await act(async () => {
+      whenLoadedGate.resolve(true);
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+  });
+
+  // Only the chip identity and order are the visible draft: an upload that
+  // advances progress while it runs must not cancel the create behind it.
+  it('creates normally when the chips only change upload status across the in-flight upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const firstChip = attachmentChip('chip-1');
+    const secondChip = attachmentChip('chip-2');
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      attachments: [firstChip, secondChip],
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const input = createInput({ organizationId: 'org-1', attachments: gatedAttachments });
+    const { renderer, resultRef } = mountCreatorWithRenderer(input);
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: {
+            ...input,
+            attachments: {
+              ...gatedAttachments,
+              attachments: [
+                { ...firstChip, progress: 1 },
+                { ...secondChip, status: 'uploading', progress: 0.5 },
+              ],
+            },
+          },
+          resultRef,
+        })
+      );
+    });
+
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useNewSessionCreator profileId', () => {
   it('passes profileId into prepareSession when an effective id exists', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());
@@ -716,6 +1078,36 @@ describe('useNewSessionCreator profileId', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('profileId');
+  });
+});
+
+describe('useNewSessionCreator manual configuration', () => {
+  it('sends the manual env vars and setup commands with the create', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      manualEnvVars: { API_KEY: 'sk-1' },
+      setupCommands: ['pnpm install'],
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      envVars: { API_KEY: 'sk-1' },
+      setupCommands: ['pnpm install'],
+    });
+  });
+
+  it('omits the manual config fields when the draft is empty', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ manualEnvVars: {}, setupCommands: [] });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('envVars');
+    expect(payload).not.toHaveProperty('setupCommands');
   });
 });
 

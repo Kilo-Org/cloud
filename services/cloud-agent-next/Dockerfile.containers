@@ -100,7 +100,11 @@ RUN cd /tmp/wrapper-build/wrapper && \
     rm -rf /tmp/wrapper-build
 
 # Keep PID 1 alive so the Durable Object's `exec` always has a running container to attach to.
-RUN printf '#!/bin/sh\nexec sleep infinity\n' > /usr/local/bin/kilo-containers-entrypoint \
+# The intercept CA is not baked in; the control wrapper trusts it when containment is enabled.
+RUN printf '%s\n' \
+	'#!/bin/sh' \
+	'exec sleep infinity' \
+	> /usr/local/bin/kilo-containers-entrypoint \
 	&& chmod +x /usr/local/bin/kilo-containers-entrypoint
 
 ENTRYPOINT ["/usr/local/bin/kilo-containers-entrypoint"]

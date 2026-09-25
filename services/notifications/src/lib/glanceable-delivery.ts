@@ -37,13 +37,28 @@ export type GlanceableApnsContentState = {
   props: string;
 };
 
-export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push_to_start' };
+export type IosActivityToken = {
+  token: string;
+  kind: 'ios_activity' | 'ios_push_to_start';
+  /**
+   * True when a newer registration replaced this row. A superseded row is not
+   * the live target, so it gets `end` and is retired once that end is confirmed.
+   * Optional so literals written before the singleton rule keep compiling.
+   */
+  superseded?: boolean;
+};
 export type ExpoPushToken = { token: string; locale: string | null };
 
 /**
- * Update eligible activities or end zero-count activities. Never start empty work.
- * A push-to-start token is used only when no activity target remains, avoiding
- * duplicate activities while allowing fresh work after terminal target retirement.
+ * Update the single live activity target or end zero-count activities. Never
+ * start empty work. A push-to-start token is used only when no activity target
+ * remains, avoiding duplicate activities while allowing fresh work after
+ * terminal target retirement.
+ *
+ * `tokens` arrives newest-first (`updated_at DESC, id DESC`), so the first
+ * `ios_activity` row that is not superseded is the one live card target. Every
+ * other activity row is an abandoned card: it gets `end` and its row is retired
+ * once that end is confirmed, so two rows can never leave two stacked cards.
  *
  * `startable` is the narrower rule the iOS sink starts on: an agent working,
  * waiting on the user, or scheduled to wake. Idle work keeps a card alive but
@@ -57,7 +72,13 @@ export function apnsSendsForTokens(
 ): { token: string; event: LiveActivityEvent }[] {
   const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
   if (activityTokens.length > 0) {
-    return activityTokens.map(({ token }) => ({ token, event: eligible ? 'update' : 'end' }));
+    // The first non-superseded row is the live target; `-1` (every row
+    // superseded) ends them all and lets the next pass raise fresh work.
+    const survivor = activityTokens.findIndex(token => token.superseded !== true);
+    return activityTokens.map(({ token }, index) => ({
+      token,
+      event: index === survivor && eligible ? 'update' : 'end',
+    }));
   }
   return startable
     ? tokens

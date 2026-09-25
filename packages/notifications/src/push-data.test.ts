@@ -192,6 +192,33 @@ describe('pushDataSchema cloud_agent_session', () => {
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
+
+  it('parses an organization session and keeps its organizationId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      organizationId: 'org-1',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('parses a personal session without an organizationId (optional field)', () => {
+    const payload = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' };
+    const parsed = pushDataSchema.parse(payload);
+    expect(parsed).toEqual(payload);
+    expect('organizationId' in parsed).toBe(false);
+  });
+
+  it('rejects an empty organizationId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      organizationId: '',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
 });
 
 describe('pushDataSchema unknown type', () => {

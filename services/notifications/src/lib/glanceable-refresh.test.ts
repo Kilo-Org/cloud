@@ -1232,6 +1232,69 @@ describe('refreshGlanceableSnapshot delivery window', () => {
   });
 });
 
+describe('dropFencedStarts fence release', () => {
+  function startFenceKey(token: string): string {
+    return `glanceable-ios-start:${JSON.stringify(token)}`;
+  }
+
+  function registration(
+    token: string,
+    kind: 'ios_activity' | 'ios_push_to_start',
+    superseded = false
+  ) {
+    return { token, kind, superseded, id: `${token}-id`, updated_at: '2026-09-18T00:00:00.000Z' };
+  }
+
+  it('keeps every push-to-start fence while two live activity rows leave the scope unsettled', async () => {
+    const h = makeHarness();
+    const base = Date.parse('2026-09-18T00:00:00.000Z');
+    const fenceKey = startFenceKey('push-token');
+    await h.storage.put(fenceKey, Date.now() + 60 * 60 * 1000);
+    h.deps.listIosActivityTokens = async () => [
+      registration('activity-new', 'ios_activity'),
+      registration('activity-old', 'ios_activity'),
+      registration('push-token', 'ios_push_to_start'),
+    ];
+
+    await refreshGlanceableSnapshot(
+      { userId: 'user-two-cards', organizationId: null },
+      asStorage(h.storage),
+      h.deps,
+      () => base
+    );
+
+    // Two live rows are not one settled card, so the fence must survive: a
+    // released fence would let a later refresh raise a second Lock Screen card.
+    expect(await h.storage.get(fenceKey)).toBeDefined();
+    expect(h.iosSends).toHaveLength(1);
+    expect(h.iosSends[0].some(send => send.event === 'start')).toBe(false);
+  });
+
+  it('releases every push-to-start fence once exactly one live activity row settles the scope', async () => {
+    const h = makeHarness();
+    const base = Date.parse('2026-09-18T00:00:00.000Z');
+    let now = base;
+    const scope = { userId: 'user-one-card', organizationId: null };
+    const fenceKey = startFenceKey('push-token');
+    await h.storage.put(fenceKey, Date.now() + 60 * 60 * 1000);
+    h.deps.listIosActivityTokens = async () => [
+      registration('activity-live', 'ios_activity'),
+      registration('push-token', 'ios_push_to_start'),
+    ];
+
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(await h.storage.get(fenceKey)).toBeUndefined();
+    expect(h.iosSends[0]).toEqual([{ token: 'activity-live', event: 'update' }]);
+
+    // With the fence released, a scope whose live row is gone may raise the
+    // push-to-start card on a later refresh.
+    now = base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    h.deps.listIosActivityTokens = async () => [registration('push-token', 'ios_push_to_start')];
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.iosSends[1]).toEqual([{ token: 'push-token', event: 'start' }]);
+  });
+});
+
 describe('NotificationChannelDO alarm glanceable flush', () => {
   it('re-arms a due record whose build returns no snapshot and keeps the later deadline', async () => {
     const id = env.NOTIFICATION_CHANNEL_DO.idFromName('user-glanceable-alarm');

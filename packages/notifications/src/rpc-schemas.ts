@@ -190,6 +190,20 @@ export const refreshGlanceableSessionsInputSchema = z.object({
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
+// ── glanceable scope refresh (POST /internal/v1/glanceable-refresh) ──
+//
+// Identity only: the notifications worker reads the scope's activity rows and
+// builds the snapshot itself. Registering a replacement iOS activity token
+// retires the previous live row, and only a refresh sends the retired token its
+// `end`, so the web router asks for one at registration instead of waiting for
+// the next agent-session transition to drive a delivery pass.
+
+export const glanceableScopeRefreshRequestSchema = z.object({
+  userId: z.string().min(1),
+  organizationId: z.string().min(1).nullable(),
+});
+export type GlanceableScopeRefreshRequest = z.infer<typeof glanceableScopeRefreshRequestSchema>;
+
 // ── sendSessionReadyNotification ────────────────────────────────────
 
 export const sendSessionReadyNotificationInputSchema = z.object({

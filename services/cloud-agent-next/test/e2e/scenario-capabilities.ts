@@ -12,6 +12,8 @@
 import type { ApiVersion } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { SandboxFaultReapEvidence } from './sandbox-fault-evidence.js';
+import { cleanupRemoteSession } from './scenarios-shared.js';
+import { createOwnedSessionRegistry } from './scenarios-shared-runtime.js';
 
 export type Profile = 'local' | 'deployed' | 'local-http';
 
@@ -193,6 +195,48 @@ export type SandboxFaultObservation = {
     messageId?: string;
     signal?: AbortSignal;
   }): Promise<SandboxFaultReapEvidence>;
+  /**
+   * Byte offset at the current end of the local worker log, for a later bounded
+   * read. The same cursor `captureEvidenceCursor` returns; the control-socket
+   * scenarios correlate against it before signalling.
+   */
+  captureWorkerLogCursor(): Promise<number>;
+  /**
+   * Drop the owned container's control socket during the first attach and prove
+   * from existing worker diagnostics that it closed and reconnected. It refuses
+   * unless `containerId` still matches the observed owned container and its
+   * control wrapper still matches `expectedWrapperInstanceId`, then signals
+   * `SIGUSR1` to that captured process and requires, after a cursor captured
+   * immediately before the signal, the ordered sequence `socket_closed` (this
+   * attach connection, handshake complete) -> `handshake_committed` (a new
+   * connection) -> `wrapper_ready` (that same new connection), all carrying the
+   * same wrapper instance. An attach `socket_response` observed before that
+   * close is a missed window and throws `attach window missed` (the only
+   * retryable outcome); one observed after the close throws
+   * `attach response after close`. Throws on any other deviation, including a
+   * no-op signal.
+   */
+  dropControlSocketDuringAttach(input: {
+    fromByte: number;
+    sessionId: string;
+    kiloSessionId: string;
+    containerId: string;
+    expectedWrapperInstanceId: string;
+    waitForAttachMs: number;
+  }): Promise<{
+    attachRequestId: string;
+    attachConnectionId: string;
+    closedConnectionId: string;
+    readyConnectionId: string;
+    wrapperInstanceId: string;
+    signaledPid: number;
+  }>;
+  /**
+   * Count the `socket_request_sent` records for `session.prompt` on the session
+   * written after `fromByte`. The caller asserts exactly one dispatch for the
+   * turn.
+   */
+  countPromptDispatches(input: { fromByte: number; sessionId: string }): Promise<number>;
 };
 
 export type ScenarioEnvironment = {
@@ -324,7 +368,9 @@ export function isScenarioSupported(
  *    because it observes identity through the e2e surface;
  * 4. a declared or profile-mandatory capability that is absent → explicit
  *    `unsupported`;
- * 5. otherwise run the scenario.
+ * 5. otherwise run the scenario. Under the deployed profile the gate also owns
+ *    session teardown: the run receives a composed config that records every id
+ *    a create reports, and the ids are released after the run (see below).
  */
 export async function runSharedScenario(
   def: RunnableSharedScenario,
@@ -364,5 +410,18 @@ export async function runSharedScenario(
     };
   }
 
-  return def.run({ ...args, api: resolvedApi.api }, env);
+  // The deployed profile now owns session teardown. The cleanup composes the
+  // scenario's own `onSessionCreated`, so an id is recorded as soon as a create
+  // reports it and is released even if a later assertion throws. The `local`
+  // and `local-http` profiles keep their existing external cleanup.
+  if (env.profile !== 'deployed') {
+    return def.run({ ...args, api: resolvedApi.api }, env);
+  }
+
+  const owned = createOwnedSessionRegistry(args.config, cleanupRemoteSession);
+  try {
+    return await def.run({ ...args, api: resolvedApi.api, config: owned.config }, env);
+  } finally {
+    await owned.cleanup(def.name);
+  }
 }

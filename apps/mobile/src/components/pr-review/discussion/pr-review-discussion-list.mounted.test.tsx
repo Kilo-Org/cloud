@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive list suite: the viewer-query and hidden-author cases share the same list mock harness, and both empty-state paths (the tab's `emptyState` prop and the list's own fallback) need their own cases. */
 import { type ComponentProps, createElement, Fragment, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,6 +18,10 @@ const observed = vi.hoisted(() => ({
   blockedLogins: [] as string[],
   mutedLogins: [] as string[],
 }));
+
+// The hidden-author suites drive the same hoisted fixtures under this name, so
+// the mocked moderation query answers whichever name a test set state on.
+const moderation = observed;
 
 // Records every query the list mounts and answers the overview with a viewer
 // login, so a test can assert BOTH which namespace was asked and what the
@@ -323,6 +328,92 @@ describe('PrReviewDiscussionList visible content', () => {
       projectPath: 'group/sub/repo',
       mrIid: 12,
     });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('PrReviewDiscussionList hidden-author filtering', () => {
+  beforeEach(() => {
+    moderation.blockedLogins = [];
+    moderation.mutedLogins = [];
+  });
+
+  it('renders the tab empty state, not the rows, when every author is hidden', () => {
+    moderation.blockedLogins = ['octocat'];
+
+    const renderer = mountList(undefined, { emptyState: createElement('EmptyStateMarker') });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the load-more footer reachable under the filtered-empty state', () => {
+    moderation.blockedLogins = ['octocat'];
+
+    const renderer = mountList(undefined, {
+      emptyState: createElement('EmptyStateMarker'),
+      hasNextPage: true,
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(1);
+    expect(
+      renderer.root
+        .findAll(node => String(node.type) === 'Button')
+        .map(button => button.props.accessibilityLabel)
+    ).toContain('prReview.discussion.loadMoreComments');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the later-page retry reachable under the filtered-empty state', () => {
+    moderation.mutedLogins = ['octocat'];
+
+    const renderer = mountList(undefined, {
+      emptyState: createElement('EmptyStateMarker'),
+      laterPageError: true,
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(1);
+    expect(
+      renderer.root
+        .findAll(node => String(node.type) === 'Button')
+        .map(button => button.props.accessibilityLabel)
+    ).toContain('prReview.discussion.retryLoadingMore');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the rows and drops the empty state when the author is visible', () => {
+    const renderer = mountList(undefined, { emptyState: createElement('EmptyStateMarker') });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders no copy of its own when no empty state was handed down', () => {
+    moderation.blockedLogins = ['octocat'];
+
+    const renderer = mountList();
+
+    // The copy belongs to the tab; the list never invents a message. With no
+    // empty state to fall back to, it keeps the list contract (here: no rows).
+    expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

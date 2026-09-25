@@ -41,6 +41,10 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // PR that can be opened from the notification. Absent on status pushes.
     attentionKind: z.enum(['question', 'permission']).optional(),
     prUrl: z.string().optional(),
+    // The session's organization, so a tap can land the app in the context
+    // the session belongs to. Optional so a push from an older producer in a
+    // rolling deploy still validates; absent means Personal.
+    organizationId: nonEmptyStringSchema.optional(),
   }),
   z.object({
     type: z.literal('low_balance'),

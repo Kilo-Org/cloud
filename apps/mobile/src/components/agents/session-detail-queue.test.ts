@@ -598,6 +598,7 @@ function makeManager() {
       remoteModelOverride: { value: null },
       cloudAgentModelOverride: { value: null },
       availableCommands: { value: [] },
+      availableCommandsCatalogStatus: { value: null },
       sessionInfo: { value: null },
       remoteCommandState: { value: null },
       contextUsage: { value: null },

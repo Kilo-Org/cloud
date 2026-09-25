@@ -107,9 +107,7 @@ export async function registerVersionIfNeeded(
   return true;
 }
 
-// ---------------------------------------------------------------------------
 // KV Tag Index
-// ---------------------------------------------------------------------------
 
 /**
  * Add a tag to the KV index if not already present.
@@ -173,9 +171,7 @@ async function rebuildIndex(kv: KVNamespace): Promise<string[]> {
   return tags;
 }
 
-// ---------------------------------------------------------------------------
 // Resolve a specific version by image tag (for pinned users)
-// ---------------------------------------------------------------------------
 
 /**
  * Find a version entry in KV by its image tag.
@@ -238,9 +234,7 @@ export async function resolveVersionByTag(
   return null;
 }
 
-// ---------------------------------------------------------------------------
 // List all versions (for admin tooling / triggerSync)
-// ---------------------------------------------------------------------------
 
 /**
  * List all registered image versions by scanning KV keys with prefix `image-version:`.

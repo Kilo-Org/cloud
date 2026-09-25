@@ -29,11 +29,11 @@ import { needsInAppFeedbackPrompt } from '@/lib/feedback-prompt-platform';
 export function useFeedbackPrompt() {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>(undefined);
-  const mounted = useRef(true);
+  const isMountedRef = useRef(true);
   useEffect(() => {
-    mounted.current = true;
+    isMountedRef.current = true;
     return () => {
-      mounted.current = false;
+      isMountedRef.current = false;
     };
   }, []);
   const requestPrompt = useCallback((nextUserId: string | undefined) => {
@@ -41,7 +41,7 @@ export function useFeedbackPrompt() {
       showFeedbackPrompt(nextUserId);
       return true;
     }
-    if (!mounted.current) {
+    if (!isMountedRef.current) {
       return false;
     }
     setUserId(nextUserId);

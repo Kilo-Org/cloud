@@ -312,7 +312,23 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           sessions={sessions}
           failureLabel={t('home.couldNotLoadActiveSessions')}
         />
-        {content === 'pending' && <Skeleton className="min-h-[72px] w-full rounded-2xl" />}
+        {content === 'pending' && (
+          // The placeholder borrows the real row's geometry: the same card,
+          // the same row padding, and a 3px leading strip glued to the card
+          // edge like `SessionRow`'s `stripMode="edge"` in `AgentBadge`. The
+          // title/eyebrow therefore land on the same x-offset the arriving row
+          // draws, and the leading mark keeps its size, so replacing the
+          // placeholder with the row cannot reflow the LIVE NOW card.
+          <View className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card">
+            <View className="relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3">
+              <Skeleton className="absolute left-0 top-0 bottom-0 w-[3px] rounded-[2px]" />
+              <View className="flex-1 gap-2">
+                <Skeleton className="h-3 w-2/3 rounded" />
+                <Skeleton className="h-3 w-1/3 rounded" />
+              </View>
+            </View>
+          </View>
+        )}
         {content === 'empty' && (
           <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
             <Text variant="muted" className="text-sm">

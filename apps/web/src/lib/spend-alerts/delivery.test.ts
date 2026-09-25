@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
@@ -165,10 +165,9 @@ afterEach(async () => {
       .where(inArray(spend_alert_deliveries.id, createdDeliveryIds));
     createdDeliveryIds.length = 0;
   }
-});
-
-afterAll(async () => {
   if (createdOrganizationIds.length > 0) {
+    // This cleanup cannot live in an `afterAll`: the jest worker teardown closes
+    // the database pool in its own `afterAll`, which runs first.
     await db.delete(organizations).where(inArray(organizations.id, createdOrganizationIds));
     createdOrganizationIds.length = 0;
   }

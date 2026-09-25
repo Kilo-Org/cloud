@@ -247,8 +247,16 @@ jobs:
       - name: Tag release
         run: |
           TAG="kilo-app-release/$(date -u +%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
-          git tag "$TAG"
-          git push origin "$TAG"
+          # The tag name is deterministic, so a rerun of this commit recomputes
+          # the tag a failed attempt already pushed. Reuse it: the failure that
+          # needs a rerun is usually the release publication below, and that must
+          # not be blocked by the tag the failed attempt created.
+          if git ls-remote --exit-code --tags origin "$TAG" > /dev/null 2>&1; then
+            echo "Tag $TAG already exists — reusing it."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
       # The SBOMs live with the build, so a user who holds an artifact can
@@ -278,10 +286,20 @@ jobs:
             "\n\nThe SHA-256 names the artifact submitted to the store, the same bytes the SBOM describes.\n"
           ' "$SUMMARY" > "$NOTES"
 
-          gh release create "$RELEASE_TAG" \
-            --title "kilo-app $APP_VERSION (iOS build $IOS_BUILD, Android build $ANDROID_BUILD) — EAS builds $IOS_BUILD_ID, $ANDROID_BUILD_ID" \
-            --notes-file "$NOTES" \
-            apps/mobile/artifacts/*.cyclonedx.json
+          TITLE="kilo-app $APP_VERSION (iOS build $IOS_BUILD, Android build $ANDROID_BUILD) — EAS builds $IOS_BUILD_ID, $ANDROID_BUILD_ID"
+
+          # Publication must survive a rerun: the tag above can already carry a
+          # release when a previous attempt failed during the upload, and that
+          # release has to receive the assets instead of failing the rerun.
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "$TITLE" --notes-file "$NOTES"
+            gh release upload "$RELEASE_TAG" apps/mobile/artifacts/*.cyclonedx.json --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "$TITLE" \
+              --notes-file "$NOTES" \
+              apps/mobile/artifacts/*.cyclonedx.json
+          fi
 
   # A store release needs a version string that was not released before, so the
   # marketing version is patch-bumped for the next one. This runs beside

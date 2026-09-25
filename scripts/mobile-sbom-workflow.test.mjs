@@ -141,6 +141,44 @@ test('every production build generates, retains and publishes a per-artifact SBO
   }
 });
 
+test('the SBOM release path is idempotent so a failed publication can be retried', () => {
+  const workflow = readYaml(releasePath);
+  const job = workflow.jobs[jobName];
+
+  // The tag name is deterministic, so a rerun of the same commit recomputes the
+  // tag the failed attempt pushed. The tag step must reuse it, or the rerun
+  // dies before it can publish the missing assets.
+  const tagRelease = requireStep(job, step => step.name === 'Tag release', 'the Tag release step');
+  assert.ok(
+    (tagRelease.run ?? '').includes('ls-remote --exit-code --tags'),
+    'Tag release must reuse a tag the failed attempt already pushed'
+  );
+
+  // A rerun must reach the release the failed attempt created and republish the
+  // assets instead of failing on the existing release.
+  const release = requireStep(
+    job,
+    step => (step.run ?? '').includes('gh release create'),
+    'a gh release create step'
+  );
+  assert.ok(
+    (release.run ?? '').includes('gh release view'),
+    'the release step must detect an existing release'
+  );
+  assert.ok(
+    (release.run ?? '').includes('gh release edit'),
+    'an existing release must have its metadata refreshed'
+  );
+  assert.ok(
+    (release.run ?? '').includes('gh release upload'),
+    'an existing release must receive the assets'
+  );
+  assert.ok(
+    (release.run ?? '').includes('--clobber'),
+    'republishing the assets must overwrite the previous upload'
+  );
+});
+
 test('a generated SBOM and the downloaded artifacts cannot be committed', () => {
   const lines = readFileSync(new URL(`../${gitignorePath}`, import.meta.url), 'utf8').split('\n');
   assert.ok(

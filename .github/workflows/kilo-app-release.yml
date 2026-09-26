@@ -331,12 +331,18 @@ jobs:
       # same commit pushes a second, distinct marker instead of failing on a
       # name that already exists. An annotated tag needs a tagger identity; the
       # runner has none.
+      # The marker points at the current tip of main, not at this run's commit:
+      # only its name and creatordate are read. GitHub refuses a GITHUB_TOKEN
+      # tag push when the tagged commit's .github/workflows differs from every
+      # branch tip, so tagging HEAD fails whenever a workflow change merges
+      # while this run builds.
       - name: Mark the iOS upload
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           MARKER="kilo-app-upload/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git tag -a "$MARKER" -m "$MARKER"
+          git fetch --no-tags --depth=1 origin main
+          git tag -a "$MARKER" -m "$MARKER" FETCH_HEAD
           git push origin "$MARKER"
 
       - name: Submit iOS

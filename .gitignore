@@ -14,6 +14,7 @@ node_modules/
 /out/
 /build
 packages/trpc/dist/
+packages/harness-sdk/dist/
 **/wrapper/dist/
 *.tsbuildinfo
 next-env.d.ts

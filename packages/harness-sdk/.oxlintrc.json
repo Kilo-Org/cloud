@@ -1,0 +1,93 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["oxc", "typescript", "unicorn", "import", "promise", "node", "vitest"],
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error"
+  },
+  "env": {
+    "builtin": true,
+    "node": true,
+    "es2024": true
+  },
+  "rules": {
+    "no-console": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/explicit-module-boundary-types": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ],
+    "import/no-named-export": "off",
+    "import/no-default-export": "error",
+    "no-ternary": "off",
+    "new-cap": [
+      "error",
+      {
+        "capIsNewExceptions": ["Tag", "GenericTag", "TaggedError", "TaggedClass"]
+      }
+    ],
+    "sort-imports": "off",
+    "vitest/no-importing-vitest-globals": "off",
+    "vitest/prefer-to-be-truthy": "off",
+    "id-length": "off",
+    "import/consistent-type-specifier-style": "off",
+    "max-classes-per-file": "off",
+    "sort-keys": "off",
+    "no-magic-numbers": "off",
+    "promise/prefer-await-to-then": "off",
+    "require-await": "off",
+    "typescript/require-await": "off",
+    "unicorn/no-array-callback-reference": "off",
+    "import/prefer-default-export": "off",
+    "func-names": "off",
+    "unicorn/no-array-method-this-argument": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*-fixture.ts"],
+      "rules": {
+        "typescript/explicit-module-boundary-types": "off",
+        "import/max-dependencies": "off"
+      }
+    },
+    {
+      "files": ["src/index.test.ts"],
+      "rules": {
+        "import/no-namespace": "off"
+      }
+    },
+    {
+      "files": ["src/index.ts"],
+      "rules": {
+        "unicorn/require-module-specifiers": "off"
+      }
+    },
+    {
+      "files": [
+        "src/plugins/store/node.ts",
+        "src/plugins/store/*.test.ts",
+        "src/plugins/conformance.test.ts",
+        "src/core/resume-fixture.ts",
+        "src/core/image.test.ts"
+      ],
+      "rules": {
+        "import/no-nodejs-modules": "off",
+        "unicorn/no-null": "off"
+      }
+    }
+  ]
+}

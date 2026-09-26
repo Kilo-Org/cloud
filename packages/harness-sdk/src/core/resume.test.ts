@@ -1,0 +1,225 @@
+import { Effect } from 'effect';
+import { expect, it } from 'vitest';
+import { asked, bench, options, prompted } from './resume-fixture.js';
+import { cloneSession, continueSession, SessionNotFoundError } from './resume.js';
+import { openSession } from './run.js';
+import { texts } from './session-fixture.js';
+import { textIn } from './prompt.js';
+
+it('carries the turns of an earlier run into the next one', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session =>
+      Effect.as(asked(session, 'the first question'), session.id)
+    )
+  );
+
+  const carried = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => session.history)
+  );
+
+  expect(texts(carried.value)).toEqual(['user:the first question', 'assistant:an answer']);
+});
+
+it('reopens with the options it was stored with, not the ones a caller has now', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const resumed = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
+  );
+
+  /* The system prompt is the front of the cached prefix. A resumed session that
+     took a system prompt from its caller would drop the prefix on this call. */
+  expect(resumed.calls[0]?.prompt.system[0]?.text).toBe(options.system);
+  expect(resumed.calls[0]?.model).toBe(options.model);
+});
+
+it('asks the next question with the whole restored conversation in front of it', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const resumed = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
+  );
+
+  expect(resumed.calls[0]?.prompt.messages.map(textIn)).toEqual(['first', 'an answer', 'second']);
+});
+
+it('refuses an identifier the store has never held', async () => {
+  const desk = bench();
+
+  const failed = await desk.run(Effect.flip(continueSession('ses_nothing')));
+
+  expect(failed.value).toBeInstanceOf(SessionNotFoundError);
+});
+
+it('gives a clone its own identifier and its own turns', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const cloned = await desk.run(
+    Effect.flatMap(cloneSession(opened.value), session =>
+      Effect.map(session.history, turns => ({ id: session.id, turns }))
+    )
+  );
+
+  expect(cloned.value.id).not.toBe(opened.value);
+  /* A copied turn identifier would collide on the primary key, and every
+     identifier also carries the order the turns are read back in. */
+  const ids = cloned.value.turns.map(turn => turn.id);
+  expect(new Set(ids).size).toBe(2);
+  expect(texts(cloned.value.turns)).toEqual(['user:first', 'assistant:an answer']);
+});
+
+it('sends a clone the same prompt bytes as the session it came from', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  /* The clone goes first. Continuing the original would append to it, and the
+     two would then be compared at different lengths. */
+  const clone = await desk.run(
+    Effect.flatMap(cloneSession(opened.value), session => asked(session, 'next'))
+  );
+  const original = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'next'))
+  );
+
+  /* This is what makes a clone cheap: the prefix is identical, so the model
+     reads it from its cache instead of building it again. */
+  expect(prompted(clone.calls[0])).toBe(prompted(original.calls[0]));
+});
+
+it('leaves the original alone when the clone is asked something', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  await desk.run(
+    Effect.flatMap(cloneSession(opened.value), session => asked(session, 'only on the branch'))
+  );
+  const original = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => session.history)
+  );
+
+  expect(texts(original.value)).toEqual(['user:first', 'assistant:an answer']);
+});
+
+/**
+ * Moving a conversation to another model.
+ *
+ * A session freezes its model, so this is the only way there is: the turns are
+ * copied onto a session opened on the other one. What cannot come with them is
+ * the thinking, because a provider reads back the signature it issued and
+ * refuses one it did not.
+ */
+it('opens the copy on the model it was moved onto', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const moved = await desk.run(
+    Effect.flatMap(cloneSession(opened.value, { model: 'z-ai/glm-5.3-flash' }), session =>
+      asked(session, 'next')
+    )
+  );
+
+  expect(moved.calls[0]?.model).toBe('z-ai/glm-5.3-flash');
+  /* The system prompt still comes from the store: the model moves, and
+     everything the caller never asked to change stays as it was. */
+  expect(moved.calls[0]?.prompt.system[0]?.text).toBe(options.system);
+});
+
+it('leaves the thinking behind when the copy moves to another model', async () => {
+  const desk = bench({ reply: { deltas: ['an answer'], reasoning: ['because of this'] } });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const moved = await desk.run(
+    Effect.flatMap(
+      cloneSession(opened.value, { model: 'z-ai/glm-5.3-flash' }),
+      session => session.history
+    )
+  );
+
+  const kinds = moved.value.flatMap(turn => turn.parts.map(part => part.kind));
+  expect(kinds).not.toContain('reasoning');
+  /* Everything else is still there. The conversation moved; only the signed
+     thinking, which no other model can read back, did not. */
+  expect(texts(moved.value)).toEqual(['user:first', 'assistant:an answer']);
+});
+
+it('keeps the thinking when the copy stays on the same model', async () => {
+  const desk = bench({ reply: { deltas: ['an answer'], reasoning: ['because of this'] } });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const branched = await desk.run(
+    Effect.flatMap(cloneSession(opened.value), session => session.history)
+  );
+
+  const kinds = branched.value.flatMap(turn => turn.parts.map(part => part.kind));
+  expect(kinds).toContain('reasoning');
+});
+
+/**
+ * A resumed session knows how full it is.
+ *
+ * The compaction trigger is the provider's own count of the last request, and
+ * nothing here estimates one. So the count is stored beside the session and
+ * read back with it: a session reopened onto a conversation that already fills
+ * the window compacts before it asks anything, rather than sending the whole
+ * thing once and learning from the answer.
+ */
+it('compacts before its first question when the stored count fills the window', async () => {
+  const desk = bench({
+    window: 1000,
+    reply: { deltas: ['an answer'], usage: { inputTokens: 900, cacheReadTokens: 0 } },
+  });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const resumed = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
+  );
+
+  /* Two calls: the summary, then the question. The first answer reported 900
+     of a 1000 window, and that is what the store handed back. */
+  expect(resumed.calls).toHaveLength(2);
+  const sent = resumed.calls[1]?.prompt.messages.map(textIn) ?? [];
+  expect(sent).toHaveLength(2);
+  expect(sent[0]).toContain('Summary of the conversation');
+  expect(sent[1]).toBe('second');
+});
+
+it('reopens a compacted session without compacting it again', async () => {
+  const desk = bench({
+    window: 1000,
+    reply: { deltas: ['an answer'], usage: { inputTokens: 900, cacheReadTokens: 0 } },
+  });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+  await desk.run(Effect.flatMap(continueSession(opened.value), session => session.compact));
+
+  const resumed = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
+  );
+
+  /* One call. A compaction records zero, because the next request starts from
+     the summary; a store that kept the old count would summarise the summary. */
+  expect(resumed.calls).toHaveLength(1);
+});

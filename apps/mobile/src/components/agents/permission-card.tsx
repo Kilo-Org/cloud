@@ -3,6 +3,7 @@ import { type Text as RNText, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -16,6 +17,11 @@ import { permissionToolLabel } from '@/components/agents/permission-tool-label';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+
+// `metadata` is an untyped transport payload. Decode the one field that is
+// display copy instead of narrowing its raw `unknown` shape with a runtime
+// check.
+const commandSchema = z.string();
 
 type PermissionCardProps = {
   permission: string;
@@ -96,6 +102,11 @@ export function PermissionCard({
   // never offer Always Allow for them.
   const isSkillShell = metadata?.skillShell === true;
 
+  // Only the command is display copy. Other metadata entries are control flags
+  // or machine payloads and must not reach the card as raw key/value rows.
+  const parsedCommand = commandSchema.safeParse(metadata?.command);
+  const command = parsedCommand.success ? parsedCommand.data : null;
+
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
@@ -132,13 +143,12 @@ export function PermissionCard({
             </View>
           ) : null}
 
-          {metadata && Object.keys(metadata).length > 0 ? (
-            <View className="gap-1">
-              {Object.entries(metadata).map(([key, value]) => (
-                <Text key={key} className="text-xs text-muted-foreground">
-                  {key}: {String(value)}
-                </Text>
-              ))}
+          {command ? (
+            <View className="gap-1 rounded-lg bg-muted p-2">
+              <Text className="text-xs font-medium text-muted-foreground">
+                {t('profiles.commandLabel')}
+              </Text>
+              <Text className="text-xs text-muted-foreground">{command}</Text>
             </View>
           ) : null}
         </View>

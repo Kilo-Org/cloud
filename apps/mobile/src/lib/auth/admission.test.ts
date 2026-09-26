@@ -68,7 +68,9 @@ const originalFetch = globalThis.fetch;
  * would fail on an already-read body.
  */
 function setupChallengeFetch(challenge = 'server-challenge') {
-  const fn = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ challenge }));
+  const fn = vi
+    .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    .mockResolvedValue(Response.json({ challenge }));
   globalThis.fetch = fn;
   return fn;
 }
@@ -254,7 +256,9 @@ describe('getAdmission', () => {
   });
 
   it('throws a retryable error when the challenge endpoint fails', async () => {
-    globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 500 }));
+    globalThis.fetch = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response(null, { status: 500 }));
     const getAdmission = await loadGetAdmission();
 
     await expect(getAdmission()).rejects.toThrow(ADMISSION_CHALLENGE_FAILED);

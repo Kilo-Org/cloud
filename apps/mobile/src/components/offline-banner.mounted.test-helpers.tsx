@@ -16,7 +16,8 @@ import { OfflineBanner } from './offline-banner';
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 
 /** The fetch transport the tRPC client answers with; scripted per test. */
-export const transport = vi.fn<typeof fetch>();
+export const transport =
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 const settingsData = {
   isEnabled: false,

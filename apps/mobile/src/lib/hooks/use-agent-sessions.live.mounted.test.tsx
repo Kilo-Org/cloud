@@ -248,7 +248,7 @@ describe('live query presentation and refresh contracts', () => {
   it.each(['cancel', 'sign-out'])(
     'rejects a fallback result after %s without publishing late data',
     async boundary => {
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => cached });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => cached });
       await render();
       const network = deferred<CachedActiveSessionsData>();
       state.request.mockReturnValue(network.promise);

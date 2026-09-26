@@ -123,7 +123,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
       const loadedProducts = await loadAppStoreKiloPassProducts({
         fetchStoreProducts: options.fetchStoreProducts,
         loadBackendProducts: async () => {
-          const backendResponse = await queryClient.fetchQuery(
+          const backendResponse = await queryClient.query(
             backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return backendResponse;

@@ -1,5 +1,79 @@
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+  WorkspaceFailureSubtype,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
+import { wrapperRestoreTelemetrySchema } from './wrapper-bootstrap.js';
+
+// Bounded assistant-failure facts are duplicated locally (type-only import
+// above) so the standalone wrapper bundle never contains worker-utils. The
+// exhaustiveness guards and the equality test in
+// control-plane-failure-fence.test.ts contain the drift risk.
+export const CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES = [
+  'insufficient_credits',
+  'rate_limited',
+  'model_unavailable',
+  'provider_authentication',
+  'provider_unavailable',
+  'timeout',
+  'invalid_request',
+  'context_limit',
+  'output_limit',
+  'content_filter',
+  'structured_output',
+  'unknown',
+] as const satisfies readonly CloudAgentAssistantFailureReason[];
+
+export const CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES = [
+  'managed',
+  'byok',
+  'unknown',
+] as const satisfies readonly CloudAgentProviderOwnership[];
+
+// Same duplication rule as the assistant-failure facts above: the wrapper
+// carries a git workspace subtype on an attach rejection, so the enum is
+// mirrored locally to keep the standalone wrapper bundle free of worker-utils.
+export const CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES = [
+  'git_clone_timeout',
+  'git_checkout_timeout',
+  'git_authentication_failed',
+  'git_rate_limited',
+  'git_network_failed',
+  'git_pack_corrupt',
+  'git_checkout_conflict',
+  'git_branch_missing',
+  'sandbox_storage_full',
+  'kilo_import_timeout',
+  'kilo_import_failed',
+  'setup_command_timeout',
+  'setup_command_failed',
+  'workspace_setup_unknown',
+] as const satisfies readonly WorkspaceFailureSubtype[];
+
+type AssertNever<_T extends never> = true;
+type _AssistantFailureReasonDriftGuard = AssertNever<
+  Exclude<
+    CloudAgentAssistantFailureReason,
+    (typeof CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES)[number]
+  >
+>;
+type _ProviderOwnershipDriftGuard = AssertNever<
+  Exclude<CloudAgentProviderOwnership, (typeof CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES)[number]>
+>;
+type _WorkspaceFailureSubtypeDriftGuard = AssertNever<
+  Exclude<WorkspaceFailureSubtype, (typeof CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES)[number]>
+>;
+
+const cloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES);
+const cloudAgentProviderOwnershipSchema = z.enum(CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES);
+// An unrecognized subtype from a newer wrapper degrades to absent rather than
+// failing the whole response parse, so the field stays additive.
+const workspaceFailureSubtypeSchema = z
+  .enum(CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES)
+  .optional()
+  .catch(undefined);
 
 export {
   MAX_WORKTREE_CHANGES_BYTES,
@@ -52,11 +126,30 @@ export class SandboxAcquisitionLostError extends Error {
   }
 }
 
-export function isSandboxAcquisitionLostError(error: unknown): boolean {
+export const SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE =
+  'Sandbox acquisition was superseded by a bindable live replacement allocation';
+
+export class SandboxAcquisitionSupersededError extends Error {
+  constructor(message: string = SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE) {
+    super(message);
+    this.name = 'SandboxAcquisitionSupersededError';
+  }
+}
+
+export function isSandboxAcquisitionSupersededError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.name === 'SandboxAcquisitionLostError' ||
-      error.message === SANDBOX_ACQUISITION_LOST_MESSAGE)
+    (error.name === 'SandboxAcquisitionSupersededError' ||
+      error.message === SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE)
+  );
+}
+
+export function isSandboxAcquisitionLostError(error: unknown): boolean {
+  return (
+    isSandboxAcquisitionSupersededError(error) ||
+    (error instanceof Error &&
+      (error.name === 'SandboxAcquisitionLostError' ||
+        error.message === SANDBOX_ACQUISITION_LOST_MESSAGE))
   );
 }
 
@@ -65,6 +158,7 @@ export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
 export const SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS = 10_000;
 export const SANDBOX_CONTROL_OPERATION_LIMIT = 32;
+export const SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT = 2048;
 export const SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS = 90_000;
 export const SANDBOX_CONTROL_OUTCOME_RETRY_MS = 1_000;
 export const SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS = 3;
@@ -157,6 +251,7 @@ export const controlErrorSchema = z.object({
   message: z.string(),
   retryable: z.boolean(),
   admission: z.literal('not-admitted').optional(),
+  subtype: workspaceFailureSubtypeSchema,
 });
 
 export const requestFrameSchema = z.object({
@@ -205,15 +300,14 @@ export const sandboxHelloPayloadSchema = z.object({
   capabilities: z
     .object({
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
 });
@@ -225,14 +319,12 @@ export const sandboxHelloResultSchema = z.object({
     .object({
       kiloVersionHeartbeat: z.boolean().optional(),
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
+      kiloLocalPhase: z.literal(true).optional(),
     })
     .optional(),
 });
@@ -423,6 +515,12 @@ export const sessionAttachResultSchema = z
   .object({
     attached: z.literal(true),
     nativeRuntimeId: z.string().uuid().optional(),
+    /**
+     * Present when the attach restored the session from a snapshot. A skipped
+     * diff is reported to the worker from here; without it the runtime
+     * replacement's partial restore would only exist in the wrapper log.
+     */
+    restore: wrapperRestoreTelemetrySchema.optional(),
   })
   .strict();
 
@@ -723,8 +821,20 @@ export const sessionMessageOutcomeSchema = z
     messageId: z.string().min(1).max(128),
     status: z.enum(['completed', 'failed', 'cancelled']),
     reason: z.string().max(4096).optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
+    assistantReason: cloudAgentAssistantFailureReasonSchema.optional(),
+    providerOwnership: cloudAgentProviderOwnershipSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status !== 'completed' && value.gateResult !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Only completed results can include gateResult',
+        path: ['gateResult'],
+      });
+    }
+  });
 
 export type SessionMessageOutcome = z.infer<typeof sessionMessageOutcomeSchema>;
 
@@ -1014,13 +1124,12 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   capabilities: z
     .object({
       sessionOperationResults: z.boolean().optional(),
-      scopedStopAbort: z.boolean().optional(),
-      nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
       eventBatches: z.boolean().optional(),
-      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

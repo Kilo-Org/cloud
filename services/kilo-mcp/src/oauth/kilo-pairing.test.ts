@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   ORG_LIST_QUERY_PATH,
+  USER_ME_QUERY_PATH,
   createKiloPairing,
   fetchOrgOptions,
+  fetchUserIsAdmin,
   pollKiloPairing,
 } from './kilo-pairing';
 import { PERSONAL_ORG_ID } from './pages';
@@ -238,6 +240,64 @@ describe('fetchOrgOptions', () => {
     await expect(
       fetchOrgOptions(
         { webBaseUrl: WEB, fetchImpl: fetchMock(() => Response.json({ nope: 1 })) },
+        'k'
+      )
+    ).rejects.toThrow();
+  });
+});
+
+describe('fetchUserIsAdmin', () => {
+  function meFetch(isAdmin: unknown): typeof fetch & { mock: { calls: FetchCall[] } } {
+    return fetchMock(() => Response.json({ result: { data: { isAdmin } } }));
+  }
+
+  it('calls user.getMe with the Kilo bearer and reads the trusted flag', async () => {
+    const fetchImpl = meFetch(true);
+    await expect(fetchUserIsAdmin({ webBaseUrl: WEB, fetchImpl }, 'kilo-tok-1')).resolves.toBe(
+      true
+    );
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe(`${WEB}/api/trpc/${USER_ME_QUERY_PATH}`);
+    expect(forwardedHeaders(init).Authorization).toBe('Bearer kilo-tok-1');
+    await expect(
+      fetchUserIsAdmin({ webBaseUrl: WEB, fetchImpl: meFetch(false) }, 'k')
+    ).resolves.toBe(false);
+  });
+
+  it('answers false for a missing or mistyped flag, never a sentinel', async () => {
+    await expect(
+      fetchUserIsAdmin({ webBaseUrl: WEB, fetchImpl: meFetch(undefined) }, 'k')
+    ).resolves.toBe(false);
+    await expect(
+      fetchUserIsAdmin({ webBaseUrl: WEB, fetchImpl: meFetch('true') }, 'k')
+    ).resolves.toBe(false);
+    await expect(
+      fetchUserIsAdmin(
+        { webBaseUrl: WEB, fetchImpl: fetchMock(() => Response.json({ nope: 1 })) },
+        'k'
+      )
+    ).resolves.toBe(false);
+  });
+
+  it('throws on a non-OK status so the caller can tell it apart from false', async () => {
+    await expect(
+      fetchUserIsAdmin(
+        { webBaseUrl: WEB, fetchImpl: fetchMock(() => new Response('', { status: 500 })) },
+        'k'
+      )
+    ).rejects.toThrow();
+    await expect(
+      fetchUserIsAdmin(
+        { webBaseUrl: WEB, fetchImpl: fetchMock(() => new Response('', { status: 401 })) },
+        'k'
+      )
+    ).rejects.toThrow();
+  });
+
+  it('throws on a transport failure without leaking it as false', async () => {
+    await expect(
+      fetchUserIsAdmin(
+        { webBaseUrl: WEB, fetchImpl: fetchMock(() => Promise.reject(new Error('down'))) },
         'k'
       )
     ).rejects.toThrow();

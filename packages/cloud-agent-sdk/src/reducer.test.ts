@@ -45,6 +45,20 @@ describe('reduce', () => {
     });
   });
 
+  describe('message.removed', () => {
+    it('produces delete_message mutation', () => {
+      const event: ChatEvent = {
+        type: 'message.removed',
+        sessionId: 'ses-1',
+        messageId: 'msg-1',
+      };
+
+      const result = reduce(event);
+
+      expect(result).toEqual<StorageMutation[]>([{ type: 'delete_message', messageId: 'msg-1' }]);
+    });
+  });
+
   describe('message.part.delta', () => {
     it('produces apply_delta mutation', () => {
       const event: ChatEvent = {

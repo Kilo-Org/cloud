@@ -10,6 +10,7 @@ import {
   orgPickerQuerySchema,
   pairingStatusQuerySchema,
   searchArgsSchema,
+  submitOtpArgsSchema,
   toolsCallParamsSchema,
 } from './schemas';
 
@@ -131,7 +132,7 @@ describe('searchArgsSchema', () => {
 });
 
 describe('callArgsSchema', () => {
-  it('accepts a path with and without an input object', () => {
+  it('accepts a path with and without an input value', () => {
     expect(callArgsSchema.safeParse({ path: 'organizations.list' }).success).toBe(true);
     expect(
       callArgsSchema.safeParse({ path: 'organizations.list', input: { query: 'x' } }).success
@@ -144,10 +145,53 @@ describe('callArgsSchema', () => {
     expect(callArgsSchema.safeParse({}).success).toBe(false);
   });
 
-  it('rejects input that is not a plain object', () => {
-    expect(callArgsSchema.safeParse({ path: 'x', input: [] }).success).toBe(false);
+  it('accepts a scalar or array input, because the published schema decides the shape', () => {
+    // debug.badInputError publishes `{type: 'string'}`: a record-only argument
+    // here would make that row permanently uncallable.
+    expect(callArgsSchema.safeParse({ path: 'debug.badInputError', input: 'hello' }).success).toBe(
+      true
+    );
+    expect(callArgsSchema.safeParse({ path: 'x', input: ['a'] }).success).toBe(true);
+    expect(callArgsSchema.safeParse({ path: 'x', input: 5 }).success).toBe(true);
+    expect(callArgsSchema.safeParse({ path: 'x', input: false }).success).toBe(true);
+  });
+
+  it('rejects a null input, which the call path reads as "no input"', () => {
     expect(callArgsSchema.safeParse({ path: 'x', input: null }).success).toBe(false);
-    expect(callArgsSchema.safeParse({ path: 'x', input: 'q' }).success).toBe(false);
+  });
+});
+
+describe('submitOtpArgsSchema', () => {
+  it('accepts a request id with a code and nothing else', () => {
+    expect(submitOtpArgsSchema.safeParse({ request_id: 'req-1', otp: '123456' }).success).toBe(
+      true
+    );
+    expect(
+      submitOtpArgsSchema.safeParse({ request_id: 'req-1', otp: '1'.repeat(16) }).success
+    ).toBe(true);
+  });
+
+  it('rejects a missing, empty or whitespace-only request_id', () => {
+    expect(submitOtpArgsSchema.safeParse({ request_id: '', otp: '123456' }).success).toBe(false);
+    expect(submitOtpArgsSchema.safeParse({ request_id: '   ', otp: '123456' }).success).toBe(false);
+    expect(submitOtpArgsSchema.safeParse({ otp: '123456' }).success).toBe(false);
+  });
+
+  it('rejects a missing, empty or over-long code', () => {
+    expect(submitOtpArgsSchema.safeParse({ request_id: 'req-1' }).success).toBe(false);
+    expect(submitOtpArgsSchema.safeParse({ request_id: 'req-1', otp: '' }).success).toBe(false);
+    expect(
+      submitOtpArgsSchema.safeParse({ request_id: 'req-1', otp: '1'.repeat(17) }).success
+    ).toBe(false);
+  });
+
+  it('is strict: a submit that carries a path or an input is refused, so the payload cannot change', () => {
+    expect(
+      submitOtpArgsSchema.safeParse({ request_id: 'req-1', otp: '123456', path: 'admin.x' }).success
+    ).toBe(false);
+    expect(
+      submitOtpArgsSchema.safeParse({ request_id: 'req-1', otp: '123456', input: {} }).success
+    ).toBe(false);
   });
 });
 
@@ -183,6 +227,30 @@ describe('orgPickerFormSchema', () => {
     expect(orgPickerFormSchema.safeParse({}).success).toBe(false);
     expect(orgPickerFormSchema.safeParse({ organization_id: '' }).success).toBe(false);
     expect(orgPickerFormSchema.safeParse({ organization_id: null }).success).toBe(false);
+  });
+
+  it('accepts the admin opt-in, its absence, and a junk value (tolerant by design)', () => {
+    // Only the literal 'on' opts in (the handler decides); the schema must
+    // never reject the form over this field.
+    expect(
+      orgPickerFormSchema.safeParse({ organization_id: 'personal', admin_enabled: 'on' }).success
+    ).toBe(true);
+    expect(orgPickerFormSchema.safeParse({ organization_id: 'personal' }).success).toBe(true);
+    expect(
+      orgPickerFormSchema.safeParse({ organization_id: 'personal', admin_enabled: 'junk' }).success
+    ).toBe(true);
+  });
+
+  it('accepts an otp code and its absence; a non-string is a type error (tolerant by design)', () => {
+    // The handler reads only a string, so an absent code re-renders the picker
+    // asking for one instead of refusing the form.
+    expect(
+      orgPickerFormSchema.safeParse({ organization_id: 'personal', otp_code: '123456' }).success
+    ).toBe(true);
+    expect(orgPickerFormSchema.safeParse({ organization_id: 'personal' }).success).toBe(true);
+    expect(
+      orgPickerFormSchema.safeParse({ organization_id: 'personal', otp_code: 42 }).success
+    ).toBe(false);
   });
 });
 

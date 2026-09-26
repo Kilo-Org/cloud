@@ -34,13 +34,13 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260514.1
-  '@vitest/coverage-v8': 4.1.6
-  '@vitest/ui': 4.1.6
+  '@vitest/coverage-v8': 4.1.11
+  '@vitest/ui': 4.1.11
   '@workos-inc/node': 8.13.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
-  hono: 4.12.34
+  hono: 4.13.5
   jose: 6.2.3
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
@@ -48,14 +48,28 @@ catalog:
   tsx: 4.21.0
   typescript: 5.9.3
   ulid: 3.0.2
-  vitest: 4.1.6
+  vitest: 4.1.11
   workers-tagged-logger: 1.0.0
-  wrangler: 4.112.0
+  wrangler: 4.135.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
+  # wrangler 4.134.0 is the first release with local development support for
+  # DO-managed Containers (named-image selection via ctx.container.images).
+  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
+  # are exempted with it. Approved early-access exception; remove all eight entries
+  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
+  - wrangler@4.135.0
+  - workerd@1.20260918.1
+  - miniflare@5.20260918.0-alpha
+  - '@cloudflare/workerd-darwin-64@1.20260918.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
+  - '@cloudflare/workerd-linux-64@1.20260918.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
+  - '@cloudflare/workerd-windows-64@1.20260918.1'
   # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
   # expects, plus the exact transitive versions that aligned graph resolves to.
   # Each entry exempts exactly the listed package@version required by that
@@ -106,7 +120,8 @@ overrides:
   storybook: 10.4.6
   next: 16.3.3
   preact: 10.28.4
-  adm-zip: 0.6.0
+  adm-zip: 0.6.1
+  baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
   decode-uri-component: 0.5.0
   glob: '>=13.0.1'
@@ -139,11 +154,20 @@ overrides:
   lodash-es: '>=4.18.1'
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.0
-  smol-toml: 1.6.1
+  smol-toml: 1.7.1
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
-  hono: 4.12.34
+  hono: 4.13.5
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  # @simplewebauthn/server's ASN.1 parser must come from the same
+  # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
+  # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
+  # Attest code, and pnpm deduped the WebAuthn library's ^2.6.0 range onto that
+  # copy while asn1-ecc resolved 2.9.4, so `AsnParser.parse(DER, ECDSASigValue)`
+  # threw "Cannot get schema for 'ECDSASigValue' target" and every ES256
+  # assertion was refused. Scope the newer copy to this dependency only.
+  '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
+  '@simplewebauthn/server>@peculiar/asn1-x509': 2.9.4
   undici@^6: 6.28.0
   undici@^8: 8.9.0
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking
@@ -157,10 +181,10 @@ overrides:
   toml: 4.2.0
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0
-  js-yaml: 4.3.1
+  js-yaml: 4.3.2
   linkify-it: 5.0.2
   protobufjs: 7.6.5
-  sharp: '>=0.35.0'
+  sharp: 0.35.4
   tar: 7.5.21
   shell-quote: 1.10.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
@@ -191,11 +215,20 @@ packageExtensions:
 patchedDependencies:
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
+  expo-dev-launcher@57.0.19: patches/expo-dev-launcher@57.0.19.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@57.0.20: patches/expo-router@57.0.20.patch
+  # Typed-routes generation must skip colocated tests, exactly like the Metro
+  # blockList in apps/mobile/metro.config.js already does for the runtime
+  # bundle. A `*.test.tsx` next to a route registers as a route, and a
+  # `_layout.*.test.tsx` (src/app/(app)/(tabs)) registers as that group's
+  # layout; the generator then drops the group's entire subtree, so every
+  # `(tabs)` route vanishes from the generated `Href` union and typecheck
+  # rejects valid navigations.
+  '@expo/router-server@57.0.9': patches/@expo+router-server@57.0.9.patch
   expo-server-sdk: patches/expo-server-sdk.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
@@ -203,6 +236,17 @@ patchedDependencies:
   expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
   expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  # Fabric mounting race: RCTComponentViewFactory registers component views from
+  # the JS thread without the class-map mutex, so a mounting transaction can
+  # dereference an unregistered handle and crash (EXC_BAD_ACCESS 0x18,
+  # KILO-APP-6H; react/react-native#58299). Also synchronizes the
+  # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
+  # compile this in — see apps/mobile/app.config.ts.
+  # Bounds-guard the unmountChildComponentView assert message. Without it a
+  # stale Fabric child index throws NSRangeException while the assert is being
+  # formatted, which SIGABRTs release builds that link the assert-enabled
+  # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
+  react-native@0.86.3: patches/react-native@0.86.3.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

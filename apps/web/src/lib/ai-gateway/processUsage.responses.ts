@@ -258,15 +258,26 @@ export function parseResponsesMicrodollarUsageFromString(
 }
 
 export function extractInputItemTextContent(
-  item: OpenAI.Responses.ResponseInputItem
+  item: unknown,
+  roles: ReadonlySet<string>
 ): string | null {
-  if (!('role' in item) || !('content' in item)) return null;
-  if (item.role !== 'user') return null;
+  if (typeof item !== 'object' || item === null || !('role' in item) || !('content' in item)) {
+    return null;
+  }
+  if (typeof item.role !== 'string' || !roles.has(item.role)) return null;
   const { content } = item;
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
-      .filter((c): c is OpenAI.Responses.ResponseInputText => c.type === 'input_text')
+      .filter(
+        (c): c is OpenAI.Responses.ResponseInputText =>
+          typeof c === 'object' &&
+          c !== null &&
+          'type' in c &&
+          c.type === 'input_text' &&
+          'text' in c &&
+          typeof c.text === 'string'
+      )
       .map(c => c.text)
       .join('\n');
   }
@@ -274,22 +285,30 @@ export function extractInputItemTextContent(
 }
 
 export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
-  const instructions = body.instructions ?? '';
+  const input = Array.isArray(body.input) ? body.input : [];
+  const systemRoles = new Set(['system', 'developer']);
+  const userRoles = new Set(['user']);
+  const systemPrompt = [
+    typeof body.instructions === 'string' ? body.instructions : null,
+    ...input.map(item => extractInputItemTextContent(item, systemRoles)),
+  ]
+    .filter((text): text is string => text !== null && text !== '')
+    .join('\n');
 
   let userPrompt = '';
   if (typeof body.input === 'string') {
     userPrompt = body.input;
-  } else if (Array.isArray(body.input)) {
-    const lastUserText = body.input
-      .map(extractInputItemTextContent)
+  } else {
+    const lastUserText = input
+      .map(item => extractInputItemTextContent(item, userRoles))
       .filter((t): t is string => t !== null)
       .at(-1);
     userPrompt = lastUserText ?? '';
   }
 
   return {
-    system_prompt_prefix: instructions.slice(0, 100),
-    system_prompt_length: instructions.length,
+    system_prompt_prefix: systemPrompt.slice(0, 100),
+    system_prompt_length: systemPrompt.length,
     user_prompt_prefix: userPrompt.slice(0, 100),
   };
 }

@@ -30,12 +30,24 @@ const state = vi.hoisted(() => ({
   },
   organization: { organizationId: null as string | null, isLoaded: true },
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
+  // The notification-preference row the mount subscribes to at app start.
+  preferencesRequest: vi.fn<() => Promise<{ agentAttention: boolean }>>(),
   mountSync: false,
+  pathname: '/(app)/(tabs)/(2_agents)',
+  // The floor poll is scoped to the visible live-agents route, so the mount
+  // reads the same segments a focused Agents tab reports.
+  segments: ['(app)', '(tabs)', '(2_agents)'] as string[],
+  scheduleNotificationAsync: vi.fn<(request: { identifier: string }) => Promise<void>>(),
+  dismissNotificationAsync: vi.fn<(identifier: string) => Promise<void>>(),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => state.organization }));
 function key(input: unknown) {
   return [['activeSessions', 'list'], { input, type: 'query' }];
+}
+/** The preferences row the Notifications screen edits; the mount reads it. */
+function preferencesKey() {
+  return [['user', 'getNotificationPreferences'], { type: 'query' }];
 }
 vi.mock('@/lib/trpc', () => {
   const trpc = {
@@ -46,6 +58,14 @@ vi.mock('@/lib/trpc', () => {
           queryKey: key(input),
           queryFn: state.request,
           ...options,
+        }),
+      },
+    },
+    user: {
+      getNotificationPreferences: {
+        queryOptions: () => ({
+          queryKey: preferencesKey(),
+          queryFn: state.preferencesRequest,
         }),
       },
     },
@@ -62,7 +82,18 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // the same subscribe/remove contract as React Native.
 vi.mock('react-native', () => ({
   InteractionManager: { runAfterInteractions: vi.fn() },
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+// The mount also derives the app-owned needs-input plan from the route and
+// posts through expo-notifications; both are native-backed, so the mount test
+// stubs them (their behavior is covered by needs-input-notification.test.ts).
+vi.mock('expo-router', () => ({
+  usePathname: () => state.pathname,
+  useSegments: () => state.segments,
+}));
+vi.mock('expo-notifications', () => ({
+  scheduleNotificationAsync: state.scheduleNotificationAsync,
+  dismissNotificationAsync: state.dismissNotificationAsync,
 }));
 
 let client = makeTestQueryClient();
@@ -117,6 +148,9 @@ beforeEach(() => {
   });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
   state.request.mockReset().mockResolvedValue({ sessions: [] });
+  state.preferencesRequest.mockReset().mockResolvedValue({ agentAttention: true });
+  state.scheduleNotificationAsync.mockClear();
+  state.dismissNotificationAsync.mockClear();
   state.mountSync = false;
   leases = 0;
   connection = makeConnection({
@@ -279,6 +313,132 @@ describe('live query presentation and refresh contracts', () => {
       expect(await pending).toBe(false);
     }
   );
+
+  it('posts an app-owned needs-input notification from a cached raise and dismisses it when answered', async () => {
+    state.mountSync = true;
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'needs-input:ses_1',
+        content: expect.objectContaining({ categoryIdentifier: 'kilo-needs-input:question' }),
+      })
+    );
+    expect(state.dismissNotificationAsync).not.toHaveBeenCalled();
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+
+    // A refetch or heartbeat that leaves the raise waiting must not re-post:
+    // the mount remembers the whole notified set, not the last plan's delta,
+    // so a plan that publishes nothing cannot erase it.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [
+          makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' }),
+          makeCached({ id: 'ses_2', status: 'running' }),
+        ],
+      });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
+      'needs-input:ses_1',
+    ]);
+
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'running' })],
+      });
+      await flush();
+    });
+    expect(state.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');
+  });
+
+  it('withholds the app-owned raise while the agentAttention preference is off', async () => {
+    state.mountSync = true;
+    state.preferencesRequest.mockResolvedValue({ agentAttention: false });
+    client.setQueryData(preferencesKey(), { agentAttention: false });
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('withholds the raise until the agentAttention row loads, then posts it', async () => {
+    state.mountSync = true;
+    // A cold start: the preferences query is still in flight, so the gate has
+    // no row to read. It must not fall back to ON and post.
+    const preferences = deferred<{ agentAttention: boolean }>();
+    state.preferencesRequest.mockReturnValue(preferences.promise);
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      preferences.resolve({ agentAttention: true });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+  });
+
+  it('dismisses a posted raise when agentAttention is turned off', async () => {
+    state.mountSync = true;
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      client.setQueryData(preferencesKey(), { agentAttention: false });
+      await flush();
+    });
+    expect(state.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');
+  });
+
+  it('replaces a re-published raise in place so a later recompute does not re-post it', async () => {
+    state.mountSync = true;
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
+      'needs-input:ses_1',
+    ]);
+
+    // The raise flips kind, so its standing notification is re-published with
+    // the new action set under the same per-session identifier.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
+      'needs-input:ses_1',
+      'needs-input:ses_1',
+    ]);
+
+    // A later recompute that leaves the raise untouched must not post a third
+    // time: the notified set carries the fresh row, so the next plan compares
+    // the raise against the shape now on screen.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [
+          makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' }),
+          makeCached({ id: 'ses_2', status: 'running' }),
+        ],
+      });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+  });
 
   it.each(['token', 'bootstrap', 'sign-out', 'organization'] as const)(
     'gates cached reads and socket ownership on %s readiness',

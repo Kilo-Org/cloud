@@ -31,6 +31,11 @@ const openBrowserMock = vi.hoisted(() => vi.fn());
 const focusedRoute = vi.hoisted(() => ({ focused: true }));
 const appStateListeners = vi.hoisted(() => new Set<(state: string) => void>());
 const activityKit = vi.hoisted(() => ({ denied: false, available: false, settingsOpen: false }));
+// The widget press sweep pulls the widget layout, expo-widgets, and the
+// glanceable action chain (expo-crypto and friends) into the route. None of
+// that native boundary runs under the mounted renderer, so the sweep is mocked
+// at its module boundary like `@/glanceable-ios/ios-sink` above.
+const widgetActionsMock = vi.hoisted(() => ({ runPendingWidgetActions: vi.fn() }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
@@ -88,6 +93,10 @@ vi.mock('@/glanceable-ios/ios-sink', () => ({
     activityKit.denied = false;
     return true;
   },
+}));
+
+vi.mock('@/glanceable-ios/widget-actions', () => ({
+  runPendingWidgetActions: widgetActionsMock.runPendingWidgetActions,
 }));
 
 vi.mock('expo-web-browser', () => ({
@@ -492,5 +501,20 @@ describe('Agents ActivityKit Settings recovery', () => {
         renderer.unmount();
       });
     }
+  });
+
+  it('sweeps a pending widget press on focus and on every foreground', async () => {
+    widgetActionsMock.runPendingWidgetActions.mockClear();
+    const renderer = mountRoute();
+    await flushMicrotasks();
+    expect(widgetActionsMock.runPendingWidgetActions).toHaveBeenCalledTimes(1);
+
+    changeAppState('background');
+    changeAppState('active');
+    await flushMicrotasks();
+    expect(widgetActionsMock.runPendingWidgetActions).toHaveBeenCalledTimes(2);
+    act(() => {
+      renderer.unmount();
+    });
   });
 });

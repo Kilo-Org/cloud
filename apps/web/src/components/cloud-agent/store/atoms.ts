@@ -1,15 +1,7 @@
-/**
- * Cloud Agent Atoms
- *
- * Jotai atom definitions for cloud agent chat state management.
- * Influenced pretty heavily by the cli.
- */
-
 import { atom } from 'jotai';
 import type { CloudMessage, SessionConfig } from '../types';
 import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 
-// Primary state
 export const messagesAtom = atom<CloudMessage[]>([]);
 export const messageVersionMapAtom = atom<Map<number, number>>(new Map());
 export const streamingMessagesAtom = atom<Set<number>>(new Set<number>());
@@ -21,7 +13,6 @@ export const chatUIAtom = atom({
   shouldAutoScroll: true,
 });
 
-// Derived atoms
 export const filteredMessagesAtom = atom(get => {
   const messages = get(messagesAtom);
   return messages.filter(msg => shouldDisplayMessage(msg));
@@ -53,7 +44,6 @@ export const totalCostAtom = atom(get => {
   return totalCost;
 });
 
-// Write-only atoms (actions)
 export const updateMessageAtom = atom(null, (get, set, updatedMessage: CloudMessage) => {
   const messages = get(messagesAtom);
   const versionMap = get(messageVersionMapAtom);
@@ -117,7 +107,6 @@ export const clearMessagesAtom = atom(null, (get, set) => {
   set(errorAtom, null);
 });
 
-// Helper functions
 function getMessageContentLength(message: CloudMessage): number {
   if (message.say === 'api_req_started') {
     const metadata = message.metadata || {};

@@ -10,7 +10,8 @@ import {
   createMessageCallbacks,
   parseCallbackOutboxValue,
 } from './message-callbacks.js';
-import type { SessionMessageRecord } from './session-message-queue.js';
+import type { MessageState } from '../sandbox-state/model/session.js';
+import type { SessionMessage } from './session-message-queue.js';
 
 const SESSION_ID = 'workspace_callback_test';
 const KILO_SESSION_ID = 'kilo_callback_test';
@@ -52,11 +53,37 @@ function metadataWithCallback(callbackUrl = 'https://example.com/callback'): Ses
   });
 }
 
+type TerminalKind = 'queued' | 'completed' | 'failed' | 'cancelled';
+
+function stateFor(kind: TerminalKind, overrides: Record<string, unknown> = {}): MessageState {
+  if (kind === 'queued') {
+    return {
+      kind,
+      intent: null,
+      legacyInvalidIntent: true,
+      deliveryStep: 'waiting',
+      deadlineAt: null,
+      attachFailures: 0,
+      promptFailures: 0,
+      ...overrides,
+    } as MessageState;
+  }
+  return {
+    kind,
+    intent: null,
+    legacyInvalidIntent: true,
+    at: 1,
+    source: 'coordinator',
+    ...overrides,
+  } as MessageState;
+}
+
 function message(
-  state: SessionMessageRecord['state'],
-  fields: Record<string, unknown> = {}
-): SessionMessageRecord {
-  return { messageId: MESSAGE_ID, state, ...fields } as SessionMessageRecord;
+  kind: TerminalKind,
+  overrides: { messageId?: string; state?: Record<string, unknown> } = {}
+): SessionMessage {
+  const { messageId = MESSAGE_ID, state = {} } = overrides;
+  return { messageId, state: stateFor(kind, state) };
 }
 
 function assistantMessage(text: string): LatestAssistantMessage {
@@ -125,14 +152,40 @@ describe('createMessageCallbacks', () => {
     });
   });
 
+  it('carries a gate result into the callback payload when the record has one', () => {
+    const harness = createHarness();
+
+    expect(
+      harness.callbacks.persistTerminalCallback(
+        message('completed', { state: { gateResult: 'pass' } })
+      )
+    ).toBe(true);
+
+    const stored = harness.kv.get<unknown>(callbackOutboxKey(MESSAGE_ID));
+    expect(parseCallbackOutboxValue(stored)?.job.payload).toMatchObject({ gateResult: 'pass' });
+  });
+
+  it('omits the gate result key from the callback payload when the record has none', () => {
+    const harness = createHarness();
+
+    expect(harness.callbacks.persistTerminalCallback(message('completed'))).toBe(true);
+
+    const stored = harness.kv.get<unknown>(callbackOutboxKey(MESSAGE_ID));
+    const payload = parseCallbackOutboxValue(stored)?.job.payload;
+    expect(payload).toBeDefined();
+    expect(payload && 'gateResult' in payload).toBe(false);
+  });
+
   it.each([
     ['failed', 'provider rejected the request', 'provider rejected the request'],
     ['cancelled', undefined, 'The message was interrupted'],
   ] as const)('projects %s terminal details into the callback', (state, detail, errorMessage) => {
     const harness = createHarness();
     const record = message(state, {
-      ...(detail ? { failedDetail: detail } : {}),
-      failedReason: 'runtime_unhealthy',
+      state: {
+        ...(detail ? { detail } : {}),
+        reason: 'runtime_unhealthy',
+      },
     });
 
     expect(harness.callbacks.persistTerminalCallback(record)).toBe(true);
@@ -332,7 +385,10 @@ describe('createMessageCallbacks', () => {
         harness.callbacks.persistDrainedBatchCallback(
           [
             message('completed', { messageId: 'a' }),
-            message('failed', { messageId: 'b', failedDetail: 'provider rejected the request' }),
+            message('failed', {
+              messageId: 'b',
+              state: { detail: 'provider rejected the request' },
+            }),
           ],
           new Set(['a', 'b'])
         )

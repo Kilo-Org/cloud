@@ -138,8 +138,6 @@ export type MicrodollarUsageContext = {
   has_tools: boolean;
   botId?: string;
   tokenSource?: string;
-  /** Request ID from abuse service classify response, for cost tracking correlation. 0 means skip. */
-  abuse_request_id?: number;
   /** Which product feature generated this API call. NULL if header not sent. */
   feature: FeatureValue | null;
   /** Client session/task identifier from X-KiloCode-TaskId header. */
@@ -150,10 +148,6 @@ export type MicrodollarUsageContext = {
   auto_model: string | null;
   /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
   ttfb_ms: number | null;
-  /** Rules-engine delay applied before forwarding the request, in milliseconds. */
-  abuse_delay?: number | null;
-  /** Original model before a rules-engine quarantine override replaced it. */
-  abuse_downgraded_from?: string | null;
   /**
    * Client-supplied per-message id from the `x-kilo-request` header.
    * Joinable to PostHog `Feedback Submitted.parentMessageID`. Optional
@@ -161,30 +155,6 @@ export type MicrodollarUsageContext = {
    * do not need to know about it.
    */
   clientRequestId?: string | null;
-  /**
-   * The exact `model_experiment_variant_version` row that served this request.
-   * Set only when an experiment was applied.
-   */
-  modelExperimentVariantVersionId?: string;
-  /** 'user' | 'machine' | 'ip' — recorded for reporting filters when an experiment was applied. */
-  modelExperimentAllocationSubject?: 'user' | 'machine' | 'ip';
-  /**
-   * Bounded (size-capped) capture of the canonical post-`transformRequest`
-   * upstream request body. Set only for experimented requests. Consumed
-   * by `persistExperimentAttribution` after the microdollar write.
-   */
-  experimentPromptCapture?: ExperimentPromptCapture;
-};
-
-/**
- * Bounded prompt capture used by the experiment attribution path. The
- * full serialized body is stored as a single content-addressed blob.
- * `requestKind` records which upstream API shape it was serialized for.
- */
-export type ExperimentPromptCapture = {
-  requestKind: 'chat_completions' | 'messages' | 'responses';
-  requestBodyContent: string;
-  wasTruncated: boolean;
 };
 
 export type CoreUsageWithMetaData = {

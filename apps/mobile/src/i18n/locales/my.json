@@ -36,6 +36,7 @@
     "cost": "ကုန်ကျစရိတ်",
     "discard": "ပယ်ဖျက်ပါ",
     "findings": "တွေ့ရှိချက်များ",
+    "mergeRequest": "merge request",
     "notConnected": "မချိတ်ဆက်ထား",
     "notifications": "အသိပေးချက်များ",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "အခြားအီးမေးလ်ကို သုံးရန်",
     "signInWithApple": "Apple ဖြင့် အကောင့်ဝင်ရန်",
     "signInWithGoogle": "Google ဖြင့် အကောင့်ဝင်ရန်",
+    "signInWithPasskey": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်ရန်",
     "emailAddress": "အီးမေးလ်လိပ်စာ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "အီးမေးလ်ဖြင့် ဆက်လုပ်ပါ",
@@ -174,6 +176,10 @@
     "termsConnector": " နှင့် ",
     "termsSuffix": "ကို သဘောတူလက်ခံပါသည်။",
     "moreSignInOptions": "အကောင့်ဝင်ရန် အခြားနည်းလမ်းများ",
+    "passkeyCancelled": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်ခြင်း ပယ်ဖျက်ခဲ့သည်။ ထပ်စမ်းကြည့်ပါ။",
+    "passkeyNotFound": "ဤစက်ပစ္စည်းအတွက် ပက်စ်ကီး မသိမ်းဆည်းထားပါ။ အစား Apple၊ Google သို့မဟုတ် သင့်အီးမေးလ်ဖြင့် အကောင့်ဝင်ပါ။",
+    "passkeyUnsupported": "ဤစက်ပစ္စည်းတွင် ပက်စ်ကီး မရနိုင်ပါ။ အစား Apple၊ Google သို့မဟုတ် သင့်အီးမေးလ်ဖြင့် အကောင့်ဝင်ပါ။",
+    "passkeyFailed": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်၍ မရပါ။ ထပ်စမ်းကြည့်ပါ။",
     "couldNotCompleteSignIn": "အကောင့်ဝင်ခြင်းကို အပြီးသတ်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
     "sessionEnded": "သင့်ဆက်ရှင် ပြီးဆုံးသွားသည်။ အကောင့်ပြန်ဝင်ပါ။",
     "signInCodeExpired": "အကောင့်ဝင်ရန် သင့်ကုဒ် သက်တမ်းကုန်သွားသည်။ ထပ်ကြိုးစားပါ။",
@@ -224,7 +230,28 @@
     "providerTestAccount": "စမ်းသပ်အကောင့်",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "လုပ်ငန်းသုံး SSO"
+    "providerEnterpriseSso": "လုပ်ငန်းသုံး SSO",
+    "passkeysTitle": "ပက်စ်ကီးများ",
+    "passkeysSubtitle": "စကားဝှက်မပါဘဲ အကောင့်ဝင်ပါ",
+    "passkeysEmpty": "ပက်စ်ကီး မရှိသေးပါ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) လုပ်ပြီး စကားဝှက်မပါဘဲ အကောင့်ဝင်ပါ။",
+    "passkeysCouldNotLoad": "ပက်စ်ကီးများ ဖွင့်၍မရပါ",
+    "passkeysLoadFailed": "ဤအရာ ဖွင့်ပြီးသည်အထိ ပက်စ်ကီးများ မရနိုင်ပါ။",
+    "addPasskey": "ပက်စ်ကီး ထည့်ရန်",
+    "passkeyDefaultName": "ပက်စ်ကီး",
+    "passkeyAddedOn": "{{date}} တွင် ထည့်ခဲ့သည်",
+    "passkeyAdded": "ပက်စ်ကီး ထည့်ပြီးပါပြီ။",
+    "passkeyAddFailed": "ပက်စ်ကီး ထည့်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "passkeyAddUnsupported": "ဤစက်ပစ္စည်းသည် ပက်စ်ကီးများ ဖန်တီး၍မရပါ။",
+    "passkeyAddCancelled": "ပက်စ်ကီး ဖန်တီးခြင်း ပယ်ဖျက်ခဲ့သည်။",
+    "passkeyRemoved": "ပက်စ်ကီး ဖယ်ရှားပြီးပါပြီ။",
+    "passkeyRemoveFailed": "ထို ပက်စ်ကီးကို ဖယ်ရှား၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "passkeyRenamed": "ပက်စ်ကီး အမည်ပြောင်းပြီးပါပြီ။",
+    "passkeyName": "ပက်စ်ကီး အမည်",
+    "renamePasskey": "ပက်စ်ကီး အမည်ပြောင်းရန်",
+    "removePasskey": "ပက်စ်ကီး ဖယ်ရှားရန်",
+    "removePasskeyTitle": "ပက်စ်ကီး ဖယ်ရှားမလား?",
+    "removePasskeyMessage": "ဤပက်စ်ကီးဖြင့် နောက်ထပ် အကောင့်ဝင်၍ မရတော့ပါ။"
   },
   "preferences": {
     "general": "အထွေထွေ",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်ထံ စာရေးသည့်အကွက်တွင် စာကြောင်းအသစ် ထည့်ပေးပါသည်။",
     "biometricUnlock": "ဇီဝအချက်အလက်ဖြင့် သော့ဖွင့်ခြင်း",
     "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။",
-    "featureFlags": "လုပ်ဆောင်ချက်အလံများ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ဖြင့် အသံမှစာသားပြောင်းခြင်း",
     "gatewayTranscriptionSubtitle": "စက်၏ အသံခွဲခြားသိရှိမှုအစား Kilo Gateway မော်ဒယ်ဖြင့် အသံထည့်သွင်းမှုကို စာသားပြောင်းပါ။ သင့်အသံသွင်းချက်ကို Kilo Gateway သို့ ပို့ပါမည်။",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "ဖိုင် {{total}} ခုအနက် {{displayCount}} ခု ရယူပြီး",
       "filesStillLoading": "ဖိုင်များကို ရယူနေဆဲဖြစ်ပါသည်။ ပြန်ရယူရန် အောက်သို့ဆွဲပါ။",
       "goToOverview": "ခြုံငုံချက်သို့ သွားပါ",
-      "goToOverviewTab": "ခြုံငုံချက်တဘ်သို့ သွားပါ"
+      "goToOverviewTab": "ခြုံငုံချက်တဘ်သို့ သွားပါ",
+      "expandAllLines_one": "စာကြောင်း {{displayCount}} ကြောင်းလုံးကို ဖြန့်ပြပါ",
+      "expandAllLines_other": "စာကြောင်း {{displayCount}} ကြောင်းလုံးကို ဖြန့်ပြပါ",
+      "expandLines_one": "စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "expandLines_other": "စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ဆက်စပ်ကုဒ် {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ",
+      "expandLinesOfContext_other": "ဆက်စပ်ကုဒ် {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ",
+      "expandMoreLines_one": "နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "expandMoreLines_other": "နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ဖိုင် {{total}} ခုအနက် {{loaded}} ခု ရယူပြီး",
+      "loadedOfTotalFiles_other": "ဖိုင် {{total}} ခုအနက် {{loaded}} ခု ရယူပြီး"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "ဖိုင်အဆုံးတွင် စာကြောင်းသစ် မရှိပါ။",
@@ -357,6 +389,7 @@
       "merge": "ပေါင်းစည်းခြင်း",
       "mergeNow": "ယခု ပေါင်းစည်းပါ",
       "mergePullRequest": "PR ပေါင်းစည်းခြင်း",
+      "mergeTermTitle": "{{term}} ပေါင်းစည်းခြင်း",
       "enableAutoMerge": "အလိုအလျောက် ပေါင်းစည်းမှုကို ဖွင့်ပါ",
       "disableAutoMerge": "အလိုအလျောက် ပေါင်းစည်းမှုကို ပိတ်ပါ",
       "autoMergeOn": "အလိုအလျောက် ပေါင်းစည်းမှု ဖွင့်ထားသည်",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "ပေါင်းစည်းပြီးနောက် ဘရန်ချ်ကို ဖျက်ပါ",
       "noEnabledMethods": "ဒီကုဒ်သိုလှောင်ရာတွင် ပေါင်းစည်းနည်းတစ်ခုမျှ ဖွင့်မထားပါ။ ပေါင်းစည်းခြင်း၊ တစ်ခုတည်းချုံ့ခြင်း သို့မဟုတ် အခြေခံပြောင်းခြင်းနည်းကို ဖွင့်ပေးရန် ကုဒ်သိုလှောင်ရာ၏ စီမံခန့်ခွဲသူကို တောင်းဆိုပါ။",
       "confirmTitle": "PR ကို ပေါင်းစည်းမလား",
+      "confirmTitleTerm": "{{term}} ကို ပေါင်းစည်းမလား",
       "confirmMessage": "သင့်ပြောင်းလဲမှုများကို အခြေခံဘရန်ချ်ထဲသို့ ပေါင်းစည်းပါမည်။",
       "enableAutoMergeConfirmTitle": "အလိုအလျောက် ပေါင်းစည်းမှုကို ဖွင့်မလား",
       "enableAutoMergeConfirmMessage": "လိုအပ်သော စစ်ဆေးမှုအားလုံး အောင်မြင်လျှင် GitHub က ဒီ PR ကို အလိုအလျောက် ပေါင်းစည်းပါမည်။",
+      "enableAutoMergeConfirmMessageTerm": "ပိုက်လိုင်းအောင်မြင်ပါ {{term}} ကို အလိုအလျောက် ပေါင်းစည်းမည်။",
+      "enableAutoMergeDescriptionTerm": "ပိုက်လိုင်းအောင်မြင်ပါ GitLab က ဤ{{term}}ကို အလိုအလျောက် ပေါင်းစည်းမည်။",
       "forbidden": "ဒီ PR ကို ပေါင်းစည်းခွင့် မရှိပါ။",
       "cannotMerge": "ဒီ PR ကို လက်ရှိအတိုင်း ပေါင်းစည်း၍မရပါ။",
       "couldNotMerge": "PR ကို ပေါင်းစည်း၍မရပါ။",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "ပေါင်းစည်းပြီးပါပြီ",
-        "closed": "ဒီ PR ကို ပိတ်ထားသည်"
+        "closed": "ဒီ PR ကို ပိတ်ထားသည်",
+        "closedMergeRequest": "ဒီ merge request ကို ပိတ်ထားသည်"
       },
       "partialSuccessBanner": {
         "body": "ဘရန်ချ်ကို ဖျက်၍မရပါ: {{reason}}။",
@@ -413,6 +450,18 @@
         "behindDetail": "မူရင်းဘရန်ချ်တွင် အခြေခံဘရန်ချ်၏ နောက်ဆုံးပြောင်းလဲမှုများ မပါသေးပါ။ မပေါင်းစည်းမီ ဘရန်ချ်ကို အခြေခံပြောင်းပါ သို့မဟုတ် မွမ်းမံပါ။",
         "notMergeableTitle": "ဒီ PR ကို ပေါင်းစည်း၍မရသေးပါ",
         "notMergeableDetail": "GitHub က ပေါင်းစည်းနိုင်မှု အခြေအနေကို {{state}} ဟု ဖော်ပြထားပါသည်။"
+      },
+      "restrictions": {
+        "title": "ပေါင်းစည်းမှု ပိတ်ပင်တားမြစ်ချက်များ",
+        "approvalsRequired_one": "{{displayCount}} ခု အတည်ပြုချက် လိုအပ်သည်",
+        "approvalsRequired_other": "{{displayCount}} ခု အတည်ပြုချက်များ လိုအပ်သည်",
+        "pipelineMustSucceed": "ပေါင်းစည်းမီ ပိုက်လိုင်း အောင်မြင်ရမည်။"
+      },
+      "providerBlocked": {
+        "failingPipeline": "နောက်ဆုံးကွန်မစ်တွင် ပိုက်လိုင်း ရှုံးနိမ့်နေသည်။",
+        "pendingPipeline": "နောက်ဆုံးကွန်မစ်တွင် ပိုက်လိုင်း ဆက်လက်လည်ပတ်နေဆဲဖြစ်သည်။",
+        "permission": "ဒီ {{term}} ကို ပေါင်းစည်းခွင့် မရှိပါ။",
+        "draft": "မပေါင်းစည်းမီ {{term}} ကို သုံးသပ်ရန်အသင့်အဖြစ် မှတ်သားပါ။"
       },
       "methodLabels": {
         "merge": "ပေါင်းစည်းကွန်မစ်ကို ဖန်တီးပါ",
@@ -462,6 +511,8 @@
       "replyBadRequest": "ဒီအကြောင်းပြန်စာကို တင်၍မရပါ။ ဆွေးနွေးချက်တွဲ ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
       "replyForbidden": "ဒီ PR တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
       "addCommentCta": "ဒီ PR တွင် မှတ်ချက် ရေးသားပါ",
+      "fixWithKilo": "Kilo ဖြင့် ပြင်ဆင်ပါ",
+      "fixWithKiloPrompt": "အောက်ပါ PR မှတ်ချက်ကို ဖြေရှင်းပေးပါ: {{link}}",
       "commentBadRequest": "ဒီမှတ်ချက်ကို တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
       "commentForbidden": "ဒီ PR တွင် မှတ်ချက်ရေးသားခွင့် မရှိပါ။",
       "moderation": {
@@ -512,7 +563,10 @@
         "outdatedOnLines": "{{lines}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်",
         "outdatedOnPath": "{{path}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်"
       },
-      "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ"
+      "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ",
+      "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
+      "moreLinesAbove_one": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။",
+      "moreLinesAbove_other": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။"
     },
     "couldNotOpenGitHubAppSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "PR ကို သုံးသပ်ပါ",
     "headLine": "{{counts}} · နောက်ဆုံးကွန်မစ် {{sha}}",
     "entry": {
-      "eyebrow": "URL ဖြင့် PR ကို ဖွင့်ပါ။",
-      "pastePrLink": "PR လင့်ခ်ကူးထည့်ပါ",
-      "noRecentPrs": "မကြာသေးမီက ကြည့်ထားသော PR မရှိပါ",
-      "noRecentPrsDescription": "သုံးသပ်မှုစတင်ရန် အပေါ်တွင် PR လင့်ခ်ကို ကူးထည့်ပါ။ နောက်တစ်ကြိမ်တွင် ဒီနေရာ၌ ပေါ်လာပါမည်။",
+      "eyebrow": "URL ဖြင့် PR သို့မဟုတ် merge request ကို ဖွင့်ပါ",
+      "pastePrLink": "PR သို့မဟုတ် merge request လင့်ခ်ကို ကူးထည့်ပါ",
+      "noRecentPrs": "မကြာသေးမီက သုံးသပ်ချက်များ မရှိပါ",
+      "noRecentPrsDescription": "သုံးသပ်မှုစရန် အပေါ်တွင် လင့်ခ်ကို ကူးထည့်ပါ — နောက်တစ်ကြိမ်တွင် ဤနေရာ၌ ပေါ်လာမည်။",
       "couldNotLoad": "ရယူ၍မရပါ။",
       "removeFromRecentsTitle": "မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားမလား",
-      "removeFromRecentsMessage": "ဒီ PR ကို မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားပါမည်။",
+      "removeFromRecentsMessage": "ဤသုံးသပ်ချက်ကို သင့်မကြာသေးမီက စာရင်းမှ ဖယ်ရှားပါမည်။",
       "removeRecentAccessibility": "{{repo}} ကို မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားပါ",
-      "urlAccessibility": "GitHub PR ၏ URL",
-      "clearLink": "PR လင့်ခ်ကို ရှင်းပါ",
-      "pasteLink": "PR လင့်ခ်ကို ကူးထည့်ပါ",
+      "urlAccessibility": "PR သို့မဟုတ် merge request URL ကို ထည့်သွင်းပါ",
+      "urlPlaceholder": "PR သို့မဟုတ် merge request URL",
+      "openAccessibility": "PR သို့မဟုတ် merge request ကို ဖွင့်ရန်",
+      "clearLink": "လင့်ခ်ကို ရှင်းပါ",
+      "pasteLink": "PR သို့မဟုတ် merge request လင့်ခ်ကို ကူးထည့်ပါ",
       "open": "ဖွင့်"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} ခု စောင့်ဆိုင်းဆဲ",
       "skipped": "{{displayCount}} ခု ကျော်ထား",
       "checksCount": "စစ်ဆေးမှု {{displayCount}} ခု",
+      "checksCount_one": "စစ်ဆေးမှု {{displayCount}} ခု",
+      "checksCount_other": "စစ်ဆေးမှု {{displayCount}} ခု",
       "checkDetails": "စစ်ဆေးမှုအသေးစိတ်များ"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "checkFailedMessage": "အချက်အလက် ရယူပြီးမှသာ အကောင့်ဝင်ထားခြင်း ရှိမရှိ သိနိုင်ပါမည်။",
+      "checkFailedTitleGitLab": "GitLab ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
+      "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
+      "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။ ဖုန်းပေါ်တွင် PR များကို ဆက်သုံးသပ်ရန် ပြန်ချိတ်ဆက်ပါ။",
-      "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။"
+      "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။",
+      "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
+      "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",
+      "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် သင့်ပရိုဖိုင်တွင် အဖွဲ့တစ်ခုကို ရွေးချယ်ပါ။"
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
-      "message": "သင့် GitHub ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။"
+      "message": "သင့် GitHub ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။",
+      "gitlabTitle": "GitLab ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
+      "bitbucketTitle": "Bitbucket ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
+      "providerMessage": "သင့် {{provider}} ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။"
     },
     "eventChips": {
       "comment": "မှတ်ချက်",
@@ -672,10 +739,12 @@
       "statusContext": "ဆက်စပ်ကုဒ်",
       "lineLabel": "{{status}} စာကြောင်း {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}၊ {{text}}",
-      "emptyLine": "(ဗလာ)"
+      "emptyLine": "(ဗလာ)",
+      "truncationBanner_one": "GitHub API ကန့်သတ်ချက်ကြောင့် ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမ {{limit}} ခုကိုသာ ပြသထားပါသည်။",
+      "truncationBanner_other": "GitHub API ကန့်သတ်ချက်ကြောင့် ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမ {{limit}} ခုကိုသာ ပြသထားပါသည်။"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ်တွင် ဘာမျှမရှိပါ။",
-    "linkPasteNotAPullRequest": "GitHub PR လင့်ခ် မဟုတ်ပါ။",
+    "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
     "announce": {
       "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",
       "reviewSubmitted": "သုံးသပ်မှု တင်သွင်းပြီးပါပြီ",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "ဒီမှတ်ချက်ကို တင်၍မရပါ။ ရွေးထားသော စာကြောင်း ပြောင်းလဲသွားခြင်း သို့မဟုတ် PR ကို မွမ်းမံထားခြင်း ဖြစ်နိုင်ပါသည်။",
       "reviewNotSubmitted": "ဒီသုံးသပ်မှုကို လက်ရှိအတိုင်း တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း သို့မဟုတ် ကိုယ်ပိုင် PR ကို သုံးသပ်ခွင့်မရှိခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
+      "reviewNotSubmittedTerm": "ဤသုံးသပ်ချက်ကို ဤအတိုင်း တင်သွင်း၍မရပါ။ {{term}} ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်ကိုယ်ပိုင် {{term}} ကို သုံးသပ်၍မရပါ။",
       "couldNotPostComment": "မှတ်ချက်ကို တင်၍မရပါ။",
       "couldNotSubmitReview": "သုံးသပ်မှုကို တင်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။"
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "အကြောင်းမပြန်နိုင်ပါ။",
       "couldNotCompleteAction": "ဒီလုပ်ဆောင်ချက်ကို အပြီးသတ်၍မရပါ။",
       "mergeResultDefaultError": "GitHub က ပေါင်းစည်းမှုကို အပြီးမသတ်ခဲ့ပါ။",
+      "mergeResultNotCompleted": "{{term}} ပေါင်းစည်းခြင်း မဖြစ်ပါ။ ၎င်း၏အခြေအနေကို စစ်ဆေးပြီး ပြန်ကြိုးစားပါ။",
       "ambiguous": "လုပ်ဆောင်မှုရလဒ်ကို အတည်ပြု၍မရပါ။ ထပ်မစမ်းမီ PR ကို စစ်ဆေးပါ။",
       "persistenceFailed": "ဒီလုပ်ဆောင်ချက်ကို မှတ်တမ်းတင်၍မရပါ။ နောက်မှ ထပ်စမ်းကြည့်ပါ။",
       "forbidden": "လုပ်ဆောင်ခွင့် မရှိပါ။"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ",
+        "accessibility": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge request ကို မျှဝေပါ",
+      "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
+      "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
+      "unavailableDescription": "၎င်းကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်တွင် ဝင်ရောက်ခွင့် မရှိနိုင်ပါ။",
+      "accessDeniedMergeRequest": "ဒီ merge request ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "couldNotLoadMergeRequest": "Merge request ကို ရယူ၍မရပါ။",
+      "discussionAccessDenied": "ဒီ merge request ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "discussionUnavailableMessage": "ဒီ merge request ကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်ပါသည်။",
+      "noDiscussionDescription": "ဒီ merge request တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
+      "noFilesChangedDescription": "ဒီ merge request တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "အကြောင်းကြားချက်များသည် သင့်လော့ခ်မျက်နှာပြင်တွင် မက်ဆေ့ခ်ျစာသားကို ပြပါသည်။",
     "previewGenericDescription": "အကြောင်းကြားချက်များတွင် ဖြစ်ရပ်တစ်ခုရှိကြောင်းသာ ပြပါသည်။ မက်ဆေ့ခ်ျကို ဖတ်ရန် Kilo ကို ဖွင့်ပါ။",
     "channel": {
-      "agent": "အေးဂျင့်စက်ရှင်များ",
+      "agentProgress": "အေးဂျင့် လုပ်ဆောင်ပြီးစီးမှု",
       "chat": "စကားဝိုင်း မက်ဆေ့ချ်များ",
       "kiloclaw": "KiloClaw လုပ်ဆောင်ချက်များ",
       "balance": "လက်ကျန်သတိပေးချက်များ",
-      "security": "လုံခြုံရေးတွေ့ရှိချက်များ"
+      "security": "လုံခြုံရေးတွေ့ရှိချက်များ",
+      "spend": "အသုံးစရိတ် သတိပေးချက်များ"
     },
     "category": {
       "chatMessagesSubtitle": "သင့်စကားဝိုင်းများရှိ တုံ့ပြန်ချက်များ",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "စက်ရှင်အခြေအနေ",
       "sessionStatusSubtitle": "ပြီးဆုံး / မအောင်မြင် / ထိန်းချုပ်ရန် အသင့်",
       "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
+      "kiloclawActivityUnavailable": "KiloClaw လုပ်ဆောင်ချက် ရရှိရန် KiloClaw စနစ်တစ်ခုကို စတင်ပါ။",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
-      "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ"
+      "balanceAlertsUnavailable": "လက်ကျန် သတိပေးချက်များ ရရှိရန် အဖွဲ့အစည်းတစ်ခုသို့ ပါဝင်ပါ။",
+      "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ",
+      "securityFindingsUnavailable": "လုံခြုံရေး တွေ့ရှိချက်များ ရရှိရန် နယ်ပယ်တစ်ခုတွင် Kilo လုံခြုံရေးအေးဂျင့်ကို ဖွင့်ပါ။",
+      "spendAlertsSubtitle": "သတ်မှတ်ချက် ကျော်လွန်မှုနှင့် နာရီအလိုက် မြင့်တက်မှု",
+      "spendAlertsToggle": "အသုံးစရိတ် သတိပေးချက် အမျိုးအစား"
+    },
+    "action": {
+      "openSession": "စက်ရှင်ကို ဖွင့်ပါ"
+    },
+    "needsInputAction": {
+      "approved": "တောင်းဆိုမှုကို အတည်ပြုလိုက်ပါပြီ",
+      "replied": "အကြောင်းပြန်စာ ပို့ပြီးပါပြီ",
+      "failed": "အကြောင်းပြန်ရန် မအောင်မြင်ပါ။ ထပ်မံကြိုးစားရန် ထပ်မံနှိပ်ပါ။",
+      "unavailable": "ဤတောင်းဆိုမှုသည် နောက်ထပ် စောင့်ဆိုင်းနေခြင်း မရှိတော့ပါ။"
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "ဖိုင်တင်၍ မရပါ။",
       "failedToUploadFile": "ဖိုင်တင်၍ မရပါ: {{reason}}။",
       "nothingToPaste": "ကူးထည့်စရာ မရှိပါ။",
-      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။"
+      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။",
+      "limit_one": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။",
+      "limit_other": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}၊ {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "တွေ့ရှိချက်များ ထပ်တူပြုရန်",
       "syncNow": "ယခု ထပ်တူပြုပါ",
       "syncQueued": "ထပ်တူပြုရန် အလှည့်စောင့်စာရင်းထဲ ထည့်ထားသည်။",
-      "syncStatusUnavailable": "ထပ်တူပြုမှုအခြေအနေကို ရယူ၍ မရပါ။"
+      "syncStatusUnavailable": "ထပ်တူပြုမှုအခြေအနေကို ရယူ၍ မရပါ။",
+      "daysOverdue_one": "သတ်မှတ်ရက်ထက် {{displayCount}} ရက် ကျော်နေ",
+      "daysOverdue_other": "သတ်မှတ်ရက်ထက် {{displayCount}} ရက် ကျော်နေ",
+      "findingsCount_one": "တွေ့ရှိချက် {{displayCount}} ခု",
+      "findingsCount_other": "တွေ့ရှိချက် {{displayCount}} ခု"
     },
     "dashboardMetrics": {
       "openFindings": "မဖြေရှင်းရသေးသော တွေ့ရှိချက်များ",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "စက်ရှင်ကို ဖွင့်၍မရပါ။",
       "failedToLoadDetails": "စက်ရှင်အသေးစိတ်ကို ရယူ၍မရပါ။",
       "failedToStopExecution": "လုပ်ဆောင်မှုကို ရပ်တန့်၍မရပါ။",
+      "stopped": "စက်ရှင်ကို ရပ်တန့်လိုက်ပါပြီ",
+      "committing": "မှတ်တမ်းတင်နေသည်…",
+      "committed": "မှတ်တမ်းတင်ပြီးပါပြီ",
+      "commitFailed": "မှတ်တမ်းတင်၍မရပါ",
       "renameSession": "စက်ရှင်အမည်ပြောင်းခြင်း",
       "renamePlaceholder": "စက်ရှင်အမည်",
       "transcriptAccessibility": "စက်ရှင်စကားဝိုင်းမှတ်တမ်း",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "အဝေးမှ မျဉ်းစောင်းအမိန့်များကို အသုံးပြုရန် ပိုသစ်သော Kilo CLI ဗားရှင်း လိုအပ်ပါသည်။ Kilo CLI ကို အဆင့်မြှင့်ပြီး ပြန်ချိတ်ဆက်ပါ။"
     },
     "sessionConnection": {
+      "label": "ချိတ်ဆက်မှု",
       "connecting": "ချိတ်ဆက်နေသည်…",
       "reconnecting": "ပြန်လည်ချိတ်ဆက်နေသည်…",
       "connectionLost": "ချိတ်ဆက်မှု ပျက်သွားသည်",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "ပန်းတိုင် ဖယ်ရှားမလား?",
       "removeConfirmMessage": "CLI သည် ဤစက်ရှင်၏ ပန်းတိုင်ကို ရှင်းလင်းသည်။",
       "updateFailed": "ပန်းတိုင်ကို အပ်ဒိတ်လုပ်နိုင်ခြင်း မရှိပါ။",
-      "sectionAccessibility": "{{status}}။ ပန်းတိုင်: {{text}}"
+      "sectionAccessibility": "{{status}}။ ပန်းတိုင်: {{text}}",
+      "collapse": "ပန်းတိုင် ခေါက်သိမ်းရန်",
+      "expand": "ပန်းတိုင် ဖြန့်ပြရန်"
     },
     "newSession": {
+      "recentlyUsed": "မကြာသေးမီက အသုံးပြုထားသည့်အရာများ",
+      "couldNotLoadGithubRepositories": "GitHub ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
+      "couldNotLoadGitlabRepositories": "GitLab ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
       "connectGithubDescription": "ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectGitlabDescription": "ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectBitbucketDescription": "ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",
+      "openGitlab": "GitLab ဖွင့်ပါ",
+      "openBitbucket": "Bitbucket ဖွင့်ပါ",
       "refreshRepositories": "ကုဒ်သိုလှောင်ခန်းစာရင်းကို ပြန်လည်ရယူပါ",
       "githubConnected": "GitHub ချိတ်ဆက်ပြီး",
+      "gitlabConnected": "GitLab ချိတ်ဆက်ပြီး",
       "noRepositoriesVisible": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ Kilo GitHub အက်ပ်၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
+      "noRepositoriesVisibleGitlab": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ GitLab ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
+      "noRepositoriesVisibleBitbucket": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ Bitbucket ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
+      "bitbucketOrganizationsOnly": "Bitbucket ကို အဖွဲ့များအတွက်သာ ရနိုင်ပါသည်။",
+      "branchPickerTitle": "ခွဲကို ရွေးချယ်ပါ",
+      "branchDefault": "ပုံသေ",
+      "branchAccessibility": "ခွဲ: {{label}}",
+      "branchLoading": "ခွဲများ လိုက်ဒ်တင်နေသည်",
+      "branchLoadError": "ခွဲများကို လိုက်ဒ်တင်၍မရပါ",
+      "branchUnavailable": "ဤရီပိုထရီအတွက် ခွဲများ မရရှိနိုင်ပါ။ ဝန်ဆောင်မှုပေးသူထံ သင့်ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီးနောက် အခြားရီပိုထရီကို ရွေးချယ်ပါ။",
+      "branchEmpty": "ရရှိနိုင်သော ခွဲများ မရှိပါ",
+      "branchPlaceholder": "ခွဲတစ်ခုကို ရွေးချယ်ပါ",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
       "environment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်",
       "couldNotLoadEnvironment": "သင့်လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ရယူ၍မရပါ။",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "ကုဒ်သိုလှောင်ခန်းစာရင်းကို ပြန်လည်ရယူ၍မရပါ။ ထပ်ကြိုးစားပါ။",
       "discardDraftTitle": "မူကြမ်းကို ပယ်ဖျက်မလား။",
       "discardDraftMessage": "သင့်ညွှန်ကြားချက် ပျောက်သွားပါမည်။",
+      "discardWithUploadsMessage": "သင့်ညွှန်ကြားချက်နှင့် မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "remoteHint": "သင့်ကွန်ပျူတာရှိ kilo လုပ်ငန်းစဉ်ကို ထိန်းချုပ်ရန် ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ၊ သို့မဟုတ် လုပ်ဆောင်နေသော CLI စက်ရှင်တွင် `/remote` ကို သုံးပါ။",
-      "connectBitbucketDescription": "ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "connectGitlabDescription": "ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "couldNotLoadGithubRepositories": "GitHub ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "couldNotLoadGitlabRepositories": "GitLab ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "gitlabConnected": "GitLab ချိတ်ဆက်ပြီး",
-      "noRepositoriesVisibleBitbucket": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ Bitbucket ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
-      "noRepositoriesVisibleGitlab": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ GitLab ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
-      "openBitbucket": "Bitbucket ဖွင့်ပါ",
-      "openGitlab": "GitLab ဖွင့်ပါ",
-      "recentlyUsed": "မကြာသေးမီက အသုံးပြုထားသည့်အရာများ",
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေပါသည်။",
       "importingSession": "စက်ရှင်ကို တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI ဖြင့် စက်ရှင်ကို ဆက်လုပ်၍မရပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
       "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။",
-      "discardWithUploadsMessage": "သင့်ညွှန်ကြားချက်နှင့် မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။"
+      "pickProfile": "ပရိုဖိုင်ကို ရွေးပါ။",
+      "noProfile": "ပရိုဖိုင်မရှိပါ။",
+      "manageProfiles": "ပရိုဖိုင်များကို စီမံပါ။",
+      "noProfiles": "ပရိုဖိုင်များ မရှိသေးပါ။ ပတ်ဝန်းကျင်ပြောင်းလဲမှုများ၊ MCP ဆာဗာများနှင့် ကျွမ်းကျင်မှုများကို ထည့်သွင်းရန် တစ်ခုဖန်တီးပါ။",
+      "advancedConfig": "အဆင့်မြင့်ဖွဲ့စည်းမှု",
+      "advancedConfigDescription": "သိမ်းဆည်းထားသော ဖွဲ့စည်းမှုပုံစံများကို တင်ရန် ပရိုဖိုင်ကို ရွေးချယ်ပြီး အပိုဆောင်းပတ်ဝန်းကျင် ကိန်းရှင်များနှင့် စနစ်ထည့်သွင်းမှု ညွှန်ကြားချက်များကို ကိုယ်တိုင် စီစဉ်သတ်မှတ်ပါ",
+      "saveAsProfile": "Profile အဖြစ် သိမ်းဆည်းပါ။",
+      "saveProfileDescription": "လက်ရှိပတ်ဝန်းကျင် ကိန်းရှင်များနှင့် ပြန်လည်အသုံးပြုနိုင်သော ပရိုဖိုင်အဖြစ် သတ်မှတ်ခြင်းဆိုင်ရာ အမိန့်များကို သိမ်းဆည်းပါ။",
+      "profileSummary": "{{vars}} ပတ်၀န်းကျင် ကိန်းရှင်များ · {{commands}} စနစ်ထည့်သွင်းမှု အမိန့်များ",
+      "profileSaved": "ပရိုဖိုင် \"{{name}}\" သိမ်းပြီးပါပြီ။",
+      "organizationProfiles": "အဖွဲ့အစည်းပရိုဖိုင်များ",
+      "personalProfiles": "ကိုယ်ရေးကိုယ်တာ ပရိုဖိုင်များ",
+      "yourProfiles": "သင်၏ပရိုဖိုင်များ",
+      "failedToLoadProfiles": "ပရိုဖိုင်များကို တင်ရန် မအောင်မြင်ပါ။",
+      "nameTooLong": "ပရိုဖိုင်အမည်သည် ရှည်လွန်းသည်။",
+      "descriptionTooLong": "ဖော်ပြချက်သည် ရှည်လွန်းသည်။",
+      "secretsEncrypted": "လျှို့ဝှက်ချက်များကို သိမ်းဆည်းခြင်းမပြုမီ ကုဒ်ဝှက်ထားသည်။",
+      "profileActive": "ပရိုဖိုင် တက်ကြွနေပါသည်။",
+      "profilesActive": "ပရိုဖိုင်များ တက်ကြွနေပါသည်။",
+      "customConfigActive": "စိတ်ကြိုက် config တက်ကြွနေပါသည်။",
+      "configNeedsAttention": "Config သည် သတိထားရန် လိုအပ်သည်။",
+      "repoProfile": "Repo ပရိုဖိုင်",
+      "selectedProfile": "ရွေးချယ်ထားသော ပရိုဖိုင်",
+      "manualOverrides": "လူကိုယ်တိုင် အစားထိုးမှုများ",
+      "openSettingsToReview": "ပြန်လည်သုံးသပ်ရန် ဆက်တင်များကိုဖွင့်ပါ။",
+      "profileSelection": "ပရိုဖိုင်ရွေးချယ်မှု"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခုကို ပြင်ဆင်ပြီးပါပြီ။",
@@ -2086,15 +2241,18 @@
       "updateTodos": "လုပ်ရန်စာရင်းကို ပြင်ဆင်ပါ",
       "linesBadge": "{{displayCount}} ကြောင်း",
       "filesBadge": "ဖိုင် {{displayCount}} ခု",
-      "matchesBadge": "ကိုက်ညီမှု {{displayCount}} ခု"
+      "matchesBadge": "ကိုက်ညီမှု {{displayCount}} ခု",
+      "filesBadge_one": "ဖိုင် {{displayCount}} ခု",
+      "filesBadge_other": "ဖိုင် {{displayCount}} ခု",
+      "linesBadge_one": "{{displayCount}} ကြောင်း",
+      "linesBadge_other": "{{displayCount}} ကြောင်း",
+      "matchesBadge_one": "ကိုက်ညီမှု {{displayCount}} ခု",
+      "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု",
+      "noOutput": "အထွက် မရှိပါ။"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",
       "linesOf": "စာကြောင်း {{start}}–{{end}} / စုစုပေါင်း {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} မအောင်မြင်ပါ ({{status}})။",
-      "failed": "Cloud Agent {{action}} မအောင်မြင်ပါ။"
     },
     "collectCopyableText": {
       "unserializableInput": "[သိမ်းဆည်းပို့ဆောင်နိုင်သည့်ပုံစံသို့ ပြောင်း၍မရသော ထည့်သွင်းဒေတာ]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "ဝန်ဆောင်မှုပေးသူက တောင်းဆိုမှုကို ငြင်းပယ်ခဲ့ပါသည်။",
       "assistantStopped": "တုံ့ပြန်မှုကို ရပ်တန့်လိုက်ပါသည်။",
       "assistantContextOverflow": "စကားဝိုင်းသည် မော်ဒယ်က လက်ခံနိုင်သည့် အရှည်ထက် ကျော်လွန်နေပါသည်။",
-      "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။",
-      "sendFailed": "မက်ဆေ့ခ်ျကို ပို့၍မရပါ။ ထပ်ကြိုးစားပါ။"
+      "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။"
     },
     "filePart": {
       "loadingImage": "ပုံ ဖွင့်နေသည်",
@@ -2376,7 +2533,11 @@
       "files": "ဖိုင်",
       "couldNotOpenPhotoPicker": "ဓာတ်ပုံရွေးသည့်အကွက်ကို ဖွင့်၍မရပါ။ Kilo ကို ပြန်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။",
       "maxFilesAllowed": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
-      "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})"
+      "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})",
+      "maxFilesAllowed_one": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
+      "maxFilesAllowed_other": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
+      "onlyAddingFiles_one": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})",
+      "onlyAddingFiles_other": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})"
     },
     "composer": {
       "addAttachment": "ပူးတွဲဖိုင် ထည့်ပါ",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
       "discardAttachmentsTitle": "ပူးတွဲဖိုင်များကို ပယ်ဖျက်မလား။",
       "charactersRemaining": "အက္ခရာ {{count}} လုံး ကျန်သည်",
-      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ"
+      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ",
+      "charactersRemaining_one": "အက္ခရာ {{count}} လုံး ကျန်သည်",
+      "charactersRemaining_other": "အက္ခရာ {{count}} လုံး ကျန်သည်"
     },
     "chatLink": {
       "linkCopied": "လင့်ခ်ကို ကူးယူပြီးပါပြီ",
@@ -2428,7 +2591,17 @@
       "startNewSession": "စက်ရှင်အသစ်တစ်ခု စတင်ပါ",
       "exitSession": "စက်ရှင်မှ ထွက်ပါ",
       "clearSession": "ဤစက်ရှင်ကို အဆုံးသတ်ပြီး အသစ်တစ်ခု စတင်ပါ",
+      "compactDescription": "လက်ရှိ ဆက်ရှင်၏ ဆက်စပ်အကြောင်းအရာကို ကျစ်လျစ်စေပါ",
+      "goalDescription": "ဆက်ရှင် ပန်းတိုင်ဆီသို့ ဆက်လက်လုပ်ဆောင်ပါ။ /goal <objective> သို့မဟုတ် pause, resume, clear",
+      "initDescription": "လမ်းညွှန်ချက်ဖြင့် AGENTS.md သတ်မှတ်ခြင်း",
+      "resumeClaudeDescription": "Claude Code ဆက်ရှင်၏ စာသားမှတ်တမ်းကို တင်သွင်းပါ",
+      "resumeCodexDescription": "OpenAI Codex ဆက်ရှင်၏ စာသားမှတ်တမ်းကို တင်သွင်းပါ",
+      "reviewDescription": "အပြောင်းအလဲများကို ပြန်လည်စစ်ဆေးပါ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ကို သုံးပါ",
+      "useSkillCommand": "/{{command}} ကျွမ်းကျင်မှုကို သုံးပါ",
+      "skillBadge": "ကျွမ်းကျင်မှု",
+      "catalogFull": "အမိန့်စာရင်း ပြည့်နေသည်၊ ထို့ကြောင့် အချို့အမိန့်များ ဖျောက်ထားသည်။",
+      "catalogOverLimit": "ကျွမ်းကျင်မှုစာရင်း အရွယ်အစား ကန့်သတ်ချက်ထက် ကျော်နေသည်၊ ထို့ကြောင့် ကျွမ်းကျင်မှုအားလုံး ပြထားသည်။",
       "insert": "ထည့်ပါ",
       "upgradeRequiredFallback": "ဤအမိန့်ကို အသုံးပြုရန် သင့် CLI ကို အဆင့်မြှင့်ပါ။",
       "exitCapabilityUnavailable": "စက်ရှင်မှ ထွက်ရန် သင့် CLI ကို အဆင့်မြှင့်ပါ။",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "အဆင့် {{steps}} ဆင့်",
       "stepsCount": "အဆင့် {{steps}} ဆင့်",
       "stepsCount_other": "အဆင့် {{steps}} ဆင့်",
-      "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}"
+      "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}",
+      "modelsCount_one": "မော်ဒယ် ({{displayCount}})",
+      "modelsCount_other": "မော်ဒယ်များ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "အလိုအလျောက် အတည်ပြုခြင်း",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "ကိရိယာခေါ်ဆိုမှုများ",
-      "condensedLabel": "{{itemCount}} အကြောင်းအရာ; {{last}}"
+      "condensedLabel": "{{itemCount}} အကြောင်းအရာ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} အကြောင်းအရာ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} အကြောင်းအရာ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "လက်ရှိလုပ်ဆောင်နေသော ဆက်ရှင်များကို ရယူ၍ မရပါ။",
     "agentSessions": "ယခု လုပ်ဆောင်နေ",
     "newCodingTask": "ကုဒ်ရေးသည့် အလုပ်အသစ်",
+    "newTaskFromPicture": "ပုံမှ အလုပ်အသစ်",
     "explore": "လေ့လာစရာများ",
     "seeAll": "အားလုံး ကြည့်ရန်",
     "noLiveSessions": "ယခု ဘာမှ လုပ်ဆောင်နေခြင်း မရှိပါ"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "ဒီစက်ရှင်က ဖိုင်များကို လက်ခံ၍မရပါ",
     "cliCantReceiveFilesMessage": "ဒီစက်ရှင်ကို လုပ်ဆောင်နေသော Kilo CLI က ဖိုင်များကို လက်ခံ၍မရပါ။ အဲဒီစက်ရှိ CLI ကို မွမ်းမံပါ သို့မဟုတ် စက်ရှင်အသစ်သို့ မျှဝေပါ။",
     "contentlessMessage": "မျှဝေစရာ မရှိပါ — စာသား သို့မဟုတ် ဖိုင်များ မပါဝင်ပါ။",
-    "couldNotReadContent": "မျှဝေထားသော အကြောင်းအရာကို ဖတ်၍မရပါ။"
+    "couldNotReadContent": "မျှဝေထားသော အကြောင်းအရာကို ဖတ်၍မရပါ။",
+    "onlyFirstFilesAttached_one": "ပထမဆုံးဖိုင် {{displayCount}} ခုကိုသာ ပူးတွဲပါမည်။",
+    "onlyFirstFilesAttached_other": "ပထမဆုံးဖိုင် {{displayCount}} ခုကိုသာ ပူးတွဲပါမည်။"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "သင့်ညွှန်ကြားချက်များ၊ စကားဝိုင်းမှတ်တမ်းနှင့် သင်ပူးတွဲထားသော ဖိုင်များ။",
     "aiProvidersWhy": "AI တုံ့ပြန်ချက်များ ဖန်တီးရန်။",
     "aiProvidersWho": "Anthropic၊ OpenAI၊ Google နှင့် တောင်းဆိုမှုတစ်ခုချင်းစီအတွက် သင်ရွေးထားသော အခြားဝန်ဆောင်မှုပေးသူများ။",
-    "gatewayWhat": "အကောင့် ID၊ တောင်းဆိုမှုဆိုင်ရာ နောက်ဆက်တွဲအချက်အလက်များ၊ တိုကင်အသုံးပြုမှု။",
+    "gatewayWhat": "အကောင့် ID၊ တောင်းဆိုမှုဆိုင်ရာ နောက်ဆက်တွဲအချက်အလက်များ၊ တိုကင်အသုံးပြုမှု၊ နှင့် အက်ပ်မှ ၎င်းမှတစ်ဆင့် ပေးပို့သော prompt များနှင့် အသံဖမ်းယူမှုများ။",
+    "viaGateway": "Kilo Gateway မှတစ်ဆင့်",
     "gatewayWhy": "အထောက်အထားအတည်ပြုရန်၊ တောင်းဆိုမှုများကို သက်ဆိုင်ရာနေရာသို့ ပို့ရန်နှင့် ငွေတောင်းခံစာရင်း ညှိနှိုင်းရန်။",
     "gatewayWho": "Kilo (kilo.ai)။",
     "crashReportingWhat": "အက်ပ်အကြောင်းအရာများကို ဖယ်ရှားထားသော အက်ပ်ပျက်သွားမှုနှင့် အမှားအစီရင်ခံစာများ။",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer။",
     "voiceTranscriptionWhat": "စာသားပြောင်းရန် သင်ပြောနေစဉ် ဖမ်းယူထားသော အသံ။",
     "voiceTranscriptionWhy": "စကားကို စာသားအဖြစ် ပြောင်းရန်။",
-    "voiceTranscriptionWho": "ဤစက်တွင်သာ လုပ်ဆောင်ပါသည်။ အင်တာနက်မရှိဘဲ အသံမှစာသားပြောင်း၍မရပါက Apple သို့မဟုတ် Google ထံ ပို့ပါသည်။",
+    "voiceTranscriptionWho": "သင့်စက်၊ သင်ရွေးချယ်ထားသော စာသားပြောင်းလဲမှုမော်ဒယ်နှင့်အတူ Kilo Gateway၊ သို့မဟုတ် အွန်လိုင်းအသိအမှတ်ပြုမှုအတွက် Apple သို့မဟုတ် Google။",
     "installAttributionPromptTitle": "အက်ပ်ထည့်သွင်းရာ ရင်းမြစ်ဖော်ထုတ်ခြင်းကို ခွင့်ပြုမလား။",
     "installAttributionPromptMessage": "Kilo သည် သင်မည်သည့်လမ်းကြောင်းမှ ရောက်လာကြောင်း သိရန်အတွက်သာ Apple ၏ ခြေရာခံခွင့်ပြုချက်ကို အသုံးပြုပါသည်။ သင့်ညွှန်ကြားချက်များနှင့် စကားဝိုင်းများကို မည်သည့်အခါမျှ အသုံးမပြုပါ။",
     "what": "မျှဝေသည့်ဒေတာ",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "အကောင့်ဝင်ရန် ကြိုးစားသည့်အကြိမ်ရေ များလွန်းပါသည်။ ခဏစောင့်ပြီး ထပ်စမ်းကြည့်ပါ။"
   },
   "models": {
+    "auto": {
+      "frontier": "အလိုအလျောက် ထိပ်တန်း",
+      "balanced": "အလိုအလျောက် မျှတ",
+      "efficient": "အလိုအလျောက် ထိရောက်",
+      "small": "အလိုအလျောက် သေး",
+      "free": "အလိုအလျောက် အခမဲ့",
+      "organization": "အဖွဲ့အစည်း အလိုအလျောက်"
+    },
     "dataCollected": "ဒေတာစုဆောင်းသည်",
     "free": "အခမဲ့",
     "couldNotUpdateFavorites": "စိတ်ကြိုက်များကို ပြင်ဆင်၍မရပါ။",
@@ -2988,8 +3177,17 @@
     "privacy": "အေးဂျင့်များကို ကြည့်ရန် Kilo ကို ဖွင့်ပါ",
     "openAgents": "အေးဂျင့်များကို ဖွင့်ပါ",
     "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
+    "newestSession": "အသစ်ဆုံး: {{title}}",
+    "noneWaiting": "စောင့်ဆိုင်းနေသော အေးဂျင့် မရှိပါ",
+    "newAgent": "အေးဂျင့်အသစ်",
+    "approving": "အတည်ပြုနေသည်...",
+    "couldNotApprove": "အတည်ပြု၍ မရပါ",
+    "couldNotStart": "စတင်၍ မရပါ",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
-    "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။"
+    "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
+    "openSession": "ဖွင့်ပါ",
+    "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။",
+    "newestResult": "အသစ်ဆုံး ရလဒ်"
   },
   "transcriptionModel": {
     "title": "အသံမှစာသားပြောင်းမော်ဒယ်",
@@ -3014,15 +3212,7 @@
     "remoteOptionTitle": "သင့်ကွန်ပျူတာ",
     "remoteOptionBody": "သင့်ကိုယ်ပိုင်စက်ပေါ်တွင် `kilo remote` CLI ဖြင့် Kilo ကို လုပ်ဆောင်ပါ။",
     "skip": "လမ်းညွှန်ကို ကျော်သွားပါ",
-    "tutorialLabel": "သင်ခန်းစာ",
-    "remoteTitle": "သင့်ပထမဆုံး ဝေးကွာဆက်ရှင်ကို စတင်ပါ",
-    "remoteBody": "သင့်ကွန်ပျူတာကို ချိတ်ဆက်ပြီး ဤနေရာမှ ဆက်ရှင်ကို စတင်ပါ။",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ကွန်ပျူတာ မချိတ်ဆက်ရသေးပါ",
-    "remoteEmptyBody": "၎င်းကို ချိတ်ဆက်ရန် သင့်ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ။",
-    "remoteFound": "ကွန်ပျူတာ ချိတ်ဆက်ပြီး",
-    "checkAgain": "ထပ်စစ်ပါ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "သင်ခန်းစာ"
   },
   "modelChat": {
     "empty": {
@@ -3052,6 +3242,214 @@
       "unauthorizedDescription": "ဤစကားဝိုင်းတွင် Kilo ကိရိယာများ အသုံးပြုရန် ထပ်မံဝင်ရောက်ပါ။",
       "unavailable": "Kilo ကိရိယာများ မရနိုင်ပါ",
       "unavailableDescription": "ဤအကောင့်အတွက် Kilo ဆာဗာ မရှိပါ။"
+    }
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "အေးဂျင့်ကို စတင်ရန် ညွှန်ကြားချက် လိုအပ်ပါသည်။ ညွှန်ကြားချက် ထည့်ပြီး ထပ်မံ လုပ်ဆောင်ပါ။",
+      "repositoryUnknown": "Kilo သည် {{repository}} ကို GitHub သို့မဟုတ် GitLab ကုဒ်သိုလှောင်ရာအဖြစ် အသိအမှတ်မပြုပါ။ Kilo တွင် အခြားကုဒ်သိုလှောင်ရာ ရွေးချယ်ပါ။",
+      "repositoryUnsupported": "{{repository}} သည် Bitbucket ကုဒ်သိုလှောင်ရာ ဖြစ်သည် — အေးဂျင့်ကို စတင်ပါ ယင်းကို မသုံးနိုင်သေးပါ။ Kilo တွင် အခြားကုဒ်သိုလှောင်ရာ ရွေးချယ်ပါ။"
+    }
+  },
+  "launcher": {
+    "openLastSession": "နောက်ဆုံးဆက်ရှင်ကို ဖွင့်ပါ"
+  },
+  "spendAlerts": {
+    "subtitle": "ဤနယ်ပယ်၏ အသုံးစရိတ်သည် သတ်မှတ်ချက်တစ်ခုကို ကျော်လွန်သောအခါ သို့မဟုတ် ပုံမှန် နာရီအလိုက် နှုန်းထက် မြင့်တက်သောအခါ ငွေတောင်းခံမှု အဆက်အသွယ်များထံ အီးမေးလ် သို့မဟုတ် push ဖြင့် သတိပေးချက် ပို့ပါ။",
+    "enable": "အသုံးစရိတ် သတိပေးချက်များကို ဖွင့်ပါ",
+    "thresholdTitle": "သတ်မှတ်ချက် ကျော်လွန်မှု",
+    "thresholdSubtitle": "လက်ရှိ အသုံးစရိတ်သည် သင့် သတ်မှတ်ချက်ကို ကျော်လွန်နေသည်",
+    "anomalyTitle": "နာရီအလိုက် မြင့်တက်မှု",
+    "anomalySubtitle": "တစ်နာရီသည် ဤနယ်ပယ်၏ ပုံမှန် နှုန်းထက် အလွန်မြင့်နေသည်",
+    "limitLabel": "သတ်မှတ်ချက် (USD)",
+    "windowLabel": "အချိန်ကာလ",
+    "window24h": "24 နာရီ",
+    "window7d": "7 ရက်",
+    "window30d": "30 ရက်",
+    "multiplierLabel": "မြင့်တက်မှု အမြှောက်",
+    "saved": "အသုံးစရိတ် သတိပေးချက် ဆက်တင်များ သိမ်းဆည်းပြီးပါပြီ",
+    "loadError": "အသုံးစရိတ် သတိပေးချက်များကို ဖွင့်၍မရပါ။",
+    "saveError": "အသုံးစရိတ် သတိပေးချက်များကို သိမ်း၍မရပါ။",
+    "empty": "အသုံးစရိတ် သတိပေးချက်များ ပိတ်ထားသည်။ ဤနယ်ပယ်၏ ငွေတောင်းခံမှု အဆက်အသွယ်များကို သတိပေးရန် ၎င်းတို့ကို ဖွင့်ပါ။",
+    "noSpend": "အသုံးစရိတ် မှတ်တမ်းတင်ထားခြင်း မရှိသေးပါ",
+    "spend24h": "လွန်ခဲ့သော 24 နာရီအတွင်း အသုံးစရိတ်",
+    "multiplierError": "1 သို့မဟုတ် ထိုထက်ကြီးသော အမြှောက်ကို ထည့်ပါ",
+    "permissionDenied": "အသုံးစရိတ် သတိပေးချက်များကို စီမံရန် သင့်တွင် ခွင့်ပြုချက် မရှိပါ။",
+    "pushOffByCategory": "အသိပေးချက်များတွင် ပိတ်ထားသည်"
+  },
+  "profiles": {
+    "title": "ကိုယ်ရေးအကျဉ်းများ",
+    "entrySubtitle": "စက်ရှင်များတစ်လျှောက် ပတ်ဝန်းကျင်ဆက်တင်များကို ပြန်သုံးပါ။",
+    "newProfile": "ပရိုဖိုင်အသစ်",
+    "emptyTitle": "ပရိုဖိုင်များ မရှိသေးပါ။",
+    "emptyDescription": "စက်ရှင်များတစ်လျှောက် ပတ်ဝန်းကျင် variable များ၊ စနစ်ထည့်သွင်းရန် ညွှန်ကြားချက်များနှင့် ကျွမ်းကျင်မှုများကို ပြန်လည်အသုံးပြုရန် ပရိုဖိုင်တစ်ခု ဖန်တီးပါ။",
+    "loadFailed": "ပရိုဖိုင်များကို တင်၍မရပါ။",
+    "counts": {
+      "vars": "{{count}} ကိန်းရှင်",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ကျွမ်းကျင်မှု",
+      "commands": "{{count}} အမိန့်",
+      "varsShort": "{{count}}က",
+      "skillsShort": "{{count}}ကျ",
+      "commandsShort": "{{count}}အ"
+    },
+    "nameLabel": "ပရိုဖိုင်အမည်",
+    "namePlaceholder": "ဥပမာ နောက်ကွယ်မှ အမှားရှာပြင်ခြင်း။",
+    "descriptionLabel": "ပရိုဖိုင်ဖော်ပြချက်",
+    "descriptionPlaceholder": "ရွေးချယ်နိုင်သော ဖော်ပြချက်",
+    "ownerLabel": "ပရိုဖိုင်ပိုင်ရှင်",
+    "nameRequired": "ပရိုဖိုင်အမည်ကို ထည့်ပါ။",
+    "createAction": "ပရိုဖိုင်ဖန်တီးပါ။",
+    "createFailed": "ပရိုဖိုင်ကို ဖန်တီး၍မရပါ။",
+    "createdToast": "ပရိုဖိုင် \"{{name}}\" ဖန်တီးပြီးပါပြီ။",
+    "settingsSectionTitle": "ဖွဲ့စည်းမှု",
+    "defaultSectionTitle": "မူရင်းပရိုဖိုင်",
+    "personalDefaultDescription": "သိုလှောင်မှုတွင် ပင်ထိုးထားသော ပရိုဖိုင်တစ်ခုမရှိသည့်အခါ အလိုအလျောက်တင်သည်။",
+    "organizationDefaultDescription": "ကိုယ်ရေးကိုယ်တာ ပုံသေမရှိသော အဖွဲ့ဝင်များအတွက် အလိုအလျောက်တင်သည်။",
+    "setAsDefault": "မူရင်းအဖြစ် သတ်မှတ်ပါ။",
+    "removeDefault": "မူရင်းအတိုင်း ဖယ်ရှားပါ။",
+    "saveFailed": "ပရိုဖိုင်ကို သိမ်းဆည်း၍မရပါ။",
+    "deleteTitle": "ပရိုဖိုင်ကိုဖျက်ပါ။",
+    "deleteMessage": "၎င်းသည် ပရိုဖိုင်နှင့် ၎င်း၏ဆက်တင်များကို အပြီးအပိုင် ဖယ်ရှားသည်။ ဒါကို ပြန်ပြင်လို့ မရပါဘူး။",
+    "deleteFailed": "ပရိုဖိုင်ကို ဖျက်၍မရပါ။",
+    "deleteBlocked": "ဤပရိုဖိုင်ကို webhook အစပျိုးခြင်းဖြင့် အသုံးပြုသည်။ ၎င်းကို အစပျိုးမှုများမှ ဦးစွာဖယ်ရှားပါ။",
+    "deletedToast": "ပရိုဖိုင် \"{{name}}\" ဖျက်ပြီးပါပြီ။",
+    "variablesTitle": "ပတ်ဝန်းကျင်ပြောင်းလဲမှုများ",
+    "addVariable": "ကိန်းရှင်ကိုထည့်ပါ။",
+    "keyLabel": "သော့",
+    "keyTooLong": "သော့သည် စာလုံး 256 လုံး သို့မဟုတ် ထိုထက်နည်းရမည်",
+    "keyDuplicate": "ဤသော့သည် ပရိုဖိုင်တွင် ရှိပြီးဖြစ်သည်",
+    "valueLabel": "တန်ဖိုး",
+    "secretLabel": "လျှို့ဝှက်ချက်",
+    "secrets": {
+      "markSecret": "လျှို့ဝှက်ချက်အဖြစ် အမှတ်အသားပြုပါ။",
+      "masked": "ဝှက်ထားသောတန်ဖိုး",
+      "reveal": "တန်ဖိုးကိုထုတ်ဖော်ပါ။",
+      "newValuePlaceholder": "လျှို့ဝှက်တန်ဖိုးအသစ် ထည့်ပါ",
+      "valuePlaceholder": "လျှို့ဝှက်တန်ဖိုး (စာဝှက်ထားသည်)"
+    },
+    "variablesEmpty": "ပြောင်းလွဲမှုများမရှိသေးပါ။",
+    "variablesSaveFailed": "ကိန်းရှင်ကို သိမ်းဆည်း၍မရပါ။",
+    "commandsTitle": "သတ်မှတ်အမိန့်များ",
+    "addCommand": "အမိန့်ကိုထည့်ပါ။",
+    "commandLabel": "အမိန့်ပေးသည်။",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "စနစ်ထည့်သွင်းရန် အမိန့်များမရှိသေးပါ။",
+    "commandsSaveFailed": "စနစ်ထည့်သွင်းမှု အမိန့်များကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
+    "moveUp": "အပေါ်ကိုရွှေ့ပါ။",
+    "moveDown": "အောက်သို့ရွှေ့ပါ။",
+    "skillsTitle": "ကျွမ်းကျင်မှု",
+    "addSkill": "ကျွမ်းကျင်မှုထည့်ပါ။",
+    "skillNameLabel": "အရည်အချင်းနာမည်",
+    "skillMarkdownLabel": "ကျွမ်းကျင်မှုအကြောင်းအရာ",
+    "skillsEmpty": "ကျွမ်းကျင်မှုမရှိသေးပါ။",
+    "skillNameRequired": "ကျွမ်းကျင်မှုအမည်ကို ထည့်သွင်းပါ။",
+    "skillNameInvalid": "ကျွမ်းကျင်မှုအမည်သည် အက္ခရာ သို့မဟုတ် ဂဏန်းဖြင့် စတင်ပြီး စာလုံးသေးများ၊ ဂဏန်းများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုရပါမည်။",
+    "skillContentRequired": "ကျွမ်းကျင်မှုအကြောင်းအရာ လိုအပ်ပါသည်။",
+    "skillSaveFailed": "ကျွမ်းကျင်မှုကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
+    "skillsHint": "SKILL.md ကို ကူးထည့်လိုက်ပြီး ၎င်း၏အမည်ကို ဖြည့်စွက်ပါ။ ဆွဲချ၍မရဘဲ သင့်ဖုန်းမှကျွမ်းကျင်မှုတစ်ခုကို ထည့်ပါ။",
+    "skillEditTitle": "ကျွမ်းကျင်မှုကို တည်းဖြတ်ပါ။",
+    "mcp": {
+      "title": "MCP ဆာဗာများ",
+      "add": "MCP ဆာဗာကို ထည့်ပါ။",
+      "empty": "MCP ဆာဗာများ မရှိသေးပါ။",
+      "name": "ဆာဗာအမည်",
+      "type": "ဆာဗာအမျိုးအစား",
+      "localType": "ပြည်တွင်း",
+      "remoteType": "အဝေး",
+      "command": "ကွန်မန့်လိုင်း",
+      "url": "URL",
+      "environment": "ပတ်ဝန်းကျင် (JSON)",
+      "headers": "ခေါင်းစီးများ (JSON)",
+      "timeout": "ခဏပွဲရပ်ခြင်း",
+      "secretCount": "လျှို့ဝှက်ချက်",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "ဆာဗာအမည်ကို ထည့်သွင်းပါ။",
+      "nameInvalid": "အမည်သည် စာလုံးများ၊ နံပါတ်များ၊ အောက်ခံများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုနိုင်သည်။",
+      "commandRequired": "အမိန့်တစ်ခုထည့်ပါ။",
+      "commandTooLong": "အများဆုံး argument 50 ခုကို အသုံးပြုပါ၊ တစ်ခုလျှင် စာလုံး 500 လုံး",
+      "urlRequired": "URL တစ်ခုထည့်ပါ။",
+      "urlInvalid": "မှန်ကန်သော URL ကိုထည့်ပါ။",
+      "urlTooLong": "URL သည် စာလုံး 2048 လုံး သို့မဟုတ် ထိုထက်နည်း ဖြစ်ရမည်",
+      "jsonInvalid": "မှန်ကန်သော JSON ကို ထည့်ပါ — စာကြောင်းတန်ဖိုးများ၏ အရာဝတ္ထုတစ်ခု",
+      "jsonTooLarge": "အများဆုံး entry 50 ခုကို အသုံးပြုပါ၊ သော့များ 128 အထိနှင့် တန်ဖိုးများ စာလုံး 4096 အထိ",
+      "timeoutInvalid": "အချိန်ကုန်ဆုံးမှုသည် မီလီစက္ကန့်အရေအတွက်တစ်ခုလုံး ဖြစ်ရပါမည်။",
+      "edit": "MCP ဆာဗာကို တည်းဖြတ်ပါ။",
+      "saveFailed": "MCP ဆာဗာကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။"
+    },
+    "agents": {
+      "title": "ပရိုဖိုင် အေးဂျင့်များ",
+      "add": "ကိုယ်စားလှယ်ထည့်ပါ။",
+      "empty": "အေးဂျင့်မရှိသေးပါ။",
+      "name": "ကိုယ်စားလှယ်အမည်",
+      "slug": "အေးဂျင့် ပက်ကျိ",
+      "description": "ကိုယ်စားလှယ်ဖော်ပြချက်",
+      "model": "မော်ဒယ် ထပ်ရေးပါ။",
+      "modelPlaceholder": "စက်ရှင် ပုံသေကို သုံးပါ။",
+      "prompt": "စနစ်အချက်ပြ",
+      "steps": "အများဆုံး အဆင့်များ",
+      "stepsPlaceholder": "ဥပမာ 50",
+      "temperature": "အပူချိန်",
+      "temperaturePlaceholder": "ဥပမာ 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "ဥပမာ 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "ကျွန်ုပ်၏ အေးဂျင့်",
+      "promptPlaceholder": "မင်းဟာ...",
+      "tools": "ကိရိယာများ",
+      "visibility": "မြင်နိုင်စွမ်း",
+      "visibilityPrimary": "မူလတန်း—ရွေးချယ်မှုတွင် ပြထားသည်။",
+      "visibilitySubagent": "Subagent — အခြားသူများထံမှသာ ခေါ်ဆိုနိုင်သည်။",
+      "visibilityAll": "အားလုံး - နှစ်ခုလုံး",
+      "saveFailed": "ကိုယ်စားလှယ်ကို သိမ်းဆည်း၍မရပါ။",
+      "nameRequired": "ကိုယ်စားလှယ်အမည်ကို ထည့်ပါ။",
+      "slugRequired": "အေးဂျင့်ပက်ကျိထည့်ပါ။",
+      "slugInvalid": "Slug သည် အက္ခရာဖြင့် စတင်ရမည်ဖြစ်ပြီး စာလုံးသေးများ၊ ဂဏန်းများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုရပါမည်။",
+      "slugConflict": "ထိုမျှော့ကို တပ်ဆင်ထားသော အေးဂျင့်က သိမ်းဆည်းထားသည်။",
+      "edit": "အေးဂျင့်ကို တည်းဖြတ်ပါ။"
+    },
+    "slashCommands": {
+      "title": "မျဉ်းစောင်းအမိန့်များ",
+      "add": "မျဥ်းစောင်းအမိန့်ကို ထည့်ပါ။",
+      "empty": "မျဥ်းစောင်းအမိန့်များ မရှိသေးပါ။",
+      "name": "အမိန့်အမည်",
+      "description": "Command ဖော်ပြချက်",
+      "template": "ပုံစံခွက်",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "$ARGUMENTS ကိုရှင်းပြပါ။",
+      "agent": "အေးဂျင့်",
+      "subtask": "လုပ်ငန်းခွဲအဖြစ် လုပ်ဆောင်ပါ။",
+      "edit": "မျဥ်းစောင်းအမိန့်ကို တည်းဖြတ်ပါ။",
+      "saveFailed": "အမိန့်ကို သိမ်းဆည်း၍မရပါ။",
+      "nameRequired": "အမိန့်အမည်တစ်ခုထည့်ပါ။",
+      "nameInvalid": "အမည်သည် စာလုံးအသေးဖြင့် စတင်ရမည်ဖြစ်ပြီး စာလုံးသေးများ၊ ဂဏန်းများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုရပါမည်။",
+      "templateRequired": "အမိန့်ပေးပုံစံကို ထည့်သွင်းပါ။",
+      "nameConflict": "ထိုအမည်ကို built-in command ဖြင့် သိမ်းဆည်းထားသည်။"
+    },
+    "repoBindings": {
+      "title": "Repos အတွက် မူရင်းပရိုဖိုင်များ",
+      "add": "ပုံသေထည့်ပါ။",
+      "empty": "ပုံသေသတ်မှတ်မှု မရှိပါ။",
+      "emptyDescription": "repo အတွက် ဆက်ရှင်များ စတင်သောအခါ ပရိုဖိုင်တစ်ခု အလိုအလျောက် အသုံးချရန် ပုံသေကို ထည့်ပါ။",
+      "repo": "သိုလှောင်မှုကို ရွေးပါ...",
+      "profile": "ပရိုဖိုင်ကို ရွေးပါ။",
+      "remove": "စည်းဖြုတ်ပါ။",
+      "private": "သီးသန့်",
+      "search": "သိုလှောင်မှုများကို ရှာဖွေပါ...",
+      "addedToast": "\"{{repo}}\" အတွက် မူရင်းပရိုဖိုင် သတ်မှတ်ပြီးပါပြီ။",
+      "addFailed": "မူရင်းပရိုဖိုင်ကို သတ်မှတ်၍မရပါ။",
+      "removedToast": "\"{{repo}}\" အတွက် မူရင်းပရိုဖိုင် ဖယ်ရှားပြီးပါပြီ။",
+      "removeFailed": "မူရင်းပရိုဖိုင်ကို ဖယ်ရှား၍မရပါ။",
+      "pinnedTitle": "သိုလှောင်ရုံများသို့ ပင်ထိုးထားသည်။",
+      "pinRepo": "repo ကို ပင်ထိုးပါ။",
+      "pinnedEmpty": "မည်သည့် သိုလှောင်ရုံများတွင် ပင်မတွဲထားပါ။",
+      "pinnedDescription": "စက်ရှင်တစ်ခုသည် ဤသိုလှောင်ရာနေရာများထဲမှ တစ်ခုကို ပစ်မှတ်ထားသည့်အခါတိုင်း အလိုအလျောက်တင်သည်။",
+      "pinnedToast": "\"{{repo}}\" သို့ ပင်ထိုးပြီးပါပြီ။",
+      "pinFailed": "repo ကို ပင်ထိုး၍မရပါ။",
+      "unboundToast": "Repo ချိတ်ဆက်မှုကို ဖြုတ်ပြီးပါပြီ။",
+      "unbindFailed": "repo ကို ပြန်တွဲ၍ မရပါ။"
     }
   }
 }

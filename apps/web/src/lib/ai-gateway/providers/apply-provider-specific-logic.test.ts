@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyAnthropicThinkingDefault,
@@ -9,18 +10,36 @@ import {
   removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
-import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
-import {
-  gpt_5_6_sol_discounted_model,
-  gpt_6_astra_flex_model,
-} from '@/lib/ai-gateway/providers/openai-exclusive';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+
+const nonFlexExclusiveModel: KiloExclusiveModel = {
+  public_id: 'test/non-flex-exclusive',
+  internal_id: 'test/non-flex',
+  display_name: 'Non-Flex test model',
+  description: 'Test model',
+  status: 'public',
+  context_length: 8_192,
+  max_completion_tokens: 4_096,
+  provider: OPENROUTER,
+  flags: [],
+  pricing: null,
+  inference_provider_restriction: [],
+};
+
+const flexExclusiveModel: KiloExclusiveModel = {
+  ...nonFlexExclusiveModel,
+  public_id: 'test/flex-exclusive',
+  internal_id: 'test/flex',
+  display_name: 'Flex test model',
+  flags: ['flex'],
+};
 
 function makeRequest(
   model: string,
@@ -38,9 +57,10 @@ function makeRequest(
 
 function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
   return {
-    id: 'perplexity',
+    id: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
+    disableUrlSuffix: false,
     apiKey: 'test-key',
     apiKeyHeader: null,
     supportedChatApis: ['chat_completions'],
@@ -67,16 +87,13 @@ function makeMessagesRequest(
 }
 
 describe('applyAnthropicThinkingDefault', () => {
-  it.each(['z-ai/glm-5.2', PERPLEXITY_KIMI_PUBLIC_ID, 'minimax/minimax-m3'])(
-    'disables implicit thinking for %s',
-    model => {
-      const request = makeMessagesRequest(model);
+  it.each(['z-ai/glm-5.2', 'minimax/minimax-m3'])('disables implicit thinking for %s', model => {
+    const request = makeMessagesRequest(model);
 
-      applyAnthropicThinkingDefault(model, request);
+    applyAnthropicThinkingDefault(model, request);
 
-      expect(request.body.thinking).toEqual({ type: 'disabled' });
-    }
-  );
+    expect(request.body.thinking).toEqual({ type: 'disabled' });
+  });
 
   it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
     'preserves explicitly enabled thinking %p',
@@ -97,8 +114,8 @@ describe('applyAnthropicThinkingDefault', () => {
     expect(request.body.thinking).toBeUndefined();
   });
 
-  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3-fast'])(
-    'does not apply the partner thinking default to %s',
+  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast'])(
+    'does not add thinking to %s',
     model => {
       const request = makeMessagesRequest(model);
 
@@ -112,13 +129,13 @@ describe('applyAnthropicThinkingDefault', () => {
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: QWEN37_MAX_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       kiloExclusiveModel: null,
       reason: 'non-fallback custom pricing',
     },
     {
-      model: gpt_5_6_sol_discounted_model.public_id,
-      kiloExclusiveModel: gpt_5_6_sol_discounted_model,
+      model: nonFlexExclusiveModel.public_id,
+      kiloExclusiveModel: nonFlexExclusiveModel,
       reason: 'non-Flex Kilo-exclusive model',
     },
   ])(
@@ -145,8 +162,8 @@ describe('removeUnsupportedRequestServiceTier', () => {
   );
 
   it.each([
-    [PERPLEXITY_KIMI_PUBLIC_ID, null],
-    [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
+    ['moonshotai/kimi-k3', null],
+    [flexExclusiveModel.public_id, flexExclusiveModel],
     ['vendor/standard-model', null],
   ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
     const request = makeRequest(model);
@@ -448,6 +465,26 @@ describe('applyPreferredProvider', () => {
     applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
 
     expect(request.body.provider).toEqual({ order: ['novita'] });
+  });
+
+  it.each(['moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast', 'kimi-k3', 'moonshotai/kimi-k2.5'])(
+    'prefers Bedrock then Alibaba for Kimi model %s',
+    model => {
+      const request = makeRequest(model);
+
+      applyPreferredProvider(model, request.body);
+
+      expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'alibaba'] });
+    }
+  );
+
+  it('preserves explicit Kimi provider order and allowed providers', () => {
+    const request = makeRequest('moonshotai/kimi-k3');
+    request.body.provider = { only: ['alibaba'], order: ['alibaba'] };
+
+    applyPreferredProvider('moonshotai/kimi-k3', request.body);
+
+    expect(request.body.provider).toEqual({ only: ['alibaba'], order: ['alibaba'] });
   });
 
   it('prefers Friendli then Novita for GLM models', () => {

@@ -11,6 +11,7 @@ import { createControlEventTransport } from './control-event-transport.js';
 import type { LegacySendResult } from './control-event-transport.js';
 import {
   MAX_CONTROL_EVENT_OUTBOX_BYTES,
+  MAX_CONTROL_EVENT_OUTBOX_EVENTS,
   controlEventPublicationWireItem,
   type BatchControlEventPublication,
   type ControlEventOutboxFailure,
@@ -55,6 +56,14 @@ type WebSocketCtor = new (
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Read one advertised worker capability by name. Tolerant so the worker can drop
+ * an advertised field without breaking this wrapper build.
+ */
+function advertisedCapability(capabilities: unknown, name: string): boolean {
+  return isRecord(capabilities) && capabilities[name] === true;
 }
 
 export type EventPublicationObservation = {
@@ -144,6 +153,12 @@ const PERMANENT_CONTROL_ERRORS = new Set([
 export type SandboxControlClient = {
   connect(): Promise<void>;
   close(): void;
+  /**
+   * Retire the current socket so the production reconnect owner establishes a
+   * fresh one. Optional: a lighter client stub does not need to implement it,
+   * and a client that is not `ready` treats it as a no-op.
+   */
+  recycleConnection?: () => void;
   sendEvent?(
     event: string,
     payload: unknown,
@@ -189,7 +204,6 @@ const HELLO_TIMEOUT_MS = 10_000;
 const KEEPALIVE_INTERVAL_MS = 20_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
-const MAX_EVENT_RECEIPT_TRACKING = 256;
 const EVENT_RECEIPT_TIMEOUT_MS = 30_000;
 
 const preparedEventSchema = z.object({
@@ -417,7 +431,7 @@ export function createSandboxControlClient(
 
   const evictEventReceiptMetadata = (incomingBytes: number, incomingCount: number): void => {
     while (
-      eventReceiptMetadata.size + incomingCount > MAX_EVENT_RECEIPT_TRACKING ||
+      eventReceiptMetadata.size + incomingCount > MAX_CONTROL_EVENT_OUTBOX_EVENTS ||
       eventReceiptBytes + incomingBytes > MAX_CONTROL_EVENT_OUTBOX_BYTES
     ) {
       const oldest = eventReceiptMetadata.values().next().value;
@@ -816,6 +830,7 @@ export function createSandboxControlClient(
               eventBatches: true,
               scopedCleanupResult: true,
               workingBranches: true,
+              nativeRuntimeIdCapture: true,
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
@@ -863,11 +878,12 @@ export function createSandboxControlClient(
             fail();
             return;
           }
-          kiloVersionHeartbeat = hello.data.capabilities?.kiloVersionHeartbeat === true;
-          connectionRecovery = hello.data.capabilities?.connectionRecovery === true;
-          negotiatedEventReceipts = hello.data.capabilities?.eventReceipts === true;
-          negotiatedEventBatches = hello.data.capabilities?.eventBatches === true;
-          negotiatedScopedCleanupResult = hello.data.capabilities?.scopedCleanupResult === true;
+          const capabilities: unknown = hello.data.capabilities;
+          kiloVersionHeartbeat = advertisedCapability(capabilities, 'kiloVersionHeartbeat');
+          connectionRecovery = advertisedCapability(capabilities, 'connectionRecovery');
+          negotiatedEventReceipts = advertisedCapability(capabilities, 'eventReceipts');
+          negotiatedEventBatches = advertisedCapability(capabilities, 'eventBatches');
+          negotiatedScopedCleanupResult = advertisedCapability(capabilities, 'scopedCleanupResult');
           phase = 'status';
           diagnostic('hello_accepted', ws);
           return;
@@ -1430,6 +1446,11 @@ export function createSandboxControlClient(
       if (current.kind === 'starting')
         current.abort.abort(new Error('sandbox control client closed'));
       else if (current.kind === 'ready') current.dispose();
+    },
+
+    recycleConnection(): void {
+      if (state.kind !== 'ready') return;
+      retireConnection(state.socket);
     },
 
     async sendOperationResult(

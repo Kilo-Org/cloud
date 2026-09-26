@@ -4,6 +4,7 @@ import { type ComponentProps, createElement, type ReactElement } from 'react';
 import type * as ReactI18next from 'react-i18next';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -17,6 +18,8 @@ const holder = vi.hoisted(() => ({
   isPending: false,
   copied: [] as string[],
   copyResult: true as boolean | Promise<boolean>,
+  copiedLinks: [] as { sessionId: string; anchorMessageId: string | null }[],
+  linkCopyResult: true as boolean | Promise<boolean>,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -32,6 +35,11 @@ vi.mock('./session-row-actions', () => ({
     await Promise.resolve();
     holder.copied.push(id);
     return holder.copyResult;
+  },
+  copySessionLink: async (sessionId: string, anchorMessageId: string | null) => {
+    await Promise.resolve();
+    holder.copiedLinks.push({ sessionId, anchorMessageId });
+    return holder.linkCopyResult;
   },
 }));
 vi.mock('react-i18next', async importOriginal => {
@@ -101,6 +109,7 @@ function renderSheet(
         visible: true,
         info: INFO,
         sessionId: 'ses-123',
+        anchorMessageId: null,
         sessionTitle: 'Greeting',
         activeSessionType: null,
         ownerConnectionId: null,
@@ -113,6 +122,8 @@ function renderSheet(
         autoApproveState: state,
         onAutoApproveChange,
         onClose: vi.fn<() => void>(),
+        connectionDisplay: 'connected',
+        onRetryConnection: vi.fn<() => void>(),
         ...overrides,
       })
     );
@@ -208,22 +219,29 @@ describe('SessionContextSheet auto-approve row', () => {
     const root = renderer.root;
 
     const rowIndex = indexOfTestID(root, 'session-auto-approve-row');
+    const connectionIndex = indexOfTestID(root, 'session-context-sheet-connection');
     const ringIndex = indexOfTestID(root, 'session-context-sheet-ring');
     const headerIndex = indexOfType(root, 'SheetHeader');
 
     expect(rowIndex).toBeGreaterThanOrEqual(0);
+    expect(connectionIndex).toBeGreaterThanOrEqual(0);
     expect(ringIndex).toBeGreaterThanOrEqual(0);
     // The header title ("Context usage") is above the row; the row is the
-    // first body element and precedes the usage ring inside the ScrollView.
+    // first body element and precedes the connection row and the usage ring
+    // inside the ScrollView.
     expect(headerIndex).toBeGreaterThanOrEqual(0);
     expect(headerIndex).toBeLessThan(rowIndex);
-    expect(rowIndex).toBeLessThan(ringIndex);
+    expect(rowIndex).toBeLessThan(connectionIndex);
+    expect(connectionIndex).toBeLessThan(ringIndex);
 
-    // Outside the ScrollView, so it never scrolls away with the details.
+    // Outside the ScrollView, so they never scroll away with the details.
     const scrollView = findByType(root, 'ScrollView')[0];
     expect(scrollView).toBeDefined();
     expect(
       scrollView?.findAll(node => node.props.testID === 'session-auto-approve-row')
+    ).toHaveLength(0);
+    expect(
+      scrollView?.findAll(node => node.props.testID === 'session-context-sheet-connection')
     ).toHaveLength(0);
 
     renderer.unmount();
@@ -271,6 +289,7 @@ function sheetElement(
     visible: true,
     info: INFO,
     sessionId: 'ses-123',
+    anchorMessageId: null,
     sessionTitle: 'Greeting',
     activeSessionType: null,
     ownerConnectionId: null,
@@ -283,6 +302,8 @@ function sheetElement(
     autoApproveState: 'on',
     onAutoApproveChange: vi.fn<(enabled: boolean) => void>(),
     onClose: vi.fn<() => void>(),
+    connectionDisplay: 'connected',
+    onRetryConnection: vi.fn<() => void>(),
     ...overrides,
   });
 }
@@ -329,6 +350,8 @@ beforeEach(() => {
   holder.isPending = false;
   holder.copied = [];
   holder.copyResult = true;
+  holder.copiedLinks = [];
+  holder.linkCopyResult = true;
 });
 
 describe('SessionContextSheet session id and running on', () => {
@@ -494,5 +517,145 @@ describe('SessionContextSheet session id and running on', () => {
     });
     expect(textValues(renderer)).not.toContain(i18n.t('agentChat.instancePicker.runOn'));
     await unmount(renderer);
+  });
+});
+
+describe('SessionContextSheet copy link row', () => {
+  it('shows the resume URL as the row value and copies it from the call to action', async () => {
+    const renderer = await mountSheet();
+    const expected = sessionResumeUrl({ sessionId: 'ses-123', anchorMessageId: null });
+    expect(textValues(renderer)).toContain(i18n.t('common.copyLink'));
+    expect(textValues(renderer)).toContain(expected);
+
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+
+    expect(holder.copiedLinks).toEqual([{ sessionId: 'ses-123', anchorMessageId: null }]);
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    // The row keeps its call-to-action name beside the outcome, so the sheet
+    // still names the row after the copy completes.
+    expect(values).toContain(i18n.t('common.copyLink'));
+    await unmount(renderer);
+  });
+
+  it('copies the row value anchored at the position the sheet was given', async () => {
+    const renderer = await mountSheet({ anchorMessageId: 'msg-42' });
+    const expected = sessionResumeUrl({ sessionId: 'ses-123', anchorMessageId: 'msg-42' });
+    expect(textValues(renderer)).toContain(expected);
+
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+
+    expect(holder.copiedLinks).toEqual([{ sessionId: 'ses-123', anchorMessageId: 'msg-42' }]);
+    await unmount(renderer);
+  });
+
+  it('shows the could-not-copy outcome and retries from the same row', async () => {
+    holder.linkCopyResult = false;
+    const renderer = await mountSheet();
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.chatLink.couldNotCopyLink'));
+    expect(values).not.toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(values).toContain(i18n.t('common.copyLink'));
+
+    holder.linkCopyResult = true;
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    expect(holder.copiedLinks).toHaveLength(2);
+    expect(textValues(renderer)).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(textValues(renderer)).not.toContain(i18n.t('agentChat.chatLink.couldNotCopyLink'));
+    await unmount(renderer);
+  });
+
+  it('resets the link feedback to the call to action when the sheet closes', async () => {
+    const renderer = await mountSheet();
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    expect(textValues(renderer)).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    await act(async () => {
+      renderer.update(sheetElement({ visible: false }));
+      await Promise.resolve();
+    });
+    expect(textValues(renderer)).toContain(i18n.t('common.copyLink'));
+    expect(textValues(renderer)).not.toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    await unmount(renderer);
+  });
+
+  it('keeps the link feedback independent of the session id feedback', async () => {
+    const renderer = await mountSheet();
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
+    await unmount(renderer);
+  });
+});
+
+describe('SessionContextSheet connection row', () => {
+  it.each([
+    { display: 'connected' as const, copy: 'common.connected' },
+    { display: 'connecting' as const, copy: 'agentChat.sessionConnection.connecting' },
+    { display: 'reconnecting' as const, copy: 'agentChat.sessionConnection.reconnecting' },
+    { display: 'lost' as const, copy: 'agentChat.sessionConnection.connectionLost' },
+  ])('renders the Connection label and the $display copy', async ({ display, copy }) => {
+    const renderer = await mountSheet({ connectionDisplay: display });
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.sessionConnection.label'));
+    expect(values).toContain(i18n.t(copy));
+    await unmount(renderer);
+  });
+
+  it('keeps the connection row outside the ScrollView, under the auto-approve row', async () => {
+    const renderer = await mountSheet();
+    const root = renderer.root;
+    const rowIndex = indexOfTestID(root, 'session-auto-approve-row');
+    const connectionIndex = indexOfTestID(root, 'session-context-sheet-connection');
+    const ringIndex = indexOfTestID(root, 'session-context-sheet-ring');
+
+    expect(rowIndex).toBeGreaterThanOrEqual(0);
+    expect(connectionIndex).toBeGreaterThanOrEqual(0);
+    expect(ringIndex).toBeGreaterThanOrEqual(0);
+    expect(rowIndex).toBeLessThan(connectionIndex);
+    expect(connectionIndex).toBeLessThan(ringIndex);
+
+    const scrollView = findByType(root, 'ScrollView')[0];
+    expect(scrollView).toBeDefined();
+    expect(
+      scrollView?.findAll(node => node.props.testID === 'session-context-sheet-connection')
+    ).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('offers Retry only for a lost connection and calls the handler once', async () => {
+    const onRetryConnection = vi.fn<() => void>();
+    const connected = await mountSheet({ connectionDisplay: 'connected' });
+    expect(findByTestID(connected.root, 'session-context-sheet-connection-retry')).toHaveLength(0);
+    await unmount(connected);
+
+    const lost = await mountSheet({ connectionDisplay: 'lost', onRetryConnection });
+    expect(findByTestID(lost.root, 'session-context-sheet-connection-retry')).toHaveLength(1);
+    await act(async () => {
+      pressByTestID(lost, 'session-context-sheet-connection-retry');
+      await Promise.resolve();
+    });
+    expect(onRetryConnection).toHaveBeenCalledTimes(1);
+    await unmount(lost);
   });
 });

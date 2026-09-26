@@ -1,5 +1,5 @@
 {
-  "id": "4db13b4c-da0b-4d8e-8c71-d96348d176d1",
+  "id": "97684d71-8078-43ce-b4ff-a11dac537691",
   "prevId": "ec12e5ab-51c0-4f29-ad88-bfe14f7f38c2",
   "version": "7",
   "dialect": "postgresql",
@@ -28680,6 +28680,111 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.organization_service_fee_exemptions": {
+      "name": "organization_service_fee_exemptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_exempt": {
+          "name": "is_exempt",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_by_kilo_user_id": {
+          "name": "changed_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_org_service_fee_exemptions_org_created_at": {
+          "name": "IDX_org_service_fee_exemptions_org_created_at",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "FK_org_svc_fee_exemptions_organization": {
+          "name": "FK_org_svc_fee_exemptions_organization",
+          "tableFrom": "organization_service_fee_exemptions",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "FK_org_svc_fee_exemptions_changed_by": {
+          "name": "FK_org_svc_fee_exemptions_changed_by",
+          "tableFrom": "organization_service_fee_exemptions",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "changed_by_kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "organization_service_fee_exemptions_reason_check": {
+          "name": "organization_service_fee_exemptions_reason_check",
+          "value": "length(trim(\"organization_service_fee_exemptions\".\"reason\")) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.organization_user_limits": {
       "name": "organization_user_limits",
       "schema": "",
@@ -30524,6 +30629,205 @@
           "value": "\"platform_oauth_credentials\".\"credential_version\" > 0"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.quick_chat_messages": {
+      "name": "quick_chat_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_quick_chat_messages_thread_created_at": {
+          "name": "IDX_quick_chat_messages_thread_created_at",
+          "columns": [
+            {
+              "expression": "thread_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "quick_chat_messages_thread_id_quick_chat_threads_id_fk": {
+          "name": "quick_chat_messages_thread_id_quick_chat_threads_id_fk",
+          "tableFrom": "quick_chat_messages",
+          "tableTo": "quick_chat_threads",
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quick_chat_threads": {
+      "name": "quick_chat_threads",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "quick_chat_threads_user_personal_uidx": {
+          "name": "quick_chat_threads_user_personal_uidx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"quick_chat_threads\".\"organization_id\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "quick_chat_threads_user_org_uidx": {
+          "name": "quick_chat_threads_user_org_uidx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"quick_chat_threads\".\"organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "quick_chat_threads_user_id_kilocode_users_id_fk": {
+          "name": "quick_chat_threads_user_id_kilocode_users_id_fk",
+          "tableFrom": "quick_chat_threads",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "quick_chat_threads_organization_id_organizations_id_fk": {
+          "name": "quick_chat_threads_organization_id_organizations_id_fk",
+          "tableFrom": "quick_chat_threads",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.referral_code_usages": {
@@ -36455,6 +36759,424 @@
         "stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check": {
           "name": "stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check",
           "value": "\"stripe_early_fraud_warning_cases\".\"amount_minor_units\" IS NULL OR \"stripe_early_fraud_warning_cases\".\"amount_minor_units\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.stripe_service_fee_assessments": {
+      "name": "stripe_service_fee_assessments",
+      "schema": "",
+      "columns": {
+        "assessment_key": {
+          "name": "assessment_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "flow": {
+          "name": "flow",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_customer_id": {
+          "name": "stripe_customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_checkout_session_id": {
+          "name": "stripe_checkout_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_invoice_id": {
+          "name": "stripe_invoice_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_payment_intent_id": {
+          "name": "stripe_payment_intent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_charge_id": {
+          "name": "stripe_charge_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_fee_price_id": {
+          "name": "stripe_fee_price_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_checkout_fee_line_item_id": {
+          "name": "stripe_checkout_fee_line_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_invoice_fee_line_item_id": {
+          "name": "stripe_invoice_fee_line_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "eligibility_created_at": {
+          "name": "eligibility_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eligible_subtotal_minor": {
+          "name": "eligible_subtotal_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_fee_minor": {
+          "name": "expected_fee_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "charged_fee_minor": {
+          "name": "charged_fee_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "gross_paid_minor": {
+          "name": "gross_paid_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "settled_product_minor": {
+          "name": "settled_product_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "refunded_product_minor": {
+          "name": "refunded_product_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "refunded_fee_minor": {
+          "name": "refunded_fee_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "refunded_gross_minor": {
+          "name": "refunded_gross_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "disputed_fee_minor": {
+          "name": "disputed_fee_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "settled_at": {
+          "name": "settled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exemption_id": {
+          "name": "exemption_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_code": {
+          "name": "failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_stripe_service_fee_assessments_stripe_customer_id": {
+          "name": "IDX_stripe_service_fee_assessments_stripe_customer_id",
+          "columns": [
+            {
+              "expression": "stripe_customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_stripe_service_fee_assessments_checkout_session_id": {
+          "name": "UQ_stripe_service_fee_assessments_checkout_session_id",
+          "columns": [
+            {
+              "expression": "stripe_checkout_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"stripe_service_fee_assessments\".\"stripe_checkout_session_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_stripe_service_fee_assessments_stripe_invoice_id": {
+          "name": "UQ_stripe_service_fee_assessments_stripe_invoice_id",
+          "columns": [
+            {
+              "expression": "stripe_invoice_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"stripe_service_fee_assessments\".\"stripe_invoice_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_stripe_service_fee_assessments_stripe_payment_intent_id": {
+          "name": "UQ_stripe_service_fee_assessments_stripe_payment_intent_id",
+          "columns": [
+            {
+              "expression": "stripe_payment_intent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"stripe_service_fee_assessments\".\"stripe_payment_intent_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_stripe_service_fee_assessments_stripe_charge_id": {
+          "name": "UQ_stripe_service_fee_assessments_stripe_charge_id",
+          "columns": [
+            {
+              "expression": "stripe_charge_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"stripe_service_fee_assessments\".\"stripe_charge_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_stripe_service_fee_assessments_checkout_fee_line_item_id": {
+          "name": "UQ_stripe_service_fee_assessments_checkout_fee_line_item_id",
+          "columns": [
+            {
+              "expression": "stripe_checkout_fee_line_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"stripe_service_fee_assessments\".\"stripe_checkout_fee_line_item_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_stripe_service_fee_assessments_invoice_fee_line_item_id": {
+          "name": "UQ_stripe_service_fee_assessments_invoice_fee_line_item_id",
+          "columns": [
+            {
+              "expression": "stripe_invoice_fee_line_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"stripe_service_fee_assessments\".\"stripe_invoice_fee_line_item_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "FK_stripe_svc_fee_assessments_kilo_user": {
+          "name": "FK_stripe_svc_fee_assessments_kilo_user",
+          "tableFrom": "stripe_service_fee_assessments",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        },
+        "FK_stripe_svc_fee_assessments_organization": {
+          "name": "FK_stripe_svc_fee_assessments_organization",
+          "tableFrom": "stripe_service_fee_assessments",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "FK_stripe_svc_fee_assessments_exemption": {
+          "name": "FK_stripe_svc_fee_assessments_exemption",
+          "tableFrom": "stripe_service_fee_assessments",
+          "tableTo": "organization_service_fee_exemptions",
+          "columnsFrom": [
+            "exemption_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "stripe_service_fee_assessments_flow_check": {
+          "name": "stripe_service_fee_assessments_flow_check",
+          "value": "\"stripe_service_fee_assessments\".\"flow\" IN ('personal_top_up', 'organization_top_up', 'personal_auto_top_up_setup', 'organization_auto_top_up_setup', 'personal_auto_top_up', 'organization_auto_top_up', 'personal_kilo_pass', 'organization_kilo_pass')"
+        },
+        "stripe_service_fee_assessments_outcome_check": {
+          "name": "stripe_service_fee_assessments_outcome_check",
+          "value": "\"stripe_service_fee_assessments\".\"outcome\" IN ('pending', 'charged', 'exempt', 'pre_activation', 'zero_rounded', 'unsupported_currency', 'missed')"
+        },
+        "stripe_service_fee_assessments_currency_check": {
+          "name": "stripe_service_fee_assessments_currency_check",
+          "value": "\"stripe_service_fee_assessments\".\"currency\" ~ '^[a-z]{3}$'"
+        },
+        "stripe_service_fee_assessments_owner_check": {
+          "name": "stripe_service_fee_assessments_owner_check",
+          "value": "(\n        \"stripe_service_fee_assessments\".\"flow\" LIKE 'personal_%'\n        AND \"stripe_service_fee_assessments\".\"kilo_user_id\" IS NOT NULL\n        AND \"stripe_service_fee_assessments\".\"organization_id\" IS NULL\n      ) OR (\n        \"stripe_service_fee_assessments\".\"flow\" LIKE 'organization_%'\n        AND \"stripe_service_fee_assessments\".\"organization_id\" IS NOT NULL\n      )"
+        },
+        "stripe_service_fee_assessments_amounts_nonnegative_check": {
+          "name": "stripe_service_fee_assessments_amounts_nonnegative_check",
+          "value": "\"stripe_service_fee_assessments\".\"eligible_subtotal_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"expected_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"charged_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"gross_paid_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"settled_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_gross_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"disputed_fee_minor\" >= 0"
+        },
+        "stripe_service_fee_assessments_refund_fee_check": {
+          "name": "stripe_service_fee_assessments_refund_fee_check",
+          "value": "\"stripe_service_fee_assessments\".\"refunded_fee_minor\" <= \"stripe_service_fee_assessments\".\"charged_fee_minor\""
+        },
+        "stripe_service_fee_assessments_refund_product_check": {
+          "name": "stripe_service_fee_assessments_refund_product_check",
+          "value": "\"stripe_service_fee_assessments\".\"refunded_product_minor\" <= \"stripe_service_fee_assessments\".\"settled_product_minor\""
+        },
+        "stripe_service_fee_assessments_disputed_fee_check": {
+          "name": "stripe_service_fee_assessments_disputed_fee_check",
+          "value": "\"stripe_service_fee_assessments\".\"disputed_fee_minor\" <= \"stripe_service_fee_assessments\".\"charged_fee_minor\""
+        },
+        "stripe_service_fee_assessments_pending_check": {
+          "name": "stripe_service_fee_assessments_pending_check",
+          "value": "\"stripe_service_fee_assessments\".\"outcome\" <> 'pending'\n        OR (\"stripe_service_fee_assessments\".\"charged_fee_minor\" = 0 AND \"stripe_service_fee_assessments\".\"settled_at\" IS NULL)"
+        },
+        "stripe_service_fee_assessments_charged_check": {
+          "name": "stripe_service_fee_assessments_charged_check",
+          "value": "\"stripe_service_fee_assessments\".\"outcome\" <> 'charged' OR (\n        (\n          \"stripe_service_fee_assessments\".\"stripe_invoice_fee_line_item_id\" IS NOT NULL\n          OR \"stripe_service_fee_assessments\".\"stripe_checkout_fee_line_item_id\" IS NOT NULL\n          OR \"stripe_service_fee_assessments\".\"settled_at\" IS NOT NULL\n        )\n        AND (\"stripe_service_fee_assessments\".\"charged_fee_minor\" <> 0 OR \"stripe_service_fee_assessments\".\"settled_product_minor\" = 0)\n      )"
+        },
+        "stripe_service_fee_assessments_missed_check": {
+          "name": "stripe_service_fee_assessments_missed_check",
+          "value": "\"stripe_service_fee_assessments\".\"outcome\" <> 'missed' OR (\n        \"stripe_service_fee_assessments\".\"expected_fee_minor\" > 0\n        AND \"stripe_service_fee_assessments\".\"charged_fee_minor\" = 0\n        AND \"stripe_service_fee_assessments\".\"failure_code\" IS NOT NULL\n        AND length(trim(\"stripe_service_fee_assessments\".\"failure_code\")) > 0\n      )"
+        },
+        "stripe_service_fee_assessments_zero_rounded_check": {
+          "name": "stripe_service_fee_assessments_zero_rounded_check",
+          "value": "\"stripe_service_fee_assessments\".\"outcome\" <> 'zero_rounded' OR \"stripe_service_fee_assessments\".\"expected_fee_minor\" = 0"
+        },
+        "stripe_service_fee_assessments_uncharged_outcome_check": {
+          "name": "stripe_service_fee_assessments_uncharged_outcome_check",
+          "value": "\"stripe_service_fee_assessments\".\"outcome\" NOT IN ('exempt', 'pre_activation', 'zero_rounded', 'unsupported_currency')\n        OR \"stripe_service_fee_assessments\".\"charged_fee_minor\" = 0"
+        },
+        "stripe_service_fee_assessments_exemption_check": {
+          "name": "stripe_service_fee_assessments_exemption_check",
+          "value": "(\"stripe_service_fee_assessments\".\"outcome\" = 'exempt') = (\"stripe_service_fee_assessments\".\"exemption_id\" IS NOT NULL)"
         }
       },
       "isRLSEnabled": false

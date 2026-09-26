@@ -446,6 +446,7 @@ export const CloseTerminalOutput = z.object({
  * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
 const PrepareSessionSharedFields = {
+  githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
@@ -501,7 +502,6 @@ const PrepareSessionSharedFields = {
     .regex(/^[0-9a-f]{40}$/)
     .optional(),
 
-  // Optional configuration
   envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
   encryptedSecrets: EncryptedSecretsSchema.optional().describe(
     'Encrypted secret env vars (from agent environment profiles). These are stored encrypted in the DO and decrypted only at execution time.'
@@ -544,12 +544,10 @@ const PrepareSessionSharedFields = {
     .optional()
     .describe('Custom text to append to the system prompt'),
 
-  // Callback configuration
   callbackTarget: CallbackTargetSchema.optional().describe(
     'Optional callback target configuration for execution completion notifications'
   ),
 
-  // Organization context
   kilocodeOrganizationId: z.string().uuid().optional().describe('Organization ID (UUID, optional)'),
 
   // Profile resolution — cloud-agent-next resolves the profile stack
@@ -1114,7 +1112,6 @@ export const ExecutionStatusSchema = z
  * Explicitly excludes secrets (tokens, env var values, setup commands, MCP configs).
  */
 export const GetSessionOutput = z.object({
-  // Session identifiers
   sessionId: z.string().describe('Cloud-agent session ID'),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
   userId: z.string().describe('Owner user ID'),
@@ -1124,12 +1121,28 @@ export const GetSessionOutput = z.object({
     .optional()
     .describe('Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs'),
 
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Worktree ID when this session belongs to a shared worktree'),
+  parentSessionId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Parent Kilo session ID for a grouped worktree session (null when no group)'),
+  cloudAgentSessionScopeId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
 
-  // Execution params
   prompt: z.string().optional().describe('Task prompt'),
   mode: z.string().optional().describe('Execution mode (built-in or custom slug)'),
   model: z.string().optional().describe('AI model'),
@@ -1153,7 +1166,6 @@ export const GetSessionOutput = z.object({
       'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
     ),
 
-  // Execution status (grouped for cleaner API)
   execution: ExecutionStatusSchema,
 
   // Lifecycle timestamps (critical for idempotency)
@@ -1168,10 +1180,8 @@ export const GetSessionOutput = z.object({
   // to any user who can run a flow that creates a session on their behalf.
   // Use service-internal logs/storage if you need to inspect the target.
 
-  // Initial message ID for correlation
   initialMessageId: MessageIdSchema.optional(),
 
-  // Versioning
   timestamp: z.number().describe('Last update timestamp'),
   version: z.number().describe('Metadata version for cache invalidation'),
 

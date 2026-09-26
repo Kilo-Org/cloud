@@ -36,6 +36,13 @@ function getGitHubInstallationId(rawBody: string): string | null {
 }
 
 /**
+ * Must stay strictly below GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS (10 minutes).
+ * The shared handler reclaims a `processing` delivery receipt once it is older than
+ * that window, so a dispatch allowed to run longer could be reclaimed and double-processed.
+ */
+export const maxDuration = 300;
+
+/**
  * GitHub App Webhook Handler (Standard App)
  *
  * Full-featured KiloConnect app with read/write permissions.

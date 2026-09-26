@@ -15,6 +15,7 @@ import {
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -33,6 +34,13 @@ type ChatComposerInputRowProps = {
   hasSendableContent: boolean;
   inputAccessibilityDisabled: boolean;
   inputEditable: boolean;
+  /**
+   * Whether the live input holds no text. Drives the single-line placeholder
+   * overlay: the native hint has no line cap, so a placeholder wider than the
+   * field wraps onto a second line that the field's height clips against its
+   * border (French "Configuration de l'environnement…" on a narrow phone).
+   */
+  inputEmpty: boolean;
   inputRef: RefObject<TextInput | null>;
   isSending: boolean;
   isStreaming: boolean;
@@ -43,6 +51,12 @@ type ChatComposerInputRowProps = {
   onInputBlur: () => void;
   onInputFocus: () => void;
   onInputLayout: (event: LayoutChangeEvent) => void;
+  /**
+   * Report the input's own rendered content height in dp. The composer uses it
+   * as the one faithful measure of the pitch this input lays lines out at (see
+   * `useTextHeight`).
+   */
+  onInputContentSizeChange: (contentHeight: number) => void;
   onInsertNewline: () => void;
   onSelectionChange: (event: TextInputSelectionChangeEvent) => void;
   onStop: () => void;
@@ -72,6 +86,7 @@ export function ChatComposerInputRow({
   hasSendableContent,
   inputAccessibilityDisabled,
   inputEditable,
+  inputEmpty,
   inputRef,
   isSending,
   isStreaming,
@@ -81,6 +96,7 @@ export function ChatComposerInputRow({
   onChangeText,
   onInputBlur,
   onInputFocus,
+  onInputContentSizeChange,
   onInputLayout,
   onInsertNewline,
   onSelectionChange,
@@ -99,6 +115,21 @@ export function ChatComposerInputRow({
   const { t } = useTranslation();
   const { reducedMotion } = useMotionPolicy();
   const inputScrollable = shouldEnableComposerInputScroll(measureHeight, maxInputHeight);
+
+  // The overlay shares the input's text rect exactly — same font size, line
+  // height and insets, and no Android font padding — so the first typed
+  // character lands where the hint sat. `position` rides on `className`; the
+  // metrics stay in a named style object because NativeWind has no utility for
+  // `includeFontPadding`.
+  const placeholderStyle: TextStyle = {
+    top: textInputStyle.paddingVertical,
+    left: textInputStyle.paddingHorizontal,
+    right: textInputStyle.paddingHorizontal,
+    color: colors.mutedForeground,
+    fontSize: textInputStyle.fontSize,
+    includeFontPadding: false,
+    lineHeight: textInputStyle.lineHeight,
+  };
 
   return (
     <View className="flex-row items-center p-2.5 px-3">
@@ -126,13 +157,41 @@ export function ChatComposerInputRow({
         )}
         onLayout={onInputLayout}
       >
+        {/* The placeholder is a single-line overlay, not the input's own hint:
+            Android lays the native hint out at the field's width with no line
+            cap, so copy wider than the field wraps onto a second line that the
+            field's fixed height clips against its border. A tail-ellipsized
+            Text truncates the copy at any width instead. It shares the input's
+            font metrics (same size, line height, padding and top-aligned text
+            rect) so the first typed character lands exactly where it sat, and
+            sits under the input so a keystroke paints over it. */}
+        {inputEmpty && placeholder.length > 0 ? (
+          <Text
+            accessible={false}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            allowFontScaling={false}
+            pointerEvents="none"
+            // The design-system Text is `font-medium`; the input's own text is
+            // the platform default weight, so the hint drops to `font-normal`
+            // to keep the metrics it shares with the text it stands in for.
+            className="absolute font-normal"
+            style={placeholderStyle}
+          >
+            {placeholder}
+          </Text>
+        ) : null}
         <TextInput
           ref={inputRef}
-          placeholder={placeholder}
-          placeholderTextColor={colors.mutedForeground}
+          // The hint is drawn by the overlay above, but Android still needs an
+          // accessible name for the field, and the hint used to be it.
+          accessibilityLabel={placeholder}
           multiline
           maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
           onChangeText={onChangeText}
+          onContentSizeChange={event => {
+            onInputContentSizeChange(event.nativeEvent.contentSize.height);
+          }}
           onFocus={onInputFocus}
           onBlur={onInputBlur}
           onSelectionChange={onSelectionChange}

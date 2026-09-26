@@ -17,6 +17,7 @@ const mergeGate = "github.event_name == 'push' && github.ref == 'refs/heads/main
 const forkCondition = 'github.event.pull_request.head.repo.fork == true';
 const sameRepoCondition = 'github.event.pull_request.head.repo.fork == false';
 const changeGate = "steps.catalog_changes.outputs.catalog == 'true'";
+const mergeChangeGate = "steps.merge_changes.outputs.catalog == 'true'";
 // The paths the change-detection step must recognise. The workflow-path
 // entries tolerate the grep escaping (`\.yml`, `\.test\.mjs`) so the required
 // check keeps running the dump whenever the catalog can actually change.
@@ -55,6 +56,11 @@ function validate(workflow) {
     'pull_request must not filter by path: a skipped required check blocks unrelated PRs'
   );
   assert.deepEqual(workflow.on.push.branches, ['main'], 'push stays main-only');
+  assert.equal(
+    workflow.on.push.paths,
+    undefined,
+    'push must not filter by path: the merge job is required on main and must always report'
+  );
 
   // The job always reports, but only catalog-relevant changes pay for the dump.
   const gate = findStep(pr, step => step.id === 'catalog_changes', 'change-detection step');
@@ -67,6 +73,30 @@ function validate(workflow) {
       step.if ?? '',
       new RegExp(changeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
       `${step.name ?? step.uses}: every post-detection step must be gated on catalog-relevant changes`
+    );
+  }
+
+  // The merge job runs on every main push but gates the dump and the upsert on
+  // the same catalog paths, so an unrelated main push stays cheap (requirement
+  // 9/22) without leaving the required check "Expected".
+  const mergeDetect = findStep(
+    merge,
+    step => step.id === 'merge_changes',
+    'merge change-detection step'
+  );
+  for (const fragment of catalogPathFragments) {
+    assert.match(
+      mergeDetect.run ?? '',
+      fragment,
+      `merge change-detection step must recognise ${fragment}`
+    );
+  }
+  const mergeGateIndex = merge.steps.indexOf(mergeDetect);
+  for (const step of merge.steps.slice(mergeGateIndex + 1)) {
+    assert.match(
+      step.if ?? '',
+      new RegExp(mergeChangeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      `${step.name ?? step.uses}: every post-detection step in the merge job must be gated on catalog-relevant changes`
     );
   }
 
@@ -392,6 +422,18 @@ for (const [name, defect] of [
     'a post-detection step escapes the gate',
     workflow => {
       const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
+      delete step.if;
+    },
+  ],
+  ['push paths filter added', workflow => (workflow.on.push.paths = ['apps/web/src/**'])],
+  [
+    'merge change-detection step removed',
+    workflow => dropStep(workflow, mergeJobName, step => step.id === 'merge_changes'),
+  ],
+  [
+    'merge dump step escapes the gate',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item => item.run === dumpCommand);
       delete step.if;
     },
   ],

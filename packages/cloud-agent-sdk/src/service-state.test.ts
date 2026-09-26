@@ -1,7 +1,8 @@
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
-import type { SessionGoal } from './types';
+import { autocommitCompletedDataSchema } from './schemas';
+import type { SessionCommit, SessionGoal } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
   return { rootSessionId: 'root-1', ...overrides };
@@ -205,7 +206,11 @@ describe('createServiceState', () => {
       state.process({ type: 'stopped', reason: 'error' });
 
       expect(state.getActivity()).toEqual({ type: 'idle' });
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
       expect(onError).toHaveBeenCalledWith('Session terminated');
     });
 
@@ -1369,11 +1374,101 @@ describe('createServiceState', () => {
         type: 'autocommit',
         step: 'started',
         message: 'Committing…',
+        code: 'committing',
       });
     });
   });
 
   describe('autocommit_completed', () => {
+    const localCommit = {
+      commitHash: 'a'.repeat(40),
+      commitMessage: 'Actual commit\n\nPreserve the body.\n',
+      messageId: 'assistant-1',
+      userMessageId: 'user-1',
+      committedAt: '2026-09-01T10:00:00Z',
+      pushStatus: 'failed',
+    } satisfies SessionCommit;
+
+    it('retains the canonical local commit when the operation reports failure', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_completed', success: false, ...localCommit });
+      expect(state.getCommits()).toEqual([localCommit]);
+      expect(state.getStatus()).toMatchObject({
+        type: 'autocommit',
+        step: 'completed',
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('deduplicates immutable facts and keeps multiple commits at one anchor', () => {
+      const state = createServiceState(makeConfig());
+      const second = {
+        ...localCommit,
+        commitHash: 'b'.repeat(40),
+        committedAt: '2026-09-01T10:00:01Z',
+      };
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      state.process({ type: 'autocommit_completed', success: true, ...second });
+      state.process({
+        type: 'autocommit_completed',
+        success: false,
+        ...localCommit,
+        commitMessage: 'Conflicting replay',
+      });
+      expect(state.getCommits()).toEqual([localCommit, second]);
+      state.clearCommits();
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      expect(state.getCommits()).toEqual([]);
+      state.reset();
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      expect(state.getCommits()).toEqual([localCommit]);
+    });
+
+    it.each([
+      { commitHash: 'abc123' },
+      { commitMessage: undefined },
+      { commitMessage: '漢'.repeat(6_000) },
+      { messageId: '' },
+      { messageId: 'a'.repeat(257) },
+      { userMessageId: undefined },
+      { userMessageId: 'u'.repeat(257) },
+      { committedAt: undefined },
+      { committedAt: 'not-a-date' },
+      { pushStatus: undefined },
+      { commitMessageTruncated: false },
+    ])('does not retain a commit from incomplete or invalid metadata: %j', invalid => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit, ...invalid });
+      expect(state.getCommits()).toEqual([]);
+    });
+
+    it('preserves offset timestamps and explicit bounded-message truncation through wire parsing', () => {
+      const state = createServiceState(makeConfig());
+      const data = autocommitCompletedDataSchema.parse({
+        ...localCommit,
+        success: false,
+        committedAt: '2026-09-01T12:00:00+02:00',
+        commitMessage: 'x'.repeat(16 * 1024),
+        commitMessageTruncated: true,
+      });
+      state.process({ type: 'autocommit_completed', ...data });
+      expect(state.getCommits()).toEqual([
+        expect.objectContaining({
+          committedAt: '2026-09-01T12:00:00+02:00',
+          commitMessage: data.commitMessage,
+          commitMessageTruncated: true,
+        }),
+      ]);
+    });
+
+    it('never treats a skipped completion as a commit even with stale metadata', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_started', messageId: localCommit.messageId });
+      state.process({ type: 'autocommit_completed', success: true, skipped: true, ...localCommit });
+      expect(state.getCommits()).toEqual([]);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('success sets status to autocommit completed', () => {
       const state = createServiceState(makeConfig());
 
@@ -1411,12 +1506,10 @@ describe('createServiceState', () => {
       });
     });
 
-    it('skipped does not update status', () => {
+    it('skipped clears the running commit indicator', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'autocommit_started', messageId: 'msg-1', message: 'Committing...' });
-
-      const statusBefore = state.getStatus();
 
       state.process({
         type: 'autocommit_completed',
@@ -1425,7 +1518,8 @@ describe('createServiceState', () => {
         skipped: true,
       });
 
-      expect(state.getStatus()).toBe(statusBefore);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(state.getCommits()).toEqual([]);
     });
   });
 
@@ -1599,7 +1693,11 @@ describe('createServiceState', () => {
       // Turn 1: busy → error stopped
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({ type: 'stopped', reason: 'error' });
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
 
       // Turn 2: busy resets everything
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
@@ -1935,6 +2033,125 @@ describe('createServiceState', () => {
       });
     });
 
+    it('a replayed failure for a retried message does not restore the footer', () => {
+      const resolved = new Set(['m1']);
+      const state = createServiceState(
+        makeConfig({ isDeliveryFailureResolved: id => resolved.has(id) })
+      );
+
+      // The retry cleared the original row's footer, and the DO's stored-event
+      // replay delivers its failure again on the next open.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The agent could not run this message.',
+        reason: 'execution',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      // A failure the user has not retried still shows its footer.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm2',
+        error: 'The agent could not run this message.',
+        reason: 'execution',
+      });
+      expect(state.getPendingMessages().get('m2')?.status).toBe('failed');
+    });
+
+    it('clearing the failure that set the terminal error undoes the status with it', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'The message could not be delivered',
+      });
+
+      // The durable memory of retried failures can resolve after this replay
+      // applied the failure. Removing it must leave what the
+      // suppressed-at-replay path leaves: no footer and no terminal error.
+      expect(state.clearFailedMessage('m1')).toBe(true);
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('clearing a failure that never set the terminal error leaves the status alone', () => {
+      const state = createServiceState(makeConfig());
+
+      // No `cloud.message.sent` for m1, so this failure is not the active
+      // turn's and never set a terminal error.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('a later sent turn takes the terminal error over', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      state.process({ type: 'cloud.message.sent', messageId: 'm2' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm2',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      // m2 owns the terminal error now; clearing the older failure must not
+      // reset the newer turn's state.
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'The message could not be delivered',
+      });
+    });
+
+    it('a later stopped event takes the terminal failure over', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      // The session then terminates with its own error. That is the terminal
+      // state now, so a late prune of the old delivery failure — the durable
+      // memory of retried failures can resolve after the replay applied it —
+      // must not discard the newer state.
+      state.process({ type: 'stopped', reason: 'error' });
+
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
+    });
+
     it('terminal delivery failure resolves a stale preparing status', () => {
       const state = createServiceState(makeConfig());
 
@@ -1949,6 +2166,10 @@ describe('createServiceState', () => {
         reason: 'exhausted',
       });
 
+      // The status carries `event.error`, the Durable Object's safe projection
+      // of the failure, so the specific reason survives to the clients that
+      // render it; the failed row's typed footer and its Copy action keep the
+      // reader's copy.
       expect(state.getCloudStatus()).toEqual({
         type: 'error',
         message: 'Environment preparation failed',

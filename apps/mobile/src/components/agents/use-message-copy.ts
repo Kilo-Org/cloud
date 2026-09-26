@@ -7,11 +7,14 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 
-import { collectCopyableText } from './collect-copyable-text';
+import { collectCopyableText, messageTextParts } from './collect-copyable-text';
+import { COPY_TOAST_DURATION_MS } from './copy-toast-duration';
 
 export function useMessageCopy() {
   const copyMessage = useCallback(async (message: StoredMessage) => {
-    const text = collectCopyableText(message);
+    // Copy message puts the message's own text on the clipboard: the thinking
+    // block above a reply and its tool calls are not message content.
+    const text = collectCopyableText({ parts: messageTextParts(message.parts) });
     if (!text) {
       return;
     }
@@ -36,14 +39,6 @@ export function useMessageCopy() {
 
   return { copyMessage };
 }
-
-/**
- * Android's system clipboard preview (Android 13+) covers the bottom-center
- * toast region for roughly six seconds after a copy, so a default-length
- * success toast is hidden for its entire life on those devices. Keep the
- * confirmation up long enough to be seen once the preview clears.
- */
-const COPY_TOAST_DURATION_MS = 8000;
 
 /**
  * Immediate clipboard write used by the message-details sheet and by the

@@ -5,13 +5,12 @@ import { getCalendars } from 'expo-localization';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from '@/components/ui/icons';
 import { useCallback, useMemo } from 'react';
-import { Platform, Pressable, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
 import { captureEvent, CONVERSATION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -21,7 +20,7 @@ import { Text } from '@/components/ui/text';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 import { EmptyConversationList } from './empty-conversation-list';
 import { groupConversationsByActivity } from './conversation-list-groups';
@@ -34,7 +33,7 @@ import {
   useLeaveConversation,
 } from './hooks/use-conversations';
 import { useInstancePresence } from './hooks/use-instance-presence';
-import { useNowTicker } from './hooks/use-now-ticker';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 
 type Props = {
@@ -101,25 +100,26 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  // The tabs layout's width-aware label decision rides along, so the list and
+  // FAB clearance track the bar height the layout actually renders.
+  const tabBarHeight = useEffectiveTabBarHeight();
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
   const activeAndFocused = useAppActiveAndFocused();
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
-  const now = useNowTicker(60_000);
+  // The rows' relative timestamps are minute-bucketed, so the clock has to be
+  // sampled at least twice per bucket: a 60s tick is phase-locked to this
+  // screen's mount and would let a just-created row read "Just now" for up to
+  // 60s past the minute it turned one minute old. Same clock as the open
+  // conversation, so both surfaces share one timer.
+  const now = useNowTicker(10_000);
 
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
-  const tabBarHeight = getEffectiveTabBarHeight({
-    bottomInset: bottom,
-    platform: Platform.OS,
-    fontScale,
-  });
   const listContentContainerStyle = useMemo(
     () =>
       ({
@@ -266,6 +266,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
                   <ConversationRow
                     conversation={item.conversation}
                     sandboxId={sandboxId}
+                    now={now}
                     onPress={handleRowPress}
                     onLeave={handleLeave}
                   />

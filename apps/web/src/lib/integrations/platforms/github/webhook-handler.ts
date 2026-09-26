@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubWebhookSignature } from '@/lib/integrations/platforms/github/adapter';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   InstallationCreatedPayloadSchema,
   InstallationDeletedWebhookPayloadSchema,
@@ -17,6 +18,7 @@ import {
   GitHubAppAuthorizationRevokedPayloadSchema,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {
+  findConnectedIntegrationByInstallationId,
   findIntegrationByInstallationId,
   getIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
@@ -46,16 +48,46 @@ import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
+import {
+  claimGitHubInstallationDelivery,
+  completeGitHubInstallationDelivery,
+  isSharedGitHubInstallation,
+  materializeGitHubInstallationIdentity,
+  releaseGitHubInstallationDelivery,
+} from '@/lib/integrations/db/github-installations';
+
+/**
+ * A retained but unhealthy association (locally disconnected, suspended, or
+ * auth-invalid) must never route a webhook. After a tenant disconnects, its
+ * row is kept for history while a healthy sibling may still own the
+ * installation; `findIntegrationByInstallationId` can return either, so the
+ * selected row is validated before it is used as the delivery's owner.
+ */
+function isRoutableGitHubIntegration(
+  integration: {
+    integration_status: string | null;
+    suspended_at: string | null;
+    auth_invalid_at: string | null;
+    github_disconnected_at?: string | null;
+  } | null
+): boolean {
+  return isPlatformIntegrationHealthy(integration);
+}
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
+  id: string;
   platform_installation_id: string | null;
   github_app_type: GitHubAppType | null;
 }): Promise<boolean> {
   if (!integration.platform_installation_id) return false;
   try {
+    // Pass the exact selected association: installation-wide authorization
+    // must never authorize deferred work that carries a different
+    // association's identity.
     await assertGitHubInstallationRuntimeAuthorized(
       integration.platform_installation_id,
-      integration.github_app_type ?? 'standard'
+      integration.github_app_type ?? 'standard',
+      integration.id
     );
     return true;
   } catch (error) {
@@ -87,6 +119,14 @@ export async function handleGitHubWebhook(
   const logSuffix = appType === 'lite' ? ' (lite app)' : '';
   const sentryPrefix = appType === 'lite' ? 'github_lite_' : 'github_';
 
+  // Identifying context for the top-level 500 capture. These come from the
+  // delivery headers and the top level of the parsed envelope only — never from
+  // the payload body, headers, tokens, or the webhook secret.
+  let eventType = '';
+  let deliveryId: string | null = null;
+  let deliveryInstallationId: string | undefined;
+  let deliveryAction: string | undefined;
+
   try {
     // 1. Verify signature
     const rawBody = await request.text();
@@ -111,9 +151,24 @@ export async function handleGitHubWebhook(
     }
 
     // 3. Get event type and action from headers
-    const eventType = request.headers.get('x-github-event') || '';
+    eventType = request.headers.get('x-github-event') || '';
     const eventSignature = request.headers.get('x-github-delivery');
+    deliveryId = eventSignature;
     const headers = redactSensitiveHeaders(Object.fromEntries(request.headers));
+
+    // Context for the top-level error capture. Only the delivery envelope is
+    // read here; the payload itself is never captured.
+    const deliveryEnvelope = payload as {
+      action?: unknown;
+      installation?: { id?: unknown };
+    } | null;
+    deliveryAction =
+      typeof deliveryEnvelope?.action === 'string' ? deliveryEnvelope.action : undefined;
+    const envelopeInstallationId = deliveryEnvelope?.installation?.id;
+    deliveryInstallationId =
+      typeof envelopeInstallationId === 'number' || typeof envelopeInstallationId === 'string'
+        ? envelopeInstallationId.toString()
+        : undefined;
 
     if (!eventType) {
       return NextResponse.json({ error: 'Missing x-github-event header' }, { status: 400 });
@@ -161,6 +216,47 @@ export async function handleGitHubWebhook(
         return { isDuplicate: false, webhookEventId: undefined };
       }
     };
+    const dispatchSharedOnce = async (
+      installationId: string,
+      action: string,
+      dispatch: () => Promise<Response>
+    ): Promise<Response> => {
+      const claim = await claimGitHubInstallationDelivery({
+        installationId,
+        appType,
+        deliveryId: eventSignature,
+        eventType: `${eventType}.${action}`,
+      });
+      if (claim.status === 'completed' || claim.status === 'processing') {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+      let response: Response;
+      try {
+        response = await dispatch();
+      } catch (error) {
+        if (claim.status === 'claimed') {
+          await releaseGitHubInstallationDelivery({
+            githubInstallationId: claim.githubInstallationId,
+            deliveryId: eventSignature,
+          });
+        }
+        throw error;
+      }
+      if (claim.status === 'claimed') {
+        if (response.ok) {
+          await completeGitHubInstallationDelivery({
+            githubInstallationId: claim.githubInstallationId,
+            deliveryId: eventSignature,
+          });
+        } else {
+          await releaseGitHubInstallationDelivery({
+            githubInstallationId: claim.githubInstallationId,
+            deliveryId: eventSignature,
+          });
+        }
+      }
+      return response;
+    };
 
     // 5. Route based on event type with type-safe Zod parsing
 
@@ -192,6 +288,15 @@ export async function handleGitHubWebhook(
           });
           return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
+        if (
+          await isSharedGitHubInstallation(parseResult.data.installation.id.toString(), appType)
+        ) {
+          return await dispatchSharedOnce(
+            parseResult.data.installation.id.toString(),
+            action,
+            async () => NextResponse.json({ message: 'Event received' }, { status: 200 })
+          );
+        }
         // Note: For installation.created, webhook logging happens inside handler
         // because we need organization_id which is only available after processing
         return await handleInstallationCreated(parseResult.data, appType);
@@ -219,40 +324,11 @@ export async function handleGitHubWebhook(
         }
         const deletedPayload = { ...parseResult.data, installation };
 
-        // Get integration before deletion to log the event
         const installationId = installation.id.toString();
-        const integration = await findIntegrationByInstallationId(
-          PLATFORM.GITHUB,
-          installationId,
-          appType
+        await materializeGitHubInstallationIdentity({ installationId, appType });
+        return await dispatchSharedOnce(installationId, action, () =>
+          handleInstallationDeleted(deletedPayload, appType)
         );
-
-        if (integration) {
-          const logResult = await logWebhook(integration, action);
-          if (logResult.isDuplicate) {
-            return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-          }
-
-          const result = await handleInstallationDeleted(deletedPayload, appType);
-
-          // Mark webhook event as processed
-          if (logResult.webhookEventId) {
-            try {
-              await updateWebhookEvent(logResult.webhookEventId, {
-                processed: true,
-                processed_at: new Date().toISOString(),
-                handlers_triggered: ['installation_deleted'],
-                errors: null,
-              });
-            } catch (error) {
-              logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
-            }
-          }
-
-          return result;
-        }
-
-        return await handleInstallationDeleted(deletedPayload, appType);
       }
 
       if (action === GITHUB_ACTION.SUSPEND) {
@@ -268,7 +344,18 @@ export async function handleGitHubWebhook(
         }
 
         const installationId = parseResult.data.installation.id.toString();
-        const integration = await findIntegrationByInstallationId(
+        if (await isSharedGitHubInstallation(installationId, appType)) {
+          return await dispatchSharedOnce(installationId, action, () =>
+            handleInstallationSuspend(parseResult.data, appType)
+          );
+        }
+        // Suspend is a canonical lifecycle event: resolve the connected tenant
+        // for logging/dispatch (the unfiltered lookup can return a retained
+        // disconnected former tenant), and never drop the delivery just
+        // because the selected row is unhealthy — the handler updates
+        // canonical state unconditionally and restricts the tenant-facing
+        // action to the connected, non-disconnected association.
+        const integration = await findConnectedIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
           appType
@@ -315,7 +402,16 @@ export async function handleGitHubWebhook(
         }
 
         const installationId = parseResult.data.installation.id.toString();
-        const integration = await findIntegrationByInstallationId(
+        if (await isSharedGitHubInstallation(installationId, appType)) {
+          return await dispatchSharedOnce(installationId, action, () =>
+            handleInstallationUnsuspend(parseResult.data, appType)
+          );
+        }
+        // Unsuspend is a recovery event: the association is expected to be
+        // suspended. Resolve the connected tenant directly, because the
+        // unfiltered lookup can return a retained disconnected former tenant
+        // and dropping the event there leaves the live tenant suspended.
+        const integration = await findConnectedIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
           appType
@@ -376,6 +472,11 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
+      if (await isSharedGitHubInstallation(installationId, appType)) {
+        return await dispatchSharedOnce(installationId, action, () =>
+          handleInstallationTargetRenamed(parseResult.data, appType)
+        );
+      }
       const integration = await findIntegrationByInstallationId(
         PLATFORM.GITHUB,
         installationId,
@@ -386,9 +487,14 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
       }
 
+      if (!isRoutableGitHubIntegration(integration)) {
+        logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+        return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
+      }
+
       // Identity synchronization is idempotent and must finish before delivery deduplication;
       // otherwise GitHub redelivery after a transient API or database failure cannot repair metadata.
-      const result = await handleInstallationTargetRenamed(parseResult.data, integration, appType);
+      const result = await handleInstallationTargetRenamed(parseResult.data, appType);
 
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
@@ -428,6 +534,12 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
+      const action = parseResult.data.action;
+      if (await isSharedGitHubInstallation(installationId, appType)) {
+        return await dispatchSharedOnce(installationId, action, () =>
+          handleInstallationRepositories(parseResult.data, appType)
+        );
+      }
       const integration = await findIntegrationByInstallationId(
         PLATFORM.GITHUB,
         installationId,
@@ -439,7 +551,11 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
       }
 
-      const action = parseResult.data.action;
+      if (!isRoutableGitHubIntegration(integration)) {
+        logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+        return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
+      }
+
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
@@ -482,6 +598,11 @@ export async function handleGitHubWebhook(
     if (!integration) {
       console.warn(`Integration not found for installation${logSuffix}:`, installationId);
       return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
+    }
+
+    if (!isRoutableGitHubIntegration(integration)) {
+      logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+      return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
     }
 
     if (!(await isAvailableForDeferredGitHubDispatch(integration))) {
@@ -820,7 +941,13 @@ export async function handleGitHubWebhook(
   } catch (error) {
     logExceptInTest(`Webhook error${logSuffix}:`, error);
     captureException(error, {
-      tags: { source: `${sentryPrefix}webhook_handler` },
+      tags: {
+        source: `${sentryPrefix}webhook_handler`,
+        ...(eventType ? { event: eventType } : {}),
+        ...(deliveryId ? { delivery: deliveryId } : {}),
+        ...(deliveryInstallationId ? { installation: deliveryInstallationId } : {}),
+        ...(deliveryAction ? { action: deliveryAction } : {}),
+      },
     });
     return new NextResponse('Internal Server Error', { status: 500 });
   }

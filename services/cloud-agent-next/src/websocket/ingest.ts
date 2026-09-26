@@ -29,8 +29,8 @@ import {
   type CompleteEventData,
   type KilocodeEventData,
   type CloudStatusData,
+  type CommandsAvailableData,
 } from '../shared/protocol.js';
-import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
@@ -50,10 +50,6 @@ import {
   type AttentionEvent,
 } from './ingest-attention-classifier.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
-
-// ---------------------------------------------------------------------------
-// Ingest Attachment
-// ---------------------------------------------------------------------------
 
 /** Debounce interval for heartbeat updates (30 seconds) */
 const HEARTBEAT_DEBOUNCE_MS = 30_000;
@@ -193,10 +189,6 @@ function sanitizePublicEventData(eventType: string, data: unknown): unknown {
   return data;
 }
 
-// ---------------------------------------------------------------------------
-// Persistence Allowlists
-// ---------------------------------------------------------------------------
-
 /**
  * Kilocode events with entity IDs are always persisted via upsert:
  *   - message.updated   → entity_id: message/{id}
@@ -241,10 +233,6 @@ const ingestAttachmentSchema = z.object({
 
 export type IngestAttachment = z.infer<typeof ingestAttachmentSchema>;
 
-// ---------------------------------------------------------------------------
-// DO Context for handlers
-// ---------------------------------------------------------------------------
-
 export type IngestDOContext = {
   updateKiloSessionId: (id: string) => Promise<void>;
   updateUpstreamBranch: (branch: string) => Promise<void>;
@@ -266,8 +254,11 @@ export type IngestDOContext = {
     params: TerminalizeParams & { assistantMessageId?: string },
     wrapperRunId: string
   ) => Promise<void>;
-  /** Persist the slash-command catalog so connecting clients can be hydrated. */
-  setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
+  /**
+   * Persist the slash-command catalog and its bound status so connecting
+   * clients can be hydrated with the notice that rows are missing.
+   */
+  setAvailableCommands: (data: CommandsAvailableData) => Promise<void>;
   /**
    * Optional callback invoked for qualifying question/permission kilocode
    * events. Synchronous/fire-and-forget; the DO owns any `waitUntil` for
@@ -277,10 +268,6 @@ export type IngestDOContext = {
    */
   onAttentionEvent?: (event: AttentionEvent) => void;
 };
-
-// ---------------------------------------------------------------------------
-// Ingest Handler Factory
-// ---------------------------------------------------------------------------
 
 /**
  * Create an ingest handler for the /ingest WebSocket endpoint.
@@ -754,17 +741,13 @@ export function createIngestHandler(
           }
         }
 
-        // -- Handler integrations --
-
-        // Handle commands.available (cache catalog in DO metadata)
         if (eventType === 'commands.available') {
           await handleCommandsAvailable(ingestEvent.data, {
-            setAvailableCommands: cmds => doContext.setAvailableCommands(cmds),
+            setAvailableCommands: data => doContext.setAvailableCommands(data),
             logger: console,
           });
         }
 
-        // Handle kilocode events (session ID capture)
         if (eventType === 'kilocode') {
           const parsedKilocode = kilocodeEventSchema.safeParse(ingestEvent.data);
           if (parsedKilocode.success) {

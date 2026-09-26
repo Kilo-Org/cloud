@@ -9,11 +9,11 @@ import {
 } from '@/lib/organizations/effective-model-access.server';
 import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/direct-byok';
-import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@/lib/organizations/organization-auto-model';
 import { addUserByokAvailability, getOrganizationByokProviderIds } from '@/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
+import { tagOpenAiChatGptByokModels } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { readDb } from '@/lib/drizzle';
 import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
 import {
@@ -48,16 +48,21 @@ export async function getAvailableModelsForOrganization(
     availableModels = availableModels.filter(model => model.mayTrainOnYourPrompts !== true);
   }
 
-  if (organization.plan !== 'enterprise' && organization.settings.data_collection !== 'deny') {
-    availableModels.push(...(await listAvailableExperimentModels()));
-  }
-
   if (isOrganizationAutoEnabled(organization)) {
     availableModels.push(buildAutoModelCatalogEntry(ORG_AUTO_MODEL));
   }
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
+
+  // The ChatGPT connection is personal, so it marks models only for the member
+  // whose connection applies to this organization.
+  if (subject.type === 'member') {
+    availableModels = await tagOpenAiChatGptByokModels(
+      { kiloUserId: subject.kiloUserId, organizationId },
+      availableModels
+    );
+  }
 
   const snapshot = await getEnkryptBenchmarks();
   return {

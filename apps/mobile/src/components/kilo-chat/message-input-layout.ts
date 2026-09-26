@@ -33,8 +33,11 @@ export const messageInputKeyboardProps = {
   submitBehavior: 'newline',
 } satisfies Pick<TextInputProps, 'keyboardType' | 'returnKeyType' | 'submitBehavior'>;
 
-export function resolveMessageInputShouldScroll(inputHeight: number): boolean {
-  return inputHeight >= MESSAGE_INPUT_MAX_HEIGHT;
+export function resolveMessageInputShouldScroll(
+  inputHeight: number,
+  maxHeight: number = MESSAGE_INPUT_MAX_HEIGHT
+): boolean {
+  return inputHeight >= maxHeight;
 }
 
 export function resolveMessageInputHeight(contentHeight: number): number {
@@ -61,6 +64,11 @@ export function resolveMessageInputBottomPadding({
   bottomSafeAreaInset?: number;
   platform?: 'android' | 'ios' | string;
 } = {}): number {
+  // The composer keeps the device's bottom inset while the keyboard is closed.
+  // Inside the keyboard-lift view its caller passes `contentReservesBottomInset`,
+  // so the lift applies only the platform's raw metric and this padding
+  // completes the strip the IME hides — one inset per screen, never two
+  // (2026-09-21 review finding).
   if (platform === 'android') {
     return MESSAGE_INPUT_BOTTOM_CLEARANCE + Math.max(bottomSafeAreaInset, 0);
   }

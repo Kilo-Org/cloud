@@ -11,12 +11,15 @@ export default defineProject({
   plugins: [inlineSqlPlugin()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': fileURLToPath(new URL('src', import.meta.url)),
     },
   },
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
     // The mobile-app gate runs `vitest related` over the branch's changed files
     // (170+ suites) beside Metro, the simulator, and the local services. On that
     // loaded machine the first transform/import of a heavy dependency
@@ -32,6 +35,7 @@ export default defineProject({
     // class down to the workers so the suite prints no warnings.
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
+      'plugins/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
@@ -42,17 +46,23 @@ export default defineProject({
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
+      'src/lib/artifacts/**/*.test.ts',
       'src/lib/glanceable/**/*.test.ts',
       'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',
       'src/glanceable-android/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
-      'src/lib/kilo-pass/**/*.test.tsx',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/kilo-pass/**/!(*.mounted).test.tsx',
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',
+      'src/lib/app-actions/**/*.test.ts',
+      'src/lib/app-actions/**/!(*.mounted).test.tsx',
+      'modules/kilo-app-actions/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/lib/tool-summary-translation/**/*.test.ts',

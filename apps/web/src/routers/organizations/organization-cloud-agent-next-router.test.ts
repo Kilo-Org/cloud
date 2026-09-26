@@ -3,6 +3,7 @@ import { inspect } from 'node:util';
 import { DrizzleQueryError } from 'drizzle-orm';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
 import type * as OrganizationUtilsModule from '@/routers/organizations/utils';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
@@ -92,6 +93,11 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
+const mockGetPendingInteractions =
+  jest.fn<
+    (cloudAgentSessionId: string) => Promise<{ questions: unknown[]; permissions: unknown[] }>
+  >();
+const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -115,6 +121,8 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
+  getMessageResult: mockGetMessageResult,
+  getPendingInteractions: mockGetPendingInteractions,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
   getWorktreeChanges: mockGetWorktreeChanges,
@@ -153,7 +161,8 @@ const mockGetBalanceForOrganizationUser =
 const mockFetchGitHubRepositoriesForOrganization = jest.fn<
   (
     organizationId: string,
-    forceRefresh: boolean
+    forceRefresh: boolean,
+    purpose?: 'workflow' | 'agent'
   ) => Promise<{
     repositories: unknown[];
     integrationInstalled: boolean;
@@ -293,9 +302,17 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     worktreeId: string;
     replayed?: boolean;
   }>;
+  getMessageResult: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    expectedWorktreeId: `worktree_${string}`;
+    messageId: string;
+  }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
   sendMessage: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
+    expectedWorktreeId?: `worktree_${string}`;
+    messageId?: string;
     payload:
       | { type: 'prompt'; prompt: string; mode: string; model: string }
       | { type: 'command'; command: string; arguments: string };
@@ -314,6 +331,10 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     sessionId: string;
     messageId: string;
   }) => Promise<unknown>;
+  getPendingInteractions: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<{ questions: unknown[]; permissions: unknown[] }>;
   listBitbucketRepositories: (input: {
     organizationId: string;
     forceRefresh?: boolean;
@@ -592,6 +613,8 @@ describe('organizationCloudAgentNextRouter.getSandboxStatus', () => {
 describe('organizationCloudAgentNextRouter worktree changes access', () => {
   const orgSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const personalSessionId = 'workspace_12345678-1234-4234-9234-123456789abd';
+  const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const reviewMessageId = 'msg_123456789abc123456789ABCDE';
   let owner: User;
   let otherMember: User;
   let organization: Organization;
@@ -616,6 +639,7 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
       {
         session_id: 'ses_changes_org',
         cloud_agent_session_id: orgSessionId,
+        cloud_agent_worktree_id: worktreeId,
         organization_id: organization.id,
         kilo_user_id: owner.id,
         created_on_platform: 'cloud-agent-web',
@@ -650,6 +674,129 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
         role: 'owner',
       })
       .onConflictDoNothing();
+  });
+
+  describe.each(['sendMessage', 'getMessageResult'] as const)('review %s', procedure => {
+    const payload = {
+      type: 'prompt' as const,
+      prompt: 'Review feedback',
+      mode: 'code',
+      model: 'model/target',
+    };
+    function call(
+      user: User,
+      overrides: {
+        organizationId?: string;
+        cloudAgentSessionId?: string;
+        expectedWorktreeId?: `worktree_${string}`;
+      } = {}
+    ) {
+      const caller = createCaller({ user });
+      const input = {
+        organizationId: organization.id,
+        cloudAgentSessionId: orgSessionId,
+        expectedWorktreeId: worktreeId,
+        messageId: reviewMessageId,
+        ...overrides,
+      } satisfies Parameters<typeof caller.getMessageResult>[0];
+      return procedure === 'sendMessage'
+        ? caller.sendMessage({ ...input, payload })
+        : caller.getMessageResult(input);
+    }
+
+    beforeEach(() => {
+      mockGetMessageResult.mockResolvedValue({
+        cloudAgentSessionId: orgSessionId,
+        messageId: reviewMessageId,
+        status: 'queued',
+      });
+      mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('keeps admission billing checks and makes reconciliation passive', async () => {
+      await call(owner);
+      if (procedure === 'sendMessage') {
+        expect(mockRequireActiveSubscription).toHaveBeenCalled();
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: owner,
+            organizationId: organization.id,
+            modelId: payload.model,
+          })
+        );
+        expect(mockSendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cloudAgentSessionId: orgSessionId,
+            payload,
+            messageId: reviewMessageId,
+          })
+        );
+        expect(mockSendMessage.mock.calls[0]?.[0]).not.toHaveProperty('expectedWorktreeId');
+      } else {
+        expect(mockGetMessageResult).toHaveBeenCalledWith({
+          cloudAgentSessionId: orgSessionId,
+          messageId: reviewMessageId,
+        });
+        expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+        expect(mockSendMessage).not.toHaveBeenCalled();
+      }
+    });
+
+    it('rejects the wrong worktree before any Worker call', async () => {
+      await expect(
+        call(owner, { expectedWorktreeId: 'worktree_22345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('requires the same owner and exact organization', async () => {
+      await expect(call(otherMember)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(call(owner, { organizationId: otherOrganization.id })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      await expect(call(owner, { cloudAgentSessionId: personalSessionId })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed members despite a stale owner row', async () => {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, owner.id)
+          )
+        );
+      await expect(call(owner)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleted organizations', async () => {
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await expect(call(owner)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects legacy references with a worktree guard', async () => {
+      await expect(
+        call(owner, { cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
   });
 
   describe.each(['getWorktreeChanges', 'refreshWorktreeChanges', 'getWorktreeFile'] as const)(
@@ -999,6 +1146,54 @@ describe('organizationCloudAgentNextRouter.cancelQueuedMessage', () => {
   });
 });
 
+describe('organizationCloudAgentNextRouter.getPendingInteractions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockGetPendingInteractions.mockResolvedValue({
+      questions: [],
+      permissions: [{ id: 'perm-1' }],
+    });
+  });
+
+  it('reads a session the organization owns through the organization-scoped client', async () => {
+    const user = { id: 'org-approver', is_admin: false } as User;
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.getPendingInteractions({ organizationId: ORGANIZATION_ID, cloudAgentSessionId })
+    ).resolves.toEqual({ questions: [], permissions: [{ id: 'perm-1' }] });
+
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user }),
+      ORGANIZATION_ID
+    );
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockGetPendingInteractions).toHaveBeenCalledWith(cloudAgentSessionId);
+  });
+
+  it('denies a session outside the organization before reading interactions', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'org-approver', is_admin: false } as User });
+
+    await expect(
+      caller.getPendingInteractions({ organizationId: ORGANIZATION_ID, cloudAgentSessionId })
+    ).rejects.toThrow('Organization does not own this session');
+
+    expect(mockGetPendingInteractions).not.toHaveBeenCalled();
+  });
+});
+
 describe('organizationCloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1078,7 +1273,8 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       } else {
         expect(mockFetchGitHubRepositoriesForOrganization).toHaveBeenCalledWith(
           ORGANIZATION_ID,
-          true
+          true,
+          'agent'
         );
       }
       expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({
@@ -1090,6 +1286,39 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
     }
   );
+
+  it('preserves the GitHub app type in organization repository listings', async () => {
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories: [
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+          platformAccountLogin: 'acme',
+          githubAppType: 'lite',
+        },
+      ],
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        repositories: [
+          expect.objectContaining({
+            fullName: 'acme/repo',
+            platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+            githubAppType: 'lite',
+          }),
+        ],
+      })
+    );
+  });
 
   it('rejects organization repository listing before ranking when membership is denied', async () => {
     mockEnsureOrganizationAccess.mockImplementation(() => {
@@ -1154,6 +1383,41 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
     ).rejects.toThrow('provider down');
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not strip platformIntegrationId/githubAppType from organization GitHub repositories in the response', async () => {
+    // Regression test: the tRPC .output() schema previously omitted
+    // githubAppType, so Zod silently stripped it even though the picker's
+    // "Lite" badge depends on it, and platformIntegrationId is required for
+    // the "Select the GitHub repository again" guard to resolve correctly.
+    const repositories = [
+      {
+        id: 1,
+        name: 'repo',
+        fullName: 'acme/repo',
+        private: false,
+        platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+        platformAccountLogin: 'acme',
+        githubAppType: 'lite' as const,
+      },
+    ];
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({
+        organizationId: ORGANIZATION_ID,
+        forceRefresh: false,
+      })
+    ).resolves.toEqual({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
   });
 });
 

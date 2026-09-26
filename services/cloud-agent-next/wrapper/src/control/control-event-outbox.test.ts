@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from '
 import { ControlDeliveryError } from './sandbox-control-client';
 import {
   CONTROL_EVENT_BATCH_WINDOW_MS,
+  MAX_CONTROL_EVENT_OUTBOX_EVENTS,
   createControlEventOutbox,
   type ControlEventOutboxFailure,
   type ControlEventPublication,
@@ -37,6 +38,31 @@ function partUpdatedPayload(
       part: { id, messageID, sessionID, type: 'text', text: marker },
     },
   };
+}
+
+function deltaPayload(
+  messageID: string,
+  id: string,
+  delta: string,
+  overrides: Record<string, unknown> = {}
+) {
+  return {
+    type: 'message.part.delta',
+    properties: {
+      sessionID: session.kiloSessionId,
+      messageID,
+      partID: id,
+      field: 'text',
+      delta,
+      ...overrides,
+    },
+  };
+}
+
+function deltaText(payload: unknown): string {
+  const delta = (payload as { properties?: { delta?: unknown } } | undefined)?.properties?.delta;
+  if (typeof delta !== 'string') throw new Error('expected a string delta');
+  return delta;
 }
 
 async function waitFor(condition: () => boolean, attempts = 100): Promise<void> {
@@ -81,7 +107,7 @@ describe('control event outbox', () => {
       onFailure: failure,
     });
     try {
-      for (let index = 0; index < 256; index += 1)
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS; index += 1)
         expect(
           outbox.enqueue(
             outbox.prepare({
@@ -104,7 +130,10 @@ describe('control event outbox', () => {
               kiloSessionId: 'ses_overflow',
               rootKiloSessionId: 'ses_overflow',
             },
-            payload: { type: 'session.idle', properties: { index: 256 } },
+            payload: {
+              type: 'session.idle',
+              properties: { index: MAX_CONTROL_EVENT_OUTBOX_EVENTS },
+            },
           })
         )
       ).toBe(false);
@@ -243,8 +272,8 @@ describe('control event outbox', () => {
         session,
         payload: messageUpdatedPayload('msg_1', 'latest'),
       });
-      expect(first.deadlineAt).toBe(31_000);
-      expect(second.deadlineAt).toBe(32_000);
+      expect(first.deadlineAt).toBe(61_000);
+      expect(second.deadlineAt).toBe(62_000);
       expect(first.deadlineAt).toBeLessThan(second.deadlineAt);
       expect(outbox.enqueue(first)).toBe(true);
       expect(outbox.enqueue(second)).toBe(true);
@@ -728,7 +757,7 @@ describe('control event outbox', () => {
     }
   });
 
-  it('admits a tail replacement at the 256-entry count boundary', async () => {
+  it(`admits a tail replacement at the ${MAX_CONTROL_EVENT_OUTBOX_EVENTS}-entry count boundary`, async () => {
     const published: ControlEventPublication[] = [];
     const outbox = createControlEventOutbox({
       publish: async publication => {
@@ -737,7 +766,7 @@ describe('control event outbox', () => {
       onFailure: mock(),
     });
     try {
-      for (let index = 0; index < 255; index += 1)
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS - 1; index += 1)
         expect(
           outbox.enqueue(
             outbox.prepare({
@@ -760,7 +789,7 @@ describe('control event outbox', () => {
       expect(outbox.enqueue(old)).toBe(true);
       expect(outbox.enqueue(latest)).toBe(true);
       expect(await outbox.resume()).toBe(true);
-      expect(published).toHaveLength(256);
+      expect(published).toHaveLength(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
       expect(published.at(-1)).toMatchObject({
         receiptId: old.receiptId,
         sequence: old.sequence,
@@ -885,10 +914,11 @@ describe('control event outbox', () => {
         });
         if (!outbox.enqueue(publication)) break;
         admitted += 1;
-        if (admitted > 256) throw new Error('byte budget did not apply');
+        if (admitted > MAX_CONTROL_EVENT_OUTBOX_EVENTS)
+          throw new Error('byte budget did not apply');
       }
       expect(admitted).toBeGreaterThan(1);
-      expect(admitted).toBeLessThan(256);
+      expect(admitted).toBeLessThan(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
       expect(failure).toHaveBeenCalledWith(expect.objectContaining({ reason: 'queue_overflow' }));
     } finally {
       outbox.close();
@@ -1220,9 +1250,9 @@ describe('control event outbox', () => {
           session: { ...session, nativeRuntimeId },
           payload: { type: 'session.idle' },
         });
-        expect(original.deadlineAt).toBe(31_000);
+        expect(original.deadlineAt).toBe(61_000);
         outbox.enqueue(original);
-        clock.mockReturnValue(30_900);
+        clock.mockReturnValue(60_900);
         outbox.enqueue(
           outbox.prepare({
             event: 'session.event',
@@ -1302,6 +1332,583 @@ describe('control event outbox', () => {
     expect(await outbox.resume()).toBe(true);
     expect(published).toHaveLength(97);
     expect(published[0]?.payload.properties.nested.state).toBe('queued');
+  });
+});
+
+describe('control event outbox delta merge', () => {
+  async function flushMicrotasks(): Promise<void> {
+    for (let attempt = 0; attempt < 20; attempt += 1) await Promise.resolve();
+  }
+
+  it('merges adjacent same-part text deltas while retaining the original receipt metadata', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'Hello '),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'world'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(1);
+      expect(published[0]).toMatchObject({
+        receiptId: first.receiptId,
+        sequence: first.sequence,
+      });
+      expect(published[0]?.payload).toEqual(deltaPayload('msg_1', 'part_1', 'Hello world'));
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it.each([
+    ['message', deltaPayload('msg_1', 'part_1', 'a'), deltaPayload('msg_2', 'part_1', 'b')],
+    ['part', deltaPayload('msg_1', 'part_1', 'a'), deltaPayload('msg_1', 'part_2', 'b')],
+    [
+      'field',
+      deltaPayload('msg_1', 'part_1', 'a'),
+      deltaPayload('msg_1', 'part_1', 'b', { field: 'reasoning' }),
+    ],
+  ] as const)(
+    'does not merge adjacent deltas with a different %s',
+    async (_name, first, second) => {
+      const published: ControlEventPublication[] = [];
+      const outbox = createControlEventOutbox({
+        publish: async publication => {
+          published.push(publication);
+        },
+        onFailure: mock(),
+      });
+      try {
+        expect(
+          outbox.enqueue(outbox.prepare({ event: 'session.event', session, payload: first }))
+        ).toBe(true);
+        expect(
+          outbox.enqueue(outbox.prepare({ event: 'session.event', session, payload: second }))
+        ).toBe(true);
+        expect(await outbox.resume()).toBe(true);
+        expect(published).toHaveLength(2);
+        expect(published.map(item => item.payload)).toEqual([first, second]);
+      } finally {
+        outbox.close();
+      }
+    }
+  );
+
+  it('keeps a delta on either side of a snapshot barrier as its own publication', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      const head = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'a'),
+      });
+      const barrier = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'snapshot'),
+      });
+      const tail = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'b'),
+      });
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(outbox.enqueue(barrier)).toBe(true);
+      expect(outbox.enqueue(tail)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published.map(item => item.payload)).toEqual([
+        head.payload,
+        barrier.payload,
+        tail.payload,
+      ]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('does not merge a delta into a snapshot tail', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      const snapshot = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'snapshot'),
+      });
+      const delta = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'a'),
+      });
+      expect(outbox.enqueue(snapshot)).toBe(true);
+      expect(outbox.enqueue(delta)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published.map(item => item.payload)).toEqual([snapshot.payload, delta.payload]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('does not merge deltas from different session identities on a shared root lane', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    const childA = { ...session, kiloSessionId: 'child_a', rootKiloSessionId: 'root_shared' };
+    const childB = { ...session, kiloSessionId: 'child_b', rootKiloSessionId: 'root_shared' };
+    try {
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session: childA,
+            payload: deltaPayload('msg_1', 'part_1', 'a'),
+          })
+        )
+      ).toBe(true);
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session: childB,
+            payload: deltaPayload('msg_1', 'part_1', 'b'),
+          })
+        )
+      ).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(2);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it.each([
+    [
+      'a non-string delta',
+      deltaPayload('msg_1', 'part_1', 'a'),
+      deltaPayload('msg_1', 'part_1', 'b', { delta: 123 }),
+    ],
+    [
+      'a differing non-delta property',
+      deltaPayload('msg_1', 'part_1', 'a', { partType: 'text' }),
+      deltaPayload('msg_1', 'part_1', 'b', { partType: 'tool' }),
+    ],
+  ] as const)('does not merge deltas with %s', async (_name, first, second) => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      expect(
+        outbox.enqueue(outbox.prepare({ event: 'session.event', session, payload: first }))
+      ).toBe(true);
+      expect(
+        outbox.enqueue(outbox.prepare({ event: 'session.event', session, payload: second }))
+      ).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(2);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('coalesces a paused same-part delta burst within the entry bound', async () => {
+    const published: ControlEventPublication[] = [];
+    const failure = mock();
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: failure,
+    });
+    const chunks = Array.from({ length: 300 }, (_value, index) => `chunk_${index};`);
+    try {
+      for (const chunk of chunks)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: deltaPayload('msg_1', 'part_1', chunk),
+            })
+          )
+        ).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(failure).not.toHaveBeenCalled();
+      expect(published).toHaveLength(1);
+      expect(deltaText(published[0]?.payload)).toBe(chunks.join(''));
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('declines an over-frame merge and appends both deltas in order', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    const left = 'a'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
+    const right = 'b'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', left),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', right),
+      });
+      expect(first.bytes).toBeLessThanOrEqual(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+      expect(second.bytes).toBeLessThanOrEqual(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(2);
+      expect(`${deltaText(published[0]?.payload)}${deltaText(published[1]?.payload)}`).toBe(
+        left + right
+      );
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('inherits the newer delta deadline so a merged group is not expired early', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'first '),
+      });
+      expect(first.deadlineAt).toBe(61_000);
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(timers.mock.calls.at(-1)?.[1]).toBe(60_000);
+
+      clock.mockReturnValue(30_000);
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'second'),
+      });
+      expect(second.deadlineAt).toBe(90_000);
+      expect(outbox.enqueue(second)).toBe(true);
+      expect(timers.mock.calls.at(-1)?.[1]).toBe(60_000);
+
+      clock.mockReturnValue(first.deadlineAt);
+      clearTimeout(timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined);
+      const wake = timers.mock.calls.at(-1)?.[0];
+      if (typeof wake !== 'function') throw new Error('Missing merged publication deadline');
+      wake();
+      expect(failures).toHaveLength(0);
+
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(0);
+      expect(delivered).toHaveLength(1);
+      expect(delivered[0]?.deadlineAt).toBe(second.deadlineAt);
+      expect(deltaText(delivered[0]?.publication.payload)).toBe('first second');
+    } finally {
+      outbox.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('does not merge into a delta publication that is in flight', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const delivered: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+        if (delivered.length === 1) {
+          started.resolve();
+          await release.promise;
+        }
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'a'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'b'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      const draining = outbox.resume();
+      await started.promise;
+      expect(outbox.enqueue(second)).toBe(true);
+      release.resolve();
+
+      expect(await draining).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(deltaText(delivered[0]?.payload)).toBe('a');
+      expect(deltaText(delivered[1]?.payload)).toBe('b');
+      expect(delivered[0]?.receiptId).toBe(first.receiptId);
+      expect(delivered[1]?.receiptId).toBe(second.receiptId);
+    } finally {
+      release.resolve();
+      outbox.close();
+    }
+  });
+
+  it('does not merge into a delta entry held in a pending batch', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new Error('single publication must not be used in batch mode');
+      },
+      publishBatch: async publications => {
+        batches.push(publications);
+        if (batches.length === 1) {
+          started.resolve();
+          await release.promise;
+        }
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      const head = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'snapshot'),
+      });
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'a'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'b'),
+      });
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+      const draining = outbox.resume();
+      await started.promise;
+      const held = batches.map(batch => batch.map(publication => publication.payload));
+      expect(held[0]).toHaveLength(2);
+
+      const third = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'c'),
+      });
+      expect(outbox.enqueue(third)).toBe(true);
+      expect(batches.map(batch => batch.map(publication => publication.payload))).toEqual(held);
+      release.resolve();
+
+      expect(await draining).toBe(true);
+      expect(batches).toHaveLength(2);
+      expect(deltaText(batches[0]?.[1]?.payload)).toBe('ab');
+      expect(batches[1]?.map(item => item.receiptId)).toEqual([third.receiptId]);
+      expect(deltaText(batches[1]?.[0]?.payload)).toBe('c');
+    } finally {
+      release.resolve();
+      outbox.close();
+    }
+  });
+
+  it('releases a merged delta entry within the byte budget after removal', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const failure = mock();
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+        if ((publication.payload as { type?: string } | undefined)?.type === 'message.updated') {
+          started.resolve();
+          await release.promise;
+        }
+      },
+      onFailure: failure,
+    });
+    const filler = 'f'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.85));
+    const largeDelta = 'd'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.9));
+    try {
+      const fillers = [0, 1, 2].map(index =>
+        outbox.prepare({
+          event: 'session.event',
+          session,
+          payload: messageUpdatedPayload(`filler_${index}`, filler),
+        })
+      );
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'a'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', largeDelta),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+      for (const fillerPublication of fillers) expect(outbox.enqueue(fillerPublication)).toBe(true);
+
+      const draining = outbox.resume();
+      await started.promise;
+
+      const fresh = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('fresh', filler),
+      });
+      expect(outbox.enqueue(fresh)).toBe(true);
+      expect(failure).not.toHaveBeenCalled();
+      release.resolve();
+
+      expect(await draining).toBe(true);
+      expect(published.map(item => item.receiptId)).toEqual([
+        first.receiptId,
+        ...fillers.map(item => item.receiptId),
+        fresh.receiptId,
+      ]);
+    } finally {
+      release.resolve();
+      outbox.close();
+    }
+  });
+
+  it('merges a delta with a tail retained across a disconnected hold', async () => {
+    const delivered: ControlEventPublication[] = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'a'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(await outbox.resume()).toBe(false);
+      await flushMicrotasks();
+
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', 'b'),
+      });
+      expect(outbox.enqueue(second)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(deltaText(delivered[0]?.payload)).toBe('a');
+      expect(deltaText(delivered[1]?.payload)).toBe('ab');
+      expect(delivered[1]?.receiptId).toBe(first.receiptId);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('declines an over-frame merge at the entry cap and reports queue_overflow', async () => {
+    const published: ControlEventPublication[] = [];
+    const failure = mock();
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: failure,
+    });
+    const left = 'a'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
+    const right = 'b'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
+    try {
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS - 1; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: { type: 'session.idle', properties: { index } },
+            })
+          )
+        ).toBe(true);
+      const tail = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', left),
+      });
+      expect(outbox.enqueue(tail)).toBe(true);
+
+      const incoming = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: deltaPayload('msg_1', 'part_1', right),
+      });
+      expect(outbox.enqueue(incoming)).toBe(false);
+      expect(failure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'queue_overflow',
+          publication: expect.objectContaining({ receiptId: incoming.receiptId }),
+        })
+      );
+
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
+      expect(deltaText(published.at(-1)?.payload)).toBe(left);
+    } finally {
+      outbox.close();
+    }
   });
 });
 
@@ -1870,7 +2477,7 @@ describe('control event outbox disconnected hold', () => {
     });
     try {
       const head = outbox.prepare(progressPublication(0));
-      expect(head.deadlineAt).toBe(31_000);
+      expect(head.deadlineAt).toBe(61_000);
       expect(outbox.enqueue(head)).toBe(true);
       expect(await outbox.resume()).toBe(false);
       expect(failures).toHaveLength(0);
@@ -1878,7 +2485,7 @@ describe('control event outbox disconnected hold', () => {
 
       const wakeup = timers.mock.calls.at(-1);
       const handle = timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined;
-      expect(wakeup?.[1]).toBe(30_000);
+      expect(wakeup?.[1]).toBe(60_000);
       clock.mockReturnValue(head.deadlineAt);
       clearTimeout(handle);
       const callback = wakeup?.[0];

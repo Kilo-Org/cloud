@@ -31,7 +31,7 @@ export type FeatureFlagDefinition = Readonly<{
 }>;
 
 /**
- * The registry the debug surface lists. Minimums record the first release that
+ * The registry the version gate reads. Minimums record the first release that
  * shipped each flag's reading code:
  * - `mobile-pr-review` (#4669) first released in 1.0.4.
  * - `mobile-chat` (#5895) first released in 1.0.11.

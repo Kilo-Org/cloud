@@ -36,6 +36,7 @@
     "cost": "لاگت",
     "discard": "ضائع کریں",
     "findings": "شناخت شدہ مسائل",
+    "mergeRequest": "مرج ریکویسٹ",
     "notConnected": "منسلک نہیں",
     "notifications": "اطلاعات",
     "pullRequest": "پل ریکویسٹ",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "دوسرا ای میل پتہ استعمال کریں",
     "signInWithApple": "Apple سے سائن ان کریں",
     "signInWithGoogle": "Google سے سائن ان کریں",
+    "signInWithPasskey": "رسائی کلید سے سائن ان کریں",
     "emailAddress": "ای میل پتہ",
     "emailPlaceholder": "صارف@example.com",
     "continueWithEmail": "ای میل کے ساتھ جاری رکھیں",
@@ -174,6 +176,10 @@
     "termsConnector": " اور ",
     "termsSuffix": "۔",
     "moreSignInOptions": "سائن ان کے مزید اختیارات",
+    "passkeyCancelled": "رسائی کلید سے سائن ان منسوخ ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
+    "passkeyNotFound": "اس ڈیوائس کے لیے کوئی رسائی کلید محفوظ نہیں ہے۔ اس کے بجائے Apple، Google یا اپنے ای میل سے سائن ان کریں۔",
+    "passkeyUnsupported": "رسائی کلیدیں اس ڈیوائس پر دستیاب نہیں ہیں۔ اس کے بجائے Apple، Google یا اپنے ای میل سے سائن ان کریں۔",
+    "passkeyFailed": "رسائی کلید سے سائن ان نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "couldNotCompleteSignIn": "سائن ان مکمل نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "sessionEnded": "آپ کا سیشن ختم ہو گیا۔ براہ کرم دوبارہ سائن ان کریں۔",
     "signInCodeExpired": "آپ کے سائن ان کوڈ کی میعاد ختم ہو گئی ہے۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -224,7 +230,28 @@
     "providerTestAccount": "آزمائشی اکاؤنٹ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "انٹرپرائز SSO"
+    "providerEnterpriseSso": "انٹرپرائز SSO",
+    "passkeysTitle": "رسائی کلیدیں",
+    "passkeysSubtitle": "بغیر پاس ورڈ سائن ان کریں",
+    "passkeysEmpty": "ابھی تک کوئی رسائی کلید نہیں",
+    "passkeysEmptyHint": "$t(profile.addPasskey) تاکہ بغیر پاس ورڈ سائن ان کر سکیں۔",
+    "passkeysCouldNotLoad": "رسائی کلیدیں لوڈ نہیں ہو سکیں",
+    "passkeysLoadFailed": "رسائی کلیدیں اس وقت تک دستیاب نہیں جب تک یہ لوڈ نہ ہو جائے۔",
+    "addPasskey": "رسائی کلید شامل کریں",
+    "passkeyDefaultName": "رسائی کلید",
+    "passkeyAddedOn": "{{date}} کو شامل کی گئی",
+    "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
+    "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+    "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",
+    "passkeyAddCancelled": "رسائی کلید بنانا منسوخ ہو گیا۔",
+    "passkeyRemoved": "رسائی کلید ہٹا دی گئی۔",
+    "passkeyRemoveFailed": "وہ رسائی کلید ہٹائی نہیں جا سکی۔ دوبارہ کوشش کریں۔",
+    "passkeyRenamed": "رسائی کلید کا نام تبدیل کر دیا گیا۔",
+    "passkeyName": "رسائی کلید کا نام",
+    "renamePasskey": "رسائی کلید کا نام تبدیل کریں",
+    "removePasskey": "رسائی کلید ہٹائیں",
+    "removePasskeyTitle": "رسائی کلید ہٹائیں؟",
+    "removePasskeyMessage": "اب آپ اس رسائی کلید سے سائن ان نہیں کر سکیں گے۔"
   },
   "preferences": {
     "general": "عمومی",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "اگر یہ ترتیب بند ہو تو ریٹرن کی دبانے سے ایجنٹ کو پیغام لکھنے کے خانے میں نئی سطر شامل ہوتی ہے۔",
     "biometricUnlock": "بایومیٹرکس سے انلاک کریں",
     "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔",
-    "featureFlags": "فیچر فلیگز",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
     "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} میں سے {{displayCount}} فائلیں لوڈ ہوئیں",
       "filesStillLoading": "فائلیں ابھی لوڈ ہو رہی ہیں۔ تازہ کرنے کے لیے نیچے کھینچیں۔",
       "goToOverview": "خلاصے پر جائیں",
-      "goToOverviewTab": "خلاصے کے ٹیب پر جائیں"
+      "goToOverviewTab": "خلاصے کے ٹیب پر جائیں",
+      "expandAllLines_one": "تمام {{displayCount}} سطر دکھائیں",
+      "expandAllLines_other": "تمام {{displayCount}} سطریں دکھائیں",
+      "expandLines_one": "{{displayCount}} سطر دکھائیں ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} سطریں دکھائیں ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "آس پاس کی {{displayCount}} سطر دکھائیں",
+      "expandLinesOfContext_other": "آس پاس کی {{displayCount}} سطریں دکھائیں",
+      "expandMoreLines_one": "مزید {{displayCount}} سطر دکھائیں ({{start}}–{{end}})",
+      "expandMoreLines_other": "مزید {{displayCount}} سطریں دکھائیں ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} میں سے {{loaded}} فائلیں لوڈ ہوئیں",
+      "loadedOfTotalFiles_other": "{{total}} میں سے {{loaded}} فائلیں لوڈ ہوئیں"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ فائل کے آخر میں نیو لائن نہیں",
@@ -357,6 +389,7 @@
       "merge": "مرج",
       "mergeNow": "ابھی مرج کریں",
       "mergePullRequest": "پل ریکویسٹ کا مرج",
+      "mergeTermTitle": "{{term}} کا مرج",
       "enableAutoMerge": "خودکار مرج فعال کریں",
       "disableAutoMerge": "خودکار مرج غیر فعال کریں",
       "autoMergeOn": "خودکار مرج فعال ہے",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "مرج کے بعد برانچ حذف کریں",
       "noEnabledMethods": "اس ریپوزٹری میں مرج کا کوئی طریقہ فعال نہیں ہے۔ ریپوزٹری کے منتظم سے مرج، اسکواش یا ریبیس کا طریقہ فعال کرنے کو کہیں۔",
       "confirmTitle": "پل ریکویسٹ مرج کریں؟",
+      "confirmTitleTerm": "{{term}} مرج کریں؟",
       "confirmMessage": "اس سے آپ کی تبدیلیاں بنیادی برانچ میں مرج ہو جائیں گی۔",
       "enableAutoMergeConfirmTitle": "خودکار مرج فعال کریں؟",
       "enableAutoMergeConfirmMessage": "تمام ضروری جانچیں کامیاب ہونے پر GitHub اس پل ریکویسٹ کو خود بخود مرج کر دے گا۔",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} پائپ لائن کے کامیاب ہوتے ہی خودکار طور پر مرج ہو جائے گا۔",
+      "enableAutoMergeDescriptionTerm": "GitLab یہ {{term}} پائپ لائن کے کامیاب ہوتے ہی خودکار طور پر مرج کر دیتا ہے۔",
       "forbidden": "آپ کو اس پل ریکویسٹ کو مرج کرنے کی اجازت نہیں ہے۔",
       "cannotMerge": "یہ پل ریکویسٹ اپنی موجودہ حالت میں مرج نہیں ہو سکتی۔",
       "couldNotMerge": "پل ریکویسٹ مرج نہیں ہو سکی۔",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "پہلے ہی مرج شدہ",
-        "closed": "یہ پل ریکویسٹ بند ہے"
+        "closed": "یہ پل ریکویسٹ بند ہے",
+        "closedMergeRequest": "یہ مرج ریکویسٹ بند ہے"
       },
       "partialSuccessBanner": {
         "body": "برانچ حذف نہیں ہو سکی: {{reason}}۔",
@@ -413,6 +450,18 @@
         "behindDetail": "ہیڈ برانچ میں بنیادی برانچ کی تازہ تبدیلیاں شامل نہیں ہیں۔ مرج کرنے سے پہلے برانچ کو ریبیس یا اپ ڈیٹ کریں۔",
         "notMergeableTitle": "یہ پل ریکویسٹ ابھی مرج نہیں ہو سکتی",
         "notMergeableDetail": "GitHub کے مطابق مرج کی حالت {{state}} ہے۔"
+      },
+      "restrictions": {
+        "title": "مرج پابندیاں",
+        "approvalsRequired_one": "{{displayCount}} منظوری درکار ہے",
+        "approvalsRequired_other": "{{displayCount}} منظوری درکار ہیں",
+        "pipelineMustSucceed": "مرج سے پہلے پائپ لائن کا کامیاب ہونا ضروری ہے۔"
+      },
+      "providerBlocked": {
+        "failingPipeline": "پائپ لائن آخری کمٹ پر ناکام ہو رہی ہے۔",
+        "pendingPipeline": "پائپ لائن آخری کمٹ پر ابھی چل رہی ہے۔",
+        "permission": "آپ کو اس {{term}} کو مرج کرنے کی اجازت نہیں ہے۔",
+        "draft": "مرج کرنے سے پہلے {{term}} پر جائزے کے لیے تیار ہونے کا نشان لگائیں۔"
       },
       "methodLabels": {
         "merge": "مرج کمیٹ بنائیں",
@@ -462,6 +511,8 @@
       "replyBadRequest": "یہ جواب پوسٹ نہیں ہو سکتا۔ شاید تھریڈ تبدیل ہو گیا ہے۔",
       "replyForbidden": "آپ کو اس پل ریکویسٹ پر جواب دینے کی اجازت نہیں ہے۔",
       "addCommentCta": "اس پل ریکویسٹ پر تبصرہ کریں",
+      "fixWithKilo": "Kilo کے ساتھ درست کریں",
+      "fixWithKiloPrompt": "براہ کرم درج ذیل پل ریکویسٹ تبصرے کو حل کریں: {{link}}",
       "commentBadRequest": "یہ تبصرہ پوسٹ نہیں ہو سکتا۔ شاید پل ریکویسٹ تبدیل ہو گیا ہے۔",
       "commentForbidden": "آپ کو اس پل ریکویسٹ پر تبصرہ کرنے کی اجازت نہیں ہے۔",
       "moderation": {
@@ -512,7 +563,10 @@
         "outdatedOnLines": "{{lines}} پر پرانا",
         "outdatedOnPath": "{{path}} پر پرانا"
       },
-      "deletedUser": "حذف شدہ صارف"
+      "deletedUser": "حذف شدہ صارف",
+      "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
+      "moreLinesAbove_one": "اوپر مزید {{displayCount}} سطر ہے…",
+      "moreLinesAbove_other": "اوپر مزید {{displayCount}} سطریں ہیں…"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "پل ریکویسٹ کا جائزہ لیں",
     "headLine": "{{counts}} · ہیڈ {{sha}}",
     "entry": {
-      "eyebrow": "URL کے ذریعے پل ریکویسٹ کھولیں۔",
-      "pastePrLink": "PR کا لنک چسپاں کریں",
-      "noRecentPrs": "کوئی حالیہ PR نہیں",
-      "noRecentPrsDescription": "جائزہ شروع کرنے کے لیے اوپر PR کا لنک چسپاں کریں — یہ اگلی بار یہاں دکھائی دے گی۔",
+      "eyebrow": "URL کے ذریعے پل ریکویسٹ یا مرج ریکویسٹ کھولیں۔",
+      "pastePrLink": "پل ریکویسٹ یا مرج ریکویسٹ کا لنک چسپاں کریں",
+      "noRecentPrs": "کوئی حالیہ جائزہ نہیں",
+      "noRecentPrsDescription": "جائزہ شروع کرنے کے لیے اوپر ایک لنک چسپاں کریں — یہ اگلی بار یہاں دکھائی دے گا۔",
       "couldNotLoad": "لوڈ نہیں ہو سکا۔",
       "removeFromRecentsTitle": "حالیہ فہرست سے ہٹائیں؟",
-      "removeFromRecentsMessage": "یہ پل ریکویسٹ آپ کی حالیہ فہرست سے ہٹا دی جائے گی۔",
+      "removeFromRecentsMessage": "یہ جائزہ آپ کی حالیہ فہرست سے ہٹا دیا جائے گا۔",
       "removeRecentAccessibility": "{{repo}} کو حالیہ فہرست سے ہٹائیں",
-      "urlAccessibility": "GitHub پل ریکویسٹ کا URL",
-      "clearLink": "پل ریکویسٹ کا لنک صاف کریں",
-      "pasteLink": "پل ریکویسٹ کا لنک چسپاں کریں",
+      "urlAccessibility": "پل ریکویسٹ یا مرج ریکویسٹ کا URL درج کریں",
+      "urlPlaceholder": "پل ریکویسٹ یا مرج ریکویسٹ کا URL",
+      "openAccessibility": "پل ریکویسٹ یا مرج ریکویسٹ کھولیں",
+      "clearLink": "لنک صاف کریں",
+      "pasteLink": "پل ریکویسٹ یا مرج ریکویسٹ کا لنک چسپاں کریں",
       "open": "کھولیں"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} زیر التوا",
       "skipped": "{{displayCount}} چھوڑی گئیں",
       "checksCount": "{{displayCount}} جانچیں",
+      "checksCount_one": "{{displayCount}} جانچ",
+      "checksCount_other": "{{displayCount}} جانچیں",
       "checkDetails": "جانچ کی تفصیلات"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "GitHub کنکشن چیک نہیں ہو سکا۔",
       "checkFailedMessage": "جب تک یہ لوڈ نہیں ہوتا، سائن ان کی حالت دستیاب نہیں ہوگی۔",
+      "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
+      "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
+      "providerCheckFailedMessage": "لوڈ ہونے تک کنکشن کی حالت دستیاب نہیں۔",
       "reconnectTitle": "GitHub سے دوبارہ رابطہ",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔ موبائل پر پل ریکویسٹ کا جائزہ جاری رکھنے کے لیے اسے دوبارہ منسلک کریں۔",
-      "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔"
+      "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
+      "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
+      "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
+      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔"
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
+      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
+      "gitlabTitle": "GitLab سے کنکشن کی مدت ختم ہو گئی۔",
+      "bitbucketTitle": "Bitbucket سے کنکشن کی مدت ختم ہو گئی۔",
+      "providerMessage": "آپ کا {{provider}} کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
     },
     "eventChips": {
       "comment": "تبصرہ",
@@ -672,10 +739,12 @@
       "statusContext": "آس پاس کی",
       "lineLabel": "{{status}} سطر {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} سطر: {{text}}",
-      "emptyLine": "(خالی)"
+      "emptyLine": "(خالی)",
+      "truncationBanner_one": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔",
+      "truncationBanner_other": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے۔",
-    "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ کا لنک نہیں ہے۔",
+    "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
       "reviewSubmitted": "جائزہ جمع ہو گیا",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "یہ تبصرہ پوسٹ نہیں کیا جا سکتا۔ ممکن ہے منتخب سطر بدل گئی ہو یا PR اپ ڈیٹ ہو گئی ہو۔",
       "reviewNotSubmitted": "یہ جائزہ اپنی موجودہ صورت میں جمع نہیں ہو سکتا۔ ممکن ہے PR بدل گئی ہو یا یہ آپ کی اپنی پل ریکویسٹ ہو، جس کا آپ جائزہ نہیں لے سکتے۔",
+      "reviewNotSubmittedTerm": "اس جائزے کو یونہی جمع نہیں کیا جا سکتا۔ ہو سکتا ہے {{term}} بدل گیا ہو، یا آپ اپنا خود {{term}} کا جائزہ نہیں لے سکتے۔",
       "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
       "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "جواب نہیں بھیجا جا سکا۔",
       "couldNotCompleteAction": "یہ کارروائی مکمل نہیں ہو سکی۔",
       "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔",
+      "mergeResultNotCompleted": "{{term}} مرج نہیں ہوا۔ اس کی حالت چیک کریں اور دوبارہ کوشش کریں۔",
       "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
       "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "forbidden": "اس کارروائی کی اجازت نہیں ہے۔"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "اس پرووائیڈر پر دستیاب نہیں",
+        "accessibility": "اس پرووائیڈر پر دستیاب نہیں: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "پل ریکویسٹ",
+      "mergeRequest": "مرج ریکویسٹ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
+      "viewOnProvider": "{{provider}} پر دیکھیں",
+      "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",
+      "unavailableDescription": "ہو سکتا ہے یہ حذف کر دی گئی ہو، یا ہو سکتا ہے آپ کو اس تک رسائی نہ ہو۔",
+      "accessDeniedMergeRequest": "آپ کو اس مرج ریکویسٹ کو دیکھنے کی اجازت نہیں ہے۔",
+      "couldNotLoadMergeRequest": "مرج ریکویسٹ لوڈ نہیں ہو سکی۔",
+      "discussionAccessDenied": "آپ کو اس مرج ریکویسٹ کی گفتگو دیکھنے کی اجازت نہیں ہے۔",
+      "discussionUnavailableMessage": "ممکن ہے یہ مرج ریکویسٹ ہٹا دی گئی ہو۔",
+      "noDiscussionDescription": "اس مرج ریکویسٹ پر ابھی جائزے کا کوئی تھریڈ یا گفتگو کا کوئی تبصرہ نہیں ہے۔",
+      "noFilesChangedDescription": "اس مرج ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔"
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "اطلاعات آپ کی لاک اسکرین پر پیغام کا متن دکھاتی ہیں۔",
     "previewGenericDescription": "اطلاعات صرف کسی سرگرمی کی خبر دیتی ہیں۔ تفصیلات پڑھنے کے لیے Kilo کھولیں۔",
     "channel": {
-      "agent": "ایجنٹ کے سیشنز",
+      "agentProgress": "ایجنٹ کی پیش رفت",
       "chat": "چیٹ کے پیغامات",
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
-      "security": "شناخت شدہ سیکیورٹی مسائل"
+      "security": "شناخت شدہ سیکیورٹی مسائل",
+      "spend": "اخراجات کی تنبیہات"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
+      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
-      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+      "balanceAlertsUnavailable": "بیلنس انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
+      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
+      "securityFindingsUnavailable": "سیکیورٹی دریافتیں حاصل کرنے کے لیے ایک دائرے پر Kilo سیکیورٹی ایجنٹ فعال کریں۔",
+      "spendAlertsSubtitle": "حدوں سے تجاوز اور فی گھنٹہ اضافہ",
+      "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم"
+    },
+    "action": {
+      "openSession": "سیشن کھولیں"
+    },
+    "needsInputAction": {
+      "approved": "درخواست منظور ہو گئی",
+      "replied": "جواب بھیج دیا گیا",
+      "failed": "جواب دینا ممکن نہیں ہو سکا۔ دوبارہ کوشش کے لیے دوبارہ ٹیپ کریں۔",
+      "unavailable": "یہ درخواست اب انتظار نہیں کر رہی۔"
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "اپ لوڈ ناکام ہو گیا۔",
       "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}۔",
       "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں ہے۔",
-      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔"
+      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔",
+      "limit_one": "آپ زیادہ سے زیادہ {{displayCount}} فائل منسلک کر سکتے ہیں۔",
+      "limit_other": "آپ زیادہ سے زیادہ {{displayCount}} فائلیں منسلک کر سکتے ہیں۔"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "مسائل ہم آہنگ کریں",
       "syncNow": "ابھی ہم آہنگ کریں",
       "syncQueued": "ہم آہنگی کی درخواست قطار میں شامل کر دی گئی",
-      "syncStatusUnavailable": "ہم آہنگی کی حالت دستیاب نہیں ہے۔"
+      "syncStatusUnavailable": "ہم آہنگی کی حالت دستیاب نہیں ہے۔",
+      "daysOverdue_one": "{{displayCount}} دن کی تاخیر",
+      "daysOverdue_other": "{{displayCount}} دن کی تاخیر",
+      "findingsCount_one": "{{displayCount}} مسئلہ",
+      "findingsCount_other": "{{displayCount}} مسائل"
     },
     "dashboardMetrics": {
       "openFindings": "غیر حل شدہ مسائل",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
+      "stopped": "سیشن روک دیا گیا",
+      "committing": "کمٹ کیا جا رہا ہے…",
+      "committed": "کمٹ ہو گیا",
+      "commitFailed": "کمٹ ناکام ہو گیا",
       "renameSession": "سیشن کا نام تبدیل کریں",
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "ریموٹ سلیش کمانڈز کے لیے Kilo CLI کا نیا ورژن درکار ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ کنکشن قائم کریں۔"
     },
     "sessionConnection": {
+      "label": "کنکشن",
       "connecting": "کنکشن قائم ہو رہا ہے…",
       "reconnecting": "کنکشن دوبارہ قائم ہو رہا ہے…",
       "connectionLost": "کنکشن ٹوٹ گیا",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "ہدف ہٹائیں؟",
       "removeConfirmMessage": "CLI اس سیشن کا ہدف صاف کر دیتا ہے۔",
       "updateFailed": "ہدف اپ ڈیٹ نہیں ہو سکا۔",
-      "sectionAccessibility": "{{status}}. ہدف: {{text}}"
+      "sectionAccessibility": "{{status}}. ہدف: {{text}}",
+      "collapse": "ہدف چھپائیں",
+      "expand": "ہدف دکھائیں"
     },
     "newSession": {
+      "recentlyUsed": "حال ہی میں استعمال شدہ",
+      "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
+      "couldNotLoadGitlabRepositories": "GitLab کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
+      "couldNotLoadBitbucketRepositories": "Bitbucket کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
       "connectGithubDescription": "اپنے براؤزر میں GitHub کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectGitlabDescription": "اپنے براؤزر میں GitLab کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
+      "openGitlab": "GitLab کھولیں",
+      "openBitbucket": "Bitbucket کھولیں",
       "refreshRepositories": "ریپوزٹریوں کی فہرست تازہ کریں",
       "githubConnected": "GitHub منسلک",
+      "gitlabConnected": "GitLab منسلک",
       "noRepositoriesVisible": "کوئی ریپوزٹری نظر نہیں آ رہی۔ چیک کریں کہ Kilo کی GitHub ایپ کو ریپوزٹریوں تک رسائی حاصل ہے، پھر فہرست تازہ کریں۔",
+      "noRepositoriesVisibleGitlab": "کوئی ریپوزٹری نظر نہیں آ رہی۔ GitLab کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
+      "noRepositoriesVisibleBitbucket": "کوئی ریپوزٹری نظر نہیں آ رہی۔ Bitbucket کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
+      "bitbucketOrganizationsOnly": "Bitbucket صرف تنظیموں کے لیے دستیاب ہے۔",
+      "branchPickerTitle": "برانچ منتخب کریں",
+      "branchDefault": "ڈیفالٹ",
+      "branchAccessibility": "برانچ: {{label}}",
+      "branchLoading": "برانچز لوڈ ہو رہی ہیں",
+      "branchLoadError": "برانچز لوڈ نہیں ہو سکیں",
+      "branchUnavailable": "اس ریپوزٹری کے لیے برانچز دستیاب نہیں ہیں۔ پرووائیڈر کے ساتھ اپنی رسائی چیک کریں، پھر کوئی دوسری ریپوزٹری منتخب کریں۔",
+      "branchEmpty": "کوئی برانچ دستیاب نہیں",
+      "branchPlaceholder": "ایک برانچ منتخب کریں",
       "runOnWithTarget": "{{target}} پر چلائیں",
       "environment": "ماحول",
       "couldNotLoadEnvironment": "آپ کا ماحول لوڈ نہیں ہو سکا۔",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "ریپوزٹریوں کی فہرست تازہ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "discardDraftTitle": "مسودہ حذف کریں؟",
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
+      "discardWithUploadsMessage": "آپ کا پرامپٹ اور اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
       "discardFailed": "مسودہ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
       "remoteHint": "مقامی kilo پراسیس کو کنٹرول کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` یا چلتے ہوئے CLI سیشن میں `/remote` چلائیں۔",
-      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "connectGitlabDescription": "اپنے براؤزر میں GitLab کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "couldNotLoadBitbucketRepositories": "Bitbucket کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "couldNotLoadGitlabRepositories": "GitLab کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "gitlabConnected": "GitLab منسلک",
-      "noRepositoriesVisibleBitbucket": "کوئی ریپوزٹری نظر نہیں آ رہی۔ Bitbucket کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
-      "noRepositoriesVisibleGitlab": "کوئی ریپوزٹری نظر نہیں آ رہی۔ GitLab کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
-      "openBitbucket": "Bitbucket کھولیں",
-      "openGitlab": "GitLab کھولیں",
-      "recentlyUsed": "حال ہی میں استعمال شدہ",
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
       "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
-      "discardWithUploadsMessage": "آپ کا پرامپٹ اور اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔"
+      "pickProfile": "ایک پروفائل منتخب کریں۔",
+      "noProfile": "کوئی پروفائل نہیں۔",
+      "manageProfiles": "پروفائلز کا نظم کریں۔",
+      "noProfiles": "ابھی تک کوئی پروفائلز نہیں ہیں۔ ماحولیاتی متغیرات، MCP سرورز، اور مہارتیں شامل کرنے کے لیے ایک بنائیں۔",
+      "advancedConfig": "اعلی درجے کی ترتیب",
+      "advancedConfigDescription": "محفوظ کردہ کنفیگریشنز کو لوڈ کرنے کے لیے پروفائل کا انتخاب کریں، اور اضافی ماحولیاتی متغیرات اور سیٹ اپ کمانڈز کو دستی طور پر ترتیب دیں۔",
+      "saveAsProfile": "بطور پروفائل محفوظ کریں۔",
+      "saveProfileDescription": "موجودہ ماحولیاتی متغیرات اور سیٹ اپ کمانڈز کو دوبارہ قابل استعمال پروفائل کے طور پر محفوظ کریں۔",
+      "profileSummary": "{{vars}} ماحولیاتی متغیرات · {{commands}} سیٹ اپ کمانڈز",
+      "profileSaved": "پروفائل \"{{name}}\" محفوظ ہو گیا۔",
+      "organizationProfiles": "تنظیمی پروفائلز",
+      "personalProfiles": "ذاتی پروفائلز",
+      "yourProfiles": "آپ کے پروفائلز",
+      "failedToLoadProfiles": "پروفائلز لوڈ کرنے میں ناکام",
+      "nameTooLong": "پروفائل کا نام بہت لمبا ہے۔",
+      "descriptionTooLong": "تفصیل بہت لمبی ہے۔",
+      "secretsEncrypted": "رازوں کو ذخیرہ کرنے سے پہلے خفیہ کیا جاتا ہے۔",
+      "profileActive": "پروفائل فعال ہے۔",
+      "profilesActive": "پروفائلز فعال ہیں۔",
+      "customConfigActive": "حسب ضرورت تشکیل فعال",
+      "configNeedsAttention": "کنفیگریشن کو توجہ کی ضرورت ہے۔",
+      "repoProfile": "ریپو پروفائل",
+      "selectedProfile": "منتخب پروفائل",
+      "manualOverrides": "دستی اوور رائیڈز",
+      "openSettingsToReview": "جائزہ لینے کے لیے ترتیبات کھولیں۔",
+      "profileSelection": "پروفائل کا انتخاب"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",
@@ -2086,15 +2241,18 @@
       "updateTodos": "کاموں کی فہرست اپ ڈیٹ کریں",
       "linesBadge": "{{displayCount}} سطریں",
       "filesBadge": "{{displayCount}} فائلیں",
-      "matchesBadge": "{{displayCount}} مماثلتیں"
+      "matchesBadge": "{{displayCount}} مماثلتیں",
+      "filesBadge_one": "{{displayCount}} فائل",
+      "filesBadge_other": "{{displayCount}} فائلیں",
+      "linesBadge_one": "{{displayCount}} سطر",
+      "linesBadge_other": "{{displayCount}} سطریں",
+      "matchesBadge_one": "{{displayCount}} مماثلت",
+      "matchesBadge_other": "{{displayCount}} مماثلتیں",
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
       "linesOf": "کل {{total}} سطروں میں سے {{start}}–{{end}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent کا عمل {{action}} ناکام ہو گیا ({{status}})۔",
-      "failed": "Cloud Agent کا عمل {{action}} ناکام ہو گیا۔"
     },
     "collectCopyableText": {
       "unserializableInput": "[ان پٹ کو سیریلائز نہیں کیا جا سکتا]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "فراہم کنندہ نے درخواست مسترد کر دی۔",
       "assistantStopped": "جواب روک دیا گیا۔",
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
-      "assistantFailed": "جواب تیار نہیں ہو سکا۔",
-      "sendFailed": "پیغام نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔"
+      "assistantFailed": "جواب تیار نہیں ہو سکا۔"
     },
     "filePart": {
       "loadingImage": "تصویر لوڈ ہو رہی ہے",
@@ -2376,7 +2533,11 @@
       "files": "فائلیں",
       "couldNotOpenPhotoPicker": "تصویر منتخب کرنے کا خانہ نہیں کھل سکا۔ Kilo دوبارہ شروع کریں اور پھر کوشش کریں۔",
       "maxFilesAllowed": "زیادہ سے زیادہ {{displayCount}} فائلیں شامل کی جا سکتی ہیں۔",
-      "onlyAddingFiles": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})"
+      "onlyAddingFiles": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})",
+      "maxFilesAllowed_one": "زیادہ سے زیادہ {{displayCount}} فائل شامل کی جا سکتی ہیں۔",
+      "maxFilesAllowed_other": "زیادہ سے زیادہ {{displayCount}} فائلیں شامل کی جا سکتی ہیں۔",
+      "onlyAddingFiles_one": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})",
+      "onlyAddingFiles_other": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})"
     },
     "composer": {
       "addAttachment": "فائل منسلک کریں",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
       "discardAttachmentsTitle": "منسلک فائلیں حذف کریں؟",
       "charactersRemaining": "{{count}} حروف باقی ہیں",
-      "insertNewline": "نئی سطر داخل کریں"
+      "insertNewline": "نئی سطر داخل کریں",
+      "charactersRemaining_one": "{{count}} حرف باقی ہے",
+      "charactersRemaining_other": "{{count}} حروف باقی ہیں"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",
@@ -2428,7 +2591,17 @@
       "startNewSession": "نیا سیشن شروع کریں",
       "exitSession": "سیشن سے باہر نکلیں",
       "clearSession": "یہ سیشن ختم کریں اور نیا شروع کریں",
+      "compactDescription": "موجودہ سیشن کا سیاق مختصر کریں",
+      "goalDescription": "سیشن کے ہدف کی طرف کام جاری رکھیں۔ /goal <objective> یا pause, resume, clear",
+      "initDescription": "رہنمائی شدہ AGENTS.md سیٹ اپ",
+      "resumeClaudeDescription": "Claude Code سیشن کی نقل درآمد کریں",
+      "resumeCodexDescription": "OpenAI Codex سیشن کی نقل درآمد کریں",
+      "reviewDescription": "تبدیلیوں کا جائزہ لیں [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} استعمال کریں",
+      "useSkillCommand": "/{{command}} مہارت استعمال کریں",
+      "skillBadge": "مہارت",
+      "catalogFull": "کمانڈ کی فہرست بھر گئی ہے، اس لیے کچھ کمانڈز چھپے ہوئے ہیں۔",
+      "catalogOverLimit": "مہارت کی فہرست سائز کی حد سے بڑھ گئی ہے، اس لیے ہر مہارت دکھائی جاتی ہے۔",
       "insert": "داخل کریں",
       "upgradeRequiredFallback": "براہ کرم یہ کمانڈ استعمال کرنے کے لیے اپنا CLI اپ گریڈ کریں۔",
       "exitCapabilityUnavailable": "سیشن سے باہر نکلنے کے لیے اپنا CLI اپ ڈیٹ کریں۔",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "{{steps}} مرحلہ",
       "stepsCount": "{{steps}} مراحل",
       "stepsCount_other": "{{steps}} مراحل",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "ماڈل ({{displayCount}})",
+      "modelsCount_other": "ماڈلز ({{displayCount}})"
     },
     "autoApprove": {
       "title": "خودکار منظوری",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "ٹول کالز",
-      "condensedLabel": "{{itemCount}} اندراجات; {{last}}"
+      "condensedLabel": "{{itemCount}} اندراجات; {{last}}",
+      "condensedLabel_one": "{{itemCount}} اندراج; {{last}}",
+      "condensedLabel_other": "{{itemCount}} اندراجات; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے۔",
     "agentSessions": "ابھی جاری",
     "newCodingTask": "کوڈنگ کا نیا کام",
+    "newTaskFromPicture": "تصویر سے نیا کام",
     "explore": "دریافت کریں",
     "seeAll": "سب دیکھیں",
     "noLiveSessions": "اس وقت کچھ بھی نہیں چل رہا"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "یہ سیشن فائلیں وصول نہیں کر سکتا",
     "cliCantReceiveFilesMessage": "اس سیشن کو چلانے والا Kilo CLI فائلیں وصول نہیں کر سکتا۔ اس مشین پر CLI اپ ڈیٹ کریں، یا اس کے بجائے نئے سیشن میں شیئر کریں۔",
     "contentlessMessage": "شیئر کرنے کے لیے کچھ نہیں ہے — کوئی متن یا فائل شامل نہیں کی گئی۔",
-    "couldNotReadContent": "شیئر کیا گیا مواد پڑھا نہیں جا سکا۔"
+    "couldNotReadContent": "شیئر کیا گیا مواد پڑھا نہیں جا سکا۔",
+    "onlyFirstFilesAttached_one": "صرف پہلی {{displayCount}} فائل منسلک ہوں گی۔",
+    "onlyFirstFilesAttached_other": "صرف پہلی {{displayCount}} فائلیں منسلک ہوں گی۔"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "آپ کے پرامپٹس، گفتگو کا ریکارڈ اور آپ کی منسلک کردہ فائلیں۔",
     "aiProvidersWhy": "AI کے جوابات تیار کرنے کے لیے۔",
     "aiProvidersWho": "Anthropic، OpenAI، Google اور وہ دیگر فراہم کنندگان جنہیں آپ ہر درخواست کے لیے منتخب کرتے ہیں۔",
-    "gatewayWhat": "اکاؤنٹ کی ID، درخواست کا میٹاڈیٹا اور ٹوکن کا استعمال۔",
+    "gatewayWhat": "اکاؤنٹ کی ID، درخواست کا میٹاڈیٹا، ٹوکن کا استعمال، اور وہ پرامپٹس اور صوتی ریکارڈنگز جو ایپ اس کے ذریعے بھیجتی ہے۔",
+    "viaGateway": "Kilo Gateway کے ذریعے",
     "gatewayWhy": "شناخت کی تصدیق، درخواستیں متعلقہ جگہ بھیجنا اور بلنگ کے حساب کا ملاپ۔",
     "gatewayWho": "Kilo (kilo.ai)۔",
     "crashReportingWhat": "کریش اور خرابی کی رپورٹس جن سے ایپ کا مواد ہٹا دیا گیا ہو۔",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer۔",
     "voiceTranscriptionWhat": "بول کر لکھواتے وقت آپ کی آواز کی ریکارڈنگ۔",
     "voiceTranscriptionWhy": "آواز کو متن میں بدلنے کے لیے۔",
-    "voiceTranscriptionWho": "صرف آپ کی ڈیوائس پر، یا اگر یہ ڈیوائس آواز کو آف لائن متن میں نہ بدل سکے تو Apple یا Google کے پاس۔",
+    "voiceTranscriptionWho": "آپ کی ڈیوائس، آپ کے منتخب کردہ ٹرانسکرپشن ماڈل کے ساتھ Kilo Gateway، یا آن لائن شناخت کے لیے Apple یا Google۔",
     "installAttributionPromptTitle": "انسٹالیشن کے ذریعے کی شناخت کی اجازت دیں؟",
     "installAttributionPromptMessage": "Kilo صرف یہ جاننے کے لیے Apple کی ٹریکنگ کی اجازت استعمال کرتا ہے کہ آپ کس ذریعے سے یہاں آئے۔ اس مقصد کے لیے آپ کے پرامپٹس اور گفتگو کبھی استعمال نہیں ہوتے۔",
     "what": "کیا",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "سائن ان کی بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم کچھ دیر انتظار کریں اور دوبارہ کوشش کریں۔"
   },
   "models": {
+    "auto": {
+      "frontier": "خودکار جدید",
+      "balanced": "خودکار متوازن",
+      "efficient": "خودکار مؤثر",
+      "small": "خودکار چھوٹا",
+      "free": "خودکار مفت",
+      "organization": "خودکار ادارہ"
+    },
     "dataCollected": "ڈیٹا جمع ہوتا ہے",
     "free": "مفت",
     "couldNotUpdateFavorites": "پسندیدہ ماڈلز اپ ڈیٹ نہیں ہو سکے۔",
@@ -2988,8 +3177,17 @@
     "privacy": "ایجنٹس دیکھنے کے لیے Kilo کھولیں",
     "openAgents": "ایجنٹس کھولیں",
     "needsInput": "ان پٹ درکار",
+    "newestSession": "تازہ ترین: {{title}}",
+    "noneWaiting": "کوئی ایجنٹ انتظار میں نہیں",
+    "newAgent": "نیا ایجنٹ",
+    "approving": "منظور کیا جا رہا ہے...",
+    "couldNotApprove": "منظور نہیں کیا جا سکا",
+    "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
-    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
+    "openSession": "کھولیں",
+    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
+    "newestResult": "تازہ ترین نتیجہ"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3014,15 +3212,7 @@
     "remoteOptionTitle": "آپ کا کمپیوٹر",
     "remoteOptionBody": "اپنے کمپیوٹر پر `kilo remote` CLI کے ذریعے Kilo چلائیں۔",
     "skip": "ٹور چھوڑیں",
-    "tutorialLabel": "ٹیوٹوریل",
-    "remoteTitle": "اپنا پہلا ریموٹ سیشن شروع کریں",
-    "remoteBody": "اپنا کمپیوٹر منسلک کریں، پھر یہاں سے سیشن شروع کریں۔",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ابھی کوئی کمپیوٹر منسلک نہیں ہوا",
-    "remoteEmptyBody": "اسے منسلک کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` چلائیں۔",
-    "remoteFound": "کمپیوٹر منسلک ہو گیا",
-    "checkAgain": "دوبارہ جانچیں",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ٹیوٹوریل"
   },
   "modelChat": {
     "empty": {
@@ -3052,6 +3242,214 @@
       "unauthorizedDescription": "اس چیٹ میں Kilo ٹولز استعمال کرنے کے لیے دوبارہ سائن ان کریں۔",
       "unavailable": "Kilo ٹولز دستیاب نہیں",
       "unavailableDescription": "اس اکاؤنٹ کے لیے Kilo سرور دستیاب نہیں۔"
+    }
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
+      "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
+      "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
+    }
+  },
+  "launcher": {
+    "openLastSession": "آخری سیشن کھولیں"
+  },
+  "spendAlerts": {
+    "subtitle": "جب اس دائرے کا خرچ کسی حد سے تجاوز کرے یا اپنی معمول کی فی گھنٹہ شرح سے بڑھ جائے تو بلنگ رابطوں کو ای میل یا پش کے ذریعے تنبیہ بھیجیں۔",
+    "enable": "اخراجات کی تنبیہات فعال کریں",
+    "thresholdTitle": "حد سے تجاوز",
+    "thresholdSubtitle": "جاری خرچ آپ کی حد سے تجاوز کر رہا ہے",
+    "anomalyTitle": "فی گھنٹہ اضافہ",
+    "anomalySubtitle": "ایک گھنٹہ اس دائرے کی معمول کی شرح سے بہت زیادہ ہے",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "وقت کی حد",
+    "window24h": "24 گھنٹے",
+    "window7d": "7 دن",
+    "window30d": "30 دن",
+    "multiplierLabel": "اضافے کا ضرب",
+    "saved": "اخراجات کی تنبیہ کی ترتیبات محفوظ ہو گئیں",
+    "loadError": "اخراجات کی تنبیہات لوڈ نہیں ہو سکیں۔",
+    "saveError": "اخراجات کی تنبیہات محفوظ نہیں ہو سکیں۔",
+    "empty": "اخراجات کی تنبیہات بند ہیں۔ اس دائرے کے بلنگ رابطوں کو آگاہ کرنے کے لیے انہیں آن کریں۔",
+    "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
+    "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
+    "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
+    "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
+    "pushOffByCategory": "اطلاعات میں بند"
+  },
+  "profiles": {
+    "title": "پروفائلز",
+    "entrySubtitle": "سیشنوں میں ماحول کی ترتیبات کو دوبارہ استعمال کریں۔",
+    "newProfile": "نیا پروفائل",
+    "emptyTitle": "ابھی تک کوئی پروفائلز نہیں ہیں۔",
+    "emptyDescription": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک پروفائل بنائیں۔",
+    "loadFailed": "پروفائلز لوڈ نہیں ہو سکے۔",
+    "counts": {
+      "vars": "{{count}} متغیرات",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ہنر",
+      "commands": "{{count}} کمانڈز",
+      "varsShort": "{{count}}م",
+      "skillsShort": "{{count}}ہ",
+      "commandsShort": "{{count}}ک"
+    },
+    "nameLabel": "پروفائل کا نام",
+    "namePlaceholder": "جیسے بیک اینڈ ڈیبگنگ",
+    "descriptionLabel": "پروفائل کی تفصیل",
+    "descriptionPlaceholder": "اختیاری تفصیل",
+    "ownerLabel": "پروفائل کا مالک",
+    "nameRequired": "پروفائل کا نام درج کریں۔",
+    "createAction": "پروفائل بنائیں",
+    "createFailed": "پروفائل نہیں بنایا جا سکا",
+    "createdToast": "پروفائل \"{{name}}\" بنایا گیا۔",
+    "settingsSectionTitle": "کنفیگریشن",
+    "defaultSectionTitle": "ڈیفالٹ پروفائل",
+    "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
+    "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
+    "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
+    "removeDefault": "بطور ڈیفالٹ ہٹا دیں۔",
+    "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
+    "deleteTitle": "پروفائل حذف کریں۔",
+    "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",
+    "deleteFailed": "پروفائل کو حذف نہیں کیا جا سکا",
+    "deleteBlocked": "یہ پروفائل ویب ہک ٹرگر کے ذریعہ استعمال کیا جاتا ہے۔ پہلے اسے ان محرکات سے ہٹا دیں۔",
+    "deletedToast": "پروفائل \"{{name}}\" حذف کر دیا گیا۔",
+    "variablesTitle": "ماحولیاتی متغیرات",
+    "addVariable": "متغیر شامل کریں۔",
+    "keyLabel": "چابی",
+    "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
+    "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
+    "valueLabel": "قدر",
+    "secretLabel": "خفیہ",
+    "secrets": {
+      "markSecret": "خفیہ کے طور پر نشان زد کریں۔",
+      "masked": "پوشیدہ قدر",
+      "reveal": "قدر ظاہر کریں۔",
+      "newValuePlaceholder": "نیا خفیہ قدر درج کریں",
+      "valuePlaceholder": "خفیہ قدر (خفیہ کردہ)"
+    },
+    "variablesEmpty": "ابھی تک کوئی متغیر نہیں ہے۔",
+    "variablesSaveFailed": "متغیر کو محفوظ نہیں کیا جا سکا",
+    "commandsTitle": "سیٹ اپ کمانڈز",
+    "addCommand": "کمانڈ شامل کریں۔",
+    "commandLabel": "حکم",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "ابھی تک کوئی سیٹ اپ کمانڈ نہیں ہے۔",
+    "commandsSaveFailed": "سیٹ اپ کمانڈز کو محفوظ نہیں کیا جا سکا",
+    "moveUp": "اوپر بڑھیں۔",
+    "moveDown": "نیچے کی طرف بڑھیں۔",
+    "skillsTitle": "ہنر",
+    "addSkill": "مہارت شامل کریں۔",
+    "skillNameLabel": "ہنر کا نام",
+    "skillMarkdownLabel": "مہارت کا مواد",
+    "skillsEmpty": "ابھی تک کوئی ہنر نہیں ہے۔",
+    "skillNameRequired": "مہارت کا نام درج کریں۔",
+    "skillNameInvalid": "ہنر کا نام ایک حرف یا ہندسے سے شروع ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کریں",
+    "skillContentRequired": "مہارت کا مواد درکار ہے۔",
+    "skillSaveFailed": "مہارت نہیں بچا سکا",
+    "skillsHint": "ایک SKILL.md چسپاں کریں اور اس کا نام بھر جائے؛ ڈریگ اینڈ ڈراپ کے بغیر اپنے فون سے مہارت شامل کریں۔",
+    "skillEditTitle": "مہارت میں ترمیم کریں۔",
+    "mcp": {
+      "title": "MCP سرورز",
+      "add": "MCP سرور شامل کریں۔",
+      "empty": "ابھی تک کوئی MCP سرور نہیں ہے۔",
+      "name": "سرور کا نام",
+      "type": "سرور کی قسم",
+      "localType": "مقامی",
+      "remoteType": "ریموٹ",
+      "command": "کمانڈ لائن",
+      "url": "URL",
+      "environment": "ماحولیات (JSON)",
+      "headers": "ہیڈرز (JSON)",
+      "timeout": "ٹائم آؤٹ",
+      "secretCount": "خفیہ گنتی",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "سرور کا نام درج کریں۔",
+      "nameInvalid": "نام صرف حروف، اعداد، انڈر سکور اور ڈیشز کا استعمال کر سکتا ہے۔",
+      "commandRequired": "ایک کمانڈ درج کریں۔",
+      "commandTooLong": "زیادہ سے زیادہ 50 دلائل استعمال کریں، ہر ایک 500 حروف کا",
+      "urlRequired": "ایک URL درج کریں۔",
+      "urlInvalid": "ایک درست URL درج کریں۔",
+      "urlTooLong": "URL 2048 حروف یا اس سے کم ہونا چاہیے",
+      "jsonInvalid": "درست JSON درج کریں - سٹرنگ ویلیوز کا ایک آبجیکٹ",
+      "jsonTooLarge": "زیادہ سے زیادہ 50 اندراجات استعمال کریں، چابیاں 128 تک اور اقدار 4096 حروف تک",
+      "timeoutInvalid": "ٹائم آؤٹ ملی سیکنڈز کی پوری تعداد میں ہونا چاہیے۔",
+      "edit": "MCP سرور میں ترمیم کریں۔",
+      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا"
+    },
+    "agents": {
+      "title": "پروفائل ایجنٹس",
+      "add": "ایجنٹ شامل کریں۔",
+      "empty": "ابھی تک کوئی ایجنٹ نہیں ہے۔",
+      "name": "ایجنٹ کا نام",
+      "slug": "ایجنٹ سلگ",
+      "description": "ایجنٹ کی تفصیل",
+      "model": "ماڈل اوور رائڈ",
+      "modelPlaceholder": "سیشن ڈیفالٹ استعمال کریں۔",
+      "prompt": "سسٹم پرامپٹ",
+      "steps": "زیادہ سے زیادہ مراحل",
+      "stepsPlaceholder": "مثلاً 50",
+      "temperature": "درجہ حرارت",
+      "temperaturePlaceholder": "مثلاً 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "مثلاً 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "میرا ایجنٹ",
+      "promptPlaceholder": "آپ ایک...",
+      "tools": "اوزار",
+      "visibility": "مرئیت",
+      "visibilityPrimary": "پرائمری - چننے والے میں دکھایا گیا ہے۔",
+      "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
+      "visibilityAll": "سبھی — دونوں",
+      "saveFailed": "ایجنٹ کو محفوظ نہیں کیا جا سکا",
+      "nameRequired": "ایجنٹ کا نام درج کریں۔",
+      "slugRequired": "ایک ایجنٹ سلگ درج کریں۔",
+      "slugInvalid": "سلگ کا آغاز ایک حرف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
+      "slugConflict": "وہ سلگ ایک بلٹ ان ایجنٹ کے ذریعہ محفوظ ہے۔",
+      "edit": "ایجنٹ میں ترمیم کریں۔"
+    },
+    "slashCommands": {
+      "title": "سلیش کمانڈز",
+      "add": "سلیش کمانڈ شامل کریں۔",
+      "empty": "ابھی تک کوئی سلیش کمانڈ نہیں ہے۔",
+      "name": "کمانڈ کا نام",
+      "description": "کمانڈ کی تفصیل",
+      "template": "سانچہ",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
+      "agent": "ایجنٹ",
+      "subtask": "ذیلی کام کے طور پر چلائیں۔",
+      "edit": "سلیش کمانڈ میں ترمیم کریں۔",
+      "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",
+      "nameRequired": "کمانڈ کا نام درج کریں۔",
+      "nameInvalid": "نام کا آغاز چھوٹے حروف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
+      "templateRequired": "کمانڈ ٹیمپلیٹ درج کریں۔",
+      "nameConflict": "یہ نام بلٹ ان کمانڈ کے ذریعہ محفوظ ہے۔"
+    },
+    "repoBindings": {
+      "title": "Repos کے لیے پہلے سے طے شدہ پروفائلز",
+      "add": "ڈیفالٹ شامل کریں۔",
+      "empty": "کوئی ڈیفالٹ کنفیگر نہیں ہے۔",
+      "emptyDescription": "ریپو کے لیے سیشن شروع کرتے وقت پروفائل کو خود بخود لاگو کرنے کے لیے ڈیفالٹ شامل کریں۔",
+      "repo": "ذخیرہ منتخب کریں…",
+      "profile": "پروفائل منتخب کریں۔",
+      "remove": "بند باندھنا",
+      "private": "نجی",
+      "search": "ذخیرے تلاش کریں…",
+      "addedToast": "\"{{repo}}\" کے لیے ڈیفالٹ پروفائل سیٹ",
+      "addFailed": "ڈیفالٹ پروفائل سیٹ نہیں کیا جا سکا",
+      "removedToast": "\"{{repo}}\" کے لیے ڈیفالٹ پروفائل ہٹا دیا گیا",
+      "removeFailed": "ڈیفالٹ پروفائل کو ہٹایا نہیں جا سکا",
+      "pinnedTitle": "ریپوزٹریز میں پن کیا گیا۔",
+      "pinRepo": "ایک ریپو پن کریں۔",
+      "pinnedEmpty": "کسی بھی ذخیرے میں پن نہیں کیا گیا ہے۔",
+      "pinnedDescription": "جب بھی کوئی سیشن ان ذخیروں میں سے کسی کو نشانہ بناتا ہے تو خودکار طور پر لوڈ ہوتا ہے۔",
+      "pinnedToast": "\"{{repo}}\" پر پن کیا گیا",
+      "pinFailed": "ریپو کو پن نہیں کیا جا سکا",
+      "unboundToast": "ریپو انباؤنڈ",
+      "unbindFailed": "ریپو کو بند نہیں کیا جا سکا"
     }
   }
 }

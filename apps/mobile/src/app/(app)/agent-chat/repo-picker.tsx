@@ -2,12 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
@@ -21,7 +21,6 @@ type PickerListItem =
 export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
@@ -106,22 +105,41 @@ export default function RepoPickerScreen() {
     <PickerSheet
       title={t('agentChat.repoPicker.title')}
       onDone={closePicker}
-      scrollable={false}
       headerContent={
         <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
           <Search size={18} color={colors.mutedForeground} />
-          <TextInput
-            accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
-            placeholder={t('agentChat.repoPicker.searchPlaceholder')}
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-            className="h-8 flex-1 p-0 text-base text-foreground"
-            style={{ color: colors.foreground }}
-            onChangeText={setSearch}
-          />
+          {/* The placeholder is a single-line Text overlay, not the input's own
+              placeholder: Android lays the native hint out at the field's width
+              with no line cap, so copy wider than a narrow field wraps onto a
+              second line. A tail-ellipsized Text truncates the copy at any width
+              instead. The shared box draws the value on one line box and centres
+              it, and both texts share `px-0` so the overlay sits exactly where
+              the typed text will. */}
+          <View className="relative flex-1">
+            <Input
+              accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+              textAlignVertical="center"
+              className="px-0 text-base text-foreground"
+              style={{ color: colors.foreground }}
+              onChangeText={setSearch}
+            />
+            {search.length === 0 ? (
+              <View className="absolute inset-0 justify-center" pointerEvents="none">
+                <Text
+                  accessible={false}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  className="text-base leading-[normal] font-normal text-muted-foreground"
+                >
+                  {t('agentChat.repoPicker.searchPlaceholder')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       }
     >
@@ -140,17 +158,18 @@ export default function RepoPickerScreen() {
           }
         />
       ) : (
-        <FlatList
-          className="flex-1 bg-background"
-          data={listItems}
-          keyExtractor={item => item.key}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingBottom: bottom }}
-          renderItem={({ item }) => {
+        // Mapped rows inside the shell ScrollView instead of a FlatList: the
+        // FlatList stretches into the space the formSheet offers and its rows
+        // painted over the pinned search header while scrolling. The shell
+        // scroll view starts below the header, so a row can never overlap it.
+        <View>
+          {listItems.map(item => {
             if (item.kind === 'header') {
               return (
-                <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Text
+                  key={item.key}
+                  className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t(item.titleKey)}
                 </Text>
               );
@@ -160,6 +179,7 @@ export default function RepoPickerScreen() {
             const rowLabel = `${platformName} ${repo.fullName}`;
             return (
               <Pressable
+                key={item.key}
                 className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
                 onPress={() => {
                   handleSelect(`${repo.platform}:${repo.fullName}`);
@@ -186,9 +206,35 @@ export default function RepoPickerScreen() {
                 ) : null}
               </Pressable>
             );
-          }}
-        />
+          })}
+          {renderBitbucketNote()}
+        </View>
       )}
     </PickerSheet>
   );
+
+  /**
+   * Personal Bitbucket never lists repositories (organization-only), so the
+   * grouped list would end at GitLab with nothing explaining the gap. The
+   * note renders once, after the provider sections, for the scope the rows
+   * were published under — the global organization selection can differ from
+   * the opening screen's scope (a Continue screen carries the session's own
+   * organization), and keying on the global one would contradict real
+   * Bitbucket rows or hide the explanation for the scope actually listed.
+   * An absent Bitbucket section says nothing about scope: all its rows may
+   * be in Recents, or an organization may have no Bitbucket repositories.
+   */
+  function renderBitbucketNote() {
+    if (search.trim() || bridge?.organizationId !== null) {
+      return null;
+    }
+    return (
+      <View className="mx-4 mt-3 gap-1 rounded-lg border border-border bg-card p-3">
+        <Text className="text-sm font-semibold text-foreground">
+          {t('agentChat.repoPicker.platformBitbucket')}
+        </Text>
+        <Text variant="muted">{t('agentChat.newSession.bitbucketOrganizationsOnly')}</Text>
+      </View>
+    );
+  }
 }

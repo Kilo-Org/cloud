@@ -10,7 +10,7 @@ import {
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
@@ -1352,10 +1352,10 @@ describe('rewriteModelResponse', () => {
   test('strips cost for models with custom pricing', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({
-        model: QWEN37_PLUS_MODEL_ID,
+        model: GEMINI_FLASH_CURRENT_MODEL_ID,
         usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
       }),
-      model: QWEN37_PLUS_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       providerId: 'openrouter',
       kind: 'chat_completions',
       logging: makeLogging(),
@@ -1365,27 +1365,8 @@ describe('rewriteModelResponse', () => {
     // The upstream-reported cost does not reflect the custom pricing, so it
     // must be removed just like for free models.
     expect(await result.json()).toEqual({
-      model: QWEN37_PLUS_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       usage: {},
-    });
-  });
-
-  test('preserves cost for models with fallback-only custom pricing', async () => {
-    const result = await rewriteModelResponse({
-      response: jsonResponse({
-        model: 'moonshotai/kimi-k3',
-        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
-      }),
-      model: 'moonshotai/kimi-k3',
-      providerId: 'openrouter',
-      kind: 'chat_completions',
-      logging: makeLogging(),
-      responseTransforms: null,
-    });
-
-    expect(await result.json()).toEqual({
-      model: 'moonshotai/kimi-k3',
-      usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
     });
   });
 
@@ -1401,9 +1382,10 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(result).not.toBeNull();
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
   });
 
-  test('does not schedule a log insert for non-custom models without opt-in', async () => {
+  test('does not schedule a log insert without opt-in', async () => {
     await rewriteModelResponse({
       response: jsonResponse({ model: 'openai/gpt-5' }),
       model: 'openai/gpt-5',
@@ -1417,7 +1399,41 @@ describe('rewriteModelResponse', () => {
     expect(mockedOptIn).toHaveBeenCalled();
   });
 
-  test('always schedules a log insert for custom models', async () => {
+  test.each(['user@anaconda.com', 'user@kilocode.ai'])(
+    'requires an explicit opt-in for %s',
+    async email => {
+      await rewriteModelResponse({
+        response: jsonResponse({ model: 'openai/gpt-5' }),
+        model: 'openai/gpt-5',
+        providerId: 'openrouter',
+        kind: 'chat_completions',
+        logging: makeLogging({
+          user: { id: 'test-user', google_user_email: email } as RequestLoggingParams['user'],
+        }),
+        responseTransforms: null,
+      });
+
+      expect(mockedAfter).not.toHaveBeenCalled();
+      expect(mockedOptIn).toHaveBeenCalledWith({ accountId: 'test-user', organizationId: null });
+    }
+  );
+
+  test('does not log custom models without opt-in', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'kilo-internal/my-model' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: null, organizationId: null });
+  });
+
+  test('logs custom models with opt-in', async () => {
+    mockedOptIn.mockResolvedValueOnce(true);
     await rewriteModelResponse({
       response: jsonResponse({ model: 'kilo-internal/my-model' }),
       model: 'kilo-internal/my-model',
@@ -1428,10 +1444,9 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(mockedAfter).toHaveBeenCalledTimes(1);
-    expect(mockedOptIn).not.toHaveBeenCalled();
   });
 
-  test('always logs unrewritten custom model responses', async () => {
+  test('does not log unrewritten custom model responses without opt-in', async () => {
     await logUnrewrittenResponse({
       response: jsonResponse({ error: 'upstream error' }, 400),
       model: 'kilo-internal/my-model',
@@ -1439,8 +1454,8 @@ describe('rewriteModelResponse', () => {
       logging: makeLogging(),
     });
 
-    expect(mockedAfter).toHaveBeenCalledTimes(1);
-    expect(mockedOptIn).not.toHaveBeenCalled();
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: null, organizationId: null });
   });
 });
 

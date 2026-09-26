@@ -10,7 +10,11 @@ import {
   useState,
 } from 'react';
 import { z } from 'zod';
+
+import { type ProviderPrRef, providerPrRefKey } from '@kilocode/app-shared/provider-review';
+
 import { clearDraft, loadDraft, prReviewDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 // One queued inline comment in the pending review. The composer fills
@@ -76,6 +80,23 @@ function keepValidPendingReviewItems(restored: unknown[]): PendingReviewItem[] {
  */
 export function pendingReviewDraftKey(owner: string, repo: string, number: number): string {
   return prReviewDraftKey(owner.toLowerCase(), repo.toLowerCase(), number);
+}
+
+/**
+ * Draft entity key for one PR/MR on ANY provider (s6, identity rule 17). The
+ * GitHub arm returns the legacy `pendingReviewDraftKey` bytes unchanged, so a
+ * queue persisted before the provider surface keeps loading. A GitLab or
+ * Bitbucket ref folds the s1 collision-free `providerPrRefKey` into the same
+ * key, so a GitLab MR and a same-numbered GitHub PR — and one project reached
+ * on two GitLab instances — can never share a queue.
+ */
+export function providerPendingReviewDraftKey(ref: ProviderPrRef): string {
+  const triple = providerPrTriple(ref);
+  const legacy = pendingReviewDraftKey(triple.owner, triple.repo, triple.number);
+  if (ref.platform === 'github') {
+    return legacy;
+  }
+  return `${legacy}@${providerPrRefKey(ref)}`;
 }
 
 type PendingReviewContextValue = {

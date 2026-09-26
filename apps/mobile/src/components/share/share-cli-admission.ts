@@ -28,14 +28,17 @@ export function resolveShareHasFiles(
 /**
  * Decide whether a share payload may be committed to a destination row.
  * Non-CLI platforms pass through; CLI rows require a live session, and
- * file payloads additionally require `capabilities.attachments`.
+ * file payloads additionally require the CLI not to have denied the
+ * `attachments` capability. Call sites pass an optimistic value: an unknown
+ * capability counts as capable; only an explicit `attachments: false` is
+ * incapable.
  */
 export function resolveShareDestinationAdmission(input: {
   /** `created_on_platform` of the stored row. */
   createdOnPlatform: string | null;
   /** True when the row's session id is in the active-sessions set. */
   live: boolean;
-  /** `capabilities.attachments === true` for the live row; false otherwise. */
+  /** False only when the live row reported `capabilities.attachments: false`. */
   attachmentsCapable: boolean;
   /** True when the share payload carries at least one file. */
   hasFiles: boolean;

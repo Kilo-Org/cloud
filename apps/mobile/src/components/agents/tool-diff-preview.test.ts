@@ -13,6 +13,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Text: 'RNText',
   Pressable: 'Pressable',
+  // The real DiffLine (mounted below) reads the color scheme for its palette.
+  useColorScheme: () => 'light',
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();

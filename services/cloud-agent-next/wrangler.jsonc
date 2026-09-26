@@ -34,7 +34,7 @@
   },
   "logpush": true,
   "triggers": {
-    "crons": ["17 2 * * *"],
+    "crons": ["17 2 * * *", "*/3 * * * *"],
   },
   "routes": [
     {
@@ -268,6 +268,16 @@
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
     },
+    {
+      "class_name": "SandboxContainers",
+      "scheduling_policy": "durable_object",
+      "images": {
+        "app": {
+          "dockerfile": "./Dockerfile.containers",
+          "build_vars": { "KILOCODE_CLI_VERSION": "7.6.2" },
+        },
+      },
+    },
   ],
   "durable_objects": {
     "bindings": [
@@ -319,6 +329,10 @@
         "class_name": "SandboxSession",
         "name": "SANDBOX_SESSION",
       },
+      {
+        "class_name": "SandboxContainers",
+        "name": "SANDBOX_CONTAINERS",
+      },
     ],
   },
   "migrations": [
@@ -365,6 +379,10 @@
     {
       "new_sqlite_classes": ["SandboxSession"],
       "tag": "v10",
+    },
+    {
+      "new_sqlite_classes": ["SandboxContainers"],
+      "tag": "v11",
     },
   ],
   /**
@@ -421,7 +439,7 @@
     "dev": {
       "name": "cloud-agent-next-dev",
       "triggers": {
-        "crons": ["17 2 * * *"],
+        "crons": ["17 2 * * *", "*/3 * * * *"],
       },
       "hyperdrive": [
         {
@@ -589,6 +607,16 @@
           "max_instances": 2,
           "rollout_active_grace_period": 60,
         },
+        {
+          "class_name": "SandboxContainers",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "app": {
+              "dockerfile": "./Dockerfile.containers",
+              "build_vars": { "KILOCODE_CLI_VERSION": "7.6.2" },
+            },
+          },
+        },
       ],
       "durable_objects": {
         "bindings": [
@@ -639,6 +667,10 @@
           {
             "class_name": "SandboxSession",
             "name": "SANDBOX_SESSION",
+          },
+          {
+            "class_name": "SandboxContainers",
+            "name": "SANDBOX_CONTAINERS",
           },
         ],
       },

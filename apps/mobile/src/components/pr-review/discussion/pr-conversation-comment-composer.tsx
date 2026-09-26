@@ -32,6 +32,11 @@ import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import {
+  type ProviderPrRef,
+  providerPrRefKey,
+  providerPrRefLabel,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useAddPrCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { i18n } from '@/i18n';
 
@@ -39,6 +44,20 @@ type PrConversationCommentComposerProps = Readonly<{
   owner: string;
   repo: string;
   number: number;
+  /**
+   * The provider ref when this composer is opened from a GitLab/Bitbucket
+   * surface; absent on the GitHub route. It routes the post through
+   * `providerReview.addComment`, keys the durable draft per ref so a
+   * same-named GitHub PR and GitLab MR never share one, and supplies the
+   * provider-native header label when no explicit `eyebrow` is given.
+   */
+  prRef?: ProviderPrRef;
+  /**
+   * The header destination label. Provider routes pass the provider-native
+   * form (`group/sub/repo!12` on GitLab, never `#`); the GitHub route and the
+   * default keep `owner/repo#number`.
+   */
+  eyebrow?: string;
   onDismiss: () => void;
 }>;
 
@@ -46,15 +65,18 @@ export function PrConversationCommentComposer({
   owner,
   repo,
   number,
+  prRef,
+  eyebrow,
   onDismiss,
 }: PrConversationCommentComposerProps) {
   const { t } = useTranslation();
-  const addComment = useAddPrCommentMutation();
+  const addComment = useAddPrCommentMutation(prRef);
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
   // restored while the user id is unknown.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const commentDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const baseDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const commentDraftKey = prRef ? `${baseDraftKey}@${providerPrRefKey(prRef)}` : baseDraftKey;
   const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: commentDraftKey });
   useDraftFlushOnBackground(userId, commentDraftKey, true);
 
@@ -325,7 +347,7 @@ export function PrConversationCommentComposer({
     <>
       <PrFormSheetHeader
         title={t('prReview.composer.addTitle')}
-        eyebrow={`${owner}/${repo}#${number}`}
+        eyebrow={eyebrow ?? (prRef ? providerPrRefLabel(prRef) : `${owner}/${repo}#${number}`)}
         onBack={handleCancel}
       />
       <ScrollView

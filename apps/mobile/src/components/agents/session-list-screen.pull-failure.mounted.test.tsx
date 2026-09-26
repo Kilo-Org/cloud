@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import { AgentSessionListScreen } from './session-list-screen';
-import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
+import { PULL_FEEDBACK_BUDGET_MS, PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
 import {
   makeCached,
@@ -71,6 +71,23 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
+// The live list renders through FlashList v2. This stub renders every row
+// through the real `renderItem` and forwards the list props (`data`,
+// `refreshControl`), so the pull lifecycle is exercised without a DOM.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
+    data: { id: string }[];
+    renderItem: (entry: { item: { id: string } }) => ReactNode;
+    keyExtractor: (item: { id: string }) => string;
+  }) =>
+    createElement(
+      'FlashList',
+      props,
+      props.data.map(item =>
+        createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
+      )
+    ),
+}));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   InteractionManager: {
@@ -86,8 +103,10 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   FlatList: (props: {
     data: { id: string }[];
     renderItem: (entry: { item: { id: string } }) => ReactNode;
@@ -280,7 +299,7 @@ async function renderScreen() {
 }
 
 function refreshControl() {
-  const control = nodes('FlatList')[0]?.props.refreshControl as
+  const control = nodes('FlashList')[0]?.props.refreshControl as
     | { props: { refreshing: boolean; onRefresh: () => void } }
     | undefined;
   if (!control) {
@@ -323,7 +342,7 @@ async function i18nChangeLanguageEn() {
 describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
   async function expectFailedPullKeepsRowsAndShowsInlineRetry() {
     await renderScreen();
-    expect(nodes('FlatList')).toHaveLength(1);
+    expect(nodes('FlashList')).toHaveLength(1);
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
     expect(text()).not.toContain("Couldn't refresh");
 
@@ -414,4 +433,35 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
     expect(refreshControl().refreshing).toBe(false);
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
   }, 15_000);
+
+  it('hands a confirmed-offline pull to the inline failure with Retry', async () => {
+    // The device is in airplane mode: NetInfo has committed offline, so React
+    // Query pauses the refetch and it never settles. The pull must still hand
+    // off to the inline retryable failure within the feedback budget instead of
+    // leaving the reader on "Updating" with no next action.
+    const { onlineManager } = await import('@tanstack/react-query');
+    await renderScreen();
+    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+
+    onlineManager.setOnline(false);
+    try {
+      act(() => {
+        refreshControl().onRefresh();
+      });
+      await act(async () => {
+        await new Promise(resolve => {
+          setTimeout(resolve, PULL_FEEDBACK_BUDGET_MS + 250);
+        });
+      });
+
+      expect(text()).toContain("Couldn't refresh");
+      expect(
+        nodes('Pressable').find(node => node.props.accessibilityLabel === 'Retry')
+      ).toBeDefined();
+      expect(nodes('RemoteSessionRow')).toHaveLength(1);
+      expect(refreshControl().refreshing).toBe(false);
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  }, 45_000);
 });

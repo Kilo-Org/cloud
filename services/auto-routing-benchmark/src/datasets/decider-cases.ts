@@ -27,9 +27,6 @@ const AGENT_SYS =
 // tools inside the benchmark container (node:22-slim, no repo, no network) and
 // every command involved is deterministic there.
 export const DECIDER_CASES: readonly DeciderCase[] = [
-  // ---------------------------------------------------------------------------
-  // implementation / feature_development
-  // ---------------------------------------------------------------------------
   {
     id: 'impl-feat-ternary-parity',
     taskType: 'implementation',
@@ -76,9 +73,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '0' },
   },
 
-  // ---------------------------------------------------------------------------
-  // implementation / code_generation
-  // ---------------------------------------------------------------------------
   {
     id: 'impl-gen-package-manifest',
     taskType: 'implementation',
@@ -119,9 +113,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // implementation / test_creation
-  // ---------------------------------------------------------------------------
   {
     id: 'impl-test-sort-expectation',
     taskType: 'implementation',
@@ -159,9 +150,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '6' },
   },
 
-  // ---------------------------------------------------------------------------
-  // debugging / bug_fixing
-  // ---------------------------------------------------------------------------
   {
     id: 'debug-fix-parseint-suffix',
     taskType: 'debugging',
@@ -201,9 +189,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: 'true false' },
   },
 
-  // ---------------------------------------------------------------------------
-  // debugging / test_repair
-  // ---------------------------------------------------------------------------
   {
     id: 'debug-repair-compound-assign',
     taskType: 'debugging',
@@ -247,9 +232,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '0.30000000000000004' },
   },
 
-  // ---------------------------------------------------------------------------
-  // debugging / root_cause_analysis
-  // ---------------------------------------------------------------------------
   {
     id: 'debug-rca-async-order',
     taskType: 'debugging',
@@ -287,9 +269,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: 'false' },
   },
 
-  // ---------------------------------------------------------------------------
-  // refactoring / code_cleanup
-  // ---------------------------------------------------------------------------
   {
     id: 'refactor-cleanup-loop-to-reduce',
     taskType: 'refactoring',
@@ -327,9 +306,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '2' },
   },
 
-  // ---------------------------------------------------------------------------
-  // refactoring / architecture_improvement
-  // ---------------------------------------------------------------------------
   {
     id: 'refactor-arch-import-updates',
     taskType: 'refactoring',
@@ -367,9 +343,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'json_equal', value: { deleted: 2, remaining: 4 } },
   },
 
-  // ---------------------------------------------------------------------------
-  // refactoring / migration
-  // ---------------------------------------------------------------------------
   {
     id: 'refactor-migrate-substr-slice',
     taskType: 'refactoring',
@@ -407,9 +380,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'regex', pattern: '^\\s*0\\s*,\\s*1\\s*,\\s*2\\s*$', flags: 'm' },
   },
 
-  // ---------------------------------------------------------------------------
-  // planning_design / architecture_design
-  // ---------------------------------------------------------------------------
   {
     id: 'plan-arch-three-layer',
     taskType: 'planning_design',
@@ -447,9 +417,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'json_equal', value: { totalMs: 350, withinBudget: false } },
   },
 
-  // ---------------------------------------------------------------------------
-  // planning_design / technical_planning
-  // ---------------------------------------------------------------------------
   {
     id: 'plan-steps-rollout-order',
     taskType: 'planning_design',
@@ -487,9 +454,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '10' },
   },
 
-  // ---------------------------------------------------------------------------
-  // planning_design / system_design
-  // ---------------------------------------------------------------------------
   {
     id: 'plan-system-write-quorum',
     taskType: 'planning_design',
@@ -554,9 +518,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '6' },
   },
 
-  // ---------------------------------------------------------------------------
-  // investigation / repo_exploration
-  // ---------------------------------------------------------------------------
   {
     id: 'invest-repo-test-file-count',
     taskType: 'investigation',
@@ -594,9 +555,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '4' },
   },
 
-  // ---------------------------------------------------------------------------
-  // investigation / codebase_understanding
-  // ---------------------------------------------------------------------------
   {
     id: 'invest-code-char-count',
     taskType: 'investigation',
@@ -634,9 +592,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '7' },
   },
 
-  // ---------------------------------------------------------------------------
-  // investigation / external_research
-  // ---------------------------------------------------------------------------
   {
     id: 'invest-ext-http-created',
     taskType: 'investigation',
@@ -675,9 +630,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '1' },
   },
 
-  // ---------------------------------------------------------------------------
-  // agentic_execution / tool_usage
-  // ---------------------------------------------------------------------------
   {
     id: 'agentic-tool-json-read',
     taskType: 'agentic_execution',
@@ -715,9 +667,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '93' },
   },
 
-  // ---------------------------------------------------------------------------
-  // agentic_execution / terminal_operations
-  // ---------------------------------------------------------------------------
   {
     id: 'agentic-term-node-major',
     taskType: 'agentic_execution',
@@ -755,9 +704,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: 'fd99e6a4' },
   },
 
-  // ---------------------------------------------------------------------------
-  // agentic_execution / multi_step_execution
-  // ---------------------------------------------------------------------------
   {
     id: 'agentic-multi-seq-sum',
     taskType: 'agentic_execution',
@@ -794,9 +740,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
       'Create a file /tmp/bench-in.json containing exactly this JSON array: [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]. Then write and run a Node.js script that reads the file, computes the sum of the distinct values in the array, and prints it. Answer with only the number.',
     check: { kind: 'exact', value: '30' },
   },
-  // ---------------------------------------------------------------------------
-  // Supplemental taxonomy-route coverage
-  // ---------------------------------------------------------------------------
   {
     id: 'supp-impl-feat-clamp',
     taskType: 'implementation',
@@ -1121,9 +1064,7 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'exact', value: '42' },
   },
 
-  // ---------------------------------------------------------------------------
   // Additional taxonomy-route coverage to keep every pair at 10+ cases
-  // ---------------------------------------------------------------------------
   {
     id: 'supp2-impl-feat-nullish-total',
     taskType: 'implementation',

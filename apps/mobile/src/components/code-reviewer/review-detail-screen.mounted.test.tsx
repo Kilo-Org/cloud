@@ -9,6 +9,8 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MetaRow } from '@/components/code-reviewer/review-detail-sections';
+import { i18n } from '@/i18n';
 import { ReviewDetailScreen } from './review-detail-screen';
 
 const detail = vi.hoisted(() => ({
@@ -145,7 +147,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   useFeatureFlag: () => true,
 }));
 vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
-  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'external' }),
+  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
 }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   reviewerPlatformLabel: () => 'GitHub',
@@ -156,7 +158,6 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
   useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
 }));
-vi.mock('@/lib/profile-agent-navigation', () => ({ getPrReviewPath: vi.fn() }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
@@ -396,6 +397,70 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(errorNode).toBeDefined();
     expect(typeof errorNode?.props.numberOfLines).toBe('number');
     expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('ReviewDetailScreen details metadata', () => {
+  it('labels the completion-timestamp row in the Details list', () => {
+    // The Details key-value list pairs every label with its value in one
+    // MetaRow. The completion row must pass the localized
+    // `codeReviewer.status.completed` copy as MetaRow's label beside its
+    // timeAgo value; a value-only row would leave the label column blank
+    // (finding: review-detail.png).
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'completed',
+        started_at: null,
+        completed_at: '2024-01-01T00:05:00.000Z',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+    const completedLabel = i18n.t('codeReviewer.status.completed');
+
+    // `timeAgo` is mocked to "now" in this suite, so the completion row is the
+    // one MetaRow that carries the completion label and the timeAgo value.
+    const completionRows = renderer.root.findAll(
+      node => node.type === MetaRow && node.props.label === completedLabel
+    );
+    expect(completionRows).toHaveLength(1);
+    // MetaRow renders the label column first, then the value column: assert the
+    // label is what the row draws beside its timestamp, not just a prop the
+    // screen passes.
+    expect(collectText(completionRows[0]?.children ?? [])).toEqual([completedLabel, 'now']);
+
+    // The row belongs to the Details card, not the Gate's status row, which
+    // also shows "Completed" but as the value under the "Status" label.
+    const texts = collectText(renderer.toJSON());
+    const completionRowIndex = texts.findIndex(
+      (text, index) => text === completedLabel && texts[index + 1] === 'now'
+    );
+    const detailsHeaderIndex = texts.indexOf('Details');
+    // Assert the header was found before comparing: `indexOf` returns -1 on a
+    // copy change, and `completionRowIndex >= 0` would then satisfy the
+    // placement check without proving the row sits inside the Details list.
+    expect(detailsHeaderIndex).toBeGreaterThanOrEqual(0);
+    expect(completionRowIndex).toBeGreaterThan(detailsHeaderIndex);
+  });
+
+  it('omits the completion row when the review was never completed', () => {
+    // The row is a function of `completed_at`: with no completion time the
+    // Details list must not draw the completion label by itself (the empty
+    // state of the row this guard covers).
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed', started_at: null, completed_at: null }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+    const completedLabel = i18n.t('codeReviewer.status.completed');
+
+    expect(
+      renderer.root.findAll(node => node.type === MetaRow && node.props.label === completedLabel)
+    ).toHaveLength(0);
   });
 });
 

@@ -12,11 +12,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 type LiveSessionListEmptyStateProps = {
   organizationId: string | null;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** Short presentation for a clear region that cannot hold the full state. */
+  compact?: boolean;
 };
 
 export function LiveSessionListEmptyState({
   organizationId,
   refreshControl,
+  compact = false,
 }: Readonly<LiveSessionListEmptyStateProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -27,16 +30,18 @@ export function LiveSessionListEmptyState({
       icon={Bot}
       title={t('home.noLiveSessions')}
       description={t('agents.sessionList.noSessionsYetDescription')}
+      compact={compact}
       action={
         <Button
-          variant="outline"
+          variant="default"
+          size={compact ? 'sm' : 'default'}
           className="max-w-full"
           accessibilityLabel={t('common.newSession')}
           onPress={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
         >
-          <Plus size={16} color={colors.foreground} />
+          <Plus size={16} color={colors.primaryForeground} />
           <Text className="shrink text-center">{t('common.newSession')}</Text>
         </Button>
       }

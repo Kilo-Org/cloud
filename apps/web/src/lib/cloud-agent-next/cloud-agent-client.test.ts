@@ -107,6 +107,80 @@ const realCloudAgentClientModule =
 const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
   realCloudAgentClientModule;
 
+describe('CloudAgentNextClient review message results', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
+  };
+  const query = jest.fn<(request: typeof input) => Promise<unknown>>();
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ getMessageResult: { query } });
+  });
+
+  it('returns only admission metadata without assistant text or diagnostics', async () => {
+    query.mockResolvedValue({
+      ...input,
+      status: 'failed',
+      acceptedAt: 1,
+      terminalAt: 2,
+      failure: { message: 'private diagnostic' },
+      assistant: { text: 'source code' },
+    });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
+      ...input,
+      status: 'failed',
+      acceptedAt: 1,
+    });
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('distinguishes the exact message-not-found response from missing sessions', async () => {
+    query.mockRejectedValueOnce(
+      new TRPCClientError('Message not found', {
+        result: {
+          error: {
+            message: 'Message not found',
+            code: -32004,
+            data: { code: 'NOT_FOUND', httpStatus: 404 },
+          },
+        },
+      })
+    );
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toBeNull();
+  });
+
+  it.each(['Session not found', 'Access denied'])(
+    'does not interpret %s as permission to retry',
+    async message => {
+      const failure = new TRPCClientError(message, {
+        result: {
+          error: { message, code: -32004, data: { code: 'NOT_FOUND', httpStatus: 404 } },
+        },
+      });
+      query.mockRejectedValueOnce(failure);
+      const thrown = await new CloudAgentNextClient('token').getMessageResult(input).then(
+        () => undefined,
+        (error: unknown) => error
+      );
+      expect(thrown).toMatchObject({ message: 'Message result unavailable' });
+      expect((thrown as { cause?: unknown }).cause).toBe(failure);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        failure,
+        expect.objectContaining({
+          tags: { source: 'cloud-agent-next-client', endpoint: 'getMessageResult' },
+        })
+      );
+    }
+  );
+
+  it('rejects unrecognized lifecycle state instead of confirming admission', async () => {
+    query.mockResolvedValue({ ...input, status: 'not-admitted' });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).rejects.toThrow();
+  });
+});
+
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const snapshot: WorktreeChangesSnapshot = {
@@ -1101,6 +1175,33 @@ describe('CloudAgentNextClient.getSandboxStatus', () => {
       message: 'Session not found or access denied',
       cause: undefined,
     });
+  });
+});
+
+describe('CloudAgentNextClient.getPendingInteractions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const query = jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
+  const { CloudAgentNextClient } =
+    jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
+  let client: InstanceType<typeof CloudAgentNextClient>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    query.mockReset();
+    jest.mocked(createTRPCClient).mockReturnValue({ getPendingInteractions: { query } } as never);
+    client = new CloudAgentNextClient('test-token');
+  });
+
+  it('calls the Worker procedure and unwraps the pending interactions it returns', async () => {
+    const pending = {
+      questions: [{ id: 'q_1', sessionID: 'ses_root' }],
+      permissions: [{ id: 'perm_1', sessionID: 'ses_root' }],
+    };
+    query.mockResolvedValue(pending);
+
+    await expect(client.getPendingInteractions(cloudAgentSessionId)).resolves.toEqual(pending);
+    expect(query).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
 

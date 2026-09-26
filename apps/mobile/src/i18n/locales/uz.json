@@ -36,6 +36,7 @@
     "cost": "Xarajat",
     "discard": "Bekor qilish",
     "findings": "Aniqlangan muammolar",
+    "mergeRequest": "merge so‘rovi",
     "notConnected": "Ulanmagan",
     "notifications": "Bildirishnomalar",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Boshqa elektron pochta manzilidan foydalanish",
     "signInWithApple": "Apple bilan kirish",
     "signInWithGoogle": "Google bilan kirish",
+    "signInWithPasskey": "Kirish kaliti bilan kirish",
     "emailAddress": "Elektron pochta manzili",
     "emailPlaceholder": "siz@misol.com",
     "continueWithEmail": "Elektron pochta bilan davom etish",
@@ -174,6 +176,10 @@
     "termsConnector": " va ",
     "termsSuffix": ".",
     "moreSignInOptions": "Boshqa kirish usullari",
+    "passkeyCancelled": "Kirish kaliti bilan kirish bekor qilindi. Qayta urinib koʻring.",
+    "passkeyNotFound": "Bu qurilma uchun kirish kaliti saqlanmagan. Buning oʻrniga Apple, Google yoki elektron pochtangiz bilan kiring.",
+    "passkeyUnsupported": "Kirish kalitlari bu qurilmada mavjud emas. Buning oʻrniga Apple, Google yoki elektron pochtangiz bilan kiring.",
+    "passkeyFailed": "Kirish kaliti bilan kirib boʻlmadi. Qayta urinib koʻring.",
     "couldNotCompleteSignIn": "Kirishni yakunlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "sessionEnded": "Seansingiz tugadi. Iltimos, qayta kiring.",
     "signInCodeExpired": "Kirish kodingizning amal qilish muddati tugadi. Iltimos, qayta urinib ko'ring.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Sinov hisobi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Korporativ SSO"
+    "providerEnterpriseSso": "Korporativ SSO",
+    "passkeysTitle": "Kirish kalitlari",
+    "passkeysSubtitle": "Parolsiz kiring",
+    "passkeysEmpty": "Hozircha kirish kalitlari yoʻq",
+    "passkeysEmptyHint": "$t(profile.addPasskey) parolsiz kirish uchun.",
+    "passkeysCouldNotLoad": "Kirish kalitlarini yuklab boʻlmadi",
+    "passkeysLoadFailed": "Bu yuklanmaguncha kirish kalitlari mavjud emas.",
+    "addPasskey": "Kirish kaliti qoʻshish",
+    "passkeyDefaultName": "Kirish kaliti",
+    "passkeyAddedOn": "{{date}} qoʻshildi",
+    "passkeyAdded": "Kirish kaliti qoʻshildi.",
+    "passkeyAddFailed": "Kirish kaliti qoʻshib boʻlmadi. Qayta urinib koʻring.",
+    "passkeyAddUnsupported": "Bu qurilma kirish kalitlarini yarata olmaydi.",
+    "passkeyAddCancelled": "Kirish kaliti yaratish bekor qilindi.",
+    "passkeyRemoved": "Kirish kaliti olib tashlandi.",
+    "passkeyRemoveFailed": "Oʻsha kirish kalitini olib tashlab boʻlmadi. Qayta urinib koʻring.",
+    "passkeyRenamed": "Kirish kaliti nomi oʻzgartirildi.",
+    "passkeyName": "Kirish kaliti nomi",
+    "renamePasskey": "Kirish kaliti nomini oʻzgartirish",
+    "removePasskey": "Kirish kalitini olib tashlash",
+    "removePasskeyTitle": "Kirish kaliti olib tashlansinmi?",
+    "removePasskeyMessage": "Endi bu kirish kaliti bilan kira olmaysiz."
   },
   "preferences": {
     "general": "Umumiy",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "O'chirilganda Enter tugmasi agentga xabar kiritish maydonida yangi qator ochadi.",
     "biometricUnlock": "Biometriya yordamida qulfni ochish",
     "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi.",
-    "featureFlags": "Funksiya bayroqlari",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
     "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} ta fayldan {{displayCount}} tasi yuklandi",
       "filesStillLoading": "Fayllar hali yuklanmoqda. Yangilash uchun pastga torting.",
       "goToOverview": "Umumiy ko'rinishga o'tish",
-      "goToOverviewTab": "Umumiy ko'rinish varag'iga o'tish"
+      "goToOverviewTab": "Umumiy ko'rinish varag'iga o'tish",
+      "expandAllLines_one": "Barcha {{displayCount}} ta qatorni ko'rsatish",
+      "expandAllLines_other": "Barcha {{displayCount}} ta qatorni ko'rsatish",
+      "expandLines_one": "{{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Atrofdagi {{displayCount}} ta qatorni ko'rsatish",
+      "expandLinesOfContext_other": "Atrofdagi {{displayCount}} ta qatorni ko'rsatish",
+      "expandMoreLines_one": "Yana {{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "expandMoreLines_other": "Yana {{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ta fayldan {{loaded}} tasi yuklandi",
+      "loadedOfTotalFiles_other": "{{total}} ta fayldan {{loaded}} tasi yuklandi"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ fayl oxirida yangi qator yo'q",
@@ -357,6 +389,7 @@
       "merge": "Birlashtirish",
       "mergeNow": "Hozir birlashtirish",
       "mergePullRequest": "PRni birlashtirish",
+      "mergeTermTitle": "{{term}}ni birlashtirish",
       "enableAutoMerge": "Avtomatik birlashtirishni yoqish",
       "disableAutoMerge": "Avtomatik birlashtirishni o'chirish",
       "autoMergeOn": "Avtomatik birlashtirish yoqilgan",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "Birlashtirishdan keyin tarmoqni o'chirish",
       "noEnabledMethods": "Bu omborda hech bir birlashtirish usuli yoqilmagan. Ombor administratoridan oddiy birlashtirish, kommitlarni jamlash yoki asosni almashtirish usulini yoqishni so'rang.",
       "confirmTitle": "PR birlashtirilsinmi?",
+      "confirmTitleTerm": "{{term}} birlashtirilsinmi?",
       "confirmMessage": "O'zgarishlaringiz asosiy tarmoqqa birlashtiriladi.",
       "enableAutoMergeConfirmTitle": "Avtomatik birlashtirish yoqilsinmi?",
       "enableAutoMergeConfirmMessage": "Barcha majburiy tekshiruvlar muvaffaqiyatli yakunlangach, GitHub bu PRni avtomatik birlashtiradi.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} pipeline muvaffaqiyatli bo‘lgach, avtomatik birlashtiriladi.",
+      "enableAutoMergeDescriptionTerm": "GitLab pipeline muvaffaqiyatli bo‘lgach, ushbu {{term}}ni avtomatik birlashtiradi.",
       "forbidden": "Bu PRni birlashtirishga ruxsatingiz yo'q.",
       "cannotMerge": "Bu PRni hozirgi holatida birlashtirib bo'lmaydi.",
       "couldNotMerge": "PRni birlashtirib bo'lmadi.",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "Allaqachon birlashtirilgan",
-        "closed": "Bu PR yopilgan"
+        "closed": "Bu PR yopilgan",
+        "closedMergeRequest": "Bu merge so‘rovi yopilgan"
       },
       "partialSuccessBanner": {
         "body": "Tarmoqni o'chirib bo'lmadi: {{reason}}.",
@@ -413,6 +450,18 @@
         "behindDetail": "Manba tarmoq asosiy tarmoqdan ortda qolgan. Birlashtirishdan oldin manba tarmoqni yangilang yoki asosini almashtiring.",
         "notMergeableTitle": "Bu PRni hali birlashtirib bo'lmaydi",
         "notMergeableDetail": "GitHub birlashtirish imkoniyati uchun quyidagi holatni bildirdi: {{state}}."
+      },
+      "restrictions": {
+        "title": "Birlashtirish cheklovlari",
+        "approvalsRequired_one": "{{displayCount}} tasdiq talab qilinadi",
+        "approvalsRequired_other": "{{displayCount}} tasdiq talab qilinadi",
+        "pipelineMustSucceed": "Birlashtirishdan oldin pipeline muvaffaqiyatli bo‘lishi kerak."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline oxirgi kommitda xato bermoqda.",
+        "pendingPipeline": "Pipeline oxirgi kommitda hali ishlayapti.",
+        "permission": "Bu {{term}}ni birlashtirishga ruxsatingiz yo‘q.",
+        "draft": "Birlashtirishdan oldin {{term}}ni ko‘rib chiqishga tayyor deb belgilang."
       },
       "methodLabels": {
         "merge": "Birlashtirish kommitini yaratish",
@@ -462,6 +511,8 @@
       "replyBadRequest": "Bu javobni joylab bo'lmaydi. Izohlar zanjiri o'zgargan bo'lishi mumkin.",
       "replyForbidden": "Bu PRga javob yozishga ruxsatingiz yo'q.",
       "addCommentCta": "Bu PRga izoh yozish",
+      "fixWithKilo": "Kilo bilan tuzatish",
+      "fixWithKiloPrompt": "Iltimos, quyidagi PR izohini hal qiling: {{link}}",
       "commentBadRequest": "Bu izohni joylab bo'lmaydi. PR o'zgargan bo'lishi mumkin.",
       "commentForbidden": "Bu PRga izoh yozishga ruxsatingiz yo'q.",
       "moderation": {
@@ -512,7 +563,10 @@
         "outdatedOnLines": "Eskirgan: {{lines}}",
         "outdatedOnPath": "Eskirgan: {{path}}"
       },
-      "deletedUser": "o'chirilgan foydalanuvchi"
+      "deletedUser": "o'chirilgan foydalanuvchi",
+      "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q.",
+      "moreLinesAbove_one": "… yuqorida yana {{displayCount}} ta qator bor.",
+      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "PRni ko'rib chiqish",
     "headLine": "{{counts}} · oxirgi kommit: {{sha}}",
     "entry": {
-      "eyebrow": "PRni URL orqali oching.",
-      "pastePrLink": "PR havolasini joylashtirish",
-      "noRecentPrs": "Oxirgi PRlar yo'q",
-      "noRecentPrsDescription": "Ko'rib chiqishni boshlash uchun yuqoriga PR havolasini joylashtiring — keyingi safar u shu yerda ko'rinadi.",
+      "eyebrow": "PR yoki merge so‘rovini URL orqali oching",
+      "pastePrLink": "PR yoki merge so‘rovi havolasini joylashtirish",
+      "noRecentPrs": "Oxirgi ko‘rib chiqishlar yo‘q",
+      "noRecentPrsDescription": "Ko‘rib chiqishni boshlash uchun yuqoriga havolani joylashtiring — keyingi safar u shu yerda ko‘rinadi.",
       "couldNotLoad": "Yuklab bo'lmadi.",
       "removeFromRecentsTitle": "Oxirgilar ro'yxatidan olib tashlansinmi?",
-      "removeFromRecentsMessage": "Bu PR oxirgilar ro'yxatidan olib tashlanadi.",
+      "removeFromRecentsMessage": "Bu ko‘rib chiqish oxirgilar ro‘yxatidan olib tashlanadi.",
       "removeRecentAccessibility": "{{repo}}ni oxirgilar ro'yxatidan olib tashlash",
-      "urlAccessibility": "GitHubdagi PRning URL manzili",
-      "clearLink": "PR havolasini tozalash",
-      "pasteLink": "PR havolasini joylashtirish",
+      "urlAccessibility": "PR yoki merge so‘rovi URL manzilini kiriting",
+      "urlPlaceholder": "PR yoki merge so‘rovi URL manzili",
+      "openAccessibility": "PR yoki merge so‘rovini ochish",
+      "clearLink": "Havolani tozalash",
+      "pasteLink": "PR yoki merge so‘rovi havolasini joylashtirish",
       "open": "Ochiq"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} tasi kutilmoqda",
       "skipped": "{{displayCount}} tasi o'tkazib yuborildi",
       "checksCount": "{{displayCount}} tekshiruv",
+      "checksCount_one": "{{displayCount}} tekshiruv",
+      "checksCount_other": "{{displayCount}} tekshiruv",
       "checkDetails": "tekshiruv tafsilotlari"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ulanishini tekshirib bo'lmadi.",
       "checkFailedMessage": "Bu ma'lumot yuklanmaguncha hisobga kirish holatini aniqlab bo'lmaydi.",
+      "checkFailedTitleGitLab": "GitLab ulanishini tekshirib bo'lmadi.",
+      "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
+      "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
       "reconnectTitle": "GitHubga qayta ulanish",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan. Mobil qurilmada PRlarni ko'rib chiqishni davom ettirish uchun qayta ulaning.",
-      "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang."
+      "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang.",
+      "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
+      "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
+      "bitbucketOrgOnlyDescription": "Profilida tashkilot tanlang va uning Bitbucket PRlarini ko‘rib chiqing."
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
+      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
     },
     "eventChips": {
       "comment": "Izoh",
@@ -672,10 +739,12 @@
       "statusContext": "Atrofdagi qator",
       "lineLabel": "{{line}}-qator, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(bo‘sh)"
+      "emptyLine": "(bo‘sh)",
+      "truncationBanner_one": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi.",
+      "truncationBanner_other": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi."
     },
     "linkPasteClipboardEmpty": "Nusxalash buferi bo'sh.",
-    "linkPasteNotAPullRequest": "Bu GitHubdagi PR havolasi emas.",
+    "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
       "reviewSubmitted": "Ko'rib chiqish natijasi yuborildi",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "Bu izohni joylashtirib bo'lmaydi. Tanlangan qator o'zgargan yoki PR yangilangan bo'lishi mumkin.",
       "reviewNotSubmitted": "Ko'rib chiqish natijasini hozirgi holatida yuborib bo'lmaydi. PR o'zgargan bo'lishi mumkin yoki siz o'zingiz ochgan PRni ko'rib chiqishga urinyapsiz.",
+      "reviewNotSubmittedTerm": "Ushbu ko'rib chiqish hozirgi holatida yuborilmaydi. {{term}} o'zgargan bo'lishi mumkin yoki o'zingiz yaratgan {{term}}ni ko'rib chiqa olmaysiz.",
       "couldNotPostComment": "Izoh joylashtirib bo'lmadi.",
       "couldNotSubmitReview": "Ko'rib chiqish natijasini yuborib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring."
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "Javob yuborib bo‘lmadi.",
       "couldNotCompleteAction": "Bu amalni yakunlab bo'lmadi.",
       "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi.",
+      "mergeResultNotCompleted": "{{term}} birlashtirilmadi. Holatini tekshiring va qayta urinib ko‘ring.",
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin PRni tekshiring.",
       "persistenceFailed": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "forbidden": "Bu amalni bajarishga ruxsat yo'q."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ushbu provayderda mavjud emas",
+        "accessibility": "Ushbu provayderda mavjud emas: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge so‘rovi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge so‘rovini ulashish",
+      "viewOnProvider": "{{provider}}da ko'rish",
+      "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",
+      "unavailableDescription": "Ehtimol u o‘chirilgan yoki unga kirish huquqingiz yo‘q.",
+      "accessDeniedMergeRequest": "Bu merge so‘rovini ko‘rishga ruxsatingiz yo‘q.",
+      "couldNotLoadMergeRequest": "Merge so‘rovini yuklab bo‘lmadi.",
+      "discussionAccessDenied": "Bu merge so‘rovi muhokamasini ko‘rishga ruxsatingiz yo‘q.",
+      "discussionUnavailableMessage": "Bu merge so‘rovi o‘chirilgan bo‘lishi mumkin.",
+      "noDiscussionDescription": "Bu merge so‘rovida ko‘rib chiqishga oid izohlar zanjiri ham, umumiy izohlar ham yo‘q.",
+      "noFilesChangedDescription": "Bu merge so‘rovida hech bir fayl o‘zgarmagan."
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "Bildirishnomalar qulflangan ekranda xabar matnini ko'rsatadi.",
     "previewGenericDescription": "Bildirishnomalar faqat yangi hodisa haqida xabar beradi. Xabarni o'qish uchun Kilo ilovasini oching.",
     "channel": {
-      "agent": "Agent sessiyalari",
+      "agentProgress": "Agent jarayoni",
       "chat": "Suhbat xabarlari",
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
-      "security": "Aniqlangan xavfsizlik muammolari"
+      "security": "Aniqlangan xavfsizlik muammolari",
+      "spend": "Xarajat bildirishnomalari"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "Sessiya holati",
       "sessionStatusSubtitle": "tugadi / xatolik yuz berdi / boshqarishga tayyor",
       "kiloclawActivitySubtitle": "nusxa tayyor yoki xatolik yuz berdi, rejalashtirilgan amallar",
+      "kiloclawActivityUnavailable": "KiloClaw faoliyatini olish uchun KiloClaw nusxasini ishga tushiring.",
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
-      "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari"
+      "balanceAlertsUnavailable": "Balans ogohlantirishlarini olish uchun tashkilotga qo'shiling.",
+      "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari",
+      "securityFindingsUnavailable": "Xavfsizlik zaifliklarini olish uchun bir qamrovda Kilo Xavfsizlik agentini yoqing.",
+      "spendAlertsSubtitle": "chegaradan oshish va soatlik ko'tarilishlar",
+      "spendAlertsToggle": "Xarajat bildirishnomalari toifasi"
+    },
+    "action": {
+      "openSession": "Sessiyani ochish"
+    },
+    "needsInputAction": {
+      "approved": "So‘rov tasdiqlandi",
+      "replied": "Javob yuborildi",
+      "failed": "Javob berilmadi. Qayta urinish uchun yana bosing.",
+      "unavailable": "Bu so‘rov endi kutmaydi."
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "Yuklash amalga oshmadi.",
       "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}.",
       "nothingToPaste": "Joylashtirish uchun hech narsa yo'q.",
-      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi."
+      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi.",
+      "limit_one": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
+      "limit_other": "Siz {{displayCount}} tagacha fayl biriktira olasiz."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "Muammolarni sinxronlash",
       "syncNow": "Hozir sinxronlash",
       "syncQueued": "Sinxronlash navbatga qo'yildi",
-      "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi."
+      "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi.",
+      "daysOverdue_one": "Muddati {{displayCount}} kun o'tgan",
+      "daysOverdue_other": "Muddati {{displayCount}} kun o'tgan",
+      "findingsCount_one": "{{displayCount}} ta muammo",
+      "findingsCount_other": "{{displayCount}} ta muammo"
     },
     "dashboardMetrics": {
       "openFindings": "Ochiq muammolar",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
       "failedToStopExecution": "Bajarishni to'xtatib bo'lmadi.",
+      "stopped": "Sessiya to'xtatildi",
+      "committing": "Kommit qilinmoqda…",
+      "committed": "Kommit qilindi",
+      "commitFailed": "Kommit amalga oshmadi",
       "renameSession": "Sessiya nomini o'zgartirish",
       "renamePlaceholder": "Sessiya nomi",
       "transcriptAccessibility": "Sessiya yozishmalari",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "Masofadan / bilan boshlanuvchi buyruqlarni bajarish uchun Kilo CLI dasturining yangiroq versiyasi kerak. Kilo CLI dasturini yangilang va qayta ulaning."
     },
     "sessionConnection": {
+      "label": "Ulanish",
       "connecting": "Ulanmoqda…",
       "reconnecting": "Qayta ulanmoqda…",
       "connectionLost": "Ulanish uzildi",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "Maqsad olib tashlansinmi?",
       "removeConfirmMessage": "CLI bu seansning maqsadini tozalaydi.",
       "updateFailed": "Maqsadni yangilab bo'lmadi.",
-      "sectionAccessibility": "{{status}}. Maqsad: {{text}}"
+      "sectionAccessibility": "{{status}}. Maqsad: {{text}}",
+      "collapse": "Maqsadni yig'ish",
+      "expand": "Maqsadni yoyish"
     },
     "newSession": {
+      "recentlyUsed": "Yaqinda ishlatilgan",
+      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
+      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
       "connectGithubDescription": "Brauzerda GitHub hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
+      "connectGitlabDescription": "Brauzerda GitLab hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
+      "connectBitbucketDescription": "Brauzerda Bitbucket hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",
+      "openGitlab": "GitLab saytini ochish",
+      "openBitbucket": "Bitbucket saytini ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
       "githubConnected": "GitHub ulandi",
+      "gitlabConnected": "GitLab ulandi",
       "noRepositoriesVisible": "Repozitoriyalar ko'rinmayapti. Kilo GitHub ilovasining repozitoriyalarga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
+      "noRepositoriesVisibleGitlab": "Repozitoriyalar ko'rinmayapti. GitLab repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
+      "noRepositoriesVisibleBitbucket": "Repozitoriyalar ko'rinmayapti. Bitbucket repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
+      "bitbucketOrganizationsOnly": "Bitbucket faqat tashkilotlar uchun mavjud.",
+      "branchPickerTitle": "Tarmoqni tanlash",
+      "branchDefault": "Standart",
+      "branchAccessibility": "Tarmoq: {{label}}",
+      "branchLoading": "Tarmoqlar yuklanmoqda",
+      "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
+      "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
+      "branchEmpty": "Mavjud tarmoqlar yo‘q",
+      "branchPlaceholder": "Tarmoq tanlang",
       "runOnWithTarget": "Ishga tushirish muhiti: {{target}}",
       "environment": "Muhit",
       "couldNotLoadEnvironment": "Muhitingizni yuklab bo'lmadi.",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "Repozitoriyalarni yangilab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "discardDraftTitle": "Qoralama bekor qilinsinmi?",
       "discardDraftMessage": "Yozgan so'rovingiz yo'qoladi.",
+      "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Kompyuteringizdagi kilo jarayonini boshqarish uchun `kilo remote` buyrug'ini yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini bajaring.",
-      "connectBitbucketDescription": "Brauzerda Bitbucket hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "connectGitlabDescription": "Brauzerda GitLab hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
-      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
-      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi.",
-      "gitlabConnected": "GitLab ulandi",
-      "noRepositoriesVisibleBitbucket": "Repozitoriyalar ko'rinmayapti. Bitbucket repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
-      "noRepositoriesVisibleGitlab": "Repozitoriyalar ko'rinmayapti. GitLab repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
-      "openBitbucket": "Bitbucket saytini ochish",
-      "openGitlab": "GitLab saytini ochish",
-      "recentlyUsed": "Yaqinda ishlatilgan",
       "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
       "importFailed": "Bu sessiyani import qilib bo'lmadi.",
-      "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi."
+      "pickProfile": "Profilni tanlang",
+      "noProfile": "Profil yo'q",
+      "manageProfiles": "Profillarni boshqarish",
+      "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
+      "advancedConfig": "Kengaytirilgan konfiguratsiya",
+      "advancedConfigDescription": "Saqlangan konfiguratsiyalarni yuklash va qoʻshimcha muhit oʻzgaruvchilari va sozlash buyruqlarini qoʻlda sozlash uchun profilni tanlang",
+      "saveAsProfile": "Profil sifatida saqlash",
+      "saveProfileDescription": "Joriy muhit o'zgaruvchilari va sozlash buyruqlarini qayta foydalanish mumkin bo'lgan profil sifatida saqlang.",
+      "profileSummary": "{{vars}} muhit o'zgaruvchilari · {{commands}} sozlash buyruqlari",
+      "profileSaved": "“{{name}}” profili saqlandi",
+      "organizationProfiles": "Tashkilot profillari",
+      "personalProfiles": "Shaxsiy profillar",
+      "yourProfiles": "Profillaringiz",
+      "failedToLoadProfiles": "Profillarni yuklab bo‘lmadi",
+      "nameTooLong": "Profil nomi juda uzun",
+      "descriptionTooLong": "Tavsif juda uzun",
+      "secretsEncrypted": "Sirlar saqlashdan oldin shifrlangan.",
+      "profileActive": "Profil faol",
+      "profilesActive": "Profillar faol",
+      "customConfigActive": "Maxsus konfiguratsiya faol",
+      "configNeedsAttention": "Konfiguratsiyaga e'tibor kerak",
+      "repoProfile": "Repo profili",
+      "selectedProfile": "Tanlangan profil",
+      "manualOverrides": "Qo'lda bekor qilish",
+      "openSettingsToReview": "Ko‘rib chiqish uchun Sozlamalarni oching",
+      "profileSelection": "Profil tanlash"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",
@@ -2086,15 +2241,18 @@
       "updateTodos": "Vazifalar ro'yxatini yangilash",
       "linesBadge": "{{displayCount}} qator",
       "filesBadge": "{{displayCount}} fayl",
-      "matchesBadge": "{{displayCount}} natija"
+      "matchesBadge": "{{displayCount}} natija",
+      "filesBadge_one": "{{displayCount}} fayl",
+      "filesBadge_other": "{{displayCount}} fayl",
+      "linesBadge_one": "{{displayCount}} qator",
+      "linesBadge_other": "{{displayCount}} qator",
+      "matchesBadge_one": "{{displayCount}} natija",
+      "matchesBadge_other": "{{displayCount}} natija",
+      "noOutput": "Chiqish yo'q."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",
       "linesOf": "{{start}}–{{end}}-qatorlar, jami {{total}} ta"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent xizmatida {{action}} amali bajarilmadi ({{status}}).",
-      "failed": "Cloud Agent xizmatida {{action}} amali bajarilmadi."
     },
     "collectCopyableText": {
       "unserializableInput": "[serializatsiya qilib bo'lmaydigan kirish ma'lumotlari]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "Provayder so'rovni rad etdi.",
       "assistantStopped": "Javob yaratish to'xtatildi.",
       "assistantContextOverflow": "Suhbat model uchun juda uzun.",
-      "assistantFailed": "Javobni yaratib bo'lmadi.",
-      "sendFailed": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "assistantFailed": "Javobni yaratib bo'lmadi."
     },
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
@@ -2376,7 +2533,11 @@
       "files": "Fayl",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
-      "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)"
+      "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
+      "maxFilesAllowed_one": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
+      "maxFilesAllowed_other": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
+      "onlyAddingFiles_one": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
+      "onlyAddingFiles_other": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)"
     },
     "composer": {
       "addAttachment": "Fayl biriktirish",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
       "charactersRemaining": "{{count}} ta belgi qoldi",
-      "insertNewline": "Yangi qator kiritish"
+      "insertNewline": "Yangi qator kiritish",
+      "charactersRemaining_one": "{{count}} ta belgi qoldi",
+      "charactersRemaining_other": "{{count}} ta belgi qoldi"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",
@@ -2428,7 +2591,17 @@
       "startNewSession": "Yangi sessiya boshlash",
       "exitSession": "Sessiyadan chiqish",
       "clearSession": "Bu sessiyani yakunlash va yangisini boshlash",
+      "compactDescription": "joriy seans kontekstini siqish",
+      "goalDescription": "Seans maqsadi sari ishlashni davom ettir. /goal <objective> yoki pause, resume, clear",
+      "initDescription": "yo'naltirilgan AGENTS.md sozlamasi",
+      "resumeClaudeDescription": "Claude Code seansi transkriptini import qilish",
+      "resumeCodexDescription": "OpenAI Codex seansi transkriptini import qilish",
+      "reviewDescription": "o'zgarishlarni ko'rib chiqish [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} buyrug'idan foydalanish",
+      "useSkillCommand": "/{{command}} ko'nikmasidan foydalanish",
+      "skillBadge": "Ko'nikma",
+      "catalogFull": "Buyruqlar katalogi to'ldi, shuning uchun ba'zi buyruqlar yashirilgan.",
+      "catalogOverLimit": "Ko'nikmalar katalogi o'lcham chegarasidan oshdi, shuning uchun barcha ko'nikmalar ko'rsatiladi.",
       "insert": "Qo'yish",
       "upgradeRequiredFallback": "Bu buyruqdan foydalanish uchun CLI dasturini yangilang.",
       "exitCapabilityUnavailable": "Sessiyadan chiqish uchun CLI dasturini yangilang.",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "{{steps}} qadam",
       "stepsCount": "{{steps}} qadam",
       "stepsCount_other": "{{steps}} qadam",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modellar ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Avtomatik tasdiqlash",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "Vosita chaqiruvlari",
-      "condensedLabel": "{{itemCount}} element; {{last}}"
+      "condensedLabel": "{{itemCount}} element; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "Faol seanslarni yuklab bo'lmadi.",
     "agentSessions": "Hozir faol",
     "newCodingTask": "Yangi kodlash vazifasi",
+    "newTaskFromPicture": "Rasmdan yangi vazifa",
     "explore": "Imkoniyatlar",
     "seeAll": "Barchasini ko'rish",
     "noLiveSessions": "Hozir hech narsa ishlamayapti"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "Bu sessiya fayllarni qabul qila olmaydi",
     "cliCantReceiveFilesMessage": "Bu sessiyani ishga tushirgan Kilo CLI fayllarni qabul qila olmaydi. O'sha kompyuterda CLIni yangilang yoki fayllarni yangi sessiyaga yuboring.",
     "contentlessMessage": "Ulashish uchun hech narsa yo'q — matn yoki fayllar kiritilmagan.",
-    "couldNotReadContent": "Ulashilgan kontentni o'qib bo'lmadi."
+    "couldNotReadContent": "Ulashilgan kontentni o'qib bo'lmadi.",
+    "onlyFirstFilesAttached_one": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi.",
+    "onlyFirstFilesAttached_other": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "So'rovlaringiz, suhbat tarixi va biriktirgan fayllaringiz.",
     "aiProvidersWhy": "AI javoblarini yaratish uchun.",
     "aiProvidersWho": "Anthropic, OpenAI, Google va har so'rovda siz tanlagan boshqa provayderlar.",
-    "gatewayWhat": "Hisob ID raqami, so'rov metama'lumotlari, ishlatilgan tokenlar soni.",
+    "gatewayWhat": "Hisob ID raqami, so'rov metama'lumotlari, ishlatilgan tokenlar soni, hamda ilova u orqali yuboradigan promptlar va ovoz yozuvlari.",
+    "viaGateway": "Kilo Gateway orqali",
     "gatewayWhy": "Shaxsni tasdiqlash, so'rovlarni yo'naltirish, to'lov hisoblarini solishtirish.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Ilova mazmuni olib tashlangan nosozlik va xato hisobotlari.",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Aytib yozdirayotganingizdagi ovoz yozuvi.",
     "voiceTranscriptionWhy": "Nutqni matnga aylantirish uchun.",
-    "voiceTranscriptionWho": "Faqat qurilmaning o'zida qayta ishlanadi. Qurilma nutqni oflayn matnga aylantira olmasa, Apple yoki Google xizmatiga yuboriladi.",
+    "voiceTranscriptionWho": "Qurilmangiz, siz tanlagan transkripsiya modeli bilan Kilo Gateway yoki onlayn tanib olish uchun Apple yoki Google.",
     "installAttributionPromptTitle": "O'rnatish manbasini aniqlashga ruxsat berilsinmi?",
     "installAttributionPromptMessage": "Kilo Apple tizimidagi kuzatish ruxsatidan faqat ilovani qaysi manba orqali topganingizni bilish uchun foydalanadi. Bunda so'rovlaringiz va suhbatlaringiz hech qachon ishlatilmaydi.",
     "what": "Qaysi ma'lumotlar",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "Kirish urinishlari juda ko'p. Iltimos, kuting va qayta urinib ko'ring."
   },
   "models": {
+    "auto": {
+      "frontier": "Avto Ilg'or",
+      "balanced": "Avto Muvozanatli",
+      "efficient": "Avto Samarali",
+      "small": "Avto Kichik",
+      "free": "Avto Bepul",
+      "organization": "Tashkilot Avto"
+    },
     "dataCollected": "Ma'lumot yig'iladi",
     "free": "Bepul",
     "couldNotUpdateFavorites": "Sevimlilarni yangilab bo'lmadi.",
@@ -2988,8 +3177,17 @@
     "privacy": "Agentlarni ko'rish uchun Kiloni oching",
     "openAgents": "Agentlarni ochish",
     "needsInput": "Javob kutilmoqda",
+    "newestSession": "Eng yangi: {{title}}",
+    "noneWaiting": "Kutayotgan agent yo'q",
+    "newAgent": "Yangi agent",
+    "approving": "Tasdiqlanmoqda...",
+    "couldNotApprove": "Tasdiqlab bo'lmadi",
+    "couldNotStart": "Boshlab bo'lmadi",
     "channelName": "Faol agentlar",
-    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
+    "openSession": "Ochish",
+    "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
+    "newestResult": "Eng yangi natija"
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
@@ -3014,15 +3212,7 @@
     "remoteOptionTitle": "Kompyuteringiz",
     "remoteOptionBody": "Kilo'ni o'z mashinangizda `kilo remote` CLI orqali ishga tushiring.",
     "skip": "Sayohatni o'tkazib yuborish",
-    "tutorialLabel": "Qo'llanma",
-    "remoteTitle": "Birinchi masofaviy seansingizni boshlang",
-    "remoteBody": "Kompyuteringizni ulang, so'ng seansni shu yerdan boshlang.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Hozircha ulangan kompyuter yo'q",
-    "remoteEmptyBody": "Uni ulash uchun kompyuteringizda `kilo remote` buyrug'ini bajaring.",
-    "remoteFound": "Kompyuter ulandi",
-    "checkAgain": "Yana tekshirish",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Qo'llanma"
   },
   "modelChat": {
     "empty": {
@@ -3052,6 +3242,214 @@
       "unauthorizedDescription": "Bu suhbatda Kilo vositalaridan foydalanish uchun qayta kiring.",
       "unavailable": "Kilo vositalari mavjud emas",
       "unavailableDescription": "Kilo serveri bu hisob uchun mavjud emas."
+    }
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
+      "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
+      "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Oxirgi seansni ochish"
+  },
+  "spendAlerts": {
+    "subtitle": "Bu sohaning xarajati chegaradan oshganda yoki odatdagi soatlik sur'atidan yuqoriga ko'tarilganda to'lov bo'yicha kontaktlarga email yoki push orqali bildirishnoma yubor.",
+    "enable": "Xarajat bildirishnomalarini yoqish",
+    "thresholdTitle": "Chegaradan oshish",
+    "thresholdSubtitle": "Joriy xarajat limitingizdan oshib ketdi",
+    "anomalyTitle": "Soatlik ko'tarilish",
+    "anomalySubtitle": "Bir soat bu sohaning odatdagi sur'atidan ancha yuqori",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Oyna",
+    "window24h": "24 soat",
+    "window7d": "7 kun",
+    "window30d": "30 kun",
+    "multiplierLabel": "Ko'tarilish koeffitsiyenti",
+    "saved": "Xarajat bildirishnomasi sozlamalari saqlandi",
+    "loadError": "Xarajat bildirishnomalarini yuklab bo'lmadi.",
+    "saveError": "Xarajat bildirishnomalarini saqlab bo'lmadi.",
+    "empty": "Xarajat bildirishnomalari o'chirilgan. Bu sohaning to'lov kontaktlarini ogohlantirish uchun ularni yoqing.",
+    "noSpend": "Hozircha xarajat qayd etilmagan",
+    "spend24h": "Oxirgi 24 soatdagi xarajat",
+    "multiplierError": "1 yoki undan katta koeffitsiyent kiriting",
+    "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
+    "pushOffByCategory": "Bildirishnomalarda o'chirilgan"
+  },
+  "profiles": {
+    "title": "Profillar",
+    "entrySubtitle": "Seanslar davomida muhit sozlamalaridan qayta foydalaning",
+    "newProfile": "Yangi profil",
+    "emptyTitle": "Hozircha profil yo'q",
+    "emptyDescription": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun profil yarating.",
+    "loadFailed": "Profillarni yuklab bo‘lmadi",
+    "counts": {
+      "vars": "{{count}} o'zgaruvchi",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ko'nikma",
+      "commands": "{{count}} buyruq",
+      "varsShort": "{{count}}o'",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}b"
+    },
+    "nameLabel": "Profil nomi",
+    "namePlaceholder": "masalan. Backend disk raskadrovka",
+    "descriptionLabel": "Profil tavsifi",
+    "descriptionPlaceholder": "Ixtiyoriy tavsif",
+    "ownerLabel": "Profil egasi",
+    "nameRequired": "Profil nomini kiriting",
+    "createAction": "Profil yaratish",
+    "createFailed": "Profil yaratib bo‘lmadi",
+    "createdToast": "“{{name}}” profili yaratildi",
+    "settingsSectionTitle": "Konfiguratsiya",
+    "defaultSectionTitle": "Standart profil",
+    "personalDefaultDescription": "Hech bir omborda mahkamlangan profil bo'lmasa, avtomatik yuklanadi.",
+    "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
+    "setAsDefault": "Standart sifatida o'rnating",
+    "removeDefault": "Standart sifatida olib tashlang",
+    "saveFailed": "Profilni saqlab bo‘lmadi",
+    "deleteTitle": "Profilni o'chirish",
+    "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",
+    "deleteFailed": "Profilni oʻchirib boʻlmadi",
+    "deleteBlocked": "Bu profil webhook trigger tomonidan ishlatiladi. Avval uni o'sha triggerlardan olib tashlang.",
+    "deletedToast": "“{{name}}” profili oʻchirib tashlandi",
+    "variablesTitle": "Atrof-muhit o'zgaruvchilari",
+    "addVariable": "O'zgaruvchini qo'shish",
+    "keyLabel": "Kalit",
+    "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
+    "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
+    "valueLabel": "Qiymat",
+    "secretLabel": "Sir",
+    "secrets": {
+      "markSecret": "Sir sifatida belgilang",
+      "masked": "Yashirin qiymat",
+      "reveal": "Qiymatni oshkor qilish",
+      "newValuePlaceholder": "Yangi maxfiy qiymatni kiriting",
+      "valuePlaceholder": "Maxfiy qiymat (shifrlangan)"
+    },
+    "variablesEmpty": "Hali oʻzgaruvchilar yoʻq",
+    "variablesSaveFailed": "Oʻzgaruvchini saqlab boʻlmadi",
+    "commandsTitle": "O'rnatish buyruqlari",
+    "addCommand": "Buyruq qo'shish",
+    "commandLabel": "Buyruq",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Hozircha sozlash buyruqlari yo'q",
+    "commandsSaveFailed": "Sozlash buyruqlarini saqlab bo‘lmadi",
+    "moveUp": "Yuqoriga siljiting",
+    "moveDown": "Pastga siljiting",
+    "skillsTitle": "Ko'nikmalar",
+    "addSkill": "Qobiliyat qo'shing",
+    "skillNameLabel": "Malaka nomi",
+    "skillMarkdownLabel": "Ko'nikma tarkibi",
+    "skillsEmpty": "Hali mahorat yo'q",
+    "skillNameRequired": "Qobiliyat nomini kiriting",
+    "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
+    "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
+    "skillSaveFailed": "Mahorat saqlanmadi",
+    "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
+    "skillEditTitle": "Tahrirlash mahorati",
+    "mcp": {
+      "title": "MCP serverlari",
+      "add": "MCP serverini qo'shing",
+      "empty": "MCP serverlari hali yo'q",
+      "name": "Server nomi",
+      "type": "Server turi",
+      "localType": "Mahalliy",
+      "remoteType": "Masofadan",
+      "command": "Buyruqlar qatori",
+      "url": "URL",
+      "environment": "Atrof-muhit (JSON)",
+      "headers": "Sarlavhalar (JSON)",
+      "timeout": "Taym-aut; turib qolish; tanaffus",
+      "secretCount": "Yashirin hisob",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Server nomini kiriting",
+      "nameInvalid": "Ism faqat harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin",
+      "commandRequired": "Buyruqni kiriting",
+      "commandTooLong": "Ko'pi bilan 500 belgidan iborat 50 ta argumentdan foydalaning",
+      "urlRequired": "URL manzilini kiriting",
+      "urlInvalid": "Yaroqli URL manzilini kiriting",
+      "urlTooLong": "URL 2048 ta belgi yoki undan kam bo'lishi kerak",
+      "jsonInvalid": "To'g'ri JSON kiriting - satr qiymatlari ob'ekti",
+      "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
+      "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
+      "edit": "MCP serverini tahrirlash",
+      "saveFailed": "MCP serverini saqlab boʻlmadi"
+    },
+    "agents": {
+      "title": "Profil agentlari",
+      "add": "Agent qo'shing",
+      "empty": "Hali agentlar yo'q",
+      "name": "Agent nomi",
+      "slug": "Agent slug",
+      "description": "Agent tavsifi",
+      "model": "Modelni bekor qilish",
+      "modelPlaceholder": "Standart seansdan foydalaning",
+      "prompt": "Tizim so'rovi",
+      "steps": "Maks. qadam",
+      "stepsPlaceholder": "mas. 50",
+      "temperature": "Harorat",
+      "temperaturePlaceholder": "mas. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "mas. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Mening agentim",
+      "promptPlaceholder": "Siz ...",
+      "tools": "Asboblar",
+      "visibility": "Ko'rinish",
+      "visibilityPrimary": "Asosiy - tanlovchida ko'rsatilgan",
+      "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
+      "visibilityAll": "Hammasi - ikkalasi ham",
+      "saveFailed": "Agentni saqlab boʻlmadi",
+      "nameRequired": "Agent nomini kiriting",
+      "slugRequired": "Agent slug'ini kiriting",
+      "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
+      "slugConflict": "Bu slug o'rnatilgan agent tomonidan zahiralangan",
+      "edit": "Agentni tahrirlash"
+    },
+    "slashCommands": {
+      "title": "Slash buyruqlari",
+      "add": "Slash buyrug'ini qo'shing",
+      "empty": "Hali slash buyruqlari yo'q",
+      "name": "Buyruq nomi",
+      "description": "Buyruq tavsifi",
+      "template": "Shablon",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
+      "agent": "Agent",
+      "subtask": "Quyi vazifa sifatida ishga tushirish",
+      "edit": "Slash buyrug'ini tahrirlash",
+      "saveFailed": "Buyruq saqlanmadi",
+      "nameRequired": "Buyruq nomini kiriting",
+      "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
+      "templateRequired": "Buyruq shablonini kiriting",
+      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan"
+    },
+    "repoBindings": {
+      "title": "Repos uchun standart profillar",
+      "add": "Standart qo‘shish",
+      "empty": "Hech qanday standart sozlanmagan",
+      "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",
+      "repo": "Repozitoriyni tanlang…",
+      "profile": "Profilni tanlang",
+      "remove": "Bog'lash",
+      "private": "Shaxsiy",
+      "search": "Repozitariylarni qidirish…",
+      "addedToast": "“{{repo}}” uchun birlamchi profil oʻrnatilgan",
+      "addFailed": "Standart profilni o‘rnatib bo‘lmadi",
+      "removedToast": "“{{repo}}” uchun birlamchi profil olib tashlandi",
+      "removeFailed": "Standart profilni olib tashlab bo‘lmadi",
+      "pinnedTitle": "Repozitariylarga mahkamlangan",
+      "pinRepo": "Reponi mahkamlang",
+      "pinnedEmpty": "Hech qanday omborga mahkamlanmagan.",
+      "pinnedDescription": "Seans ushbu omborlardan birini maqsad qilganda avtomatik yuklanadi.",
+      "pinnedToast": "“{{repo}}”ga mahkamlangan",
+      "pinFailed": "Reponi mahkamlab bo‘lmadi",
+      "unboundToast": "Repo cheklanmagan",
+      "unbindFailed": "Reponi ajratib boʻlmadi"
     }
   }
 }

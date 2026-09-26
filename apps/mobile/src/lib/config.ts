@@ -3,6 +3,7 @@ import { type ENV_KEYS, type OPTIONAL_ENV_KEYS } from './env-keys';
 import {
   assertProductionHost,
   assertUrlScheme,
+  LATENCY_INGEST_URL_DEFAULT,
   PRODUCTION_HOSTS,
   URL_SCHEMES,
 } from '@/lib/url-contract';
@@ -56,18 +57,27 @@ export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
 );
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
 
+/** Client-observed latency ingest endpoint. The optional `LATENCY_INGEST_URL`
+ *  key overrides the committed production default, so every shipped build
+ *  carries an endpoint without a committed .env value. */
+export const LATENCY_INGEST_URL: string | undefined =
+  optional('latencyIngestUrl') ?? LATENCY_INGEST_URL_DEFAULT;
+
 // URL contract at module evaluation. The production host check keys off the
 // baked `extra.isProductionBuild` flag, not the Sentry environment, so a
-// preview release build never crashes on preview hosts. The `required`
-// presence check above is the old presence-only check; remove it when every
-// build passes through the config boundary in app.config.ts, which already
-// throws on missing values.
+// preview release build never crashes on preview hosts. The optional URL key
+// (the latency ingest endpoint) is skipped when absent — its committed default
+// is asserted by url-contract.test.ts — so a checkout with no env value still
+// starts; every required URL key is presence-checked by its `required(...)`
+// export above.
 const runProductionHostCheck = !__DEV__ && extra?.isProductionBuild === true;
 for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
-  const value = required(key as keyof typeof ENV_KEYS);
-  assertUrlScheme(key, value, schemes, { allowInsecure: __DEV__ });
-  if (runProductionHostCheck) {
-    assertProductionHost(key, value, PRODUCTION_HOSTS);
+  const value = extra?.[key] as string | undefined;
+  if (value) {
+    assertUrlScheme(key, value, schemes, { allowInsecure: __DEV__ });
+    if (runProductionHostCheck) {
+      assertProductionHost(key, value, PRODUCTION_HOSTS);
+    }
   }
 }
 

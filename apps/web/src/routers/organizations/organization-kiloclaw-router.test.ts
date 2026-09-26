@@ -761,6 +761,7 @@ describe('organizations.kiloclaw compute entitlement gates', () => {
       caller.organizations.kiloclaw.start({ organizationId: organization.id })
     ).resolves.toEqual({ ok: true, started: true });
     expect(kiloclawClientMock.__startMock).toHaveBeenCalledWith(user.id, instanceId, {
+      skipCooldown: true,
       reason: 'manual_user_request',
     });
   });

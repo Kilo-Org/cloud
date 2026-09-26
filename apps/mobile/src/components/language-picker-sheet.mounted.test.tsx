@@ -15,6 +15,7 @@ const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
+const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const i18nManager = vi.hoisted(() => ({
   allowRTL: vi.fn(),
@@ -47,13 +48,29 @@ const flatListMock = vi.hoisted(
     }
 );
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
-vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-  FlatList: flatListMock,
-  I18nManager: i18nManager,
-  TextInput: 'TextInput',
-  View: 'View',
-}));
+// The sheet clears its uncontrolled search field through the ref (it must not
+// remount the input), so the mock exposes the imperative `clear` the real
+// TextInput has and hosts the props on a `TextInput` node for the assertions.
+const clearSearch = vi.hoisted(() => vi.fn());
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  const MockTextInput = forwardRef<{ clear: () => void }, Record<string, unknown>>((props, ref) => {
+    useImperativeHandle(ref, () => ({ clear: clearSearch }));
+    return createMockElement('TextInput', props);
+  });
+  MockTextInput.displayName = 'MockTextInput';
+  return {
+    ActivityIndicator: 'ActivityIndicator',
+    FlatList: flatListMock,
+    I18nManager: i18nManager,
+    TextInput: MockTextInput,
+    View: 'View',
+  };
+});
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
@@ -89,7 +106,7 @@ vi.mock('@/components/picker-sheet', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
-vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6b7280' }),
@@ -108,6 +125,9 @@ vi.mock('@/i18n/return-target', () => ({
 vi.mock('@/lib/notifications', () => ({
   renameAndroidNotificationChannels,
 }));
+vi.mock('@/lib/notification-actions', () => ({
+  registerNeedsInputCategories,
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -116,6 +136,20 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+// The TextInput mock forwards its ref through a wrapper component, so a found
+// `TextInput` node's immediate test-instance parent is that wrapper, which
+// carries the input's own props. Walk up to the pill View that hosts the field.
+function findFieldContainer(input: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  let node: TestRenderer.ReactTestInstance | null = input.parent;
+  while (node) {
+    if (typeof node.props.className === 'string' && node.props.className.includes('rounded-full')) {
+      return node;
+    }
+    node = node.parent;
+  }
+  throw new Error('language search field container not found');
 }
 
 function findChoiceRow(
@@ -187,10 +221,13 @@ async function applySelection(
 describe('LanguagePickerSheet apply', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    clearSearch.mockReset();
     setLanguagePreferenceAsync.mockReset();
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
     writeLanguageReturnTarget.mockReset();
+    renameAndroidNotificationChannels.mockReset();
+    registerNeedsInputCategories.mockReset();
     insets.bottom = 0;
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
@@ -232,6 +269,48 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
+  it('keeps the same item array identity when the sheet re-renders without a query change', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    const listData = renderer.root.findByType(flatListMock).props.data;
+
+    await act(async () => {
+      renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
+      await Promise.resolve();
+    });
+
+    // The derived list is only rebuilt on a query or applied-language change, so
+    // an unrelated re-render hands the list the same `data` identity and no
+    // mounted row re-renders.
+    expect(renderer.root.findByType(flatListMock).props.data).toBe(listData);
+
+    renderer.unmount();
+  });
+
+  it('clears the live search field on focus instead of remounting the input', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+    // The focus effect empties the field through the ref, so the sheet opens
+    // empty on every focus without recreating the native input.
+    expect(clearSearch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('Deutsch');
+    });
+
+    // Typing must never recreate the field. A remount handed the recreated
+    // native EditText the text it still held, and the next keystrokes appended
+    // to that stale copy: the field read the term twice, as one unbroken run
+    // (language-search-deutsch, language-search-kb-up).
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    expect(clearSearch).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
   it('preserves horizontal padding and the safe-area inset', async () => {
     insets.bottom = 24;
     const renderer = await mountSheet(vi.fn<() => void>());
@@ -252,6 +331,9 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('es');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    // The needs-input notification buttons were registered under the English
+    // default; the apply must re-register them in the new language.
+    expect(registerNeedsInputCategories).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
@@ -453,6 +535,90 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('en');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('LanguagePickerSheet row alignment', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    i18nManager.isRTL = false;
+  });
+
+  function rowLineClassNames(row: TestRenderer.ReactTestInstance): string[] {
+    return findByType(row, 'Text').map(line => line.props.className ?? '');
+  }
+
+  it('pins both lines of a row to the interface start edge in an LTR interface', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    // `العربية` is the row whose endonym right-aligned itself under LTR; the
+    // device row carries the same two-line shape.
+    for (const label of ['العربية', 'Device language']) {
+      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
+      expect(lines).toHaveLength(2);
+      for (const className of lines) {
+        expect(className).toContain('text-left');
+      }
+    }
+
+    renderer.unmount();
+  });
+
+  it('leaves an RTL row to the paragraph direction, never a physical edge', async () => {
+    i18nManager.isRTL = true;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    for (const label of ['العربية', 'Device language']) {
+      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
+      expect(lines).toHaveLength(2);
+      for (const className of lines) {
+        expect(className).not.toContain('text-left');
+      }
+    }
+
+    renderer.unmount();
+  });
+});
+
+describe('LanguagePickerSheet search field', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  // The language and repository pickers render the same "search a list"
+  // control. The repository picker's field is a filled rounded pill with a
+  // leading magnifier; the language field used to be a thin outlined box with
+  // no icon, so the same control read as two different controls.
+  it('uses the shared filled search pill with a leading magnifier', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+    // The field is the shared single-line `Input`, which renders the TextInput
+    // itself, so the pill is the input's wrapper row: walk up to it rather than
+    // stopping at the input's own node. The shared box is what keeps the
+    // placeholder and the value in one box.
+    const field = findFieldContainer(input);
+
+    expect((field.props.className as string).split(/\s+/)).toEqual(
+      expect.arrayContaining([
+        'flex-row',
+        'items-center',
+        'gap-2',
+        'rounded-full',
+        'bg-secondary',
+        'px-3',
+        'py-2',
+      ])
+    );
+    expect(field.props.className as string).not.toContain('border-input');
+    expect(findByType(renderer.root, 'Search')).toHaveLength(1);
+    expect(input.props.className as string).not.toContain('border');
+    expect(input.props.className as string).toContain('flex-1');
 
     renderer.unmount();
   });

@@ -904,6 +904,25 @@ describe('database schema', () => {
         'kiloclaw_suspension',
       ],
       StripeDisputeActionStatus: ['queued', 'processing', 'completed', 'failed', 'skipped'],
+      StripeServiceFeeFlow: [
+        'personal_top_up',
+        'organization_top_up',
+        'personal_auto_top_up_setup',
+        'organization_auto_top_up_setup',
+        'personal_auto_top_up',
+        'organization_auto_top_up',
+        'personal_kilo_pass',
+        'organization_kilo_pass',
+      ],
+      StripeServiceFeeOutcome: [
+        'pending',
+        'charged',
+        'exempt',
+        'pre_activation',
+        'zero_rounded',
+        'unsupported_currency',
+        'missed',
+      ],
       AffiliateProvider: ['impact'],
       AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
@@ -1054,7 +1073,6 @@ describe('database schema', () => {
       MCPGatewayAuthorizationRequestStatus: ['pending', 'completed', 'error'],
       MCPGatewayPendingProviderAuthorizationStatus: ['pending', 'completed', 'error'],
       MCPGatewayAuditOutcome: ['success', 'failure', 'blocked'],
-      RepositoryReviewMode: ['on', 'off'],
       SecurityFindingNotificationKind: ['new_finding', 'sla_warning', 'sla_breach'],
       SecurityFindingNotificationStatus: [
         'staged',
@@ -1689,9 +1707,9 @@ describe('database schema', () => {
     });
   });
 
-  describe('GitHub platform integration global unique index', () => {
-    const uniqueIndexName = 'UQ_platform_integrations_github_platform_inst';
-    const installationId = `schema-github-idx-${crypto.randomUUID()}`;
+  describe('GitHub platform integration sharing constraints', () => {
+    const uniqueIndexName = 'UQ_platform_integrations_github_user_canonical';
+    const installationId = `8${Date.now()}`;
     let userIdA: string;
     let userIdB: string;
 
@@ -1727,9 +1745,17 @@ describe('database schema', () => {
       await schemaTestDb.db
         .delete(schema.kilocode_users)
         .where(eq(schema.kilocode_users.id, userIdB));
+      await schemaTestDb.db
+        .delete(schema.github_app_installations)
+        .where(eq(schema.github_app_installations.installation_id, installationId));
     });
 
-    it('rejects duplicate (platform, github_app_type, platform_installation_id) for GitHub', async () => {
+    it('allows different owners to associate with one canonical GitHub installation', async () => {
+      const [canonical] = await schemaTestDb.db
+        .insert(schema.github_app_installations)
+        .values({ github_app_type: 'standard', installation_id: installationId })
+        .returning({ id: schema.github_app_installations.id });
+      if (!canonical) throw new Error('Expected canonical GitHub installation');
       const base = {
         platform: 'github',
         integration_type: 'app',
@@ -1739,6 +1765,7 @@ describe('database schema', () => {
         integration_status: 'active',
         repository_access: 'all',
         github_app_type: 'standard',
+        github_installation_id: canonical.id,
         installed_at: '2026-07-01T00:00:00.000Z',
       } satisfies typeof schema.platform_integrations.$inferInsert;
 
@@ -1748,13 +1775,41 @@ describe('database schema', () => {
         owned_by_user_id: userIdA,
       });
 
-      // Second insert with same installation_id but different owner must fail.
-      const duplicate = schemaTestDb.db.insert(schema.platform_integrations).values({
-        ...base,
-        owned_by_user_id: userIdB,
-      });
+      await expect(
+        schemaTestDb.db.insert(schema.platform_integrations).values({
+          ...base,
+          owned_by_user_id: userIdB,
+        })
+      ).resolves.not.toThrow();
+    });
 
-      await expect(duplicate).rejects.toMatchObject({
+    it('rejects a second association from the same owner to one canonical installation', async () => {
+      const [canonical] = await schemaTestDb.db
+        .insert(schema.github_app_installations)
+        .values({ github_app_type: 'standard', installation_id: installationId })
+        .returning({ id: schema.github_app_installations.id });
+      if (!canonical) throw new Error('Expected canonical GitHub installation');
+      const base = {
+        platform: 'github',
+        integration_type: 'app',
+        platform_account_id: '12345',
+        platform_account_login: 'test-owner',
+        integration_status: 'active',
+        repository_access: 'all',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        owned_by_user_id: userIdA,
+      } satisfies typeof schema.platform_integrations.$inferInsert;
+      await schemaTestDb.db.insert(schema.platform_integrations).values({
+        ...base,
+        platform_installation_id: installationId,
+      });
+      await expect(
+        schemaTestDb.db.insert(schema.platform_integrations).values({
+          ...base,
+          platform_installation_id: `${installationId}0`,
+        })
+      ).rejects.toMatchObject({
         cause: {
           constraint: uniqueIndexName,
         },
@@ -1791,8 +1846,11 @@ describe('database schema', () => {
       await expect(lite).resolves.not.toThrow();
     });
 
-    it('runs migration 0204 against duplicates before creating its unique index', async () => {
-      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+    it('runs the GitHub installation backfill before creating its unique index', async () => {
+      // The backfill and the unique index that this test exercises live in
+      // `0205_device_auth_hardening.sql` in the current journal; the earlier
+      // `0204_brainy_baron_strucker.sql` name no longer exists on disk.
+      const migrationPath = path.join(__dirname, 'migrations/0205_device_auth_hardening.sql');
       const fullMigration = fs.readFileSync(migrationPath, 'utf8');
       const statements = fullMigration.split('--> statement-breakpoint');
       // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
@@ -1811,8 +1869,6 @@ describe('database schema', () => {
 
       try {
         await schemaTestDb.db.transaction(async tx => {
-          await tx.execute(sql.raw('DROP INDEX "UQ_platform_integrations_github_platform_inst"'));
-
           const base = {
             platform: 'github',
             integration_type: 'app',
@@ -1863,13 +1919,15 @@ describe('database schema', () => {
           expect(loser).toMatchObject({ status: 'suspended', installationId: null });
           expect(loser?.metadata).toMatchObject({
             github_dedup: {
-              reason: 'Duplicate installation resolved by migration 0204',
+              reason: 'Duplicate installation resolved by migration 0205',
               original_installation_id: installationId,
             },
           });
           await expect(
             tx.insert(schema.platform_integrations).values({ ...base, owned_by_user_id: userIdA })
-          ).rejects.toMatchObject({ cause: { constraint: uniqueIndexName } });
+          ).rejects.toMatchObject({
+            cause: { constraint: 'UQ_platform_integrations_github_platform_inst' },
+          });
 
           throw rollback;
         });
@@ -1878,132 +1936,6 @@ describe('database schema', () => {
           throw error;
         }
       }
-    });
-  });
-
-  describe('repository_customizations', () => {
-    async function insertGitHubIntegration(organizationId: string, installationId: string) {
-      return insertPlatformIntegration(organizationId, {
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: installationId,
-        platform_account_id: `acct-${installationId}`,
-        platform_account_login: 'test-owner',
-        integration_status: 'active',
-        repository_access: 'all',
-        github_app_type: 'standard',
-        installed_at: '2026-07-01T00:00:00.000Z',
-        metadata: { pr_review_mode: 'on' },
-      });
-    }
-
-    it('leaves overrides null rather than copying installation defaults and stores platform IDs as text', async () => {
-      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
-        const integration = await insertGitHubIntegration(
-          organizationId,
-          `schema-repo-custom-${crypto.randomUUID()}`
-        );
-
-        const [customization] = await schemaTestDb.db
-          .insert(schema.repository_customizations)
-          .values({ platform_integration_id: integration.id, repository_id: '4294967296' })
-          .returning();
-
-        expect(customization).toMatchObject({
-          repository_id: '4294967296',
-          bot_mention_model_slug: null,
-          pr_review_mode: null,
-        });
-      });
-    });
-
-    it('enforces uniqueness per integration and repository without restricting other pairs', async () => {
-      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
-        const integration = await insertGitHubIntegration(
-          organizationId,
-          `schema-repo-custom-${crypto.randomUUID()}`
-        );
-        const otherIntegration = await insertGitHubIntegration(
-          organizationId,
-          `schema-repo-custom-${crypto.randomUUID()}`
-        );
-        const values = { platform_integration_id: integration.id, repository_id: '123' };
-
-        await schemaTestDb.db.insert(schema.repository_customizations).values(values);
-
-        await expect(
-          schemaTestDb.db.insert(schema.repository_customizations).values(values)
-        ).rejects.toMatchObject({
-          cause: {
-            code: '23505',
-            constraint: 'UQ_repository_customizations_integration_repository',
-          },
-        });
-
-        // A different repository under the same integration, and the same
-        // repository under a different integration, are both unconstrained.
-        await expect(
-          schemaTestDb.db.insert(schema.repository_customizations).values([
-            { platform_integration_id: integration.id, repository_id: '456' },
-            { platform_integration_id: otherIntegration.id, repository_id: '123' },
-          ])
-        ).resolves.not.toThrow();
-      });
-    });
-
-    it('rejects a pr_review_mode outside the on/off CHECK constraint', async () => {
-      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
-        const integration = await insertGitHubIntegration(
-          organizationId,
-          `schema-repo-custom-${crypto.randomUUID()}`
-        );
-
-        await expect(
-          schemaTestDb.db.execute(sql`
-            INSERT INTO repository_customizations
-              (platform_integration_id, repository_id, pr_review_mode)
-            VALUES (${integration.id}, '789', 'manual')
-          `)
-        ).rejects.toMatchObject({
-          cause: {
-            code: '23514',
-            constraint: 'repository_customizations_pr_review_mode_check',
-          },
-        });
-      });
-    });
-
-    it('cascades integration deletion without deleting other integrations’ customizations', async () => {
-      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
-        const integration = await insertGitHubIntegration(
-          organizationId,
-          `schema-repo-custom-${crypto.randomUUID()}`
-        );
-        const otherIntegration = await insertGitHubIntegration(
-          organizationId,
-          `schema-repo-custom-${crypto.randomUUID()}`
-        );
-        await schemaTestDb.db.insert(schema.repository_customizations).values([
-          { platform_integration_id: integration.id, repository_id: '123' },
-          { platform_integration_id: otherIntegration.id, repository_id: '123' },
-        ]);
-
-        await schemaTestDb.db
-          .delete(schema.platform_integrations)
-          .where(eq(schema.platform_integrations.id, integration.id));
-
-        const remaining = await schemaTestDb.db
-          .select()
-          .from(schema.repository_customizations)
-          .where(eq(schema.repository_customizations.platform_integration_id, integration.id));
-        const retained = await schemaTestDb.db
-          .select()
-          .from(schema.repository_customizations)
-          .where(eq(schema.repository_customizations.platform_integration_id, otherIntegration.id));
-
-        expect(remaining).toHaveLength(0);
-        expect(retained).toHaveLength(1);
-      });
     });
   });
 });

@@ -7,6 +7,7 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
+import { sessionCommitDataSchema } from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
@@ -19,6 +20,7 @@ import type {
   CloudStatus,
   MessageDeliveryState,
   PreparationAttempt,
+  SessionCommit,
   PreparationStepSnapshot,
 } from './types';
 
@@ -80,6 +82,15 @@ type ServiceStateConfig = {
   onMessageFailed?:
     | ((messageId: string, state: Extract<MessageDeliveryState, { status: 'failed' }>) => void)
     | undefined;
+  /**
+   * True when the user already retried this message's delivery failure. A
+   * successful retry clears the original row's footer locally, and that clear
+   * must survive a relaunch: the DO replays its stored events (including the
+   * original `cloud.message.failed`) on the next open, so a replayed failure
+   * for a resolved id is dropped instead of resurrecting the footer. The id
+   * is final on the server, so a failure for a resolved id is always a replay.
+   */
+  isDeliveryFailureResolved?: ((messageId: string) => boolean) | undefined;
 };
 
 type ServiceState = {
@@ -90,13 +101,19 @@ type ServiceState = {
   /** @deprecated Legacy transient setup output. */
   getSetupLog(): readonly string[];
   getPreparationAttempts(): readonly PreparationAttempt[];
+  getCommits(): readonly SessionCommit[];
+  clearCommits(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
-  /** Remove one failed delivery entry (called after a successful retry). */
-  clearFailedMessage(messageId: string): void;
+  /**
+   * Remove one failed delivery entry (called after a successful retry).
+   * Returns true when that entry was also the failure that set the terminal
+   * error state, which this removal has undone together with the footer.
+   */
+  clearFailedMessage(messageId: string): boolean;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
   setActivity(activity: SessionActivity): void;
@@ -135,6 +152,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let cloudStatus: CloudStatus | null = null;
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
+  let commits: readonly SessionCommit[] = [];
+  const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
@@ -147,6 +166,24 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
   let terminated = false;
+
+  /**
+   * The message id whose `cloud.message.failed` last set the terminal error
+   * state (`status`, `terminated`, `config.onError`), together with the exact
+   * `status` object it installed. Kept so a later `clearFailedMessage` for that
+   * id undoes the whole failure, not just the footer: the durable memory of
+   * retried failures can resolve after the DO replay already applied the
+   * failure, and that late removal must leave the same state the
+   * suppressed-at-replay path leaves.
+   *
+   * The status object identity is part of the key on purpose. Any takeover of
+   * the terminal state — a new turn (`processMessageSent`), a `stopped`
+   * reason, a `session.error`, an autocommit, an external `setStatus` — installs
+   * a new status object. Comparing identity invalidates the tracker then,
+   * without having to remember to clear it in every takeover branch, so a late
+   * prune cannot discard a newer terminal state.
+   */
+  let terminalFailure: { messageId: string; status: AgentStatus } | null = null;
 
   const subscribers = new Set<() => void>();
 
@@ -214,7 +251,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         terminated = true;
         disconnectedSource = null;
         completed = false;
-        status = { type: 'error', message: 'Session terminated' };
+        status = { type: 'error', message: 'Session terminated', code: 'session-terminated' };
         config.onError?.('Session terminated');
         break;
       case 'disconnected':
@@ -568,21 +605,50 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processAutocommitStarted(
     event: Extract<ServiceEvent, { type: 'autocommit_started' }>
   ): void {
-    status = { type: 'autocommit', step: 'started', message: event.message ?? 'Committing…' };
+    status = {
+      type: 'autocommit',
+      step: 'started',
+      message: event.message ?? 'Committing…',
+      ...(event.message === undefined ? { code: 'committing' } : {}),
+    };
     notify();
   }
 
   function processAutocommitCompleted(
     event: Extract<ServiceEvent, { type: 'autocommit_completed' }>
   ): void {
-    if (event.skipped) return;
+    if (event.skipped) {
+      if (status.type === 'autocommit' && status.step === 'started') {
+        status = IDLE_STATUS;
+        notify();
+      }
+      return;
+    }
 
-    if (event.success) {
+    const parsedCommit = sessionCommitDataSchema.safeParse(event);
+    const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
+    if (parsedCommit.success) {
+      if (seenCommits.has(parsedCommit.data.commitHash)) return;
+      seenCommits.add(parsedCommit.data.commitHash);
+      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
+    }
+    if (event.success || commitHash) {
       const parts = [event.commitHash, event.commitMessage].filter(Boolean);
       const message = parts.length > 0 ? parts.join(' ') : 'Committed';
-      status = { type: 'autocommit', step: 'completed', message };
+      status = {
+        type: 'autocommit',
+        step: 'completed',
+        message,
+        ...(commitHash ? { commitHash } : {}),
+        ...(parts.length === 0 ? { code: 'committed' } : {}),
+      };
     } else {
-      status = { type: 'autocommit', step: 'failed', message: event.message ?? 'Commit failed' };
+      status = {
+        type: 'autocommit',
+        step: 'failed',
+        message: event.message ?? 'Commit failed',
+        ...(event.message === undefined ? { code: 'commit-failed' } : {}),
+      };
     }
     notify();
   }
@@ -610,6 +676,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
   function processMessageSent(event: Extract<ServiceEvent, { type: 'cloud.message.sent' }>): void {
     activeMessageId = event.messageId;
+    // A new turn takes the terminal error over: the previous failure is no
+    // longer what the error state describes, so a later clear of its id must
+    // not reset this turn's state.
+    terminalFailure = null;
     if (
       status.type === 'error' ||
       status.type === 'interrupted' ||
@@ -636,6 +706,12 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processMessageFailed(
     event: Extract<ServiceEvent, { type: 'cloud.message.failed' }>
   ): void {
+    // A replayed failure for a message the user already retried must not
+    // restore the footer the retry cleared (see
+    // `isDeliveryFailureResolved`).
+    if (config.isDeliveryFailureResolved?.(event.messageId)) {
+      return;
+    }
     const deliveryState: Extract<MessageDeliveryState, { status: 'failed' }> = {
       status: 'failed',
       error: event.error,
@@ -665,11 +741,21 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       activity = { type: 'idle' };
       cloudStatus = null;
       setupLog = [];
+      // The status carries `event.error`, the Durable Object's own safe
+      // projection of the failure ("Assistant request failed: insufficient
+      // credits", "Workspace setup failed", "No model was selected", a repo
+      // auth failure), so a client that renders the status verbatim — web and
+      // the extension — keeps the specific reason and the extension's credits
+      // detection still matches. The mobile transcript maps the text to the
+      // app's classified copy and the failed row's typed footer keeps the
+      // original behind its copy action.
       status =
         event.reason === 'interrupted'
           ? { type: 'interrupted' }
           : { type: 'error', message: event.error };
       terminated = true;
+      terminalFailure =
+        event.reason === 'interrupted' ? null : { messageId: event.messageId, status };
       disconnectedSource = null;
       completed = false;
       clearPendingInteractions();
@@ -902,15 +988,33 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getCloudStatus: () => cloudStatus,
     getSetupLog: () => setupLog,
     getPreparationAttempts: () => preparationAttempts,
+    getCommits: () => commits,
+    clearCommits(): void {
+      commits = [];
+      notify();
+    },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
 
-    clearFailedMessage(messageId: string): void {
+    clearFailedMessage(messageId: string): boolean {
       pendingMessages.delete(messageId);
+      if (terminalFailure?.messageId === messageId && terminalFailure.status === status) {
+        // The removed failure is the one that set the terminal error and no
+        // event has replaced that status since, so the error state goes with
+        // it — the suppressed-at-replay path never applied it in the first
+        // place.
+        terminalFailure = null;
+        status = IDLE_STATUS;
+        terminated = false;
+        completed = false;
+        notify();
+        return true;
+      }
       notify();
+      return false;
     },
 
     snapshot: () => ({
@@ -919,6 +1023,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus,
       setupLog,
       preparationAttempts,
+      commits,
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
@@ -954,12 +1059,15 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus = null;
       setupLog = [];
       preparationAttempts = [];
+      commits = [];
+      seenCommits.clear();
       sessionInfo = null;
       questions = [];
       permissions = [];
       suggestion = null;
       pendingMessages.clear();
       activeMessageId = null;
+      terminalFailure = null;
       terminated = false;
       disconnectedSource = null;
       completed = false;

@@ -15,15 +15,18 @@ import { modelsRouter } from '@/routers/models-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
+import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
+import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
  * consumes, so `@kilocode/trpc/mobile` ships a smaller client-facing type
- * surface than the full `RootRouter`. This is additive: `root-router.ts` is
- * unchanged and remains the single source of the server router composition.
+ * surface than the full `RootRouter`. `root-router.ts` remains the single
+ * source of the server router composition: every namespace listed here must
+ * also be mounted there, or the call fails at runtime.
  */
 const mobileRouter = createTRPCRouter({
   organizations: organizationsRouter,
@@ -41,8 +44,10 @@ const mobileRouter = createTRPCRouter({
   activeSessions: activeSessionsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
+  providerReview: providerReviewRouter,
   moderation: moderationRouter,
   kiloChat: kiloChatRouter,
+  spendAlerts: spendAlertRouter,
   agentProfiles: agentProfilesMobileRouter,
 });
 

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the source-sheet suite and the picture-entry suite share one module mock harness. */
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -5,7 +6,8 @@ import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
-import { normalizeImageAsset, pickAgentAttachments } from './attachment-picker';
+import { normalizeImageAsset, pickAgentAttachments, pickAgentPicture } from './attachment-picker';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -62,6 +64,7 @@ vi.mock('expo-document-picker', () => ({
 vi.mock('expo-image-picker', () => ({
   launchCameraAsync: vi.fn(),
   launchImageLibraryAsync: vi.fn(),
+  PermissionStatus: { GRANTED: 'granted' },
   requestCameraPermissionsAsync: vi.fn(),
 }));
 
@@ -80,6 +83,14 @@ const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];
 type SheetButtonHandler = Parameters<ShowActionSheet>[1];
 
+const themedSheet: ThemedActionSheetOptions = {
+  containerStyle: { backgroundColor: '#17171A', paddingBottom: 24 },
+  textStyle: { color: '#F2F0EB' },
+  titleTextStyle: { color: '#8A8680' },
+  messageTextStyle: { color: '#8A8680' },
+  destructiveColor: '#F28B7A',
+};
+
 /**
  * Drive `pickAgentAttachments` by capturing the sheet handler the
  * production code registers, then invoking it with a button index.
@@ -91,15 +102,50 @@ async function pickWithSheetSelection(
   const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
     mock: { calls: [unknown, SheetButtonHandler][] };
   };
-  const resultPromise = pickAgentAttachments(showActionSheet, {
-    userId: 'user-1',
-    surface: 'agent-chat',
-    sessionId: 'sess-1',
-  });
+  const resultPromise = pickAgentAttachments(
+    showActionSheet,
+    {
+      userId: 'user-1',
+      surface: 'agent-chat',
+      sessionId: 'sess-1',
+    },
+    themedSheet
+  );
   const registered = showActionSheet.mock.calls[0]?.[1];
   expect(registered).toEqual(expect.any(Function));
   await Promise.resolve(registered?.(buttonIndex));
   return resultPromise;
+}
+
+/** The same driver for the picture entry point (its own surface/session). */
+async function pickPictureWithSheetSelection(
+  buttonIndex: number
+): Promise<Awaited<ReturnType<typeof pickAgentPicture>>> {
+  const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
+    mock: { calls: [unknown, SheetButtonHandler][] };
+  };
+  const resultPromise = pickAgentPicture(
+    showActionSheet,
+    {
+      userId: 'user-1',
+      surface: 'agent-picture',
+      sessionId: null,
+    },
+    themedSheet
+  );
+  const registered = showActionSheet.mock.calls[0]?.[1];
+  expect(registered).toEqual(expect.any(Function));
+  await Promise.resolve(registered?.(buttonIndex));
+  return resultPromise;
+}
+
+function grantedCameraPermission(): ImagePicker.PermissionResponse {
+  return {
+    canAskAgain: true,
+    expires: 'never',
+    granted: true,
+    status: ImagePicker.PermissionStatus.GRANTED,
+  };
 }
 
 describe('normalizeImageAsset', () => {
@@ -156,16 +202,21 @@ describe('agent attachment picker', () => {
       mock: { calls: unknown[][] };
     };
 
-    void pickAgentAttachments(showActionSheet, {
-      userId: 'user-1',
-      surface: 'agent-chat',
-      sessionId: null,
-    });
+    void pickAgentAttachments(
+      showActionSheet,
+      {
+        userId: 'user-1',
+        surface: 'agent-chat',
+        sessionId: null,
+      },
+      themedSheet
+    );
 
     expect(showActionSheet).toHaveBeenCalledWith(
       {
         options: ['Camera', 'Photo Library', 'Files', 'Cancel'],
         cancelButtonIndex: 3,
+        ...themedSheet,
       },
       expect.any(Function)
     );
@@ -185,6 +236,14 @@ describe('agent attachment picker', () => {
     expect(announcingToastMock.error).toHaveBeenCalledWith(
       'Could not open the photo picker. Restart Kilo and try again.'
     );
+  });
+
+  it('resolves empty when the library picker invocation throws', async () => {
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockImplementationOnce(() => {
+      throw new Error('native launch threw');
+    });
+
+    expect(await pickWithSheetSelection(1)).toEqual([]);
   });
 
   it('launches the picker when the launch context write fails', async () => {
@@ -273,5 +332,125 @@ describe('agent attachment picker (document MIME derivation)', () => {
     // Cancel is button index 3; Files (2) with a canceled document result
     // also yields []. Use Files so the document path is exercised.
     expect(await pickWithSheetSelection(2)).toEqual([]);
+  });
+});
+
+describe('agent picture picker', () => {
+  it('offers only the camera and a single-select photo library, with cancel last', () => {
+    const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
+      mock: { calls: unknown[][] };
+    };
+
+    void pickAgentPicture(
+      showActionSheet,
+      {
+        userId: 'user-1',
+        surface: 'agent-picture',
+        sessionId: null,
+      },
+      themedSheet
+    );
+
+    expect(showActionSheet).toHaveBeenCalledWith(
+      {
+        options: ['Camera', 'Photo Library', 'Cancel'],
+        cancelButtonIndex: 2,
+        ...themedSheet,
+      },
+      expect.any(Function)
+    );
+  });
+
+  it('launches the camera through the permission gate on the first option', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    const result: Awaited<ReturnType<typeof ImagePicker.launchCameraAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/camera.jpg', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickPictureWithSheetSelection(0);
+
+    expect(ImagePicker.requestCameraPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(ImagePicker.launchCameraAsync).toHaveBeenCalledTimes(1);
+    expect(candidates.map(candidate => candidate.uri)).toEqual(['file:///cache/camera.jpg']);
+  });
+
+  it('launches the photo library single-select on the second option', async () => {
+    const result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/screenshot.png', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickPictureWithSheetSelection(1);
+
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsMultipleSelection: false })
+    );
+    expect(candidates.map(candidate => candidate.uri)).toEqual(['file:///cache/screenshot.png']);
+  });
+
+  it('records the picture surface so Android recovery can match the result', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    const result: Awaited<ReturnType<typeof ImagePicker.launchCameraAsync>> = {
+      canceled: true,
+      assets: null,
+    };
+    vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValueOnce(result);
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+
+    const stored = vi.mocked(SecureStore.setItemAsync).mock.calls.at(-1)?.[1] ?? '';
+    expect(JSON.parse(stored)).toMatchObject({
+      userId: 'user-1',
+      surface: 'agent-picture',
+      sessionId: null,
+    });
+  });
+
+  // A rejected permission request, or a synchronous throw while building the
+  // native launch promise, must settle the public helper instead of leaving it
+  // pending forever with the person stuck on Home.
+  it('resolves empty when the camera permission request rejects', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockRejectedValueOnce(
+      new Error('permission module unavailable')
+    );
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+  });
+
+  it('resolves empty and reports when the camera launch throws synchronously', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    vi.mocked(ImagePicker.launchCameraAsync).mockImplementationOnce(() => {
+      throw new Error('native launch threw');
+    });
+    vi.mocked(Sentry.captureException).mockClear();
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'pick-attachment-source',
+      },
+      extra: { source: 'camera', surface: 'agent-picture', hasSession: false },
+    });
+  });
+
+  it('resolves empty on cancel without launching a picker', async () => {
+    const cameraCalls = vi.mocked(ImagePicker.launchCameraAsync).mock.calls.length;
+    const libraryCalls = vi.mocked(ImagePicker.launchImageLibraryAsync).mock.calls.length;
+
+    expect(await pickPictureWithSheetSelection(2)).toEqual([]);
+
+    expect(vi.mocked(ImagePicker.launchCameraAsync).mock.calls.length).toBe(cameraCalls);
+    expect(vi.mocked(ImagePicker.launchImageLibraryAsync).mock.calls.length).toBe(libraryCalls);
   });
 });

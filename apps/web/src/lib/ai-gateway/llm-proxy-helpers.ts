@@ -7,13 +7,9 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import {
-  APP_URL,
-  FIRST_TOPUP_BONUS_AMOUNT,
-  INCEPTION_PROMO_MODEL,
-  INCEPTION_PROMO_RUNNING,
-} from '@/lib/constants';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
+import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
@@ -32,9 +28,13 @@ import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactErrorResponse,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -44,7 +44,6 @@ import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
-import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -84,6 +83,39 @@ export function malformedJsonResponse(parseError: unknown) {
       message: `Request body is not valid JSON: ${detail}`,
     },
     { status: 400 }
+  );
+}
+
+/**
+ * Error code a client matches on to detect a credential it has to replace.
+ *
+ * It is carried in `error.code` rather than inferred from the status, because
+ * the same status also carries the sign-in prompts served to anonymous callers.
+ */
+export const INVALID_TOKEN_CODE = 'INVALID_TOKEN';
+
+/**
+ * Response for a request that presented a credential which failed verification.
+ *
+ * Such a request must not be answered as an anonymous caller. The caller
+ * believes it is authenticated, so downgrading it silently drops the account,
+ * its organization, its BYOK keys and its credits, and hides the broken
+ * credential from the client that sent it. Fail loudly so the client can
+ * re-authenticate.
+ */
+export function invalidTokenResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: INVALID_TOKEN_CODE,
+        message: 'Your authentication token is invalid. Please sign in again.',
+      },
+      error_type: ProxyErrorType.authentication_required,
+    },
+    {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Bearer error="invalid_token"' },
+    }
   );
 }
 
@@ -132,6 +164,52 @@ export async function usageLimitExceededResponse(user: User, balance?: number) {
     },
     { status: 402 }
   );
+}
+
+/**
+ * Returned when a paid request is blocked at a non-positive balance while an
+ * auto-top-up is in flight. The balance is expected to recover when the
+ * `invoice.paid` webhook posts credits, so this is a transient, retryable
+ * condition rather than a terminal no-credits state.
+ *
+ * The message must not contain "credit", "payment", "balance", or "quota":
+ * agent runtimes classify those words as a terminal insufficient-credits error.
+ */
+export function topUpInProgressResponse() {
+  const message = 'Your top-up is processing. Please retry in a few seconds.';
+  return NextResponse.json(
+    {
+      error: message,
+      error_type: ProxyErrorType.top_up_in_progress,
+      message,
+    },
+    { status: 503, headers: { 'Retry-After': '5' } }
+  );
+}
+
+/**
+ * Builds the response for a request that is blocked because the billing
+ * entity has no available balance. If an auto-top-up is in flight, the block is
+ * transient and reported as retryable; otherwise it is the terminal
+ * low-credits response.
+ *
+ * A block caused by an exhausted per-user allowance is never retryable: an
+ * organization top-up restores the organization balance, not the member's
+ * allowance, so the retry would not resolve.
+ */
+export async function creditsBlockedResponse(params: {
+  user: User;
+  balance?: number;
+  organizationId?: string;
+  balanceLimitedByUserAllowance?: boolean;
+}) {
+  if (
+    !params.balanceLimitedByUserAllowance &&
+    (await isAutoTopUpInFlight({ userId: params.user.id, organizationId: params.organizationId }))
+  ) {
+    return topUpInProgressResponse();
+  }
+  return await usageLimitExceededResponse(params.user, params.balance);
 }
 
 export function dataCollectionRequiredResponse() {
@@ -193,14 +271,26 @@ async function redactedErrorResponse(response: Response) {
   );
 }
 
+const BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
+  '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
+
+const OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
+  '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.';
+
 const byokErrorMessages: Record<number, string> = {
   401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
   402: '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
-  403: '[BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.',
+  403: BYOK_MODEL_PERMISSION_DENIED_MESSAGE,
   429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
 };
 
-function byokErrorMessage(status: number): string | undefined {
+function byokErrorMessage(
+  status: number,
+  userByokProviderIds: UserByokProviderId[]
+): string | undefined {
+  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
   return byokErrorMessages[status];
 }
 
@@ -289,7 +379,7 @@ export async function makeErrorReadable({
   if (vertexByokResponse) return vertexByokResponse;
 
   if (userByokProviderIds !== null) {
-    const byokMessage = byokErrorMessage(response.status);
+    const byokMessage = byokErrorMessage(response.status, userByokProviderIds);
     if (byokMessage) {
       warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
       return NextResponse.json(
@@ -358,6 +448,20 @@ export function modelDoesNotExistResponse() {
       message: 'The requested model could not be found.',
     },
     { status: 404 }
+  );
+}
+
+/**
+ * Returned when an enabled "Sign in with ChatGPT" connection can no longer be
+ * refreshed. The stored credential is terminal: the connection has been cleared
+ * and disabled, so this is never a retryable condition and must not be served
+ * by another billing path. The person is told what happened and what to do.
+ */
+export function chatGptReconnectResponse(message: string) {
+  const error = `${message} Reconnect your ChatGPT connection at ${APP_URL}/byok, or choose a different model.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
   );
 }
 
@@ -432,31 +536,7 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(
-    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan).then(
-      async usageIdentity => {
-        // Chain the experiment-attribution write after the microdollar
-        // write. This is best-effort analytics: failures here MUST NOT
-        // roll back the billing write, which has already succeeded by
-        // the time we reach here. `persistExperimentAttribution`
-        // swallows errors internally.
-        if (
-          usageIdentity &&
-          usageContext.modelExperimentVariantVersionId &&
-          usageContext.modelExperimentAllocationSubject
-        ) {
-          await persistExperimentAttribution({
-            usageId: usageIdentity.usageId,
-            createdAt: usageIdentity.createdAt,
-            variantVersionId: usageContext.modelExperimentVariantVersionId,
-            allocationSubject: usageContext.modelExperimentAllocationSubject,
-            clientRequestId: usageContext.clientRequestId ?? null,
-            capture: usageContext.experimentPromptCapture ?? null,
-          });
-        }
-      }
-    )
-  );
+  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
 }
 
 export async function captureProxyError(params: {
@@ -538,19 +618,16 @@ export function checkOrganizationModelRestrictions(params: {
   }
 
   const providerAllowList = params.settings.provider_allow_list;
-  const dataCollection = params.settings.data_collection;
 
-  const providerConfig: OpenRouterProviderConfig = {};
+  const providerConfig: OpenRouterProviderConfig = getEffectiveProviderPrivacy(
+    undefined,
+    params.settings.data_collection
+  );
 
   if (params.organizationPlan === 'enterprise') {
     if (providerAllowList !== undefined) {
       providerConfig.only = providerAllowList;
     }
-  }
-
-  // Setting this only if it's set as an override on the organization settings
-  if (dataCollection) {
-    providerConfig.data_collection = dataCollection;
   }
 
   return {
@@ -809,10 +886,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      const isInceptionPromoRequest =
-        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
-
-      if (isInceptionPromoRequest || usageContext.user_byok) {
+      if (usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -949,15 +1023,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      // Mirror the canonical chat path in `processOpenRouterUsage`: when the
-      // promotion is running or the request is BYOK we don't bill the user, so
-      // the cache discount we would otherwise have given them must be zeroed
-      // too. Otherwise the usage row would claim a discount on spend that never
-      // happened and distort "money saved by caching" reporting.
-      const isInceptionPromoRequest =
-        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
-
-      if (isInceptionPromoRequest || usageContext.user_byok) {
+      if (usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }

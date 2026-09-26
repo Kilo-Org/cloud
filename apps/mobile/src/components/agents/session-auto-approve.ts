@@ -20,9 +20,15 @@ export type SessionAutoApproveState = 'on' | 'off' | 'unavailable';
 export type SessionAutoApproveSessionType = 'remote' | 'cloud-agent' | 'read-only' | null;
 
 /**
- * A session can auto-approve permissions only when its transport can answer a
- * permission ask. The read-only transport cannot send, and an unresolved
- * transport (`null`) is not assumed answerable.
+ * Whether the session's permission settings may be used.
+ *
+ * The auto-approve toggle is a client-side, per-session preference, so it must
+ * be usable while the session is still opening: the transport resolves only
+ * after the session metadata and transcript, and a session whose transcript is
+ * still loading (or failed to load) still owns its settings. Treating the
+ * unresolved transport (`null`) as unavailable hid the only way into the
+ * context sheet for exactly that phase. A session known to be read-only can
+ * never receive a permission ask, so it stays unavailable.
  */
 export function canAutoApprovePermissions(input: {
   activeSessionType: SessionAutoApproveSessionType;
@@ -31,7 +37,22 @@ export function canAutoApprovePermissions(input: {
   if (input.isReadOnly) {
     return false;
   }
-  return input.activeSessionType === 'remote' || input.activeSessionType === 'cloud-agent';
+  return input.activeSessionType !== 'read-only';
+}
+
+/**
+ * Whether the session can actually answer a permission ask, which is what
+ * makes an auto-reply eligible.
+ *
+ * Distinct from {@link canAutoApprovePermissions}: the settings row must stay
+ * reachable while the transport is unresolved, but an unresolved transport
+ * cannot deliver an ask, so it must never make an auto-reply eligible.
+ */
+export function canAutoApproveReply(input: {
+  activeSessionType: SessionAutoApproveSessionType;
+  isReadOnly: boolean;
+}): boolean {
+  return input.activeSessionType !== null && canAutoApprovePermissions(input);
 }
 
 /** Resolve the row state: unavailable wins over the stored enabled flag. */

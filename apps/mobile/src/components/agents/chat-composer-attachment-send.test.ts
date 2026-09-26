@@ -175,6 +175,7 @@ vi.mock('@/components/agents/remote-session-exit-alert', () => ({
 vi.mock('@/components/agents/use-text-height', () => ({
   useTextHeight: () => ({
     height: 88,
+    maxHeight: 124,
     measureElement: null,
     reset: vi.fn(),
     setText: vi.fn(),

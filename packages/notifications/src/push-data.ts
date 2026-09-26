@@ -37,10 +37,26 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
     category: cloudAgentSessionCategorySchema.optional(),
+    // Needs-input raise detail: which answer the waiting agent wants, and the
+    // PR that can be opened from the notification. Absent on status pushes.
+    attentionKind: z.enum(['question', 'permission']).optional(),
+    prUrl: z.string().optional(),
+    // The session's organization, so a tap can land the app in the context
+    // the session belongs to. Optional so a push from an older producer in a
+    // rolling deploy still validates; absent means Personal.
+    organizationId: nonEmptyStringSchema.optional(),
   }),
   z.object({
     type: z.literal('low_balance'),
     organizationId: nonEmptyStringSchema,
+  }),
+  // Spend alert push. Carries the owner scope and its id only — never an
+  // amount, an email, or the configured threshold: this blob crosses the OS
+  // lock screen, so the generic preview copy above must stay content-free.
+  z.object({
+    type: z.literal('spend_alert'),
+    scope: z.enum(['personal', 'organization']),
+    organizationId: nonEmptyStringSchema.optional(),
   }),
   z.object({
     type: z.literal('security_finding'),
@@ -91,10 +107,24 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
     running: z.number().int().min(0),
     needsInput: z.number().int().min(0),
+    /**
+     * Needs-input rows waiting on a permission prompt: the ones the wrist can
+     * approve. Optional so a push from a server older than this release still
+     * parses; every mobile reader treats absent as 0.
+     */
+    needsApproval: z.number().int().min(0).optional(),
     idle: z.number().int().min(0),
     updatedAt: z.string(),
     expiresAt: z.string(),
     needsInputSince: z.string().nullable(),
+    // The newest agent state change: its kind in the shared three-state
+    // vocabulary and when it happened. Optional on input with a null default,
+    // so a payload from a server that predates the fact still parses while the
+    // parsed (output) type stays total — the mobile client spreads the parsed
+    // fields straight into a `GlanceableAgentsSnapshot`. Remove the optional
+    // and the default when every server sends both keys.
+    newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable().default(null),
+    newestResultAt: z.string().nullable().default(null),
   }),
 ]);
 
@@ -109,5 +139,5 @@ export type PushData = z.infer<typeof pushDataSchema>;
  */
 export type GlanceableLiveActivityContentState = Pick<
   Extract<PushData, { type: 'active_agents_glanceable' }>,
-  'status' | 'running' | 'needsInput' | 'idle' | 'needsInputSince'
+  'status' | 'running' | 'needsInput' | 'needsApproval' | 'idle' | 'needsInputSince'
 >;

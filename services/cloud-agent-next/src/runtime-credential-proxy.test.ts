@@ -9,8 +9,11 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
   verifyRuntimeCredentialProxyHandle,
+  type RuntimeProxyFence,
 } from './runtime-credential-proxy.js';
 import { resolveRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
+
+type ControlFence = Extract<RuntimeProxyFence, { plane: 'control' }>;
 
 const targets = {
   backendBaseUrl: 'https://backend.example.test/base',
@@ -173,6 +176,66 @@ describe('runtime credential proxy', () => {
       wrapperConnectionId: 'connection_1',
     });
     expect(legacyV1.plane).toBe('legacy');
+  });
+
+  it('keeps a control grant valid when only the connection changes', async () => {
+    const env = { NEXTAUTH_SECRET: 'test-secret' } as never;
+    const now = Date.now();
+    const control = createRuntimeProxyGrant({
+      plane: 'control',
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      sessionId: 'agent_1',
+      kiloSessionId: 'kilo_1',
+      userId: 'user_1',
+      mode: 'contained',
+      allocationId: 'allocation_1',
+      providerInstanceId: 'provider_1',
+      connectionId: 'connection_1',
+      wrapperInstanceId: 'wrapper_1',
+      leaseExpiresAt: now + 60_000,
+      state: 'active',
+    });
+    if (control.plane !== 'control') throw new Error('Expected control grant');
+    const claims = await verifyRuntimeCredentialProxyHandle(
+      env,
+      await issueRuntimeCredentialProxyHandle(env, control)
+    );
+    if (!claims) throw new Error('Expected control handle claims');
+    const context = {
+      authorizationId: control.authorizationId,
+      sessionId: control.sessionId,
+      kiloSessionId: control.kiloSessionId,
+      userId: control.userId,
+      now,
+    };
+    const fence = (overrides: Partial<ControlFence> = {}): ControlFence => ({
+      plane: 'control',
+      allocationId: control.allocationId,
+      providerInstanceId: control.providerInstanceId,
+      connectionId: 'connection_2',
+      wrapperInstanceId: control.wrapperInstanceId,
+      ...overrides,
+    });
+
+    expect(matchesRuntimeProxyGrant(control, claims, { ...context, fence: fence() })).toBe(true);
+    expect(
+      matchesRuntimeProxyGrant(control, claims, {
+        ...context,
+        fence: fence({ wrapperInstanceId: 'wrapper_2' }),
+      })
+    ).toBe(false);
+    expect(
+      matchesRuntimeProxyGrant(control, claims, {
+        ...context,
+        fence: fence({ allocationId: 'allocation_2' }),
+      })
+    ).toBe(false);
+    expect(
+      matchesRuntimeProxyGrant(control, claims, {
+        ...context,
+        fence: fence({ providerInstanceId: 'provider_2' }),
+      })
+    ).toBe(false);
   });
 
   it('matches a readable legacy v2 grant against a physical-only fence by allocation', async () => {

@@ -7,7 +7,7 @@ import { CenteredState } from '@/components/centered-state';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useSessionRowPress } from '@/components/agents/use-agent-session-navigator';
+import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import {
   liveSessionContent,

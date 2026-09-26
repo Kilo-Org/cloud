@@ -14,6 +14,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { modelTrains } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { VIRTUAL_PROVIDER } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
@@ -26,6 +27,7 @@ type ProviderIndexCacheState = {
   expiresAtMs: number;
   index: ModelIdToProviderSlugsIndex;
   dataCollectionRequiredModelIds: ReadonlySet<string>;
+  realProviderSlugs: readonly string[];
 };
 
 export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
@@ -155,6 +157,11 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
           dataCollectionRequiredModelIds: snapshot
             ? buildDataCollectionRequiredModelIds(snapshot)
             : new Set(),
+          realProviderSlugs: snapshot
+            ? snapshot.providers
+                .map(provider => provider.slug)
+                .filter(slug => slug !== VIRTUAL_PROVIDER.slug)
+            : [],
         };
       } finally {
         inFlight = undefined;
@@ -204,10 +211,29 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     );
   }
 
+  /**
+   * OpenRouter does not know the snapshot-only `virtual` provider. Routers
+   * listed under it pick among real providers per request, so allowing
+   * `virtual` for a router allows every real provider; for any other model it
+   * adds nothing.
+   */
+  async function toUpstreamProviderOnly(
+    modelId: string,
+    only: readonly string[]
+  ): Promise<string[]> {
+    if (!only.includes(VIRTUAL_PROVIDER.slug)) return [...only];
+    const { index, realProviderSlugs } = await loadState();
+    if (index.get(normalizeModelId(modelId))?.has(VIRTUAL_PROVIDER.slug)) {
+      return [...realProviderSlugs];
+    }
+    return only.filter(slug => slug !== VIRTUAL_PROVIDER.slug);
+  }
+
   return {
     getIndex: loadIndex,
     getProviderSlugsForModel,
     getDataCollectionRequiredModelIds,
+    toUpstreamProviderOnly,
   };
 }
 
@@ -243,4 +269,11 @@ export async function getModelIdToProviderSlugsIndex(): Promise<ModelIdToProvide
 
 export async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
   return defaultLoader.getDataCollectionRequiredModelIds();
+}
+
+export async function toUpstreamProviderOnly(
+  modelId: string,
+  only: readonly string[]
+): Promise<string[]> {
+  return defaultLoader.toUpstreamProviderOnly(modelId, only);
 }

@@ -179,6 +179,25 @@ describe('injectVirtualModels', () => {
     expect(providerModelData[1]?.models.map(model => model.slug)).toEqual([SONNET_LATEST]);
   });
 
+  test('only treats `~` ids as aliases of their target', () => {
+    const router = 'openrouter/sonnet-router';
+    const providerModelData = [
+      { provider: provider('anthropic'), models: [snapshotModel(SONNET)] },
+    ];
+
+    injectVirtualModels({
+      providerModelData,
+      catalogModels: [catalogModel(router, 'Sonnet Router')],
+      storedModels: { [router]: storedModel(router, SONNET) },
+    });
+
+    expect(providerModelData[0]?.models.map(model => model.slug)).toEqual([SONNET]);
+    expect(providerModelData[1]).toMatchObject({
+      provider: VIRTUAL_PROVIDER,
+      models: [expect.objectContaining({ slug: router })],
+    });
+  });
+
   test('keeps models that providers already list and skips batch variants', () => {
     const providerModelData = [
       { provider: provider('anthropic'), models: [snapshotModel(SONNET)] },

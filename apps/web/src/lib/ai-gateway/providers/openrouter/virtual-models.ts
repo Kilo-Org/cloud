@@ -86,7 +86,9 @@ export function injectVirtualModels(params: {
     }
     snapshotModelIds.add(modelId);
 
-    const aliasTargetSlug = storedModels[catalogModel.id]?.alias_target?.slug;
+    const aliasTargetSlug = catalogModel.id.startsWith('~')
+      ? storedModels[catalogModel.id]?.alias_target?.slug
+      : undefined;
     let isListedUnderAliasTarget = false;
     if (aliasTargetSlug) {
       const aliasTargetId = normalizeModelId(aliasTargetSlug);

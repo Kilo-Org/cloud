@@ -129,8 +129,14 @@ export function projectOptionKey(gitUrl: string): string {
   return formatGitUrlProject(gitUrl).trim().toLocaleLowerCase(i18n.language);
 }
 
-export function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toLocaleUpperCase(i18n.language);
+/**
+ * Relative-time label for a row's meta line. `nowMs` is the caller's sampled
+ * clock so a memoized row can pass the tick that re-rendered it instead of
+ * reading `Date.now()` behind the memo (see `useNowTicker`); omitted, the
+ * formatter reads the current time.
+ */
+export function formatMeta(timestamp: string, nowMs?: number): string {
+  return timeAgo(parseTimestamp(timestamp), undefined, nowMs).toLocaleUpperCase(i18n.language);
 }
 
 /**
@@ -323,14 +329,18 @@ export function activeSessionMetaTimestamp(session: {
  * Pinned-tray meta line for an active session. Prefers `lastActivityAt`, falls
  * back to `updatedAt`; otherwise `undefined` so `SessionRow` renders the live
  * dot alone. Never the CLI status — status words in the timestamp slot were a
- * defect (BUSY/IDLE/RETRY).
+ * defect (BUSY/IDLE/RETRY). `nowMs` is the caller's sampled clock, so a
+ * memoized row ages its own label (see {@link formatMeta}).
  */
-export function remoteMeta(session: {
-  updatedAt?: string;
-  lastActivityAt?: string;
-}): string | undefined {
+export function remoteMeta(
+  session: {
+    updatedAt?: string;
+    lastActivityAt?: string;
+  },
+  nowMs?: number
+): string | undefined {
   const ts = activeSessionMetaTimestamp(session);
-  return ts ? formatMeta(ts) : undefined;
+  return ts ? formatMeta(ts, nowMs) : undefined;
 }
 
 /**

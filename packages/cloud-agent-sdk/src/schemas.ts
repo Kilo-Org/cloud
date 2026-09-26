@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
-import type { KiloSessionId } from './types';
+import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -472,9 +472,10 @@ export const activeSessionSchema = z
     scheduledAt: z.string().optional(),
     /**
      * Per-session capabilities advertised by the owning CLI in its
-     * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
-     * gates the remote-CLI attachment path; absent / false means the CLI
-     * either predates the capability or has not yet reported it.
+     * `sessions.heartbeat` / `sessions.list` payload. Only an explicit
+     * `attachments: false` closes the remote-CLI attachment path; absent
+     * (the CLI predates the capability or has not yet reported it) is
+     * treated as supported.
      *
      * Declared here (rather than relying on `.passthrough()`) so typed
      * consumers can reason about the shape without an extra `as` cast. The
@@ -958,8 +959,16 @@ export const slashCommandInfoSchema = z.object({
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
 
+export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatus> = z.object({
+  dropped: z.number().int().nonnegative(),
+  overLimit: z.boolean(),
+});
+
 export const commandsAvailableDataSchema = z.object({
   commands: z.array(slashCommandInfoSchema),
+  // The notice is a nicety and the catalog is essential, so a malformed status
+  // is dropped instead of failing the whole event and losing the catalog.
+  catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
 

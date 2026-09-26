@@ -2,9 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
-import { GET } from './route';
-import { GET as openRouterV1GET } from '@/app/api/openrouter/v1/models/[provider]/[model]/endpoints/route';
-import { GET as gatewayV1GET } from '@/app/api/gateway/v1/models/[provider]/[model]/endpoints/route';
+import { handleModelEndpointsRequest } from './model-endpoints';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -19,11 +17,6 @@ function request(modelId: string) {
 }
 
 describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
-  test('uses the canonical handler for versioned routes', () => {
-    expect(openRouterV1GET).toBe(GET);
-    expect(gatewayV1GET).toBe(GET);
-  });
-
   test('undoes discounts for every priced endpoint without adding missing fields', async () => {
     const model = {
       id: 'deepseek/deepseek-v4-pro',
@@ -43,7 +36,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     };
     mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
 
-    const response = await GET(request(model.id), {
+    const response = await handleModelEndpointsRequest(request(model.id), {
       params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4-pro' }),
     });
 
@@ -74,7 +67,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
   test('returns 404 when the model is absent from the cache', async () => {
     mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({});
 
-    const response = await GET(request('missing/model'), {
+    const response = await handleModelEndpointsRequest(request('missing/model'), {
       params: Promise.resolve({ provider: 'missing', model: 'model' }),
     });
 
@@ -93,7 +86,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
       mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
       const [provider, model] = modelId.split('/');
 
-      const response = await GET(request(modelId), {
+      const response = await handleModelEndpointsRequest(request(modelId), {
         params: Promise.resolve({ provider, model }),
       });
 
@@ -127,7 +120,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
     const [provider, modelName] = model.id.split('/');
 
-    const response = await GET(request(model.id), {
+    const response = await handleModelEndpointsRequest(request(model.id), {
       params: Promise.resolve({ provider, model: modelName }),
     });
 

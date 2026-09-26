@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import { NextRequest } from 'next/server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { GET } from './route';
+import { handleModelsRequest } from './models';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -69,10 +68,6 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-function request(headers?: Record<string, string>) {
-  return new NextRequest('http://localhost:3000/api/openrouter/models', { headers });
-}
-
 describe('GET /api/openrouter/models', () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -93,7 +88,7 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
-    const response = await GET(request());
+    const response = await handleModelsRequest();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ data: [makeModel('public/model')] });
@@ -121,7 +116,7 @@ describe('GET /api/openrouter/models', () => {
       { ...publicModel, hasUserByokAvailable: true },
     ]);
 
-    const response = await GET(request());
+    const response = await handleModelsRequest();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -146,7 +141,7 @@ describe('GET /api/openrouter/models', () => {
         )
     );
 
-    const response = await GET(request());
+    const response = await handleModelsRequest();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -185,7 +180,7 @@ describe('GET /api/openrouter/models', () => {
       },
     } as never);
 
-    const response = await GET(request());
+    const response = await handleModelsRequest();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -232,7 +227,7 @@ describe('GET /api/openrouter/models', () => {
       },
     } as never);
 
-    const response = await GET(request());
+    const response = await handleModelsRequest();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({

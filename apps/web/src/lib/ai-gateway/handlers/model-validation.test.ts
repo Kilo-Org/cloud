@@ -6,7 +6,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { POST } from './route';
+import { handleModelValidationRequest } from './model-validation';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -60,7 +60,7 @@ describe('POST /api/openrouter/models/validate', () => {
   });
 
   test('confirms a Kilo-eligible catalog model', async () => {
-    const response = await POST(request('available/model'));
+    const response = await handleModelValidationRequest(request('available/model'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ valid: true });
@@ -71,7 +71,7 @@ describe('POST /api/openrouter/models/validate', () => {
   });
 
   test('does not expose details for an unavailable model', async () => {
-    const response = await POST(request('missing/model'));
+    const response = await handleModelValidationRequest(request('missing/model'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
@@ -84,14 +84,14 @@ describe('POST /api/openrouter/models/validate', () => {
       authFailedResponse: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     } as never);
 
-    const response = await POST(request('available/model'));
+    const response = await handleModelValidationRequest(request('available/model'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ valid: true });
   });
 
   test('rejects organization-scoped validation through the personal endpoint', async () => {
-    const response = await POST(
+    const response = await handleModelValidationRequest(
       request('available/model', { [ORGANIZATION_ID_HEADER]: 'organization-id' })
     );
 
@@ -106,7 +106,7 @@ describe('POST /api/openrouter/models/validate', () => {
   test('returns a service failure when catalog construction fails', async () => {
     mockedGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog unavailable'));
 
-    const response = await POST(request('available/model'));
+    const response = await handleModelValidationRequest(request('available/model'));
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
@@ -116,7 +116,7 @@ describe('POST /api/openrouter/models/validate', () => {
   });
 
   test('rejects an invalid body without reading a catalog', async () => {
-    const response = await POST(
+    const response = await handleModelValidationRequest(
       new NextRequest('http://localhost:3000/api/openrouter/models/validate', {
         method: 'POST',
         body: JSON.stringify({ modelId: '' }),

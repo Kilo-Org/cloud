@@ -32,7 +32,7 @@ import {
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import {
   type AgentProfileDetail,
   useAgentProfile,
@@ -93,15 +93,25 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
   const nameRef = useRef(profile.name);
   const descriptionRef = useRef(profile.description ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = () => {
     const name = nameRef.current.trim();
-    if (validateProfileName(name) !== null) {
-      setNameError(t('profiles.nameRequired'));
+    const nameIssue = validateProfileName(name);
+    if (nameIssue !== null) {
+      setNameError(
+        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
+      );
+      return;
+    }
+    const description = descriptionRef.current.trim();
+    if (validateProfileDescription(description) !== null) {
+      setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
     setNameError(null);
-    onSave({ name, description: descriptionRef.current.trim() });
+    setDescriptionError(null);
+    onSave({ name, description });
   };
 
   return (
@@ -125,12 +135,16 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
         label={t('profiles.descriptionLabel')}
         placeholder={t('profiles.descriptionPlaceholder')}
         defaultValue={profile.description ?? ''}
+        error={descriptionError ?? undefined}
         multiline
         textAlignVertical="top"
         className="min-h-20 leading-5"
         disabled={isSaving}
         onChangeText={value => {
           descriptionRef.current = value;
+          if (descriptionError !== null && validateProfileDescription(value) === null) {
+            setDescriptionError(null);
+          }
         }}
       />
       <Button loading={isSaving} disabled={isSaving} onPress={submit}>

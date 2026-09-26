@@ -1,8 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
+import { Check, Info, Lock, Search, SearchX, Unlock, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -27,9 +27,17 @@ export default function RepoPickerScreen() {
   // on a large repository list does not filter/reconcile on every key.
   const deferredSearch = useDeferredValue(search);
   const [bridge, setBridge] = useState(() => repoPickerSlot.get(UNFENCED_ROUTE_KEY));
+  // The input stays uncontrolled (iOS TextInput rules), so the in-field X
+  // clears the native text imperatively while `search` stays the list source.
+  const searchInputRef = useRef<TextInput>(null);
 
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
+
+  const handleClearSearch = useCallback(() => {
+    searchInputRef.current?.clear();
+    setSearch('');
+  }, []);
 
   const closePicker = useCallback(() => {
     router.back();
@@ -41,6 +49,7 @@ export default function RepoPickerScreen() {
       bridgeRef.current = nextBridge;
       setBridge(nextBridge);
       setSearch('');
+      searchInputRef.current?.clear();
 
       return () => {
         repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
@@ -117,10 +126,10 @@ export default function RepoPickerScreen() {
               the typed text will. */}
           <View className="relative flex-1">
             <Input
+              ref={searchInputRef}
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
               autoCapitalize="none"
               autoCorrect={false}
-              clearButtonMode="while-editing"
               returnKeyType="search"
               textAlignVertical="center"
               className="px-0 text-base text-foreground"
@@ -140,6 +149,19 @@ export default function RepoPickerScreen() {
               </View>
             ) : null}
           </View>
+          {/* In-field clear on every platform: `clearButtonMode` is iOS only,
+              so Android otherwise had no way to reset a typed query. */}
+          {search.length > 0 ? (
+            <Pressable
+              onPress={handleClearSearch}
+              accessibilityLabel={t('common.clearSearch')}
+              accessibilityRole="button"
+              hitSlop={12}
+              className="active:opacity-70"
+            >
+              <X size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
         </View>
       }
     >

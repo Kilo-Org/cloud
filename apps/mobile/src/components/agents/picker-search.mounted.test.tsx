@@ -23,6 +23,10 @@ const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 // The one token the picker's search input passes inline; the assertions read
 // the same value the mock hands the component.
 const theme = vi.hoisted(() => ({ foreground: '#111111' }));
+// The repository picker clears the uncontrolled field through the ref, so the
+// TextInput mock exposes the imperative `clear` the native input has and the
+// test can prove the native text is reset, not just the derived query.
+const clearSearch = vi.hoisted(() => vi.fn());
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The model picker renders its rows through FlashList v2; this stub renders
@@ -45,14 +49,26 @@ vi.mock('@shopify/flash-list', () => ({
       )
     ),
 }));
-vi.mock('react-native', () => ({
-  FlatList: 'FlatList',
-  I18nManager: i18nManager,
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  TextInput: 'TextInput',
-  View: 'View',
-}));
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  const MockTextInput = forwardRef<{ clear: () => void }, Record<string, unknown>>((props, ref) => {
+    useImperativeHandle(ref, () => ({ clear: clearSearch }));
+    return createMockElement('TextInput', props);
+  });
+  MockTextInput.displayName = 'MockTextInput';
+  return {
+    FlatList: 'FlatList',
+    I18nManager: i18nManager,
+    Pressable: 'Pressable',
+    ScrollView: 'ScrollView',
+    TextInput: MockTextInput,
+    View: 'View',
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({
@@ -94,10 +110,12 @@ const model: SessionModelOption = {
   showGatewayMetadata: false,
 };
 const repo: RepoOption = { platform: 'github', fullName: 'org/repo', isPrivate: false };
+const bitbucketNote = 'Bitbucket is available for organizations only.';
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   i18nManager.isRTL = false;
+  clearSearch.mockClear();
   modelPickerSlot.set(UNFENCED_ROUTE_KEY, {
     options: [model],
     currentValue: '',
@@ -123,11 +141,9 @@ beforeEach(() => {
 });
 
 describe('repository picker Bitbucket scope note', () => {
-  const note = 'Bitbucket is available for organizations only.';
-
   it('explains the Personal limitation without a retry action', async () => {
     const renderer = await mount(RepoPickerScreen);
-    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === bitbucketNote)).toBe(true);
     expect(hosts(renderer, 'Pressable')).toHaveLength(1);
   });
 
@@ -157,7 +173,9 @@ describe('repository picker Bitbucket scope note', () => {
         onSelect,
       });
       const renderer = await mount(RepoPickerScreen);
-      expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
+      expect(hosts(renderer, 'Text').some(node => node.props.children === bitbucketNote)).toBe(
+        false
+      );
       expect(hosts(renderer, 'Pressable')).toHaveLength(1);
       if (kind === 'recents') {
         const row = renderer.root.findByProps({ accessibilityLabel: 'Bitbucket workspace/repo' });
@@ -179,12 +197,15 @@ describe('repository picker Bitbucket scope note', () => {
     act(() => {
       changeSearch('org/repo');
     });
-    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
-    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
+    // The query is non-empty, so the in-field clear control joins the single
+    // matching row; the row host count stays one.
+    expect(rowHosts(renderer, 'Pressable')).toHaveLength(1);
+    expect(clearSearchButtons(renderer)).toHaveLength(1);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === bitbucketNote)).toBe(false);
     act(() => {
       changeSearch('');
     });
-    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === bitbucketNote)).toBe(true);
   });
 });
 
@@ -214,6 +235,40 @@ describe('repository picker search placeholder', () => {
       changeSearch('org/repo');
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === copy)).toBe(false);
+  });
+});
+
+describe('repository picker search clear', () => {
+  it('resets the query and the native text when the in-field control is pressed', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    // Opening the picker focuses the field and clears it once already; the
+    // press must add exactly one more native clear.
+    const nativeClearsOnMount = clearSearch.mock.calls.length;
+    const changeSearch = input.props.onChangeText as (text: string) => void;
+    act(() => {
+      changeSearch('org/repo');
+    });
+    expect(clearSearchButtons(renderer)).toHaveLength(1);
+
+    const [clear] = clearSearchButtons(renderer);
+    if (!clear) {
+      throw new Error('Clear affordance did not mount');
+    }
+    act(() => {
+      (clear.props.onPress as () => void)();
+    });
+
+    // The test-level ref stands in for the native field, so this proves the
+    // imperative clear ran; the emptied `search` drops the affordance and the
+    // matching row, and brings the Personal note back.
+    expect(clearSearch).toHaveBeenCalledTimes(nativeClearsOnMount + 1);
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === bitbucketNote)).toBe(true);
   });
 });
 
@@ -281,6 +336,27 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
 }
 
+/** The in-field clear affordance, found by the label the Agents search field uses. */
+function clearSearchButtons(renderer: Awaited<ReturnType<typeof mount>>) {
+  return hosts(renderer, 'Pressable').filter(
+    node => node.props.accessibilityLabel === 'Clear search'
+  );
+}
+
+/**
+ * The repository picker's row host is `Pressable`, the same type as its in-field
+ * clear control, so a row assertion counts only the pressables that are not the
+ * clear affordance. The model picker's row host is the list itself, so every
+ * match is a row.
+ */
+function rowHosts(renderer: Awaited<ReturnType<typeof mount>>, rowHost: string) {
+  const candidates = hosts(renderer, rowHost);
+  if (rowHost !== 'Pressable') {
+    return candidates;
+  }
+  return candidates.filter(node => node.props.accessibilityLabel !== 'Clear search');
+}
+
 // The model picker hosts its rows in a FlashList and manages its own scrolling
 // (PickerSheet scrollable=false); the repository picker renders mapped rows
 // inside the shell ScrollView and so always keeps that ScrollView mounted.
@@ -303,14 +379,14 @@ describe.each([
     const group = header.parent;
     expect(group?.props.collapsable).toBe(false);
     expect(group?.findAll(node => node === input)).toHaveLength(1);
-    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
+    expect(rowHosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
     act(() => {
       changeSearch('no matching choice');
     });
-    expect(hosts(renderer, rowHost)).toHaveLength(0);
+    expect(rowHosts(renderer, rowHost)).toHaveLength(0);
     if (!hasShellScrollView) {
       expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
     }
@@ -322,7 +398,7 @@ describe.each([
     act(() => {
       changeSearch('');
     });
-    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
+    expect(rowHosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
     expect(hosts(renderer, 'TextInput')[0]).toBe(input);
     expect(header.parent).toBe(group);

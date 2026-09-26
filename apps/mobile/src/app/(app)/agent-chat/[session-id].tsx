@@ -42,7 +42,7 @@ export default function SessionDetailScreen() {
   const confirmation = useIdentityConfirmation();
   const {
     'session-id': rawSessionId,
-    organizationId: routeOrganizationId,
+    organizationId: rawOrganizationId,
     via,
     spawned,
     shareId: shareIdParam,
@@ -81,6 +81,10 @@ export default function SessionDetailScreen() {
   // or a `string[]`, both of which parseParam rejects. Optional params keep
   // the existing first-element unwrapping below.
   const sessionId = parseParam(rawSessionId);
+  // A repeated `?organizationId=` yields `string[]`, which is not a concrete
+  // org scope: parseParam drops it to null so the metadata read still runs and
+  // the provider never receives an array where it expects a string.
+  const organizationId = parseParam(rawOrganizationId);
   // Param can be string | string[] depending on how the route was opened.
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
@@ -137,7 +141,7 @@ export default function SessionDetailScreen() {
       owner.generation,
       owner.userId,
     ]),
-    enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
+    enabled: isAuthenticatedOwner(owner) && organizationId === null && sessionId !== null,
   });
 
   // The account that owns this device's persisted transcript. The live
@@ -153,12 +157,12 @@ export default function SessionDetailScreen() {
   const sessionScopeUserId = owner.userId ?? restoredUserId;
   const identityPending = sessionScopeUserId === null;
   const identityFailed = identityPending && confirmation.isError;
-  const providerKey = `${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`;
+  const providerKey = `${owner.generation}:${sessionScopeUserId}:${sessionId}:${organizationId ?? 'personal'}`;
   const displayedProviderKey = useRef<string | null>(null);
 
   const displayScope = {
-    organizationId: routeOrganizationId ?? sessionQuery.data?.organization_id ?? null,
-    isResolved: routeOrganizationId !== undefined || sessionQuery.data != null,
+    organizationId: organizationId ?? sessionQuery.data?.organization_id ?? null,
+    isResolved: organizationId !== null || sessionQuery.data != null,
   };
 
   // The live account confirmed the session; a pending metadata read only
@@ -175,8 +179,8 @@ export default function SessionDetailScreen() {
   const scopeFromRestoredIdentity = owner.userId === null && sessionScopeUserId !== null;
   const metadataReadWaiting = !scopeFromRestoredIdentity && sessionQuery.fetchStatus !== 'paused';
   const metadataPhase = useSessionSlowLoadPhase({
-    isLoading: metadataReadWaiting && routeOrganizationId === undefined && sessionQuery.isPending,
-    hasContent: routeOrganizationId !== undefined || sessionQuery.data != null,
+    isLoading: metadataReadWaiting && organizationId === null && sessionQuery.isPending,
+    hasContent: organizationId !== null || sessionQuery.data != null,
     hasError: sessionQuery.isError,
     hasStatusIndicator: false,
     openStartedAt: openStart.current.startedAt,
@@ -235,10 +239,7 @@ export default function SessionDetailScreen() {
   // still hold its persisted transcript, so mount the session and let the SDK
   // paint the cached content and surface the retryable failure in place. Only a
   // denial (deleted session / lost access) replaces the screen with the error.
-  if (
-    identityFailed ||
-    (routeOrganizationId === undefined && sessionQuery.isError && metadataAccessDenied)
-  ) {
+  if (identityFailed || (organizationId === null && sessionQuery.isError && metadataAccessDenied)) {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
     // it shows a permanent state with no Retry. Both get Back and Copy.
@@ -312,7 +313,7 @@ export default function SessionDetailScreen() {
     );
   }
 
-  const organizationId = routeOrganizationId ?? sessionQuery.data?.organization_id ?? undefined;
+  const resolvedOrganizationId = organizationId ?? sessionQuery.data?.organization_id ?? undefined;
   // Same-scope metadata is background work once the transcript has mounted.
   // Confirmation/reconnection must not replace it with the initial skeleton.
   displayedProviderKey.current = providerKey;
@@ -335,7 +336,7 @@ export default function SessionDetailScreen() {
       // organization still re-keys, because it is authoritative from the first
       // frame.
       key={providerKey}
-      organizationId={organizationId}
+      organizationId={resolvedOrganizationId}
       restoredUserId={restoredUserId ?? undefined}
     >
       <SessionDetailContent

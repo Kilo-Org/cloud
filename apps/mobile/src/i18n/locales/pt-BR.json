@@ -3286,8 +3286,6 @@
       "unavailable": "As ferramentas do Kilo não estão disponíveis",
       "unavailableDescription": "O servidor do Kilo não está disponível para esta conta.",
       "sheetTitle": "Ferramentas de chat",
-      "serversSection": "Servidores MCP",
-      "addServer": "Adicionar servidor MCP",
       "addServerTitle": "Adicionar um servidor MCP",
       "editServerTitle": "Editar este servidor MCP",
       "fieldName": "Nome de exibição",

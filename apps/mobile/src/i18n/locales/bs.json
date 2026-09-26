@@ -3286,8 +3286,6 @@
       "unavailable": "Kilo alati nisu dostupni",
       "unavailableDescription": "Kilo server nije dostupan za ovaj račun.",
       "sheetTitle": "Alati za ćaskanje",
-      "serversSection": "MCP serveri",
-      "addServer": "Dodaj MCP server",
       "addServerTitle": "Dodaj MCP server",
       "editServerTitle": "Uredi ovaj MCP server",
       "fieldName": "Prikazano ime",

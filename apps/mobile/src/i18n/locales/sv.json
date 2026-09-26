@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo-verktyg är inte tillgängliga",
       "unavailableDescription": "Kilo-servern är inte tillgänglig för det här kontot.",
       "sheetTitle": "Chattverktyg",
-      "serversSection": "MCP-servrar",
-      "addServer": "Lägg till MCP-server",
       "addServerTitle": "Lägg till en MCP-server",
       "editServerTitle": "Redigera denna MCP-server",
       "fieldName": "Visat namn",

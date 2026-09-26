@@ -3286,8 +3286,6 @@
       "unavailable": "Les eines de Kilo no estan disponibles",
       "unavailableDescription": "El servidor de Kilo no està disponible per a aquest compte.",
       "sheetTitle": "Eines del xat",
-      "serversSection": "Servidors MCP",
-      "addServer": "Afegeix un servidor MCP",
       "addServerTitle": "Afegeix un servidor MCP",
       "editServerTitle": "Edita aquest servidor MCP",
       "fieldName": "Nom que es mostra",

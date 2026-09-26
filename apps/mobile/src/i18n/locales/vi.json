@@ -3243,8 +3243,6 @@
       "unavailable": "Công cụ Kilo không khả dụng",
       "unavailableDescription": "Máy chủ Kilo không khả dụng cho tài khoản này.",
       "sheetTitle": "Công cụ trò chuyện",
-      "serversSection": "Máy chủ MCP",
-      "addServer": "Thêm máy chủ MCP",
       "addServerTitle": "Thêm máy chủ MCP",
       "editServerTitle": "Sửa máy chủ MCP này",
       "fieldName": "Tên hiển thị",

@@ -3286,8 +3286,6 @@
       "unavailable": "Kilo rīki nav pieejami",
       "unavailableDescription": "Kilo serveris nav pieejams šim kontam.",
       "sheetTitle": "Tērzēšanas rīki",
-      "serversSection": "MCP serveri",
-      "addServer": "Pievienot MCP serveri",
       "addServerTitle": "Pievienot MCP serveri",
       "editServerTitle": "Rediģēt šo MCP serveri",
       "fieldName": "Parādāmais nosaukums",

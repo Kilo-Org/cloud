@@ -3329,8 +3329,6 @@
       "unavailable": "Kilo įrankiai nepasiekiami",
       "unavailableDescription": "Kilo serveris nepasiekiamas šiai paskyrai.",
       "sheetTitle": "Pokalbių įrankiai",
-      "serversSection": "MCP serveriai",
-      "addServer": "Pridėti MCP serverį",
       "addServerTitle": "Pridėti MCP serverį",
       "editServerTitle": "Redaguoti šį MCP serverį",
       "fieldName": "Rodomas pavadinimas",

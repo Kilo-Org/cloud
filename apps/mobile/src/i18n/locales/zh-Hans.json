@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo 工具不可用",
       "unavailableDescription": "此账户无法使用 Kilo 服务器。",
       "sheetTitle": "聊天工具",
-      "serversSection": "MCP 服务器",
-      "addServer": "添加 MCP 服务器",
       "addServerTitle": "添加 MCP 服务器",
       "editServerTitle": "编辑此 MCP 服务器",
       "fieldName": "显示名称",

@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo araçları kullanılamıyor",
       "unavailableDescription": "Kilo sunucusu bu hesap için kullanılamıyor.",
       "sheetTitle": "Sohbet araçları",
-      "serversSection": "MCP sunucuları",
-      "addServer": "MCP sunucusu ekle",
       "addServerTitle": "MCP sunucusu ekle",
       "editServerTitle": "Bu MCP sunucusunu düzenle",
       "fieldName": "Görünen ad",

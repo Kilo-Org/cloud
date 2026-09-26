@@ -3329,8 +3329,6 @@
       "unavailable": "Nástroje Kilo nejsou dostupné",
       "unavailableDescription": "Server Kilo pro tento účet není k dispozici.",
       "sheetTitle": "Nástroje chatu",
-      "serversSection": "Servery MCP",
-      "addServer": "Přidat server MCP",
       "addServerTitle": "Přidat server MCP",
       "editServerTitle": "Upravit tento server MCP",
       "fieldName": "Zobrazovaný název",

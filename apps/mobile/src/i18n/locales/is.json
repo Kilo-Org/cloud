@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo-verkfæri eru ekki í boði",
       "unavailableDescription": "Kilo-þjónninn er ekki í boði fyrir þennan reikning.",
       "sheetTitle": "Spjallverkfæri",
-      "serversSection": "MCP-þjónar",
-      "addServer": "Bæta við MCP-þjóni",
       "addServerTitle": "Bæta við MCP-þjóni",
       "editServerTitle": "Breyta þessum MCP-þjóni",
       "fieldName": "Sýnt heiti",

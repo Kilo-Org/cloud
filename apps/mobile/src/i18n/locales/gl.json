@@ -3243,8 +3243,6 @@
       "unavailable": "As ferramentas de Kilo non están dispoñibles",
       "unavailableDescription": "O servidor de Kilo non está dispoñible para esta conta.",
       "sheetTitle": "Ferramentas de chat",
-      "serversSection": "Servidores MCP",
-      "addServer": "Engadir un servidor MCP",
       "addServerTitle": "Engadir un servidor MCP",
       "editServerTitle": "Editar este servidor MCP",
       "fieldName": "Nome mostrado",

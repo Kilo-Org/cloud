@@ -91,11 +91,11 @@ export function McpServersSection({
   return (
     <View className="gap-2">
       <Text className="px-1 text-xs font-semibold uppercase text-muted-foreground">
-        {t('modelChat.mcp.serversSection')}
+        {t('profiles.mcp.title')}
       </Text>
       {list}
       <Button variant="secondary" onPress={onAdd}>
-        <Text>{t('modelChat.mcp.addServer')}</Text>
+        <Text>{t('profiles.mcp.add')}</Text>
       </Button>
     </View>
   );

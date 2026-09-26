@@ -3243,8 +3243,6 @@
       "unavailable": "Kilon työkalut eivät ole saatavilla",
       "unavailableDescription": "Kilo-palvelin ei ole käytettävissä tälle tilille.",
       "sheetTitle": "Keskustelutyökalut",
-      "serversSection": "MCP-palvelimet",
-      "addServer": "Lisää MCP-palvelin",
       "addServerTitle": "Lisää MCP-palvelin",
       "editServerTitle": "Muokkaa tätä MCP-palvelinta",
       "fieldName": "Näyttönimi",

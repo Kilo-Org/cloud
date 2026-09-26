@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo-ს ხელსაწყოები მიუწვდომელია",
       "unavailableDescription": "Kilo-ს სერვერი ამ ანგარიშისთვის მიუწვდომელია.",
       "sheetTitle": "ჩატის ხელსაწყოები",
-      "serversSection": "MCP სერვერები",
-      "addServer": "MCP სერვერის დამატება",
       "addServerTitle": "MCP სერვერის დამატება",
       "editServerTitle": "ამ MCP სერვერის რედაქტირება",
       "fieldName": "ნაჩვენები სახელი",

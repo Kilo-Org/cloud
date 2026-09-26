@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo хэрэгслүүд боломжгүй",
       "unavailableDescription": "Kilo сервер энэ бүртгэлд боломжгүй.",
       "sheetTitle": "Чатын хэрэгслүүд",
-      "serversSection": "MCP серверүүд",
-      "addServer": "MCP сервер нэмэх",
       "addServerTitle": "MCP сервер нэмэх",
       "editServerTitle": "Энэ MCP серверийг засах",
       "fieldName": "Харагдах нэр",

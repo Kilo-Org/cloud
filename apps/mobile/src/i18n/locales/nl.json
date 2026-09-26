@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo-tools zijn niet beschikbaar",
       "unavailableDescription": "De Kilo-server is niet beschikbaar voor dit account.",
       "sheetTitle": "Chattools",
-      "serversSection": "MCP-servers",
-      "addServer": "MCP-server toevoegen",
       "addServerTitle": "Een MCP-server toevoegen",
       "editServerTitle": "Deze MCP-server bewerken",
       "fieldName": "Weergavenaam",

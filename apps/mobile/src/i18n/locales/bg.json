@@ -3243,8 +3243,6 @@
       "unavailable": "Инструментите на Kilo не са налични",
       "unavailableDescription": "Сървърът на Kilo не е достъпен за този акаунт.",
       "sheetTitle": "Инструменти за чата",
-      "serversSection": "MCP сървъри",
-      "addServer": "Добавяне на MCP сървър",
       "addServerTitle": "Добавяне на MCP сървър",
       "editServerTitle": "Редактиране на този MCP сървър",
       "fieldName": "Показвано име",

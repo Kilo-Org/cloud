@@ -3243,8 +3243,6 @@
       "unavailable": "Kiloren tresnak ez daude erabilgarri",
       "unavailableDescription": "Kilo zerbitzaria ez dago erabilgarri kontu honetarako.",
       "sheetTitle": "Txat tresnak",
-      "serversSection": "MCP zerbitzariak",
-      "addServer": "Gehitu MCP zerbitzaria",
       "addServerTitle": "Gehitu MCP zerbitzari bat",
       "editServerTitle": "Editatu MCP zerbitzari hau",
       "fieldName": "Erakusteko izena",

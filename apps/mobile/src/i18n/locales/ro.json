@@ -3286,8 +3286,6 @@
       "unavailable": "Instrumentele Kilo nu sunt disponibile",
       "unavailableDescription": "Serverul Kilo nu este disponibil pentru acest cont.",
       "sheetTitle": "Instrumente de chat",
-      "serversSection": "Servere MCP",
-      "addServer": "Adaugă server MCP",
       "addServerTitle": "Adaugă un server MCP",
       "editServerTitle": "Editează acest server MCP",
       "fieldName": "Nume afișat",

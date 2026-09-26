@@ -3329,8 +3329,6 @@
       "unavailable": "Orodja Kilo niso na voljo",
       "unavailableDescription": "Strežnik Kilo ni na voljo za ta račun.",
       "sheetTitle": "Orodja za klepet",
-      "serversSection": "Strežniki MCP",
-      "addServer": "Dodaj strežnik MCP",
       "addServerTitle": "Dodaj strežnik MCP",
       "editServerTitle": "Uredi ta strežnik MCP",
       "fieldName": "Prikazano ime",

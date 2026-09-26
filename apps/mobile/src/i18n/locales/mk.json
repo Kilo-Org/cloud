@@ -3243,8 +3243,6 @@
       "unavailable": "Алатките на Kilo не се достапни",
       "unavailableDescription": "Серверот на Kilo не е достапен за оваа сметка.",
       "sheetTitle": "Алатки за разговор",
-      "serversSection": "MCP сервери",
-      "addServer": "Додај MCP сервер",
       "addServerTitle": "Додај MCP сервер",
       "editServerTitle": "Уреди го овој MCP сервер",
       "fieldName": "Прикажано име",

@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo vositalari mavjud emas",
       "unavailableDescription": "Kilo serveri bu hisob uchun mavjud emas.",
       "sheetTitle": "Chat vositalari",
-      "serversSection": "MCP serverlari",
-      "addServer": "MCP server qoʻshish",
       "addServerTitle": "MCP server qoʻshish",
       "editServerTitle": "Bu MCP serverni tahrirlash",
       "fieldName": "Koʻrsatiladigan nom",

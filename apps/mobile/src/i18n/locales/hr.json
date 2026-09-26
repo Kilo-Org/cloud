@@ -3286,8 +3286,6 @@
       "unavailable": "Kilo alati nisu dostupni",
       "unavailableDescription": "Kilo poslužitelj nije dostupan za ovaj račun.",
       "sheetTitle": "Alati za razgovor",
-      "serversSection": "MCP poslužitelji",
-      "addServer": "Dodaj MCP poslužitelj",
       "addServerTitle": "Dodaj MCP poslužitelj",
       "editServerTitle": "Uredi ovaj MCP poslužitelj",
       "fieldName": "Prikazani naziv",

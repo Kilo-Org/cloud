@@ -3243,8 +3243,6 @@
       "unavailable": "เครื่องมือ Kilo ไม่พร้อมใช้งาน",
       "unavailableDescription": "เซิร์ฟเวอร์ Kilo ไม่มีสำหรับบัญชีนี้",
       "sheetTitle": "เครื่องมือแชท",
-      "serversSection": "เซิร์ฟเวอร์ MCP",
-      "addServer": "เพิ่มเซิร์ฟเวอร์ MCP",
       "addServerTitle": "เพิ่มเซิร์ฟเวอร์ MCP",
       "editServerTitle": "แก้ไขเซิร์ฟเวอร์ MCP นี้",
       "fieldName": "ชื่อที่แสดง",

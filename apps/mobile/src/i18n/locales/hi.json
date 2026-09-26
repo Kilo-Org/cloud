@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo टूल उपलब्ध नहीं हैं",
       "unavailableDescription": "इस खाते के लिए Kilo सर्वर उपलब्ध नहीं है।",
       "sheetTitle": "चैट टूल",
-      "serversSection": "MCP सर्वर",
-      "addServer": "MCP सर्वर जोड़ें",
       "addServerTitle": "MCP सर्वर जोड़ें",
       "editServerTitle": "इस MCP सर्वर को संपादित करें",
       "fieldName": "प्रदर्शित नाम",

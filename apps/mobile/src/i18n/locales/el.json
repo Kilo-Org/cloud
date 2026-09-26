@@ -3243,8 +3243,6 @@
       "unavailable": "Τα εργαλεία Kilo δεν είναι διαθέσιμα",
       "unavailableDescription": "Ο διακομιστής Kilo δεν είναι διαθέσιμος για αυτόν τον λογαριασμό.",
       "sheetTitle": "Εργαλεία συνομιλίας",
-      "serversSection": "Διακομιστές MCP",
-      "addServer": "Προσθήκη διακομιστή MCP",
       "addServerTitle": "Προσθήκη διακομιστή MCP",
       "editServerTitle": "Επεξεργασία αυτού του διακομιστή MCP",
       "fieldName": "Εμφανιζόμενο όνομα",

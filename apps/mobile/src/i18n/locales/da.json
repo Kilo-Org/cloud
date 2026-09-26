@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo-værktøjer er ikke tilgængelige",
       "unavailableDescription": "Kilo-serveren er ikke tilgængelig for denne konto.",
       "sheetTitle": "Chatværktøjer",
-      "serversSection": "MCP-servere",
-      "addServer": "Tilføj MCP-server",
       "addServerTitle": "Tilføj en MCP-server",
       "editServerTitle": "Rediger denne MCP-server",
       "fieldName": "Vist navn",

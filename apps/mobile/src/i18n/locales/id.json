@@ -3243,8 +3243,6 @@
       "unavailable": "Alat Kilo tidak tersedia",
       "unavailableDescription": "Server Kilo tidak tersedia untuk akun ini.",
       "sheetTitle": "Alat chat",
-      "serversSection": "Server MCP",
-      "addServer": "Tambah server MCP",
       "addServerTitle": "Tambah server MCP",
       "editServerTitle": "Edit server MCP ini",
       "fieldName": "Nama tampilan",

@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo tööriistad pole saadaval",
       "unavailableDescription": "Kilo server pole selle konto jaoks saadaval.",
       "sheetTitle": "Vestlusetööriistad",
-      "serversSection": "MCP-serverid",
-      "addServer": "Lisa MCP-server",
       "addServerTitle": "Lisa MCP-server",
       "editServerTitle": "Muuda seda MCP-serverit",
       "fieldName": "Kuvatav nimi",

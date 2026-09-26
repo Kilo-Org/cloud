@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo 도구를 사용할 수 없습니다",
       "unavailableDescription": "이 계정에서는 Kilo 서버를 사용할 수 없습니다.",
       "sheetTitle": "채팅 도구",
-      "serversSection": "MCP 서버",
-      "addServer": "MCP 서버 추가",
       "addServerTitle": "MCP 서버 추가",
       "editServerTitle": "이 MCP 서버 편집",
       "fieldName": "표시 이름",

@@ -3243,8 +3243,6 @@
       "unavailable": "Alat Kilo tidak tersedia",
       "unavailableDescription": "Pelayan Kilo tidak tersedia untuk akaun ini.",
       "sheetTitle": "Alat sembang",
-      "serversSection": "Pelayan MCP",
-      "addServer": "Tambah pelayan MCP",
       "addServerTitle": "Tambah pelayan MCP",
       "editServerTitle": "Edit pelayan MCP ini",
       "fieldName": "Nama paparan",

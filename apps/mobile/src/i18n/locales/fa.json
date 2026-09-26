@@ -3243,8 +3243,6 @@
       "unavailable": "ابزارهای Kilo در دسترس نیستند",
       "unavailableDescription": "سرور Kilo برای این حساب در دسترس نیست.",
       "sheetTitle": "ابزارهای گفتگو",
-      "serversSection": "سرورهای MCP",
-      "addServer": "افزودن سرور MCP",
       "addServerTitle": "افزودن سرور MCP",
       "editServerTitle": "ویرایش این سرور MCP",
       "fieldName": "نام نمایشی",

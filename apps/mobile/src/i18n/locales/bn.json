@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo টুল পাওয়া যাচ্ছে না",
       "unavailableDescription": "এই অ্যাকাউন্টের জন্য Kilo সার্ভার নেই।",
       "sheetTitle": "চ্যাট টুল",
-      "serversSection": "MCP সার্ভার",
-      "addServer": "MCP সার্ভার যোগ করুন",
       "addServerTitle": "একটি MCP সার্ভার যোগ করুন",
       "editServerTitle": "এই MCP সার্ভার সম্পাদনা করুন",
       "fieldName": "প্রদর্শিত নাম",

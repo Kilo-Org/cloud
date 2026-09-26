@@ -3243,8 +3243,6 @@
       "unavailable": "A Kilo-eszközök nem érhetők el",
       "unavailableDescription": "A Kilo-kiszolgáló nem érhető el ehhez a fiókhoz.",
       "sheetTitle": "Csevegőeszközök",
-      "serversSection": "MCP-szerverek",
-      "addServer": "MCP-szerver hozzáadása",
       "addServerTitle": "MCP-szerver hozzáadása",
       "editServerTitle": "Ennek az MCP-szervernek a szerkesztése",
       "fieldName": "Megjelenített név",

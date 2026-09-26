@@ -3243,8 +3243,6 @@
       "unavailable": "Mjetet Kilo nuk janë të disponueshme",
       "unavailableDescription": "Serveri Kilo nuk është i disponueshëm për këtë llogari.",
       "sheetTitle": "Mjetet e bisedës",
-      "serversSection": "Serverët MCP",
-      "addServer": "Shto server MCP",
       "addServerTitle": "Shto një server MCP",
       "editServerTitle": "Modifiko këtë server MCP",
       "fieldName": "Emri i shfaqur",

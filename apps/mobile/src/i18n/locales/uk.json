@@ -3329,8 +3329,6 @@
       "unavailable": "Інструменти Kilo недоступні",
       "unavailableDescription": "Сервер Kilo недоступний для цього облікового запису.",
       "sheetTitle": "Інструменти чату",
-      "serversSection": "Сервери MCP",
-      "addServer": "Додати сервер MCP",
       "addServerTitle": "Додати сервер MCP",
       "editServerTitle": "Редагувати цей сервер MCP",
       "fieldName": "Відображувана назва",

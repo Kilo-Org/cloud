@@ -3243,8 +3243,6 @@
       "unavailable": "Kilo գործիքները հասանելի չեն",
       "unavailableDescription": "Kilo սերվերը հասանելի չէ այս հաշվի համար։",
       "sheetTitle": "Զրույցի գործիքներ",
-      "serversSection": "MCP սերվերներ",
-      "addServer": "Ավելացնել MCP սերվեր",
       "addServerTitle": "Ավելացնել MCP սերվեր",
       "editServerTitle": "Խմբագրել այս MCP սերվերը",
       "fieldName": "Ցուցադրվող անուն",

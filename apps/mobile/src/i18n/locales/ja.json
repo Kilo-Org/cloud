@@ -3243,8 +3243,6 @@
       "unavailable": "Kiloツールは利用できません",
       "unavailableDescription": "このアカウントではKiloサーバーを利用できません。",
       "sheetTitle": "チャットツール",
-      "serversSection": "MCPサーバー",
-      "addServer": "MCPサーバーを追加",
       "addServerTitle": "MCPサーバーを追加",
       "editServerTitle": "このMCPサーバーを編集",
       "fieldName": "表示名",

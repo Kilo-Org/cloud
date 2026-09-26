@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 /**
  * Single source of truth for the pinned producer/consumer contract between the
  * cloud-agent-sdk's remote-session exit messages and the mobile surfaces that
@@ -39,4 +41,22 @@ export function isNonRetryableExitError(message: string): boolean {
     return true;
   }
   return message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX);
+}
+
+/**
+ * Catalog copy for a pinned SDK exit message, or null when it is not one. The
+ * SDK produces the pinned messages in English; matching them here lets every
+ * surface show the reader their own language.
+ */
+export function exitErrorCopy(message: string): string | null {
+  if (message === REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE) {
+    return i18n.t('agentChat.remoteSession.exitNotSupported');
+  }
+  if (message === REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE) {
+    return i18n.t('agentChat.remoteSession.exitUnavailable');
+  }
+  if (message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX)) {
+    return i18n.t('agentChat.remoteSession.exitNeedsNewerCli');
+  }
+  return null;
 }

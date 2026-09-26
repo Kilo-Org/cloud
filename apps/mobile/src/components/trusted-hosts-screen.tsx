@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -17,6 +17,22 @@ export function TrustedHostsScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { trustedHosts, hasLoaded } = useTrustedHosts();
+
+  // Revoking is destructive and one tap away on a single row, so it confirms
+  // first, the way the passkey and device-session removal rows do
+  // (apps/mobile/AGENTS.md).
+  const confirmRevoke = (host: string) => {
+    Alert.alert(t('trustedHosts.revoke', { host }), t('trustedHosts.revokeMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('organization.members.revokeConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          revokeHost(host);
+        },
+      },
+    ]);
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -67,7 +83,7 @@ export function TrustedHostsScreen() {
                   </Text>
                   <Pressable
                     onPress={() => {
-                      revokeHost(host);
+                      confirmRevoke(host);
                     }}
                     hitSlop={8}
                     accessibilityRole="button"

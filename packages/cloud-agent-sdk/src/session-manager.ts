@@ -189,6 +189,18 @@ const RETAINED_MESSAGE_WINDOW = 200;
 const EMPTY_PARTS: Part[] = [];
 
 /**
+ * Shared empty sentinel for the read-only resolved-delivery projection, so a
+ * session with no recorded resolution does not allocate a Set per derivation.
+ */
+const EMPTY_RESOLVED_DELIVERY_FAILURES: ReadonlySet<string> = new Set();
+
+/**
+ * Shared empty sentinel for the read-only in-flight-supersede projection, for
+ * the same reason as `EMPTY_RESOLVED_DELIVERY_FAILURES`.
+ */
+const EMPTY_SUPERSEDED_IN_FLIGHT: ReadonlySet<string> = new Set();
+
+/**
  * Flatten a `ModelSelection` into the Decision 5 create_session model object.
  * `variant` is nested only when present (no second top-level field).
  */
@@ -484,6 +496,20 @@ type SessionManagerAtoms = {
    * (pre-clear messages may reappear — accepted tradeoff).
    */
   transcriptCleared: W<boolean>;
+  /**
+   * Ids whose delivery failure the user resolved by retrying, for the active
+   * session. Seeded from the durable resolved-delivery record on open, so a
+   * superseded row stays hidden across a switch-back and a relaunch.
+   */
+  resolvedDeliveryFailures: Atom<ReadonlySet<string>>;
+  /**
+   * Ids whose failed row a re-send superseded while it is still in flight, for
+   * the active session. The row must stop rendering in the same tap as the
+   * retry, before the manager can record the accepted resolution, so the caller
+   * marks it with `markMessageSuperseded`. The record is keyed by the session
+   * that owns the row, so switching away and back keeps the row hidden.
+   */
+  supersededInFlightMessageIds: Atom<ReadonlySet<string>>;
 };
 
 type SessionManager = {
@@ -572,6 +598,20 @@ type SessionManager = {
    * Omitted, the currently active session is assumed.
    */
   clearFailedMessage(messageId: string, ownerSessionId?: KiloSessionId): void;
+  /**
+   * Mark a failed row as superseded by a re-send that is still in flight, for
+   * the session that owns the row. The row stops rendering from this call, so
+   * the caller makes it in the same tap as the retry instead of waiting for the
+   * transport round-trip, which would render the prompt twice for its duration.
+   * The mark is removed by `unmarkMessageSuperseded` when the re-send is
+   * rejected and replaced by the resolved record when it is accepted.
+   */
+  markMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void;
+  /**
+   * Undo `markMessageSuperseded` after a re-send was rejected: nothing was
+   * delivered, so the failed row must render again with its retry control.
+   */
+  unmarkMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -932,6 +972,95 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
 
+  // Bumped whenever the active session or its resolved-delivery record changes,
+  // so the read-only projection below re-derives on a switch, on a recorded
+  // retry, and on the durable seed. A storage read cannot serve as the trigger:
+  // a cached re-open preserves the storage object, and `destroy` nulls it
+  // before clearing the active session id.
+  const resolvedDeliveryFailuresRevisionAtom = atom(0);
+  /**
+   * Memo for the read-only projection below, keyed by the session and revision
+   * it was derived from, so the returned Set keeps a stable identity between
+   * bumps (see the derivation for why the identity must change on a bump).
+   */
+  let resolvedDeliveryProjectionCache: {
+    sessionId: KiloSessionId;
+    revision: number;
+    value: ReadonlySet<string>;
+  } | null = null;
+  /**
+   * Ids whose delivery failure the user resolved by retrying, for the active
+   * session. A superseded row must stay hidden after the screen that hosted
+   * the retry unmounts: only a client-materialised ghost is deleted from
+   * storage, so a server-confirmed failed row is still history and would
+   * render again beside the retry's own row. The durable record seeded on open
+   * is the cross-launch source, and this projection is how the transcript
+   * filter reaches it.
+   */
+  const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get => {
+    const revision = get(resolvedDeliveryFailuresRevisionAtom);
+    if (activeSessionId === null) {
+      return EMPTY_RESOLVED_DELIVERY_FAILURES;
+    }
+    if (
+      resolvedDeliveryProjectionCache !== null &&
+      resolvedDeliveryProjectionCache.sessionId === activeSessionId &&
+      resolvedDeliveryProjectionCache.revision === revision
+    ) {
+      return resolvedDeliveryProjectionCache.value;
+    }
+    // The record is mutated in place (the live session predicate holds the same
+    // Set), and jotai compares a derived value with `Object.is`: returning the
+    // mutated Set would leave its identity unchanged and notify no subscriber.
+    // A fresh Set per revision keeps the identity stable between bumps while
+    // making a bump observable.
+    const recorded = resolvedDeliveryFailuresBySession.get(activeSessionId);
+    const value =
+      recorded === undefined || recorded.size === 0
+        ? EMPTY_RESOLVED_DELIVERY_FAILURES
+        : new Set(recorded);
+    resolvedDeliveryProjectionCache = { sessionId: activeSessionId, revision, value };
+    return value;
+  });
+
+  // Bumped whenever the active session's in-flight supersede record changes: on
+  // a mark, an unmark, an accepted resolution, a session switch, and a destroy.
+  // Same reason for a revision trigger as `resolvedDeliveryFailuresRevisionAtom`.
+  const supersededInFlightRevisionAtom = atom(0);
+  /**
+   * Memo for the read-only projection below, for the same identity reason as
+   * `resolvedDeliveryProjectionCache`.
+   */
+  let supersededInFlightProjectionCache: {
+    sessionId: KiloSessionId;
+    revision: number;
+    value: ReadonlySet<string>;
+  } | null = null;
+  /**
+   * Ids whose failed row a re-send superseded while it is still in flight, for
+   * the active session. The record is mutated in place, so a fresh Set per
+   * revision keeps the projection's identity stable between bumps while making
+   * a bump observable.
+   */
+  const supersededInFlightMessageIdsAtom = atom<ReadonlySet<string>>(get => {
+    const revision = get(supersededInFlightRevisionAtom);
+    if (activeSessionId === null) {
+      return EMPTY_SUPERSEDED_IN_FLIGHT;
+    }
+    if (
+      supersededInFlightProjectionCache !== null &&
+      supersededInFlightProjectionCache.sessionId === activeSessionId &&
+      supersededInFlightProjectionCache.revision === revision
+    ) {
+      return supersededInFlightProjectionCache.value;
+    }
+    const marked = supersededInFlightBySession.get(activeSessionId);
+    const value =
+      marked === undefined || marked.size === 0 ? EMPTY_SUPERSEDED_IN_FLIGHT : new Set(marked);
+    supersededInFlightProjectionCache = { sessionId: activeSessionId, revision, value };
+    return value;
+  });
+
   // Memoized per-row StoredMessage objects. Reused while both `info` and the
   // parts array keep the same reference, so unchanged rows keep object identity
   // across a delta on another row (React.memo relies on this).
@@ -1028,6 +1157,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * only way to reach any set.
    */
   const resolvedDeliveryFailuresBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Failed rows a re-send superseded while it is still in flight, keyed by the
+   * session that owns the row. The transcript filter needs the row hidden
+   * before the accepted resolution can be recorded, and keeping the record per
+   * session is what makes the hide survive a switch away and back — the screen
+   * that hosted the retry may not be the one that renders the row again. An
+   * entry is removed on either outcome, so this map only ever holds the
+   * sessions with a re-send in flight and needs no eviction bound.
+   */
+  const supersededInFlightBySession = new Map<KiloSessionId, Set<string>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1894,6 +2033,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return created;
   }
 
+  /**
+   * Bump the in-flight projection only for the session that owns the change:
+   * the atom projects the active session, so another session's record changes
+   * nothing a reader can see (the switch back re-derives it).
+   */
+  function bumpSupersededInFlight(ownerSessionId: KiloSessionId): void {
+    if (ownerSessionId !== activeSessionId) {
+      return;
+    }
+    store.set(supersededInFlightRevisionAtom, store.get(supersededInFlightRevisionAtom) + 1);
+  }
+
+  function markMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void {
+    const existing = supersededInFlightBySession.get(ownerSessionId);
+    if (existing === undefined) {
+      supersededInFlightBySession.set(ownerSessionId, new Set([messageId]));
+      bumpSupersededInFlight(ownerSessionId);
+      return;
+    }
+    if (existing.has(messageId)) {
+      return;
+    }
+    existing.add(messageId);
+    bumpSupersededInFlight(ownerSessionId);
+  }
+
+  function unmarkMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void {
+    const existing = supersededInFlightBySession.get(ownerSessionId);
+    if (existing === undefined || !existing.delete(messageId)) {
+      return;
+    }
+    if (existing.size === 0) {
+      supersededInFlightBySession.delete(ownerSessionId);
+    }
+    bumpSupersededInFlight(ownerSessionId);
+  }
+
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     // A retry of a failed metadata refresh must keep the transcript mounted.
     // A real session switch (or a caller without caching) still starts clean.
@@ -1911,6 +2087,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const expectedGeneration = switchGeneration;
     activeSessionId = kiloSessionId;
     activeSessionType = null;
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
+    store.set(supersededInFlightRevisionAtom, store.get(supersededInFlightRevisionAtom) + 1);
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -1932,6 +2113,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (expectedGeneration !== switchGeneration) return;
           for (const id of ids) {
             resolvedFailures.add(id);
+          }
+          if (ids.length > 0) {
+            store.set(
+              resolvedDeliveryFailuresRevisionAtom,
+              store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+            );
           }
           for (const id of ids) {
             // `clearFailedMessage` reports when the pruned entry was also the
@@ -2766,8 +2953,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // transcript's id applied to its state or atom.
     const owner = ownerSessionId ?? activeSessionId;
     if (owner === null) return;
-    if (owner === activeSessionId) {
+    const ownerIsActive = owner === activeSessionId;
+    if (ownerIsActive) {
       currentSession?.state.clearFailedMessage(messageId);
+      // A client-materialised row is a local ghost: the accepted re-send
+      // supersedes its content and materialises its own row, so leaving the
+      // original would render the prompt twice — once for the failed
+      // submission and once for the retry. Delete it outright so it stays
+      // gone across a relaunch. A confirmed row (`synthetic` undefined) is
+      // server history and must be kept.
+      const info = currentSession?.storage.getMessageInfo(messageId);
+      if (info?.role === 'user' && info.synthetic === true) {
+        currentSession?.storage.deleteMessage(messageId);
+      }
       const next = new Map(store.get(pendingMessagesAtom));
       next.delete(messageId);
       store.set(pendingMessagesAtom, next);
@@ -2780,7 +2978,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // switches back before the durable write below lands; that write is what
     // keeps the clear across a relaunch.
     resolvedFailuresForSession(owner).add(messageId);
+    // The accepted resolution replaces the in-flight mark: one record per id,
+    // and the resolved record is the one that survives a relaunch.
+    unmarkMessageSuperseded(messageId, owner);
     config.persistResolvedDeliveryFailure?.(owner, messageId);
+    // Only the active session's projection is on screen; a resolution recorded
+    // for another session changes nothing a reader can see here, and the switch
+    // back re-derives anyway.
+    if (ownerIsActive) {
+      store.set(
+        resolvedDeliveryFailuresRevisionAtom,
+        store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+      );
+    }
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -2874,8 +3084,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     clearAllAtoms();
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
+    supersededInFlightBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
+    store.set(supersededInFlightRevisionAtom, store.get(supersededInFlightRevisionAtom) + 1);
   }
 
   return {
@@ -2901,6 +3117,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     acceptSuggestion,
     dismissSuggestion,
     clearFailedMessage,
+    markMessageSuperseded,
+    unmarkMessageSuperseded,
     createAndStart,
     clearError: () => {
       store.set(errorAtom, null);
@@ -2961,6 +3179,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       olderMessagesError: olderMessagesErrorAtom,
       olderMessagesOmittedItemCount: olderMessagesOmittedItemCountAtom,
       transcriptCleared: transcriptClearedAtom,
+      resolvedDeliveryFailures: resolvedDeliveryFailuresAtom,
+      supersededInFlightMessageIds: supersededInFlightMessageIdsAtom,
     },
   };
 }

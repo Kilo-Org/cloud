@@ -2650,7 +2650,14 @@
       "replyForbiddenTerm": "Você não tem permissão para responder a este {{term}}.",
       "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
       "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
-      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima",
+      "deleteComment": "Excluir comentário",
+      "deleteCommentTitle": "Excluir comentário?",
+      "deleteCommentMessage": "Este comentário será excluído do pull request.",
+      "commentEditFailed": "Não foi possível salvar seu comentário. Verifique sua conexão e tente novamente.",
+      "commentEditUnavailable": "Este comentário não pode ser editado. Ele pode ter sido excluído.",
+      "commentDeleteFailed": "Não foi possível excluir seu comentário. Verifique sua conexão e tente novamente.",
+      "commentDeleteUnavailable": "Este comentário não pode ser excluído."
     },
     "entry": {
       "eyebrow": "Abra um pull request ou merge request pela URL",
@@ -2975,6 +2982,8 @@
     "linkPasteNotAPullRequest": "Este link não é de um pull request ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
+      "commentUpdated": "Comentário atualizado",
+      "commentDeleted": "Comentário excluído",
       "reviewSubmitted": "Revisão enviada",
       "autoMergeEnabled": "Mesclagem automática ativada"
     },

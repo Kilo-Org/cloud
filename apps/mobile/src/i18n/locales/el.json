@@ -566,7 +566,14 @@
       "deletedUser": "διαγραμμένος χρήστης",
       "replyForbiddenTerm": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το {{term}}.",
       "moreLinesAbove_one": "… υπάρχει {{displayCount}} επιπλέον γραμμή παραπάνω.",
-      "moreLinesAbove_other": "… υπάρχουν {{displayCount}} επιπλέον γραμμές παραπάνω."
+      "moreLinesAbove_other": "… υπάρχουν {{displayCount}} επιπλέον γραμμές παραπάνω.",
+      "deleteComment": "Διαγραφή σχολίου",
+      "deleteCommentTitle": "Διαγραφή σχολίου;",
+      "deleteCommentMessage": "Αυτό το σχόλιο θα διαγραφεί από το αίτημα ενσωμάτωσης.",
+      "commentEditFailed": "Δεν ήταν δυνατή η αποθήκευση του σχολίου σου. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
+      "commentEditUnavailable": "Αυτό το σχόλιο δεν μπορεί να επεξεργαστεί. Μπορεί να έχει διαγραφεί.",
+      "commentDeleteFailed": "Δεν ήταν δυνατή η διαγραφή του σχολίου σου. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
+      "commentDeleteUnavailable": "Αυτό το σχόλιο δεν μπορεί να διαγραφεί."
     },
     "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων της εφαρμογής GitHub.",
     "installKiloGitHubApp": "Εγκατάσταση της εφαρμογής Kilo για το GitHub",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος αιτήματος ενσωμάτωσης ή συγχώνευσης",
     "announce": {
       "commentPosted": "Δημοσιεύτηκε το σχόλιο",
+      "commentUpdated": "Το σχόλιο ενημερώθηκε",
+      "commentDeleted": "Το σχόλιο διαγράφηκε",
       "reviewSubmitted": "Υποβλήθηκε η αξιολόγηση",
       "autoMergeEnabled": "Η αυτόματη συγχώνευση ενεργοποιήθηκε"
     },

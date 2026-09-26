@@ -566,7 +566,14 @@
       "deletedUser": "کاربر حذف‌شده",
       "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
       "moreLinesAbove_one": "… {{displayCount}} خط دیگر در بالا",
-      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا"
+      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا",
+      "deleteComment": "حذف نظر",
+      "deleteCommentTitle": "نظر حذف شود؟",
+      "deleteCommentMessage": "این نظر از درخواست ادغام حذف می‌شود.",
+      "commentEditFailed": "ذخیرهٔ نظر شما ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "commentEditUnavailable": "این نظر قابل ویرایش نیست. ممکن است حذف شده باشد.",
+      "commentDeleteFailed": "حذف نظر شما ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "commentDeleteUnavailable": "این نظر قابل حذف نیست."
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
     "announce": {
       "commentPosted": "نظر ارسال شد",
+      "commentUpdated": "نظر به‌روزرسانی شد",
+      "commentDeleted": "نظر حذف شد",
       "reviewSubmitted": "بازبینی ارسال شد",
       "autoMergeEnabled": "ادغام خودکار فعال شد"
     },

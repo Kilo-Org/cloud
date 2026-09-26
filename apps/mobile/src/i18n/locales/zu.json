@@ -566,7 +566,14 @@
       "deletedUser": "umsebenzisi osusiwe",
       "replyForbiddenTerm": "Awunayo imvume yokuphendula ku-{{term}}.",
       "moreLinesAbove_one": "… omunye umugqa ongu-{{displayCount}} ngenhla",
-      "moreLinesAbove_other": "… eminye imigqa engu-{{displayCount}} ngenhla"
+      "moreLinesAbove_other": "… eminye imigqa engu-{{displayCount}} ngenhla",
+      "deleteComment": "Susa amazwana",
+      "deleteCommentTitle": "Susa amazwana?",
+      "deleteCommentMessage": "Lawa mazwana azosuswa esicelweni sokuhlanganisa.",
+      "commentEditFailed": "Asikwazanga ukulondoloza amazwana akho. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "commentEditUnavailable": "Lawa mazwana awakwazi ukuhlelwa. Kungenzeka asusiwe.",
+      "commentDeleteFailed": "Asikwazanga ukususa amazwana akho. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "commentDeleteUnavailable": "Lawa mazwana awakwazi ukususwa."
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo zohlelo lokusebenza lwe-GitHub.",
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Lokhu akusiso isixhumanisi se-PR noma sesicelo sokuhlanganisa",
     "announce": {
       "commentPosted": "Amazwana athunyelwe",
+      "commentUpdated": "Amazwana abuyekezwe",
+      "commentDeleted": "Amazwana asusiwe",
       "reviewSubmitted": "Ukubuyekeza kuthunyelwe",
       "autoMergeEnabled": "Ukuhlanganisa okuzenzakalelayo kuvuliwe"
     },

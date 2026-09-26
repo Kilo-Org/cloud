@@ -566,7 +566,14 @@
       "deletedUser": "itilizatè ki efase",
       "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a.",
       "moreLinesAbove_one": "Gen {{displayCount}} liy anplis pi wo a.",
-      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a."
+      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a.",
+      "deleteComment": "Efase kòmantè a",
+      "deleteCommentTitle": "Efase kòmantè a?",
+      "deleteCommentMessage": "Kòmantè sa a ap efase nan demann fizyon an.",
+      "commentEditFailed": "Nou pa t ka anrejistre kòmantè ou. Tcheke koneksyon ou epi eseye ankò.",
+      "commentEditUnavailable": "Kòmantè sa a pa ka modifye. Petèt li te efase.",
+      "commentDeleteFailed": "Nou pa t ka efase kòmantè ou. Tcheke koneksyon ou epi eseye ankò.",
+      "commentDeleteUnavailable": "Kòmantè sa a pa ka efase."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon ni merge request",
     "announce": {
       "commentPosted": "Kòmantè pibliye",
+      "commentUpdated": "Kòmantè mete ajou",
+      "commentDeleted": "Kòmantè efase",
       "reviewSubmitted": "Revizyon soumèt",
       "autoMergeEnabled": "Fizyon otomatik aktive"
     },

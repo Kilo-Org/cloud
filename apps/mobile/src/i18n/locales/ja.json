@@ -2620,7 +2620,14 @@
       "deletedUser": "削除されたユーザー",
       "replyForbiddenTerm": "この{{term}}に返信する権限がありません。",
       "moreLinesAbove_one": "… この上にさらに{{displayCount}}行あります。",
-      "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。"
+      "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。",
+      "deleteComment": "コメントを削除",
+      "deleteCommentTitle": "コメントを削除しますか?",
+      "deleteCommentMessage": "このコメントはプルリクエストから削除されます。",
+      "commentEditFailed": "コメントを保存できませんでした。接続を確認して、もう一度お試しください。",
+      "commentEditUnavailable": "このコメントは編集できません。削除された可能性があります。",
+      "commentDeleteFailed": "コメントを削除できませんでした。接続を確認して、もう一度お試しください。",
+      "commentDeleteUnavailable": "このコメントは削除できません。"
     },
     "entry": {
       "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
@@ -2933,6 +2940,8 @@
     "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",
+      "commentUpdated": "コメントを更新しました",
+      "commentDeleted": "コメントを削除しました",
       "reviewSubmitted": "レビューを送信しました",
       "autoMergeEnabled": "自動マージを有効にしました"
     },

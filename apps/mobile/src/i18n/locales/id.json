@@ -2620,7 +2620,14 @@
       "deletedUser": "pengguna yang dihapus",
       "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini.",
       "moreLinesAbove_one": "… {{displayCount}} baris lagi di atas",
-      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas"
+      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas",
+      "deleteComment": "Hapus komentar",
+      "deleteCommentTitle": "Hapus komentar?",
+      "deleteCommentMessage": "Komentar ini akan dihapus dari PR.",
+      "commentEditFailed": "Tidak dapat menyimpan komentarmu. Periksa koneksimu dan coba lagi.",
+      "commentEditUnavailable": "Komentar ini tidak dapat diedit. Mungkin sudah dihapus.",
+      "commentDeleteFailed": "Tidak dapat menghapus komentarmu. Periksa koneksimu dan coba lagi.",
+      "commentDeleteUnavailable": "Komentar ini tidak dapat dihapus."
     },
     "entry": {
       "eyebrow": "Buka PR atau merge request melalui URL",
@@ -2933,6 +2940,8 @@
     "linkPasteNotAPullRequest": "Ini bukan tautan PR atau merge request",
     "announce": {
       "commentPosted": "Komentar terkirim",
+      "commentUpdated": "Komentar diperbarui",
+      "commentDeleted": "Komentar dihapus",
       "reviewSubmitted": "Tinjauan terkirim",
       "autoMergeEnabled": "Penggabungan otomatis diaktifkan"
     },

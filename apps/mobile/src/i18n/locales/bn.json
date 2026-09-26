@@ -566,7 +566,14 @@
       "deletedUser": "মুছে ফেলা ব্যবহারকারী",
       "replyForbiddenTerm": "এই {{term}}ে উত্তর দেওয়ার অনুমতি আপনার নেই।",
       "moreLinesAbove_one": "… ওপরে আরও {{displayCount}}টি লাইন আছে।",
-      "moreLinesAbove_other": "… ওপরে আরও {{displayCount}}টি লাইন আছে।"
+      "moreLinesAbove_other": "… ওপরে আরও {{displayCount}}টি লাইন আছে।",
+      "deleteComment": "মন্তব্য মুছুন",
+      "deleteCommentTitle": "মন্তব্য মুছবেন?",
+      "deleteCommentMessage": "এই মন্তব্যটি পুল রিকোয়েস্ট থেকে মুছে ফেলা হবে।",
+      "commentEditFailed": "আপনার মন্তব্য সংরক্ষণ করা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "commentEditUnavailable": "এই মন্তব্যটি সম্পাদনা করা যাবে না। এটি মুছে ফেলা হয়ে থাকতে পারে।",
+      "commentDeleteFailed": "আপনার মন্তব্য মুছে ফেলা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "commentDeleteUnavailable": "এই মন্তব্যটি মুছে ফেলা যাবে না।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "এটি পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক নয়",
     "announce": {
       "commentPosted": "মন্তব্য পোস্ট হয়েছে",
+      "commentUpdated": "মন্তব্য আপডেট হয়েছে",
+      "commentDeleted": "মন্তব্য মুছে ফেলা হয়েছে",
       "reviewSubmitted": "রিভিউ জমা হয়েছে",
       "autoMergeEnabled": "অটো-মার্জ চালু হয়েছে"
     },

@@ -2620,7 +2620,14 @@
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
       "moreLinesAbove_one": "… Hierboven staan nog regels: {{displayCount}}.",
-      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
+      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}.",
+      "deleteComment": "Opmerking verwijderen",
+      "deleteCommentTitle": "Opmerking verwijderen?",
+      "deleteCommentMessage": "Deze opmerking wordt uit de PR verwijderd.",
+      "commentEditFailed": "Je opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.",
+      "commentEditUnavailable": "Deze opmerking kan niet worden bewerkt. Mogelijk is deze verwijderd.",
+      "commentDeleteFailed": "Je opmerking kon niet worden verwijderd. Controleer je verbinding en probeer het opnieuw.",
+      "commentDeleteUnavailable": "Deze opmerking kan niet worden verwijderd."
     },
     "entry": {
       "eyebrow": "Open een PR of merge request via een URL",
@@ -2933,6 +2940,8 @@
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
     "announce": {
       "commentPosted": "Opmerking geplaatst",
+      "commentUpdated": "Opmerking bijgewerkt",
+      "commentDeleted": "Opmerking verwijderd",
       "reviewSubmitted": "Beoordeling verzonden",
       "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
     },

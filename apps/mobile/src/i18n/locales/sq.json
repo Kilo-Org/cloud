@@ -566,7 +566,14 @@
       "deletedUser": "përdorues i fshirë",
       "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} rresht tjetër më sipër",
-      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër"
+      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër",
+      "deleteComment": "Fshi komentin",
+      "deleteCommentTitle": "Të fshihet komenti?",
+      "deleteCommentMessage": "Ky koment do të fshihet nga kërkesa për bashkim.",
+      "commentEditFailed": "Nuk u arrit të ruhej komenti yt. Kontrollo lidhjen dhe provo përsëri.",
+      "commentEditUnavailable": "Ky koment nuk mund të redaktohet. Mund të jetë fshirë.",
+      "commentDeleteFailed": "Nuk u arrit të fshihej komenti yt. Kontrollo lidhjen dhe provo përsëri.",
+      "commentDeleteUnavailable": "Ky koment nuk mund të fshihet."
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Kjo nuk është lidhje për një kërkesë për bashkim ose kërkesë integrimi",
     "announce": {
       "commentPosted": "Komenti u postua",
+      "commentUpdated": "Komenti u përditësua",
+      "commentDeleted": "Komenti u fshi",
       "reviewSubmitted": "Rishikimi u dërgua",
       "autoMergeEnabled": "Bashkimi automatik u aktivizua"
     },

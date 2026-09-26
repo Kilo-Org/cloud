@@ -566,7 +566,14 @@
       "deletedUser": "isticmaale la tirtiray",
       "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
-      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya."
+      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
+      "deleteComment": "Tirtir faallada",
+      "deleteCommentTitle": "Tirtir faallada?",
+      "deleteCommentMessage": "Faalladan waxaa laga tirtiri doonaa codsiga isku-darka.",
+      "commentEditFailed": "Faaladaada lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "commentEditUnavailable": "Faalladan lama tafatiri karo. Waxaa laga yaabaa in la tirtiray.",
+      "commentDeleteFailed": "Faaladaada lama tirtiri karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "commentDeleteUnavailable": "Faalladan lama tirtiri karo."
     },
     "couldNotOpenGitHubAppSettings": "Dejinta abka GitHub lama furi karin.",
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",
+      "commentUpdated": "Faallada waa la cusboonaysiiyay",
+      "commentDeleted": "Faallada waa la tirtiray",
       "reviewSubmitted": "Dib-u-eegista waa la gudbiyay",
       "autoMergeEnabled": "Isku-darka tooska ah waa la daaray"
     },

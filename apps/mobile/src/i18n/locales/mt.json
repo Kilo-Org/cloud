@@ -599,7 +599,14 @@
       "moreLinesAbove_other": "… {{displayCount}} linji oħra 'l fuq.",
       "moreLinesAbove_two": "… {{displayCount}} linji oħra 'l fuq.",
       "moreLinesAbove_few": "… {{displayCount}} linji oħra 'l fuq.",
-      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq."
+      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq.",
+      "deleteComment": "Ħassar il-kumment",
+      "deleteCommentTitle": "Ħassar il-kumment?",
+      "deleteCommentMessage": "Dan il-kumment se jiġi mħassar mit-talba għall-għaqda.",
+      "commentEditFailed": "Ma setax jiġi ssejvjat il-kumment tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "commentEditUnavailable": "Dan il-kumment ma jistax jiġi editjat. Jista' jkun li ġie mħassar.",
+      "commentDeleteFailed": "Ma setax jiġi mħassar il-kumment tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "commentDeleteUnavailable": "Dan il-kumment ma jistax jiġi mħassar."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
@@ -795,6 +802,8 @@
     "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
     "announce": {
       "commentPosted": "Il-kumment ġie ppubblikat",
+      "commentUpdated": "Il-kumment ġie aġġornat",
+      "commentDeleted": "Il-kumment ġie mħassar",
       "reviewSubmitted": "Ir-reviżjoni ntbagħtet",
       "autoMergeEnabled": "L-għaqda awtomatika ġiet attivata"
     },

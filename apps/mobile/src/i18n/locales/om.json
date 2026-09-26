@@ -566,7 +566,14 @@
       "deletedUser": "fayyadamaa haqame",
       "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
       "moreLinesAbove_one": "… Sararoonni dabalataa {{displayCount}} ol jiru.",
-      "moreLinesAbove_other": "… Sararoonni dabalataa {{displayCount}} ol jiru."
+      "moreLinesAbove_other": "… Sararoonni dabalataa {{displayCount}} ol jiru.",
+      "deleteComment": "Yaada haqi",
+      "deleteCommentTitle": "Yaada haquu?",
+      "deleteCommentMessage": "Yaadni kun gaaffii walitti makuu keessaa haqama.",
+      "commentEditFailed": "Yaada kee kuusuu hin dandeenye. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+      "commentEditUnavailable": "Yaadni kun gulaalamuu hin danda'u. Haqameera ta'a.",
+      "commentDeleteFailed": "Yaada kee haquu hin dandeenye. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+      "commentDeleteUnavailable": "Yaadni kun haqamuu hin danda'u."
     },
     "couldNotOpenGitHubAppSettings": "Qindaa'ina appii GitHub banuun hin danda'amne.",
     "installKiloGitHubApp": "Appii Kilo GitHub fe'i",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Liinkii gaaffii walitti makuu miti",
     "announce": {
       "commentPosted": "Yaadni maxxanfameera",
+      "commentUpdated": "Yaadni haaromfameera",
+      "commentDeleted": "Yaadni haqameera",
       "reviewSubmitted": "Gamaaggamni dhiheeffameera",
       "autoMergeEnabled": "Ofumaan walitti makuun hojii irra ooleera"
     },

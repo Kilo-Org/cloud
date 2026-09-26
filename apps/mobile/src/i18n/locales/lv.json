@@ -577,7 +577,14 @@
       "replyForbiddenTerm": "Tev nav atļaujas atbildēt uz {{term}}.",
       "moreLinesAbove_one": "Augstāk ir vēl citas rindas: {{displayCount}}.",
       "moreLinesAbove_other": "Augstāk ir vēl citas rindas: {{displayCount}}.",
-      "moreLinesAbove_zero": "Augstāk ir vēl citas rindas: {{displayCount}}."
+      "moreLinesAbove_zero": "Augstāk ir vēl citas rindas: {{displayCount}}.",
+      "deleteComment": "Dzēst komentāru",
+      "deleteCommentTitle": "Dzēst komentāru?",
+      "deleteCommentMessage": "Šis komentārs tiks dzēsts no izmaiņu pieprasījuma.",
+      "commentEditFailed": "Neizdevās saglabāt tavu komentāru. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "commentEditUnavailable": "Šo komentāru nevar rediģēt. Iespējams, tas ir dzēsts.",
+      "commentDeleteFailed": "Neizdevās dzēst tavu komentāru. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "commentDeleteUnavailable": "Šo komentāru nevar dzēst."
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
@@ -763,6 +770,8 @@
     "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",
+      "commentUpdated": "Komentārs atjaunināts",
+      "commentDeleted": "Komentārs dzēsts",
       "reviewSubmitted": "Vērtējums iesniegts",
       "autoMergeEnabled": "Automātiskā apvienošana iespējota"
     },

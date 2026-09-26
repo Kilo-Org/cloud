@@ -15,6 +15,14 @@
 // User actions are hidden when the author is null (deleted account)
 // and disabled when the author is the viewer (self-target).
 //
+// The viewer's OWN comment (s4) additionally offers Edit comment and
+// Delete comment, wired by the Discussion tab through the optional
+// `onEditComment` / `onDeleteComment` callbacks. When those are present
+// the self-target moderation trio is dropped instead of rendered
+// disabled — the row can never use it on itself. A read-only provider
+// row passes neither callback and keeps today's menu exactly, so no
+// author/scope combination ever shows a dead affordance.
+//
 // The trailing group beside that menu is the "Fix with Kilo" CTA
 // (`PrCommentFixWithKilo`): it opens the new-session composer prefilled
 // with this comment's link, scoped to the provider surface the row is on,
@@ -62,6 +70,13 @@ type CommentRowProps = {
   readonly reactionsSupported?: boolean;
   /** The viewer's GitHub login, used to disable self-target moderation. */
   readonly viewerLogin?: string | null;
+  /**
+   * Edit this comment (s4). Wired only for the viewer's own comment on the
+   * GitHub write surface; absent on a read-only provider scope.
+   */
+  readonly onEditComment?: () => void;
+  /** Delete this comment (s4). Same wiring and gating as `onEditComment`. */
+  readonly onDeleteComment?: () => void;
 };
 
 export function CommentRow({
@@ -75,6 +90,8 @@ export function CommentRow({
   readOnly,
   reactionsSupported = true,
   viewerLogin = null,
+  onEditComment,
+  onDeleteComment,
 }: Readonly<CommentRowProps>) {
   const authorName = selectCommentAuthorName(comment.author);
   const timestamp = parseTimestamp(comment.createdAt);
@@ -93,8 +110,18 @@ export function CommentRow({
       viewerLogin !== null &&
       author.login.toLowerCase() === viewerLogin.toLowerCase();
     // oxlint-enable typescript-eslint/prefer-optional-chain
+    // The viewer's own comment: Edit / Delete lead the menu and the
+    // self-target moderation trio is dropped — it can never be used on
+    // yourself, so three disabled entries would be a dead affordance. Without
+    // both callbacks (a read-only provider row) nothing is replaced and the
+    // menu keeps today's shape, disabled trio included.
+    const ownActions: { label: string; run: () => void }[] = [];
+    if (isSelf && onEditComment !== undefined && onDeleteComment !== undefined) {
+      ownActions.push({ label: t('prReview.composer.editTitle'), run: onEditComment });
+      ownActions.push({ label: t('prReview.discussion.deleteComment'), run: onDeleteComment });
+    }
     const userActions: { label: string; run: () => void }[] = [];
-    if (author !== null) {
+    if (author !== null && ownActions.length === 0) {
       userActions.push({
         label: t('prReview.discussion.reportUser'),
         run: () => {
@@ -114,12 +141,18 @@ export function CommentRow({
         },
       });
     }
+    // Explicit index arithmetic: own actions occupy [0, ownActions.length),
+    // report content sits at `reportContentIndex`, the user actions follow.
+    const reportContentIndex = ownActions.length;
     const options = [
+      ...ownActions.map(action => action.label),
       t('prReview.discussion.reportContent'),
       ...userActions.map(action => action.label),
       t('common.cancel'),
     ];
-    const disabledButtonIndices = isSelf ? userActions.map((_, index) => 1 + index) : [];
+    const disabledButtonIndices = isSelf
+      ? userActions.map((_, index) => reportContentIndex + 1 + index)
+      : [];
     showActionSheetWithOptions(
       {
         ...themedSheet,
@@ -131,11 +164,16 @@ export function CommentRow({
         if (index === undefined) {
           return;
         }
-        if (index === 0) {
+        const own = ownActions[index];
+        if (own !== undefined) {
+          own.run();
+          return;
+        }
+        if (index === reportContentIndex) {
           moderation.report({ action: 'report-content', commentId: comment.commentId });
           return;
         }
-        userActions[index - 1]?.run();
+        userActions[index - reportContentIndex - 1]?.run();
       }
     );
   }

@@ -115,6 +115,56 @@ export function buildReplyToCommentParams(input: ReplyToCommentInput) {
   };
 }
 
+// `pulls.updateReviewComment` / `issues.updateComment` body. Both endpoints
+// take the same field names, so one input type feeds the two builders.
+export type UpdateCommentParamsInput = {
+  owner: string;
+  repo: string;
+  commentId: number;
+  body: string;
+};
+
+export function buildUpdateReviewCommentParams(input: UpdateCommentParamsInput) {
+  return {
+    owner: input.owner,
+    repo: input.repo,
+    comment_id: input.commentId,
+    body: input.body,
+  };
+}
+
+export function buildUpdateIssueCommentParams(input: UpdateCommentParamsInput) {
+  return {
+    owner: input.owner,
+    repo: input.repo,
+    comment_id: input.commentId,
+    body: input.body,
+  };
+}
+
+// `pulls.deleteReviewComment` / `issues.deleteComment` body.
+export type DeleteCommentParamsInput = {
+  owner: string;
+  repo: string;
+  commentId: number;
+};
+
+export function buildDeleteReviewCommentParams(input: DeleteCommentParamsInput) {
+  return {
+    owner: input.owner,
+    repo: input.repo,
+    comment_id: input.commentId,
+  };
+}
+
+export function buildDeleteIssueCommentParams(input: DeleteCommentParamsInput) {
+  return {
+    owner: input.owner,
+    repo: input.repo,
+    comment_id: input.commentId,
+  };
+}
+
 // `pulls.createReview` body. The mobile client queues a small batch of
 // comments and submits them in one call together with an event.
 export type SubmitReviewInput = {

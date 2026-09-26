@@ -2620,7 +2620,14 @@
       "deletedUser": "已删除的用户",
       "replyForbiddenTerm": "你无权回复此{{term}}。",
       "moreLinesAbove_one": "上方还有 {{displayCount}} 行。",
-      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。"
+      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。",
+      "deleteComment": "删除评论",
+      "deleteCommentTitle": "删除评论？",
+      "deleteCommentMessage": "此评论将从拉取请求中删除。",
+      "commentEditFailed": "无法保存你的评论。请检查网络连接后重试。",
+      "commentEditUnavailable": "无法编辑此评论。它可能已被删除。",
+      "commentDeleteFailed": "无法删除你的评论。请检查网络连接后重试。",
+      "commentDeleteUnavailable": "无法删除此评论。"
     },
     "entry": {
       "eyebrow": "通过 URL 打开拉取请求或合并请求",
@@ -2933,6 +2940,8 @@
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
       "commentPosted": "评论已发布",
+      "commentUpdated": "评论已更新",
+      "commentDeleted": "评论已删除",
       "reviewSubmitted": "审查已提交",
       "autoMergeEnabled": "已开启自动合并"
     },

@@ -56,13 +56,15 @@ export function buildPrReviewDiscussionThreadsQueryOptions(
 }
 
 /**
- * Keep the first-page conversation comments across the retention trim.
+ * Fallback used once the retention trim has evicted page one.
  *
  * The backend returns conversation comments on the first page only; later
  * pages carry `conversation: []`. Once `maxPages` trims the oldest page,
  * `pages[0]` is no longer the first page, so reading `pages[0].conversation`
  * would erase the comments. Prefer the current first page's conversation when
- * it is non-empty; otherwise fall back to the retained value.
+ * it is non-empty; otherwise fall back to the retained value. While page one
+ * IS loaded the caller uses its value directly (see
+ * `retainConversationAcrossMounts`), including when it is empty.
  */
 export function retainConversation<C>(
   pages: readonly { conversation: readonly C[] }[] | undefined,
@@ -78,20 +80,30 @@ export function retainConversation<C>(
 // providers never share one entry.
 const conversationRetention = new Map<string, readonly ConversationComment[]>();
 
+// Shared empty reference so an empty first page keeps a stable identity across
+// renders instead of a fresh `[]` literal on every call.
+const EMPTY_CONVERSATION: readonly ConversationComment[] = [];
+
 /**
  * Read and update the retained first-page conversation for one PR.
  *
- * Prefer the current first page's conversation when it is non-empty;
- * otherwise fall back to the previously retained value. Writes the value
- * back when it changed so a later mount (over the trimmed cache) still
- * reads it.
+ * `firstPageLoaded` tells the two cases apart. When the live first page is
+ * loaded (`pages[0]` is page one), it is the source of truth — including when
+ * it is empty, so deleting the last conversation comment empties the
+ * discussion and a later eviction still reads that empty truth. Only once the
+ * retention trim has evicted page one (later pages carry `conversation: []` by
+ * backend contract) does the retained copy become the source, so the comments
+ * survive the trim and the tab's unmount/remount cycle.
  */
 export function retainConversationAcrossMounts(
   key: string,
-  pages: readonly { conversation: readonly ConversationComment[] }[] | undefined
+  pages: readonly { conversation: readonly ConversationComment[] }[] | undefined,
+  firstPageLoaded: boolean
 ): readonly ConversationComment[] {
-  const retained = conversationRetention.get(key) ?? [];
-  const conversation = retainConversation(pages, retained);
+  const retained = conversationRetention.get(key) ?? EMPTY_CONVERSATION;
+  const conversation = firstPageLoaded
+    ? (pages?.[0]?.conversation ?? EMPTY_CONVERSATION)
+    : retainConversation(pages, retained);
   if (conversation !== retained) {
     conversationRetention.set(key, conversation);
   }
@@ -111,6 +123,12 @@ export function usePrReviewDiscussionThreads(args: {
   );
 
   const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
+  // Neither arm sets `initialPageParam`, so page one's `pageParam` is
+  // `undefined`, and the retention trim evicts `pages` and `pageParams`
+  // together. `pageParams[0] === undefined` therefore holds exactly when
+  // `pages[0]` is page one — the signal that tells the live-first-page case
+  // apart from the evicted one.
+  const firstPageLoaded = hasLoadedPages && query.data?.pageParams[0] === undefined;
   const firstPagePending = query.isPending;
   const firstPageErrorState =
     !firstPagePending && !hasLoadedPages && query.error
@@ -132,10 +150,15 @@ export function usePrReviewDiscussionThreads(args: {
 
   // Conversation comments live only on the first page. Retention trims the
   // oldest page once the bound is exceeded, which would erase the comments if
-  // we read `pages[0]` directly. Keep the last non-empty conversation in a
-  // module-level store keyed by the PR identity so it survives both the trim
-  // and the tab's unmount/remount cycle.
-  const conversation = retainConversationAcrossMounts(providerPrRefKey(scope.ref), pages);
+  // we read `pages[0]` directly. While page one is loaded it is the truth
+  // (including an empty one, so a deleted last comment empties the
+  // discussion); once it is evicted, the module-level store keeps the last
+  // first-page value across both the trim and the tab's unmount/remount cycle.
+  const conversation = retainConversationAcrossMounts(
+    providerPrRefKey(scope.ref),
+    pages,
+    firstPageLoaded
+  );
 
   return {
     query,

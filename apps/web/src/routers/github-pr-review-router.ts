@@ -39,6 +39,7 @@ import {
   REVIEW_THREADS_PAGE_SIZE,
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
+import { classifyGitHubHttpError } from '@/lib/github-pr-review/errors';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -49,7 +50,9 @@ import {
   ReviewSideSchema,
   buildAddReactionVariables,
   buildCreateReviewCommentParams,
+  buildDeleteIssueCommentParams,
   buildDeleteRefParams,
+  buildDeleteReviewCommentParams,
   buildDisableAutoMergeVariables,
   buildEnableAutoMergeVariables,
   buildMergePullRequestParams,
@@ -59,6 +62,8 @@ import {
   buildSubmitReviewParams,
   buildUnresolveThreadVariables,
   buildUpdateBranchParams,
+  buildUpdateIssueCommentParams,
+  buildUpdateReviewCommentParams,
 } from '@/lib/github-pr-review/mutations';
 
 const ownerRepoRegex = /^[A-Za-z0-9_.-]+$/;
@@ -159,6 +164,28 @@ const AddIssueCommentInput = ownerRepoSchema
     number: prNumberSchema,
     body: z.string().min(1).max(65_535),
     operationKey: operationKeySchema,
+  })
+  .strict();
+
+// A posted PR comment is either an inline review comment (`pulls.*`) or a PR
+// conversation/issue comment (`issues.*`). The two endpoints take the same
+// `comment_id`, so the client only has to say which kind it is editing.
+const CommentKindSchema = z.enum(['review', 'conversation']);
+
+const UpdateCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    commentId: z.number().int().positive(),
+    kind: CommentKindSchema,
+    body: z.string().min(1).max(65_535),
+  })
+  .strict();
+
+const DeleteCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    commentId: z.number().int().positive(),
+    kind: CommentKindSchema,
   })
   .strict();
 
@@ -1856,6 +1883,92 @@ export const githubPrReviewRouter = createTRPCRouter({
         return { commentId: response.data.id, nodeId: response.data.node_id };
       },
     });
+  }),
+
+  // Edit a posted comment the viewer owns. Unledgered, exactly like
+  // `resolveThread`: the update is idempotent (same body → same state), so a
+  // retry after a lost response is safe without an operation key. The UGC gate
+  // still runs because an edit publishes new text. GitHub-only: GitLab and
+  // Bitbucket have no note-edit seam, so the mobile surface withholds the
+  // affordance there.
+  updateComment: baseProcedure.input(UpdateCommentInput).mutation(async ({ ctx, input }) => {
+    await assertTermsAccepted(ctx.user.id);
+    return withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const response =
+          input.kind === 'review'
+            ? await octokit.pulls.updateReviewComment(
+                buildUpdateReviewCommentParams({
+                  owner: input.owner,
+                  repo: input.repo,
+                  commentId: input.commentId,
+                  body: input.body,
+                })
+              )
+            : await octokit.issues.updateComment(
+                buildUpdateIssueCommentParams({
+                  owner: input.owner,
+                  repo: input.repo,
+                  commentId: input.commentId,
+                  body: input.body,
+                })
+              );
+        return {
+          commentId: response.data.id,
+          nodeId: response.data.node_id,
+          body: response.data.body,
+        };
+      },
+    });
+  }),
+
+  // Delete a posted comment the viewer owns. Unledgered for the same reason as
+  // `updateComment` plus one more: GitHub 404s an already-deleted comment, so a
+  // retry whose first response was lost is treated as success instead of
+  // surfacing a failure for work that already happened (idempotent delete).
+  // A bare 404 is not proof of that, though: GitHub returns the same status for
+  // a missing PR / repo or a repo the App cannot see, so the write confirms the
+  // PR itself is still reachable before reporting the delete as done. When it
+  // is not, the 404 propagates and the client sees the real failure.
+  deleteComment: baseProcedure.input(DeleteCommentInput).mutation(async ({ ctx, input }) => {
+    await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        try {
+          if (input.kind === 'review') {
+            await octokit.pulls.deleteReviewComment(
+              buildDeleteReviewCommentParams({
+                owner: input.owner,
+                repo: input.repo,
+                commentId: input.commentId,
+              })
+            );
+          } else {
+            await octokit.issues.deleteComment(
+              buildDeleteIssueCommentParams({
+                owner: input.owner,
+                repo: input.repo,
+                commentId: input.commentId,
+              })
+            );
+          }
+        } catch (error) {
+          if (classifyGitHubHttpError(error).code !== 'NOT_FOUND') {
+            throw error;
+          }
+          // Same 404 boundary as a non-matching comment: a reachable PR means
+          // the comment is gone; a failing read rethrows the provider error,
+          // which the wrapper classifies as NOT_FOUND.
+          await octokit.pulls.get({
+            owner: input.owner,
+            repo: input.repo,
+            pull_number: input.number,
+          });
+        }
+      },
+    });
+    return { commentId: input.commentId, deleted: true };
   }),
 
   // Submit a pending review with an optional batch of inline comments and

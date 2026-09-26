@@ -577,7 +577,14 @@
       "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} línia més amunt",
       "moreLinesAbove_other": "… {{displayCount}} línies més amunt",
-      "moreLinesAbove_many": "… {{displayCount}} línies més amunt"
+      "moreLinesAbove_many": "… {{displayCount}} línies més amunt",
+      "deleteComment": "Elimina el comentari",
+      "deleteCommentTitle": "Eliminar el comentari?",
+      "deleteCommentMessage": "Aquest comentari s'eliminarà de la sol·licitud d'integració.",
+      "commentEditFailed": "No s'ha pogut desar el teu comentari. Comprova la connexió i torna-ho a provar.",
+      "commentEditUnavailable": "Aquest comentari no es pot editar. Pot ser que s'hagi eliminat.",
+      "commentDeleteFailed": "No s'ha pogut eliminar el teu comentari. Comprova la connexió i torna-ho a provar.",
+      "commentDeleteUnavailable": "Aquest comentari no es pot eliminar."
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
@@ -763,6 +770,8 @@
     "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració o de fusió",
     "announce": {
       "commentPosted": "Comentari publicat",
+      "commentUpdated": "Comentari actualitzat",
+      "commentDeleted": "Comentari eliminat",
       "reviewSubmitted": "Revisió enviada",
       "autoMergeEnabled": "Fusió automàtica activada"
     },

@@ -2740,7 +2740,14 @@
       "moreLinesAbove_zero": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_two": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_few": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
-      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}."
+      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "deleteComment": "حذف التعليق",
+      "deleteCommentTitle": "حذف التعليق؟",
+      "deleteCommentMessage": "سيُحذف هذا التعليق من طلب السحب.",
+      "commentEditFailed": "تعذّر حفظ تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
+      "commentEditUnavailable": "لا يمكن تعديل هذا التعليق. ربما حُذف.",
+      "commentDeleteFailed": "تعذّر حذف تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
+      "commentDeleteUnavailable": "لا يمكن حذف هذا التعليق."
     },
     "entry": {
       "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
@@ -3101,6 +3108,8 @@
     "linkPasteNotAPullRequest": "هذا ليس رابط طلب سحب أو طلب دمج",
     "announce": {
       "commentPosted": "تم نشر التعليق",
+      "commentUpdated": "تم تحديث التعليق",
+      "commentDeleted": "تم حذف التعليق",
       "reviewSubmitted": "تم إرسال المراجعة",
       "autoMergeEnabled": "تم تفعيل الدمج التلقائي"
     },

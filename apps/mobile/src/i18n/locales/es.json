@@ -2650,7 +2650,14 @@
       "replyForbiddenTerm": "No tienes permiso para responder a {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} línea más arriba",
       "moreLinesAbove_other": "… {{displayCount}} líneas más arriba",
-      "moreLinesAbove_many": "… {{displayCount}} líneas más arriba"
+      "moreLinesAbove_many": "… {{displayCount}} líneas más arriba",
+      "deleteComment": "Eliminar comentario",
+      "deleteCommentTitle": "¿Eliminar el comentario?",
+      "deleteCommentMessage": "Este comentario se eliminará de la PR.",
+      "commentEditFailed": "No se pudo guardar tu comentario. Comprueba tu conexión e inténtalo de nuevo.",
+      "commentEditUnavailable": "Este comentario no se puede editar. Es posible que se haya eliminado.",
+      "commentDeleteFailed": "No se pudo eliminar tu comentario. Comprueba tu conexión e inténtalo de nuevo.",
+      "commentDeleteUnavailable": "Este comentario no se puede eliminar."
     },
     "entry": {
       "eyebrow": "Abre una PR o una merge request mediante su URL",
@@ -2975,6 +2982,8 @@
     "linkPasteNotAPullRequest": "No es un enlace a una PR o una merge request",
     "announce": {
       "commentPosted": "Comentario publicado",
+      "commentUpdated": "Comentario actualizado",
+      "commentDeleted": "Comentario eliminado",
       "reviewSubmitted": "Revisión enviada",
       "autoMergeEnabled": "Fusión automática activada"
     },

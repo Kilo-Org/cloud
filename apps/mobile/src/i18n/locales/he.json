@@ -2650,7 +2650,14 @@
       "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה.",
       "moreLinesAbove_one": "… עוד {{displayCount}} שורה למעלה.",
       "moreLinesAbove_other": "… עוד {{displayCount}} שורות למעלה.",
-      "moreLinesAbove_two": "… עוד {{displayCount}} שורות למעלה."
+      "moreLinesAbove_two": "… עוד {{displayCount}} שורות למעלה.",
+      "deleteComment": "מחיקת תגובה",
+      "deleteCommentTitle": "למחוק את התגובה?",
+      "deleteCommentMessage": "התגובה הזו תימחק מבקשת המשיכה.",
+      "commentEditFailed": "שמירת התגובה שלך נכשלה. בדוק את החיבור ונסה שוב.",
+      "commentEditUnavailable": "לא ניתן לערוך את התגובה הזו. ייתכן שהיא נמחקה.",
+      "commentDeleteFailed": "מחיקת התגובה שלך נכשלה. בדוק את החיבור ונסה שוב.",
+      "commentDeleteUnavailable": "לא ניתן למחוק את התגובה הזו."
     },
     "entry": {
       "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
@@ -2975,6 +2982,8 @@
     "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
     "announce": {
       "commentPosted": "התגובה פורסמה",
+      "commentUpdated": "התגובה עודכנה",
+      "commentDeleted": "התגובה נמחקה",
       "reviewSubmitted": "הסקירה נשלחה",
       "autoMergeEnabled": "מיזוג אוטומטי הופעל"
     },

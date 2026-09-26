@@ -2650,7 +2650,14 @@
       "replyForbiddenTerm": "Vous n'avez pas l'autorisation de répondre à {{term}}.",
       "moreLinesAbove_one": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
       "moreLinesAbove_other": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
-      "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}."
+      "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
+      "deleteComment": "Supprimer le commentaire",
+      "deleteCommentTitle": "Supprimer le commentaire ?",
+      "deleteCommentMessage": "Ce commentaire sera supprimé de la demande de fusion.",
+      "commentEditFailed": "Impossible d'enregistrer votre commentaire. Vérifiez votre connexion et réessayez.",
+      "commentEditUnavailable": "Ce commentaire ne peut pas être modifié. Il a peut-être été supprimé.",
+      "commentDeleteFailed": "Impossible de supprimer votre commentaire. Vérifiez votre connexion et réessayez.",
+      "commentDeleteUnavailable": "Ce commentaire ne peut pas être supprimé."
     },
     "entry": {
       "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
@@ -2975,6 +2982,8 @@
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de PR ou de merge request",
     "announce": {
       "commentPosted": "Commentaire publié",
+      "commentUpdated": "Commentaire mis à jour",
+      "commentDeleted": "Commentaire supprimé",
       "reviewSubmitted": "Revue envoyée",
       "autoMergeEnabled": "Fusion automatique activée"
     },

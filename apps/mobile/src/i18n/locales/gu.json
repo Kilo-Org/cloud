@@ -566,7 +566,14 @@
       "deletedUser": "કાઢી નાખેલો વપરાશકર્તા",
       "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી.",
       "moreLinesAbove_one": "… ઉપર વધુ {{displayCount}} લીટી છે.",
-      "moreLinesAbove_other": "… ઉપર વધુ {{displayCount}} લીટીઓ છે."
+      "moreLinesAbove_other": "… ઉપર વધુ {{displayCount}} લીટીઓ છે.",
+      "deleteComment": "ટિપ્પણી દૂર કરો",
+      "deleteCommentTitle": "ટિપ્પણી દૂર કરવી?",
+      "deleteCommentMessage": "આ ટિપ્પણી પુલ રિક્વેસ્ટમાંથી દૂર કરવામાં આવશે.",
+      "commentEditFailed": "તમારી ટિપ્પણી સાચવી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "commentEditUnavailable": "આ ટિપ્પણીમાં ફેરફાર કરી શકાતો નથી. તે દૂર કરવામાં આવી હોઈ શકે છે.",
+      "commentDeleteFailed": "તમારી ટિપ્પણી દૂર કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "commentDeleteUnavailable": "આ ટિપ્પણી દૂર કરી શકાતી નથી."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ઍપનાં સેટિંગ્સ ખોલી શકાયાં નહીં.",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક નથી",
     "announce": {
       "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
+      "commentUpdated": "ટિપ્પણી અપડેટ થઈ",
+      "commentDeleted": "ટિપ્પણી દૂર કરવામાં આવી",
       "reviewSubmitted": "સમીક્ષા મોકલાઈ",
       "autoMergeEnabled": "ઓટો-મર્જ ચાલુ થયું"
     },

@@ -2620,7 +2620,14 @@
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
       "moreLinesAbove_one": "… Còn {{displayCount}} dòng ở trên.",
-      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
+      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên.",
+      "deleteComment": "Xóa bình luận",
+      "deleteCommentTitle": "Xóa bình luận?",
+      "deleteCommentMessage": "Bình luận này sẽ bị xóa khỏi PR.",
+      "commentEditFailed": "Không thể lưu bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentEditUnavailable": "Không thể chỉnh sửa bình luận này. Có thể nó đã bị xóa.",
+      "commentDeleteFailed": "Không thể xóa bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentDeleteUnavailable": "Không thể xóa bình luận này."
     },
     "entry": {
       "eyebrow": "Mở PR hoặc merge request bằng URL",
@@ -2933,6 +2940,8 @@
     "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",
+      "commentUpdated": "Đã cập nhật bình luận",
+      "commentDeleted": "Đã xóa bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
       "autoMergeEnabled": "Đã bật tự động hợp nhất"
     },

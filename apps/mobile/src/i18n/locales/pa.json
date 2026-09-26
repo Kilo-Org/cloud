@@ -566,7 +566,14 @@
       "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
       "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moreLinesAbove_one": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨ ਹੈ।",
-      "moreLinesAbove_other": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ ਹਨ।"
+      "moreLinesAbove_other": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ ਹਨ।",
+      "deleteComment": "ਟਿੱਪਣੀ ਮਿਟਾਓ",
+      "deleteCommentTitle": "ਟਿੱਪਣੀ ਮਿਟਾਉਣੀ?",
+      "deleteCommentMessage": "ਇਹ ਟਿੱਪਣੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਤੋਂ ਮਿਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
+      "commentEditFailed": "ਤੁਹਾਡੀ ਟਿੱਪਣੀ ਸੰਭਾਲੀ ਨਹੀਂ ਜਾ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "commentEditUnavailable": "ਇਹ ਟਿੱਪਣੀ ਸੋਧੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਮਿਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ।",
+      "commentDeleteFailed": "ਤੁਹਾਡੀ ਟਿੱਪਣੀ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "commentDeleteUnavailable": "ਇਹ ਟਿੱਪਣੀ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕਦੀ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀਆਂ।",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ",
     "announce": {
       "commentPosted": "ਟਿੱਪਣੀ ਪੋਸਟ ਹੋ ਗਈ",
+      "commentUpdated": "ਟਿੱਪਣੀ ਅੱਪਡੇਟ ਹੋਈ",
+      "commentDeleted": "ਟਿੱਪਣੀ ਮਿਟਾਈ ਗਈ",
       "reviewSubmitted": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਹੋ ਗਈ",
       "autoMergeEnabled": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਹੋ ਗਿਆ"
     },

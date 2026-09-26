@@ -937,9 +937,6 @@ importers:
       '@octokit/auth-app':
         specifier: 'catalog:'
         version: 8.2.0
-      '@octokit/oauth-methods':
-        specifier: 6.0.2
-        version: 6.0.2
       '@octokit/rest':
         specifier: 22.0.1
         version: 22.0.1
@@ -1027,9 +1024,6 @@ importers:
       '@simplewebauthn/server':
         specifier: 14.0.1
         version: 14.0.1
-      '@slack/oauth':
-        specifier: 3.0.5
-        version: 3.0.5
       '@slack/types':
         specifier: 2.21.1
         version: 2.21.1
@@ -9211,10 +9205,6 @@ packages:
   '@slack/logger@4.0.1':
     resolution: {integrity: sha512-6cmdPrV/RYfd2U0mDGiMK8S7OJqpCTm7enMLRR3edccsPX8j7zXTLnaEF4fhxxJJTAIOil6+qZrnUPTuaLvwrQ==}
     engines: {node: '>= 18', npm: '>= 8.6.0'}
-
-  '@slack/oauth@3.0.5':
-    resolution: {integrity: sha512-exqFQySKhNDptWYSWhvRUJ4/+ndu2gayIy7vg/JfmJq3wGtGdHk531P96fAZyBm5c1Le3yaPYqv92rL4COlU3A==}
-    engines: {node: '>=18', npm: '>=8.6.0'}
 
   '@slack/socket-mode@2.0.7':
     resolution: {integrity: sha512-qYy07je71WnEHgRwmw12DlAnZLi5HXmdlI2WUzUK2LH/rYXQpP6uEg462S5CwfE8FoCKUdIigHtYnOOfzZH1lQ==}
@@ -26718,17 +26708,6 @@ snapshots:
   '@slack/logger@4.0.1':
     dependencies:
       '@types/node': 24.12.4
-
-  '@slack/oauth@3.0.5':
-    dependencies:
-      '@slack/logger': 4.0.1
-      '@slack/web-api': 7.19.0
-      '@types/jsonwebtoken': 9.0.10
-      '@types/node': 24.12.4
-      jsonwebtoken: 9.0.3
-    transitivePeerDependencies:
-      - debug
-      - supports-color
 
   '@slack/socket-mode@2.0.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:

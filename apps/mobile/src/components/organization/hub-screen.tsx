@@ -95,7 +95,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // enabled must never read as disabled. Only a loaded payload with no stored
   // threshold is genuinely off.
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
-  let lowBalanceSubtitle: string;
+  let lowBalanceSubtitle = t('common.loading');
   if (minimumBalance != null) {
     lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
       amount: formatMoney(minimumBalance, i18n.language),
@@ -104,8 +104,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     lowBalanceSubtitle = t('common.off');
   } else if (orgWithMembers.isError) {
     lowBalanceSubtitle = t('common.unknown');
-  } else {
-    lowBalanceSubtitle = t('common.loading');
   }
 
   return (

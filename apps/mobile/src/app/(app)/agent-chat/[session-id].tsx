@@ -239,10 +239,7 @@ export default function SessionDetailScreen() {
   // still hold its persisted transcript, so mount the session and let the SDK
   // paint the cached content and surface the retryable failure in place. Only a
   // denial (deleted session / lost access) replaces the screen with the error.
-  if (
-    identityFailed ||
-    (organizationId === null && sessionQuery.isError && metadataAccessDenied)
-  ) {
+  if (identityFailed || (organizationId === null && sessionQuery.isError && metadataAccessDenied)) {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
     // it shows a permanent state with no Retry. Both get Back and Copy.
@@ -316,8 +313,7 @@ export default function SessionDetailScreen() {
     );
   }
 
-  const resolvedOrganizationId =
-    organizationId ?? sessionQuery.data?.organization_id ?? undefined;
+  const resolvedOrganizationId = organizationId ?? sessionQuery.data?.organization_id ?? undefined;
   // Same-scope metadata is background work once the transcript has mounted.
   // Confirmation/reconnection must not replace it with the initial skeleton.
   displayedProviderKey.current = providerKey;

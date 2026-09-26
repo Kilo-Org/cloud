@@ -7,7 +7,7 @@
       "instanceLifecycle": "Enstans ou gen yon aktyalizasyon",
       "scheduledAction": "Yon aksyon pwograme gen yon aktyalizasyon",
       "lowBalance": "Saldo ou bezwen atansyon",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
       "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} saldo tonbe anba ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Alèt depans",
+      "body": "Depans {{scopeName}} depase ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nouvo rezilta sekirite ({{severity}})",

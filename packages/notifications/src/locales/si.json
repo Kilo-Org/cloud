@@ -7,7 +7,7 @@
       "instanceLifecycle": "ඔබගේ අවස්ථාවට යාවත්කාලීනයක් ඇත",
       "scheduledAction": "සැලසුම්ගත ක්‍රියාවකට යාවත්කාලීනයක් ඇත",
       "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "ඔබගේ වියදමට අවධානය අවශ්‍යයි",
       "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි",
       "activeAgentsGlanceable": "සක්‍රිය නියෝජිතයන්ට යාවත්කාලීනයක් ඇත"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} ශේෂය ${{minimumBalanceUsd}} ට පහළට වැටුණි"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "වියදම් අනතුරු ඇඟවීම",
+      "body": "{{scopeName}} හි වියදම ${{amountUsd}} ඉක්මවා ගියේය"
     },
     "securityFindingNew": {
       "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})",

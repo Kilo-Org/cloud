@@ -7,7 +7,7 @@
       "instanceLifecycle": "Je instance heeft een update",
       "scheduledAction": "Een geplande actie heeft een update",
       "lowBalance": "Je saldo heeft aandacht nodig",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Je bestedingen hebben aandacht nodig",
       "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig",
       "activeAgentsGlanceable": "Actieve agents hebben een update"
     }
@@ -44,8 +44,8 @@
       "body": "Het saldo van {{organizationName}} is gedaald onder ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Bestedingswaarschuwing",
+      "body": "De bestedingen van {{scopeName}} overschreden ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nieuwe beveiligingsbevinding ({{severity}})",

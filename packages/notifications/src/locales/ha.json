@@ -7,7 +7,7 @@
       "instanceLifecycle": "Misalin naka yana da sabuntawa",
       "scheduledAction": "Wani aiki da aka tsara yana da sabuntawa",
       "lowBalance": "Ma'auninka yana buƙatar kulawa",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Kashe kuɗinka yana buƙatar kulawa",
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
       "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
     }
@@ -44,8 +44,8 @@
       "body": "Ma'aunin {{organizationName}} ya faɗi ƙasa da ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Faɗakarwar kashe kuɗi",
+      "body": "Kashe kuɗin {{scopeName}} ya wuce ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Sabon binciken tsaro ({{severity}})",

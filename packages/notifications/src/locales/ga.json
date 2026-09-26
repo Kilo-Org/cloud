@@ -7,7 +7,7 @@
       "instanceLifecycle": "Tá nuashonrú ar do chás",
       "scheduledAction": "Tá nuashonrú ar ghníomh sceidealta",
       "lowBalance": "Teastaíonn aird ar do chothromas",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Teastaíonn aird ar do chaiteachas",
       "securityFinding": "Teastaíonn aird ar thátal slándála",
       "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
@@ -44,8 +44,8 @@
       "body": "Thit cothromas {{organizationName}} faoi ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Foláireamh caiteachais",
+      "body": "Sháraigh caiteachas {{scopeName}} ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Tátal slándála nua ({{severity}})",

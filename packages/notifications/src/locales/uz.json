@@ -7,7 +7,7 @@
       "instanceLifecycle": "Instansiyangizda yangilanish bor",
       "scheduledAction": "Rejalashtirilgan harakatda yangilanish bor",
       "lowBalance": "Balansingiz e'tibor talab qiladi",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Xarajatingiz e'tibor talab qiladi",
       "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
       "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} balansi ${{minimumBalanceUsd}} dan pastga tushdi"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Xarajat ogohlantirishi",
+      "body": "{{scopeName}} xarajati ${{amountUsd}} dan oshdi"
     },
     "securityFindingNew": {
       "title": "Yangi xavfsizlik xulosasi ({{severity}})",

@@ -7,7 +7,7 @@
       "instanceLifecycle": "Ձեր օրինակն ունի թարմացում",
       "scheduledAction": "Պլանավորված գործողությունն ունի թարմացում",
       "lowBalance": "Ձեր մնացորդը ուշադրության կարիք ունի",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Ձեր ծախսը ուշադրության կարիք ունի",
       "securityFinding": "Անվտանգության հայտնաբերումը ուշադրության կարիք ունի",
       "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}}-ի մնացորդն իջել է ${{minimumBalanceUsd}}-ից ցածր"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Ծախսի ծանուցում",
+      "body": "{{scopeName}}-ի ծախսը գերազանցել է ${{amountUsd}}-ը"
     },
     "securityFindingNew": {
       "title": "Նոր անվտանգության հայտնաբերում ({{severity}})",

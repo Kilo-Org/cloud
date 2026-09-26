@@ -7,7 +7,7 @@
       "instanceLifecycle": "Таны инстанц шинэчлэлттэй байна",
       "scheduledAction": "Төлөвлөсөн үйлдэл шинэчлэлттэй байна",
       "lowBalance": "Таны үлдэгдэл анхаарал шаарддаг",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Таны зарлага анхаарал шаарддаг",
       "securityFinding": "Аюулгүй байдлын олдолт анхаарал шаарддаг",
       "activeAgentsGlanceable": "Идэвхтэй агентуудад шинэчлэлт бий"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} үлдэгдэл ${{minimumBalanceUsd}}-оос доош унав"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Зарлагын дохиолол",
+      "body": "{{scopeName}}-ийн зарлага ${{amountUsd}}-аас хэтэрсэн"
     },
     "securityFindingNew": {
       "title": "Шинэ аюулгүй байдлын олдолт ({{severity}})",

@@ -7,7 +7,7 @@
       "instanceLifecycle": "თქვენს ინსტანსს განახლება აქვს",
       "scheduledAction": "დაგეგმილ მოქმედებას განახლება აქვს",
       "lowBalance": "თქვენი ბალანსი ყურადღებას საჭიროებს",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "თქვენი ხარჯი ყურადღებას საჭიროებს",
       "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
       "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} ბალანსი დაეცა ${{minimumBalanceUsd}}-ზე ქვემოთ"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "ხარჯის შეტყობინება",
+      "body": "{{scopeName}}-ის ხარჯმა გადააჭარბა ${{amountUsd}}-ს"
     },
     "securityFindingNew": {
       "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})",

@@ -214,7 +214,6 @@
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
     "bonusCreditsExpiring": "Boonuskrediit summas {{amount}} aegub {{date}}.",
-    "creditBalanceEmpty": "Sinu krediidisaldo on null. Selle konto krediiti hallatakse väljaspool iOS-i rakendust.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",
@@ -3429,5 +3428,17 @@
       "unboundToast": "Repo sidumata",
       "unbindFailed": "Repot ei saanud lahti siduda"
     }
+  },
+  "credits": {
+    "title": "Osta krediiti",
+    "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
+    "packLabel": "Lisa {{amount}} krediiti",
+    "priceUnavailable": "Hind pole saadaval",
+    "purchased": "Krediit on sinu saldole lisatud.",
+    "empty": "Krediidipaketid pole praegu saadaval.",
+    "noMatchingProducts": "App Store ei tagastanud ühtegi sobivat krediidipaketti.",
+    "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
+    "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse vastavale Kilo kontole.",
+    "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellesse Kilo kontosse."
   }
 }

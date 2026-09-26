@@ -28,12 +28,13 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * catalog.
  *
  * Empty: the `notifications.category.*Unavailable` reasons, the profile-editor
- * validation copy (the duplicate-key refusal and the MCP bound messages), and
- * the `/` suggestion list's skill-row keys
+ * validation copy (the duplicate-key refusal and the MCP bound messages), the
+ * `/` suggestion list's skill-row keys
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
- * `slash-command-suggestions.tsx`) have all landed in every catalog, so the
- * missing-key assertion is strict again.
+ * `slash-command-suggestions.tsx`), and the `credits.*` keys of the Buy
+ * credits screen have all landed in every catalog, so the missing-key
+ * assertion is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

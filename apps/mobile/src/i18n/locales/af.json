@@ -214,7 +214,6 @@
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
     "bonusCreditsExpiring": "Bonuskrediete ter waarde van {{amount}} verval op {{date}}.",
-    "creditBalanceEmpty": "Jou kredietsaldo is nul. Krediete vir hierdie rekening word buite die iOS-toep bestuur.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -3429,5 +3428,17 @@
       "unboundToast": "Repo ongebonde",
       "unbindFailed": "Kon nie repo ontbind nie"
     }
+  },
+  "credits": {
+    "title": "Koop krediete",
+    "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
+    "packLabel": "Voeg {{amount}} se krediete by",
+    "priceUnavailable": "Prys nie beskikbaar nie",
+    "purchased": "Krediete is by jou saldo gevoeg.",
+    "empty": "Kredietpakkette is tans nie beskikbaar nie.",
+    "noMatchingProducts": "Geen passende kredietpakkette is deur App Store terugbesorg nie.",
+    "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
+    "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
+    "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   }
 }

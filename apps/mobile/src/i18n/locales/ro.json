@@ -214,7 +214,6 @@
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
     "bonusCreditsExpiring": "Creditele bonus în valoare de {{amount}} expiră la {{date}}.",
-    "creditBalanceEmpty": "Nu mai ai credite. Pentru acest cont, creditele se gestionează în afara aplicației iOS.",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",
@@ -3472,5 +3471,17 @@
       "unboundToast": "Repo nelegat",
       "unbindFailed": "Nu s-a putut dezlega repo"
     }
+  },
+  "credits": {
+    "title": "Cumpără credite",
+    "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
+    "packLabel": "Adaugă {{amount}} în credite",
+    "priceUnavailable": "Preț indisponibil",
+    "purchased": "Creditele au fost adăugate la soldul tău.",
+    "empty": "Pachetele de credite nu sunt disponibile momentan.",
+    "noMatchingProducts": "App Store nu a returnat pachete de credite corespunzătoare.",
+    "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
+    "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
+    "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."
   }
 }

@@ -214,7 +214,6 @@
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
     "bonusCreditsExpiring": "เครดิตโบนัส {{amount}} จะหมดอายุ {{date}}",
-    "creditBalanceEmpty": "คุณไม่มีเครดิตเหลืออยู่ บัญชีนี้ต้องจัดการเครดิตนอกแอป iOS",
     "signOutTitle": "ออกจากระบบหรือไม่?",
     "signOutMessage": "คุณต้องเข้าสู่ระบบอีกครั้งเพื่อใช้พื้นที่ทำงาน",
     "deleteAccountTitle": "ลบบัญชีหรือไม่?",
@@ -3429,5 +3428,17 @@
       "unboundToast": "Repo ไม่ถูกผูกไว้",
       "unbindFailed": "ไม่สามารถเลิกผูก repo ได้"
     }
+  },
+  "credits": {
+    "title": "ซื้อเครดิต",
+    "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
+    "packLabel": "เพิ่มเครดิต {{amount}}",
+    "priceUnavailable": "ไม่มีราคา",
+    "purchased": "เพิ่มเครดิตเข้าสู่ยอดคงเหลือของคุณแล้ว",
+    "empty": "แพ็กเกจเครดิตไม่พร้อมใช้งานในขณะนี้",
+    "noMatchingProducts": "App Store ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
+    "noMatchingProductsPlay": "Google Play ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
+    "purchaseOwnedByAnotherAccount": "เครดิตใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน",
+    "purchaseOwnedByAnotherAccountPlay": "เครดิตในบัญชี Google Play นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน"
   }
 }

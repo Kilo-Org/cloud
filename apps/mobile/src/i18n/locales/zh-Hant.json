@@ -214,7 +214,6 @@
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
     "bonusCreditsExpiring": "{{amount}} 的加贈點數將於 {{date}} 到期。",
-    "creditBalanceEmpty": "你的點數餘額已用完。此帳戶的點數須在 iOS 應用程式外管理。",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -3429,5 +3428,17 @@
       "unboundToast": "倉庫已解除綁定",
       "unbindFailed": "無法解除倉庫綁定"
     }
+  },
+  "credits": {
+    "title": "購買點數",
+    "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
+    "packLabel": "新增 {{amount}} 點數",
+    "priceUnavailable": "價格無法取得",
+    "purchased": "點數已加入你的餘額。",
+    "empty": "目前無法取得點數包。",
+    "noMatchingProducts": "App Store 未傳回相符的點數包。",
+    "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
+    "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
+    "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   }
 }

@@ -214,7 +214,6 @@
     "showBalance": "Fi owó tó kù hàn",
     "balanceHidden": "Owó tó kù ti pamọ́",
     "bonusCreditsExpiring": "Kirẹ́dítì ẹ̀bùn {{amount}} yóò dópin {{date}}.",
-    "creditBalanceEmpty": "Kò sí kirẹ́dítì tó kù fún ọ. Ìṣàkóso kirẹ́dítì àkọọ́lẹ̀ yìí wà ní òde ohun èlò iOS.",
     "signOutTitle": "Jáde?",
     "signOutMessage": "O máa nílò láti tún wọlé kí o lè lo àyè iṣẹ́ rẹ.",
     "deleteAccountTitle": "Pa àkọọ́lẹ̀ rẹ́?",
@@ -3429,5 +3428,17 @@
       "unboundToast": "A ti tú repo sílẹ̀",
       "unbindFailed": "Ko le yọkuro repo"
     }
+  },
+  "credits": {
+    "title": "Ra kírẹ́dítì",
+    "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
+    "packLabel": "Fi kírẹ́dítì tó tó {{amount}} kún un",
+    "priceUnavailable": "Owó kò sí",
+    "purchased": "A ti fi kírẹ́dítì kún iwọntunwọnsi rẹ.",
+    "empty": "Àwọn àpò kírẹ́dítì kò sí ní báyìí.",
+    "noMatchingProducts": "App Store kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
+    "noMatchingProductsPlay": "Google Play kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
+    "purchaseOwnedByAnotherAccount": "Kírẹ́dítì lórí Apple Account yìí jẹ́ ti àkọọ́lẹ̀ Kilo mìíràn. Wọlé sí àkọọ́lẹ̀ Kilo yẹn láti lò ó.",
+    "purchaseOwnedByAnotherAccountPlay": "Kírẹ́dítì lori Google Play àkọọ́lẹ̀ yii jẹ ti Kilo àkọọ́lẹ̀ miiran. Wọle si Kilo àkọọ́lẹ̀ yẹn lati lo o."
   }
 }

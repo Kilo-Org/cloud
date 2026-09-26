@@ -34,6 +34,8 @@ import {
 import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
+import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
+import { reverseStoreCreditPurchase } from '@/lib/credits/store-refund';
 import { dayjs } from './dayjs';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
@@ -83,6 +85,13 @@ const PURCHASE_TYPES = new Set<number>([
   GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_PURCHASED,
   GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RESTARTED,
 ]);
+
+// Google Play VoidedPurchaseNotification.productType:
+// https://developer.android.com/google/play/billing/rtdn-reference#voided
+const GOOGLE_PLAY_VOIDED_PRODUCT_TYPE = {
+  SUBSCRIPTION: 1,
+  ONE_TIME_PRODUCT: 2,
+} as const;
 
 const STORE_EVENT_CLAIM_STALE_AFTER_MS = 5 * 60 * 1000;
 
@@ -637,6 +646,82 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     // A refund can leave the subscription entitled. Lifecycle notifications
     // reconcile access; this event reverses only the exact refunded order.
+    return { processed: true };
+  }
+
+  if (
+    voided?.productType === GOOGLE_PLAY_VOIDED_PRODUCT_TYPE.ONE_TIME_PRODUCT &&
+    voided.refundType === 1
+  ) {
+    const { purchaseToken, orderId } = voided;
+    if (!purchaseToken || !orderId) throw new Error('Google Play refund missing identifiers');
+    const order = await getGooglePlaySubscriptionOrder(orderId);
+    if (
+      order.orderId !== orderId ||
+      order.purchaseToken !== purchaseToken ||
+      order.state !== 'REFUNDED'
+    ) {
+      throw new Error('Google Play refund does not match a refunded order');
+    }
+    const productId = order.lineItems?.[0]?.productId ?? '';
+    if (!getStoreCreditProductByGoogleProductId(productId)) {
+      // A voided one-time product Kilo does not sell as a credit pack has
+      // nothing to reverse.
+      return { processed: true };
+    }
+    const eventId = computeGooglePlayEventId({
+      messageId,
+      purchaseToken,
+      notificationType: 'voided_purchase',
+      eventTimeMillis: developerNotification.eventTimeMillis ?? null,
+    });
+    const claim = await claimGooglePlayStoreEventForProcessing({
+      eventId,
+      notificationType: 'voided_purchase',
+      packageName: developerNotification.packageName,
+      eventTimeMillis: developerNotification.eventTimeMillis ?? null,
+      purchaseToken,
+      latestOrderId: orderId,
+      appAccountToken: null,
+      productId,
+      environment: 'Production',
+    });
+    if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
+    if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
+    await db.transaction(async tx => {
+      // The grant is keyed by the order id when Play reported one and by the
+      // purchase token otherwise, while a voided notification always carries an
+      // order id. Try the order id first and fall back to the purchase token so
+      // a grant keyed by the token is still clawed back exactly.
+      let reversal = await reverseStoreCreditPurchase(tx, {
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerTransactionId: orderId,
+      });
+      if (reversal.creditTransactionId === null) {
+        reversal = await reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId: purchaseToken,
+        });
+      }
+      await appendKiloPassAuditLog(tx, {
+        action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
+        result: KiloPassAuditLogResult.Success,
+        payload: {
+          messageId: messageId ?? null,
+          providerTransactionId: orderId,
+          storeCreditReversal: reversal,
+        },
+      });
+      await tx
+        .update(kilo_pass_store_events)
+        .set({ processed_at: new Date().toISOString() })
+        .where(
+          and(
+            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+            eq(kilo_pass_store_events.event_id, eventId)
+          )
+        );
+    });
     return { processed: true };
   }
 

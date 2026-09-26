@@ -172,6 +172,13 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
+              name="credits"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="onboarding"
               options={{
                 presentation: 'modal',

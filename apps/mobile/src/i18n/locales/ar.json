@@ -214,7 +214,6 @@
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
     "bonusCreditsExpiring": "تنتهي صلاحية رصيد إضافي بقيمة {{amount}} في {{date}}.",
-    "creditBalanceEmpty": "نفد رصيدك. تُدار عمليات الرصيد لهذا الحساب خارج تطبيق iOS.",
     "signOutTitle": "تسجيل الخروج؟",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك.",
     "deleteAccountTitle": "حذف الحساب؟",
@@ -3601,5 +3600,17 @@
       "unboundToast": "الريبو غير منضم",
       "unbindFailed": "تعذر إلغاء ربط الريبو"
     }
+  },
+  "credits": {
+    "title": "شراء الرصيد",
+    "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
+    "packLabel": "إضافة {{amount}} من الرصيد",
+    "priceUnavailable": "السعر غير متاح",
+    "purchased": "تمت إضافة الرصيد إلى رصيدك.",
+    "empty": "حزم الرصيد غير متاحة الآن.",
+    "noMatchingProducts": "لم يُرجِع App Store أي حزم رصيد مطابقة.",
+    "noMatchingProductsPlay": "لم يُرجِع Google Play أي حزم رصيد مطابقة.",
+    "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
+    "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
   }
 }

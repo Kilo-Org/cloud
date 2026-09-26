@@ -214,7 +214,6 @@
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
     "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni tōmua tāpiri {{amount}}.",
-    "creditBalanceEmpty": "Kua pau ō moni tōmua. Ka whakahaeretia ngā moni tōmua mō tēnei pūkete ki waho o te taupānga iOS.",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",
@@ -3429,5 +3428,17 @@
       "unboundToast": "Repo kore here",
       "unbindFailed": "Kaore i taea te wete i te repo"
     }
+  },
+  "credits": {
+    "title": "Hoko whiwhinga",
+    "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
+    "packLabel": "Tāpirihia {{amount}} whiwhinga",
+    "priceUnavailable": "Kāore te utu e wātea",
+    "purchased": "Kua tāpirihia ngā whiwhinga ki tō toenga.",
+    "empty": "Kāore ngā pākete whiwhinga e wātea ana i tēnei wā.",
+    "noMatchingProducts": "Kāore te App Store i whakahoki i ētahi pākete whiwhinga ōrite.",
+    "noMatchingProductsPlay": "Kāore Google Play i whakahoki i ētahi pākete whiwhinga ōrite.",
+    "purchaseOwnedByAnotherAccount": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei Apple Account. Whakauru ki taua pūkete Kilo hei whakamahi.",
+    "purchaseOwnedByAnotherAccountPlay": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei pūkete Google Play. Whakauru ki taua pūkete Kilo hei whakamahi."
   }
 }

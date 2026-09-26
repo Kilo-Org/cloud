@@ -214,7 +214,6 @@
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
     "bonusCreditsExpiring": "{{amount}} hobari-kreditu iraungiko dira data honetan: {{date}}.",
-    "creditBalanceEmpty": "Ez duzu krediturik geratzen. Kontu honetan, kredituak iOS aplikaziotik kanpo kudeatzen dira.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -3429,5 +3428,17 @@
       "unboundToast": "Repo lotu gabe",
       "unbindFailed": "Ezin izan da biltegia deslotu"
     }
+  },
+  "credits": {
+    "title": "Erosi kredituak",
+    "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
+    "packLabel": "Gehitu {{amount}} kreditutan",
+    "priceUnavailable": "Prezioa ez dago erabilgarri",
+    "purchased": "Kredituak zure saldoari gehitu zaizkio.",
+    "empty": "Kreditu-paketeak ez daude orain erabilgarri.",
+    "noMatchingProducts": "App Store-k ez du bat datorren kreditu-paketerik itzuli.",
+    "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
+    "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
+    "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   }
 }

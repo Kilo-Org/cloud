@@ -41,6 +41,11 @@ import {
 } from './store-subscription-completion';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
+import { getStoreCreditProductByAppleProductId } from '@/lib/credits/store-products';
+import {
+  reverseStoreCreditPurchase,
+  type StoreCreditReversalResult,
+} from '@/lib/credits/store-refund';
 import { dayjs } from './dayjs';
 
 type DbOrTx = DrizzleTransaction | typeof db;
@@ -835,6 +840,20 @@ export async function processAppStoreKiloPassNotification(params: {
           },
         });
       }
+      // A refunded credit pack is not a Kilo Pass purchase, so it is reversed
+      // separately, keyed by its store transaction id. A failure here must
+      // propagate: swallowing it would mark the event processed with the
+      // credits still granted, and the App Store never redelivers a processed
+      // event, so the clawback would be lost permanently. The reversal is
+      // idempotent, so a redelivery retries it safely — the same contract as
+      // the Google Play one-time refund branch.
+      let storeCreditReversal: StoreCreditReversalResult | null = null;
+      if (getStoreCreditProductByAppleProductId(transaction.productId)) {
+        storeCreditReversal = await reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId: transaction.transactionId,
+        });
+      }
       await endStoreSubscription(tx, transaction);
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
@@ -847,6 +866,7 @@ export async function processAppStoreKiloPassNotification(params: {
           creditTransactionIds: reversal?.creditTransactionIds ?? [],
           totalReversalMicrodollars: reversal?.totalReversalMicrodollars ?? 0,
           reversedItemKinds: reversal?.reversedItemKinds ?? [],
+          storeCreditReversal,
         },
       });
       await tx

@@ -348,6 +348,7 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
     github_app_type: 'standard',
     github_installation_id: null,
     github_disconnected_at: null,
+    github_connection_role: 'workflow',
     github_authorized_by_user_id: null,
     github_authorized_user_id: null,
     github_authorized_at: null,
@@ -829,7 +830,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it('infers BYOK permission callbacks as action-required failures', async () => {
       const errorMessage =
-        'Forbidden: [BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.';
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(

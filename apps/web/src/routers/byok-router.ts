@@ -36,7 +36,7 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/pr
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -100,7 +100,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
-    const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id)];
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
@@ -418,6 +418,14 @@ export const byokRouter = createTRPCRouter({
         if (existingKey.kilo_user_id !== ctx.user.id) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
         }
+      }
+
+      const providerId = UserByokProviderIdSchema.safeParse(existingKey.provider_id);
+      if (!providerId.success) {
+        return {
+          success: false,
+          message: `Provider ${existingKey.provider_id} is no longer supported.`,
+        };
       }
 
       const decryptedKey = decryptByokRow(existingKey);

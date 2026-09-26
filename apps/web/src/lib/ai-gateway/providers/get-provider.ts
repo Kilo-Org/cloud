@@ -3,7 +3,10 @@ import type {
   OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isKiloExclusiveModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
@@ -17,16 +20,11 @@ import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
-import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
-import {
-  pickModelExperimentVariant,
-  type AllocationSubject,
-} from '@/lib/ai-gateway/experiments/pick-variant';
+import { buildDirectProvider } from '@/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
@@ -38,18 +36,6 @@ import {
   isLocalFakeLlmEnabled,
 } from '@/lib/ai-gateway/local-fake-llm';
 
-/**
- * Metadata about the experiment that resolved this provider, attached when
- * routing chose a model_experiment_variant_version. Persisted in the
- * `model_experiment_request` row by Phase 4 attribution.
- */
-export type ExperimentRouting = {
-  experimentId: string;
-  variantId: string;
-  variantVersionId: string;
-  allocationSubject: AllocationSubject;
-};
-
 export type GetProviderProviderResult = {
   kind: 'provider';
   provider: Provider;
@@ -58,19 +44,15 @@ export type GetProviderProviderResult = {
    *  by direct-byok and custom_llm2 because both already require explicit
    *  admin opt-in. */
   bypassAccessCheck: boolean;
-  /** Present when this provider was resolved through a model experiment. */
-  experiment?: ExperimentRouting;
+  /** Skip only the zero-balance paid-model block. Set when a user credential
+   *  outside Kilo credits pays for the request, such as the ChatGPT
+   *  subscription, while abuse and organization policy checks still apply. */
+  skipBalanceCheck?: boolean;
 };
 
-/**
- * Discriminated routing result. `not-found` maps to the local
- * model-unavailable response (used by paused experiments); `unavailable`
- * maps to a 503 temporarily-unavailable response (cache/DB/config failure).
- */
 export type GetProviderResult =
   | GetProviderProviderResult
-  | { kind: 'not-found' }
-  | { kind: 'unavailable' };
+  | { kind: 'chatgpt-reconnect'; message: string };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -93,6 +75,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiUrlOverrides: directByok.base_url_overrides,
+      disableUrlSuffix: false,
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,
@@ -198,30 +181,17 @@ export type GetProviderInput = {
   request: GatewayRequest;
   user: User | AnonymousUserContext;
   organizationId: string | undefined;
+  /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
+  botId?: string | undefined;
   taskId: string | undefined;
-  /** Resolved client IP from the route handler. Used as the IP-cohort
-   *  allocation subject for experiment routing when no userId/machineId
-   *  is available. */
-  clientIp: string | null;
-  /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
-   *  cohort allocation subject for experiment routing. */
-  machineId: string | null;
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes remain exempt. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const {
-    requestedModel,
-    request,
-    user,
-    organizationId,
-    taskId,
-    clientIp,
-    machineId,
-    getRoutingProviderConfig,
-  } = input;
+  const { requestedModel, request, user, organizationId, botId, taskId, getRoutingProviderConfig } =
+    input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -240,6 +210,25 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return directByokByok;
   }
 
+  // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
+  // responses request, before the Vercel BYOK lookup. A connection whose
+  // credential is terminally dead must fail readably instead of resolving to
+  // another billing path. Every other resolution (including an ineligible
+  // request for the same model) stays as it is today.
+  const openAiChatGptByok = await checkOpenAiChatGptByok({
+    request,
+    requestedModel,
+    userId: isAnonymousContext(user) ? null : user.id,
+    organizationId,
+    botId,
+  });
+  if (openAiChatGptByok?.kind === 'reconnect') {
+    return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };
+  }
+  if (openAiChatGptByok) {
+    return openAiChatGptByok;
+  }
+
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (vercelByok) {
     return {
@@ -251,47 +240,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-
-  // Model experiment routing for dedicated preview public ids. Runs before
-  // the custom-LLM (`kilo-internal/...`) and the `kiloExclusiveModels` lookup
-  // so an experimented public id never falls through to OpenRouter/Vercel.
-  const experimented = await isPublicIdExperimented(requestedModel);
-  if (experimented === true) {
-    if (kiloExclusiveModel) {
-      throw new Error(
-        `Configuration error: ${requestedModel} cannot be both an experiment and a Kilo-exclusive model`
-      );
-    }
-    const userId = isAnonymousContext(user) ? null : user.id;
-    const selection = await pickModelExperimentVariant({
-      publicModelId: requestedModel,
-      userId,
-      machineId,
-      clientIp,
-    });
-    if (selection?.status === 'not-found') {
-      return { kind: 'not-found' };
-    }
-    if (selection?.status === 'unavailable') {
-      return { kind: 'unavailable' };
-    }
-    if (selection?.status === 'active') {
-      return {
-        kind: 'provider',
-        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream, null),
-        userByok: null,
-        bypassAccessCheck: false,
-        experiment: {
-          experimentId: selection.experimentId,
-          variantId: selection.variantId,
-          variantVersionId: selection.variantVersionId,
-          allocationSubject: selection.allocationSubject,
-        },
-      };
-    }
-    // selection === null: cache+DB say no routing-relevant experiment for
-    // this id. Fall through to non-experiment routing.
-  }
 
   if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
     const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
@@ -324,7 +272,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider: (kiloExclusiveModel && tryGetProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER,
+    provider: kiloExclusiveModel?.provider ?? OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };

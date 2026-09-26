@@ -12,6 +12,7 @@ import {
   isRetryableDeliveryError,
   observeControlAfterStopping,
   reconstructControlRequestError,
+  safeErrorFromQueueReason,
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
@@ -42,6 +43,22 @@ describe('controlDispatchDisposition', () => {
     expect(controlDispatchDisposition({ physical: 'failed', connection: 'ready' })).toEqual({
       action: 'wait',
     });
+  });
+
+  it('fails a terminal launch failure instead of waiting for a replacement', () => {
+    expect(
+      controlDispatchDisposition({
+        physical: 'failed',
+        connection: 'disconnected',
+        launchFailed: true,
+      })
+    ).toEqual({ action: 'fail', reason: 'launch_failed' });
+  });
+});
+
+describe('safeErrorFromQueueReason', () => {
+  it('names a terminal launch failure', () => {
+    expect(safeErrorFromQueueReason('launch_failed')).toBe('Sandbox launch failed');
   });
 });
 
@@ -188,10 +205,90 @@ describe('deliveryErrorLogFields', () => {
     });
   });
 
+  it('logs the detail for an unclassified transport or internal error', () => {
+    expect(deliveryErrorLogFields(new Error('some transport detail'))).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'some transport detail',
+      retryable: false,
+    });
+  });
+
+  it('stringifies a non-Error thrown value for an unclassified error', () => {
+    expect(deliveryErrorLogFields('boom')).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'boom',
+      retryable: false,
+    });
+  });
+
+  it('logs the message of a passed-through malformed rejection', () => {
+    const malformed = { code: '', message: 'Invalid rejection', retryable: true };
+    expect(deliveryErrorLogFields(malformed)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'Invalid rejection',
+      retryable: true,
+    });
+  });
+
+  it('falls back for a non-Error object whose message is not a string', () => {
+    const error = { message: { nested: true } };
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[object Object]',
+      retryable: false,
+    });
+  });
+
+  it('refuses an inherited message for a non-Error value', () => {
+    const error = Object.create({ message: 'inherited' });
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[object Object]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a non-Error object whose message read throws', () => {
+    const error = {
+      get message(): string {
+        throw new Error('message exploded');
+      },
+    };
+    expect(() => deliveryErrorLogFields(error)).not.toThrow();
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a null-prototype value that cannot be stringified', () => {
+    expect(() => deliveryErrorLogFields(Object.create(null))).not.toThrow();
+    expect(deliveryErrorLogFields(Object.create(null))).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a thrown value whose string conversion throws', () => {
+    const error = {
+      toString() {
+        throw new Error('toString exploded');
+      },
+    };
+    expect(() => deliveryErrorLogFields(error)).not.toThrow();
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
   it.each([false, true])(
-    'classifies transport exceptions without copying fields when overloaded=%s',
+    'classifies a transport exception with its detail when overloaded=%s',
     overloaded => {
-      const error = Object.assign(new Error('sensitive-message'), {
+      const error = Object.assign(new Error('transport detail'), {
         code: 'session_busy',
         retryable: true,
         overloaded,
@@ -200,6 +297,7 @@ describe('deliveryErrorLogFields', () => {
       });
       expect(deliveryErrorLogFields(error)).toEqual({
         errorCode: 'transport_or_internal_error',
+        errorMessage: 'transport detail',
         retryable: !overloaded,
       });
     }

@@ -175,6 +175,37 @@ describe('normalize', () => {
       const part = { id: 'p-1', sessionID: 'ses-1', messageID: 1 };
       expect(normalize(createRaw('message.part.updated', { part }))).toBeNull();
     });
+
+    it('carries the event time so downstream merges can order by event time', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+      };
+      const result = normalize(
+        createRaw('message.part.updated', { part, time: 1_772_214_640_111 })
+      );
+      expect(result).toEqual({
+        type: 'message.part.updated',
+        part,
+        time: 1_772_214_640_111,
+      });
+    });
+
+    it('omits the event time when the wire payload has none', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text',
+      };
+      const result = normalize(createRaw('message.part.updated', { part }));
+      // Assert the normalized shape first: `not.toHaveProperty` alone passes
+      // for a null result, so it cannot prove the event was recognized.
+      expect(result).toEqual({ type: 'message.part.updated', part });
+      expect(Object.hasOwn(result as object, 'time')).toBe(false);
+    });
   });
 
   describe('message.part.delta', () => {
@@ -400,6 +431,40 @@ describe('normalize', () => {
             partID: 1,
           })
         )
+      ).toBeNull();
+    });
+  });
+
+  describe('message.removed', () => {
+    it('normalizes with field name mapping (sessionID → sessionId, etc.)', () => {
+      const result = normalize(
+        createRaw('message.removed', { sessionID: 'ses-1', messageID: 'msg-1' })
+      );
+      expect(result).toEqual({
+        type: 'message.removed',
+        sessionId: 'ses-1',
+        messageId: 'msg-1',
+      });
+    });
+
+    it('is routed as a chat event so storage receives the removal', () => {
+      const result = normalize(
+        createRaw('message.removed', { sessionID: 'ses-1', messageID: 'msg-1' })
+      );
+      expect(result !== null && isChatEvent(result)).toBe(true);
+    });
+
+    it('returns null when sessionID is missing', () => {
+      expect(normalize(createRaw('message.removed', { messageID: 'msg-1' }))).toBeNull();
+    });
+
+    it('returns null when messageID is missing', () => {
+      expect(normalize(createRaw('message.removed', { sessionID: 'ses-1' }))).toBeNull();
+    });
+
+    it('returns null when messageID is not a string', () => {
+      expect(
+        normalize(createRaw('message.removed', { sessionID: 'ses-1', messageID: 1 }))
       ).toBeNull();
     });
   });
@@ -1705,6 +1770,33 @@ describe('normalize', () => {
       expect(result).toEqual({ type: 'commands.available', commands: [] });
     });
 
+    it('carries the bound status so a bounded catalog is not silent', () => {
+      const result = normalize(
+        createRaw('commands.available', {
+          commands: [{ name: 'review', hints: [] }],
+          catalogStatus: { dropped: 7, overLimit: false },
+        })
+      );
+      expect(result).toEqual({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+        catalogStatus: { dropped: 7, overLimit: false },
+      });
+    });
+
+    it('keeps the catalog when the bound status is malformed', () => {
+      const result = normalize(
+        createRaw('commands.available', {
+          commands: [{ name: 'review', hints: [] }],
+          catalogStatus: { dropped: 'many', overLimit: false },
+        })
+      );
+      expect(result).toEqual({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+    });
+
     it('returns null when commands array is missing', () => {
       expect(normalize(createRaw('commands.available', {}))).toBeNull();
     });
@@ -2050,6 +2142,20 @@ describe('normalizeCliEvent', () => {
       expect(normalizeCliEvent('message.part.updated', { part })).toEqual({
         type: 'message.part.updated',
         part,
+      });
+    });
+
+    it('carries the event time for a CLI part update without envelope', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+      };
+      expect(normalizeCliEvent('message.part.updated', { part, time: 42 })).toEqual({
+        type: 'message.part.updated',
+        part,
+        time: 42,
       });
     });
 

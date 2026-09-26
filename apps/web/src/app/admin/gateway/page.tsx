@@ -8,9 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
-import { UsageContent } from '@/app/admin/gateway/UsageContent';
-import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
-import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -18,19 +15,9 @@ const VALID_TABS: readonly string[] = [
   'sync-providers',
   'custom-llms',
   'routing',
-  'monthly-usage',
-  'model-experiments',
-  'experiment-requests',
   'api-request-log',
 ];
-type Tab =
-  | 'sync-providers'
-  | 'custom-llms'
-  | 'routing'
-  | 'monthly-usage'
-  | 'model-experiments'
-  | 'experiment-requests'
-  | 'api-request-log';
+type Tab = 'sync-providers' | 'custom-llms' | 'routing' | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -43,11 +30,7 @@ export default function AdminGatewayPage() {
   const pathname = usePathname();
 
   const tabParam = searchParams.get('tab');
-  const activeTab: Tab = isValidTab(tabParam)
-    ? tabParam
-    : searchParams.has('experimentId')
-      ? 'model-experiments'
-      : 'sync-providers';
+  const activeTab: Tab = isValidTab(tabParam) ? tabParam : 'sync-providers';
 
   const onTabChange = useCallback(
     (value: string) => {
@@ -56,9 +39,6 @@ export default function AdminGatewayPage() {
         params.delete('tab');
       } else {
         params.set('tab', value);
-      }
-      if (value !== 'model-experiments') {
-        params.delete('experimentId');
       }
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
@@ -87,15 +67,6 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="routing" className={tabTriggerClass}>
               Routing
             </TabsTrigger>
-            <TabsTrigger value="monthly-usage" className={tabTriggerClass}>
-              Model Usage
-            </TabsTrigger>
-            <TabsTrigger value="model-experiments" className={tabTriggerClass}>
-              Model Experiments
-            </TabsTrigger>
-            <TabsTrigger value="experiment-requests" className={tabTriggerClass}>
-              Experiment Requests
-            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
@@ -108,15 +79,6 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="routing" className="mt-4">
             <RoutingContent />
-          </TabsContent>
-          <TabsContent value="monthly-usage" className="mt-4">
-            <UsageContent />
-          </TabsContent>
-          <TabsContent value="model-experiments" className="mt-4">
-            <ModelExperimentsContent />
-          </TabsContent>
-          <TabsContent value="experiment-requests" className="mt-4">
-            <ModelExperimentRequestsContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

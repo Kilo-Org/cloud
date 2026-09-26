@@ -36,6 +36,7 @@
     "cost": "Custo",
     "discard": "Descartar",
     "findings": "Ocorrências",
+    "mergeRequest": "merge request",
     "notConnected": "Sem ligação",
     "notifications": "Notificações",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Utilizar um e-mail diferente",
     "signInWithApple": "Iniciar sessão com Apple",
     "signInWithGoogle": "Iniciar sessão com Google",
+    "signInWithPasskey": "Iniciar sessão com uma chave de acesso",
     "emailAddress": "Endereço de e-mail",
     "emailPlaceholder": "nome@exemplo.com",
     "continueWithEmail": "Continuar com e-mail",
@@ -174,6 +176,10 @@
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mais opções de início de sessão",
+    "passkeyCancelled": "O início de sessão com chave de acesso foi cancelado. Tenta novamente.",
+    "passkeyNotFound": "Não há nenhuma chave de acesso guardada para este dispositivo. Inicia sessão com a Apple, a Google ou o teu email.",
+    "passkeyUnsupported": "As chaves de acesso não estão disponíveis neste dispositivo. Inicia sessão com a Apple, a Google ou o teu email.",
+    "passkeyFailed": "Não foi possível iniciar sessão com uma chave de acesso. Tenta novamente.",
     "couldNotCompleteSignIn": "Não foi possível concluir o início de sessão. Tenta novamente.",
     "sessionEnded": "A tua sessão terminou. Inicia sessão novamente.",
     "signInCodeExpired": "O teu código de início de sessão expirou. Tenta novamente.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO empresarial"
+    "providerEnterpriseSso": "SSO empresarial",
+    "passkeysTitle": "Chaves de acesso",
+    "passkeysSubtitle": "Inicia sessão sem palavra-passe",
+    "passkeysEmpty": "Ainda não há chaves de acesso",
+    "passkeysEmptyHint": "$t(profile.addPasskey) para iniciares sessão sem palavra-passe.",
+    "passkeysCouldNotLoad": "Não foi possível carregar as chaves de acesso",
+    "passkeysLoadFailed": "As chaves de acesso ficam indisponíveis até isto carregar.",
+    "addPasskey": "Adicionar uma chave de acesso",
+    "passkeyDefaultName": "Chave de acesso",
+    "passkeyAddedOn": "Adicionada {{date}}",
+    "passkeyAdded": "Chave de acesso adicionada.",
+    "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tenta novamente.",
+    "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
+    "passkeyAddCancelled": "A criação da chave de acesso foi cancelada.",
+    "passkeyRemoved": "Chave de acesso removida.",
+    "passkeyRemoveFailed": "Não foi possível remover essa chave de acesso. Tenta novamente.",
+    "passkeyRenamed": "Chave de acesso renomeada.",
+    "passkeyName": "Nome da chave de acesso",
+    "renamePasskey": "Renomear a chave de acesso",
+    "removePasskey": "Remover a chave de acesso",
+    "removePasskeyTitle": "Remover a chave de acesso?",
+    "removePasskeyMessage": "Já não vais poder iniciar sessão com esta chave de acesso."
   },
   "preferences": {
     "general": "Geral",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes.",
     "biometricUnlock": "Desbloquear com biometria",
     "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano.",
-    "featureFlags": "Sinalizadores de recursos",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva o ditado com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. A sua gravação é enviada para o Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -325,7 +347,7 @@
       "expandMoreLines": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
       "expandLinesOfContext": "Expandir {{displayCount}} linhas de contexto",
       "expandAll": "Expandir tudo",
-      "expandAllLines": "Expandir todas as {{displayCount}} linhas",
+      "expandAllLines": "Expandir todas as linhas ({{displayCount}})",
       "loadingMoreFiles": "A carregar mais ficheiros…",
       "retryLoadingNextPage": "Tentar carregar a página seguinte novamente",
       "failedToLoadMoreFiles": "Não foi possível carregar mais ficheiros — toca para tentar novamente",
@@ -344,7 +366,22 @@
       "goToOverview": "Ir para a visão geral",
       "goToOverviewTab": "Ir para o separador de visão geral",
       "fileLoadedCount_many": "{{displayCount}} ficheiros carregados",
-      "fileLoadedOfTotalCount_many": "{{displayCount}} de {{total}} ficheiros carregados"
+      "fileLoadedOfTotalCount_many": "{{displayCount}} de {{total}} ficheiros carregados",
+      "expandAllLines_one": "Expandir todas as linhas ({{displayCount}})",
+      "expandAllLines_other": "Expandir todas as linhas ({{displayCount}})",
+      "expandAllLines_many": "Expandir todas as linhas ({{displayCount}})",
+      "expandLines_one": "Expandir {{displayCount}} linha ({{start}}–{{end}})",
+      "expandLines_other": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandLines_many": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Expandir {{displayCount}} linha de contexto",
+      "expandLinesOfContext_other": "Expandir {{displayCount}} linhas de contexto",
+      "expandLinesOfContext_many": "Expandir {{displayCount}} linhas de contexto",
+      "expandMoreLines_one": "Expandir mais {{displayCount}} linha ({{start}}–{{end}})",
+      "expandMoreLines_other": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandMoreLines_many": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} ficheiros carregados",
+      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} ficheiros carregados",
+      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} ficheiros carregados"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "falta uma quebra de linha no fim do ficheiro.",
@@ -359,6 +396,7 @@
       "merge": "Fusão",
       "mergeNow": "Integrar agora",
       "mergePullRequest": "Integrar PR",
+      "mergeTermTitle": "Integrar {{term}}",
       "enableAutoMerge": "Ativar integração automática",
       "disableAutoMerge": "Desativar integração automática",
       "autoMergeOn": "Integração automática ativa",
@@ -377,9 +415,12 @@
       "deleteBranchAfterMerge": "Eliminar o ramo após a integração",
       "noEnabledMethods": "Este repositório não tem métodos de integração ativos. Pede a um administrador do repositório para ativar a integração com um commit, a combinação de commits ou a reaplicação de commits.",
       "confirmTitle": "Integrar PR?",
+      "confirmTitleTerm": "Integrar {{term}}?",
       "confirmMessage": "As tuas alterações serão integradas no ramo base.",
       "enableAutoMergeConfirmTitle": "Ativar integração automática?",
       "enableAutoMergeConfirmMessage": "O GitHub vai integrar este PR automaticamente quando todas as verificações obrigatórias forem concluídas com êxito.",
+      "enableAutoMergeConfirmMessageTerm": "O {{term}} será integrado automaticamente quando o pipeline for bem-sucedido.",
+      "enableAutoMergeDescriptionTerm": "O GitLab integra este {{term}} automaticamente quando o pipeline for bem-sucedido.",
       "forbidden": "Não tens permissão para integrar este PR.",
       "cannotMerge": "Não é possível integrar este PR no estado atual.",
       "couldNotMerge": "Não foi possível integrar o PR.",
@@ -390,7 +431,8 @@
       },
       "terminal": {
         "alreadyMerged": "Já integrado",
-        "closed": "Este PR está fechado"
+        "closed": "Este PR está fechado",
+        "closedMergeRequest": "Este merge request está fechado"
       },
       "partialSuccessBanner": {
         "body": "Não foi possível eliminar o ramo: {{reason}}.",
@@ -415,6 +457,19 @@
         "behindDetail": "O ramo de origem não inclui as alterações mais recentes do ramo base. Reaplica os commits ou atualiza o ramo antes de o integrar.",
         "notMergeableTitle": "Ainda não é possível integrar este PR",
         "notMergeableDetail": "O GitHub indicou o estado de integração {{state}}."
+      },
+      "restrictions": {
+        "title": "Restrições à integração",
+        "approvalsRequired_one": "É necessária {{displayCount}} aprovação",
+        "approvalsRequired_other": "São necessárias {{displayCount}} aprovações",
+        "pipelineMustSucceed": "O pipeline tem de ser bem-sucedido antes da integração.",
+        "approvalsRequired_many": "São necessárias {{displayCount}} aprovações"
+      },
+      "providerBlocked": {
+        "failingPipeline": "O pipeline está a falhar no último commit.",
+        "pendingPipeline": "O pipeline ainda está a ser executado no último commit.",
+        "permission": "Não tens permissão para integrar este {{term}}.",
+        "draft": "Marca o {{term}} como pronto para revisão antes de o integrar."
       },
       "methodLabels": {
         "merge": "Criar um commit de integração",
@@ -464,6 +519,8 @@
       "replyBadRequest": "Esta resposta não pode ser publicada. A conversa pode ter mudado.",
       "replyForbidden": "Não tens permissão para responder a este PR.",
       "addCommentCta": "Comentar neste PR",
+      "fixWithKilo": "Corrigir com Kilo",
+      "fixWithKiloPrompt": "Por favor, resolve o seguinte comentário do PR: {{link}}",
       "commentBadRequest": "Este comentário não pode ser publicado. O PR pode ter mudado.",
       "commentForbidden": "Não tens permissão para comentar neste PR.",
       "moderation": {
@@ -516,7 +573,11 @@
         "outdatedOnLines": "Desatualizado em {{lines}}",
         "outdatedOnPath": "Desatualizado em {{path}}"
       },
-      "deletedUser": "utilizador eliminado"
+      "deletedUser": "utilizador eliminado",
+      "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}.",
+      "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
+      "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da aplicação GitHub.",
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
@@ -528,17 +589,19 @@
     "reviewPullRequest": "Rever PR",
     "headLine": "{{counts}} · commit mais recente: {{sha}}",
     "entry": {
-      "eyebrow": "Abre um PR através do URL.",
-      "pastePrLink": "Colar uma ligação de PR",
-      "noRecentPrs": "Sem PRs recentes",
-      "noRecentPrsDescription": "Cola uma ligação de PR acima para iniciar uma revisão. O PR aparecerá aqui na próxima vez.",
+      "eyebrow": "Abre um PR ou um merge request através do URL",
+      "pastePrLink": "Colar uma ligação de PR ou de merge request",
+      "noRecentPrs": "Sem revisões recentes",
+      "noRecentPrsDescription": "Cola uma ligação acima para iniciar uma revisão — aparecerá aqui na próxima vez.",
       "couldNotLoad": "Não foi possível carregar os dados.",
       "removeFromRecentsTitle": "Remover dos recentes?",
-      "removeFromRecentsMessage": "Este PR será removido da tua lista de recentes.",
+      "removeFromRecentsMessage": "Esta revisão será removida da tua lista de recentes.",
       "removeRecentAccessibility": "Remover {{repo}} dos recentes",
-      "urlAccessibility": "URL do PR no GitHub",
-      "clearLink": "Limpar a ligação do PR",
-      "pasteLink": "Colar a ligação do PR",
+      "urlAccessibility": "Introduz um URL de PR ou de merge request",
+      "urlPlaceholder": "URL de PR ou de merge request",
+      "openAccessibility": "Abrir PR ou merge request",
+      "clearLink": "Limpar a ligação",
+      "pasteLink": "Colar a ligação de PR ou de merge request",
       "open": "Abrir"
     },
     "checks": {
@@ -555,6 +618,9 @@
       "pending": "{{displayCount}} por concluir",
       "skipped": "{{displayCount}} ignoradas",
       "checksCount": "{{displayCount}} verificações",
+      "checksCount_one": "{{displayCount}} verificação",
+      "checksCount_many": "{{displayCount}} verificações",
+      "checksCount_other": "{{displayCount}} verificações",
       "checkDetails": "detalhes da verificação"
     },
     "inbox": {
@@ -587,9 +653,15 @@
     "connect": {
       "checkFailedTitle": "Não foi possível verificar a ligação ao GitHub.",
       "checkFailedMessage": "O estado da sessão só fica disponível quando o carregamento terminar.",
+      "checkFailedTitleGitLab": "Não foi possível verificar a ligação ao GitLab.",
+      "checkFailedTitleBitbucket": "Não foi possível verificar a ligação ao Bitbucket.",
+      "providerCheckFailedMessage": "O estado da ligação só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Voltar a ligar o GitHub",
       "reconnectDescription": "A tua ligação ao GitHub foi revogada. Volta a ligar a conta para continuar a rever PRs no telemóvel.",
-      "description": "Liga a tua conta do GitHub para rever PRs no telemóvel."
+      "description": "Liga a tua conta do GitHub para rever PRs no telemóvel.",
+      "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
+      "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
+      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -612,7 +684,10 @@
     },
     "reconnectNotice": {
       "title": "A ligação ao GitHub expirou.",
-      "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
+      "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
+      "gitlabTitle": "A ligação ao GitLab expirou.",
+      "bitbucketTitle": "A ligação ao Bitbucket expirou.",
+      "providerMessage": "A tua ligação ao {{provider}} já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
     },
     "eventChips": {
       "comment": "Comentar",
@@ -679,10 +754,13 @@
       "statusContext": "Contexto",
       "lineLabel": "Linha {{line}} — {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(vazio)"
+      "emptyLine": "(vazio)",
+      "truncationBanner_one": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub.",
+      "truncationBanner_other": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub.",
+      "truncationBanner_many": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub."
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia.",
-    "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR do GitHub.",
+    "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
       "reviewSubmitted": "Revisão enviada",
@@ -691,6 +769,7 @@
     "mutationError": {
       "commentNotPosted": "Não é possível publicar este comentário. A linha selecionada pode ter mudado ou o PR pode ter sido atualizado.",
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou podes estar a tentar rever o teu próprio PR.",
+      "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
       "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente."
     },
@@ -698,9 +777,31 @@
       "couldNotReply": "Não foi possível responder.",
       "couldNotCompleteAction": "Não foi possível concluir esta ação.",
       "mergeResultDefaultError": "O GitHub não concluiu a integração.",
+      "mergeResultNotCompleted": "O {{term}} não foi integrado. Verifica o estado e tenta novamente.",
       "ambiguous": "Não foi possível confirmar o resultado. Verifica o PR antes de tentar novamente.",
       "persistenceFailed": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
       "forbidden": "Não tens permissão para executar esta ação."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Não disponível neste fornecedor",
+        "accessibility": "Não disponível neste fornecedor: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Partilhar merge request",
+      "viewOnProvider": "Ver em {{provider}}",
+      "mergeRequestUnavailable": "Merge request indisponível",
+      "unavailableDescription": "Pode ter sido eliminado, ou não tens acesso a ele.",
+      "accessDeniedMergeRequest": "Não tens permissão para ver este merge request.",
+      "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
+      "discussionAccessDenied": "Não tens permissão para ver a discussão deste merge request.",
+      "discussionUnavailableMessage": "Este merge request pode ter sido removido.",
+      "noDiscussionDescription": "Este merge request ainda não tem conversas de revisão nem comentários na discussão.",
+      "noFilesChangedDescription": "Este merge request não tem alterações nos ficheiros."
     }
   },
   "notifications": {
@@ -733,11 +834,12 @@
     "previewFullDescription": "As notificações mostram o texto da mensagem no ecrã bloqueado.",
     "previewGenericDescription": "As notificações indicam que há novidades. Abra o Kilo para ler a mensagem.",
     "channel": {
-      "agent": "Sessões de agente",
+      "agentProgress": "Progresso do agente",
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Ocorrências de segurança"
+      "security": "Ocorrências de segurança",
+      "spend": "Alertas de gastos"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas suas conversas",
@@ -748,8 +850,22 @@
       "sessionStatusTitle": "Estado da sessão",
       "sessionStatusSubtitle": "concluída / com erro / pronta para controlo",
       "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
+      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber atividade do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA"
+      "balanceAlertsUnavailable": "Junte-se a uma organização para receber alertas de saldo.",
+      "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA",
+      "securityFindingsUnavailable": "Ative o Agente de segurança do Kilo num âmbito para receber ocorrências de segurança.",
+      "spendAlertsSubtitle": "ultrapassagens de limites e picos horários",
+      "spendAlertsToggle": "Categoria de alertas de gastos"
+    },
+    "action": {
+      "openSession": "Abrir sessão"
+    },
+    "needsInputAction": {
+      "approved": "Pedido aprovado",
+      "replied": "Resposta enviada",
+      "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
+      "unavailable": "Este pedido já não está à espera."
     }
   },
   "tabs": {
@@ -830,7 +946,10 @@
       "uploadFailed": "Não foi possível enviar o anexo.",
       "failedToUploadFile": "Não foi possível enviar o ficheiro: {{reason}}",
       "nothingToPaste": "Não há nada para colar.",
-      "metadataStripFailed": "Não foi possível remover os metadados da fotografia."
+      "metadataStripFailed": "Não foi possível remover os metadados da fotografia.",
+      "limit_one": "Podes anexar até {{displayCount}} ficheiro.",
+      "limit_other": "Podes anexar até {{displayCount}} ficheiros.",
+      "limit_many": "Podes anexar até {{displayCount}} ficheiros."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}: {{status}}",
@@ -1577,7 +1696,13 @@
       "syncFindings": "Sincronizar ocorrências",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronização adicionada à fila",
-      "syncStatusUnavailable": "Não é possível consultar o estado da sincronização."
+      "syncStatusUnavailable": "Não é possível consultar o estado da sincronização.",
+      "daysOverdue_one": "{{displayCount}} dia em atraso",
+      "daysOverdue_other": "{{displayCount}} dias em atraso",
+      "daysOverdue_many": "{{displayCount}} dias em atraso",
+      "findingsCount_one": "{{displayCount}} ocorrência",
+      "findingsCount_other": "{{displayCount}} ocorrências",
+      "findingsCount_many": "{{displayCount}} ocorrências"
     },
     "dashboardMetrics": {
       "openFindings": "Ocorrências abertas",
@@ -1980,6 +2105,10 @@
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
+      "stopped": "Sessão interrompida",
+      "committing": "A confirmar…",
+      "committed": "Confirmado",
+      "commitFailed": "Falha ao confirmar",
       "renameSession": "Renomear sessão",
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",
@@ -2014,6 +2143,7 @@
       "exitNeedsNewerCli": "Os comandos de barra remotos exigem uma versão mais recente do Kilo CLI. Atualize o Kilo CLI e volte a estabelecer a ligação."
     },
     "sessionConnection": {
+      "label": "Ligação",
       "connecting": "A ligar…",
       "reconnecting": "A restabelecer a ligação…",
       "connectionLost": "Ligação perdida",
@@ -2033,14 +2163,36 @@
       "removeConfirmTitle": "Remover objetivo?",
       "removeConfirmMessage": "O CLI limpa o objetivo desta sessão.",
       "updateFailed": "Não foi possível atualizar o objetivo.",
-      "sectionAccessibility": "{{status}}. Objetivo: {{text}}"
+      "sectionAccessibility": "{{status}}. Objetivo: {{text}}",
+      "collapse": "Recolher objetivo",
+      "expand": "Expandir objetivo"
     },
     "newSession": {
+      "recentlyUsed": "Usados recentemente",
+      "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
+      "couldNotLoadGitlabRepositories": "Não foi possível carregar os repositórios do GitLab.",
+      "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
       "connectGithubDescription": "Ligue a sua conta do GitHub no navegador e volte aqui para escolher um repositório.",
+      "connectGitlabDescription": "Ligue a sua conta do GitLab no navegador e volte aqui para escolher um repositório.",
+      "connectBitbucketDescription": "Ligue a sua conta do Bitbucket no navegador e volte aqui para escolher um repositório.",
       "openGithub": "Abrir o GitHub",
+      "openGitlab": "Abrir o GitLab",
+      "openBitbucket": "Abrir o Bitbucket",
       "refreshRepositories": "Atualizar repositórios",
       "githubConnected": "GitHub ligado",
+      "gitlabConnected": "GitLab ligado",
       "noRepositoriesVisible": "Não há repositórios visíveis. Verifique as permissões de acesso da aplicação Kilo para GitHub e atualize a lista.",
+      "noRepositoriesVisibleGitlab": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do GitLab e atualize a lista.",
+      "noRepositoriesVisibleBitbucket": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do Bitbucket e atualize a lista.",
+      "bitbucketOrganizationsOnly": "O Bitbucket está disponível apenas para organizações.",
+      "branchPickerTitle": "Selecionar ramo",
+      "branchDefault": "Predefinido",
+      "branchAccessibility": "Ramo: {{label}}",
+      "branchLoading": "A carregar ramos",
+      "branchLoadError": "Não foi possível carregar os ramos",
+      "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
+      "branchEmpty": "Nenhum ramo disponível",
+      "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
       "couldNotLoadEnvironment": "Não foi possível carregar o seu ambiente.",
@@ -2061,24 +2213,39 @@
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Eliminar rascunho?",
       "discardDraftMessage": "O seu pedido será eliminado.",
+      "discardWithUploadsMessage": "O seu pedido e os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
       "discardFailed": "Não foi possível eliminar o rascunho. Tente novamente.",
       "remoteHint": "Execute `kilo remote` no seu computador ou `/remote` numa sessão CLI em execução para controlar um processo local do kilo.",
-      "connectBitbucketDescription": "Ligue a sua conta do Bitbucket no navegador e volte aqui para escolher um repositório.",
-      "connectGitlabDescription": "Ligue a sua conta do GitLab no navegador e volte aqui para escolher um repositório.",
-      "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
-      "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
-      "couldNotLoadGitlabRepositories": "Não foi possível carregar os repositórios do GitLab.",
-      "gitlabConnected": "GitLab ligado",
-      "noRepositoriesVisibleBitbucket": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do Bitbucket e atualize a lista.",
-      "noRepositoriesVisibleGitlab": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do GitLab e atualize a lista.",
-      "openBitbucket": "Abrir o Bitbucket",
-      "openGitlab": "Abrir o GitLab",
-      "recentlyUsed": "Usados recentemente",
       "continueFrom": "A sessão {{title}} está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",
-      "discardWithUploadsMessage": "O seu pedido e os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados."
+      "pickProfile": "Escolha um perfil",
+      "noProfile": "Sem perfil",
+      "manageProfiles": "Gerir perfis",
+      "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e competências.",
+      "advancedConfig": "Configuração avançada",
+      "advancedConfigDescription": "Selecione um perfil para carregar configurações guardadas e configure manualmente variáveis de ambiente e comandos de configuração adicionais",
+      "saveAsProfile": "Guardar como perfil",
+      "saveProfileDescription": "Guarde as variáveis de ambiente e os comandos de configuração atuais como um perfil reutilizável.",
+      "profileSummary": "{{vars}} variáveis de ambiente · {{commands}} comandos de configuração",
+      "profileSaved": "Perfil \"{{name}}\" guardado",
+      "organizationProfiles": "Perfis da organização",
+      "personalProfiles": "Perfis pessoais",
+      "yourProfiles": "Os teus perfis",
+      "failedToLoadProfiles": "Não foi possível carregar os perfis",
+      "nameTooLong": "O nome do perfil é demasiado longo",
+      "descriptionTooLong": "A descrição é demasiado longa",
+      "secretsEncrypted": "Os segredos são encriptados antes de serem guardados.",
+      "profileActive": "Perfil ativo",
+      "profilesActive": "Perfis ativos",
+      "customConfigActive": "Configuração personalizada ativa",
+      "configNeedsAttention": "A configuração precisa de atenção",
+      "repoProfile": "Perfil do repositório",
+      "selectedProfile": "Perfil selecionado",
+      "manualOverrides": "Substituições manuais",
+      "openSettingsToReview": "Abra as definições para rever",
+      "profileSelection": "Seleção de perfil"
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",
@@ -2103,15 +2270,21 @@
       "updateTodos": "Atualizar lista de tarefas",
       "linesBadge": "{{displayCount}} linhas",
       "filesBadge": "{{displayCount}} ficheiros",
-      "matchesBadge": "{{displayCount}} correspondências"
+      "matchesBadge": "{{displayCount}} correspondências",
+      "filesBadge_one": "{{displayCount}} ficheiro",
+      "filesBadge_other": "{{displayCount}} ficheiros",
+      "filesBadge_many": "{{displayCount}} ficheiros",
+      "linesBadge_one": "{{displayCount}} linha",
+      "linesBadge_other": "{{displayCount}} linhas",
+      "linesBadge_many": "{{displayCount}} linhas",
+      "matchesBadge_one": "{{displayCount}} correspondência",
+      "matchesBadge_other": "{{displayCount}} correspondências",
+      "matchesBadge_many": "{{displayCount}} correspondências",
+      "noOutput": "Sem saída."
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
       "linesOf": "linhas {{start}}–{{end}} de {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Falhou uma operação do Cloud Agent: {{action}} ({{status}}).",
-      "failed": "Falhou uma operação do Cloud Agent: {{action}}."
     },
     "collectCopyableText": {
       "unserializableInput": "[entrada não serializável]",
@@ -2208,8 +2381,7 @@
       "assistantProviderRejected": "O fornecedor rejeitou o pedido.",
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
-      "assistantFailed": "A resposta falhou.",
-      "sendFailed": "Não foi possível enviar a mensagem. Tente novamente."
+      "assistantFailed": "A resposta falhou."
     },
     "filePart": {
       "loadingImage": "A carregar a imagem",
@@ -2396,7 +2568,13 @@
       "files": "Ficheiros",
       "couldNotOpenPhotoPicker": "Não foi possível abrir o seletor de fotografias. Reinicie o Kilo e tente novamente.",
       "maxFilesAllowed": "Só pode adicionar até {{displayCount}} ficheiros.",
-      "onlyAddingFiles": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})"
+      "onlyAddingFiles": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "maxFilesAllowed_one": "Só pode adicionar até {{displayCount}} ficheiro.",
+      "maxFilesAllowed_other": "Só pode adicionar até {{displayCount}} ficheiros.",
+      "maxFilesAllowed_many": "Só pode adicionar até {{displayCount}} ficheiros.",
+      "onlyAddingFiles_one": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "onlyAddingFiles_other": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "onlyAddingFiles_many": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})"
     },
     "composer": {
       "addAttachment": "Adicionar anexo",
@@ -2414,7 +2592,10 @@
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
       "discardAttachmentsTitle": "Eliminar anexos?",
       "charactersRemaining": "{{count}} caracteres restantes",
-      "insertNewline": "Inserir nova linha"
+      "insertNewline": "Inserir nova linha",
+      "charactersRemaining_one": "{{count}} caractere restante",
+      "charactersRemaining_other": "{{count}} caracteres restantes",
+      "charactersRemaining_many": "{{count}} caracteres restantes"
     },
     "chatLink": {
       "linkCopied": "Ligação copiada",
@@ -2448,7 +2629,17 @@
       "startNewSession": "Iniciar uma nova sessão",
       "exitSession": "Sair da sessão",
       "clearSession": "Terminar esta sessão e iniciar uma nova",
+      "compactDescription": "compactar o contexto da sessão atual",
+      "goalDescription": "Continua a trabalhar para um objetivo de sessão. /goal <objective> ou pause, resume, clear",
+      "initDescription": "configuração guiada do AGENTS.md",
+      "resumeClaudeDescription": "importar uma transcrição de sessão do Claude Code",
+      "resumeCodexDescription": "importar uma transcrição de sessão do OpenAI Codex",
+      "reviewDescription": "rever as alterações [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
+      "useSkillCommand": "Usar competência /{{command}}",
+      "skillBadge": "Competência",
+      "catalogFull": "O catálogo de comandos está cheio, por isso alguns comandos ficam ocultos.",
+      "catalogOverLimit": "O catálogo de competências excede o limite de tamanho, por isso são apresentadas todas as competências.",
       "insert": "Inserir",
       "upgradeRequiredFallback": "Atualize a sua CLI para usar este comando.",
       "exitCapabilityUnavailable": "Atualize a sua CLI para sair da sessão.",
@@ -2481,7 +2672,10 @@
       "stepsCount": "{{steps}} passos",
       "stepsCount_other": "{{steps}} passos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_many": "{{steps}} passos"
+      "stepsCount_many": "{{steps}} passos",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Modelos ({{displayCount}})",
+      "modelsCount_many": "Modelos ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Aprovação automática",
@@ -2521,7 +2715,10 @@
     },
     "toolRun": {
       "sheetTitle": "Chamadas de ferramentas",
-      "condensedLabel": "{{itemCount}} itens; {{last}}"
+      "condensedLabel": "{{itemCount}} itens; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} itens; {{last}}",
+      "condensedLabel_many": "{{itemCount}} itens; {{last}}"
     }
   },
   "bootstrap": {
@@ -2566,6 +2763,7 @@
     "couldNotLoadActiveSessions": "Não foi possível carregar as sessões ativas.",
     "agentSessions": "Em curso agora",
     "newCodingTask": "Nova tarefa de programação",
+    "newTaskFromPicture": "Nova tarefa a partir de uma imagem",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
     "noLiveSessions": "Nada em execução neste momento"
@@ -2655,7 +2853,10 @@
     "cliCantReceiveFilesTitle": "Esta sessão não pode receber ficheiros",
     "cliCantReceiveFilesMessage": "A Kilo CLI que executa esta sessão não pode receber ficheiros. Atualiza a CLI nessa máquina ou partilha o conteúdo com uma nova sessão.",
     "contentlessMessage": "Nada para partilhar — não foram incluídos texto nem ficheiros.",
-    "couldNotReadContent": "Não foi possível ler o conteúdo partilhado."
+    "couldNotReadContent": "Não foi possível ler o conteúdo partilhado.",
+    "onlyFirstFilesAttached_one": "Apenas os primeiros {{displayCount}} ficheiro serão anexados.",
+    "onlyFirstFilesAttached_other": "Apenas os primeiros {{displayCount}} ficheiros serão anexados.",
+    "onlyFirstFilesAttached_many": "Apenas os primeiros {{displayCount}} ficheiros serão anexados."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2787,7 +2988,8 @@
     "aiProvidersWhat": "Os seus pedidos, o histórico de conversas e quaisquer ficheiros que anexar.",
     "aiProvidersWhy": "Para gerar respostas de IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google e outros fornecedores que seleciona em cada pedido.",
-    "gatewayWhat": "ID da conta, metadados dos pedidos e utilização de tokens.",
+    "gatewayWhat": "ID da conta, metadados dos pedidos, utilização de tokens e os prompts e gravações de voz que a app envia através dele.",
+    "viaGateway": "Através do Kilo Gateway",
     "gatewayWhy": "Autenticação, encaminhamento de pedidos, reconciliação de faturação.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Relatórios de falhas e erros, com o conteúdo da aplicação removido.",
@@ -2807,7 +3009,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "A sua gravação enquanto dita.",
     "voiceTranscriptionWhy": "Para transformar a fala em texto.",
-    "voiceTranscriptionWho": "Apenas no dispositivo, ou pela Apple ou Google quando não for possível transcrever sem ligação à Internet.",
+    "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway com o modelo de transcrição que escolheres, ou a Apple ou a Google para reconhecimento online.",
     "installAttributionPromptTitle": "Permitir identificar a origem da instalação?",
     "installAttributionPromptMessage": "O Kilo usa a permissão de seguimento da Apple apenas para identificar o canal através do qual conheceu a aplicação. Os seus pedidos e conversas nunca são usados para este fim.",
     "what": "O quê",
@@ -2980,6 +3182,14 @@
     "tooManySignInAttempts": "Demasiadas tentativas de início de sessão. Aguarda um momento e tenta novamente."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avançado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Gratuito",
+      "organization": "Automático de organização"
+    },
     "dataCollected": "Dados recolhidos",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Não foi possível atualizar os favoritos.",
@@ -3018,8 +3228,17 @@
     "privacy": "Abre o Kilo para ver os agentes",
     "openAgents": "Abrir agentes",
     "needsInput": "À espera de resposta",
+    "newestSession": "A mais recente: {{title}}",
+    "noneWaiting": "Nenhum agente à espera",
+    "newAgent": "Novo agente",
+    "approving": "A aprovar...",
+    "couldNotApprove": "Não foi possível aprovar",
+    "couldNotStart": "Não foi possível iniciar",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado."
+    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
+    "openSession": "Abrir",
+    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
+    "newestResult": "Resultado mais recente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3044,14 +3263,214 @@
     "remoteOptionTitle": "O seu computador",
     "remoteOptionBody": "Execute o Kilo na sua própria máquina através da CLI `kilo remote`.",
     "skip": "Saltar tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicie a sua primeira sessão remota",
-    "remoteBody": "Ligue o seu computador e depois inicie a sessão a partir daqui.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ainda sem computador ligado",
-    "remoteEmptyBody": "Para ligá-lo, execute `kilo remote` no seu computador.",
-    "remoteFound": "Computador ligado",
-    "checkAgain": "Verificar novamente",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Iniciar agente precisa de um pedido. Adiciona um pedido e executa-o novamente.",
+      "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório GitHub ou GitLab. Escolhe outro repositório no Kilo.",
+      "repositoryUnsupported": "{{repository}} é um repositório Bitbucket — Iniciar agente ainda não o pode usar. Escolhe outro repositório no Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Abrir última sessão"
+  },
+  "spendAlerts": {
+    "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
+    "enable": "Ativar os alertas de gastos",
+    "thresholdTitle": "Ultrapassagem do limite",
+    "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
+    "anomalyTitle": "Pico horário",
+    "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste âmbito",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Janela",
+    "window24h": "24 horas",
+    "window7d": "7 dias",
+    "window30d": "30 dias",
+    "multiplierLabel": "Multiplicador do pico",
+    "saved": "Definições dos alertas de gastos guardadas",
+    "loadError": "Não foi possível carregar os alertas de gastos.",
+    "saveError": "Não foi possível guardar os alertas de gastos.",
+    "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contactos de faturação deste âmbito.",
+    "noSpend": "Ainda não há gastos registados",
+    "spend24h": "Gastos nas últimas 24 horas",
+    "multiplierError": "Introduza um multiplicador de 1 ou mais",
+    "permissionDenied": "Não tem permissão para gerir os alertas de gastos.",
+    "pushOffByCategory": "Desativado em Notificações"
+  },
+  "profiles": {
+    "title": "Perfis",
+    "entrySubtitle": "Reutilizar definições de ambiente entre sessões",
+    "newProfile": "Novo perfil",
+    "emptyTitle": "Ainda não há perfis",
+    "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
+    "loadFailed": "Não foi possível carregar perfis",
+    "counts": {
+      "vars": "{{count}} variáveis",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} competências",
+      "commands": "{{count}} comandos",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}comp",
+      "commandsShort": "{{count}}cmd"
+    },
+    "nameLabel": "Nome do perfil",
+    "namePlaceholder": "ex.: Depuração de back-end",
+    "descriptionLabel": "Descrição do perfil",
+    "descriptionPlaceholder": "Descrição opcional",
+    "ownerLabel": "Proprietário do perfil",
+    "nameRequired": "Introduza um nome de perfil",
+    "createAction": "Criar perfil",
+    "createFailed": "Não foi possível criar o perfil",
+    "createdToast": "Perfil \"{{name}}\" criado",
+    "settingsSectionTitle": "Configuração",
+    "defaultSectionTitle": "Perfil predefinido",
+    "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
+    "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
+    "setAsDefault": "Definir como predefinido",
+    "removeDefault": "Remover predefinição",
+    "saveFailed": "Não foi possível guardar o perfil",
+    "deleteTitle": "Eliminar perfil",
+    "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",
+    "deleteFailed": "Não foi possível eliminar o perfil",
+    "deleteBlocked": "Este perfil é usado por um acionador de webhook. Remova-o primeiro desses acionadores.",
+    "deletedToast": "Perfil \"{{name}}\" eliminado",
+    "variablesTitle": "Variáveis de ambiente",
+    "addVariable": "Adicionar variável",
+    "keyLabel": "Chave",
+    "keyTooLong": "A chave deve ter 256 caracteres ou menos",
+    "keyDuplicate": "Esta chave já existe no perfil",
+    "valueLabel": "Valor",
+    "secretLabel": "Segredo",
+    "secrets": {
+      "markSecret": "Marcar como secreto",
+      "masked": "Valor oculto",
+      "reveal": "Mostrar valor",
+      "newValuePlaceholder": "Introduza um novo valor secreto",
+      "valuePlaceholder": "Valor secreto (encriptado)"
+    },
+    "variablesEmpty": "Ainda não há variáveis",
+    "variablesSaveFailed": "Não foi possível guardar a variável",
+    "commandsTitle": "Comandos de configuração",
+    "addCommand": "Adicionar comando",
+    "commandLabel": "Comando",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Ainda não há comandos de configuração",
+    "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
+    "skillsTitle": "Competências",
+    "addSkill": "Adicionar competência",
+    "skillNameLabel": "Nome da competência",
+    "skillMarkdownLabel": "Conteúdo da competência",
+    "skillsEmpty": "Ainda não há competências",
+    "skillNameRequired": "Introduza um nome de competência",
+    "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
+    "skillContentRequired": "O conteúdo da competência é obrigatório",
+    "skillSaveFailed": "Não foi possível guardar a competência",
+    "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
+    "skillEditTitle": "Editar competência",
+    "mcp": {
+      "title": "Servidores MCP",
+      "add": "Adicionar servidor MCP",
+      "empty": "Ainda não há servidores MCP",
+      "name": "Nome do servidor",
+      "type": "Tipo de servidor",
+      "localType": "Local",
+      "remoteType": "Remoto",
+      "command": "Linha de comando",
+      "url": "URL",
+      "environment": "Ambiente (JSON)",
+      "headers": "Cabeçalhos (JSON)",
+      "timeout": "Tempo limite",
+      "secretCount": "Número de segredos",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Introduza um nome de servidor",
+      "nameInvalid": "O nome pode usar apenas letras, números, sublinhados e hífenes",
+      "commandRequired": "Introduza um comando",
+      "commandTooLong": "Utilize no máximo 50 argumentos de 500 caracteres cada",
+      "urlRequired": "Introduza um URL",
+      "urlInvalid": "Introduza um URL válido",
+      "urlTooLong": "O URL deve ter 2048 caracteres ou menos",
+      "jsonInvalid": "Introduza JSON válido — um objeto de cadeias de caracteres",
+      "jsonTooLarge": "Utilize no máximo 50 entradas, chaves até 128 e valores até 4096 caracteres",
+      "timeoutInvalid": "O tempo limite deve ser um número inteiro de milissegundos",
+      "edit": "Editar servidor MCP",
+      "saveFailed": "Não foi possível guardar o servidor MCP"
+    },
+    "agents": {
+      "title": "Agentes do perfil",
+      "add": "Adicionar agente",
+      "empty": "Ainda não há agentes",
+      "name": "Nome do agente",
+      "slug": "Slug do agente",
+      "description": "Descrição do agente",
+      "model": "Substituição do modelo",
+      "modelPlaceholder": "Usar predefinição da sessão",
+      "prompt": "Instrução do sistema",
+      "steps": "Passos máximos",
+      "stepsPlaceholder": "p. ex. 50",
+      "temperature": "Temperatura",
+      "temperaturePlaceholder": "p. ex. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "p. ex. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Meu agente",
+      "promptPlaceholder": "És um...",
+      "tools": "Ferramentas",
+      "visibility": "Visibilidade",
+      "visibilityPrimary": "Primário — mostrado no seletor",
+      "visibilitySubagent": "Subagente — só pode ser invocado por outros",
+      "visibilityAll": "Todos — ambos",
+      "saveFailed": "Não foi possível guardar o agente",
+      "nameRequired": "Introduza um nome de agente",
+      "slugRequired": "Introduza um slug de agente",
+      "slugInvalid": "O slug deve começar por uma letra e usar apenas letras minúsculas, dígitos e hífenes",
+      "slugConflict": "Esse slug está reservado por um agente incorporado",
+      "edit": "Editar agente"
+    },
+    "slashCommands": {
+      "title": "Comandos de barra",
+      "add": "Adicionar comando de barra",
+      "empty": "Ainda não há comandos de barra",
+      "name": "Nome do comando",
+      "description": "Descrição do comando",
+      "template": "Modelo",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Explica $ARGUMENTS",
+      "agent": "Agente",
+      "subtask": "Executar como subtarefa",
+      "edit": "Editar comando de barra",
+      "saveFailed": "Não foi possível guardar o comando",
+      "nameRequired": "Introduza um nome de comando",
+      "nameInvalid": "O nome deve começar por uma letra minúscula e usar apenas letras minúsculas, dígitos e hífenes",
+      "templateRequired": "Introduza um modelo de comando",
+      "nameConflict": "Esse nome está reservado por um comando incorporado"
+    },
+    "repoBindings": {
+      "title": "Perfis predefinidos para repositórios",
+      "add": "Adicionar padrão",
+      "empty": "Nenhuma predefinição configurada",
+      "emptyDescription": "Adicione um padrão para aplicar automaticamente um perfil ao iniciar sessões de um repositório.",
+      "repo": "Selecione o repositório…",
+      "profile": "Selecione o perfil",
+      "remove": "Desvincular",
+      "private": "Privado",
+      "search": "Pesquisar repositórios…",
+      "addedToast": "Perfil predefinido definido para \"{{repo}}\"",
+      "addFailed": "Não foi possível definir o perfil predefinido",
+      "removedToast": "Perfil predefinido removido para \"{{repo}}\"",
+      "removeFailed": "Não foi possível remover o perfil predefinido",
+      "pinnedTitle": "Fixado a repositórios",
+      "pinRepo": "Fixar um repositório",
+      "pinnedEmpty": "Não fixado a nenhum repositório.",
+      "pinnedDescription": "Carregado automaticamente sempre que uma sessão tem como destino um destes repositórios.",
+      "pinnedToast": "Fixado a \"{{repo}}\"",
+      "pinFailed": "Não foi possível fixar o repositório",
+      "unboundToast": "Repositório desvinculado",
+      "unbindFailed": "Não foi possível desvincular o repositório"
+    }
   }
 }

@@ -36,6 +36,7 @@
     "cost": "Kostnad",
     "discard": "Kassera",
     "findings": "Anmärkningar",
+    "mergeRequest": "merge request",
     "notConnected": "Inte ansluten",
     "notifications": "Aviseringar",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Använd en annan e-postadress",
     "signInWithApple": "Logga in med Apple",
     "signInWithGoogle": "Logga in med Google",
+    "signInWithPasskey": "Logga in med en passnyckel",
     "emailAddress": "E-postadress",
     "emailPlaceholder": "du@exempel.se",
     "continueWithEmail": "Fortsätt med e-post",
@@ -174,6 +176,10 @@
     "termsConnector": " och ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fler inloggningsalternativ",
+    "passkeyCancelled": "Inloggning med passnyckel avbröts. Försök igen.",
+    "passkeyNotFound": "Ingen passnyckel är sparad för den här enheten. Logga in med Apple, Google eller din e-post i stället.",
+    "passkeyUnsupported": "Passnycklar är inte tillgängliga på den här enheten. Logga in med Apple, Google eller din e-post i stället.",
+    "passkeyFailed": "Det gick inte att logga in med en passnyckel. Försök igen.",
     "couldNotCompleteSignIn": "Kunde inte slutföra inloggningen. Försök igen.",
     "sessionEnded": "Din session avslutades. Logga in igen.",
     "signInCodeExpired": "Din inloggningskod har upphört att gälla. Försök igen.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO för företag"
+    "providerEnterpriseSso": "SSO för företag",
+    "passkeysTitle": "Passnycklar",
+    "passkeysSubtitle": "Logga in utan lösenord",
+    "passkeysEmpty": "Inga passnycklar än",
+    "passkeysEmptyHint": "$t(profile.addPasskey) för att logga in utan lösenord.",
+    "passkeysCouldNotLoad": "Det gick inte att läsa in passnycklar",
+    "passkeysLoadFailed": "Passnycklar är otillgängliga tills detta har lästs in.",
+    "addPasskey": "Lägg till en passnyckel",
+    "passkeyDefaultName": "Passnyckel",
+    "passkeyAddedOn": "Tillagd {{date}}",
+    "passkeyAdded": "Passnyckel tillagd.",
+    "passkeyAddFailed": "Det gick inte att lägga till en passnyckel. Försök igen.",
+    "passkeyAddUnsupported": "Den här enheten kan inte skapa passnycklar.",
+    "passkeyAddCancelled": "Skapandet av passnyckeln avbröts.",
+    "passkeyRemoved": "Passnyckel borttagen.",
+    "passkeyRemoveFailed": "Det gick inte att ta bort den passnyckeln. Försök igen.",
+    "passkeyRenamed": "Passnyckeln har bytt namn.",
+    "passkeyName": "Namn på passnyckel",
+    "renamePasskey": "Byt namn på passnyckel",
+    "removePasskey": "Ta bort passnyckel",
+    "removePasskeyTitle": "Ta bort passnyckel?",
+    "removePasskeyMessage": "Du kan inte längre logga in med den här passnyckeln."
   },
   "preferences": {
     "general": "Allmänt",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
     "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
-    "featureFlags": "Funktionsflaggor",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribering via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -325,7 +347,7 @@
       "expandMoreLines": "Visa ytterligare {{displayCount}} rader ({{start}}–{{end}})",
       "expandLinesOfContext": "Visa {{displayCount}} kontextrader",
       "expandAll": "Visa allt",
-      "expandAllLines": "Visa alla {{displayCount}} rader",
+      "expandAllLines": "Visa alla rader ({{displayCount}})",
       "loadingMoreFiles": "Läser in fler filer…",
       "retryLoadingNextPage": "Försök läsa in nästa sida igen",
       "failedToLoadMoreFiles": "Kunde inte läsa in fler filer – tryck för att försöka igen",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} av {{total}} filer inlästa",
       "filesStillLoading": "Filer läses fortfarande in. Dra nedåt för att uppdatera.",
       "goToOverview": "Gå till översikten",
-      "goToOverviewTab": "Gå till översiktsfliken"
+      "goToOverviewTab": "Gå till översiktsfliken",
+      "expandAllLines_one": "Visa alla rader ({{displayCount}})",
+      "expandAllLines_other": "Visa alla rader ({{displayCount}})",
+      "expandLines_one": "Visa {{displayCount}} rad ({{start}}–{{end}})",
+      "expandLines_other": "Visa {{displayCount}} rader ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Visa {{displayCount}} kontextrad",
+      "expandLinesOfContext_other": "Visa {{displayCount}} kontextrader",
+      "expandMoreLines_one": "Visa ytterligare {{displayCount}} rad ({{start}}–{{end}})",
+      "expandMoreLines_other": "Visa ytterligare {{displayCount}} rader ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} av {{total}} filer inlästa",
+      "loadedOfTotalFiles_other": "{{loaded}} av {{total}} filer inlästa"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ingen radbrytning i slutet av filen",
@@ -357,6 +389,7 @@
       "merge": "Sammanfogning",
       "mergeNow": "Slå samman nu",
       "mergePullRequest": "Slå samman PR",
+      "mergeTermTitle": "Slå samman {{term}}",
       "enableAutoMerge": "Aktivera automatisk sammanslagning",
       "disableAutoMerge": "Inaktivera automatisk sammanslagning",
       "autoMergeOn": "Automatisk sammanslagning är aktiverad",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "Ta bort grenen efter sammanslagning",
       "noEnabledMethods": "Det här kodarkivet har inga aktiverade sammanslagningsmetoder. Be en administratör för kodarkivet att aktivera sammanslagning med en separat incheckning, hopslagning av incheckningar eller ombasering.",
       "confirmTitle": "Slå samman PR:en?",
+      "confirmTitleTerm": "Slå samman {{term}}?",
       "confirmMessage": "Dina ändringar slås samman med basgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivera automatisk sammanslagning?",
       "enableAutoMergeConfirmMessage": "GitHub slår samman den här PR:en automatiskt när alla obligatoriska kontroller har godkänts.",
+      "enableAutoMergeConfirmMessageTerm": "När pipelinen lyckats slås {{term}} samman automatiskt.",
+      "enableAutoMergeDescriptionTerm": "GitLab slår ihop den här {{term}} automatiskt när pipelinen lyckats.",
       "forbidden": "Du har inte behörighet att slå samman den här PR:en.",
       "cannotMerge": "Den här PR:en kan inte slås samman i sitt nuvarande skick.",
       "couldNotMerge": "Kunde inte slå samman PR:en.",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "Redan sammanslagen",
-        "closed": "Den här PR:en är stängd"
+        "closed": "Den här PR:en är stängd",
+        "closedMergeRequest": "Den här merge requesten är stängd"
       },
       "partialSuccessBanner": {
         "body": "Kunde inte ta bort grenen. Orsak: {{reason}}",
@@ -413,6 +450,18 @@
         "behindDetail": "Källgrenen ligger efter basgrenen. Gör en ombasering eller uppdatera grenen före sammanslagningen.",
         "notMergeableTitle": "Den här PR:en kan inte slås samman ännu",
         "notMergeableDetail": "GitHub rapporterade följande status för sammanslagningen: {{state}}."
+      },
+      "restrictions": {
+        "title": "Sammanslagningsbegränsningar",
+        "approvalsRequired_one": "{{displayCount}} godkännande krävs",
+        "approvalsRequired_other": "{{displayCount}} godkännanden krävs",
+        "pipelineMustSucceed": "Pipelinen måste lyckas innan sammanslagning."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipelinen misslyckas med den senaste commiten.",
+        "pendingPipeline": "Pipelinen körs fortfarande på den senaste commiten.",
+        "permission": "Du har inte behörighet att slå samman {{term}}.",
+        "draft": "Markera {{term}} som redo för granskning före sammanslagningen."
       },
       "methodLabels": {
         "merge": "Skapa en incheckning för sammanslagningen",
@@ -462,6 +511,8 @@
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
       "addCommentCta": "Kommentera den här PR:en",
+      "fixWithKilo": "Åtgärda med Kilo",
+      "fixWithKiloPrompt": "Hantera följande kommentar på PR:en: {{link}}",
       "commentBadRequest": "Den här kommentaren kan inte publiceras. PR:en kan ha ändrats.",
       "commentForbidden": "Du har inte behörighet att kommentera den här PR:en.",
       "moderation": {
@@ -491,7 +542,7 @@
       "noDiscussionDescription": "Den här PR:en har inga granskningstrådar eller kommentarer i diskussionen.",
       "reviewFiles": "Granska filer",
       "quotedDiffSnippet": "Citerat diffutdrag",
-      "moreLinesAbove": "… {{displayCount}} fler rader ovanför",
+      "moreLinesAbove": "… fler rader ovanför: {{displayCount}}",
       "termsAcceptRequired": "Du måste godkänna användarvillkoren för att publicera inlägg.",
       "termsOutdatedCopy": "Användarvillkoren har ändrats. Öppna den här vyn igen för att godkänna den senaste versionen.",
       "termsCheckRetryCopy": "Kunde inte kontrollera användarvillkoren. Kontrollera anslutningen och försök igen.",
@@ -512,7 +563,10 @@
         "outdatedOnLines": "Inaktuell på {{lines}}",
         "outdatedOnPath": "Inaktuell i {{path}}"
       },
-      "deletedUser": "borttagen användare"
+      "deletedUser": "borttagen användare",
+      "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
+      "moreLinesAbove_one": "… fler rader ovanför: {{displayCount}}",
+      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "Granska PR",
     "headLine": "{{counts}} · senaste incheckning {{sha}}",
     "entry": {
-      "eyebrow": "Öppna en PR via en URL.",
-      "pastePrLink": "Klistra in en PR-länk",
-      "noRecentPrs": "Inga nyligen öppnade PR:er",
-      "noRecentPrsDescription": "Klistra in en PR-länk ovan för att börja granska. PR:en visas här nästa gång.",
+      "eyebrow": "Öppna en PR eller merge request via en URL",
+      "pastePrLink": "Klistra in en PR- eller merge request-länk",
+      "noRecentPrs": "Inga senaste granskningar",
+      "noRecentPrsDescription": "Klistra in en länk ovan för att börja granska — den visas här nästa gång.",
       "couldNotLoad": "Kunde inte läsa in innehållet.",
       "removeFromRecentsTitle": "Ta bort från senast öppnade?",
-      "removeFromRecentsMessage": "Den här PR:en tas bort från listan över senast öppnade PR:er.",
+      "removeFromRecentsMessage": "Den här granskningen tas bort från listan över senaste.",
       "removeRecentAccessibility": "Ta bort {{repo}} från senast öppnade",
-      "urlAccessibility": "URL till en PR på GitHub",
-      "clearLink": "Rensa PR-länken",
-      "pasteLink": "Klistra in PR-länk",
+      "urlAccessibility": "Ange en URL till en PR eller merge request",
+      "urlPlaceholder": "URL till PR eller merge request",
+      "openAccessibility": "Öppna PR eller merge request",
+      "clearLink": "Rensa länken",
+      "pasteLink": "Klistra in PR- eller merge request-länk",
       "open": "Öppna"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} väntande",
       "skipped": "{{displayCount}} överhoppade",
       "checksCount": "{{displayCount}} kontroller",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontroller",
       "checkDetails": "information om kontrollen"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "Kunde inte kontrollera GitHub-anslutningen.",
       "checkFailedMessage": "Inloggningsstatusen kan inte visas förrän inläsningen är klar.",
+      "checkFailedTitleGitLab": "Kunde inte kontrollera GitLab-anslutningen.",
+      "checkFailedTitleBitbucket": "Kunde inte kontrollera Bitbucket-anslutningen.",
+      "providerCheckFailedMessage": "Anslutningsstatusen kan inte visas förrän inläsningen är klar.",
       "reconnectTitle": "Anslut GitHub igen",
       "reconnectDescription": "Åtkomsten via din GitHub-anslutning har återkallats. Anslut igen för att fortsätta granska PR:er i mobilen.",
-      "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen."
+      "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen.",
+      "gitlabDescription": "Anslut ditt GitLab-konto för att granska merge requests i mobilen.",
+      "bitbucketDescription": "Anslut Bitbucket till den här organisationen för att granska PR:er i mobilen.",
+      "bitbucketOrgOnlyDescription": "Välj en organisation i din profil för att granska dess Bitbucket-PR:er."
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-anslutningen har upphört att gälla.",
-      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
+      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
+      "gitlabTitle": "GitLab-anslutningen har upphört att gälla.",
+      "bitbucketTitle": "Bitbucket-anslutningen har upphört att gälla.",
+      "providerMessage": "Din {{provider}}-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
     },
     "eventChips": {
       "comment": "Kommentera",
@@ -672,10 +739,12 @@
       "statusContext": "Kontext",
       "lineLabel": "{{status}} rad {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(tom)"
+      "emptyLine": "(tom)",
+      "truncationBanner_one": "Visar de första {{limit}} av {{total}} ändrade filerna på grund av en begränsning i GitHubs API.",
+      "truncationBanner_other": "Visar de första {{limit}} av {{total}} ändrade filerna på grund av en begränsning i GitHubs API."
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt.",
-    "linkPasteNotAPullRequest": "Länken leder inte till en PR på GitHub.",
+    "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
       "reviewSubmitted": "Granskning skickad",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "Den här kommentaren kan inte publiceras. Den markerade raden kan ha ändrats eller PR:en kan ha uppdaterats.",
       "reviewNotSubmitted": "Den här granskningen kan inte skickas i sitt nuvarande skick. PR:en kan ha ändrats, eller så gäller den din egen PR som du inte får granska.",
+      "reviewNotSubmittedTerm": "Den här granskningen kan inte skickas i sitt nuvarande skick. {{term}} kan ha ändrats, eller så kan du inte granska din egen {{term}}.",
       "couldNotPostComment": "Kunde inte publicera kommentaren.",
       "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "Det gick inte att skicka svaret.",
       "couldNotCompleteAction": "Kunde inte slutföra den här åtgärden.",
       "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen.",
+      "mergeResultNotCompleted": "{{term}} slogs inte samman. Kontrollera statusen och försök igen.",
       "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera PR:en innan du försöker igen.",
       "persistenceFailed": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
       "forbidden": "Du saknar behörighet."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Inte tillgänglig hos den här leverantören",
+        "accessibility": "Inte tillgänglig hos den här leverantören: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Dela merge request",
+      "viewOnProvider": "Visa på {{provider}}",
+      "mergeRequestUnavailable": "Merge requesten är inte tillgänglig",
+      "unavailableDescription": "Den kan ha tagits bort, eller så har du inte åtkomst.",
+      "accessDeniedMergeRequest": "Du har inte behörighet att se den här merge requesten.",
+      "couldNotLoadMergeRequest": "Kunde inte läsa in merge requesten.",
+      "discussionAccessDenied": "Du har inte behörighet att se diskussionen för den här merge requesten.",
+      "discussionUnavailableMessage": "Den här merge requesten kan ha tagits bort.",
+      "noDiscussionDescription": "Den här merge requesten har inga granskningstrådar eller kommentarer i diskussionen.",
+      "noFilesChangedDescription": "Den här merge requesten innehåller inga filändringar."
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "Aviseringarna visar meddelandetexten på din låsskärm.",
     "previewGenericDescription": "Aviseringarna visar att något har hänt. Öppna Kilo för att läsa meddelandet.",
     "channel": {
-      "agent": "Agentsessioner",
+      "agentProgress": "Agentförlopp",
       "chat": "Chattmeddelanden",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
-      "security": "Säkerhetsanmärkningar"
+      "security": "Säkerhetsanmärkningar",
+      "spend": "Utgiftsvarningar"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "avslutad / misslyckad / redo att styras",
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
+      "kiloclawActivityUnavailable": "Starta en KiloClaw-instans för att få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser"
+      "balanceAlertsUnavailable": "Gå med i en organisation för att få saldovarningar.",
+      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd.",
+      "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
+      "spendAlertsToggle": "Kategorin utgiftsvarningar"
+    },
+    "action": {
+      "openSession": "Öppna session"
+    },
+    "needsInputAction": {
+      "approved": "Begäran godkänd",
+      "replied": "Svar skickat",
+      "failed": "Kunde inte svara. Tryck igen för att försöka igen.",
+      "unavailable": "Denna begäran väntar inte längre."
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "Uppladdningen misslyckades.",
       "failedToUploadFile": "Kunde inte ladda upp filen: {{reason}}",
       "nothingToPaste": "Det finns inget att klistra in.",
-      "metadataStripFailed": "Fotots metadata kunde inte tas bort."
+      "metadataStripFailed": "Fotots metadata kunde inte tas bort.",
+      "limit_one": "Du kan bifoga upp till {{displayCount}} fil.",
+      "limit_other": "Du kan bifoga upp till {{displayCount}} filer."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "Synkronisera fynd",
       "syncNow": "Synkronisera nu",
       "syncQueued": "Synkroniseringen har köats",
-      "syncStatusUnavailable": "Synkroniseringens status är inte tillgänglig."
+      "syncStatusUnavailable": "Synkroniseringens status är inte tillgänglig.",
+      "daysOverdue_one": "{{displayCount}} dag efter tidsfristen",
+      "daysOverdue_other": "{{displayCount}} dagar efter tidsfristen",
+      "findingsCount_one": "{{displayCount}} fynd",
+      "findingsCount_other": "{{displayCount}} fynd"
     },
     "dashboardMetrics": {
       "openFindings": "Öppna fynd",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
+      "stopped": "Sessionen stoppad",
+      "committing": "Committar…",
+      "committed": "Committad",
+      "commitFailed": "Committen misslyckades",
       "renameSession": "Byt namn på sessionen",
       "renamePlaceholder": "Sessionens namn",
       "transcriptAccessibility": "Meddelandehistorik",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "Du behöver en nyare version av Kilo CLI för att använda snedstreckskommandon i fjärrsessioner. Uppdatera Kilo CLI och anslut igen."
     },
     "sessionConnection": {
+      "label": "Anslutning",
       "connecting": "Ansluter…",
       "reconnecting": "Återansluter…",
       "connectionLost": "Anslutningen bröts",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "Ta bort mål?",
       "removeConfirmMessage": "CLI rensar den här sessionens mål.",
       "updateFailed": "Målet kunde inte uppdateras.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Fäll ihop målet",
+      "expand": "Fäll ut målet"
     },
     "newSession": {
+      "recentlyUsed": "Nyligen använda",
+      "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
+      "couldNotLoadGitlabRepositories": "Det gick inte att läsa in kodarkiven från GitLab.",
+      "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
       "connectGithubDescription": "Anslut GitHub i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
+      "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
+      "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
       "openGithub": "Öppna GitHub",
+      "openGitlab": "Öppna GitLab",
+      "openBitbucket": "Öppna Bitbucket",
       "refreshRepositories": "Uppdatera kodarkiven",
       "githubConnected": "GitHub anslutet",
+      "gitlabConnected": "GitLab anslutet",
       "noRepositoriesVisible": "Inga kodarkiv visas. Kontrollera vilka kodarkiv Kilos GitHub-app har åtkomst till och uppdatera sedan listan.",
+      "noRepositoriesVisibleGitlab": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i GitLab och uppdatera sedan listan.",
+      "noRepositoriesVisibleBitbucket": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i Bitbucket och uppdatera sedan listan.",
+      "bitbucketOrganizationsOnly": "Bitbucket är bara tillgängligt för organisationer.",
+      "branchPickerTitle": "Välj gren",
+      "branchDefault": "Standard",
+      "branchAccessibility": "Gren: {{label}}",
+      "branchLoading": "Läser in grenar",
+      "branchLoadError": "Kunde inte läsa in grenar",
+      "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
+      "branchEmpty": "Inga grenar tillgängliga",
+      "branchPlaceholder": "Välj en gren",
       "runOnWithTarget": "Kör på: {{target}}",
       "environment": "Miljö",
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",
       "discardDraftMessage": "Din prompt går förlorad.",
+      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
       "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
-      "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
-      "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
-      "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
-      "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
-      "couldNotLoadGitlabRepositories": "Det gick inte att läsa in kodarkiven från GitLab.",
-      "gitlabConnected": "GitLab anslutet",
-      "noRepositoriesVisibleBitbucket": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i Bitbucket och uppdatera sedan listan.",
-      "noRepositoriesVisibleGitlab": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i GitLab och uppdatera sedan listan.",
-      "openBitbucket": "Öppna Bitbucket",
-      "openGitlab": "Öppna GitLab",
-      "recentlyUsed": "Nyligen använda",
-      "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
       "continueFrom": "Sessionen {{title}} fortsätter.",
-      "importFailed": "Det gick inte att importera den här sessionen.",
       "importingSession": "Importerar sessionen",
-      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort."
+      "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
+      "importFailed": "Det gick inte att importera den här sessionen.",
+      "pickProfile": "Välj en profil",
+      "noProfile": "Ingen profil",
+      "manageProfiles": "Hantera profiler",
+      "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
+      "advancedConfig": "Avancerad konfiguration",
+      "advancedConfigDescription": "Välj en profil för att ladda sparade konfigurationer och manuellt konfigurera ytterligare miljövariabler och inställningskommandon",
+      "saveAsProfile": "Spara som profil",
+      "saveProfileDescription": "Spara de aktuella miljövariablerna och inställningskommandona som en återanvändbar profil.",
+      "profileSummary": "{{vars}} miljövariabler · {{commands}} inställningskommandon",
+      "profileSaved": "Profilen \"{{name}}\" har sparats",
+      "organizationProfiles": "Organisationsprofiler",
+      "personalProfiles": "Personliga profiler",
+      "yourProfiles": "Dina profiler",
+      "failedToLoadProfiles": "Det gick inte att läsa in profiler",
+      "nameTooLong": "Profilnamnet är för långt",
+      "descriptionTooLong": "Beskrivningen är för lång",
+      "secretsEncrypted": "Hemligheter krypteras innan lagring.",
+      "profileActive": "Profil aktiv",
+      "profilesActive": "Profiler aktiva",
+      "customConfigActive": "Anpassad konfiguration aktiv",
+      "configNeedsAttention": "Config behöver uppmärksamhet",
+      "repoProfile": "Repo profil",
+      "selectedProfile": "Vald profil",
+      "manualOverrides": "Manuella åsidosättningar",
+      "openSettingsToReview": "Öppna Inställningar för att granska",
+      "profileSelection": "Profilval"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil har uppdaterats.",
@@ -2086,15 +2241,18 @@
       "updateTodos": "Uppdatera uppgiftslistan",
       "linesBadge": "{{displayCount}} rader",
       "filesBadge": "{{displayCount}} filer",
-      "matchesBadge": "{{displayCount}} träffar"
+      "matchesBadge": "{{displayCount}} träffar",
+      "filesBadge_one": "{{displayCount}} fil",
+      "filesBadge_other": "{{displayCount}} filer",
+      "linesBadge_one": "{{displayCount}} rad",
+      "linesBadge_other": "{{displayCount}} rader",
+      "matchesBadge_one": "{{displayCount}} träff",
+      "matchesBadge_other": "{{displayCount}} träffar",
+      "noOutput": "Ingen utdata."
     },
     "readToolMarkdown": {
       "linesTruncated": "rader {{start}}–{{end}} (avkortat)",
       "linesOf": "rader {{start}}–{{end}} av {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Åtgärden {{action}} i Cloud Agent misslyckades ({{status}}).",
-      "failed": "Åtgärden {{action}} i Cloud Agent misslyckades."
     },
     "collectCopyableText": {
       "unserializableInput": "[indata som inte kan serialiseras]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "Leverantören avvisade begäran.",
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
-      "assistantFailed": "Det gick inte att generera svaret.",
-      "sendFailed": "Det gick inte att skicka meddelandet. Försök igen."
+      "assistantFailed": "Det gick inte att generera svaret."
     },
     "filePart": {
       "loadingImage": "Läser in bild",
@@ -2376,7 +2533,11 @@
       "files": "Filer",
       "couldNotOpenPhotoPicker": "Det gick inte att öppna bildväljaren. Starta om Kilo och försök igen.",
       "maxFilesAllowed": "Du kan lägga till högst {{displayCount}} filer.",
-      "onlyAddingFiles": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})"
+      "onlyAddingFiles": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})",
+      "maxFilesAllowed_one": "Du kan lägga till högst {{displayCount}} fil.",
+      "maxFilesAllowed_other": "Du kan lägga till högst {{displayCount}} filer.",
+      "onlyAddingFiles_one": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})",
+      "onlyAddingFiles_other": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})"
     },
     "composer": {
       "addAttachment": "Bifoga fil",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardAttachmentsTitle": "Ta bort bilagorna?",
       "charactersRemaining": "{{count}} tecken kvar",
-      "insertNewline": "Infoga radbrytning"
+      "insertNewline": "Infoga radbrytning",
+      "charactersRemaining_one": "{{count}} tecken kvar",
+      "charactersRemaining_other": "{{count}} tecken kvar"
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",
@@ -2428,7 +2591,17 @@
       "startNewSession": "Starta en ny session",
       "exitSession": "Avsluta sessionen",
       "clearSession": "Avsluta den här sessionen och starta en ny",
+      "compactDescription": "komprimera den aktuella sessionens kontext",
+      "goalDescription": "Fortsätt arbeta mot ett sessionsmål. /goal <objective> eller pause, resume, clear",
+      "initDescription": "guidad AGENTS.md-konfiguration",
+      "resumeClaudeDescription": "importera en Claude Code-sessionstranskription",
+      "resumeCodexDescription": "importera en OpenAI Codex-sessionstranskription",
+      "reviewDescription": "granska ändringar [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Använd /{{command}}",
+      "useSkillCommand": "Använd färdigheten /{{command}}",
+      "skillBadge": "Färdighet",
+      "catalogFull": "Kommandokatalogen är full, så vissa kommandon är dolda.",
+      "catalogOverLimit": "Färdighetskatalogen överskrider storleksgränsen, så alla färdigheter visas.",
       "insert": "Infoga",
       "upgradeRequiredFallback": "Uppdatera din CLI-version för att använda det här kommandot.",
       "exitCapabilityUnavailable": "Uppdatera din CLI-version för att avsluta sessionen.",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "{{steps}} steg",
       "stepsCount": "{{steps}} steg",
       "stepsCount_other": "{{steps}} steg",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modell ({{displayCount}})",
+      "modelsCount_other": "Modeller ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatiskt godkännande",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "Verktygsanrop",
-      "condensedLabel": "{{itemCount}} poster; {{last}}"
+      "condensedLabel": "{{itemCount}} poster; {{last}}",
+      "condensedLabel_one": "{{itemCount}} post; {{last}}",
+      "condensedLabel_other": "{{itemCount}} poster; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "Kunde inte läsa in de aktiva sessionerna.",
     "agentSessions": "Pågår nu",
     "newCodingTask": "Ny programmeringsuppgift",
+    "newTaskFromPicture": "Ny uppgift från en bild",
     "explore": "Utforska",
     "seeAll": "Visa alla",
     "noLiveSessions": "Inget körs just nu"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "Den här sessionen kan inte ta emot filer",
     "cliCantReceiveFilesMessage": "Kilo CLI som kör den här sessionen kan inte ta emot filer. Uppdatera CLI-verktyget på den datorn eller dela till en ny session i stället.",
     "contentlessMessage": "Det finns inget att dela. Varken text eller filer följde med.",
-    "couldNotReadContent": "Kunde inte läsa det delade innehållet."
+    "couldNotReadContent": "Kunde inte läsa det delade innehållet.",
+    "onlyFirstFilesAttached_one": "Endast de första {{displayCount}} fil bifogas.",
+    "onlyFirstFilesAttached_other": "Endast de första {{displayCount}} filerna bifogas."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "Dina prompter, din konversationshistorik och de filer du bifogar.",
     "aiProvidersWhy": "För att generera AI-svar.",
     "aiProvidersWho": "Anthropic, OpenAI, Google och andra leverantörer som du väljer för varje begäran.",
-    "gatewayWhat": "Konto-ID, metadata om begäranden och tokenanvändning.",
+    "gatewayWhat": "Konto-ID, metadata om begäranden, tokenanvändning samt de prompter och ljudinspelningar som appen skickar genom den.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "För att verifiera din identitet, dirigera begäranden och stämma av faktureringen.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Krasch- och felrapporter där appinnehållet har tagits bort.",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Din inspelning medan du dikterar.",
     "voiceTranscriptionWhy": "För att omvandla tal till text.",
-    "voiceTranscriptionWho": "Bara på enheten, eller hos Apple eller Google om enheten inte kan transkribera utan internetanslutning.",
+    "voiceTranscriptionWho": "Din enhet, Kilo Gateway med den transkriberingsmodell du väljer, eller Apple eller Google för identifiering online.",
     "installAttributionPromptTitle": "Tillåt spårning av installationskälla?",
     "installAttributionPromptMessage": "Kilo använder Apples spårningsbehörighet bara för att ta reda på vilken kanal du hittade appen genom. Dina prompter och konversationer används aldrig.",
     "what": "Vad",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "För många inloggningsförsök. Vänta ett tag och försök igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisk Avancerad",
+      "balanced": "Automatisk Balanserad",
+      "efficient": "Automatisk Effektiv",
+      "small": "Automatisk Liten",
+      "free": "Automatisk Gratis",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Data samlas in",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Det gick inte att uppdatera favoriterna.",
@@ -2996,8 +3185,17 @@
     "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
     "needsInput": "Väntar på svar",
+    "newestSession": "Nyaste: {{title}}",
+    "noneWaiting": "Inga agenter väntar",
+    "newAgent": "Ny agent",
+    "approving": "Godkänner...",
+    "couldNotApprove": "Kunde inte godkänna",
+    "couldNotStart": "Kunde inte starta",
     "channelName": "Aktiva agenter",
-    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
+    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
+    "openSession": "Öppna",
+    "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
+    "newestResult": "Nyaste resultatet"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
@@ -3022,14 +3220,214 @@
     "remoteOptionTitle": "Din dator",
     "remoteOptionBody": "Kör Kilo på din egen maskin via `kilo remote`-CLI:n.",
     "skip": "Hoppa över guiden",
-    "tutorialLabel": "Handledning",
-    "remoteTitle": "Starta din första distanssession",
-    "remoteBody": "Anslut din dator och starta sessionen härifrån.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ingen dator är ansluten ännu",
-    "remoteEmptyBody": "För att ansluta den, kör `kilo remote` på din dator.",
-    "remoteFound": "Dator ansluten",
-    "checkAgain": "Kontrollera igen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Handledning"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Starta agenten kräver en prompt. Lägg till en prompt och kör den igen.",
+      "repositoryUnknown": "Kilo känner inte igen {{repository}} som ett GitHub- eller GitLab-kodarkiv. Välj ett annat kodarkiv i Kilo.",
+      "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Öppna senaste sessionen"
+  },
+  "spendAlerts": {
+    "subtitle": "Skicka en varning via e-post eller push till faktureringskontakterna när detta områdes utgifter överskrider en gräns eller stiger över den vanliga timtakten.",
+    "enable": "Aktivera utgiftsvarningar",
+    "thresholdTitle": "Gränsöverskridande",
+    "thresholdSubtitle": "Löpande utgifter överskrider din gräns",
+    "anomalyTitle": "Topp per timme",
+    "anomalySubtitle": "En timme ligger långt över detta områdes vanliga takt",
+    "limitLabel": "Gräns (USD)",
+    "windowLabel": "Fönster",
+    "window24h": "24 timmar",
+    "window7d": "7 dagar",
+    "window30d": "30 dagar",
+    "multiplierLabel": "Toppmultiplikator",
+    "saved": "Inställningarna för utgiftsvarningar har sparats",
+    "loadError": "Utgiftsvarningarna kunde inte läsas in.",
+    "saveError": "Utgiftsvarningarna kunde inte sparas.",
+    "empty": "Utgiftsvarningar är av. Slå på dem för att varna detta områdes faktureringskontakter.",
+    "noSpend": "Ingen utgift registrerad ännu",
+    "spend24h": "Utgifter de senaste 24 timmarna",
+    "multiplierError": "Ange en multiplikator på 1 eller mer",
+    "permissionDenied": "Du har inte behörighet att hantera utgiftsvarningar.",
+    "pushOffByCategory": "Av i Aviseringar"
+  },
+  "profiles": {
+    "title": "Profiler",
+    "entrySubtitle": "Återanvänd miljöinställningar över sessioner",
+    "newProfile": "Ny profil",
+    "emptyTitle": "Inga profiler än",
+    "emptyDescription": "Skapa en profil för att återanvända miljövariabler, inställningskommandon och färdigheter över sessioner.",
+    "loadFailed": "Det gick inte att läsa in profiler",
+    "counts": {
+      "vars": "{{count}} variabler",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} färdigheter",
+      "commands": "{{count}} kommandon",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}fär",
+      "commandsShort": "{{count}}kom"
+    },
+    "nameLabel": "Profilnamn",
+    "namePlaceholder": "till exempel Backend-felsökning",
+    "descriptionLabel": "Profilbeskrivning",
+    "descriptionPlaceholder": "Valfri beskrivning",
+    "ownerLabel": "Profilägare",
+    "nameRequired": "Ange ett profilnamn",
+    "createAction": "Skapa profil",
+    "createFailed": "Det gick inte att skapa profil",
+    "createdToast": "Profilen \"{{name}}\" har skapats",
+    "settingsSectionTitle": "Konfiguration",
+    "defaultSectionTitle": "Standardprofil",
+    "personalDefaultDescription": "Laddas automatiskt när inget arkiv har en fäst profil.",
+    "organizationDefaultDescription": "Laddas automatiskt för medlemmar som inte har någon personlig standard.",
+    "setAsDefault": "Ställ in som standard",
+    "removeDefault": "Ta bort som standard",
+    "saveFailed": "Det gick inte att spara profilen",
+    "deleteTitle": "Ta bort profil",
+    "deleteMessage": "Detta tar bort profilen och dess inställningar permanent. Detta kan inte ångras.",
+    "deleteFailed": "Det gick inte att ta bort profilen",
+    "deleteBlocked": "Den här profilen används av en webhook-utlösare. Ta bort den från dessa utlösare först.",
+    "deletedToast": "Profilen {{name}} har tagits bort",
+    "variablesTitle": "Miljövariabler",
+    "addVariable": "Lägg till variabel",
+    "keyLabel": "Nyckel",
+    "keyTooLong": "Nyckeln får innehålla högst 256 tecken",
+    "keyDuplicate": "Den här nyckeln finns redan i profilen",
+    "valueLabel": "Värde",
+    "secretLabel": "Hemlighet",
+    "secrets": {
+      "markSecret": "Markera som hemlig",
+      "masked": "Dolt värde",
+      "reveal": "Avslöja värde",
+      "newValuePlaceholder": "Ange ett nytt hemligt värde",
+      "valuePlaceholder": "Hemligt värde (krypterat)"
+    },
+    "variablesEmpty": "Inga variabler ännu",
+    "variablesSaveFailed": "Det gick inte att spara variabeln",
+    "commandsTitle": "Inställningskommandon",
+    "addCommand": "Lägg till kommando",
+    "commandLabel": "Kommando",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Inga inställningskommandon ännu",
+    "commandsSaveFailed": "Det gick inte att spara installationskommandon",
+    "moveUp": "Flytta upp",
+    "moveDown": "Flytta ner",
+    "skillsTitle": "Färdigheter",
+    "addSkill": "Lägg till skicklighet",
+    "skillNameLabel": "Skicklighetsnamn",
+    "skillMarkdownLabel": "Skicklighetsinnehåll",
+    "skillsEmpty": "Inga färdigheter än",
+    "skillNameRequired": "Ange ett färdighetsnamn",
+    "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
+    "skillContentRequired": "Skicklighetsinnehåll krävs",
+    "skillSaveFailed": "Kunde inte rädda skickligheten",
+    "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
+    "skillEditTitle": "Redigera färdighet",
+    "mcp": {
+      "title": "MCP-servrar",
+      "add": "Lägg till MCP-server",
+      "empty": "Inga MCP-servrar ännu",
+      "name": "Servernamn",
+      "type": "Servertyp",
+      "localType": "Lokal",
+      "remoteType": "Avlägsen",
+      "command": "Kommandorad",
+      "url": "URL",
+      "environment": "Miljö (JSON)",
+      "headers": "Rubriker (JSON)",
+      "timeout": "Timeout",
+      "secretCount": "Hemlig räkning",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Ange ett servernamn",
+      "nameInvalid": "Namn kan endast använda bokstäver, siffror, understreck och bindestreck",
+      "commandRequired": "Ange ett kommando",
+      "commandTooLong": "Använd högst 50 argument med 500 tecken vardera",
+      "urlRequired": "Ange en URL",
+      "urlInvalid": "Ange en giltig URL",
+      "urlTooLong": "URL:en får innehålla högst 2048 tecken",
+      "jsonInvalid": "Ange giltig JSON — ett objekt med strängvärden",
+      "jsonTooLarge": "Använd högst 50 poster, nycklar upp till 128 och värden upp till 4096 tecken",
+      "timeoutInvalid": "Timeout måste vara ett helt antal millisekunder",
+      "edit": "Redigera MCP-server",
+      "saveFailed": "Det gick inte att spara MCP-servern"
+    },
+    "agents": {
+      "title": "Profilagenter",
+      "add": "Lägg till agent",
+      "empty": "Inga agenter än",
+      "name": "Agentens namn",
+      "slug": "Agentsnigel",
+      "description": "Agent beskrivning",
+      "model": "Modell åsidosättande",
+      "modelPlaceholder": "Använd sessionsstandard",
+      "prompt": "Systemuppmaning",
+      "steps": "Max. steg",
+      "stepsPlaceholder": "t.ex. 50",
+      "temperature": "Temperatur",
+      "temperaturePlaceholder": "t.ex. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "t.ex. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Min agent",
+      "promptPlaceholder": "Du är en...",
+      "tools": "Verktyg",
+      "visibility": "Synlighet",
+      "visibilityPrimary": "Primär — visas i väljaren",
+      "visibilitySubagent": "Subagent — endast anropsbar från andra",
+      "visibilityAll": "Alla - båda",
+      "saveFailed": "Det gick inte att spara agenten",
+      "nameRequired": "Ange ett agentnamn",
+      "slugRequired": "Ange en agentsnigel",
+      "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
+      "slugConflict": "Den snigeln är reserverad av en inbyggd agent",
+      "edit": "Redigera agent"
+    },
+    "slashCommands": {
+      "title": "Slash kommandon",
+      "add": "Lägg till ett snedstreck kommando",
+      "empty": "Inga snedstreck kommandon ännu",
+      "name": "Kommandonamn",
+      "description": "Kommandobeskrivning",
+      "template": "Mall",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Förklara $ARGUMENTS",
+      "agent": "Ombud",
+      "subtask": "Kör som deluppgift",
+      "edit": "Redigera snedstreck kommando",
+      "saveFailed": "Det gick inte att spara kommandot",
+      "nameRequired": "Ange ett kommandonamn",
+      "nameInvalid": "Namnet måste börja med en liten bokstav och endast använda små bokstäver, siffror och bindestreck",
+      "templateRequired": "Ange en kommandomall",
+      "nameConflict": "Det namnet är reserverat av ett inbyggt kommando"
+    },
+    "repoBindings": {
+      "title": "Standardprofiler för Repos",
+      "add": "Lägg till standard",
+      "empty": "Inga standardinställningar konfigurerade",
+      "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett repo.",
+      "repo": "Välj förråd...",
+      "profile": "Välj profil",
+      "remove": "Avbinda",
+      "private": "Privat",
+      "search": "Sök arkiv...",
+      "addedToast": "Standardprofil inställd för \"{{repo}}\"",
+      "addFailed": "Det gick inte att ange standardprofil",
+      "removedToast": "Standardprofilen har tagits bort för \"{{repo}}\"",
+      "removeFailed": "Det gick inte att ta bort standardprofilen",
+      "pinnedTitle": "Fäst till arkiv",
+      "pinRepo": "Fäst ett repo",
+      "pinnedEmpty": "Inte fäst vid några förråd.",
+      "pinnedDescription": "Laddas automatiskt när en session riktar sig mot ett av dessa förråd.",
+      "pinnedToast": "Fäst till \"{{repo}}\"",
+      "pinFailed": "Det gick inte att fästa repo",
+      "unboundToast": "Repo obundet",
+      "unbindFailed": "Det gick inte att koppla upp repor"
+    }
   }
 }

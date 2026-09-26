@@ -1,9 +1,12 @@
-import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+/* eslint-disable max-lines -- every family, the in-place action buttons, and the newest-result footer compose inside one stringified 'widget' layout, which cannot be split across modules */
+import { Button, type ButtonProps, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
   allowsTightening,
+  buttonStyle,
   containerBackground,
+  controlSize,
   cornerRadius,
   environment,
   font,
@@ -20,7 +23,7 @@ import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 import { PlatformColor } from 'react-native';
 
 import { withGlanceableCopy } from './layout-copy';
-import { type GlanceableViewProps } from './view-props';
+import { type GlanceableWidgetAction, type GlanceableWidgetProps } from './view-props';
 import { withWidgetLogo } from './widget-logo';
 
 /* eslint-disable new-cap -- PlatformColor is a React Native factory function, not a constructor */
@@ -37,7 +40,33 @@ import { withWidgetLogo } from './widget-logo';
 // the mark, and `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the
 // translated copy.
 
-type WidgetProps = Partial<GlanceableViewProps>;
+// The timeline props: the builder's props plus the press marker a widget
+// button's App Intent patches into the pressed entry (see GlanceableWidgetProps
+// in view-props).
+type WidgetProps = GlanceableWidgetProps;
+
+/**
+ * The press patch. `@expo/ui` types `onPress` as `() => void`, but in the
+ * widget process the bundle calls the handler and merges the returned patch
+ * into the pressed entry's props (its `findAndCallOnPress`), so the return
+ * value is load-bearing. The patch rides in these two fields; the app maps
+ * them back to the action (see `pendingActionOf` in widget-actions).
+ */
+type WidgetPressPatch = {
+  pendingAction: GlanceableWidgetAction;
+  pendingActionVisible: boolean;
+};
+
+/**
+ * The shared Button with the widget press's real `onPress` contract: the
+ * returned patch is load-bearing there. A local narrow cast, not a widening of
+ * the shared UI types.
+ */
+type WidgetButtonProps = Omit<ButtonProps, 'onPress'> & {
+  onPress?: () => WidgetPressPatch;
+};
+
+export type { WidgetProps };
 
 // Babel replaces the annotated arrow with its source string, so `layout` is a
 // string at runtime while TypeScript still checks it as a component.
@@ -50,10 +79,13 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // The literal, not the imported constant: the widget transform stringifies
   // this function's source, so an imported binding would be an undefined
   // global in the widget process. `withGlanceableCopy` replaces the token,
-  // quotes included, with the translated copy as a JSON source literal.
+  // quotes included, with the translated copy as a JSON source literal. Until
+  // then the value is the bare token, which is not JSON: falling back to an
+  // empty copy renders the fallback literals below instead of throwing a
+  // blank surface.
   // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
   const copySource: string = '__KILO_GLANCEABLE_COPY__';
-  const COPY = JSON.parse(copySource) as Record<string, string>;
+  const COPY = JSON.parse(copySource.startsWith('{') ? copySource : '{}') as Record<string, string>;
   // The tag SwiftUI formats the relative wait with; English when the bake is
   // somehow missing it, which is what the widget process would have used anyway.
   const locale = COPY.locale ?? 'en';
@@ -253,11 +285,175 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
   );
 
+  // The newest-session slot and the action row are Home Screen families only:
+  // the Lock Screen families keep their generic layout, which is what the
+  // snapshot privacy contract protects. While a press is unanswered, the App
+  // Intent's patch owns the slot with the pressed action's copy, so the press
+  // is visible in place before the app answers; when the app answers it pushes
+  // fresh props, and the slot shows the failure line or the newest session.
+  //
+  // The height is declared inside this function, not at module scope: the
+  // widget transform stringifies this function's source alone and the widget
+  // process evaluates it against widget globals, so a module-scope binding
+  // would be a `ReferenceError` at render. The literal copy fallbacks follow
+  // the same rule as `COPY` above: the widget process is the only consumer.
+  const NEWEST_SLOT_HEIGHT = 14;
+  // The press patch carries which action was pressed, so the slot names it
+  // instead of always reading "Approving…" under a New agent tap. The baked
+  // fallbacks carry the typographic ellipsis their catalog keys use
+  // (`common.starting`, `glanceable.approving`), so the gallery placeholder
+  // matches the pushed copy in this same reserved slot.
+  const pressCopy =
+    props.pendingAction === 'new-agent'
+      ? (COPY.starting ?? 'Starting…')
+      : (COPY.approving ?? 'Approving…');
+  const newestLine = props.pendingActionVisible === true ? pressCopy : (props.newestTitle ?? null);
+  const actions = props.actions ?? { approve: false, newAgent: false };
+  // The slot is laid out whether or not it carries a line, so a title arriving
+  // after a process restart, the press line taking the slot, and the answer
+  // replacing it move neither the count rows above nor the actions below.
+  const newestSlot = (
+    <VStack alignment="leading" spacing={0} modifiers={[frame({ height: NEWEST_SLOT_HEIGHT })]}>
+      {newestLine === null ? null : (
+        <Text
+          modifiers={[
+            font({ textStyle: 'caption' }),
+            lineLimit(1),
+            minimumScaleFactor(0.6),
+            allowsTightening(true),
+            mutedForeground,
+          ]}
+        >
+          {newestLine}
+        </Text>
+      )}
+    </VStack>
+  );
+
+  // The patch a press returns marks the action in the pressed entry's props;
+  // the app sweeps it up, runs it, and pushes the answer. `onPress` is the
+  // shared prop that @expo/ui's widget Button turns into the native
+  // `onButtonPress` event the widget bundle dispatches, so a tap opens the
+  // press patch in place instead of the app — the body keeps its own
+  // `widgetURL` deep link for taps beside the buttons. `WidgetButton` is the
+  // narrow local view of the shared Button whose `onPress` carries the patch
+  // the bundle reads; the shared `onPress: () => void` type would forbid the
+  // value-returning handler the widget press depends on.
+  const WidgetButton = Button as (props: WidgetButtonProps) => React.JSX.Element;
+  const actionButtons = (
+    <HStack alignment="center" spacing={8}>
+      {actions.approve ? (
+        <WidgetButton
+          label={COPY.approve}
+          modifiers={[
+            buttonStyle('borderedProminent'),
+            controlSize('small'),
+            font({ textStyle: 'caption' }),
+          ]}
+          onPress={() => ({ pendingAction: 'approve', pendingActionVisible: true })}
+        />
+      ) : null}
+      {actions.newAgent ? (
+        <WidgetButton
+          label={COPY.newAgent}
+          modifiers={[
+            buttonStyle('bordered'),
+            controlSize('small'),
+            font({ textStyle: 'caption' }),
+          ]}
+          onPress={() => ({ pendingAction: 'new-agent', pendingActionVisible: true })}
+        />
+      ) : null}
+    </HStack>
+  );
+
   const systemModifiers = [
     widgetURL('kiloapp:///cloud/sessions'),
     containerBackground(PlatformColor('systemBackground'), 'widget'),
     ...a11y,
   ];
+
+  // The large card's lower third. A stale frame keeps the counts but drops the
+  // claim that they are current, so the footer prefers the delayed copy where
+  // the relative time would otherwise assert a freshness the snapshot no
+  // longer has.
+  const newestResultKind = props.newestResultKind ?? null;
+  const newestResultLabel = props.newestResultLabel ?? null;
+  const newestResultAt = props.newestResultAt ?? null;
+  const newestResultBody = () => {
+    if (statusLine !== null) {
+      return (
+        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
+      );
+    }
+    if (newestResultKind === null || newestResultLabel === null || newestResultAt === null) {
+      return null;
+    }
+    return (
+      <HStack alignment="center" spacing={6}>
+        <Image
+          systemName={GLYPH[newestResultKind].icon}
+          color={GLYPH[newestResultKind].color}
+          size={13}
+        />
+        <Text
+          modifiers={[
+            font({ textStyle: 'subheadline', weight: 'semibold' }),
+            lineLimit(1),
+            minimumScaleFactor(0.6),
+            allowsTightening(true),
+            primaryForeground,
+          ]}
+        >
+          {newestResultLabel}
+        </Text>
+        <Spacer />
+        <Text
+          date={new Date(newestResultAt)}
+          dateStyle="relative"
+          modifiers={[
+            font({ textStyle: 'subheadline' }),
+            monospacedDigit(),
+            lineLimit(1),
+            mutedForeground,
+          ]}
+        />
+      </HStack>
+    );
+  };
+
+  // The locked frames draw their status line through `systemRows` instead, so
+  // the footer is absent entirely there rather than repeating that copy.
+  const footerBody = newestResultBody();
+  const newestResultFooter =
+    !hasCounts || footerBody === null ? null : (
+      <VStack alignment="leading" spacing={4}>
+        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>
+          {COPY.newestResult}
+        </Text>
+        {footerBody}
+      </VStack>
+    );
+
+  // StandBy draws this family on a charging phone in landscape. The mark sits
+  // at the top, the three count rows centre, and the newest result owns the
+  // bottom of the card, so the extra height reads as composed rather than
+  // empty. The spacers hold the rows in place as the footer appears and
+  // disappears, so a state change cannot shift the counts.
+  if (family === 'systemLarge') {
+    return (
+      <VStack alignment="leading" spacing={10} modifiers={systemModifiers}>
+        <HStack alignment="center" spacing={8}>
+          {logo(26)}
+          <Spacer />
+        </HStack>
+        <Spacer />
+        {systemRows}
+        <Spacer />
+        {newestResultFooter}
+      </VStack>
+    );
+  }
 
   // The medium family is wide, not tall: the mark sits beside the rows and the
   // whole block centres, the same composition as the Live Activity banner. A
@@ -266,7 +462,11 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     return (
       <HStack alignment="center" spacing={14} modifiers={systemModifiers}>
         {logo(34)}
-        {systemRows}
+        <VStack alignment="leading" spacing={6}>
+          {systemRows}
+          {newestSlot}
+          {actions.approve || actions.newAgent ? actionButtons : null}
+        </VStack>
       </HStack>
     );
   }
@@ -278,14 +478,26 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         <Spacer />
       </HStack>
       {/* The mark sits at the top and the counts at the bottom, so the card
-          reads as one composed block. */}
+          reads as one composed block. The newest slot reserves its line in
+          every state, so an arriving title or an action's progress line moves
+          nothing above it. */}
       <Spacer />
       {systemRows}
+      {newestSlot}
+      {actions.approve || actions.newAgent ? actionButtons : null}
     </VStack>
   );
 };
 
-const WIDGET_NAME = 'ActiveAgentsWidget';
+export const WIDGET_NAME = 'ActiveAgentsWidget';
+
+/**
+ * The unpatched layout function, exported for unit tests: under vitest no
+ * widget transform runs, so this still holds the real function, and the
+ * unpatched copy token parses to an empty copy (see the COPY fallback above).
+ * Registration wraps it with `withGlanceableCopy(withWidgetLogo(...))`.
+ */
+export const activeAgentsWidgetLayout = layout;
 
 const registerLayout = () =>
   createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)));

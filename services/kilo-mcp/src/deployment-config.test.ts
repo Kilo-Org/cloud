@@ -17,3 +17,30 @@ it('uses a real or automatically provisioned production OAuth KV namespace', () 
     expect(binding.id).not.toBe('0'.repeat(32));
   }
 });
+
+it('marks the dev AI and Vectorize bindings remote so semantic search is reachable locally', () => {
+  // Workers AI and Vectorize have no local emulation: `wrangler dev` reports
+  // them "not supported" and every search degrades to token-only, so the
+  // semantic half of hybrid search can never be exercised locally. The
+  // supported fix is `remote: true` on the binding, which proxies the local
+  // dev worker to the real dev resources (src/search-knn.ts + wrangler's
+  // binding table). Assert it here so a regression is caught in CI instead of
+  // silently disabling semantic search at sign-in.
+  const parsed = parseConfigFileTextToJson(
+    'wrangler.jsonc',
+    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
+  );
+  expect(parsed.error).toBeUndefined();
+  const config = parsed.config as {
+    env?: {
+      dev?: {
+        ai?: { binding: string; remote?: boolean };
+        vectorize?: Array<{ binding: string; index_name: string; remote?: boolean }>;
+      };
+    };
+  };
+  const dev = config.env?.dev;
+  expect(dev?.ai).toMatchObject({ binding: 'AI', remote: true });
+  const vectorize = dev?.vectorize?.find(item => item.binding === 'VECTORIZE');
+  expect(vectorize).toMatchObject({ index_name: 'kilo-mcp-catalog-dev', remote: true });
+});

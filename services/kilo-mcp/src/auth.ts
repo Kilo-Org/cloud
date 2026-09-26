@@ -23,5 +23,13 @@ export function forwardedAuthFromProps(props: GrantProps): ForwardedAuth {
     organizationId: props.organizationId ?? undefined,
     kiloUserId: props.kiloUserId,
     clientId: props.clientId,
+    adminEnabled: props.adminEnabled === true,
+    adminEligible: props.adminEligible === true,
+    // The grant's own connection id, forwarded so a protected request binds to
+    // the session that created it. Absent or empty stays absent: a
+    // pre-amendment grant (no sessionId) is unusable by the protected tools.
+    ...(typeof props.sessionId === 'string' && props.sessionId.length > 0
+      ? { sessionId: props.sessionId }
+      : {}),
   };
 }

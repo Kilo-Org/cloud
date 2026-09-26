@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import type { WorkerDb } from '@kilocode/db/client';
 import { AgentSandboxUnavailableError } from '../../agent-sandbox/protocol.js';
 import { createAgentSandbox } from '../../agent-sandbox/factory.js';
 import { logger, withLogTags } from '../../logger.js';
@@ -37,7 +38,7 @@ import type { CloudAgentSessionState } from '../../persistence/types.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { getPgDb } from '../../db/pg.js';
-import { cloud_billing_sku, container_usage_interval } from '@kilocode/db/schema';
+import { cloud_billing_sku, cli_sessions_v2, container_usage_interval } from '@kilocode/db/schema';
 import { and, desc, eq, like } from 'drizzle-orm';
 import { SANDBOX_USAGE_SKUS } from '../../container-usage-context.js';
 
@@ -62,6 +63,34 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
 
 function toIso(value: string): string {
   return new Date(value).toISOString();
+}
+
+type WorktreeOwnership = {
+  parentSessionId: string | null;
+  cloudAgentSessionScopeId: string | null;
+};
+
+async function findWorktreeOwnership(
+  db: WorkerDb,
+  userId: string,
+  kiloSessionId: string,
+  cloudAgentSessionId: string
+): Promise<WorktreeOwnership | null> {
+  const [row] = await db
+    .select({
+      parentSessionId: cli_sessions_v2.parent_session_id,
+      cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+    })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, userId),
+        eq(cli_sessions_v2.session_id, kiloSessionId),
+        eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId)
+      )
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 function microdollarsForSeconds(seconds: number, rateCentsPerSecond: string): number {
@@ -235,7 +264,7 @@ export function createSessionManagementHandlers() {
             if (!success) {
               logger
                 .withFields({
-                  message: message ?? 'No accepted current messages or pending queued messages',
+                  reason: message ?? 'No accepted current messages or pending queued messages',
                 })
                 .info('No accepted current messages or pending queued messages to interrupt');
             }
@@ -326,7 +355,7 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching session metadata');
-          await requireCurrentSessionAccess({
+          const sessionAccess = await requireCurrentSessionAccess({
             env,
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
@@ -341,7 +370,6 @@ export function createSessionManagementHandlers() {
             CloudAgentSessionState | null
           >(getStub, s => s.getMetadata(), 'getMetadata');
 
-          // Handle not found
           if (!metadata) {
             logger.info('Session not found');
             throw new TRPCError({
@@ -375,7 +403,6 @@ export function createSessionManagementHandlers() {
               .warn('Failed to fetch latest event ID for getSession');
           }
 
-          // Compute sandboxId for log correlation
           const sessionMetadata = metadata;
           const metadataProfile = readProfileBundle(sessionMetadata);
 
@@ -395,6 +422,20 @@ export function createSessionManagementHandlers() {
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
 
+          // Worktree ownership lives on the external ownership row, not in DO
+          // metadata. Only worktree sessions need that read, so ordinary
+          // sessions never touch PostgreSQL here.
+          const worktreeId = sessionMetadata.workspace?.worktreeId;
+          let worktreeOwnership: WorktreeOwnership | null = null;
+          if (worktreeId) {
+            worktreeOwnership = await findWorktreeOwnership(
+              getPgDb(env),
+              userId,
+              sessionAccess.kiloSessionId,
+              sessionId
+            );
+          }
+
           // Sanitize and return safe fields only (no tokens/secrets)
           const repositoryFields = publicRepositoryFields(sessionMetadata);
           return {
@@ -403,6 +444,14 @@ export function createSessionManagementHandlers() {
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
             sandboxId,
+
+            ...(worktreeId
+              ? {
+                  worktreeId,
+                  parentSessionId: worktreeOwnership?.parentSessionId ?? null,
+                  cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
+                }
+              : {}),
 
             githubRepo: repositoryFields.githubRepo,
             gitUrl: repositoryFields.gitUrl,

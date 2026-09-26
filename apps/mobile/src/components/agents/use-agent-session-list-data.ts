@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react';
 import {
   expandPlatformFilter,
   formatGitUrlProject,
+  normalisePlatformSelection,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
@@ -22,10 +23,14 @@ export function useAgentSessionListData(options: {
 }) {
   const { organizationId, platformFilter, projectFilter, ready, searchQuery } = options;
   const sortBy = SESSION_LIST_SORT;
-  const createdOnPlatform = useMemo(
-    () => (platformFilter.length > 0 ? expandPlatformFilter(platformFilter) : undefined),
-    [platformFilter]
-  );
+  const createdOnPlatform = useMemo(() => {
+    if (platformFilter.length === 0) {
+      return undefined;
+    }
+    // Collapse a persisted variant into its bucket first, so the history query
+    // covers the raw platforms of the single row the sheet checks.
+    return expandPlatformFilter(normalisePlatformSelection(platformFilter));
+  }, [platformFilter]);
   const gitUrl = useMemo(
     () => (projectFilter.length > 0 ? projectFilter : undefined),
     [projectFilter]
@@ -129,7 +134,10 @@ export function useAgentSessionListData(options: {
   }, [dateGroups, effectiveSearchQuery, search.dateGroups]);
   const projectOptions = useMemo(() => {
     const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
-    for (const project of recentRepositories?.repositories.slice(0, 3) ?? []) {
+    // The server already bounds `recentRepositories` (LIMIT 10); offer every row
+    // it returns so older repositories stay filterable. A client-side cap here
+    // silently drops the rows the user needs to narrow the list.
+    for (const project of recentRepositories?.repositories ?? []) {
       byGitUrl.set(project.gitUrl, {
         gitUrl: project.gitUrl,
         displayName: formatGitUrlProject(project.gitUrl),

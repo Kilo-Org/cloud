@@ -291,7 +291,6 @@ export type UsageDetails = {
 export const TimePeriodSchema = z.enum(['week', 'month', 'year', 'all']);
 export type TimePeriod = z.infer<typeof TimePeriodSchema>;
 
-// OpenRouter API Types
 const OpenRouterProviderSchema = z.object({
   name: z.string(),
   displayName: z.string(),
@@ -397,12 +396,3 @@ export const OrganizationSSODomainSchema = z
   .trim()
   .toLowerCase()
   .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
-
-export type OrgTrialStatus =
-  | 'subscribed' // Has active paid subscription
-  | 'trial_active' // Trial active, 8+ days remaining
-  | 'trial_ending_soon' // Trial active, 4-7 days remaining
-  | 'trial_ending_very_soon' // Trial active, 1-3 days remaining
-  | 'trial_expires_today' // Last day of trial
-  | 'trial_expired_soft' // 1-3 days past expiration (read-only, dismissible)
-  | 'trial_expired_hard'; // 4+ days past expiration (blocked, must upgrade)

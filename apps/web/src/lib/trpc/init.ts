@@ -2,6 +2,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { getUserFromAuth } from '@/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
+import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import {
   authViaTokenFromHeaders,
@@ -21,6 +22,11 @@ import {
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import {
+  buildTimingLine,
+  readClientDimensions,
+  shouldLogTiming,
+} from '@/lib/observability/request-timing';
 
 export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
@@ -98,24 +104,46 @@ const sentryMiddleware = t.middleware(
   })
 );
 
-const timingMiddleware = t.middleware(async ({ path, type, ctx, next }) => {
+/**
+ * Options this middleware reads. Kept narrow so the timing behaviour can be
+ * driven directly in `init-timing.test.ts`; `baseProcedure.use` accepts it as a
+ * regular middleware function.
+ */
+export type TimingMiddlewareOptions<TResult extends { ok: boolean }> = {
+  path: string;
+  type: ProcedureType;
+  ctx: TRPCContext;
+  next: () => Promise<TResult>;
+};
+
+export const timingMiddleware = async <TResult extends { ok: boolean }>({
+  path,
+  type,
+  ctx,
+  next,
+}: TimingMiddlewareOptions<TResult>): Promise<TResult> => {
   if (process.env.TRPC_TIMING_LOGGING !== '1') return next();
 
   const start = performance.now();
   const result = await next();
   const durationMs = performance.now() - start;
+  const dimensions = readClientDimensions(ctx.headersList);
+  if (!shouldLogTiming({ client: dimensions.client })) return result;
   console.log(
-    JSON.stringify({
-      type: 'trpc_timing',
-      path,
-      procedureType: type, // 'query' | 'mutation' | 'subscription'
-      durationMs: Math.round(durationMs),
-      ok: result.ok,
-      userId: ctx.user.id,
-    })
+    JSON.stringify(
+      buildTimingLine({
+        surface: 'trpc',
+        path,
+        procedureType: type, // 'query' | 'mutation' | 'subscription'
+        durationMs: Math.round(durationMs),
+        ok: result.ok,
+        userId: ctx.user?.id ?? null,
+        dimensions,
+      })
+    )
   );
   return result;
-});
+};
 
 // Publishes the procedure path/type onto the context so audit emitters reachable
 // only from a resolver (see `recordKiloAdminElevation`) can name the procedure.

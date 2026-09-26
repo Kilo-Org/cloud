@@ -94,7 +94,6 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
-  RepositoryReviewMode,
   BYOKManagementSource,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
@@ -140,8 +139,6 @@ import type {
   KiloClawScheduledActionNotificationStatus,
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
-  CustomLlmMetadata,
-  CustomLlmApiConfig,
   DirectByokModel,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
@@ -208,7 +205,35 @@ export function enumCheck<T extends Record<string, string>>(
   );
 }
 
+export const StripeServiceFeeFlow = {
+  PersonalTopUp: 'personal_top_up',
+  OrganizationTopUp: 'organization_top_up',
+  PersonalAutoTopUpSetup: 'personal_auto_top_up_setup',
+  OrganizationAutoTopUpSetup: 'organization_auto_top_up_setup',
+  PersonalAutoTopUp: 'personal_auto_top_up',
+  OrganizationAutoTopUp: 'organization_auto_top_up',
+  PersonalKiloPass: 'personal_kilo_pass',
+  OrganizationKiloPass: 'organization_kilo_pass',
+} as const;
+
+export type StripeServiceFeeFlow = (typeof StripeServiceFeeFlow)[keyof typeof StripeServiceFeeFlow];
+
+export const StripeServiceFeeOutcome = {
+  Pending: 'pending',
+  Charged: 'charged',
+  Exempt: 'exempt',
+  PreActivation: 'pre_activation',
+  ZeroRounded: 'zero_rounded',
+  UnsupportedCurrency: 'unsupported_currency',
+  Missed: 'missed',
+} as const;
+
+export type StripeServiceFeeOutcome =
+  (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
+
 export const SCHEMA_CHECK_ENUMS = {
+  StripeServiceFeeFlow,
+  StripeServiceFeeOutcome,
   KiloPassTier,
   KiloPassCadence,
   KiloPassPaymentProvider,
@@ -297,7 +322,6 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
-  RepositoryReviewMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -2145,6 +2169,18 @@ export const kilo_pass_store_purchases = pgTable(
     environment: text().notNull(),
     purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    amount_charged_minor_units: integer(),
+    currency: text(),
+    tax_minor_units: integer(),
+    /**
+     * When the money backfill finished with this row: it either wrote the money
+     * columns or found that Play has no money for the order. NULL means the
+     * backfill has not settled the row yet, including rows whose order lookup
+     * failed, which stay eligible so a later run retries them. Without this
+     * marker the rows Play has no money for would be selected by every bounded
+     * run and the backfill would never converge.
+     */
+    money_backfill_attempted_at: timestamp({ withTimezone: true, mode: 'string' }),
     raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -2185,6 +2221,22 @@ export const kilo_pass_store_purchases = pgTable(
     check(
       'kilo_pass_store_purchases_store_provider_check',
       sql`${table.payment_provider} IN ('app_store', 'google_play')`
+    ),
+    check(
+      'kilo_pass_store_purchases_amount_charged_non_negative_check',
+      sql`${table.amount_charged_minor_units} IS NULL OR ${table.amount_charged_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_tax_non_negative_check',
+      sql`${table.tax_minor_units} IS NULL OR ${table.tax_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_check',
+      sql`${table.currency} IS NULL OR ${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_required_check',
+      sql`${table.currency} IS NOT NULL OR (${table.amount_charged_minor_units} IS NULL AND ${table.tax_minor_units} IS NULL)`
     ),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',
@@ -4245,8 +4297,15 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
-    github_installation_id: uuid(),
+    // Canonical installations are soft-deleted (lifecycle_state/deleted_at), never hard-deleted,
+    // except by the account-anonymization path in `anonymizeCloudUserData`, which already guards
+    // with a `NOT EXISTS` check against remaining associations before deleting. `restrict` makes
+    // that invariant explicit at the database level instead of relying on the implicit default.
+    github_installation_id: uuid().references(() => github_app_installations.id, {
+      onDelete: 'restrict',
+    }),
     github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    github_connection_role: text().$type<'workflow' | 'agent_only'>(),
     github_authorized_by_user_id: text(),
     github_authorized_user_id: text(),
     github_authorized_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -4273,14 +4332,51 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
-    uniqueIndex('UQ_platform_integrations_github_platform_inst')
-      .on(table.platform, table.github_app_type, table.platform_installation_id)
+    uniqueIndex('UQ_platform_integrations_github_org_canonical')
+      .on(table.owned_by_organization_id, table.github_installation_id)
       .concurrently()
-      .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
-    uniqueIndex('UQ_platform_integrations_github_pending_target')
-      .on(table.platform, table.github_app_type, table.platform_account_id)
       .where(
-        sql`${table.platform} = 'github' AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+        sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
+      ),
+    check(
+      'platform_integrations_github_connection_role_check',
+      sql`${table.github_connection_role} IS NULL OR (
+        ${table.platform} = 'github' AND ${table.integration_type} = 'app'
+        AND ${table.platform_installation_id} IS NOT NULL
+        AND ${table.github_connection_role} IN ('workflow', 'agent_only')
+        AND (${table.github_connection_role} <> 'agent_only' OR ${table.github_installation_id} IS NOT NULL)
+      )`
+    ),
+    uniqueIndex('UQ_platform_integrations_github_workflow_canonical')
+      .on(table.github_installation_id)
+      .where(sql`${table.github_connection_role} = 'workflow'`)
+      .concurrently(),
+    uniqueIndex('UQ_platform_integrations_github_workflow_identity')
+      .on(sql`COALESCE(${table.github_app_type}, 'standard')`, table.platform_installation_id)
+      .where(sql`${table.github_connection_role} = 'workflow'`)
+      .concurrently(),
+    uniqueIndex('UQ_platform_integrations_github_user_canonical')
+      .on(table.owned_by_user_id, table.github_installation_id)
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_org_pending_target')
+      .on(
+        table.owned_by_organization_id,
+        table.platform,
+        table.github_app_type,
+        table.platform_account_id
+      )
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_user_pending_target')
+      .on(table.owned_by_user_id, table.platform, table.github_app_type, table.platform_account_id)
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
       ),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
@@ -4348,6 +4444,8 @@ export const github_app_installations = pgTable(
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_reason: text(),
+    sharing_mode: text().$type<'exclusive' | 'web_cloud_agent'>().notNull().default('exclusive'),
+    sharing_admission_checked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revision: integer().notNull().default(0),
     observed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4373,6 +4471,75 @@ export const github_app_installations = pgTable(
       'github_app_installations_lifecycle_state_check',
       sql`${table.lifecycle_state} IN ('unknown', 'active', 'suspended', 'deleted')`
     ),
+    check(
+      'github_app_installations_sharing_mode_check',
+      sql`${table.sharing_mode} IN ('exclusive', 'web_cloud_agent')`
+    ),
+  ]
+);
+
+export const github_installation_webhook_receipts = pgTable(
+  'github_installation_webhook_receipts',
+  {
+    id: idPrimaryKeyColumn,
+    github_installation_id: uuid()
+      .notNull()
+      .references(() => github_app_installations.id, { onDelete: 'cascade' }),
+    delivery_id: text().notNull(),
+    event_type: text().notNull(),
+    status: text().$type<'processing' | 'completed'>().notNull().default('completed'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_github_installation_webhook_receipts_delivery').on(
+      table.github_installation_id,
+      table.delivery_id
+    ),
+    check(
+      'github_installation_webhook_receipts_status_check',
+      sql`${table.status} IN ('processing', 'completed')`
+    ),
+  ]
+);
+
+export const provider_oauth_attempts = pgTable(
+  'provider_oauth_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    provider: text().$type<'slack' | 'linear' | 'discord'>().notNull(),
+    purpose: text().$type<'provider_install'>().notNull().default('provider_install'),
+    state_hash: text().notNull().unique(),
+    initiated_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    status: text().$type<'pending' | 'consumed' | 'expired'>().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    check(
+      'provider_oauth_attempts_provider_check',
+      sql`${table.provider} IN ('slack', 'linear', 'discord')`
+    ),
+    check(
+      'provider_oauth_attempts_status_check',
+      sql`${table.status} IN ('pending', 'consumed', 'expired')`
+    ),
+    check('provider_oauth_attempts_purpose_check', sql`${table.purpose} = 'provider_install'`),
+    check(
+      'provider_oauth_attempts_owner_check',
+      sql`num_nonnulls(${table.owned_by_user_id}, ${table.owned_by_organization_id}) = 1`
+    ),
+    uniqueIndex('UQ_provider_oauth_attempts_user_pending')
+      .on(table.owned_by_user_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_provider_oauth_attempts_org_pending')
+      .on(table.owned_by_organization_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    index('IDX_provider_oauth_attempts_expires_at').on(table.expires_at),
   ]
 );
 
@@ -4410,45 +4577,6 @@ export const github_connection_attempts = pgTable(
     ),
   ]
 );
-
-// Per-repository overrides for an installation's default bot-mention model
-// and automatic PR review mode. Both columns are nullable: null means
-// "inherit the installation default" (stored in `platform_integrations.metadata`),
-// not "disabled". A row with all-null overrides is equivalent to having no row.
-export const repository_customizations = pgTable(
-  'repository_customizations',
-  {
-    id: idPrimaryKeyColumn,
-    platform_integration_id: uuid()
-      .notNull()
-      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    // The platform's repository identifier (e.g. GitHub's numeric repository
-    // ID, stable across renames/transfers), stored as text so platforms with
-    // non-numeric IDs are representable; not the repository's owner/name string.
-    repository_id: text().notNull(),
-    bot_mention_model_slug: text(),
-    pr_review_mode: text().$type<RepositoryReviewMode>(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_repository_customizations_integration_repository').on(
-      table.platform_integration_id,
-      table.repository_id
-    ),
-    enumCheck(
-      'repository_customizations_pr_review_mode_check',
-      table.pr_review_mode,
-      RepositoryReviewMode
-    ),
-  ]
-);
-
-export type RepositoryCustomization = typeof repository_customizations.$inferSelect;
-export type NewRepositoryCustomization = typeof repository_customizations.$inferInsert;
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',
@@ -5205,6 +5333,100 @@ export const magic_link_tokens = pgTable(
 );
 
 export type MagicLinkToken = typeof magic_link_tokens.$inferSelect;
+
+export const passkey_credentials = pgTable(
+  'passkey_credentials',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    // A user id is an arbitrary string, not necessarily a UUID (OAuth ids are
+    // `oauth/...`), so this is text like every other user-id reference.
+    kilo_user_id: text().notNull(),
+    // base64url of the raw WebAuthn credential id.
+    credential_id: text().notNull(),
+    // base64url COSE key the assertion signature is checked against.
+    public_key: text().notNull(),
+    sign_count: integer().default(0).notNull(),
+    transports: text().array(),
+    device_type: text(),
+    backed_up: boolean().default(false).notNull(),
+    aaguid: text(),
+    name: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    // A credential id belongs to exactly one user.
+    uniqueIndex('UQ_passkey_credentials_credential_id').on(table.credential_id),
+    index('idx_passkey_credentials_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type PasskeyCredential = typeof passkey_credentials.$inferSelect;
+export type NewPasskeyCredential = typeof passkey_credentials.$inferInsert;
+
+export const passkey_challenges = pgTable(
+  'passkey_challenges',
+  {
+    // The opaque `challengeId` the client echoes back; the server looks the
+    // challenge up by it, so the client never supplies the challenge itself.
+    id: uuid().primaryKey(),
+    challenge: text().notNull(),
+    kind: text().notNull().$type<'registration' | 'authentication'>(),
+    // Null for usernameless authentication.
+    kilo_user_id: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_passkey_challenges_expires_at').on(table.expires_at),
+    // Account deletion removes this user's open challenges; without the index
+    // that delete is a sequential scan of every ceremony ever minted.
+    index('idx_passkey_challenges_kilo_user_id').on(table.kilo_user_id),
+    // `kind` decides which ceremony a challenge may authorize, so an unknown
+    // value must never reach a consumer that matches on the known set. The
+    // column is plain text, so without this constraint the union is a fiction.
+    check(
+      'check_passkey_challenges_kind',
+      sql`${table.kind} IN ('registration', 'authentication')`
+    ),
+  ]
+);
+
+export type PasskeyChallenge = typeof passkey_challenges.$inferSelect;
+export type NewPasskeyChallenge = typeof passkey_challenges.$inferInsert;
+
+/**
+ * One-time sign-in tickets minted by a verified passkey assertion and redeemed
+ * by the sign-in provider to establish a session. Only the SHA-256 hash of the
+ * ticket is stored, and a redemption consumes the row atomically, so a stolen
+ * `ticket_hash` alone cannot be replayed.
+ */
+export const passkey_sign_in_tickets = pgTable(
+  'passkey_sign_in_tickets',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ticket_hash: text().notNull(),
+    kilo_user_id: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_passkey_sign_in_tickets_ticket_hash').on(table.ticket_hash),
+    // The device-auth cleanup cron deletes tickets past `expires_at` once a day,
+    // so a full day of tickets is present when it runs; without the index that
+    // delete is a sequential scan of every ticket minted since the last run.
+    index('idx_passkey_sign_in_tickets_expires_at').on(table.expires_at),
+    // Account deletion removes this user's tickets; without the index that
+    // delete is a sequential scan of every ticket ever minted.
+    index('idx_passkey_sign_in_tickets_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type PasskeySignInTicket = typeof passkey_sign_in_tickets.$inferSelect;
+export type NewPasskeySignInTicket = typeof passkey_sign_in_tickets.$inferInsert;
+
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
 // ============ MODEL STATS ============
@@ -6162,6 +6384,14 @@ export const cli_sessions_v2 = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'set null',
     }),
+    // The profile the session was prepared with, resolved server-side (an
+    // explicit pick, the effective default, or a repository binding). Null on
+    // rows created before this column existed and on sessions whose create
+    // origin resolved no profile. `set null` so deleting a profile keeps the
+    // session history readable.
+    profile_id: uuid().references(() => agent_environment_profiles.id, {
+      onDelete: 'set null',
+    }),
     cloud_agent_session_id: text(),
     cloud_agent_session_scope_id: text(),
     cloud_agent_worktree_id: text(),
@@ -6192,6 +6422,10 @@ export const cli_sessions_v2 = pgTable(
       table.parent_session_id,
       table.kilo_user_id
     ),
+    // Supports the ON DELETE SET NULL scan when a profile is deleted. Built
+    // concurrently — `cli_sessions_v2` is large, so a plain build blocks writes
+    // for the whole scan, the same reason the `user_*` indexes below do.
+    index('IDX_cli_sessions_v2_profile_id').on(table.profile_id).concurrently(),
     uniqueIndex('UQ_cli_sessions_v2_public_id')
       .on(table.public_id)
       .where(isNotNull(table.public_id)),
@@ -6232,7 +6466,7 @@ export type CloudAgentSessionFailureCode =
   | 'initial_queue_full'
   | 'invalid_initial_intent'
   | 'do_rpc_outcome_unknown';
-export type CloudAgentFailureResponsibility = 'platform' | 'user' | 'unknown';
+export type CloudAgentFailureResponsibility = 'platform' | 'provider' | 'user' | 'unknown';
 export type CloudAgentFailureReason =
   | 'insufficient_credits'
   | 'rate_limited'
@@ -6804,6 +7038,76 @@ export const byok_api_keys = pgTable(
 );
 
 export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
+
+/**
+ * A "Sign in with ChatGPT" delegated connection. The integration is inherently
+ * personal: a connection belongs to one person and is scoped to one account,
+ * either that person's personal account (`organization_id` null) or one
+ * organization they belong to. The same person can connect the same ChatGPT
+ * subscription to several accounts by connecting each one separately, so the
+ * owner is the `(kilo_user_id, organization_id)` pair. The one exception is the
+ * organization's shared-services row, which belongs to the organization rather
+ * than to the person who connected it.
+ */
+export const openai_chatgpt_connections = pgTable(
+  'openai_chatgpt_connections',
+  {
+    id: idPrimaryKeyColumn,
+    /**
+     * The person who connected this row. Only the organization's shared-services
+     * row is nullable here: that row belongs to the organization, so deleting the
+     * connector's account clears the reference instead of taking the connection
+     * with it — the foreign key clears it when the account row is deleted and
+     * `softDeleteUser` clears it on the anonymization path. `created_by` keeps
+     * the record, and every other row names its owner.
+     */
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
+    is_enabled: boolean().default(true).notNull(),
+    /**
+     * True for the organization's shared-services connection: one row per
+     * organization, used by the platform's own callers (code reviewer, Slack
+     * bot, auto-triage) instead of any member's personal connection. The
+     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     */
+    is_shared_services: boolean().default(false).notNull(),
+    /**
+     * The last time OpenAI answered a delegated request with a plan usage
+     * limit. The gateway writes it and a reconnect clears it. It is request
+     * state, not credential state, so it stays out of the encrypted payload. A
+     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
+     * hides it once the reset time OpenAI reported has passed.
+     */
+    usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** The reset time OpenAI reported with the limit, when it reported one. */
+    usage_limit_resets_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    created_by: text().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_openai_chatgpt_connections_personal')
+      .on(table.kilo_user_id)
+      .where(sql`${table.organization_id} IS NULL`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_member')
+      .on(table.kilo_user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.is_shared_services} = false`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.is_shared_services} = true`),
+    index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
+  ]
+);
+
+export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
 // Security Reviews - Phase 1
 export const security_findings = pgTable(
@@ -9758,9 +10062,19 @@ export const user_activity_tokens = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+    // Set when this row's card was retired. A live card has `superseded_at` null;
+    // the partial unique index below allows at most one such row per scope.
+    superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
     uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
+    // folds the personal scope (null organization) into a single key, because
+    // Postgres treats NULLs as distinct in a unique index.
+    uniqueIndex('UQ_user_activity_tokens_live_ios_activity')
+      .on(table.user_id, sql`coalesce(${table.organization_id}, '')`)
+      .concurrently()
+      .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
   ]
 );
@@ -9783,6 +10097,9 @@ export const user_notification_preferences = pgTable('user_notification_preferen
   session_status_enabled: boolean().default(true).notNull(),
   kiloclaw_activity_enabled: boolean().default(true).notNull(),
   balance_alerts_enabled: boolean().default(true).notNull(),
+  // Category "Spend alerts" — also the push channel of the spend view, so the
+  // mobile notification settings and the spend view cannot disagree.
+  spend_alerts_enabled: boolean().default(true).notNull(),
   security_findings_enabled: boolean().default(true).notNull(),
   // 'generic' hides lock-screen content; 'full' shows the message text.
   notification_previews: text().$type<'generic' | 'full'>().default('generic').notNull(),
@@ -9795,6 +10112,155 @@ export const user_notification_preferences = pgTable('user_notification_preferen
 
 export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
 export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
+
+// ─── Spend Alerts ─────────────────────────────────────────────────────
+// Owner-scoped spend alert configuration, the hourly counter the sweep rolls
+// up, and the durable delivery outbox. `scope_key` is `user:<kilocode_users.id>`
+// or `org:<organizations.id>`; a settings row sets exactly one of the two
+// scope foreign keys. Push delivery reuses the existing mobile push
+// infrastructure, and `user_notification_preferences.spend_alerts_enabled` is
+// the notification category behind the spend view's push channel choice.
+
+export const spend_alert_settings = pgTable(
+  'spend_alert_settings',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    // Server-only lookup key derived from the owner scope; never sent to clients.
+    scope_key: text().notNull(),
+    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    enabled: boolean().default(false).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('uq_spend_alert_settings_scope').on(table.scope_key),
+    check(
+      'spend_alert_settings_scope_check',
+      sql`(${table.kilo_user_id} IS NOT NULL) <> (${table.organization_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type SpendAlertSetting = typeof spend_alert_settings.$inferSelect;
+export type NewSpendAlertSetting = typeof spend_alert_settings.$inferInsert;
+
+export const spend_alert_rules = pgTable(
+  'spend_alert_rules',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    settings_id: uuid()
+      .notNull()
+      .references(() => spend_alert_settings.id, { onDelete: 'cascade' }),
+    kind: text().$type<'threshold' | 'anomaly'>().notNull(),
+    enabled: boolean().default(true).notNull(),
+    threshold_microdollars: bigint({ mode: 'number' }),
+    window_hours: integer(),
+    multiplier_basis_points: integer(),
+    email_enabled: boolean().default(true).notNull(),
+    push_enabled: boolean().default(false).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('uq_spend_alert_rules_kind').on(table.settings_id, table.kind)]
+);
+
+export type SpendAlertRule = typeof spend_alert_rules.$inferSelect;
+export type NewSpendAlertRule = typeof spend_alert_rules.$inferInsert;
+
+// One row per rule. `firing` is the whole one-alert guarantee: a crossing sets
+// it, and no further alert fires until the condition clears and crosses again.
+export const spend_alert_rule_state = pgTable('spend_alert_rule_state', {
+  rule_id: uuid()
+    .notNull()
+    .primaryKey()
+    .references(() => spend_alert_rules.id, { onDelete: 'cascade' }),
+  firing: boolean().default(false).notNull(),
+  condition_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+  last_value_microdollars: bigint({ mode: 'number' }),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type SpendAlertRuleState = typeof spend_alert_rule_state.$inferSelect;
+export type NewSpendAlertRuleState = typeof spend_alert_rule_state.$inferInsert;
+
+// Per-hour rollup of an owner's spend, maintained by the sweep. The unique
+// (scope_key, hour_start) index is the conflict target the sweep upserts on.
+export const spend_alert_hourly = pgTable(
+  'spend_alert_hourly',
+  {
+    scope_key: text().notNull(),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('uq_spend_alert_hourly_scope_hour').on(table.scope_key, table.hour_start),
+    index('IDX_spend_alert_hourly_hour_start').on(table.hour_start),
+  ]
+);
+
+export type SpendAlertHourly = typeof spend_alert_hourly.$inferSelect;
+
+// Durable outbox for alerts handed to the existing email and push senders.
+// `dedupe_key` makes a replayed sweep a no-op, and the pending index is the
+// claim order for the delivery worker.
+export const spend_alert_deliveries = pgTable(
+  'spend_alert_deliveries',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    dedupe_key: text().notNull(),
+    scope_key: text().notNull(),
+    rule_id: uuid().references(() => spend_alert_rules.id, { onDelete: 'set null' }),
+    kind: text(),
+    channel: text().$type<'email' | 'push'>(),
+    fired_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    recipients: jsonb(),
+    payload: jsonb(),
+    status: text().default('pending').notNull(),
+    attempt_count: integer().default(0).notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_spend_alert_deliveries_dedupe_key').on(table.dedupe_key),
+    index('IDX_spend_alert_deliveries_pending').on(
+      table.status,
+      table.next_attempt_at,
+      table.attempt_count,
+      table.id
+    ),
+  ]
+);
+
+export type SpendAlertDelivery = typeof spend_alert_deliveries.$inferSelect;
+export type NewSpendAlertDelivery = typeof spend_alert_deliveries.$inferInsert;
 
 // ============ EXA USAGE TRACKING ============
 // Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
@@ -9979,165 +10445,6 @@ export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelec
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
 
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
-
-// ---------------------------------------------------------------------------
-// Model experiments (preview/experimental A/B testing)
-//
-// Scope: opt-in dedicated preview public model ids only. Never used for
-// production/general traffic. Users only reach this routing path by
-// explicitly selecting a dedicated preview public id (e.g.
-// `kilo/preview-experiment-foo`).
-// ---------------------------------------------------------------------------
-
-export const model_experiment = pgTable(
-  'model_experiment',
-  {
-    id: idPrimaryKeyColumn,
-    public_model_id: text().notNull(),
-    name: text().notNull(),
-    description: text(),
-    metadata: jsonb().$type<CustomLlmMetadata>(),
-    // status: draft | active | paused | completed
-    status: text().notNull().default('draft'),
-    is_archived: boolean().notNull().default(false),
-    created_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    ended_at: timestamp({ withTimezone: true, mode: 'string' }),
-  },
-  table => [
-    // Only one routing-relevant experiment per public_model_id at a time.
-    uniqueIndex('UQ_model_experiment_public_model_id_routing')
-      .on(table.public_model_id)
-      .where(sql`${table.status} IN ('active', 'paused')`),
-    index('IDX_model_experiment_status').on(table.status),
-    check(
-      'model_experiment_status_valid',
-      sql`${table.status} IN ('draft', 'active', 'paused', 'completed')`
-    ),
-    // Active experiments cannot be archived.
-    check(
-      'model_experiment_active_not_archived',
-      sql`${table.status} <> 'active' OR ${table.is_archived} = false`
-    ),
-  ]
-);
-
-export type ModelExperiment = typeof model_experiment.$inferSelect;
-export type NewModelExperiment = typeof model_experiment.$inferInsert;
-
-export const model_experiment_variant = pgTable(
-  'model_experiment_variant',
-  {
-    id: idPrimaryKeyColumn,
-    experiment_id: uuid()
-      .notNull()
-      .references(() => model_experiment.id, { onDelete: 'cascade' }),
-    label: text().notNull(),
-    weight: integer().notNull(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_model_experiment_variant_experiment_label').on(table.experiment_id, table.label),
-    index('IDX_model_experiment_variant_experiment_id').on(table.experiment_id),
-    check('model_experiment_variant_weight_positive', sql`${table.weight} > 0`),
-  ]
-);
-
-export type ModelExperimentVariant = typeof model_experiment_variant.$inferSelect;
-export type NewModelExperimentVariant = typeof model_experiment_variant.$inferInsert;
-
-// Immutable per-variant version. New RC = new row. Never UPDATEd.
-// `upstream` is typed as CustomLlmApiConfig and validated with
-// CustomLlmApiConfigSchema at application boundaries. The api key is stored
-// separately in `encrypted_api_key` (same shape as
-// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the secret
-// and reporting/admin views can simply omit the column.
-export const model_experiment_variant_version = pgTable(
-  'model_experiment_variant_version',
-  {
-    id: idPrimaryKeyColumn,
-    variant_id: uuid()
-      .notNull()
-      .references(() => model_experiment_variant.id, { onDelete: 'cascade' }),
-    upstream: jsonb().$type<CustomLlmApiConfig>().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
-    effective_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    created_by: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_model_experiment_variant_version_variant_effective').on(
-      table.variant_id,
-      table.effective_at.desc()
-    ),
-  ]
-);
-
-export type ModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferSelect;
-export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
-
-// One row per experimented request, linked 1:1 to microdollar_usage by usage_id.
-// The physical table is monthly range-partitioned on created_at; PostgreSQL
-// therefore requires the primary key to include created_at as well as usage_id.
-// Stores attribution + a single R2 prompt hash for the post-`transformRequest`
-// upstream body. `request_body_sha256` holds either a 64-char lowercase hex
-// digest pointing at an R2 object, or one of the reserved sentinels:
-// `__failed__` (R2 storage failed) or `__deleted__` (prompt content wiped
-// while retaining attribution). `request_kind` records which upstream API
-// shape the body was serialized for.
-export const model_experiment_request = pgTable(
-  'model_experiment_request',
-  {
-    usage_id: uuid()
-      .notNull()
-      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
-    variant_version_id: uuid()
-      .notNull()
-      .references(() => model_experiment_variant_version.id),
-    // 'user' | 'machine' | 'ip'
-    allocation_subject: text().notNull(),
-    client_request_id: text(),
-    // 'chat_completions' | 'messages' | 'responses'
-    request_kind: text().notNull(),
-    // 64-char lowercase hex sha256, or '__failed__' | '__deleted__'.
-    request_body_sha256: text().notNull(),
-    was_truncated: boolean().notNull().default(false),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    primaryKey({ columns: [table.usage_id, table.created_at] }),
-    index('IDX_model_experiment_request_variant_version_created_at').on(
-      table.variant_version_id,
-      table.created_at
-    ),
-    index('IDX_model_experiment_request_client_request_id')
-      .on(table.client_request_id)
-      .where(isNotNull(table.client_request_id)),
-    check(
-      'model_experiment_request_allocation_subject_valid',
-      sql`${table.allocation_subject} IN ('user', 'machine', 'ip')`
-    ),
-    check(
-      'model_experiment_request_request_kind_valid',
-      sql`${table.request_kind} IN ('chat_completions', 'messages', 'responses')`
-    ),
-    check(
-      'model_experiment_request_request_body_sha256_format',
-      sql`${table.request_body_sha256} ~ '^[0-9a-f]{64}$' OR ${table.request_body_sha256} IN ('__failed__', '__deleted__')`
-    ),
-  ]
-);
-
-export type ModelExperimentRequest = typeof model_experiment_request.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // MCP Gateway
@@ -10852,7 +11159,6 @@ export const mcp_gateway_audit_events = pgTable(
 
 export type MCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferSelect;
 export type NewMCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferInsert;
-export type NewModelExperimentRequest = typeof model_experiment_request.$inferInsert;
 
 export type UserModelPreferenceLastSelected = {
   model: string;
@@ -11476,3 +11782,214 @@ export const quick_chat_messages = pgTable(
 
 export type QuickChatMessage = typeof quick_chat_messages.$inferSelect;
 export type NewQuickChatMessage = typeof quick_chat_messages.$inferInsert;
+
+export const organization_service_fee_exemptions = pgTable(
+  'organization_service_fee_exemptions',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    is_exempt: boolean().notNull(),
+    reason: text().notNull(),
+    changed_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_org_svc_fee_exemptions_organization',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.changed_by_kilo_user_id],
+      foreignColumns: [kilocode_users.id],
+      name: 'FK_org_svc_fee_exemptions_changed_by',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    index('IDX_org_service_fee_exemptions_org_created_at').on(
+      table.organization_id,
+      table.created_at.desc()
+    ),
+    check(
+      'organization_service_fee_exemptions_reason_check',
+      sql`length(trim(${table.reason})) > 0`
+    ),
+  ]
+);
+
+export type OrganizationServiceFeeExemption =
+  typeof organization_service_fee_exemptions.$inferSelect;
+export type NewOrganizationServiceFeeExemption =
+  typeof organization_service_fee_exemptions.$inferInsert;
+
+export const stripe_service_fee_assessments = pgTable(
+  'stripe_service_fee_assessments',
+  {
+    assessment_key: text().primaryKey().notNull(),
+    version: text().notNull(),
+    flow: text().notNull().$type<StripeServiceFeeFlow>(),
+    outcome: text().notNull().$type<StripeServiceFeeOutcome>(),
+    currency: text().notNull(),
+    kilo_user_id: text(),
+    organization_id: uuid(),
+    stripe_customer_id: text(),
+    stripe_checkout_session_id: text(),
+    stripe_invoice_id: text(),
+    stripe_payment_intent_id: text(),
+    stripe_charge_id: text(),
+    stripe_fee_price_id: text(),
+    stripe_checkout_fee_line_item_id: text(),
+    stripe_invoice_fee_item_id: text(),
+    stripe_invoice_fee_line_item_id: text(),
+    eligibility_created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    eligible_subtotal_minor: integer().notNull(),
+    expected_fee_minor: integer().notNull(),
+    charged_fee_minor: integer().default(0).notNull(),
+    gross_paid_minor: integer().default(0).notNull(),
+    settled_product_minor: integer().default(0).notNull(),
+    refunded_product_minor: integer().default(0).notNull(),
+    refunded_fee_minor: integer().default(0).notNull(),
+    refunded_gross_minor: integer().default(0).notNull(),
+    disputed_fee_minor: integer().default(0).notNull(),
+    settled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    exemption_id: uuid(),
+    failure_code: text(),
+    metadata: jsonb().$type<Record<string, unknown>>().default({}).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.kilo_user_id],
+      foreignColumns: [kilocode_users.id],
+      name: 'FK_stripe_svc_fee_assessments_kilo_user',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_stripe_svc_fee_assessments_organization',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.exemption_id],
+      foreignColumns: [organization_service_fee_exemptions.id],
+      name: 'FK_stripe_svc_fee_assessments_exemption',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    index('IDX_stripe_service_fee_assessments_stripe_customer_id').on(table.stripe_customer_id),
+    uniqueIndex('UQ_stripe_service_fee_assessments_checkout_session_id')
+      .on(table.stripe_checkout_session_id)
+      .where(isNotNull(table.stripe_checkout_session_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_stripe_invoice_id')
+      .on(table.stripe_invoice_id)
+      .where(isNotNull(table.stripe_invoice_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_stripe_payment_intent_id')
+      .on(table.stripe_payment_intent_id)
+      .where(isNotNull(table.stripe_payment_intent_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_stripe_charge_id')
+      .on(table.stripe_charge_id)
+      .where(isNotNull(table.stripe_charge_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_checkout_fee_line_item_id')
+      .on(table.stripe_checkout_fee_line_item_id)
+      .where(isNotNull(table.stripe_checkout_fee_line_item_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_invoice_fee_item_id')
+      .on(table.stripe_invoice_fee_item_id)
+      .where(isNotNull(table.stripe_invoice_fee_item_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_invoice_fee_line_item_id')
+      .on(table.stripe_invoice_fee_line_item_id)
+      .where(isNotNull(table.stripe_invoice_fee_line_item_id)),
+    enumCheck('stripe_service_fee_assessments_flow_check', table.flow, StripeServiceFeeFlow),
+    enumCheck(
+      'stripe_service_fee_assessments_outcome_check',
+      table.outcome,
+      StripeServiceFeeOutcome
+    ),
+    check('stripe_service_fee_assessments_currency_check', sql`${table.currency} ~ '^[a-z]{3}$'`),
+    check(
+      'stripe_service_fee_assessments_owner_check',
+      sql`(
+        ${table.flow} LIKE 'personal_%'
+        AND ${table.kilo_user_id} IS NOT NULL
+        AND ${table.organization_id} IS NULL
+      ) OR (
+        ${table.flow} LIKE 'organization_%'
+        AND ${table.organization_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'stripe_service_fee_assessments_amounts_nonnegative_check',
+      sql`${table.eligible_subtotal_minor} >= 0
+        AND ${table.expected_fee_minor} >= 0
+        AND ${table.charged_fee_minor} >= 0
+        AND ${table.gross_paid_minor} >= 0
+        AND ${table.settled_product_minor} >= 0
+        AND ${table.refunded_product_minor} >= 0
+        AND ${table.refunded_fee_minor} >= 0
+        AND ${table.refunded_gross_minor} >= 0
+        AND ${table.disputed_fee_minor} >= 0`
+    ),
+    check(
+      'stripe_service_fee_assessments_refund_fee_check',
+      sql`${table.refunded_fee_minor} <= ${table.charged_fee_minor}`
+    ),
+    check(
+      'stripe_service_fee_assessments_refund_product_check',
+      sql`${table.refunded_product_minor} <= ${table.settled_product_minor}`
+    ),
+    check(
+      'stripe_service_fee_assessments_disputed_fee_check',
+      sql`${table.disputed_fee_minor} <= ${table.charged_fee_minor}`
+    ),
+    check(
+      'stripe_service_fee_assessments_pending_check',
+      sql`${table.outcome} <> 'pending'
+        OR (${table.charged_fee_minor} = 0 AND ${table.settled_at} IS NULL)`
+    ),
+    check(
+      'stripe_service_fee_assessments_charged_check',
+      sql`${table.outcome} <> 'charged' OR (
+        (
+          ${table.stripe_invoice_fee_item_id} IS NOT NULL
+          OR ${table.stripe_invoice_fee_line_item_id} IS NOT NULL
+          OR ${table.stripe_checkout_fee_line_item_id} IS NOT NULL
+          OR ${table.settled_at} IS NOT NULL
+        )
+        AND (${table.charged_fee_minor} <> 0 OR ${table.settled_product_minor} = 0)
+      )`
+    ),
+    check(
+      'stripe_service_fee_assessments_missed_check',
+      sql`${table.outcome} <> 'missed' OR (
+        ${table.expected_fee_minor} > 0
+        AND ${table.charged_fee_minor} = 0
+        AND ${table.failure_code} IS NOT NULL
+        AND length(trim(${table.failure_code})) > 0
+      )`
+    ),
+    check(
+      'stripe_service_fee_assessments_zero_rounded_check',
+      sql`${table.outcome} <> 'zero_rounded' OR ${table.expected_fee_minor} = 0`
+    ),
+    check(
+      'stripe_service_fee_assessments_uncharged_outcome_check',
+      sql`${table.outcome} NOT IN ('exempt', 'pre_activation', 'zero_rounded', 'unsupported_currency')
+        OR ${table.charged_fee_minor} = 0`
+    ),
+    check(
+      'stripe_service_fee_assessments_exemption_check',
+      sql`(${table.outcome} = 'exempt') = (${table.exemption_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
+export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;

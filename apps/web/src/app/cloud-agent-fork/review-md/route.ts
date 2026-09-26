@@ -174,19 +174,22 @@ export async function GET(request: NextRequest) {
     // integration actually covers them), so they must NOT gate this credit-spending, PR-opening
     // action — otherwise a user could add an arbitrary full_name to their config and pass this
     // check. The worker enforces installation scope regardless; this keeps the fail-fast honest.
+    // forceRefresh keeps the allowlist off the cached snapshot: a synced-empty cache (connect-time
+    // sync stored zero repositories, then access was granted) would otherwise reject a repo the
+    // provider now reports, and GitLab never invalidates that cache.
     const repositoryList = organizationId
       ? platform === 'gitlab'
         ? await caller.organizations.reviewAgent.listGitLabRepositories({
             organizationId,
-            forceRefresh: false,
+            forceRefresh: true,
           })
         : await caller.organizations.reviewAgent.listGitHubRepositories({
             organizationId,
-            forceRefresh: false,
+            forceRefresh: true,
           })
       : platform === 'gitlab'
-        ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: false })
-        : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: false });
+        ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: true })
+        : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: true });
 
     const allowedRepoFullNames = buildAllowedRepositoryFullNames(repositoryList.repositories, []);
     if (!allowedRepoFullNames.has(repo)) {

@@ -1,0 +1,362 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+
+// Disclosure contract for the fixed session goal row: the row keeps the
+// status in both states, hides the objective and the reason when collapsed,
+// exposes a sibling disclosure pressable whose label and accessibility state
+// follow the state, keeps the tuned top padding, and rotates the chevron with
+// a 200ms timing that the reduced-motion policy turns into an instant jump.
+// The same row carries the trailing control (the PR link) between the goal and
+// the chevron, and renders it alone in the same shell when the goal is absent.
+
+import { type ComponentProps, type ElementType } from 'react';
+import { Pressable } from 'react-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+
+import { SessionGoalSection } from './session-goal-section';
+
+const policy = vi.hoisted(() => ({ reducedMotion: false }));
+const reanimated = vi.hoisted(() => ({
+  withTiming: vi.fn((value: number, config: unknown) => ({ __timing: true, value, config })),
+  sharedValues: [] as { value: unknown }[],
+}));
+
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown', CircleDot: 'CircleDot' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ primary: '#07f', mutedForeground: '#666' }),
+}));
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: policy.reducedMotion,
+    scrollAnimated: !policy.reducedMotion,
+  }),
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  useSharedValue: (value: unknown) => {
+    const holder = { value };
+    reanimated.sharedValues.push(holder);
+    return holder;
+  },
+  useAnimatedStyle: () => ({}),
+  withTiming: reanimated.withTiming,
+  LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
+}));
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+
+const OBJECTIVE = 'Ship the goal row';
+const REASON = 'Waiting on the review';
+const STATUS_TEXT = 'agentChat.goal.statusPaused';
+const ROW_LABEL = 'agentChat.goal.sectionAccessibility';
+const COLLAPSE_LABEL = 'agentChat.goal.collapse';
+const EXPAND_LABEL = 'agentChat.goal.expand';
+const TRAILING_LABEL = 'pull request';
+
+let mounted: ReactTestRenderer | undefined = undefined;
+const onToggleCollapsed = vi.fn<() => void>();
+
+/** The shared row's trailing control: the PR link the screen passes in. */
+function trailingControl() {
+  return <Pressable accessibilityLabel={TRAILING_LABEL} />;
+}
+
+function mountSection(
+  props: Partial<ComponentProps<typeof SessionGoalSection>> = {}
+): ReactTestRenderer {
+  act(() => {
+    mounted = TestRenderer.create(
+      <SessionGoalSection
+        goal={{ text: OBJECTIVE, status: 'paused', reason: REASON }}
+        collapsed={false}
+        onToggleCollapsed={onToggleCollapsed}
+        onPress={vi.fn<() => void>()}
+        {...props}
+      />
+    );
+  });
+  if (!mounted) {
+    throw new Error('SessionGoalSection did not mount');
+  }
+  return mounted;
+}
+
+function rowContainer(renderer: ReactTestRenderer) {
+  return renderer.root.find(
+    node =>
+      node.type === ('View' as ElementType) && String(node.props.className).includes('min-h-12')
+  );
+}
+
+/** The disclosure pressable is the only one carrying an accessibility state. */
+function disclosure(renderer: ReactTestRenderer) {
+  return renderer.root.find(
+    node =>
+      node.type === ('Pressable' as ElementType) && node.props.accessibilityState !== undefined
+  );
+}
+
+function rowAction(renderer: ReactTestRenderer) {
+  return renderer.root.find(
+    node =>
+      node.type === ('Pressable' as ElementType) && node.props.accessibilityState === undefined
+  );
+}
+
+function renderedText(renderer: ReactTestRenderer): string[] {
+  return renderer.root
+    .findAllByType('Text' as ElementType)
+    .map(node => String(node.props.children));
+}
+
+function animatedViews(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(node => node.type === ('Animated.View' as ElementType));
+}
+
+/** The nearest host element above a node: `parent` alone lands on a component. */
+function hostAncestor(node: ReactTestInstance): ReactTestInstance | null {
+  let current = node.parent;
+  while (current != null && typeof current.type !== 'string') {
+    current = current.parent;
+  }
+  return current;
+}
+
+/**
+ * The host box a row child renders to: the child itself when it is already a
+ * host element, otherwise the box a mounted component (the chevron) renders.
+ */
+function rowChildBox(child: ReactTestInstance | string): ReactTestInstance | null {
+  if (typeof child === 'string') {
+    return null;
+  }
+  if (typeof child.type === 'string') {
+    return child;
+  }
+  const inner = child.children.find(
+    (rendered): rendered is ReactTestInstance => typeof rendered !== 'string'
+  );
+  return inner ?? null;
+}
+
+/**
+ * The boxes the row keeps after the trailing control: the disclosure chevron
+ * beside a goal, the reserved gutter on a PR-only row. Both are 24px wide, so
+ * the control ends on one right edge whether or not a goal is shown.
+ */
+function trailingReserve(control: ReactTestInstance): string[] {
+  const slot = hostAncestor(control);
+  if (slot == null) {
+    throw new Error('the trailing control is not inside a row slot');
+  }
+  const row = hostAncestor(slot);
+  if (row == null) {
+    throw new Error('the trailing slot is not inside a row');
+  }
+  const children = row.children;
+  const index = children.indexOf(slot);
+  if (index === -1) {
+    throw new Error('the trailing slot is not a row child');
+  }
+  return children
+    .slice(index + 1)
+    .map(child => rowChildBox(child))
+    .filter((box): box is ReactTestInstance => box != null)
+    .map(box => String(box.props.className));
+}
+
+/** The rotation shared value is the only one the section creates; each render
+ *  asks for it again, so the last holder belongs to the newest commit. */
+function rotationValue(): unknown {
+  const holder = reanimated.sharedValues.at(-1);
+  if (!holder) {
+    throw new Error('the section did not create a shared value');
+  }
+  return holder.value;
+}
+
+describe('SessionGoalSection disclosure', () => {
+  beforeEach(() => {
+    policy.reducedMotion = false;
+    reanimated.sharedValues = [];
+    reanimated.withTiming.mockClear();
+    onToggleCollapsed.mockClear();
+  });
+
+  afterEach(() => {
+    act(() => mounted?.unmount());
+    mounted = undefined;
+  });
+
+  it('keeps the tuned top padding and drops the symmetric py-2', () => {
+    const renderer = mountSection();
+
+    expect(rowContainer(renderer).props.className).toContain('pt-0.5');
+    expect(rowContainer(renderer).props.className).toContain('pb-2');
+    expect(rowContainer(renderer).props.className).not.toContain('py-2');
+    expect(rowContainer(renderer).props.className).toContain('min-h-12');
+  });
+
+  it('stretches the row action across the row height so the whole row opens the goal', () => {
+    const renderer = mountSection({ collapsed: true });
+
+    const classes = String(rowAction(renderer).props.className);
+    expect(classes).toContain('self-stretch');
+    expect(classes).toContain('items-start');
+  });
+
+  it('renders the status, the objective, and the reason when expanded', () => {
+    const renderer = mountSection({ collapsed: false });
+
+    expect(renderedText(renderer)).toEqual([STATUS_TEXT, OBJECTIVE, REASON]);
+    expect(disclosure(renderer).props.accessibilityLabel).toBe(COLLAPSE_LABEL);
+    expect(disclosure(renderer).props.accessibilityState).toEqual({ expanded: true });
+    expect(disclosure(renderer).props.hitSlop).toBe(12);
+    expect(rowAction(renderer).props.accessibilityLabel).toBe(ROW_LABEL);
+  });
+
+  it('renders the status only when collapsed', () => {
+    const renderer = mountSection({ collapsed: true });
+
+    expect(renderedText(renderer)).toEqual([STATUS_TEXT]);
+    expect(disclosure(renderer).props.accessibilityLabel).toBe(EXPAND_LABEL);
+    expect(disclosure(renderer).props.accessibilityState).toEqual({ expanded: false });
+    expect(rowAction(renderer).props.accessibilityLabel).toBe(STATUS_TEXT);
+  });
+
+  it('keeps the disclosure as a sibling of the row action', () => {
+    const renderer = mountSection();
+    const pressables = renderer.root.findAll(node => node.type === ('Pressable' as ElementType));
+
+    expect(pressables).toHaveLength(2);
+    // The carat is its own pressable under the row, a sibling of the action
+    // pressable rather than nested inside it: a nested pressable disappears
+    // from assistive technology inside an accessible parent.
+    expect(hostAncestor(disclosure(renderer))).toBe(rowContainer(renderer));
+    expect(hostAncestor(rowAction(renderer))).toBe(rowContainer(renderer));
+  });
+
+  it('renders the trailing control between the goal and the chevron', () => {
+    const renderer = mountSection({ trailing: trailingControl() });
+
+    const pressables = renderer.root.findAll(node => node.type === ('Pressable' as ElementType));
+    // The goal action, the trailing control, and the disclosure chevron.
+    expect(pressables).toHaveLength(3);
+    expect(pressables.map(node => node.props.accessibilityLabel)).toEqual([
+      ROW_LABEL,
+      TRAILING_LABEL,
+      COLLAPSE_LABEL,
+    ]);
+
+    // The trailing control keeps its own box at the row end, top-aligned.
+    const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
+    expect(String(slot?.props.className)).toContain('shrink-0');
+    expect(String(slot?.props.className)).toContain('self-start');
+    expect(String(slot?.props.className)).toContain('pt-0.5');
+    // `ml-auto` keeps the PR link at the row's trailing edge, and the chevron
+    // that follows it is the only box left of that edge.
+    expect(String(slot?.props.className)).toContain('ml-auto');
+    // The goal pressable still owns the tap target for the whole row.
+    expect(
+      String(renderer.root.findByProps({ accessibilityLabel: ROW_LABEL }).props.className)
+    ).toContain('self-stretch');
+  });
+
+  it('renders only the trailing control in the same shell when the goal is absent', () => {
+    const renderer = mountSection({ goal: null, trailing: trailingControl() });
+
+    const pressables = renderer.root.findAll(node => node.type === ('Pressable' as ElementType));
+    expect(pressables).toHaveLength(1);
+    expect(pressables[0]?.props.accessibilityLabel).toBe(TRAILING_LABEL);
+    // No goal text, no chevron, and no goal accessibility state.
+    expect(renderedText(renderer)).toEqual([]);
+    expect(renderer.root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(
+      0
+    );
+
+    const row = rowContainer(renderer);
+    expect(row.props.className).toContain('min-h-12');
+    expect(row.props.className).toContain('pt-0.5');
+    expect(row.props.className).toContain('pb-2');
+
+    // The lone PR link takes the same trailing edge it has beside a goal, so
+    // the control does not jump to the row's leading edge on a PR-only session.
+    const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
+    expect(String(slot?.props.className)).toContain('ml-auto');
+  });
+
+  it('keeps the trailing control on one right edge with and without a goal', () => {
+    const withGoal = mountSection({ trailing: trailingControl() });
+    // Beside a goal only the 24px disclosure chevron follows the control, so
+    // the control's right edge sits one chevron plus the row's 8px gap from the
+    // row edge.
+    const goalReserve = trailingReserve(
+      withGoal.root.findByProps({ accessibilityLabel: TRAILING_LABEL })
+    );
+    expect(goalReserve).toHaveLength(1);
+    expect(goalReserve[0]).toContain('w-6');
+    expect(goalReserve[0]).toContain('shrink-0');
+
+    act(() => mounted?.unmount());
+    reanimated.sharedValues = [];
+
+    const withoutGoal = mountSection({ goal: null, trailing: trailingControl() });
+    // A PR-only row reserves that same box, so the control's right edge does
+    // not move by the chevron's width plus the row's gap between the two.
+    const prOnlyReserve = trailingReserve(
+      withoutGoal.root.findByProps({ accessibilityLabel: TRAILING_LABEL })
+    );
+    expect(prOnlyReserve).toHaveLength(1);
+    expect(prOnlyReserve[0]).toContain('w-6');
+    expect(prOnlyReserve[0]).toContain('shrink-0');
+  });
+
+  it('calls onToggleCollapsed from the disclosure pressable', () => {
+    const renderer = mountSection();
+    const pressable = disclosure(renderer);
+
+    act(() => {
+      (pressable.props.onPress as () => void)();
+    });
+
+    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+  });
+
+  it('targets 180deg collapsed and 0deg expanded with the 200ms timing', () => {
+    const expanded = mountSection({ collapsed: false });
+    expect(reanimated.withTiming).toHaveBeenCalledWith(0, { duration: 200 });
+    expect(animatedViews(expanded)[0]?.props.layout).toEqual({ __linearTransition: 200 });
+    act(() => mounted?.unmount());
+
+    reanimated.sharedValues = [];
+    reanimated.withTiming.mockClear();
+
+    mountSection({ collapsed: true });
+    expect(reanimated.withTiming).toHaveBeenCalledWith(180, { duration: 200 });
+    expect(rotationValue()).toEqual({ __timing: true, value: 180, config: { duration: 200 } });
+  });
+
+  it('rotates instantly and drops the layout transition under reduced motion', () => {
+    policy.reducedMotion = true;
+    const renderer = mountSection({ collapsed: false });
+
+    expect(reanimated.withTiming).not.toHaveBeenCalled();
+    expect(rotationValue()).toBe(0);
+    expect(animatedViews(renderer)[0]?.props.layout).toBeUndefined();
+
+    act(() => mounted?.unmount());
+    reanimated.sharedValues = [];
+
+    mountSection({ collapsed: true });
+    expect(reanimated.withTiming).not.toHaveBeenCalled();
+    expect(rotationValue()).toBe(180);
+  });
+});

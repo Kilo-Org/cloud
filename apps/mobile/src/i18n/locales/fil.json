@@ -36,6 +36,7 @@
     "cost": "Gastos",
     "discard": "Itapon",
     "findings": "Mga natukoy na isyu",
+    "mergeRequest": "merge request",
     "notConnected": "Hindi nakakonekta",
     "notifications": "Mga abiso",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Gumamit ng ibang email",
     "signInWithApple": "Mag-sign in gamit ang Apple",
     "signInWithGoogle": "Mag-sign in gamit ang Google",
+    "signInWithPasskey": "Mag-sign in gamit ang passkey",
     "emailAddress": "Address ng email",
     "emailPlaceholder": "ikaw@example.com",
     "continueWithEmail": "Magpatuloy gamit ang email",
@@ -174,6 +176,10 @@
     "termsConnector": " at ",
     "termsSuffix": ".",
     "moreSignInOptions": "Higit pang mga opsyon sa pag-sign in",
+    "passkeyCancelled": "Kinansela ang pag-sign in gamit ang passkey. Subukan muli.",
+    "passkeyNotFound": "Walang naka-save na passkey para sa device na ito. Mag-sign in gamit ang Apple, Google, o ang iyong email sa halip.",
+    "passkeyUnsupported": "Hindi available ang mga passkey sa device na ito. Mag-sign in gamit ang Apple, Google, o ang iyong email sa halip.",
+    "passkeyFailed": "Hindi makapag-sign in gamit ang passkey. Subukan muli.",
     "couldNotCompleteSignIn": "Hindi makumpleto ang pag-sign in. Pakisubukang muli.",
     "sessionEnded": "Natapos na ang sesyon mo. Mag-sign in muli.",
     "signInCodeExpired": "Nag-expire na ang code mo sa pag-sign in. Pakisubukang muli.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Akawnt sa pagsubok",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO para sa negosyo"
+    "providerEnterpriseSso": "SSO para sa negosyo",
+    "passkeysTitle": "Mga passkey",
+    "passkeysSubtitle": "Mag-sign in nang walang password",
+    "passkeysEmpty": "Wala pang passkey",
+    "passkeysEmptyHint": "$t(profile.addPasskey) para makapag-sign in nang walang password.",
+    "passkeysCouldNotLoad": "Hindi ma-load ang mga passkey",
+    "passkeysLoadFailed": "Hindi available ang mga passkey hanggang ma-load ito.",
+    "addPasskey": "Magdagdag ng passkey",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Idinagdag {{date}}",
+    "passkeyAdded": "Naidagdag ang passkey.",
+    "passkeyAddFailed": "Hindi maidagdag ang passkey. Subukan muli.",
+    "passkeyAddUnsupported": "Hindi makakagawa ng mga passkey ang device na ito.",
+    "passkeyAddCancelled": "Kinansela ang paggawa ng passkey.",
+    "passkeyRemoved": "Naalis ang passkey.",
+    "passkeyRemoveFailed": "Hindi maalis ang passkey na iyon. Subukan muli.",
+    "passkeyRenamed": "Napalitan ang pangalan ng passkey.",
+    "passkeyName": "Pangalan ng passkey",
+    "renamePasskey": "Palitan ang pangalan ng passkey",
+    "removePasskey": "Alisin ang passkey",
+    "removePasskeyTitle": "Alisin ang passkey?",
+    "removePasskeyMessage": "Hindi ka na makakapag-sign in gamit ang passkey na ito."
   },
   "preferences": {
     "general": "Pangkalahatan",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga sulatan ng mensahe para sa ahente.",
     "biometricUnlock": "I-unlock gamit ang biometriko",
     "biometricUnlockSubtitle": "I-unlock ang app sa pagbukas at matapos ang limang minuto sa background.",
-    "featureFlags": "Mga feature flag",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Pagsasalin ng boses sa teksto gamit ang Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "Na-load ang {{displayCount}} sa {{total}} na payl",
       "filesStillLoading": "Nilo-load pa ang mga file. Hilahin pababa para i-refresh.",
       "goToOverview": "Pumunta sa buod",
-      "goToOverviewTab": "Pumunta sa tab ng buod"
+      "goToOverviewTab": "Pumunta sa tab ng buod",
+      "expandAllLines_one": "Ipakita ang lahat ng {{displayCount}} na linya",
+      "expandAllLines_other": "Ipakita ang lahat ng {{displayCount}} na linya",
+      "expandLines_one": "Ipakita ang {{displayCount}} na linya ({{start}}–{{end}})",
+      "expandLines_other": "Ipakita ang {{displayCount}} na linya ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Ipakita ang {{displayCount}} na linya ng konteksto",
+      "expandLinesOfContext_other": "Ipakita ang {{displayCount}} na linya ng konteksto",
+      "expandMoreLines_one": "Ipakita ang {{displayCount}} pang linya ({{start}}–{{end}})",
+      "expandMoreLines_other": "Ipakita ang {{displayCount}} pang linya ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} sa {{total}} na file ang na-load",
+      "loadedOfTotalFiles_other": "{{loaded}} sa {{total}} na file ang na-load"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ walang bagong linya sa dulo ng file",
@@ -357,6 +389,7 @@
       "merge": "Pagsasama",
       "mergeNow": "I-merge ngayon",
       "mergePullRequest": "Pag-merge ng pull request",
+      "mergeTermTitle": "Pag-merge ng {{term}}",
       "enableAutoMerge": "Paganahin ang awtomatikong pag-merge",
       "disableAutoMerge": "Huwag paganahin ang awtomatikong pag-merge",
       "autoMergeOn": "Aktibo ang awtomatikong pag-merge",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "Burahin ang branch pagkatapos i-merge",
       "noEnabledMethods": "Walang aktibong paraan ng pag-merge sa repository na ito. Hilingin sa admin ng repository na paganahin ang merge, squash, o rebase.",
       "confirmTitle": "I-merge ang pull request?",
+      "confirmTitleTerm": "I-merge ang {{term}}?",
       "confirmMessage": "Ime-merge nito ang mga pagbabago mo sa base branch.",
       "enableAutoMergeConfirmTitle": "Paganahin ang awtomatikong pag-merge?",
       "enableAutoMergeConfirmMessage": "Awtomatikong ime-merge ng GitHub ang pull request na ito kapag pumasa ang lahat ng kinakailangang pagsusuri.",
+      "enableAutoMergeConfirmMessageTerm": "Awtomatikong magme-merge ang {{term}} kapag tagumpay ang pipeline nito.",
+      "enableAutoMergeDescriptionTerm": "Awtomatikong mine-merge ng GitLab ang {{term}} na ito kapag tagumpay ang pipeline nito.",
       "forbidden": "Wala kang pahintulot na i-merge ang pull request na ito.",
       "cannotMerge": "Hindi ma-merge ang pull request na ito sa kasalukuyang kalagayan nito.",
       "couldNotMerge": "Hindi ma-merge ang pull request.",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "Na-merge na",
-        "closed": "Nakasara ang pull request na ito"
+        "closed": "Nakasara ang pull request na ito",
+        "closedMergeRequest": "Nakasara ang merge request na ito"
       },
       "partialSuccessBanner": {
         "body": "Hindi mabura ang branch: {{reason}}.",
@@ -413,6 +450,18 @@
         "behindDetail": "Kulang ang head branch sa mga pagbabago mula sa base branch. Mag-rebase o i-update ang branch bago mag-merge.",
         "notMergeableTitle": "Hindi pa maaaring i-merge ang pull request na ito",
         "notMergeableDetail": "Iniulat ng GitHub ang {{state}} bilang status ng pag-merge."
+      },
+      "restrictions": {
+        "title": "Mga paghihigko sa pag-merge",
+        "approvalsRequired_one": "{{displayCount}} approval ang kailangan",
+        "approvalsRequired_other": "{{displayCount}} approval ang kailangan",
+        "pipelineMustSucceed": "Kailangang maging matagumpay ang pipeline bago mag-merge."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Nabibigo ang pipeline sa pinakabagong commit.",
+        "pendingPipeline": "Tumatakbo pa rin ang pipeline sa pinakabagong commit.",
+        "permission": "Wala kang pahintulot na i-merge ang {{term}} na ito.",
+        "draft": "Markahan ang {{term}} bilang handa nang suriin bago mag-merge."
       },
       "methodLabels": {
         "merge": "Gumawa ng merge commit",
@@ -462,6 +511,8 @@
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
       "addCommentCta": "Magkomento sa pull request na ito",
+      "fixWithKilo": "Ayusin gamit ang Kilo",
+      "fixWithKiloPrompt": "Pakisagawa ang sumusunod na komento sa pull request: {{link}}",
       "commentBadRequest": "Hindi ma-post ang komentong ito. Maaaring nagbago ang pull request.",
       "commentForbidden": "Wala kang pahintulot na magkomento sa pull request na ito.",
       "moderation": {
@@ -512,7 +563,10 @@
         "outdatedOnLines": "Luma na sa {{lines}}",
         "outdatedOnPath": "Luma na sa {{path}}"
       },
-      "deletedUser": "binurang user"
+      "deletedUser": "binurang user",
+      "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
+      "moreLinesAbove_one": "… may {{displayCount}} pang linya sa itaas.",
+      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas."
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "Suriin ang pull request",
     "headLine": "{{counts}} · kasalukuyang commit {{sha}}",
     "entry": {
-      "eyebrow": "Buksan ang pull request gamit ang URL nito.",
-      "pastePrLink": "I-paste ang link ng PR",
-      "noRecentPrs": "Walang kamakailang binuksang PR",
-      "noRecentPrsDescription": "I-paste ang link ng PR sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",
+      "eyebrow": "Buksan ang pull request o merge request gamit ang URL nito",
+      "pastePrLink": "I-paste ang link ng pull request o merge request",
+      "noRecentPrs": "Walang kamakailang pagsusuri",
+      "noRecentPrsDescription": "I-paste ang link sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",
       "couldNotLoad": "Hindi ma-load.",
       "removeFromRecentsTitle": "Alisin sa mga kamakailang binuksan?",
-      "removeFromRecentsMessage": "Aalisin ang pull request na ito sa listahan ng mga kamakailan mong binuksan.",
+      "removeFromRecentsMessage": "Aalisin ang pagsusuring ito sa listahan ng mga kamakailan.",
       "removeRecentAccessibility": "Alisin ang {{repo}} sa mga kamakailang binuksan",
-      "urlAccessibility": "URL ng pull request sa GitHub",
-      "clearLink": "Alisin ang link ng pull request",
-      "pasteLink": "I-paste ang link ng pull request",
+      "urlAccessibility": "Ilagay ang URL ng pull request o merge request",
+      "urlPlaceholder": "URL ng pull request o merge request",
+      "openAccessibility": "Buksan ang pull request o merge request",
+      "clearLink": "Alisin ang link",
+      "pasteLink": "I-paste ang link ng pull request o merge request",
       "open": "Bukas"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} ang nakabinbin",
       "skipped": "{{displayCount}} ang nilaktawan",
       "checksCount": "{{displayCount}} na pagsusuri",
+      "checksCount_one": "{{displayCount}} na pagsusuri",
+      "checksCount_other": "{{displayCount}} na pagsusuri",
       "checkDetails": "mga detalye ng pagsusuri"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "Hindi masuri ang koneksyon sa GitHub.",
       "checkFailedMessage": "Hindi makuha ang status ng pag-sign in hangga't hindi ito tapos mag-load.",
+      "checkFailedTitleGitLab": "Hindi masuri ang koneksyon sa GitLab.",
+      "checkFailedTitleBitbucket": "Hindi masuri ang koneksyon sa Bitbucket.",
+      "providerCheckFailedMessage": "Hindi available ang katayuan ng koneksyon hanggang sa ma-load ito.",
       "reconnectTitle": "Kumonekta muli sa GitHub",
       "reconnectDescription": "Binawi ang koneksyon mo sa GitHub. Kumonekta muli para patuloy na makapagsuri ng mga pull request sa mobile.",
-      "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile."
+      "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
+      "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
+      "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
+      "bitbucketOrgOnlyDescription": "Pumili ng organisasyon sa iyong profile para suriin ang mga pull request nito sa Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "Nag-expire ang koneksyon sa GitHub.",
-      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
+      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
+      "gitlabTitle": "Nag-expire ang koneksyon sa GitLab.",
+      "bitbucketTitle": "Nag-expire ang koneksyon sa Bitbucket.",
+      "providerMessage": "Wala nang bisa ang koneksyon mo sa {{provider}}. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
     },
     "eventChips": {
       "comment": "Komento",
@@ -672,10 +739,12 @@
       "statusContext": "Konteksto",
       "lineLabel": "{{status}} na linya {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(walang laman)"
+      "emptyLine": "(walang laman)",
+      "truncationBanner_one": "Ipinapakita ang unang {{limit}} sa {{total}} na binagong file — ito ang limitasyon ng GitHub API.",
+      "truncationBanner_other": "Ipinapakita ang unang {{limit}} sa {{total}} na binagong file — ito ang limitasyon ng GitHub API."
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard.",
-    "linkPasteNotAPullRequest": "Hindi ito link ng pull request sa GitHub.",
+    "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
     "announce": {
       "commentPosted": "Na-post ang komento",
       "reviewSubmitted": "Naisumite ang pagsusuri",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "Hindi ma-post ang komentong ito. Maaaring nagbago ang napiling linya, o na-update na ang PR.",
       "reviewNotSubmitted": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo nito. Maaaring nagbago ang PR, o hindi ka puwedeng magsuri ng sarili mong pull request.",
+      "reviewNotSubmittedTerm": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo. Baka nagbago ang {{term}}, o hindi mo masusuri ang sarili mong {{term}}.",
       "couldNotPostComment": "Hindi ma-post ang komento.",
       "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli."
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "Hindi maipadala ang sagot.",
       "couldNotCompleteAction": "Hindi makumpleto ang aksiyong ito.",
       "mergeResultDefaultError": "Hindi nakumpleto ng GitHub ang pag-merge.",
+      "mergeResultNotCompleted": "Hindi na-merge ang {{term}}. Suriin ang katayuan nito at subukang muli.",
       "ambiguous": "Hindi makumpirma — suriin ang PR bago subukan muli.",
       "persistenceFailed": "Hindi namin maitala ang aksiyong ito. Pakisubukan muli mamaya.",
       "forbidden": "Hindi pinapayagan ang aksiyong ito."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Hindi available sa provider na ito",
+        "accessibility": "Hindi available sa provider na ito: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Ibahagi ang merge request",
+      "viewOnProvider": "Tingnan sa {{provider}}",
+      "mergeRequestUnavailable": "Hindi mabuksan ang merge request",
+      "unavailableDescription": "Baka tinanggal na ito, o wala kang access dito.",
+      "accessDeniedMergeRequest": "Wala kang pahintulot na tingnan ang merge request na ito.",
+      "couldNotLoadMergeRequest": "Hindi ma-load ang merge request.",
+      "discussionAccessDenied": "Wala kang pahintulot na tingnan ang talakayan ng merge request na ito.",
+      "discussionUnavailableMessage": "Maaaring naalis ang merge request na ito.",
+      "noDiscussionDescription": "Walang talakayan sa pagsusuri o komento sa pag-uusap para sa merge request na ito.",
+      "noFilesChangedDescription": "Walang binagong file sa merge request na ito."
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "Ipinapakita ng mga notipikasyon ang teksto ng mensahe sa naka-lock mong screen.",
     "previewGenericDescription": "Ipinapaalam ng mga notipikasyon na may nangyari. Buksan ang Kilo para basahin ang mensahe.",
     "channel": {
-      "agent": "Mga sesyon ng ahente",
+      "agentProgress": "Pag-usad ng ahente",
       "chat": "Mga mensahe sa usapan",
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
-      "security": "Mga natukoy na isyu sa seguridad"
+      "security": "Mga natukoy na isyu sa seguridad",
+      "spend": "Mga babala sa gastos"
     },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "Status ng sesyon",
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
+      "kiloclawActivityUnavailable": "Magsimula ng instance ng KiloClaw para makakuha ng aktibidad ng KiloClaw.",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
-      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
+      "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa balanse.",
+      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
+      "securityFindingsUnavailable": "I-enable ang Ahente sa seguridad ng Kilo sa isang saklaw para makakuha ng mga natuklasan sa seguridad.",
+      "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
+      "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
+    },
+    "action": {
+      "openSession": "Buksan ang sesyon"
+    },
+    "needsInputAction": {
+      "approved": "Aprubado ang kahilingan",
+      "replied": "Naipadala ang sagot",
+      "failed": "Hindi nasagot. I-tap muli para subukang muli.",
+      "unavailable": "Hindi na naghihintay ang kahilingang ito."
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "Nabigo ang pag-upload.",
       "failedToUploadFile": "Hindi ma-upload ang file: {{reason}}.",
       "nothingToPaste": "Walang maipa-paste.",
-      "metadataStripFailed": "Hindi maalis ang metadata ng larawan."
+      "metadataStripFailed": "Hindi maalis ang metadata ng larawan.",
+      "limit_one": "Maaari kang maglakip ng hanggang {{displayCount}} file.",
+      "limit_other": "Maaari kang maglakip ng hanggang {{displayCount}} file."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "I-sync ang mga natukoy na isyu",
       "syncNow": "I-sync ngayon",
       "syncQueued": "Nakapila ang sync",
-      "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync."
+      "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync.",
+      "daysOverdue_one": "{{displayCount}} araw nang lampas sa takdang petsa",
+      "daysOverdue_other": "{{displayCount}} araw nang lampas sa takdang petsa",
+      "findingsCount_one": "{{displayCount}} natukoy na isyu",
+      "findingsCount_other": "{{displayCount}} natukoy na isyu"
     },
     "dashboardMetrics": {
       "openFindings": "Mga bukas na isyu",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
+      "stopped": "Huminto ang sesyon",
+      "committing": "Nagko-commit…",
+      "committed": "Na-commit",
+      "commitFailed": "Nabigo ang pag-commit",
       "renameSession": "Palitan ang pangalan ng sesyon",
       "renamePlaceholder": "Pangalan ng sesyon",
       "transcriptAccessibility": "Tala ng pag-uusap sa sesyon",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "Kailangan ng mas bagong Kilo CLI para sa malayuang paggamit ng mga utos na may slash. I-update ang Kilo CLI at muling kumonekta."
     },
     "sessionConnection": {
+      "label": "Koneksyon",
       "connecting": "Kumokonekta…",
       "reconnecting": "Muling kumokonekta…",
       "connectionLost": "Nawala ang koneksyon",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "Alisin ang layunin?",
       "removeConfirmMessage": "Kinaklaro ng CLI ang layunin ng session na ito.",
       "updateFailed": "Hindi na-update ang layunin.",
-      "sectionAccessibility": "{{status}}. Layunin: {{text}}"
+      "sectionAccessibility": "{{status}}. Layunin: {{text}}",
+      "collapse": "Itago ang layunin",
+      "expand": "Ipakita ang layunin"
     },
     "newSession": {
+      "recentlyUsed": "Mga ginamit kamakailan",
+      "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
+      "couldNotLoadGitlabRepositories": "Hindi ma-load ang mga imbakan ng code sa GitLab.",
+      "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga imbakan ng code sa Bitbucket.",
       "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
+      "connectGitlabDescription": "Ikonekta ang GitLab sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
+      "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
       "openGithub": "Buksan ang GitHub",
+      "openGitlab": "Buksan ang GitLab",
+      "openBitbucket": "Buksan ang Bitbucket",
       "refreshRepositories": "I-refresh ang mga imbakan ng code",
       "githubConnected": "Konektado ang GitHub",
+      "gitlabConnected": "Konektado ang GitLab",
       "noRepositoriesVisible": "Walang nakikitang imbakan ng code. Suriin kung may access ang Kilo GitHub App sa mga imbakan ng code, saka i-refresh.",
+      "noRepositoriesVisibleGitlab": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa GitLab, saka i-refresh.",
+      "noRepositoriesVisibleBitbucket": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa Bitbucket, saka i-refresh.",
+      "bitbucketOrganizationsOnly": "Available lang ang Bitbucket para sa mga organisasyon.",
+      "branchPickerTitle": "Pumili ng sangay",
+      "branchDefault": "Default",
+      "branchAccessibility": "Sangay: {{label}}",
+      "branchLoading": "Ini-load ang mga sangay",
+      "branchLoadError": "Hindi ma-load ang mga sangay",
+      "branchUnavailable": "Walang available na sangay para sa repositoryong ito. Suriin ang access mo sa provider, tapos pumili ng ibang repositoryo.",
+      "branchEmpty": "Walang available na sangay",
+      "branchPlaceholder": "Pumili ng sangay",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
       "environment": "Kapaligiran",
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong kapaligiran.",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",
       "discardDraftMessage": "Mawawala ang iyong prompt.",
+      "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
       "remoteHint": "Patakbuhin ang `kilo remote` sa iyong computer, o ang `/remote` sa isang tumatakbong sesyon ng CLI, para kontrolin ang isang lokal na proseso ng kilo.",
-      "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
-      "connectGitlabDescription": "Ikonekta ang GitLab sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
-      "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga imbakan ng code sa Bitbucket.",
-      "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
-      "couldNotLoadGitlabRepositories": "Hindi ma-load ang mga imbakan ng code sa GitLab.",
-      "gitlabConnected": "Konektado ang GitLab",
-      "noRepositoriesVisibleBitbucket": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa Bitbucket, saka i-refresh.",
-      "noRepositoriesVisibleGitlab": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa GitLab, saka i-refresh.",
-      "openBitbucket": "Buksan ang Bitbucket",
-      "openGitlab": "Buksan ang GitLab",
-      "recentlyUsed": "Mga ginamit kamakailan",
       "continueFrom": "Ipinagpapatuloy ang {{title}}.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
       "importFailed": "Hindi ma-import ang sesyong ito.",
-      "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit."
+      "pickProfile": "Pumili ng profile",
+      "noProfile": "Walang profile",
+      "manageProfiles": "Pamahalaan ang mga profile",
+      "noProfiles": "Wala pang mga profile. Gumawa ng isa upang magdagdag ng mga variable ng kapaligiran, mga server ng MCP, at mga kasanayan.",
+      "advancedConfig": "Advanced na kompigurasyon",
+      "advancedConfigDescription": "Pumili ng profile upang i-load ang mga naka-save na configuration, at manu-manong i-configure ang mga karagdagang environment variable at setup command",
+      "saveAsProfile": "I-save bilang Profile",
+      "saveProfileDescription": "I-save ang kasalukuyang mga variable ng kapaligiran at mga command sa pag-setup bilang isang reusable na profile.",
+      "profileSummary": "{{vars}} variable ng kapaligiran · {{commands}} utos sa pag-setup",
+      "profileSaved": "Na-save ang profile na \"{{name}}\".",
+      "organizationProfiles": "Mga Profile ng Organisasyon",
+      "personalProfiles": "Mga Personal na Profile",
+      "yourProfiles": "Iyong mga Profile",
+      "failedToLoadProfiles": "Nabigong i-load ang mga profile",
+      "nameTooLong": "Masyadong mahaba ang pangalan ng profile",
+      "descriptionTooLong": "Masyadong mahaba ang paglalarawan",
+      "secretsEncrypted": "Ang mga lihim ay naka-encrypt bago imbakan.",
+      "profileActive": "Aktibo ang profile",
+      "profilesActive": "Aktibo ang mga profile",
+      "customConfigActive": "Aktibo ang custom na config",
+      "configNeedsAttention": "Ang configuration ay nangangailangan ng pansin",
+      "repoProfile": "Profile ng repo",
+      "selectedProfile": "Napiling profile",
+      "manualOverrides": "Mga manu-manong override",
+      "openSettingsToReview": "Buksan ang Mga Setting para suriin",
+      "profileSelection": "Pagpili ng profile"
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",
@@ -2086,15 +2241,18 @@
       "updateTodos": "I-update ang listahan ng gagawin",
       "linesBadge": "{{displayCount}} na linya",
       "filesBadge": "{{displayCount}} na file",
-      "matchesBadge": "{{displayCount}} tugma"
+      "matchesBadge": "{{displayCount}} tugma",
+      "filesBadge_one": "{{displayCount}} na file",
+      "filesBadge_other": "{{displayCount}} na file",
+      "linesBadge_one": "{{displayCount}} na linya",
+      "linesBadge_other": "{{displayCount}} na linya",
+      "matchesBadge_one": "{{displayCount}} tugma",
+      "matchesBadge_other": "{{displayCount}} tugma",
+      "noOutput": "Walang output."
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
       "linesOf": "mga linyang {{start}}–{{end}} sa {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Nabigo ang {{action}} ng Cloud Agent ({{status}}).",
-      "failed": "Nabigo ang {{action}} ng Cloud Agent."
     },
     "collectCopyableText": {
       "unserializableInput": "[input na hindi ma-serialize]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingan.",
       "assistantStopped": "Inihinto ang tugon.",
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
-      "assistantFailed": "Nabigo ang pagtugon.",
-      "sendFailed": "Hindi maipadala ang mensahe. Subukang muli."
+      "assistantFailed": "Nabigo ang pagtugon."
     },
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",
@@ -2376,7 +2533,11 @@
       "files": "Mga payl",
       "couldNotOpenPhotoPicker": "Hindi mabuksan ang pagpili ng larawan. I-restart ang Kilo at subukang muli.",
       "maxFilesAllowed": "Hanggang {{displayCount}} na file lang ang pinapayagan.",
-      "onlyAddingFiles": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)"
+      "onlyAddingFiles": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)",
+      "maxFilesAllowed_one": "Hanggang {{displayCount}} na file lang ang pinapayagan.",
+      "maxFilesAllowed_other": "Hanggang {{displayCount}} na file lang ang pinapayagan.",
+      "onlyAddingFiles_one": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)",
+      "onlyAddingFiles_other": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)"
     },
     "composer": {
       "addAttachment": "Magdagdag ng kalakip",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",
       "discardAttachmentsTitle": "Burahin ang mga kalakip?",
       "charactersRemaining": "{{count}} na character ang natitira",
-      "insertNewline": "Magpasok ng bagong linya"
+      "insertNewline": "Magpasok ng bagong linya",
+      "charactersRemaining_one": "{{count}} na character ang natitira",
+      "charactersRemaining_other": "{{count}} na character ang natitira"
     },
     "chatLink": {
       "linkCopied": "Nakopya ang link",
@@ -2428,7 +2591,17 @@
       "startNewSession": "Magsimula ng bagong sesyon",
       "exitSession": "Lumabas sa sesyon",
       "clearSession": "Tapusin ang sesyong ito at magsimula ng bago",
+      "compactDescription": "i-compact ang konteksto ng kasalukuyang sesyon",
+      "goalDescription": "Magpatuloy sa paggawa tungo sa layunin ng sesyon. /goal <objective> o pause, resume, clear",
+      "initDescription": "gabay na pag-set up ng AGENTS.md",
+      "resumeClaudeDescription": "i-import ang transkript ng sesyon sa Claude Code",
+      "resumeCodexDescription": "i-import ang transkript ng sesyon sa OpenAI Codex",
+      "reviewDescription": "suriin ang mga pagbabago [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gamitin ang /{{command}}",
+      "useSkillCommand": "Gamitin ang kasanayan /{{command}}",
+      "skillBadge": "Kasanayan",
+      "catalogFull": "Puno na ang katalogo ng mga utos, kaya may mga utos na nakatago.",
+      "catalogOverLimit": "Lumampas sa limitasyon ng laki ang katalogo ng mga kasanayan, kaya nakalista ang lahat ng kasanayan.",
       "insert": "Ipasok",
       "upgradeRequiredFallback": "I-upgrade ang iyong CLI para magamit ang utos na ito.",
       "exitCapabilityUnavailable": "I-update ang iyong CLI para lumabas sa sesyon.",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "{{steps}} hakbang",
       "stepsCount": "{{steps}} na hakbang",
       "stepsCount_other": "{{steps}} na hakbang",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Mga modelo ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Auto-apruba",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "Mga tawag ng kagamitan",
-      "condensedLabel": "{{itemCount}} item; {{last}}"
+      "condensedLabel": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "Hindi ma-load ang mga aktibong sesyon.",
     "agentSessions": "Kasalukuyang tumatakbo",
     "newCodingTask": "Bagong gawain sa pag-code",
+    "newTaskFromPicture": "Bagong gawain mula sa larawan",
     "explore": "Tuklasin",
     "seeAll": "Tingnan ang lahat",
     "noLiveSessions": "Walang tumatakbo sa ngayon"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "Hindi makakatanggap ng file ang session na ito",
     "cliCantReceiveFilesMessage": "Hindi makatanggap ng mga file ang Kilo CLI na nagpapatakbo ng session na ito. I-update ang CLI sa computer na iyon, o ibahagi ito sa bagong session.",
     "contentlessMessage": "Walang maibabahagi — walang kasamang teksto o file.",
-    "couldNotReadContent": "Hindi mabasa ang ibinahaging nilalaman."
+    "couldNotReadContent": "Hindi mabasa ang ibinahaging nilalaman.",
+    "onlyFirstFilesAttached_one": "Ang unang {{displayCount}} na file lang ang ilalakip.",
+    "onlyFirstFilesAttached_other": "Ang unang {{displayCount}} na file lang ang ilalakip."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "Ang mga prompt mo, kasaysayan ng pag-uusap, at anumang file na ilalakip mo.",
     "aiProvidersWhy": "Para makabuo ng mga tugon ng AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, at iba pang tagapagbigay ng serbisyo na pipiliin mo sa bawat kahilingan.",
-    "gatewayWhat": "ID ng akawnt, metadata ng kahilingan, paggamit ng token.",
+    "gatewayWhat": "ID ng akawnt, metadata ng kahilingan, paggamit ng token, at ang mga prompt at voice recording na ipinapadala ng app sa pamamagitan nito.",
+    "viaGateway": "Sa pamamagitan ng Kilo Gateway",
     "gatewayWhy": "Pagpapatunay ng pagkakakilanlan, pagdadala ng mga kahilingan sa tamang destinasyon, pagtutugma ng mga tala ng pagsingil.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Mga ulat ng pag-crash at error na inalisan ng nilalaman ng app.",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Rekording ng boses mo habang nagdidikta ka.",
     "voiceTranscriptionWhy": "Para gawing teksto ang sinasabi mo.",
-    "voiceTranscriptionWho": "Sa device lang, o sa Apple o Google kung hindi kayang gawing teksto ng device ang boses nang walang internet.",
+    "voiceTranscriptionWho": "Ang device mo, Kilo Gateway kasama ang napili mong transcription model, o Apple o Google para sa online recognition.",
     "installAttributionPromptTitle": "Payagang tukuyin ang pinagmulan ng pag-install?",
     "installAttributionPromptMessage": "Ginagamit ng Kilo ang pahintulot sa pagsubaybay ng Apple para lang malaman kung saan mo nalaman ang app. Hindi kailanman ginagamit ang mga prompt at pag-uusap mo.",
     "what": "Ano",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "Masyadong maraming pagtatangkang mag-sign in. Pakihintay at subukan muli."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatikong Pinakamaunlad",
+      "balanced": "Awtomatikong Balanse",
+      "efficient": "Awtomatikong Mabisa",
+      "small": "Awtomatikong Maliit",
+      "free": "Awtomatikong Libre",
+      "organization": "Awtomatikong Organisasyon"
+    },
     "dataCollected": "Kinokolekta ang datos",
     "free": "Libre",
     "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito.",
@@ -2996,8 +3185,17 @@
     "privacy": "Buksan ang Kilo para makita ang mga agent",
     "openAgents": "Buksan ang mga agent",
     "needsInput": "Naghihintay ng sagot",
+    "newestSession": "Pinakabago: {{title}}",
+    "noneWaiting": "Walang naghihintay na agent",
+    "newAgent": "Bagong agent",
+    "approving": "Inaaprubahan...",
+    "couldNotApprove": "Hindi maaprubahan",
+    "couldNotStart": "Hindi masimulan",
     "channelName": "Mga aktibong agent",
-    "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen."
+    "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
+    "openSession": "Buksan",
+    "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
+    "newestResult": "Pinakabagong resulta"
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3022,14 +3220,214 @@
     "remoteOptionTitle": "Iyong computer",
     "remoteOptionBody": "Patakbuhin ang Kilo sa iyong sariling machine gamit ang `kilo remote` CLI.",
     "skip": "Laktawan ang tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Simulan ang iyong unang remote session",
-    "remoteBody": "Ikonekta ang iyong computer, pagkatapos simulan ang sesyon mula rito.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Walang konektadong computer pa",
-    "remoteEmptyBody": "Para ikonekta ito, patakbuhin ang `kilo remote` sa iyong computer.",
-    "remoteFound": "Konektado ang computer",
-    "checkAgain": "Tingnan muli",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Nangangailangan ng prompt ang Simulan ang agent. Magdagdag ng prompt at patakbuhin itong muli.",
+      "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
+      "repositoryUnsupported": "Ang {{repository}} ay isang Bitbucket na repositoryo — Hindi pa ito magagamit ng Simulan ang agent. Pumili ng ibang repositoryo sa Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Buksan ang huling sesyon"
+  },
+  "spendAlerts": {
+    "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
+    "enable": "Paganahin ang mga babala sa gastos",
+    "thresholdTitle": "Paglampas sa hangganan",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "anomalyTitle": "Pagtaas bawat oras",
+    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "limitLabel": "Limitasyon (USD)",
+    "windowLabel": "Panahon",
+    "window24h": "24 na oras",
+    "window7d": "7 araw",
+    "window30d": "30 araw",
+    "multiplierLabel": "Multiplier ng pagtaas",
+    "saved": "Nai-save ang mga setting ng babala sa gastos",
+    "loadError": "Hindi ma-load ang mga babala sa gastos.",
+    "saveError": "Hindi mai-save ang mga babala sa gastos.",
+    "empty": "Naka-off ang mga babala sa gastos. I-on ang mga ito para abisuhan ang mga contact sa pagsingil ng saklaw na ito.",
+    "noSpend": "Wala pang naitalang gastos",
+    "spend24h": "Gastos sa nakalipas na 24 na oras",
+    "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
+    "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
+    "pushOffByCategory": "Naka-off sa Mga abiso"
+  },
+  "profiles": {
+    "title": "Mga profile",
+    "entrySubtitle": "Muling gamitin ang mga setting ng kapaligiran sa mga session",
+    "newProfile": "Bagong profile",
+    "emptyTitle": "Wala pang mga profile",
+    "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
+    "loadFailed": "Hindi ma-load ang mga profile",
+    "counts": {
+      "vars": "{{count}} variable",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} kasanayan",
+      "commands": "{{count}} utos",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}u"
+    },
+    "nameLabel": "Pangalan ng profile",
+    "namePlaceholder": "hal. Backend debugging",
+    "descriptionLabel": "Paglalarawan ng profile",
+    "descriptionPlaceholder": "Opsyonal na paglalarawan",
+    "ownerLabel": "May-ari ng profile",
+    "nameRequired": "Maglagay ng pangalan ng profile",
+    "createAction": "Lumikha ng profile",
+    "createFailed": "Hindi makalikha ng profile",
+    "createdToast": "Nagawa ang profile na \"{{name}}\".",
+    "settingsSectionTitle": "Kompigurasyon",
+    "defaultSectionTitle": "Default na profile",
+    "personalDefaultDescription": "Awtomatikong na-load kapag walang repository na may naka-pin na profile.",
+    "organizationDefaultDescription": "Awtomatikong na-load para sa mga miyembrong walang personal na default.",
+    "setAsDefault": "Itakda bilang default",
+    "removeDefault": "Alisin bilang default",
+    "saveFailed": "Hindi ma-save ang profile",
+    "deleteTitle": "Tanggalin ang profile",
+    "deleteMessage": "Permanente nitong inaalis ang profile at mga setting nito. Hindi na ito maaaring bawiin.",
+    "deleteFailed": "Hindi matanggal ang profile",
+    "deleteBlocked": "Ang profile na ito ay ginagamit ng isang webhook trigger. Alisin muna ito sa mga trigger na iyon.",
+    "deletedToast": "Ang profile na \"{{name}}\" ay tinanggal",
+    "variablesTitle": "Mga variable ng kapaligiran",
+    "addVariable": "Magdagdag ng variable",
+    "keyLabel": "Susi",
+    "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
+    "keyDuplicate": "Umiiral na ang key na ito sa profile",
+    "valueLabel": "Halaga",
+    "secretLabel": "Lihim",
+    "secrets": {
+      "markSecret": "Markahan bilang sikreto",
+      "masked": "Nakatagong halaga",
+      "reveal": "Ipakita ang halaga",
+      "newValuePlaceholder": "Maglagay ng bagong lihim na halaga",
+      "valuePlaceholder": "Lihim na halaga (naka-encrypt)"
+    },
+    "variablesEmpty": "Wala pang variable",
+    "variablesSaveFailed": "Hindi ma-save ang variable",
+    "commandsTitle": "Mga utos sa pag-setup",
+    "addCommand": "Magdagdag ng utos",
+    "commandLabel": "Utos",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Wala pang setup command",
+    "commandsSaveFailed": "Hindi ma-save ang mga command sa pag-setup",
+    "moveUp": "Umakyat",
+    "moveDown": "Ilipat pababa",
+    "skillsTitle": "Mga kasanayan",
+    "addSkill": "Magdagdag ng kasanayan",
+    "skillNameLabel": "Pangalan ng kasanayan",
+    "skillMarkdownLabel": "Nilalaman ng kasanayan",
+    "skillsEmpty": "Wala pang skills",
+    "skillNameRequired": "Maglagay ng pangalan ng kasanayan",
+    "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
+    "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
+    "skillSaveFailed": "Hindi makapag-save ng kasanayan",
+    "skillsHint": "Mag-paste ng SKILL.md at mapunan ang pangalan nito; magdagdag ng kasanayan mula sa iyong telepono nang walang drag at drop.",
+    "skillEditTitle": "Mag-edit ng kasanayan",
+    "mcp": {
+      "title": "Mga MCP server",
+      "add": "Magdagdag ng MCP server",
+      "empty": "Wala pang MCP server",
+      "name": "Pangalan ng server",
+      "type": "Uri ng server",
+      "localType": "Lokal",
+      "remoteType": "Malayo",
+      "command": "Linya ng utos",
+      "url": "URL",
+      "environment": "Kapaligiran (JSON)",
+      "headers": "Mga Header (JSON)",
+      "timeout": "Oras ng paghihintay",
+      "secretCount": "Lihim na bilang",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Maglagay ng pangalan ng server",
+      "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga titik, numero, underscore, at gitling",
+      "commandRequired": "Maglagay ng command",
+      "commandTooLong": "Gumamit ng hindi hihigit sa 50 argumento na 500 character bawat isa",
+      "urlRequired": "Maglagay ng URL",
+      "urlInvalid": "Maglagay ng wastong URL",
+      "urlTooLong": "Dapat 2048 character o mas kaunti ang URL",
+      "jsonInvalid": "Maglagay ng wastong JSON — isang bagay ng mga halaga ng string",
+      "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
+      "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
+      "edit": "I-edit ang MCP server",
+      "saveFailed": "Hindi ma-save ang MCP server"
+    },
+    "agents": {
+      "title": "Mga ahente ng profile",
+      "add": "Magdagdag ng ahente",
+      "empty": "Wala pang ahente",
+      "name": "Pangalan ng ahente",
+      "slug": "Slug ng ahente",
+      "description": "Paglalarawan ng ahente",
+      "model": "Override ng modelo",
+      "modelPlaceholder": "Gamitin ang default ng session",
+      "prompt": "Prompt ng sistema",
+      "steps": "Pinakamataas na hakbang",
+      "stepsPlaceholder": "hal. 50",
+      "temperature": "Temperatura",
+      "temperaturePlaceholder": "hal. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "hal. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Aking Ahente",
+      "promptPlaceholder": "ikaw ay isang...",
+      "tools": "Mga gamit",
+      "visibility": "Bisibilidad",
+      "visibilityPrimary": "Pangunahin — ipinapakita sa picker",
+      "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
+      "visibilityAll": "Lahat - pareho",
+      "saveFailed": "Hindi ma-save ang ahente",
+      "nameRequired": "Maglagay ng pangalan ng ahente",
+      "slugRequired": "Maglagay ng agent slug",
+      "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
+      "slugConflict": "Ang slug na iyon ay nakalaan ng isang built-in na ahente",
+      "edit": "I-edit ang ahente"
+    },
+    "slashCommands": {
+      "title": "Mga utos ng slash",
+      "add": "Magdagdag ng slash command",
+      "empty": "Wala pang slash command",
+      "name": "Pangalan ng command",
+      "description": "Paglalarawan ng utos",
+      "template": "Padron",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
+      "agent": "Ahente",
+      "subtask": "Patakbuhin bilang subtask",
+      "edit": "I-edit ang slash command",
+      "saveFailed": "Hindi ma-save ang command",
+      "nameRequired": "Maglagay ng command name",
+      "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
+      "templateRequired": "Maglagay ng command template",
+      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command"
+    },
+    "repoBindings": {
+      "title": "Mga Default na Profile para sa Repos",
+      "add": "Magdagdag ng default",
+      "empty": "Walang mga default na na-configure",
+      "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",
+      "repo": "Pumili ng repositoryo...",
+      "profile": "Pumili ng profile",
+      "remove": "Alisin ang pagkakatali",
+      "private": "Pribado",
+      "search": "Maghanap ng mga repositoryo...",
+      "addedToast": "Itinakda ang default na profile para sa \"{{repo}}\"",
+      "addFailed": "Hindi maitakda ang default na profile",
+      "removedToast": "Inalis ang default na profile para sa \"{{repo}}\"",
+      "removeFailed": "Hindi maalis ang default na profile",
+      "pinnedTitle": "Naka-pin sa mga repository",
+      "pinRepo": "I-pin ang isang repo",
+      "pinnedEmpty": "Hindi naka-pin sa anumang mga repository.",
+      "pinnedDescription": "Awtomatikong na-load sa tuwing tina-target ng isang session ang isa sa mga repositoryo na ito.",
+      "pinnedToast": "Naka-pin sa \"{{repo}}\"",
+      "pinFailed": "Hindi ma-pin ang repo",
+      "unboundToast": "Nakalag ang repo",
+      "unbindFailed": "Hindi ma-unbind ang repo"
+    }
   }
 }

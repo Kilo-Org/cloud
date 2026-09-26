@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
 import { useCallback, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
@@ -10,6 +9,7 @@ import {
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryGroups,
+  repositoryIdentityKey,
   type RepositoryPlatform,
   resolveBitbucketStatus,
   resolveProviderStatus,
@@ -21,9 +21,9 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
-import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
+import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
   organizationId: string | undefined;
@@ -42,6 +42,23 @@ type UseNewSessionReposResult = {
   refreshReposForceFresh: () => Promise<void>;
 };
 
+/**
+ * How long a provider's repository list stays fresh. Without it the three
+ * queries take the query client's `staleTime: 0` default and refetch a full
+ * repository list per provider on every mount of the new-session form, for
+ * data that changes at the rate of a repository being connected.
+ *
+ * This window is never the only way the lists update: every explicit
+ * invalidation path still writes fresh results into the same `forceRefresh:
+ * false` keys, so the next mount reads them instead of refetching —
+ * `refreshReposForceFresh` (through `fetchQuery` on its own `forceRefresh:
+ * true` keys at `staleTime: 0`), `forceFreshGitLab` and `forceFreshBitbucket`
+ * (`setQueryData` on the normal keys), and the connect/return flow
+ * (`useGitHubReposRefresh.performForceFresh` and
+ * `openAuthorizationAndWaitForReturn`).
+ */
+const NEW_SESSION_REPOS_STALE_TIME_MS = 5 * 60 * 1000;
+
 export function useNewSessionRepos({
   organizationId,
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
@@ -50,32 +67,47 @@ export function useNewSessionRepos({
 
   const githubQuery = useQuery(
     organizationId
-      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
-          forceRefresh: false,
-        })
+      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions(
+          {
+            organizationId,
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
+      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions(
+          {
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
   );
 
   const gitlabQuery = useQuery(
     organizationId
-      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
-          forceRefresh: false,
-        })
+      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions(
+          {
+            organizationId,
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
+      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions(
+          {
+            forceRefresh: false,
+          },
+          { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+        )
   );
 
   // Bitbucket is organization-only: the query is disabled without an org.
   const bitbucketQuery = useQuery({
-    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
-      organizationId: organizationId ?? '',
-      forceRefresh: false,
-    }),
+    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions(
+      {
+        organizationId: organizationId ?? '',
+        forceRefresh: false,
+      },
+      { staleTime: NEW_SESSION_REPOS_STALE_TIME_MS }
+    ),
     enabled: Boolean(organizationId),
   });
 
@@ -280,36 +312,18 @@ export function useNewSessionRepos({
   }, [refreshGitHubForceFresh, forceFreshGitLab, forceFreshBitbucket]);
 
   // ── Per-provider connect ──────────────────────────────────────────
-  // Android: `openAuthorizationAndWaitForReturn` returns `'app-foreground'`
-  // (the browser launch is fire-and-forget), so each provider's refresh runs
-  // from a shared foreground listener when the app returns.
-  const { markLaunched: markGitLabLaunched, clearLaunch: clearGitLabLaunch } =
-    useExternalAuthReturn(() => {
-      void forceFreshGitLab();
-    });
-  const { markLaunched: markBitbucketLaunched, clearLaunch: clearBitbucketLaunch } =
-    useExternalAuthReturn(() => {
-      void forceFreshBitbucket();
-    });
-
   const openGitLabIntegration = useCallback(() => {
     void (async () => {
       try {
-        markGitLabLaunched();
-        const trigger = await openAuthorizationAndWaitForReturn(
-          Platform.OS,
+        await openAuthorizationAndWaitForReturn(
           getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
         );
-        if (trigger === 'sheet-close') {
-          clearGitLabLaunch();
-          await forceFreshGitLab();
-        }
+        await forceFreshGitLab();
       } catch {
-        clearGitLabLaunch();
         toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
       }
     })();
-  }, [organizationId, forceFreshGitLab, markGitLabLaunched, clearGitLabLaunch]);
+  }, [organizationId, forceFreshGitLab]);
 
   const openBitbucketIntegration = useCallback(() => {
     if (!organizationId) {
@@ -317,21 +331,15 @@ export function useNewSessionRepos({
     }
     void (async () => {
       try {
-        markBitbucketLaunched();
-        const trigger = await openAuthorizationAndWaitForReturn(
-          Platform.OS,
+        await openAuthorizationAndWaitForReturn(
           getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
         );
-        if (trigger === 'sheet-close') {
-          clearBitbucketLaunch();
-          await forceFreshBitbucket();
-        }
+        await forceFreshBitbucket();
       } catch {
-        clearBitbucketLaunch();
         toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
       }
     })();
-  }, [organizationId, forceFreshBitbucket, markBitbucketLaunched, clearBitbucketLaunch]);
+  }, [organizationId, forceFreshBitbucket]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {
@@ -372,4 +380,98 @@ export function useNewSessionRepos({
 
 function repoKey(repository: NewSessionRepository): string {
   return `${repository.platform}/${repository.fullName.toLowerCase()}`;
+}
+
+// ── Branches of the selected repository ──────────────────────────────
+
+export type RepositoryBranchesState = {
+  /** The provider's default branch, or null when it reports none. */
+  defaultBranch: string | null;
+  branches: string[];
+  /** The query runs only for a selected repository in a scope that can serve it. */
+  isEnabled: boolean;
+  isLoading: boolean;
+  /** A transient failure: the caller offers a retry. */
+  isRetryableError: boolean;
+  /** FORBIDDEN/UNAUTHORIZED/NOT_FOUND — a retry cannot fix it, so no retry CTA. */
+  isPermanentError: boolean;
+  isRetrying: boolean;
+  retry: () => void;
+};
+
+/**
+ * Branches of the selected repository, from the provider, through the s4
+ * `listRepositoryBranches` procedures (organization variant when the
+ * new-session route carries an organization).
+ *
+ * The query runs only when a repository is selected. Bitbucket is
+ * organization-only, so a personal Bitbucket row never issues a request — the
+ * server would refuse it with the org-only message, and the section explains
+ * the restriction instead.
+ *
+ * The organization scope is the caller's `organizationId` PROP, not a value
+ * read back from a store: the screen owns the route's scope, so passing it in
+ * means a scope change reaches the query key on the same render that changed
+ * it — a store published by a passive effect would leave the previous
+ * organization installed for one render and query it.
+ *
+ * The cache key carries the full repository identity: the procedure input
+ * only accepts `platform` + `fullName`, so the Bitbucket workspace/repository
+ * uuids are appended to the key here. Two same-named rows — across providers,
+ * or across renamed Bitbucket workspaces — can never read each other's
+ * branches out of the cache.
+ */
+export function useRepositoryBranches(
+  repository: NewSessionRepository | null,
+  organizationId: string | undefined
+): RepositoryBranchesState {
+  const trpc = useTRPC();
+
+  const platform: RepositoryPlatform = repository?.platform ?? 'github';
+  const fullName = repository?.fullName ?? '';
+  const isEnabled =
+    repository !== null && fullName !== '' && !(platform === 'bitbucket' && !organizationId);
+
+  const personalInput = { platform, repository: { fullName } };
+  const organizationInput = { organizationId: organizationId ?? '', ...personalInput };
+  const identity = repository ? repositoryIdentityKey(repository) : 'none';
+
+  const branchQuery = useQuery({
+    queryKey: [
+      ...(organizationId
+        ? trpc.organizations.cloudAgentNext.listRepositoryBranches.queryKey(organizationInput)
+        : trpc.cloudAgentNext.listRepositoryBranches.queryKey(personalInput)),
+      identity,
+    ],
+    queryFn: async () => {
+      const listing = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.listRepositoryBranches.query(
+            organizationInput
+          )
+        : await trpcClient.cloudAgentNext.listRepositoryBranches.query(personalInput);
+      return listing;
+    },
+    enabled: isEnabled,
+  });
+
+  const errorCode = branchQuery.isError
+    ? // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the query fn calls tRPC directly, so the error is a TRPCClientError carrying `data.code`
+      (branchQuery.error as { data?: { code?: string } } | null)?.data?.code
+    : undefined;
+  const { permanent } = classifyProviderErrorCode(errorCode);
+
+  const retry = useCallback(() => {
+    void branchQuery.refetch();
+  }, [branchQuery]);
+
+  return {
+    defaultBranch: branchQuery.data?.defaultBranch ?? null,
+    branches: branchQuery.data?.branches ?? [],
+    isEnabled,
+    isLoading: isEnabled && branchQuery.isPending,
+    isRetryableError: branchQuery.isError && !permanent,
+    isPermanentError: branchQuery.isError && permanent,
+    isRetrying: branchQuery.isFetching && branchQuery.isError,
+    retry,
+  };
 }

@@ -82,7 +82,13 @@ export async function GET(request: NextRequest) {
   );
   authorizeUrl.searchParams.set(
     'state',
-    createGitHubBotLinkState(user.id, verifiedToken.installationId, '/github/link', appType)
+    createGitHubBotLinkState(
+      user.id,
+      verifiedToken.installationId,
+      '/github/link',
+      appType,
+      integration.id
+    )
   );
   authorizeUrl.searchParams.set('scope', 'read:user');
 

@@ -16,7 +16,12 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
-import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
+import {
+  boundSlashCommandCatalog,
+  toSlashCommandInfo,
+  type BoundedSlashCommandCatalog,
+  type SlashCommandInfo,
+} from '../../src/shared/slash-commands.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -173,10 +178,6 @@ function requireSdkData<T>(
   return result.data;
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type KiloServerHandle = {
   url: string;
   close: () => void;
@@ -231,7 +232,6 @@ type PromptOptions = {
   model?: { providerID?: string; modelID: string };
   system?: string;
   tools?: Record<string, boolean>;
-  snapshotInitialization?: 'wait';
   directory?: string;
   signal?: AbortSignal;
 };
@@ -271,12 +271,15 @@ export type WrapperKiloClient = {
     agent?: string;
     model?: { providerID?: string; modelID: string };
     variant?: string;
-    snapshotInitialization?: 'wait';
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<SessionCommandResponse>;
-  /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
-  listCommands: () => Promise<SlashCommandInfo[]>;
+  /**
+   * Fetch the full slash command catalog from kilo, trimmed to wire shape and
+   * bounded to the shared limits. The bound status is returned beside the
+   * commands so the client can be told when rows were dropped.
+   */
+  listCommands: () => Promise<BoundedSlashCommandCatalog>;
   answerPermission: (
     permissionId: string,
     response: PermissionResponse,
@@ -328,10 +331,6 @@ export type WrapperKiloClient = {
   readonly serverUrl: string;
 };
 
-// ---------------------------------------------------------------------------
-// Implementation
-// ---------------------------------------------------------------------------
-
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
   serverUrl: string,
@@ -364,9 +363,6 @@ export function createWrapperKiloClient(
       ...(opts.system ? { system: opts.system } : {}),
       ...(opts.tools ? { tools: opts.tools } : {}),
       ...(opts.agent ? { agent: opts.agent } : {}),
-      ...(opts.snapshotInitialization
-        ? { snapshotInitialization: opts.snapshotInitialization }
-        : {}),
     };
   }
 
@@ -513,9 +509,6 @@ export function createWrapperKiloClient(
             ? { model: `${opts.model.providerID ?? 'kilo'}/${opts.model.modelID}` }
             : {}),
           ...(opts.variant ? { variant: opts.variant } : {}),
-          ...(opts.snapshotInitialization
-            ? { snapshotInitialization: opts.snapshotInitialization }
-            : {}),
         },
         { signal: opts.signal }
       );
@@ -528,9 +521,25 @@ export function createWrapperKiloClient(
       const commands: SlashCommandInfo[] = [];
       for (const item of raw) {
         const trimmed = toSlashCommandInfo(item);
-        if (trimmed && trimmed.source !== 'skill') commands.push(trimmed);
+        // Skill-sourced rows stay in the catalog: the mobile composer lists
+        // and invokes them like any other command. The CLI reports a skill
+        // only when it is available to this session, so keeping every reported
+        // row never un-hides an unavailable skill.
+        if (trimmed) commands.push(trimmed);
       }
-      return commands;
+      // Bound the catalog the same way the remote catalog is bounded. The
+      // bound drops non-skill rows first and never truncates a skill row; a
+      // full catalog carries its status to the client rather than hiding
+      // skills silently.
+      const bounded = boundSlashCommandCatalog(commands);
+      if (bounded.dropped > 0 || bounded.overLimit) {
+        logToFile(
+          bounded.overLimit
+            ? `slash command catalog over limit: kept all ${bounded.commands.length} rows (skill rows are never truncated), dropped ${bounded.dropped}`
+            : `slash command catalog full: dropped ${bounded.dropped} non-skill rows, kept ${bounded.commands.length}`
+        );
+      }
+      return bounded;
     },
 
     answerPermission: async (

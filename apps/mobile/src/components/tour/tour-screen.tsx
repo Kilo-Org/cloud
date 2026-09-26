@@ -1,17 +1,16 @@
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, View } from 'react-native';
+import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CenteredState } from '@/components/centered-state';
 import { ScreenHeader } from '@/components/screen-header';
-import { TourRemoteStep } from '@/components/tour/tour-remote-step';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -22,19 +21,17 @@ import { useTourCompletion } from '@/lib/tour/tour-completion';
 /**
  * The first-sign-in tour shell.
  *
- * The shell owns the fork. The Cloud card hands straight off to the
- * new-session page with the Cloud Agent preselected; the computer card opens
- * the instructions page, whose detected-computer tap hands off the same way
- * with that connection preselected. Either hand-off records the per-account
+ * The shell owns the fork. Both cards hand straight off to the new-session
+ * page: the Cloud card preselects the Cloud Agent, while the computer card
+ * passes no run-on param so the form restores the person's stored preference
+ * and they pick their computer there. Either hand-off records the per-account
  * decision and replaces the tour, so the tour never re-opens. Skip and Android
- * hardware Back are the one other decision — record it the instant the person
+ * hardware Back are the other decision — record it the instant the person
  * dismisses, then pop back to the screen that opened the tour (Home on
  * auto-open, Profile on the Tutorial replay); a tour with nothing beneath it
  * lands on Home instead (see `dismissTour`). Nothing here ever clears the
  * decision.
  */
-
-type TourPath = 'fork' | 'remote';
 
 type ForkStepProps = {
   onChoose: (path: 'cloud' | 'remote') => void;
@@ -75,38 +72,46 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
   const colors = useThemeColors();
 
   return (
-    <CenteredState>
-      {/* Scrolls the fork body so a large system font or a short screen cannot
-          push the path cards over the header or the Skip action bar. */}
-      <View className="gap-8 px-6">
-        <View className="items-center gap-4">
-          <TourStepHeader
-            icon={<Sparkles size={36} color={colors.foreground} />}
-            title={t('tour.forkTitle')}
-            body={t('tour.forkSubtitle')}
-          />
-        </View>
-
-        <View className="gap-3">
-          <ForkOption
-            icon={Cloud}
-            title={t('tour.cloudOptionTitle')}
-            body={t('tour.cloudOptionBody')}
-            onPress={() => {
-              onChoose('cloud');
-            }}
-          />
-          <ForkOption
-            icon={Monitor}
-            title={t('tour.remoteOptionTitle')}
-            body={t('tour.remoteOptionBody')}
-            onPress={() => {
-              onChoose('remote');
-            }}
-          />
-        </View>
+    <ScrollView
+      className="flex-1"
+      contentContainerClassName="grow justify-center gap-8 px-6 py-6"
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Centred in the band between the header and the Skip bar: the content
+          container grows to the viewport (`grow`) and distributes its children
+          in the middle (`justify-center`), so the block sits where the eye
+          expects it instead of against the header. `grow` is a minimum, not a
+          fixed height, so the block still scrolls: a large system font or a
+          short screen starts at the top padding rather than being pushed over
+          the header or the action bar. */}
+      <View className="items-center gap-4">
+        <TourStepHeader
+          icon={<Sparkles size={36} color={colors.foreground} />}
+          eyebrow={t('tour.eyebrow')}
+          title={t('tour.forkTitle')}
+          body={t('tour.forkSubtitle')}
+        />
       </View>
-    </CenteredState>
+
+      <View className="gap-3">
+        <ForkOption
+          icon={Cloud}
+          title={t('tour.cloudOptionTitle')}
+          body={t('tour.cloudOptionBody')}
+          onPress={() => {
+            onChoose('cloud');
+          }}
+        />
+        <ForkOption
+          icon={Monitor}
+          title={t('tour.remoteOptionTitle')}
+          body={stripInlineCodeMarkers(t('tour.remoteOptionBody'))}
+          onPress={() => {
+            onChoose('remote');
+          }}
+        />
+      </View>
+    </ScrollView>
   );
 }
 
@@ -119,8 +124,6 @@ export function TourScreen() {
   const insets = useSafeAreaInsets();
   const { userId } = useCurrentUserId();
   const { recordCompleted } = useTourCompletion(userId);
-
-  const [path, setPath] = useState<TourPath>('fork');
 
   // One dismissal decision: record it synchronously (the hook flips its
   // in-memory state before returning and persists in the background), then
@@ -139,34 +142,30 @@ export function TourScreen() {
   // both in one native-stack commit — the Android Fabric `addViewAt` crash the
   // stack-safe replace exists for (KILO-APP-25). It pushes instead and drops
   // the tour route once the push transition has ended, the same end state
-  // `replace` produces. The route param is transient — the stored run-on
-  // preference is never written here.
+  // `replace` produces. The run-on param is transient — the stored run-on
+  // preference is never written here. The computer card omits it so the form
+  // restores the stored preference and the person picks their computer there.
   const handOff = useCallback(
-    (value: string) => {
+    (runOn?: string) => {
       recordCompleted();
-      stackSafeRouter.replace(
-        `/(app)/agent-chat/new?preselectRunOn=${encodeURIComponent(value)}` as Href
-      );
+      const query = runOn ? `?preselectRunOn=${encodeURIComponent(runOn)}` : '';
+      stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
     },
     [recordCompleted, stackSafeRouter]
   );
 
   const choosePath = useCallback(
     (next: 'cloud' | 'remote') => {
-      if (next === 'cloud') {
-        handOff(PRESELECT_CLOUD_RUN_ON);
-        return;
-      }
-      setPath('remote');
+      handOff(next === 'cloud' ? PRESELECT_CLOUD_RUN_ON : undefined);
     },
     [handOff]
   );
 
-  // Android hardware Back must record the decision on the spot, exactly like
+  // Android hardware Back records the decision and dismisses, exactly like
   // Skip. Returning `true` stops the modal's default pop, which would dismiss
   // without recording. The listener belongs to the route's focus, so leaving
-  // the tour — through the hand-off's replace or Skip's back — releases it
-  // with the route.
+  // the tour — through the hand-off's replace or Skip's back — releases it with
+  // the route.
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -181,17 +180,19 @@ export function TourScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader eyebrow={t('tour.eyebrow')} showBackButton={false} />
+      {/* The tour is presented `modal` (apps/mobile/src/app/(app)/_layout.tsx),
+          so the header keeps the clearance the native sheet owns. The eyebrow
+          belongs to the centred step header above the title. The fork has no
+          back control to return to. */}
+      <ScreenHeader modal showBackButton={false} />
 
       <View className="flex-1">
-        {path === 'fork' ? <ForkStep onChoose={choosePath} /> : null}
-        {path === 'remote' ? <TourRemoteStep onChooseComputer={handOff} /> : null}
+        <ForkStep onChoose={choosePath} />
       </View>
 
-      {/* Action bar: Skip is always available so a slow or failing computer
-          list can never trap the person; every other exit is a hand-off from
-          the step itself. The bottom inset is dynamic, so it goes through
-          `style` like ScreenHeader and the pr-review footers. */}
+      {/* Action bar: Skip is always available as the one alternate exit. The
+          bottom inset is dynamic, so it goes through `style` like ScreenHeader
+          and the pr-review footers. */}
       <View
         className="flex-row items-center gap-3 px-6 pt-2"
         style={{ paddingBottom: Math.max(insets.bottom, 16) }}

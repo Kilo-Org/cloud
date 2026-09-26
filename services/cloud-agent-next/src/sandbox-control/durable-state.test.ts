@@ -1,28 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
   eraseSandboxRecord,
-  loadDeadlines,
-  loadPhysicalRecord,
+  loadAllocation,
   initialRuntimeMetadata,
   loadRuntimeMetadata,
   saveRuntimeMetadata,
-  readSandboxControlState,
   loadRouteTable,
   loadSessionCredentialGrants,
+  loadSessionReferences,
   loadTransitionLog,
-  saveDeadlines,
-  savePhysicalRecord,
   saveRouteTable,
   saveSessionCredentialGrants,
+  saveSessionReferences,
   saveTransitionLog,
+  storeAllocation,
+  SESSION_REFERENCES_KEY,
 } from './durable-state.js';
-import { createControlPlaneCredential } from './managed-credential.js';
 import {
-  claimCreate,
-  confirmRunning,
-  initialPhysicalRecord,
-  WORKTREE_CREDENTIAL_CONTAINMENT,
-} from './physical-lifecycle.js';
+  MAX_REFERENCE_BYTES,
+  MAX_REFERENCE_ENTRIES,
+  addSessionReference,
+  emptySessionReferenceState,
+  markReferencesReconciled,
+  serializedReferenceBytes,
+} from './session-references.js';
+import { createControlPlaneCredential } from './managed-credential.js';
+import { CONTROL_ALARM_ANCHORS_KEY, LEGACY_CONTROL_DEADLINES_KEY } from './control-alarm.js';
+import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
+import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../sandbox-state/model/allocation.js';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import { attachRoute, emptyRouteTable, resolveSessionEventRoute } from './session-routes.js';
 
@@ -111,16 +116,16 @@ describe('sandbox control durable state', () => {
       kiloCliVersion: '7.4.20',
     };
     await saveRuntimeMetadata(storage, runtime);
-    await savePhysicalRecord(storage, initialPhysicalRecord(false));
+    await storeAllocation(storage, allocationFixture({ state: 'stopped' })!);
     expect(await loadRuntimeMetadata(storage)).toEqual(runtime);
-    expect((await readSandboxControlState(storage)).runtime).toEqual(runtime);
+    expect((await loadAllocation(storage)).state.kind).toBe('stopped');
     await eraseSandboxRecord(storage);
     expect(await loadRuntimeMetadata(storage)).toBeUndefined();
   });
 
   it('does not backfill or reflect malformed stored runtime metadata', async () => {
     const storage = memoryStorage();
-    await savePhysicalRecord(storage, initialPhysicalRecord(false));
+    await storeAllocation(storage, allocationFixture({ state: 'stopped' })!);
     for (const runtime of [
       undefined,
       {},
@@ -128,8 +133,7 @@ describe('sandbox control durable state', () => {
     ]) {
       await storage.put('runtime_metadata', runtime);
       expect(await loadRuntimeMetadata(storage)).toBeUndefined();
-      expect((await readSandboxControlState(storage)).physical?.state).toBe('stopped');
-      expect((await readSandboxControlState(storage)).runtime).toBeUndefined();
+      expect((await loadAllocation(storage)).state.kind).toBe('stopped');
       expect(await storage.get('runtime_metadata')).toEqual(runtime);
     }
   });
@@ -250,19 +254,18 @@ describe('sandbox control durable state', () => {
     const storage = memoryStorage();
     const grant = credentialGrant();
     await saveSessionCredentialGrants(storage, [grant]);
-    await savePhysicalRecord(
+    await storeAllocation(
       storage,
-      confirmRunning(
-        claimCreate(
-          initialPhysicalRecord(false),
-          'intent_1',
-          1000,
-          undefined,
-          WORKTREE_CREDENTIAL_CONTAINMENT
-        ),
-        'ref_1',
-        1001
-      )
+      allocationFixture({
+        state: 'running',
+        providerRef: 'ref_1',
+        createIntent: {
+          intentId: 'intent_1',
+          createdAt: 1000,
+          containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+        },
+        containment: { providerRef: 'ref_1', ...WORKTREE_CREDENTIAL_CONTAINMENT },
+      })!
     );
     const { table } = attachRoute(
       emptyRouteTable(),
@@ -276,17 +279,110 @@ describe('sandbox control durable state', () => {
       grant.userId
     );
     await saveRouteTable(storage, table);
-    await saveDeadlines(storage, { heartbeatExpiry: 3000 });
+    await saveSessionReferences(
+      storage,
+      markReferencesReconciled(
+        addSessionReference(emptySessionReferenceState(), {
+          sessionId: grant.scopeId,
+          kiloSessionId: ROOT_ID,
+          directory: grant.directory,
+          worktreeId: grant.scopeId,
+        }).state
+      )
+    );
     await saveTransitionLog(storage, [{ at: 1001, kind: 'physical', to: 'running' }]);
     await storage.put('owner', grant.userId);
 
     await eraseSandboxRecord(storage);
 
     expect(await loadSessionCredentialGrants(storage)).toEqual([]);
-    expect(await loadPhysicalRecord(storage)).toStrictEqual(initialPhysicalRecord(false));
+    expect((await loadAllocation(storage)).state.kind).toBe('stopped');
     expect(await loadRouteTable(storage)).toEqual(emptyRouteTable());
-    expect(await loadDeadlines(storage)).toEqual({});
+    expect(await loadSessionReferences(storage)).toEqual(emptySessionReferenceState());
     expect(await loadTransitionLog(storage)).toEqual([]);
     expect(await storage.get('owner')).toBe(grant.userId);
+  });
+
+  it('erases infrastructure alarm anchors so a deleted runtime cannot re-arm them', async () => {
+    const storage = memoryStorage();
+    await storage.put(CONTROL_ALARM_ANCHORS_KEY, {
+      credentialExpiryAt: 5_000,
+      socketHandshakeAt: 6_000,
+    });
+    await storage.put(LEGACY_CONTROL_DEADLINES_KEY, {
+      credentialExpiry: 5_000,
+      socketHandshake: 6_000,
+    });
+
+    await eraseSandboxRecord(storage);
+
+    expect(await storage.get(CONTROL_ALARM_ANCHORS_KEY)).toBeUndefined();
+    expect(await storage.get(LEGACY_CONTROL_DEADLINES_KEY)).toBeUndefined();
+  });
+
+  it('defaults absent session references to the empty state and round-trips a reconciled index', async () => {
+    const storage = memoryStorage();
+    expect(await loadSessionReferences(storage)).toEqual(emptySessionReferenceState());
+    const state = emptySessionReferenceState();
+    addSessionReference(state, {
+      sessionId: SESSION_ID,
+      kiloSessionId: ROOT_ID,
+      directory: '/workspace/paths/org/project/worktree_11111111-1111-4111-8111-111111111111',
+    });
+    addSessionReference(state, {
+      sessionId: 'workspace_other',
+      kiloSessionId: 'ses_other',
+      directory: '/workspace/paths/org/other',
+      worktreeId: 'worktree_22222222-2222-4222-8222-222222222222',
+    });
+    markReferencesReconciled(state);
+
+    await saveSessionReferences(storage, state);
+
+    expect(await loadSessionReferences(storage)).toEqual(state);
+  });
+
+  it('rejects malformed session references instead of defaulting to the empty state', async () => {
+    const storage = memoryStorage();
+    for (const value of [
+      { reconciled: 'yes', overflowed: false, entries: [] },
+      {
+        reconciled: true,
+        overflowed: false,
+        entries: [{ sessionId: SESSION_ID, kiloSessionId: ROOT_ID }],
+      },
+      {
+        reconciled: true,
+        overflowed: false,
+        entries: [{ sessionId: SESSION_ID, kiloSessionId: ROOT_ID, directory: '', extra: 'field' }],
+      },
+    ]) {
+      await storage.put(SESSION_REFERENCES_KEY, value);
+      await expect(loadSessionReferences(storage)).rejects.toThrow();
+    }
+  });
+
+  it('rejects a persisted session reference index over the entry or byte limit', async () => {
+    const storage = memoryStorage();
+    const entry = (index: number, directory: string) => ({
+      sessionId: `ses_${index}`,
+      kiloSessionId: `kilo_${index}`,
+      directory,
+    });
+    await storage.put(SESSION_REFERENCES_KEY, {
+      reconciled: false,
+      overflowed: false,
+      entries: Array.from({ length: MAX_REFERENCE_ENTRIES + 1 }, (_, index) => entry(index, 'd')),
+    });
+    await expect(loadSessionReferences(storage)).rejects.toThrow();
+
+    const oversized = Array.from({ length: 200 }, (_, index) => entry(index, 'd'.repeat(512)));
+    expect(serializedReferenceBytes(oversized)).toBeGreaterThan(MAX_REFERENCE_BYTES);
+    await storage.put(SESSION_REFERENCES_KEY, {
+      reconciled: false,
+      overflowed: false,
+      entries: oversized,
+    });
+    await expect(loadSessionReferences(storage)).rejects.toThrow();
   });
 });

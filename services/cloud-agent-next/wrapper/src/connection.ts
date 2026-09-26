@@ -27,8 +27,10 @@ import {
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
+import { gateResultFromProperties } from '../../src/shared/kilo-event-properties.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
+import { slashCommandCatalogStatus } from '../../src/shared/slash-commands.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -46,13 +48,6 @@ function isPlanFollowupQuestion(value: unknown): boolean {
 
 function isCodeReviewJob(state: WrapperState): boolean {
   return state.currentSession?.platform === 'code-review';
-}
-
-function gateResultFromProperties(
-  properties: Record<string, unknown>
-): 'pass' | 'fail' | undefined {
-  const gateResult = properties.gateResult;
-  return gateResult === 'pass' || gateResult === 'fail' ? gateResult : undefined;
 }
 
 function statusTypeFromProperties(properties: Record<string, unknown>): string | undefined {
@@ -233,10 +228,6 @@ function isAssistantCompletionSignal(info: unknown): boolean {
   const time = isRecord(info.time) ? info.time : undefined;
   return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
@@ -462,10 +453,6 @@ export async function openIngestProgressChannel(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Connection Manager
-// ---------------------------------------------------------------------------
-
 export type ConnectionManager = {
   /** Open ingest WS and SSE consumer. Resolves when both are connected. */
   open: () => Promise<void>;
@@ -568,7 +555,6 @@ export function createConnectionManager(
       );
     }
 
-    // Flush buffered pre-serialized frames
     for (const buffered of eventBuffer.drain()) {
       ingestWs.send(buffered.serialized);
     }
@@ -708,13 +694,24 @@ export function createConnectionManager(
    */
   async function sendCommandsAvailable(): Promise<void> {
     try {
-      const commands = await config.kiloClient.listCommands();
+      const catalog = await config.kiloClient.listCommands();
+      const catalogStatus = slashCommandCatalogStatus(catalog);
       sendToIngest({
         streamEventType: 'commands.available',
-        data: { commands },
+        // The status rides with the catalog: the DO caches it and hydrates
+        // clients with it, so a bounded catalog is never silent.
+        data: {
+          commands: catalog.commands,
+          ...(catalogStatus ? { catalogStatus } : {}),
+        },
         timestamp: new Date().toISOString(),
       });
-      logToFile(`commands.available sent: count=${commands.length}`);
+      logToFile(
+        `commands.available sent: count=${catalog.commands.length}` +
+          (catalogStatus
+            ? ` dropped=${catalogStatus.dropped} overLimit=${catalogStatus.overLimit}`
+            : '')
+      );
     } catch (err) {
       logToFile(
         `failed to send commands.available: ${err instanceof Error ? err.message : String(err)}`
@@ -853,7 +850,6 @@ export function createConnectionManager(
         }
       };
 
-      // Timeout for initial connection
       initialConnectTimer = setTimeout(() => {
         if (!settled) {
           logToFile(`ingest WS connection timed out: ${wsUrl}`);
@@ -1146,7 +1142,6 @@ export function createConnectionManager(
             state.observeGateResult(gateResult);
           }
 
-          // Track activity
           state.updateActivity();
 
           if (eventType === 'server.connected') {
@@ -1253,7 +1248,6 @@ export function createConnectionManager(
             }
           }
 
-          // Terminal error detection
           const terminalFailure = getTerminalFailure(eventType, properties);
           if (terminalFailure) {
             const modelNotFoundRuntimeDiagnostics = await maybeBuildModelNotFoundDiagnostics(

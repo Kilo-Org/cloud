@@ -4,6 +4,7 @@ import type { OperationLedgerRow } from '@kilocode/db/schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  getSandboxAllocationProvider,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 
@@ -171,7 +172,7 @@ function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): Session
     sandboxAllocation === 'cloudflare-shared'
       ? 'org-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
       : 'ses-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  const sandboxProvider = sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare';
+  const sandboxProvider = getSandboxAllocationProvider(sandboxAllocation);
   return {
     ...metadata,
     workspace: {
@@ -303,9 +304,10 @@ function fixture(options?: {
   };
   const legacySessionNamespace = { idFromName: vi.fn(), get: vi.fn() };
   const sandboxControlNamespace = { idFromName: vi.fn(), get: vi.fn() };
-  const headers = new Headers({
-    'x-internal-api-key': options?.internalSecret ?? INTERNAL_SECRET,
-  });
+  const headers = new Headers();
+  if (options?.internalSecret) {
+    headers.set('x-internal-api-key', options.internalSecret);
+  }
   const context = {
     userId,
     authToken: options?.authToken ?? CURRENT_AUTH_TOKEN,
@@ -445,12 +447,25 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(CreateWorktreeChatInput.safeParse({ ...input, unexpected: true }).success).toBe(false);
   });
 
-  it('requires internal authentication before loading source ownership', async () => {
-    const { caller, input } = fixture({ internalSecret: 'wrong-secret' });
+  it('requires a user token before loading source ownership', async () => {
+    const { caller, input } = fixture({ authToken: '' });
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(getPgDbMock).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a worktree chat for an owned source without an internal API key', async () => {
+    const { caller, context, input, destinationStub } = fixture();
+
+    expect(context.request.headers.get('x-internal-api-key')).toBeNull();
+    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
   });
 
   it('rejects another owner or a same-organization member without source ownership', async () => {
@@ -698,6 +713,50 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
+
+  it.each(['purpose', 'association'] as const)(
+    'retains trusted GitHub purpose in siblings and rejects recovered %s substitution',
+    async mismatch => {
+      const metadata = sourceMetadataWithPreset('vercel-small');
+      if (metadata.repository?.type !== 'github') throw new Error('Expected GitHub fixture');
+      metadata.repository.githubAccessPurpose = 'agent';
+      metadata.repository.githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+      const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[source], [source]],
+      });
+      destinationStub.registerSession.mockRejectedValueOnce(
+        new Error('registration response lost')
+      );
+      await expect(caller.createWorktreeChat(input)).rejects.toThrow('registration response lost');
+      expect(destinationStub.registerSession.mock.calls[0]?.[0]?.repository).toMatchObject({
+        githubAccessPurpose: 'agent',
+        githubIntegrationId: metadata.repository.githubIntegrationId,
+      });
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      const registered = destinationMetadata(metadata);
+      if (registered.repository?.type !== 'github') throw new Error('Expected GitHub fixture');
+      if (mismatch === 'purpose') registered.repository.githubAccessPurpose = 'workflow';
+      else registered.repository.githubIntegrationId = '123e4567-e89b-12d3-a456-426614174099';
+      destinationStub.getMetadata.mockResolvedValueOnce(registered);
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'reconcile_pending',
+          canonical_result: progress,
+        }),
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+      expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+      expect(settleOperationMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('replays the inherited preset after rollouts are disabled without re-registering', async () => {
     const metadata = sourceMetadataWithPreset('vercel-large');

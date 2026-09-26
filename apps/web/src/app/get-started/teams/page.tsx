@@ -6,7 +6,10 @@ type GetStartedPageProps = {
 };
 
 export default async function TeamsGetStartedPage({ searchParams }: GetStartedPageProps) {
-  const { params, error } = await getAuthPageProps(searchParams, '/organizations/new');
+  const { params, error, accountMismatch } = await getAuthPageProps(
+    searchParams,
+    '/organizations/new'
+  );
 
   return (
     <>
@@ -15,6 +18,7 @@ export default async function TeamsGetStartedPage({ searchParams }: GetStartedPa
         callbackPath="/organizations/new"
         searchParams={params}
         error={error}
+        accountMismatch={accountMismatch}
         signUpText="Try out Kilo Teams with a 14-day free trial, no credit card required. After you sign up, you can directly onboard all your team members."
       />
     </>

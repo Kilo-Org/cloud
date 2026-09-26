@@ -1,28 +1,21 @@
 import { type RefObject, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
-import {
-  type NewSessionRepository,
-  type RepositoryPlatform,
-} from '@/components/agents/new-session-repository-state';
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
-import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
-import {
-  type AgentAttachmentWire,
-  type useAgentAttachmentUpload,
-} from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { type useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { prepareAgentSession } from '@/lib/app-actions/prepare-agent-session';
+import { useTRPC } from '@/lib/trpc';
 
 /**
  * A cloud `prepareSession` rejection, classified for the form's inline error.
@@ -54,23 +47,10 @@ type UseNewSessionCreatorInput = {
   autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
-};
-
-type PrepareSessionInput = {
-  prompt: string;
-  initialMessageId: string;
-  mode: AgentMode;
-  model: string;
-  variant: string | undefined;
-  /** Exactly one repository field is set, matching the selected row's platform. */
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
-  autoCommit: boolean;
-  autoInitiate: boolean;
-  operationKey: string;
-  profileId?: string;
-  attachments?: AgentAttachmentWire;
+  /** Manual env vars from Advanced Configuration; omitted from the body when empty. */
+  manualEnvVars?: Record<string, string>;
+  /** Manual setup commands from Advanced Configuration; omitted from the body when empty. */
+  setupCommands?: string[];
 };
 
 type UseNewSessionCreatorResult = {
@@ -79,10 +59,25 @@ type UseNewSessionCreatorResult = {
 };
 
 /**
+ * The identity and order of the chips the composer is showing. A create
+ * snapshots this before `uploadPending()` and re-checks it before dispatching:
+ * the strip keeps taking removes, reorders and (through an already-open
+ * picker) adds while a create is in flight, and `uploadPending()` builds its
+ * wire from the chips it read *before* its awaits. Ids are UUIDs, so a
+ * replaced chip can never compare equal, and the order is the wire's `files`
+ * order.
+ */
+function attachmentDraftSignature(attachments: readonly { id: string }[]): string {
+  return attachments.map(attachment => attachment.id).join('|');
+}
+
+/**
  * Owns the side effects of starting a new Cloud Agent session: validating
- * the draft, calling the tRPC `prepareSession` mutation, navigating to the
- * session, and reporting the analytics event. The route supplies the live
- * draft through `promptRef` so the caller can read the post-settle value
+ * the draft, uploading the composer's attachments, and handing the intent to
+ * the shared `prepareAgentSession` core, which runs the `prepareSession`
+ * mutation and settles the operation key and safe-retry row. Navigation,
+ * analytics, haptics and the host signal all stay here. The route supplies the
+ * live draft through `promptRef` so the caller can read the post-settle value
  * without re-rendering the parent.
  */
 export function useNewSessionCreator({
@@ -97,11 +92,20 @@ export function useNewSessionCreator({
   variant,
   autoCommit,
   profileId,
+  manualEnvVars,
+  setupCommands,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const promptRef = useRef('');
+  // Live mirror of the visible attachment draft, so an in-flight create can
+  // tell whether the strip changed behind the snapshot it dispatched. Kept as a
+  // render-phase ref (`chat-composer`'s `submitRef` is the same pattern)
+  // because the in-flight closure's `attachments` prop is the list from the
+  // render that started it.
+  const attachmentDraftRef = useRef('');
+  attachmentDraftRef.current = attachmentDraftSignature(attachments.attachments);
   // P1-A-08b: one `operationKey` per submit intent, so a retry of the same
   // intent dedupes on the ledger instead of spawning a second session.
   const { getKey, rotateKey } = useHoistedOperationKey();
@@ -122,7 +126,8 @@ export function useNewSessionCreator({
     // call prepareSession with an empty prompt. The voice controller has
     // already presented its own feedback, so a no-op here preserves the
     // user's draft and screen state without toasting.
-    const prompt = resolveNewSessionPromptForCreate(promptRef.current);
+    const draft = promptRef.current;
+    const prompt = resolveNewSessionPromptForCreate(draft);
     if (prompt === null) {
       return;
     }
@@ -133,6 +138,14 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // The chip set the composer is showing when the create starts, and the set
+    // `uploadPending()` reads before its awaits. The strip stays interactive
+    // while a create is in flight (locking it would drop the IME on a focused
+    // Android input and collapse the pinned footer, exactly like the prompt),
+    // so a remove, reorder or add during the upload leaves the wire it builds
+    // describing chips the user can no longer see.
+    const submittedAttachments = attachmentDraftRef.current;
+
     // Upload pending attachments now so the create body carries the real
     // payload. A failed or in-flight chip (including a strip-fail) blocks
     // inside `uploadPending`; `{ ok: false }` is truthy, so test `ok`.
@@ -142,105 +155,93 @@ export function useNewSessionCreator({
       return;
     }
 
-    // Computed once and reused for both the fingerprint and the create body, so
-    // the two cannot disagree and a swapped attachment set is a fresh intent.
-    const attachmentWire = uploaded.wire;
-    const intentFingerprint = JSON.stringify({
-      prompt,
-      mode,
-      model,
-      variant: variant || undefined,
-      repo: resolveRepoFingerprint(selectedRepository),
-      autoCommit,
-      organizationId: organizationId ?? null,
-      profileId: profileId ?? null,
-      attachments: attachmentWire ?? null,
-    });
-    // Pre-fix safe-retry rows persisted the bare `fullName` as `repo`. A GitHub
-    // `owner/repo` is inherently a single-provider identity, so only GitHub
-    // intents fall back to the legacy bare-name lookup: two same-named
-    // GitLab/Bitbucket rows must never share the stale retry key.
-    const legacyIntentFingerprint =
-      selectedRepository?.platform === 'github'
-        ? JSON.stringify({
-            prompt,
-            mode,
-            model,
-            variant: variant || undefined,
-            repo: selectedRepository.fullName,
-            autoCommit,
-            organizationId: organizationId ?? null,
-            profileId: profileId ?? null,
-            attachments: attachmentWire ?? null,
-          })
-        : null;
-    // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
-    // fresh key only when no stored row exists. A stored row must never be
-    // replaced by a new in-memory key. Gate on the outbox load first: a submit
-    // that races the launch load would read empty rows and mint a duplicate.
-    // A failed outbox read reads as no stored rows, so refuse instead of
-    // minting a fresh key over a row whose POST the server may have accepted.
-    if (!(await whenLoaded())) {
-      toast.error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
+    // The dispatched payload is the trimmed `prompt`, so compare the live
+    // draft through the same projection: a trailing space, or an
+    // IME/autocorrect composition commit that leaves the trimmed text
+    // identical, is not a semantic edit and must not cancel a create whose
+    // body did not change.
+    const promptChanged = (): boolean =>
+      resolveNewSessionPromptForCreate(promptRef.current) !== prompt;
+    // Only the chip identity and order are the visible draft, so an upload
+    // still advancing its progress does not read as a change. A changed set
+    // does: submitting a file the user removed, or dropping one they added,
+    // must never ride the wire.
+    const attachmentsChanged = (): boolean => attachmentDraftRef.current !== submittedAttachments;
+
+    // The keyboard stays up while a create is in flight (making a focused
+    // Android input non-editable drops the IME and collapses the pinned
+    // footer), so the composer keeps taking edits. This attempt holds the
+    // snapshot above: a draft the user changed mid-flight is a request for
+    // different text or a different payload, so cancel before the create is
+    // dispatched instead of discarding the edit. Their edited draft stays for
+    // the next Start. The same predicate goes to the core, so the outbox-load
+    // and safe-retry windows — where the composer is also still editable — are
+    // covered too.
+    if (promptChanged() || attachmentsChanged()) {
       setIsCreating(false);
       return;
     }
-    let operationKey = getStoredOperationKey(intentFingerprint);
-    // The consumed legacy row migrates to the scoped fingerprint so the normal
-    // success/failure cleanup only ever touches the scoped row. Delete it only
-    // after the scoped row exists: a crash between the two writes would
-    // otherwise lose the key and mint a duplicate session on relaunch.
-    let legacyRowToDrop: string | null = null;
-    if (operationKey === null && legacyIntentFingerprint !== null) {
-      operationKey = getStoredOperationKey(legacyIntentFingerprint);
-      if (operationKey !== null) {
-        legacyRowToDrop = legacyIntentFingerprint;
-      }
-    }
-    operationKey ??= getKey(intentFingerprint);
 
     try {
-      const initialMessageId = generateMessageId();
-      const baseInput: PrepareSessionInput = {
-        prompt,
-        initialMessageId,
-        mode,
-        model,
-        variant: variant || undefined,
-        autoCommit,
-        autoInitiate: true,
-        operationKey,
-      };
-      setRepositoryField(baseInput, selectedRepository);
-      if (profileId) {
-        baseInput.profileId = profileId;
-      }
-      if (attachmentWire) {
-        baseInput.attachments = attachmentWire;
-      }
+      // The core owns the retry fingerprint and the safe-retry row: the upload
+      // wire is part of both, so a swapped attachment set is a fresh intent.
+      const outcome = await prepareAgentSession(
+        {
+          kind: 'new',
+          prompt,
+          repository: selectedRepository,
+          mode,
+          model,
+          variant,
+          profileId,
+          envVars: manualEnvVars,
+          setupCommands,
+          autoCommit,
+          attachments: uploaded.wire,
+          organizationId,
+        },
+        {
+          getKey,
+          rotateKey,
+          getStoredOperationKey,
+          writeSafeRetry,
+          removeOutboxRow,
+          whenLoaded,
+          // The composer stays editable until the request is sent, so the core
+          // re-checks the draft — text and attachment chips — immediately
+          // before the mutate and abandons an unsent intent whose payload
+          // changed.
+          shouldAbort: () => promptChanged() || attachmentsChanged(),
+          // Cache invalidation is React Query's; the core owns when it runs.
+          invalidate: async () => {
+            await invalidateAgentSessionQueries(queryClient, trpc);
+          },
+        }
+      );
 
-      // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
-      // reuses the same key on relaunch instead of minting a duplicate.
-      await writeSafeRetry({
-        operationKey,
-        fingerprint: intentFingerprint,
-        input: baseInput,
-      });
-      if (legacyRowToDrop !== null) {
-        await removeOutboxRow(legacyRowToDrop);
+      if (!outcome.ok) {
+        if (outcome.reason === 'aborted') {
+          // The draft — text or attachment chips — changed after the snapshot
+          // was taken and the request was never sent: stay silent and keep the
+          // edited draft for the next Start. Starting over is the user's own
+          // next action, not a failure.
+          return;
+        }
+        if (outcome.reason === 'outbox-unreadable') {
+          // The pending rows were not read as empty: refuse rather than mint a
+          // duplicate key. The user's retry re-reads the store.
+          toast.error(outcome.message);
+          return;
+        }
+        // One feedback channel: the form's inline error when it accepts the
+        // callback, the toast otherwise. Never both for the same rejection.
+        if (onCreateError) {
+          onCreateError({ retryable: outcome.retryable, message: outcome.message });
+        } else {
+          toast.error(outcome.message);
+        }
+        return;
       }
-
-      const result = organizationId
-        ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...baseInput,
-            organizationId,
-          })
-        : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
-
-      // Rotate before the post-success work so a UI failure cannot keep the
-      // successful key for a retry.
-      rotateKey();
-      await removeOutboxRow(intentFingerprint);
 
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.
@@ -248,9 +249,8 @@ export function useNewSessionCreator({
         // Contained together so neither can skip the host signal below.
         try {
           captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-          await invalidateAgentSessionQueries(queryClient, trpc);
         } catch {
-          // Analytics and cache invalidation are cosmetic; stay silent.
+          // Analytics is cosmetic; stay silent.
         }
         // Signal the host (e.g. clear the new-session draft) before navigating,
         // so the draft is gone by the time the route unmounts and can never be
@@ -275,28 +275,9 @@ export function useNewSessionCreator({
         // mutated the stack while the native push transition was still running,
         // which crashed Fabric on Android ("addViewAt: failed to insert view
         // ... The specified child already has a parent", Sentry KILO-APP-25).
-        replaceWithAgentSession(router, result.kiloSessionId, organizationId);
+        replaceWithAgentSession(router, outcome.sessionId, organizationId);
       } catch {
         // Stay silent: no create-failure toast, no duplicate-create retry.
-      }
-    } catch (error) {
-      // Only `prepareSession` errors reach here; UI failures are swallowed.
-      const retryable = isCloudPrepareRetryableError(error);
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : i18n.t('agentChat.newSession.failedToCreate');
-      // One feedback channel: the form's inline error when it accepts the
-      // callback, the toast otherwise. Never both for the same rejection.
-      if (onCreateError) {
-        onCreateError({ retryable, message });
-      } else {
-        toast.error(message);
-      }
-      // A typed terminal rejection ends the intent; a retryable one keeps the key.
-      if (!retryable) {
-        rotateKey();
-        await removeOutboxRow(intentFingerprint);
       }
     } finally {
       setIsCreating(false);
@@ -309,6 +290,8 @@ export function useNewSessionCreator({
     autoCommit,
     organizationId,
     profileId,
+    manualEnvVars,
+    setupCommands,
     queryClient,
     trpc,
     router,
@@ -325,59 +308,4 @@ export function useNewSessionCreator({
   ]);
 
   return { createSessionFromDraft, promptRef };
-}
-
-/**
- * The retry fingerprint's repository identity. Includes the platform so two
- * same-named repos on different providers mint distinct retry keys, and the
- * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: RepositoryPlatform;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (!repository) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
-}
-
-/**
- * Write exactly one repository field into the create body, matching the
- * selected row's platform. Bitbucket requires workspace + run ids, so it
- * contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
- */
-function setRepositoryField(
-  input: PrepareSessionInput,
-  repository: NewSessionRepository | null
-): void {
-  if (!repository) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    input.githubRepo = repository.fullName;
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    input.gitlabProject = repository.fullName;
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    input.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-  }
 }

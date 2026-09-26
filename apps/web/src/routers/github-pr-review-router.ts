@@ -1010,7 +1010,7 @@ type ReplayedResult<T> = T & { replayed: true };
  * creates a ledger row. Throws PRECONDITION_FAILED `terms_required` when
  * absent.
  */
-async function assertTermsAccepted(userId: string): Promise<void> {
+export async function assertTermsAccepted(userId: string): Promise<void> {
   const [row] = await db
     .select({ id: user_terms_acceptances.id })
     .from(user_terms_acceptances)
@@ -1607,10 +1607,16 @@ export const githubPrReviewRouter = createTRPCRouter({
           page,
           per_page: FILES_PAGE_SIZE,
         });
+        const link = response.headers?.link;
         return buildFilesPage({
           page,
           perPage: FILES_PAGE_SIZE,
           rawFiles: response.data as never,
+          // GitHub answers with `Link: rel="next"` exactly while more pages
+          // exist, so the header — not the page length — decides whether the
+          // client keeps paging. A response with no Link header (an older
+          // proxy, a test double) falls back to the page-length heuristic.
+          linkHasNext: typeof link === 'string' ? link.includes('rel="next"') : undefined,
         });
       },
     });

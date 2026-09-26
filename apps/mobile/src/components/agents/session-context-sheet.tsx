@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { type ResolvedSession, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { SheetHeader } from '@/components/sheet-header';
@@ -25,7 +26,6 @@ import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
   formatCost,
-  formatExactTokens,
   getArcFraction,
   getContextSheetContent,
   getContextTone,
@@ -39,13 +39,17 @@ import {
   type SessionCostBreakdownModel,
 } from './session-cost-breakdown';
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
+import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
-import { copySessionId } from './session-row-actions';
+import { copySessionId, copySessionLink } from './session-row-actions';
+import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 
 type SessionContextSheetProps = {
   visible: boolean;
   info: SessionContextInfo | undefined;
   sessionId: string;
+  /** Message the copied link resumes at; null copies the session link without a position. */
+  anchorMessageId: string | null;
   sessionTitle: string;
   activeSessionType: ResolvedSession['type'] | null;
   ownerConnectionId: string | null;
@@ -58,6 +62,8 @@ type SessionContextSheetProps = {
   onClose: () => void;
   autoApproveState: SessionAutoApproveState;
   onAutoApproveChange: (enabled: boolean) => void;
+  connectionDisplay: SessionConnectionDisplay;
+  onRetryConnection: () => void;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -78,20 +84,66 @@ type RunningOnState = { kind: 'hidden' } | { kind: 'pending' } | { kind: 'label'
 
 type CopyFeedbackState = 'idle' | 'copied' | 'failed';
 
-function copyStatusLabel(state: CopyFeedbackState, t: (key: string) => string): string | null {
+/** Catalog keys for a copy row's inline outcome, per outcome. */
+type CopyRowMessages = { readonly copied: string; readonly failed: string };
+
+function copyStatusLabel(
+  state: CopyFeedbackState,
+  t: (key: string) => string,
+  messages: CopyRowMessages
+): string | null {
   if (state === 'copied') {
-    return t('agents.sessionRow.idCopied');
+    return t(messages.copied);
   }
   if (state === 'failed') {
-    return t('agents.sessionRow.couldNotCopyId');
+    return t(messages.failed);
   }
   return null;
+}
+
+/**
+ * Inline feedback for a copy row inside the sheet. sonner toasts render in the
+ * app root, behind this Modal's window, so the row shows the outcome itself
+ * instead of relying on the toast. Closing the sheet clears the feedback and
+ * invalidates pending results so a reopen starts from the call to action even
+ * if an earlier copy finishes late.
+ */
+function useCopyRowFeedback(
+  copy: () => Promise<boolean>,
+  messages: CopyRowMessages,
+  visible: boolean
+) {
+  const { t } = useTranslation();
+  const [state, setState] = useState<CopyFeedbackState>('idle');
+  const generation = useRef(0);
+  useEffect(() => {
+    if (!visible) {
+      setState('idle');
+    }
+    return () => {
+      generation.current += 1;
+    };
+  }, [visible]);
+  return {
+    state,
+    status: copyStatusLabel(state, t, messages),
+    handlePress: () => {
+      void (async () => {
+        const current = generation.current;
+        const success = await copy();
+        if (current === generation.current) {
+          setState(success ? 'copied' : 'failed');
+        }
+      })();
+    },
+  };
 }
 
 export function SessionContextSheet({
   visible,
   info,
   sessionId,
+  anchorMessageId,
   sessionTitle,
   activeSessionType,
   ownerConnectionId,
@@ -104,25 +156,36 @@ export function SessionContextSheet({
   onClose,
   autoApproveState,
   onAutoApproveChange,
+  connectionDisplay,
+  onRetryConnection,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const runningOn = useRunningOnLabel(activeSessionType, ownerConnectionId, visible);
-  const [copyState, setCopyState] = useState<CopyFeedbackState>('idle');
-  const copyFeedbackGeneration = useRef(0);
-  // sonner toasts render in the app root, behind this Modal's window, so the
-  // copy row shows the outcome inline instead of relying on the toast.
-  // Closing the sheet clears feedback and invalidates pending results so a
-  // reopen starts from the CTA even if an earlier copy finishes late.
-  useEffect(() => {
-    if (!visible) {
-      setCopyState('idle');
-    }
-    return () => {
-      copyFeedbackGeneration.current += 1;
-    };
-  }, [visible]);
-  const copyStatus = copyStatusLabel(copyState, t);
+  const idCopy = useCopyRowFeedback(
+    async () => {
+      const copied = await copySessionId(sessionId);
+      return copied;
+    },
+    { copied: 'agents.sessionRow.idCopied', failed: 'agents.sessionRow.couldNotCopyId' },
+    visible
+  );
+  const linkCopy = useCopyRowFeedback(
+    async () => {
+      const copied = await copySessionLink(sessionId, anchorMessageId);
+      return copied;
+    },
+    { copied: 'agentChat.chatLink.linkCopied', failed: 'agentChat.chatLink.couldNotCopyLink' },
+    visible
+  );
+  let connectionLabel = t('agentChat.sessionConnection.connecting');
+  if (connectionDisplay === 'connected') {
+    connectionLabel = t('common.connected');
+  } else if (connectionDisplay === 'lost') {
+    connectionLabel = t('agentChat.sessionConnection.connectionLost');
+  } else if (connectionDisplay === 'reconnecting') {
+    connectionLabel = t('agentChat.sessionConnection.reconnecting');
+  }
   const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info?.percentage);
   const arcFraction = getArcFraction(info?.percentage);
@@ -154,6 +217,32 @@ export function SessionContextSheet({
           visible while the context details scroll. */}
       <View className="px-6 pb-2 pt-2">
         <SessionAutoApproveRow state={autoApproveState} onValueChange={onAutoApproveChange} />
+      </View>
+
+      {/* Always-visible, outside the ScrollView so the connection reading stays
+          on screen while the details scroll. */}
+      <View
+        className="flex-row items-center justify-between gap-3 px-6 pb-2 pt-1"
+        testID="session-context-sheet-connection"
+      >
+        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+          {t('agentChat.sessionConnection.label')}
+        </Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm font-medium text-foreground">{connectionLabel}</Text>
+          {connectionDisplay === 'lost' ? (
+            <Pressable
+              onPress={onRetryConnection}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+              className="active:opacity-70"
+              testID="session-context-sheet-connection-retry"
+            >
+              <Text className="text-sm font-medium text-primary">{t('common.retry')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {/* Rows below are exposed individually to screen readers; collapsing
@@ -233,43 +322,26 @@ export function SessionContextSheet({
             </Text>
           </Row>
 
-          <Pressable
-            onPress={() => {
-              void (async () => {
-                const generation = copyFeedbackGeneration.current;
-                const success = await copySessionId(sessionId);
-                if (generation === copyFeedbackGeneration.current) {
-                  setCopyState(success ? 'copied' : 'failed');
-                }
-              })();
-            }}
-            accessibilityRole="button"
-            className="gap-1 active:opacity-70"
+          <CopyRow
             testID="session-context-sheet-copy-id"
-          >
-            {/* The row keeps its call-to-action name in every state; the copy
-                outcome renders beside it, so one capture of the sheet shows
-                both the row the scenario names and the feedback it demands.
-                The child texts are the accessible name in reading order. */}
-            <View className="flex-row items-center justify-between">
-              <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-                {t('agents.sessionRow.copyId')}
-              </Text>
-              {copyStatus ? (
-                <Text
-                  className={cn(
-                    'text-xs uppercase tracking-wide',
-                    copyState === 'failed' ? 'text-destructive' : 'text-foreground'
-                  )}
-                >
-                  {copyStatus}
-                </Text>
-              ) : null}
-            </View>
-            <Text variant="mono" className="text-xs text-foreground">
-              {sessionId}
-            </Text>
-          </Pressable>
+            label={t('agents.sessionRow.copyId')}
+            value={sessionId}
+            state={idCopy.state}
+            status={idCopy.status}
+            onPress={idCopy.handlePress}
+          />
+
+          {/* The link row sits under the id row: both copy this session's
+              value, and the sheet keeps the destination (resume URL) visible
+              beside its call to action. */}
+          <CopyRow
+            testID="session-context-sheet-copy-link"
+            label={t('common.copyLink')}
+            value={sessionResumeUrl({ sessionId, anchorMessageId })}
+            state={linkCopy.state}
+            status={linkCopy.status}
+            onPress={linkCopy.handlePress}
+          />
 
           {runningOn.kind !== 'hidden' ? (
             <Row label={t('agentChat.instancePicker.runOn')}>
@@ -327,6 +399,7 @@ export function SessionContextSheet({
 
         {modelsSectionCount > 0 ? (
           <View className="mt-8 gap-3">
+            {/* i18n-dup-ok: 'agentChat.contextUsage.modelsCount_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text className="text-sm font-semibold text-foreground">
               {t('agentChat.contextUsage.modelsCount', {
                 count: modelsSectionCount,
@@ -387,23 +460,49 @@ function useRunningOnLabel(
   return isRemote && isPending ? { kind: 'pending' } : { kind: 'hidden' };
 }
 
-function Row({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
+function CopyRow({
+  testID,
+  label,
+  value,
+  state,
+  status,
+  onPress,
+}: Readonly<{
+  testID: string;
+  label: string;
+  value: string;
+  state: CopyFeedbackState;
+  status: string | null;
+  onPress: () => void;
+}>) {
   return (
-    <View className="gap-1">
-      <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function TokenRow({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatExactTokens(value)}
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="gap-1 active:opacity-70"
+      testID={testID}
+    >
+      {/* The row keeps its call-to-action name in every state; the copy
+          outcome renders beside it, so one capture of the sheet shows both the
+          row the scenario names and the feedback it demands. The child texts
+          are the accessible name in reading order. */}
+      <View className="flex-row items-center justify-between">
+        <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
+        {status ? (
+          <Text
+            className={cn(
+              'text-xs uppercase tracking-wide',
+              state === 'failed' ? 'text-destructive' : 'text-foreground'
+            )}
+          >
+            {status}
+          </Text>
+        ) : null}
+      </View>
+      <Text variant="mono" className="text-xs text-foreground">
+        {value}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 

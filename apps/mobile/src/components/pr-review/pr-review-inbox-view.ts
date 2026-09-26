@@ -39,7 +39,13 @@ export function selectPrInboxView(args: {
   }
 
   if (itemCount === 0) {
-    return { kind: 'empty', showLoadMoreRetry: false };
+    // Nothing to show and at least one provider failed: the empty state would
+    // claim "no review requests" while a connected provider is down, so the
+    // retryable failure owns the surface and carries the retry that recovers
+    // it. Empty stays reserved for "no rows and no failure".
+    return laterPageError
+      ? { kind: 'retryable', showLoadMoreRetry: false }
+      : { kind: 'empty', showLoadMoreRetry: false };
   }
 
   return { kind: 'happy', showLoadMoreRetry: laterPageError };

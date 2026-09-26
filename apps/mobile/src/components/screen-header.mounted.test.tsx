@@ -1,10 +1,18 @@
 /* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+// eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import { type Href } from 'expo-router';
+import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ScreenHeader } from './screen-header';
-import { OFFLINE_BANNER_HEIGHT, OfflineBannerSpaceProvider } from './offline-banner-space';
+import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
+import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
 const routerState = vi.hoisted(() => ({
   routes: ['previous-screen', 'session-detail'],
@@ -15,6 +23,8 @@ const routerState = vi.hoisted(() => ({
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** A normal phone window: wide enough for the title and its actions to share a row. */
+const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
@@ -24,6 +34,7 @@ vi.mock('react-native', () => ({
   Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: layout.width, height: 800, fontScale: layout.fontScale }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
@@ -65,6 +76,21 @@ function findTitlePressable(root: TestInstance): TestInstance {
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
+  );
+}
+
+/**
+ * The row the header puts `headerRight` on when the window is too narrow for
+ * the title and the actions to share one. Only that variant carries `mt-2`;
+ * the single-row variant wraps the cluster in an `ms-3 shrink-0` View instead.
+ */
+function isStackedActionsRow(node: TestInstance): boolean {
+  const className = String(node.props.className ?? '');
+  return (
+    typeof node.type === 'string' &&
+    (node.type as string) === 'View' &&
+    className.includes('mt-2') &&
+    !className.includes('shrink-0')
   );
 }
 
@@ -111,6 +137,81 @@ function deriveTitleFontSize(className: string): number {
   throw new Error(`no known title font size in class: ${className}`);
 }
 
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
+
+/** The property name(s) of one compiled style declaration. */
+function declarationProperties(declaration: unknown): string[] {
+  if (Array.isArray(declaration)) {
+    const property: unknown = declaration[1];
+    return typeof property === 'string' ? [property] : [];
+  }
+  return typeof declaration === 'object' && declaration !== null ? Object.keys(declaration) : [];
+}
+
+/**
+ * The React Native style property each margin utility in a className compiles
+ * to, through the app's own Tailwind and NativeWind compilers — not a
+ * hand-written utility-to-property map.
+ *
+ * The physical/logical name matters: `ml`/`mr` compile to `marginLeft`/
+ * `marginRight`, which Fabric rewrites to Yoga Start/End for an RTL tree when
+ * `I18nManager.doLeftAndRightSwapInRTL` is on
+ * (`YogaLayoutableShadowNode::swapLeftAndRightInYogaStyleProps`), while `ms`
+ * compiles to `marginInlineStart`, already logical and passed through as
+ * Yoga Start in both directions.
+ */
+async function compiledMarginProperties(className: string): Promise<string[]> {
+  const margins = className
+    .split(' ')
+    .filter(token => /^-?m[slre]-/.test(token))
+    .join(' ');
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../global.css"; .target { @apply ${margins}; }`,
+    { from: import.meta.filename }
+  );
+  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
+  const declarations =
+    rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
+  return declarations.flatMap(declaration => declarationProperties(declaration));
+}
+
+function findHeaderRight(root: TestInstance): TestInstance {
+  const headerRight = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(^|\s)-?m[slre]-[0-9]/.test(node.props.className)
+  )[0];
+  if (!headerRight) {
+    throw new Error('headerRight view not found');
+  }
+  return headerRight;
+}
+
+/**
+ * The trailing wrapper that carries `inlineActions`. It shares the `ms-3`
+ * start margin with the `headerRight` cluster and is the second trailing slot
+ * in the row, so the last match wins.
+ */
+function findInlineActionsWrapper(root: TestInstance): TestInstance {
+  const wrappers = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(^|\s)ms-3(\s|$)/.test(node.props.className) &&
+      !node.props.className.includes('shrink-0')
+  );
+  const wrapper = wrappers.at(-1);
+  if (!wrapper) {
+    throw new Error('inlineActions view not found');
+  }
+  return wrapper;
+}
+
 function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -136,6 +237,7 @@ describe('ScreenHeader mounted', () => {
     i18nManager.isRTL = false;
     platform.OS = 'ios';
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    Object.assign(layout, { width: 390, fontScale: 1 });
   });
 
   it('gives the back control a 44-point target and no hit slop', () => {
@@ -145,36 +247,99 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.className).toContain('h-11 w-11');
     expect(back.props.className).toContain('items-center');
     expect(back.props.className).toContain('justify-center');
-    expect(back.props.className).toContain('-ml-4');
+    expect(back.props.className).toContain('-ms-4');
     expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
   });
 
-  it('swaps the back and headerRight margins to the logical edges in RTL', () => {
-    i18nManager.isRTL = true;
+  it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
     const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
 
+    // The pull is on the START edge, so it must compile to the logical
+    // `marginInlineStart`. A hand-picked `-mr-4` under RTL compiles to
+    // `marginRight`, which Fabric rewrites to Yoga End for an RTL tree, landing
+    // the pull on the side that faces the title: the heading then started 12
+    // points under the 44-point back target and the title's box covered 0.27 of
+    // it — the "two controls cover each other" finding (the scan reports above
+    // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
+    // both writing directions.
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('-mr-4');
-    expect(back.props.className).not.toContain('-ml-4');
+    expect(back.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(back.props.className as string)).toEqual([
+      'marginInlineStart',
+    ]);
 
-    const headerRight = renderer.root.findAll(
+    // The 12-point gap between the title and the cluster sits on the cluster's
+    // start side, so it mirrors with the direction instead of leaving the two
+    // touching and adding the space to the outer gutter.
+    const headerRight = findHeaderRight(renderer.root);
+    expect(headerRight.props.className).toContain('ms-3');
+    expect(await compiledMarginProperties(headerRight.props.className as string)).toEqual([
+      'marginInlineStart',
+    ]);
+    // The cluster is content-sized and never shrinks, so a fixed-width
+    // trailing control keeps its full width instead of being clamped and
+    // painting past the screen edge (session-compose-kbup capture).
+    expect(headerRight.props.className).toContain('shrink-0');
+    expect(headerRight.props.className).not.toContain('max-w-[50%]');
+    expect(headerRight.children).toEqual(['RIGHT']);
+  });
+
+  it('renders inlineActions in the title row uncapped beside the content-sized cluster', () => {
+    const renderer = renderHeader({
+      title: 'Agents',
+      headerRight: 'RIGHT',
+      inlineActions: 'ACTIONS',
+    });
+
+    const cluster = findHeaderRight(renderer.root);
+    const inline = findInlineActionsWrapper(renderer.root);
+
+    // Both trailing slots sit in the title row beside the heading, so the
+    // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
+    expect(inline.parent).toBe(cluster.parent);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    const heading = inline.parent?.children[0] as TestInstance;
+    expect(heading.props.className).toContain('min-w-0 flex-1');
+    // Neither trailing slot clamps itself: `headerRight` sizes to its content
+    // and `inlineActions` keeps its full width instead of wrapping the controls.
+    expect(cluster.children).toEqual(['RIGHT']);
+    expect(inline.props.className).toContain('min-w-0');
+    expect(inline.props.className).toContain('shrink');
+  });
+
+  it('renders inlineActions alone in the title row', () => {
+    const renderer = renderHeader({ title: 'Agents', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    // The inline slot is the row's only trailing wrapper: no `headerRight`
+    // cluster is rendered beside it.
+    const trailing = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
         typeof node.props.className === 'string' &&
-        (node.props.className.includes('ml-3') || node.props.className.includes('mr-3'))
-    )[0];
-    if (!headerRight) {
-      throw new Error('headerRight view not found');
-    }
-    expect(headerRight.props.className).toContain('mr-3');
-    expect(headerRight.props.className).not.toContain('ml-3');
-    expect(headerRight.props.className).toContain('max-w-[50%]');
-    expect(headerRight.props.className).toContain('shrink');
-    expect(headerRight.props.className).not.toContain('shrink-0');
+        /(^|\s)ms-3(\s|$)/.test(node.props.className)
+    );
+    expect(trailing).toEqual([inline]);
+  });
+
+  it('renders inlineActions beside a centered title too', () => {
+    // A centered title (`centerTitle`, e.g. a modal with a title or eyebrow)
+    // shares its row with the leading control; the inline actions slot must not
+    // be dropped just because the title is centered.
+    const renderer = renderHeader({ modal: true, title: 'Filters', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    expect(inline.props.className).toContain('min-w-0');
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
@@ -221,6 +386,18 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
+  it('paints the large route title in the foreground token, never a muted one', () => {
+    // Explorer finding 5 (profile, f2181ae79) reported the Profile title muted
+    // gray while every other heading is white. A pixel measure of the capture
+    // refuted it: the large title is text-foreground, the same white as the
+    // Kilo Pass row. Pin the token so the top of the hierarchy cannot silently
+    // drop to text-muted-foreground.
+    const renderer = renderHeader({ title: 'Profile', size: 'large' });
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-foreground');
+    expect(title.props.className).not.toContain('text-muted-foreground');
+  });
+
   it('returns to the previous screen by default', () => {
     const renderer = renderHeader({ title: 'Sessions' });
     act(() => {
@@ -239,7 +416,7 @@ describe('ScreenHeader mounted', () => {
       let titleOpened = false;
       const renderer = renderHeader({
         title: 'Session',
-        backFallback: '/(app)/(tabs)/(2_agents)',
+        backFallback: '/(app)/(tabs)/(2_agents)' as Href,
         onTitlePress: () => {
           titleOpened = true;
         },
@@ -259,8 +436,8 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: true, backFallback: undefined },
-    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' },
-    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' },
+    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
+    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
   ] as const)(
     'preserves custom onBack precedence for history=$history, fallback=$backFallback',
     ({ history, backFallback }) => {
@@ -329,7 +506,7 @@ describe('ScreenHeader mounted', () => {
     const explicitlyHidden = renderHeader({
       title: 'Sessions',
       showBackButton: false,
-      backFallback: '/(app)/(tabs)/(2_agents)',
+      backFallback: '/(app)/(tabs)/(2_agents)' as Href,
     });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });
@@ -355,17 +532,23 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
+      { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
+      { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
     ];
 
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-      expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
+      // The cap is clamped to the three lines the reserved box covers, so a
+      // title can never paint a line the reserve does not hold.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain('min-h-14 justify-center');
+        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
+        expect(title.parent?.props.className).toContain('justify-center');
       }
       if (props.context) {
         expect(title.parent?.children).toEqual([title, props.context]);
@@ -377,6 +560,25 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent);
       }
     }
+  });
+
+  it('gives the session header three title lines so a real session name is not cut mid-word', () => {
+    // 15-session-working: the session header's primary heading was capped at
+    // two lines, so a name like "Tax export formatter test" truncated mid-word
+    // beside the back control and the metrics/copy cluster on a narrow window.
+    const renderer = renderHeader({
+      title: 'Tax export formatter test',
+      titleNumberOfLines: SESSION_HEADER_TITLE_LINES,
+      reserveTitleSpace: true,
+      headerRight: 'METRICS',
+    });
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
+    // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
+    // line height), so the rendered title cannot move the body below it.
+    expect(title.parent?.props.className).toContain('min-h-21');
+    expect(title.parent?.props.className).toContain('justify-center');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
@@ -394,6 +596,64 @@ describe('ScreenHeader mounted', () => {
     expect(title.parent?.parent).toBe(back.parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
+    i18nManager.isRTL = isRTL;
+    platform.OS = 'android';
+    const repositories = ['KILO-ORG/CLOUD', 'organization-with-a-long-name/repository-name'];
+
+    for (const eyebrow of repositories) {
+      const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
+      const label = renderer.root.findByType('Eyebrow');
+      expect(label.props.numberOfLines).toBe(1);
+      expect(label.props.ellipsizeMode).toBe('tail');
+      expect(label.children).toEqual([eyebrow]);
+      expect(label.props.accessible).toBe(true);
+      expect(label.parent?.props.className).toContain('min-w-0 flex-1');
+
+      // Files and Discussion have fewer header actions than Overview. Keep the
+      // same line limit as their available width changes instead of reflowing.
+      act(() => {
+        renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
+      });
+      expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
+      expect(findBackPressable(renderer.root).props.className).toContain('h-11 w-11');
+      renderer.unmount();
+    }
+  });
+
+  it('keeps a reserved eyebrow hidden and on one line until its label arrives', () => {
+    const renderer = renderHeader({ title: '#6054', reserveEyebrow: true, centerTitle: true });
+    const placeholder = renderer.root.findByType('Eyebrow');
+    expect(placeholder.props.numberOfLines).toBe(1);
+    expect(placeholder.props.accessible).toBe(false);
+    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
+    expect(placeholder.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(placeholder.props.className).toContain('opacity-0');
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: '#6054',
+          reserveEyebrow: true,
+          centerTitle: true,
+          eyebrow: 'KILO-ORG/CLOUD',
+        })
+      );
+    });
+    const label = renderer.root.findByType('Eyebrow');
+    expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.className).toContain('text-center');
+    expect(label.props.className).not.toContain('opacity-0');
+    expect(label.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
+  it('omits an absent eyebrow when no space is reserved', () => {
+    const renderer = renderHeader({ title: '#6054' });
+    expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(0);
+    renderer.unmount();
   });
 
   it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {
@@ -428,7 +688,7 @@ describe('ScreenHeader mounted', () => {
     // The outer container keeps only its top inset and the `px-4` gutter class;
     // the side insets land on the inner wrapper so they ADD to the gutter (an
     // inline padding on the container would override the class and pull the
-    // back control's `-ml-4` chevron back into the sensor area).
+    // back control's `-ms-4` chevron back into the sensor area).
     const container = findOuterContainer(renderer.root);
     expect(container.props.style).toEqual({ paddingTop: 8 });
     expect(container.props.className).toContain('px-4');
@@ -436,7 +696,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackPressable(renderer.root).props.className).toContain('-ml-4');
+    expect(findBackPressable(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -529,5 +789,164 @@ describe('ScreenHeader mounted', () => {
 
     expect(iosStyle).toEqual({ paddingTop: 32 });
     expect(androidStyle).toEqual(iosStyle);
+  });
+
+  it('caps the eyebrow to one line with a middle ellipsis when eyebrowNumberOfLines is set', () => {
+    const renderer = renderHeader({
+      title: '#1',
+      eyebrow: 'KILO-STUB/DISCUSSION-MIXED',
+      eyebrowNumberOfLines: 1,
+    });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
+  });
+
+  it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
+    const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['\u00A0']);
+  });
+});
+
+describe('header actions row', () => {
+  it('keeps the actions on the title row at a normal phone width', () => {
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const cluster = findHeaderRight(renderer.root);
+    // The cluster's gap is the logical start margin (`ms-3`), which the RTL
+    // swap cannot mirror away; it sizes to its content and never shrinks, so
+    // the heading's `flex-1 min-w-0` box is what absorbs the squeeze.
+    expect(cluster.props.className).toContain('ms-3');
+    expect(cluster.props.className).toContain('shrink-0');
+  });
+
+  it('drops the actions to their own row when the window cannot hold the title beside them', () => {
+    // The e1 geometry: 160dp wide with a 1.5 font scale left the 30px title
+    // 48dp, which broke it and the mono link beside it into letter columns.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    // The single-row cluster is gone: the actions own a full-width row.
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          String(node.props.className ?? '').includes('ms-3 shrink-0')
+      )
+    ).toHaveLength(0);
+    // The title still shares its row with the back control; only the actions moved.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+  });
+
+  it('reflows a centered modal header the same way', () => {
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', modal: true, headerRight: 'RIGHT' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+  });
+
+  it('leaves a header without actions on its single row', () => {
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+
+  it('drops a declared trailing cluster to its own row before it squeezes the title', () => {
+    // PR review at 320dp with a font scale of 2: Share, Submit review and
+    // Merge (236dp of fixed-width controls) left the title a few characters
+    // while the width-only rule kept them all on one row.
+    layout.width = 320;
+    layout.fontScale = 2;
+    const renderer = renderHeader({
+      title: 'PR review #7',
+      eyebrow: 'owner/repo',
+      headerRight: 'RIGHT',
+      headerRightWidth: 236,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+  });
+
+  it('keeps a narrower declared cluster on the title row', () => {
+    // A normal phone width: the suite's `beforeEach` does not cover this
+    // describe, and the test above leaves a 320dp / scale 2 window behind.
+    layout.width = 390;
+    layout.fontScale = 1;
+    // Share and Merge alone: 44 + 44 + the `gap-1` between them.
+    const renderer = renderHeader({
+      title: 'PR review #7',
+      eyebrow: 'owner/repo',
+      headerRight: 'RIGHT',
+      headerRightWidth: 92,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+});
+
+describe('header status line', () => {
+  it('keeps the eyebrow on one line at the reported narrow geometry', () => {
+    // e1: a 160dp window at a 1.5 font scale broke '1 LIVE' into a letter
+    // column beside the title and grew the header down over the search field.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.children).toEqual(['1 LIVE']);
+  });
+});
+
+describe('shouldStackHeaderActions', () => {
+  it('reflows at the reported 160dp window with a 1.5 font scale', () => {
+    expect(shouldStackHeaderActions(160, 1.5)).toBe(true);
+  });
+
+  it('keeps one row at every phone width the scenarios cover', () => {
+    expect(shouldStackHeaderActions(320, 1)).toBe(false);
+    expect(shouldStackHeaderActions(360, 1)).toBe(false);
+    expect(shouldStackHeaderActions(360, 2)).toBe(false);
+    expect(shouldStackHeaderActions(390, 2)).toBe(false);
+  });
+
+  it('reflows a window too narrow for the title beside the actions', () => {
+    expect(shouldStackHeaderActions(160, 1)).toBe(true);
+    expect(shouldStackHeaderActions(220, 1.5)).toBe(true);
+    expect(shouldStackHeaderActions(320, 2.5)).toBe(true);
+  });
+
+  it('reflows for a declared trailing cluster the title cannot share the row with', () => {
+    // The PR review header at 320dp with a font scale of 2: the width-only
+    // rule kept Share, Submit review and Merge on the title's row, which left
+    // the title a few characters. The declared cluster width reflows it.
+    expect(shouldStackHeaderActions(320, 2)).toBe(false);
+    expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
+    // A cluster the title still fits beside keeps the single row, and the PR
+    // review cluster stacks even at a normal phone width: 390 - 44 - 12 - 236
+    // leaves the title 98dp, below its 120dp minimum.
+    expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
+    expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
+  });
+
+  it('treats a missing window measurement as a single row', () => {
+    expect(shouldStackHeaderActions(Number.NaN, 1)).toBe(false);
+    expect(shouldStackHeaderActions(160, Number.NaN)).toBe(true);
   });
 });

@@ -149,6 +149,7 @@ type Repository = {
   workspaceUuid?: string;
   platformIntegrationId?: string;
   platformAccountLogin?: string;
+  githubAppType?: 'standard' | 'lite';
 };
 
 type NewSessionPanelProps = {
@@ -618,6 +619,7 @@ export function NewSessionPanel({
       platform: 'github' as const,
       platformIntegrationId: repo.platformIntegrationId,
       platformAccountLogin: repo.platformAccountLogin,
+      githubAppType: repo.githubAppType,
     }));
     const gitlab = gitlabRepositories.map(repo => ({
       id: repo.id,
@@ -1179,6 +1181,10 @@ export function NewSessionPanel({
       return;
     if (!selectedRepo) {
       setShowRepositoryRequiredMessage(true);
+      return;
+    }
+    if (organizationId && selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
+      toast.error('Select the GitHub repository again.');
       return;
     }
     if (selectedPlatform === 'bitbucket' && !bitbucketRepo) {
@@ -2067,7 +2073,7 @@ function RepoCommandItem({
 }) {
   return (
     <CommandItem
-      value={`${repo.fullName} ${repo.platformAccountLogin ?? ''} ${repo.platformIntegrationId ?? ''}`}
+      value={`${repo.fullName} ${repo.platformAccountLogin ?? ''} ${repo.githubAppType ?? ''} ${repo.platformIntegrationId ?? ''}`}
       onSelect={() => onSelect(repo)}
       className="flex items-center gap-2"
     >
@@ -2077,6 +2083,9 @@ function RepoCommandItem({
         <Unlock className="size-3.5 text-gray-500" />
       )}
       <span className="truncate">{repo.fullName}</span>
+      {repo.platform === 'github' && repo.githubAppType === 'lite' && (
+        <span className="text-xs text-muted-foreground">Lite</span>
+      )}
       <Check className={cn('ml-auto h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
     </CommandItem>
   );

@@ -6,10 +6,6 @@
  * to maintain exclusive access to an execution.
  */
 
-// ---------------------------------------------------------------------------
-// Timing Constants
-// ---------------------------------------------------------------------------
-
 /** Duration of a lease in milliseconds (90 seconds) */
 export const LEASE_TTL_MS = 90_000;
 
@@ -23,10 +19,6 @@ export const STALE_THRESHOLD_MS = 90_000;
 /** Sandbox container sleep-after timeout in seconds (15 minutes).
  * After this duration of inactivity the container is stopped by @cloudflare/containers. */
 export const SANDBOX_SLEEP_AFTER_SECONDS = 900;
-
-// ---------------------------------------------------------------------------
-// Lease Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Calculate when a lease should expire.

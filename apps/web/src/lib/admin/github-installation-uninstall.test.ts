@@ -4,6 +4,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kilocode_users,
   agent_configs,
+  github_app_installations,
   organization_audit_logs,
   organizations,
   platform_integrations,
@@ -157,6 +158,58 @@ describe('uninstallGitHubOrganizationInstallation', () => {
       .where(eq(user_admin_notes.kilo_user_id, owner.id));
     expect(notes).toHaveLength(2);
     expect(notes.every(note => note.admin_kilo_user_id === actor.id)).toBe(true);
+  });
+
+  test('tombstones one shared canonical installation and audits every affected association', async () => {
+    const actor = await insertTestUser({ is_admin: true });
+    const ownerA = await insertTestUser();
+    const ownerB = await insertTestUser();
+    const organizationA = await createTestOrganization('Shared uninstall A', ownerA.id, 0);
+    const organizationB = await createTestOrganization('Shared uninstall B', ownerB.id, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: '123',
+        account_id: '456',
+        lifecycle_state: 'active',
+        sharing_mode: 'web_cloud_agent',
+      })
+      .returning();
+    const rowA = await integration(
+      { organizationId: organizationA.id },
+      { github_installation_id: canonical!.id }
+    );
+    await integration(
+      { organizationId: organizationB.id },
+      { github_installation_id: canonical!.id }
+    );
+
+    await expect(
+      uninstallGitHubOrganizationInstallation({
+        input: request(rowA, { type: 'organization', id: organizationA.id }),
+        actor: { id: actor.id, email: actor.google_user_email, name: actor.google_user_name },
+      })
+    ).resolves.toEqual({ status: 'uninstalled', localCleanup: 'complete' });
+
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.github_installation_id, canonical!.id));
+    expect(associations).toHaveLength(2);
+    expect(associations.every(row => row.suspended_by === 'github_deleted')).toBe(true);
+    const [deletedCanonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, canonical!.id));
+    expect(deletedCanonical?.lifecycle_state).toBe('deleted');
+    const audits = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(
+        sql`${organization_audit_logs.organization_id} IN (${organizationA.id}, ${organizationB.id})`
+      );
+    expect(audits.filter(entry => entry.message.includes('uninstall confirmed'))).toHaveLength(2);
   });
 
   test('supports legacy standard association and preserves organization resources', async () => {

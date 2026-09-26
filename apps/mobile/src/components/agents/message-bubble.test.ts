@@ -21,11 +21,55 @@ import {
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
+/** React compares hook dependencies one position at a time with `Object.is`. */
+function sameHookDeps(
+  a: readonly unknown[] | undefined,
+  b: readonly unknown[] | undefined
+): boolean {
+  if (a === undefined || b === undefined || a.length !== b.length) {
+    return false;
+  }
+  for (const [position, value] of a.entries()) {
+    if (!Object.is(value, b[position])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // The harness invokes the memoized component directly (no React renderer), so
-// the identity `useCallback` mock keeps the stabilized handler callable there.
+// the identity `useCallback` mock keeps the stabilized handler callable there,
+// and `useMemo` replays React's contract from one slot per hook position: the
+// slot's value is reused while its dependencies are referentially equal.
+// `useCallback` is the component's last hook before its two `useMemo` calls, so
+// each call opens a render and points the next `useMemo` at slot 0.
+const hooks = vi.hoisted(() => {
+  const slots: { deps: readonly unknown[] | undefined; value: unknown }[] = [];
+  let index = 0;
+  return {
+    openRender: () => {
+      index = 0;
+    },
+    memo: <T>(factory: () => T, deps?: readonly unknown[]): T => {
+      const slot = slots[index];
+      index += 1;
+      if (slot && sameHookDeps(slot.deps, deps)) {
+        return slot.value as T;
+      }
+      const value = factory();
+      slots[index - 1] = { deps, value };
+      return value;
+    },
+  };
+});
+
 vi.mock('react', async importOriginal => ({
   ...(await importOriginal<typeof React>()),
-  useCallback: <T>(fn: T) => fn,
+  useCallback: <T>(fn: T) => {
+    hooks.openRender();
+    return fn;
+  },
+  useMemo: hooks.memo,
 }));
 
 vi.mock('react-i18next', async importOriginal => {
@@ -92,6 +136,9 @@ vi.mock('./part-types', async () => {
     ...actual,
     isFilePart: vi.fn(() => false),
     isTextPart: vi.fn(() => false),
+    // Wrapped, not replaced: the memoization test counts the scan, and every
+    // other test keeps the real first-human-part behaviour.
+    firstHumanText: vi.fn(actual.firstHumanText),
   };
 });
 vi.mock('./use-message-copy', () => ({
@@ -301,6 +348,26 @@ describe('MessageBubble failure footer', () => {
     );
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a generic assistant failure once, without a detail line repeating the title', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-laconic', 'APIError'),
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The response failed.')).toBe(false);
+  });
+
+  it('keeps the classified detail line for a known assistant error', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-known', 'ProviderAuthError'),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The provider rejected the request.')).toBe(true);
   });
 
   it('does not render the footer when no handler is supplied', async () => {
@@ -545,6 +612,28 @@ describe('MessageBubble copy-to-composer human text', () => {
   });
 });
 
+describe('MessageBubble derived text memoization', () => {
+  it('derives the user text and copy text once per parts array', async () => {
+    const { firstHumanText } = await import('./part-types');
+    const firstHumanTextSpy = vi.mocked(firstHumanText);
+    firstHumanTextSpy.mockClear();
+
+    const message = userMessage('m-memo');
+    await renderBubble(message);
+    expect(firstHumanTextSpy).toHaveBeenCalledTimes(1);
+
+    // The same parts array is the memo key, so the second render reuses the
+    // slot and never re-scans the parts for the copy text or the join.
+    await renderBubble(message);
+    expect(firstHumanTextSpy).toHaveBeenCalledTimes(1);
+
+    // A fresh parts array misses the memo, so the derivation is keyed on the
+    // part list rather than skipped outright.
+    await renderBubble(userMessage('m-memo-next'));
+    expect(firstHumanTextSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('MessageBubble regressions', () => {
   it('holds badge slot when queued and holdQueuedSlot is set after dequeue', async () => {
     const message = userMessage('m7');
@@ -604,6 +693,60 @@ describe('MessageBubble user text join', () => {
   );
 });
 
+describe('MessageBubble assistant treatment', () => {
+  // The user treatment (Bubble side="user": right-aligned accent tile) is
+  // reserved for a user-role info. An assistant message at any point of its
+  // life — before the first token, mid-stream, completed — and a message whose
+  // role is missing or unknown must never take it.
+  async function findUserBubble(tree: unknown): Promise<{ side: unknown } | null> {
+    const { Bubble: MockBubble } = await import('@/components/ui/bubble');
+    const element = findElementByTypeFn(tree, MockBubble);
+    return element ? { side: element.props.side } : null;
+  }
+
+  it('renders streaming assistant text through the part renderer, never the user bubble', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-treatment-streaming');
+    message.parts = [
+      {
+        id: 'm-treatment-streaming-text',
+        sessionID: 'ses_1',
+        messageID: 'm-treatment-streaming',
+        type: 'text',
+        text: 'AI Gateway abuse classification is an external, fail-mostly-open integration',
+      },
+    ] as typeof message.parts;
+
+    const tree = await renderBubble(message);
+    expect(await findUserBubble(tree)).toBeNull();
+    expect(findElementByTypeFn(tree, MockPartRenderer)).not.toBeNull();
+  });
+
+  it('renders an assistant message with no content yet without the user bubble', async () => {
+    // Before the first token the assistant row has no visible parts; the
+    // transcript drops it, and the bubble itself must not render user ink.
+    const tree = await renderBubble(assistantMessage('m-treatment-empty'));
+    expect(await findUserBubble(tree)).toBeNull();
+  });
+
+  it('renders a message with an undefined role without the user bubble', async () => {
+    // A payload quirk must never fall back to the user treatment: the missing
+    // role renders the assistant path (no bubble), never Bubble side="user".
+    const message = assistantMessage('m-treatment-unknown-role');
+    (message.info as { role?: string }).role = undefined;
+
+    const tree = await renderBubble(message);
+    expect(await findUserBubble(tree)).toBeNull();
+  });
+
+  it('reserves Bubble side="user" for a user-role message', async () => {
+    const tree = await renderBubble(userMessage('m-treatment-user'));
+    const userBubble = await findUserBubble(tree);
+    expect(userBubble).not.toBeNull();
+    expect(userBubble?.side).toBe('user');
+  });
+});
+
 describe('MessageBubble in-bubble text selection context', () => {
   it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
     const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
@@ -621,6 +764,29 @@ describe('MessageBubble in-bubble text selection context', () => {
     const provider = findProvider(tree, InMessageBubbleContext.Provider);
     expect(provider).not.toBeNull();
     expect(provider?.props.value).toBe(true);
+  });
+});
+
+describe('MessageBubble part-row long-press context', () => {
+  it('mounts the message long-press provider on the assistant parts when the details sheet is wired', async () => {
+    const onLongPressDetails = vi.fn<(m: StoredMessage) => void>();
+    const message = assistantMessage('m-long-press');
+    const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.message).toBe(message);
+    expect(provider?.props.onLongPressDetails).toBe(onLongPressDetails);
+  });
+
+  it('keeps assistant part rows tap-only when no details sheet is wired', async () => {
+    const tree = await renderBubble(assistantMessage('m-long-press-plain'));
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.onLongPressDetails).toBeUndefined();
   });
 });
 

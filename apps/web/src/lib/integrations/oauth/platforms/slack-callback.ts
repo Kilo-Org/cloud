@@ -7,7 +7,7 @@ import {
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -17,7 +17,9 @@ import {
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
+  cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
+import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
@@ -42,6 +44,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // Handle OAuth errors from Slack
     if (error) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'slack' });
       captureMessage('Slack OAuth error', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -62,6 +65,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // Validate code is present
     if (!code) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'slack' });
       captureMessage('Slack callback missing code', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -78,7 +82,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // 3. Verify signed state (CSRF protection)
     const verified = verifyOAuthState(state);
-    if (!verified) {
+    if (!state || !verified) {
       captureMessage('Slack callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -117,6 +121,23 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       if (user.id !== owner.id) {
         return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
       }
+    }
+
+    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+    }
+
+    if (
+      verified.purpose === 'provider_install' &&
+      !(await consumeProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: 'slack',
+        state,
+        purpose: 'provider_install',
+      }))
+    ) {
+      throw new Error('Slack OAuth attempt is invalid, expired, or already used');
     }
 
     // 7. Let the Chat SDK exchange the code and seed its installation state

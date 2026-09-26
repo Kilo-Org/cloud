@@ -5,10 +5,12 @@ import {
   verifyKiloToken,
 } from '@kilocode/worker-utils';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import type { GitHubRepositoryAuthorizationFailureReason } from '@kilocode/worker-utils/github-authorization';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -84,7 +86,12 @@ import {
   BitbucketDeleteWebhookRequestSchema,
   BitbucketEnsureWebhookRequestSchema,
   BitbucketPullRequestRequestSchema,
+  BitbucketWorkspaceTargetSchema,
 } from './bitbucket-code-review-service.js';
+import {
+  BitbucketWorkspaceAccessTokenAuthorizationService,
+  type BitbucketWorkspaceAccessTokenAuthorizationResult,
+} from './bitbucket-workspace-access-token-authorization-service.js';
 import {
   KiloSessionCapabilityCodec,
   KiloSessionCapabilityError,
@@ -114,13 +121,7 @@ export type GetTokenForRepoSuccess = {
 
 export type GetTokenForRepoFailure = {
   success: false;
-  reason:
-    | 'database_not_configured'
-    | 'invalid_repo_format'
-    | 'no_installation_found'
-    | 'repository_not_installed'
-    | 'invalid_org_id'
-    | 'integration_mismatch';
+  reason: GitHubRepositoryAuthorizationFailureReason;
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
@@ -139,6 +140,7 @@ export type {
 export type ManagedGitHubFallbackReason = UserAuthorizationFallbackReason | 'lite_installation';
 
 export type GetCloudAgentAuthForRepoParams = GetTokenForRepoParams & {
+  accessPurpose?: 'workflow' | 'agent';
   allowUserAuthorization?: boolean;
 };
 
@@ -313,6 +315,7 @@ export type RedeemKiloSessionCapabilityResult =
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
 const USER_ACCESS_TOKEN_PATH = '/internal/github-user-authorizations/token';
 const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
+const BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH = '/internal/bitbucket/workspace-access-token';
 const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review/pull-request';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH = '/internal/bitbucket/code-review/webhooks/delete';
@@ -328,6 +331,9 @@ const BitbucketEnsureWebhookHttpRequestSchema = BitbucketEnsureWebhookRequestSch
   owner: true,
 });
 const BitbucketDeleteWebhookHttpRequestSchema = BitbucketDeleteWebhookRequestSchema.omit({
+  owner: true,
+});
+const BitbucketWorkspaceAccessTokenHttpRequestSchema = BitbucketWorkspaceTargetSchema.omit({
   owner: true,
 });
 
@@ -741,8 +747,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
   }
 
-  private async refreshGitHubInstallationLogins(params: GetTokenForRepoParams): Promise<void> {
-    const candidates = await this.installationLookupService.findRefreshCandidates(params);
+  private async refreshGitHubInstallationLogins(
+    params: GetCloudAgentAuthForRepoParams,
+    authorizationMode: 'generic' | 'managed' = 'generic'
+  ): Promise<void> {
+    const candidates = await this.installationLookupService.findRefreshCandidates(
+      params,
+      authorizationMode
+    );
     if (!candidates.success) {
       return;
     }
@@ -808,13 +820,13 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return installation;
   }
 
-  private async findManagedInstallationWithLoginRepair(params: GetTokenForRepoParams) {
+  private async findManagedInstallationWithLoginRepair(params: GetCloudAgentAuthForRepoParams) {
     let installation = await this.installationLookupService.findManagedInstallationForRepo(params);
     if (
       !installation.success &&
       this.shouldRepairGitHubInstallationLogin(params, installation.reason)
     ) {
-      await this.refreshGitHubInstallationLogins(params);
+      await this.refreshGitHubInstallationLogins(params, 'managed');
       installation = await this.installationLookupService.findManagedInstallationForRepo(params);
     }
     return installation;
@@ -871,6 +883,22 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       }
       throw error;
     }
+  }
+
+  async authorizeCloudAgentGitHubRepo(
+    params: GetCloudAgentAuthForRepoParams
+  ): Promise<{ success: true } | GetTokenForRepoFailure> {
+    const installation = await this.findManagedInstallationWithLoginRepair(params);
+    if (!installation.success) {
+      return {
+        success: false,
+        reason:
+          installation.reason === 'ambiguous_installation'
+            ? 'no_installation_found'
+            : installation.reason,
+      };
+    }
+    return { success: true };
   }
 
   async getCloudAgentAuthForRepo(
@@ -959,6 +987,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
+        accessPurpose: params.accessPurpose ?? 'workflow',
         ...(params.outboundContainerId !== undefined
           ? { outboundContainerId: params.outboundContainerId }
           : {}),
@@ -1012,6 +1041,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const authParams = {
       userId: claims.userId,
+      accessPurpose: claims.accessPurpose ?? 'workflow',
       ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
       ...(claims.integrationId !== undefined
         ? { expectedIntegrationId: claims.integrationId }
@@ -1070,7 +1100,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   }
 
   private async redeemPinnedUserAuthorization(
-    params: GetTokenForRepoParams
+    params: GetCloudAgentAuthForRepoParams
   ): Promise<GetCloudAgentAuthForRepoResult | null> {
     const installation = await this.findManagedInstallationWithLoginRepair(params);
     if (!installation.success && installation.reason === 'integration_mismatch') {
@@ -1505,9 +1535,12 @@ export default {
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
     // Credential-bearing endpoints must never be cached, including on their
     // shared early-return error paths (405/401/503). The GitHub user-access
-    // token endpoint joins the GitLab private endpoints here.
+    // token endpoint joins the GitLab private endpoints here, and the
+    // Bitbucket workspace access-token release endpoint with them.
     const privateNoStoreHeaders =
-      isGitLabCredentialBroker || url.pathname === USER_ACCESS_TOKEN_PATH
+      isGitLabCredentialBroker ||
+      url.pathname === USER_ACCESS_TOKEN_PATH ||
+      url.pathname === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH
         ? { 'Cache-Control': 'no-store' }
         : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
@@ -1515,6 +1548,7 @@ export default {
       url.pathname !== DISCONNECT_PATH &&
       url.pathname !== USER_ACCESS_TOKEN_PATH &&
       url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
+      url.pathname !== BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH &&
       url.pathname !== GITLAB_CREDENTIAL_BROKER_PATH &&
       !codeReviewAudience
     ) {
@@ -1553,11 +1587,13 @@ export default {
       const audience =
         url.pathname === BITBUCKET_REPOSITORIES_PATH
           ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
-          : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
-            ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
-            : url.pathname === USER_ACCESS_TOKEN_PATH
-              ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
-              : codeReviewAudience;
+          : url.pathname === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH
+            ? BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE
+            : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
+              ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
+              : url.pathname === USER_ACCESS_TOKEN_PATH
+                ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
+                : codeReviewAudience;
       authorization =
         url.pathname === DISCONNECT_PATH
           ? await verifyKiloTokenForResource(token, secret, {
@@ -1584,6 +1620,77 @@ export default {
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
+    if (url.pathname === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH) {
+      if (!authorization.organizationId) {
+        return Response.json(
+          { error: 'organization_required' },
+          { status: 403, headers: privateNoStoreHeaders }
+        );
+      }
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json(
+          { status: 'invalid_request' },
+          { status: 400, headers: privateNoStoreHeaders }
+        );
+      }
+      const parsed = BitbucketWorkspaceAccessTokenHttpRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { status: 'invalid_request' },
+          { status: 400, headers: privateNoStoreHeaders }
+        );
+      }
+
+      // The owner comes from the verified token claims, never from the body:
+      // the release re-resolves the org integration and decrypts the
+      // credential, then answers only when the requested workspace identity
+      // matches the integration the token belongs to.
+      const requested = parsed.data;
+      try {
+        const authorizationService = new BitbucketWorkspaceAccessTokenAuthorizationService(env);
+        const workspaceAuthorization: BitbucketWorkspaceAccessTokenAuthorizationResult =
+          await authorizationService.getAuthorization({
+            userId: authorization.kiloUserId,
+            orgId: authorization.organizationId,
+          });
+        if (workspaceAuthorization.status !== 'available') {
+          return Response.json(
+            { status: workspaceAuthorization.status },
+            { headers: privateNoStoreHeaders }
+          );
+        }
+        if (
+          workspaceAuthorization.integrationId !== requested.integrationId ||
+          workspaceAuthorization.workspace.uuid !== requested.workspaceUuid ||
+          workspaceAuthorization.workspace.slug !== requested.workspaceSlug
+        ) {
+          return Response.json(
+            { status: 'reconnect_required' },
+            { headers: privateNoStoreHeaders }
+          );
+        }
+        return Response.json(
+          {
+            status: 'available',
+            token: workspaceAuthorization.token,
+            workspace: {
+              uuid: workspaceAuthorization.workspace.uuid,
+              slug: workspaceAuthorization.workspace.slug,
+            },
+          },
+          { headers: privateNoStoreHeaders }
+        );
+      } catch {
+        return Response.json(
+          { status: 'temporarily_unavailable' },
+          { headers: privateNoStoreHeaders }
+        );
       }
     }
 

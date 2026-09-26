@@ -573,20 +573,60 @@ api.get('/session/:sessionId/messages', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-    () =>
-      getSessionIngestDO(c.env, {
-        kiloUserId,
-        sessionId: inputParse.data.kiloSessionId,
-      }),
-    stub =>
-      stub.readKiloSdkMessages({
-        limit: inputParse.data.limit,
-        before: inputParse.data.before,
-      }),
-    'SessionIngestDO.readKiloSdkMessages'
-  );
+  const readStartedAt = Date.now();
+  let rawHistory: unknown;
+  try {
+    rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId,
+          sessionId: inputParse.data.kiloSessionId,
+        }),
+      stub =>
+        stub.readKiloSdkMessages({
+          limit: inputParse.data.limit,
+          before: inputParse.data.before,
+        }),
+      'SessionIngestDO.readKiloSdkMessages'
+    );
+  } catch (error) {
+    // A DO isolate reset is `retryable:false` upstream and would otherwise
+    // leave the read unattributable in production. Log it once, then rethrow
+    // so the response is unchanged.
+    console.warn({
+      event: 'kilo_sdk_history_read_failed',
+      sessionId: inputParse.data.kiloSessionId,
+      limit: inputParse.data.limit,
+      hasCursor: inputParse.data.before !== undefined,
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - readStartedAt,
+    });
+    throw error;
+  }
   const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+  const page =
+    history.success && history.data !== null && !('kind' in history.data) ? history.data : null;
+  const outcome = !history.success
+    ? 'invalid_data'
+    : history.data === null
+      ? 'none'
+      : 'kind' in history.data
+        ? history.data.kind
+        : 'ok';
+  // Exactly one structured read-outcome line per request, in the same plain
+  // object shape as `direct_ingest_ok`, so `cloudflare-logpush` names the read
+  // (and its typed outcome) that a stale-transcript report blames.
+  console.log({
+    event: 'kilo_sdk_history_read',
+    sessionId: inputParse.data.kiloSessionId,
+    limit: inputParse.data.limit,
+    hasCursor: inputParse.data.before !== undefined,
+    outcome,
+    messageCount: page?.messages.length ?? 0,
+    omittedItemCount: page?.omittedItemCount ?? 0,
+    hasNextCursor: page ? page.nextCursor !== null : false,
+    durationMs: Date.now() - readStartedAt,
+  });
 
   // Session-level state travels with the bounded message page so a client can
   // restore it on open and on reconnect without a second snapshot round trip.

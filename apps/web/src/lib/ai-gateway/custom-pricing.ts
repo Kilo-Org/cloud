@@ -2,18 +2,11 @@ import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
-import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { partnerPricingByModelId } from '@/lib/ai-gateway/providers/partner/pricing';
 import {
   calculateCost_mUsd,
   type Pricing,
   type PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-
-export { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID };
-
-// Qwen long-context pricing starts at exactly 256 Ki tokens (262,144 tokens).
-const TOKENS_256K = 256 * 1024;
 
 export type CustomPricing = {
   pricing: PricingTiers;
@@ -39,44 +32,6 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
-  [QWEN37_MAX_MODEL_ID]: {
-    discountPercentage: 50,
-    pricing: [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 1.25,
-          completion_per_million: 3.75,
-          input_cache_read_per_million: 0.125,
-          input_cache_write_per_million: 1.5625,
-        },
-      },
-    ],
-  },
-  [QWEN37_PLUS_MODEL_ID]: {
-    discountPercentage: 20,
-    pricing: [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 0.32,
-          completion_per_million: 1.28,
-          input_cache_read_per_million: 0.032,
-          input_cache_write_per_million: 0.4,
-        },
-      },
-      {
-        start_context_length: TOKENS_256K,
-        pricing: {
-          prompt_per_million: 0.96,
-          completion_per_million: 3.84,
-          input_cache_read_per_million: 0.096,
-          input_cache_write_per_million: 1.2,
-        },
-      },
-    ],
-  },
-  ...partnerPricingByModelId,
 };
 
 export function getCustomPricing(modelId: string): CustomPricing | undefined {

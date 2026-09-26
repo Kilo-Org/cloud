@@ -36,7 +36,7 @@ import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
@@ -47,7 +47,6 @@ import {
 } from './usage-post-commit-work';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
-import { reportAbuseCost } from '@/lib/ai-gateway/abuse-service';
 import type {
   BalanceUpdateResult,
   ChatCompletionChunk,
@@ -159,8 +158,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
     ttfb_ms: usageContext.ttfb_ms,
-    abuse_delay: usageContext.abuse_delay ?? null,
-    abuse_downgraded_from: usageContext.abuse_downgraded_from ?? null,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 }
 
@@ -238,13 +237,11 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: await isFreeModel(usageContextInfo.requested_model),
+    is_free: isFreeModel(usageContextInfo.requested_model),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
-  // Legacy heuristic classification removed - abuse_classification is now handled
-  // by the external abuse detection service in src/lib/abuse-service.ts
   if (organization_id) {
     //never log any sensitive data for orgs
     metadata.user_prompt_prefix = null;
@@ -1310,17 +1307,11 @@ export async function processTokenData(
 
   const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
 
-  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
-  // (abuse service needs actual spend for heuristics like free_tier_exhausted)
-  reportAbuseCost(usageContext, usageStats).catch(error => {
-    console.error('[Abuse] Failed to report cost:', error);
-  });
-
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
+  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1344,7 +1335,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    (await isFreeModel(usageContext.requested_model)) ||
+    isFreeModel(usageContext.requested_model) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);

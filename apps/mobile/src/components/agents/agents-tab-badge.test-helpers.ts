@@ -58,14 +58,20 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+// The live list now renders through FlashList v2; without this stub the real
+// `@shopify/flash-list` module loads and its internal `Animated` import trips
+// the minimal `react-native` mock below.
+vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   View: 'View',
   FlatList: 'FlatList',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -81,6 +87,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

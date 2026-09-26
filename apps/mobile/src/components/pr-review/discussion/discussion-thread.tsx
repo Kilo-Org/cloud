@@ -39,6 +39,7 @@ import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import {
   type ReviewComment,
@@ -55,6 +56,7 @@ import {
   useResolveThreadMutation,
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -82,6 +84,19 @@ export function DiscussionThread({
   viewerLogin = null,
   onReplyFocus,
 }: Readonly<DiscussionThreadProps>) {
+  // s6: the reply and resolve writes route through the `providerReview` seam
+  // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
+  // provider scope the layout publishes), so what this card offers is decided
+  // by the capability list, not by the platform. Reactions stay behind the
+  // GitHub write path: the seam has no reaction procedure and no provider
+  // read layer returns reaction data, so a provider comment row renders
+  // read-only — the row shows nothing rather than a dead or failing
+  // affordance.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const capabilities = providerPrCapabilities(scope.ref.platform);
+  const isGithub = scope.ref.platform === 'github';
+  const canReply = capabilities.canComment;
+  const canResolve = capabilities.canResolveThreads;
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);
@@ -134,11 +149,23 @@ export function DiscussionThread({
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
     onToggleResolve,
+    canResolve,
     resolveDisabled: isResolving,
     onToggleExpand,
   } as const;
 
   if (expanded) {
+    // The provider reply target carries the provider-native ids the seam
+    // needs: the thread's discussion/root-comment id and the first comment's
+    // verbatim provider id (kept in `nodeId` by the read layer).
+    const providerReply =
+      !isGithub && firstComment
+        ? {
+            ref: scope.ref,
+            threadId: thread.threadId,
+            commentNodeId: firstComment.nodeId,
+          }
+        : undefined;
     return (
       <View
         accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
@@ -151,7 +178,13 @@ export function DiscussionThread({
             <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
               <CommentRow
                 comment={comment}
+                owner={owner}
+                repo={repo}
+                number={number}
+                commentKind="review"
                 reactionsDisabled={isReacting}
+                readOnly={!isGithub}
+                reactionsSupported={capabilities.reactions.supported}
                 viewerLogin={viewerLogin}
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
@@ -160,13 +193,14 @@ export function DiscussionThread({
             </View>
           ))}
         </View>
-        {firstComment ? (
+        {firstComment && canReply ? (
           <ReplyInput
             owner={owner}
             repo={repo}
             number={number}
             commentId={firstComment.commentId}
             reply={reply}
+            provider={providerReply}
             onInputFocus={onReplyFocus}
           />
         ) : null}
@@ -199,6 +233,8 @@ type ThreadHeaderProps = {
   readonly expanded: boolean;
   readonly onToggleExpand: () => void;
   readonly onToggleResolve: () => void;
+  /** False on a GitLab/Bitbucket scope: the resolve control is withheld. */
+  readonly canResolve: boolean;
   readonly resolveDisabled: boolean;
 };
 
@@ -212,6 +248,7 @@ function ThreadHeader({
   expanded,
   onToggleExpand,
   onToggleResolve,
+  canResolve,
   resolveDisabled,
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
@@ -227,7 +264,12 @@ function ThreadHeader({
     : ({} as const);
   return (
     <View className="gap-2">
-      <View className="flex-row items-start justify-between gap-2">
+      {/* `items-center`: the resolve control's tap frame is taller than the
+          anchor label, and the row holds that frame so the whole target is
+          hittable (a negative margin would push part of it outside the row,
+          where React Native stops delivering touches). Centering keeps the
+          label aligned with the control's visible circle. */}
+      <View className="flex-row items-center justify-between gap-2">
         <LabelRow
           {...labelRowA11y}
           className={cn('flex-1 flex-row items-center gap-2', expanded && 'active:opacity-70')}
@@ -241,7 +283,9 @@ function ThreadHeader({
             {anchorLabel}
           </Text>
         </LabelRow>
-        <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        {canResolve ? (
+          <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        ) : null}
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (
@@ -312,10 +356,18 @@ function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveTogglePr
       }
       onPress={onPress}
       disabled={disabled}
-      hitSlop={8}
-      className="h-7 w-7 items-center justify-center rounded-full border border-border bg-card"
+      // The frame is the tap target the size audit measures (38.5pt on
+      // device) and the header row grows to hold it, so the whole frame is
+      // hittable; the 3pt slop reaches the 44pt minimum.
+      hitSlop={COMPACT_H11_HIT_SLOP_DP}
+      className="h-11 w-11 items-center justify-center active:opacity-70"
     >
-      <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
+      {/* The visible circle stays compact (explicit px, because NativeWind's
+          14pt rem renders `h-7` at 24.5pt): DESIGN.md keeps the target, not the
+          visual, at 44pt. */}
+      <View className="h-[28px] w-[28px] items-center justify-center rounded-full border border-border bg-card">
+        <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

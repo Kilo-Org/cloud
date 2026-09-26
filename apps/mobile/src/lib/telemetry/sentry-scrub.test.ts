@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+import { NETWORK_BODY_CONTEXT, scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
 describe('scrubEvent', () => {
   it('strips query strings from request.url', () => {
@@ -107,6 +107,20 @@ describe('scrubEvent', () => {
     expect(result.tags.session).toBe('[redacted]');
   });
 
+  it('redacts token-shaped runs that mix cases or carry digits', () => {
+    const event = {
+      extra: {
+        upper: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+        hyphenated: 'sk-proj-abc123def456ghi789jkl',
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.upper).toBe('[redacted]');
+    expect(result.extra.hyphenated).toBe('[redacted]');
+  });
+
   it('redacts token values nested in extra', () => {
     const event = {
       extra: { cause: { token: 'abcdefghijklmnopqrst' } },
@@ -155,6 +169,25 @@ describe('scrubEvent', () => {
     const result = scrubEvent(event);
 
     expect(result.contexts.TRPCClientError.data.token).toBe('[redacted]');
+  });
+
+  it('redacts the app payload context the exception integration does not own', () => {
+    const event = {
+      // The integration replaces `contexts[error.name]`; the payload lives
+      // under a different key, so it survives to be redacted here.
+      exception: { values: [{ type: 'NetworkError' }] },
+      contexts: {
+        NetworkError: {},
+        [NETWORK_BODY_CONTEXT]: {
+          data: { code: 'UNAUTHORIZED', token: 'abcdefghijklmnopqrst' },
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts[NETWORK_BODY_CONTEXT].data.code).toBe('UNAUTHORIZED');
+    expect(result.contexts[NETWORK_BODY_CONTEXT].data.token).toBe('[redacted]');
   });
 
   it('leaves structured network and trace contexts intact', () => {

@@ -40,7 +40,7 @@ import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { sha256Hex } from '../../utils/sha256.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
-import { internalApiProtectedProcedure } from '../auth.js';
+import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
@@ -451,6 +451,11 @@ function assertRegisteredMetadata(
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     !metadata.repository ||
     canonicalRepositoryUrl(metadata.repository) !== canonicalRepositoryUrl(source.repository) ||
+    (source.repository.type === 'github' &&
+      (metadata.repository.type !== 'github' ||
+        metadata.repository.githubIntegrationId !== source.repository.githubIntegrationId ||
+        (metadata.repository.githubAccessPurpose ?? 'workflow') !==
+          (source.repository.githubAccessPurpose ?? 'workflow'))) ||
     metadata.repository.upstreamBranch !== source.repository.upstreamBranch
   ) {
     throw operationConflict();
@@ -981,7 +986,7 @@ async function reconcileWorktreeCreate(
   return resultFromProgress(progress, true);
 }
 
-const createWorktreeChatHandler = internalApiProtectedProcedure
+const createWorktreeChatHandler = protectedProcedure
   .input(CreateWorktreeChatInput)
   .output(CreateWorktreeChatOutput)
   .mutation(async ({ input, ctx }) => {

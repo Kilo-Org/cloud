@@ -39,6 +39,25 @@ function userMessage(overrides: Partial<UserMessage> = {}): UserMessage {
   };
 }
 
+/**
+ * A compaction summary the CLI wrote for `/compact`: `summary: true` on an
+ * assistant message (see the CLI's `SessionCompaction.process`). `finish` is
+ * set when the compaction completed; the CLI leaves the tokens at zero on the
+ * chunked path and reports the compaction request's usage on the direct path.
+ */
+function compactionSummaryMessage(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
+  return assistantMessage({
+    id: 'msg-summary',
+    parentID: 'msg-compaction-user',
+    mode: 'compaction',
+    agent: 'compaction',
+    summary: true,
+    finish: 'stop',
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    ...overrides,
+  });
+}
+
 describe('findLatestContextUsage', () => {
   it('sums all token buckets from an eligible assistant response', () => {
     const message = assistantMessage({
@@ -150,6 +169,236 @@ describe('findLatestContextUsage', () => {
     });
 
     expect(findLatestContextUsage([{ info: overflowing }])).toBeUndefined();
+  });
+});
+
+describe('findLatestContextUsage across a compaction', () => {
+  /** The 96%-full response the session reported before `/compact`. */
+  const preCompaction = assistantMessage({
+    id: 'msg-before-compaction',
+    tokens: { input: 190_000, output: 1_000, reasoning: 0, cache: { read: 0, write: 0 } },
+  });
+  /** The first report after `/compact`: the compacted context. */
+  const postCompaction = assistantMessage({
+    id: 'msg-after-compaction',
+    tokens: { input: 27_000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } },
+  });
+
+  it('drops the pre-compaction reading once the compaction completes', () => {
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        { info: userMessage({ id: 'msg-compaction-user' }) },
+        { info: compactionSummaryMessage() },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('never falls back to the pre-compaction reading while a post-compaction turn streams', () => {
+    const streaming = assistantMessage({
+      id: 'msg-after-compaction',
+      tokens: { input: 27_000, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    });
+
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        { info: compactionSummaryMessage() },
+        { info: streaming },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('reads the post-compaction turn once it reports, and not the pre-compaction figure', () => {
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        { info: compactionSummaryMessage() },
+        { info: postCompaction },
+      ])
+    ).toEqual({
+      contextTokens: 27_500,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('ignores a completed summary report that restates the pre-compaction history', () => {
+    const summary = compactionSummaryMessage({
+      tokens: { input: 190_000, output: 900, reasoning: 0, cache: { read: 0, write: 0 } },
+    });
+
+    expect(findLatestContextUsage([{ info: preCompaction }, { info: summary }])).toBeUndefined();
+  });
+
+  it('keeps the pre-compaction reading while the compaction is still running', () => {
+    const running = compactionSummaryMessage({ finish: undefined });
+
+    expect(findLatestContextUsage([{ info: preCompaction }, { info: running }])).toEqual({
+      contextTokens: 191_000,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('keeps the pre-compaction reading when the compaction failed', () => {
+    const failed = compactionSummaryMessage({
+      error: {
+        name: 'UnknownError',
+        data: { message: 'compaction failed' },
+      },
+    });
+
+    expect(findLatestContextUsage([{ info: preCompaction }, { info: failed }])).toEqual({
+      contextTokens: 191_000,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('treats a finished summary whose error is serialized as null as a boundary', () => {
+    // Some serializers write an absent optional as an explicit null; a
+    // finished summary with no error is still the compaction boundary.
+    const completedWithNullError = { ...compactionSummaryMessage(), error: null };
+
+    expect(
+      findLatestContextUsage([{ info: preCompaction }, { info: completedWithNullError }])
+    ).toBeUndefined();
+  });
+
+  it('reads from after the newest compaction, not an older compacted context', () => {
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        { info: compactionSummaryMessage({ id: 'msg-summary-1' }) },
+        { info: postCompaction },
+        { info: compactionSummaryMessage({ id: 'msg-summary-2' }) },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('reports the compacted context after the second compaction completes', () => {
+    const afterSecond = assistantMessage({
+      id: 'msg-after-second-compaction',
+      tokens: { input: 5_000, output: 100, reasoning: 0, cache: { read: 0, write: 0 } },
+    });
+
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        { info: compactionSummaryMessage({ id: 'msg-summary-1' }) },
+        { info: postCompaction },
+        { info: compactionSummaryMessage({ id: 'msg-summary-2' }) },
+        { info: afterSecond },
+      ])
+    ).toEqual({
+      contextTokens: 5_100,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+});
+
+describe('findLatestContextUsage across the compaction request part', () => {
+  /** The 96%-full response the session reported before `/compact`. */
+  const preCompaction = assistantMessage({
+    id: 'msg-before-compaction',
+    tokens: { input: 190_000, output: 1_000, reasoning: 0, cache: { read: 0, write: 0 } },
+  });
+  /** The first report after `/compact`: the compacted context. */
+  const postCompaction = assistantMessage({
+    id: 'msg-after-compaction',
+    tokens: { input: 27_000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } },
+  });
+  /** The part the CLI puts on the `/compact` request's user message. */
+  const compactionPart = {
+    id: 'prt-compaction',
+    sessionID: 'ses-root',
+    messageID: 'msg-compaction-user',
+    type: 'compaction',
+  };
+  /** The compaction request's user message as the transcript shows it. */
+  const compactionRequest = {
+    info: userMessage({ id: 'msg-compaction-user' }),
+    parts: [compactionPart],
+  };
+
+  it('never falls back to the pre-compaction reading once the compaction part arrived', () => {
+    // The transcript renders "Context compacted" from this part alone; the
+    // summary message's own events may still be missing when it is visible.
+    expect(findLatestContextUsage([{ info: preCompaction }, compactionRequest])).toBeUndefined();
+  });
+
+  it('reads the post-compaction turn reported after the compaction part', () => {
+    expect(
+      findLatestContextUsage([{ info: preCompaction }, compactionRequest, { info: postCompaction }])
+    ).toEqual({
+      contextTokens: 27_500,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('holds the boundary even when the summary message is still streaming', () => {
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        compactionRequest,
+        { info: compactionSummaryMessage({ finish: undefined }) },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('keeps the pre-compaction reading when the compaction part is followed by a failed summary', () => {
+    // The compaction failed, so the pre-compaction context is still in force;
+    // the request's part must not blank the still-valid reading.
+    const failed = compactionSummaryMessage({
+      error: {
+        name: 'UnknownError',
+        data: { message: 'compaction failed' },
+      },
+    });
+
+    expect(
+      findLatestContextUsage([{ info: preCompaction }, compactionRequest, { info: failed }])
+    ).toEqual({
+      contextTokens: 191_000,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('still blanks after a completed compaction that followed a failed one', () => {
+    const failed = compactionSummaryMessage({
+      id: 'msg-summary-1',
+      error: {
+        name: 'UnknownError',
+        data: { message: 'compaction failed' },
+      },
+    });
+
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        compactionRequest,
+        { info: failed },
+        { info: userMessage({ id: 'msg-second-compaction-user' }) },
+        { info: compactionSummaryMessage({ id: 'msg-summary-2' }) },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('ignores parts that are not compaction markers', () => {
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        { info: userMessage(), parts: [{ type: 'text', text: 'hello' }] },
+      ])
+    ).toEqual({
+      contextTokens: 191_000,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
   });
 });
 

@@ -1,6 +1,7 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import {
+  hasNonWhitespaceText,
   isCompactionPart,
   isFilePart,
   isPatchPart,
@@ -26,7 +27,9 @@ export function partRendersContent(part: Part): boolean {
     // blank: markdown draws no ink for it, so counting it as content adds a
     // zero-height row that eats a transcript gap and doubles the visible one.
     return (
-      !isSnapshotProgressPart(part) && part.text.trim() !== '' && !htmlSanitizesToEmpty(part.text)
+      !isSnapshotProgressPart(part) &&
+      hasNonWhitespaceText(part.text) &&
+      !htmlSanitizesToEmpty(part.text)
     );
   }
   if (isToolPart(part)) {
@@ -38,7 +41,17 @@ export function partRendersContent(part: Part): boolean {
     // property of the part, not of the stream.
     return shouldRenderReasoningPart(part, false);
   }
-  return isFilePart(part) || isCompactionPart(part) || (isPatchPart(part) && part.files.length > 0);
+  // A patch part whose `files` the wire omitted means the same as an empty one:
+  // nothing to draw. The generated type declares the array unconditionally
+  // (the live per-event schemas are `.passthrough()`), so the runtime shape is
+  // read through a declared optional. The chat processor fills the array, but a
+  // part can still reach a reader unfixed (a unit caller, a stored part from an
+  // older build), and a throw here replaces the whole app with the error
+  // boundary (Sentry KILO-APP-BZ).
+  const files = (part as { files?: readonly string[] }).files;
+  return (
+    isFilePart(part) || isCompactionPart(part) || (isPatchPart(part) && (files ?? []).length > 0)
+  );
 }
 
 /**

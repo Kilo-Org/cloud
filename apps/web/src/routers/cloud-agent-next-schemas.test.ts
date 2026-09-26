@@ -9,6 +9,7 @@ import {
   baseCreateWorktreeChatNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetSandboxStatusNextSchema,
+  baseGetSessionNextOutputSchema,
   basePrepareSessionNextSchema,
   organizationPrepareSessionNextSchema,
   personalPrepareSessionNextSchema,
@@ -42,6 +43,7 @@ const sandboxLifecycleCases = [
   { status: 'stopping', detailCode: 'sandbox_stopping' },
   { status: 'error', detailCode: 'sandbox_failed' },
   { status: 'unreachable', detailCode: 'connection_unavailable' },
+  { status: 'unreachable', detailCode: 'check_needed' },
   { status: 'unknown', detailCode: 'insufficient_evidence' },
   { status: 'unknown', detailCode: 'status_unavailable' },
 ] satisfies Pick<SandboxStatusSnapshot, 'status' | 'detailCode'>[];
@@ -220,6 +222,50 @@ describe('baseGetSandboxStatusNextSchema', () => {
     expect(baseGetSandboxStatusNextSchema.safeParse({ cloudAgentSessionId: '' }).success).toBe(
       false
     );
+  });
+});
+
+describe('baseGetSessionNextOutputSchema', () => {
+  const workspaceSessionId = `workspace_${MESSAGE_UUID}`;
+  const worktreeId = `worktree_${MESSAGE_UUID}`;
+  const baseSession = {
+    sessionId: workspaceSessionId,
+    userId: 'user_123',
+    execution: null,
+    timestamp: 1,
+    version: 1,
+  };
+
+  it('preserves worktree ownership for a grouped worktree session', () => {
+    const response = {
+      ...baseSession,
+      worktreeId,
+      parentSessionId: KILO_SESSION_ID,
+      cloudAgentSessionScopeId: workspaceSessionId,
+    };
+
+    expect(baseGetSessionNextOutputSchema.parse(response)).toEqual(response);
+  });
+
+  it('preserves explicit null ownership fields when no ownership row exists', () => {
+    const response = baseGetSessionNextOutputSchema.parse({
+      ...baseSession,
+      worktreeId,
+      parentSessionId: null,
+      cloudAgentSessionScopeId: null,
+    });
+
+    expect(response.worktreeId).toBe(worktreeId);
+    expect(response.parentSessionId).toBeNull();
+    expect(response.cloudAgentSessionScopeId).toBeNull();
+  });
+
+  it('omits ownership fields for an ordinary session', () => {
+    const response = baseGetSessionNextOutputSchema.parse(baseSession);
+
+    expect(response).not.toHaveProperty('worktreeId');
+    expect(response).not.toHaveProperty('parentSessionId');
+    expect(response).not.toHaveProperty('cloudAgentSessionScopeId');
   });
 });
 

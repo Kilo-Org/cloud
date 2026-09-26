@@ -13,6 +13,10 @@ import {
 function baseProxy(request: NextRequestWithAuth) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', request.nextUrl.pathname);
+  // The query, kept separate from the pathname: `appendCallbackPath` re-attaches
+  // it to the sign-in callback so a resume link does not lose its `?at=` anchor
+  // (and the browser does not lose any other query) across the sign-in detour.
+  requestHeaders.set('x-search', request.nextUrl.search);
 
   const response = NextResponse.next({
     request: {

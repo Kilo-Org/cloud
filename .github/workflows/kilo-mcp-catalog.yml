@@ -19,10 +19,14 @@ name: Kilo MCP catalog
 #   change-detection step gates the heavy work on the catalog's source paths so
 #   an unrelated PR still gets a fast, green check instead of "Expected".
 # - Merge job: gated to main pushes only, so PRs structurally cannot reach it
-#   (requirement 10). Re-runs the dump to fill any summaries that slipped
-#   through (requirement 8), then upserts the Vectorize index (requirement 9).
-#   Production deploys from main, so the committed bundled catalog and the
-#   upserted index stay in lockstep (requirement 22).
+#   (requirement 10). The workflow triggers on every main push — the merge job
+#   is required on main and must always report — and its own change-detection
+#   step diff against `github.event.before` gates the dump and the Vectorize
+#   upsert, so an unrelated main push still gets a fast, green check. Re-runs
+#   the dump to fill any summaries that slipped through (requirement 8), then
+#   upserts the Vectorize index (requirement 9). Production deploys from main,
+#   so the committed bundled catalog and the upserted index stay in lockstep
+#   (requirement 22).
 #
 # The dump's `kilo run` never uses a maintainer's personal credential: both jobs
 # mint a short-lived benchmarking-service-account token from apps/web
@@ -35,13 +39,12 @@ name: Kilo MCP catalog
 on:
   # No paths filter: `catalog (PR)` is a required status check, and a
   # path-filtered workflow leaves that check "Expected" (blocking) on every PR
-  # it skips. The job gates its own work instead.
+  # it skips. The job gates its own work instead. Same for push: the merge job
+  # is required on main, so every main push triggers the workflow and the job
+  # gates its own work against the pushed diff.
   pull_request:
   push:
     branches: [main]
-    paths:
-      - 'apps/web/src/**'
-      - 'services/kilo-mcp/**'
 
 # New commits to the same PR supersede in-progress runs; a main push must not
 # be cancelled mid-Vectorize-upsert.
@@ -71,8 +74,8 @@ jobs:
           fetch-depth: 0
 
       # The job always reports (required check); only the catalog's own paths
-      # justify the expensive dump. Keep the patterns in sync with the `push`
-      # filter and with scripts/kilo-mcp-catalog.test.mjs.
+      # justify the expensive dump. Keep the patterns in sync with the merge
+      # job's detection step and with scripts/kilo-mcp-catalog.test.mjs.
       - name: Detect catalog-relevant changes
         id: catalog_changes
         run: |
@@ -304,12 +307,41 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Full history so the change-detection step can diff the pushed commit
+      # against `github.event.before`.
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      # The job always reports (required on main); only the catalog's own paths
+      # justify the expensive dump and the Vectorize upsert. Keep the patterns
+      # in sync with scripts/kilo-mcp-catalog.test.mjs.
+      - name: Detect catalog-relevant changes
+        id: merge_changes
+        run: |
+          set -euo pipefail
+          # If the pushed commit's parent is unavailable (first push, forced
+          # push, unknown `before`), run the catalog work rather than skip it: a
+          # false "no changes" would break the required check's promise, while a
+          # redundant dump is harmless.
+          before="${{ github.event.before }}"
+          if ! git rev-parse --verify "${before}^{commit}" > /dev/null 2>&1; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$before" HEAD \
+            | grep -Eq '^apps/web/src/|^services/kilo-mcp/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "catalog=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup pnpm
+        if: steps.merge_changes.outputs.catalog == 'true'
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Setup Node
+        if: steps.merge_changes.outputs.catalog == 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
@@ -317,12 +349,15 @@ jobs:
 
       # The dump shells out to `kilo run` to fill any straggler summaries.
       - name: Install Kilo CLI
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: npm install -g @kilocode/cli
 
       - name: Install web dependencies
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: pnpm install --frozen-lockfile --filter web...
 
       - name: Setup dummy env
+        if: steps.merge_changes.outputs.catalog == 'true'
         working-directory: apps/web
         run: cp .env.test .env
 
@@ -330,6 +365,7 @@ jobs:
       # deploy that adds the mint endpoint; the dump only needs the credential
       # when summaries are missing, so a failed mint is tolerated here too.
       - name: Mint catalog token
+        if: steps.merge_changes.outputs.catalog == 'true'
         id: mint
         continue-on-error: true
         env:
@@ -363,6 +399,7 @@ jobs:
       # Fill any summaries that slipped through before the index is updated
       # (requirement 8); keep-edit semantics leave author edits alone.
       - name: Regenerate catalog.json
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # The bundled catalog a production deploy serves must match the index this
@@ -370,6 +407,7 @@ jobs:
       # (the PR job never landed the refresh): fail instead of indexing content
       # the Worker bundle does not carry (requirement 22).
       - name: Fail if the regenerated catalog is not the committed one
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: |
           if ! git diff --exit-code -- services/kilo-mcp/catalog.json > /dev/null; then
             echo "::error::The dump changed services/kilo-mcp/catalog.json on main. Commit the regenerated catalog before the Vectorize upsert; otherwise the deployed Worker bundle and the index diverge."
@@ -380,6 +418,7 @@ jobs:
       # the production bindings in services/kilo-mcp/wrangler.jsonc; the
       # account id is not a secret (it is committed there).
       - name: Upsert Vectorize index
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

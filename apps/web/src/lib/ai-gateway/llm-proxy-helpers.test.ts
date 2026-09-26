@@ -3,15 +3,6 @@ import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUs
 import type { GatewayRequest } from './providers/openrouter/types';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from './latest-model-aliases';
 
-let mockInceptionPromoRunning = true;
-
-jest.mock('@/lib/constants', () => ({
-  ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
-  get INCEPTION_PROMO_RUNNING() {
-    return mockInceptionPromoRunning;
-  },
-}));
-
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
 // it with an immediate invocation so the test can await the work synchronously.
@@ -491,25 +482,11 @@ describe('countAndStoreFimUsage', () => {
   }
 
   beforeEach(() => {
-    mockInceptionPromoRunning = true;
     mockedLogMicrodollarUsage.mockClear();
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
 
-  it('preserves market cost but does not bill the promoted Inception model', async () => {
-    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(), undefined);
-
-    await new Promise(resolve => setImmediate(resolve));
-
-    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
-    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(0);
-    expect(stats.cacheDiscount_mUsd).toBe(0);
-    expect(stats.market_cost).toBe(325);
-  });
-
-  it('bills the Inception model when the promotion is disabled', async () => {
-    mockInceptionPromoRunning = false;
+  it('bills the Inception model', async () => {
     countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
@@ -519,7 +496,7 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(325);
   });
 
-  it('does not apply the promotion to other FIM models', async () => {
+  it('bills other FIM models', async () => {
     countAndStoreFimUsage(
       makeUpstreamResponse(),
       makeUsageContext({
@@ -536,8 +513,7 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(390);
   });
 
-  it('does not bill BYOK requests when the promotion is disabled', async () => {
-    mockInceptionPromoRunning = false;
+  it('does not bill BYOK requests', async () => {
     countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext({ user_byok: true }), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
@@ -593,7 +569,6 @@ describe('countAndStoreEditUsage', () => {
   }
 
   beforeEach(() => {
-    mockInceptionPromoRunning = true;
     mockedLogMicrodollarUsage.mockClear();
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
@@ -624,32 +599,7 @@ describe('countAndStoreEditUsage', () => {
     expect(stats.market_cost).toBe(4_750);
   });
 
-  it('preserves market cost but does not bill non-BYOK requests during the promotion', async () => {
-    const response = makeUpstreamResponse({
-      id: 'edit-paid',
-      model: 'mercury-edit-2',
-      usage: {
-        prompt_tokens: 100_000,
-        cached_input_tokens: 90_000,
-        completion_tokens: 0,
-        total_tokens: 100_000,
-      },
-      choices: [],
-    });
-
-    countAndStoreEditUsage(response, makeUsageContext({ user_byok: false }), undefined);
-
-    await new Promise(resolve => setImmediate(resolve));
-
-    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
-    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(0);
-    expect(stats.cacheDiscount_mUsd).toBe(0);
-    expect(stats.market_cost).toBe(4_750);
-  });
-
-  it('bills non-BYOK requests when the promotion is disabled', async () => {
-    mockInceptionPromoRunning = false;
+  it('bills non-BYOK requests', async () => {
     const response = makeUpstreamResponse({
       id: 'edit-paid',
       model: 'mercury-edit-2',
@@ -931,6 +881,42 @@ describe('makeErrorReadable', () => {
     expect((await result.json()).error_type).toBe('byok_error');
   });
 
+  it('names the model in a generic BYOK permission error', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response: Response.json({}, { status: 403 }),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+    });
+  });
+
+  it('mentions OpenCode Go opt-in requirements on a BYOK permission error', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json({ model: 'mimo-v2.5' }, { status: 403 }),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
+    });
+  });
+
   it('does not use generic BYOK errors for a null provider set', async () => {
     await expect(
       makeErrorReadable({
@@ -1068,29 +1054,6 @@ describe('makeErrorReadable', () => {
     });
 
     expect(result).toBeUndefined();
-  });
-
-  it('redacts errors for experiment provider', async () => {
-    const response = Response.json(
-      { error: { message: 'Internal experiment failure' } },
-      { status: 500 }
-    );
-
-    const result = await makeErrorReadable({
-      providerId: 'experiment',
-      requestedModel: 'experiment/test-model',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
-
-    expect(result).toBeDefined();
-    expect(result?.status).toBe(500);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'The upstream provider was unable to process the request',
-      error_type: 'upstream_error',
-      message: 'The upstream provider was unable to process the request',
-    });
   });
 
   it('redacts errors for stealth models', async () => {

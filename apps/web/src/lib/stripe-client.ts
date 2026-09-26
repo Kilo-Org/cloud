@@ -10,7 +10,9 @@ if (!stripeSecretKey) {
 const skipStripeApi =
   process.env.NODE_ENV !== 'production' && process.env.SKIP_STRIPE_API === 'true';
 
-export const client: Stripe = new Stripe(stripeSecretKey);
+export const client: Stripe = new Stripe(stripeSecretKey, {
+  apiVersion: '2025-10-29.clover',
+});
 
 type ConstrainedMetadata = UserConstrainedMetadata | OrganizationConstrainedMetdata;
 
@@ -48,11 +50,23 @@ export async function deleteStripeCustomer(stripeCustomerId: string) {
   await client.customers.del(stripeCustomerId);
 }
 
+/**
+ * Stripe answers `No such customer` (code `resource_missing`) when the id we
+ * stored does not exist in the account the secret key belongs to — the customer
+ * was deleted in Stripe, or the row points at another Stripe account (a local
+ * database against a different key). Callers treat that as an absent customer
+ * rather than a failure: a missing customer owns no payment methods and needs
+ * no removal.
+ */
+function isMissingStripeCustomerError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('No such customer');
+}
+
 export async function safeDeleteStripeCustomer(stripeCustomerId: string) {
   try {
     await deleteStripeCustomer(stripeCustomerId);
   } catch (error) {
-    if (error instanceof Error && error.message.includes('No such customer')) {
+    if (isMissingStripeCustomerError(error)) {
       const message = `Stripe customer ${stripeCustomerId} not found, continuing with GDPR removal`;
       console.log(message);
       captureMessage(message, {
@@ -73,9 +87,24 @@ export async function hasPaymentMethodInStripe({
   if (skipStripeApi) return false;
 
   // This function may become redundant if our in-db administration is accurate.
-  const paymentMethods = await client.paymentMethods.list({
-    customer: stripeCustomerId,
-    type: 'card',
-  });
-  return paymentMethods.data.length > 0;
+  try {
+    const paymentMethods = await client.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: 'card',
+    });
+    return paymentMethods.data.length > 0;
+  } catch (error) {
+    if (!isMissingStripeCustomerError(error)) throw error;
+    // The profile page reads this on every render. A stored id Stripe no
+    // longer knows must degrade to "no payment method on file" — rethrowing
+    // turned the whole profile into the error boundary's "Something went
+    // wrong" page for that user.
+    const message = `Stripe customer ${stripeCustomerId} not found, treating as no payment method`;
+    console.log(message);
+    captureMessage(message, {
+      level: 'info',
+      tags: { source: 'stripe-payment-method-lookup' },
+    });
+    return false;
+  }
 }

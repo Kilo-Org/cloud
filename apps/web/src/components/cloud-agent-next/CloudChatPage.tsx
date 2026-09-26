@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { useManager } from './CloudAgentProvider';
+import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
@@ -31,6 +39,7 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
+import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -53,8 +62,12 @@ import {
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import { WorktreeChangesDrawer } from './WorktreeChanges';
+import { WorktreeChangesView } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';
+import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
+import { WorktreeReviewDialog } from './WorktreeReviewDialog';
+import { useWorktreeReview } from './useWorktreeReview';
+import type { WorktreeReviewComment } from './worktree-review';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { canOpenWorktreeChanges } from './worktree-changes';
 import {
@@ -96,6 +109,42 @@ import type { TerminalStatus } from './useCloudAgentTerminal';
 // CloudChatPage
 // ---------------------------------------------------------------------------
 const emptyQuestionRequestIds = new Map<string, string>();
+
+/** Older pages the resume fetches while looking for a not-yet-loaded anchor. */
+const MAX_RESUME_OLDER_PAGES = 8;
+
+type ResumeState = {
+  key: string;
+  attempts: number;
+  done: boolean;
+};
+
+/** The rendered element carrying `messageId`, when it is in the DOM. */
+function findMessageElement(container: HTMLElement, messageId: string): HTMLElement | null {
+  for (const element of container.querySelectorAll<HTMLElement>('[data-message-id]')) {
+    if (element.dataset.messageId === messageId) return element;
+  }
+  return null;
+}
+
+/**
+ * The scroll target for a resolved anchor: the first of the anchor's candidate
+ * ids that is in the DOM. A group can render no element at all — an
+ * all-invisible assistant turn draws nothing — and such a group is invisible by
+ * design, so the anchor falls to the nearest rendered group after it instead of
+ * looking like an unloaded message. Every probed group is already in the loaded
+ * window, so a hit never needs an older page.
+ */
+function findAnchorElement(
+  container: HTMLElement,
+  selectorIds: readonly string[]
+): HTMLElement | null {
+  for (const selectorId of selectorIds) {
+    const element = findMessageElement(container, selectorId);
+    if (element) return element;
+  }
+  return null;
+}
 
 type CloudChatPageProps = {
   currentUserId?: string;
@@ -145,6 +194,7 @@ export default function CloudChatPage({
   organizationRole,
 }: CloudChatPageProps) {
   const manager = useManager();
+  const reviewApi = useCloudAgent();
   const { createWorktreeChat, creatingWorktreeSourceSessionId } = useWorktreeChatCreation();
   const {
     selectedWorktreeId,
@@ -173,25 +223,31 @@ export default function CloudChatPage({
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
   const [preparationDrawerAttemptId, setPreparationDrawerAttemptId] = useState<string | null>(null);
   const preparationDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
-  const [changesDrawerSessionId, setChangesDrawerSessionId] = useState<string | null>(null);
-  const changesDrawerFocusTargetRef = useRef<HTMLElement | 'workspace-tab' | null>(null);
+  const [changesViewSessionId, setChangesViewSessionId] = useState<string | null>(null);
+  const changesViewFocusTargetRef = useRef<HTMLElement | null>(null);
+  const changesViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
   const activeWorkspaceTabRef = useRef<HTMLButtonElement | null>(null);
+  const closeChangesView = useCallback(() => {
+    changesViewOpenedTabRef.current = null;
+    changesViewFocusTargetRef.current = null;
+    setChangesViewSessionId(null);
+  }, []);
 
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
+  const anchorMessageIdFromParams = searchParams?.get('at') ?? null;
   useEffect(() => {
     childSessionDrawerFocusTargetRef.current = null;
     setChildSessionStack([]);
     preparationDrawerFocusTargetRef.current = null;
     setPreparationDrawerAttemptId(null);
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
+    closeChangesView();
     if (sessionIdFromParams) {
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
     } else {
       manager.destroy();
     }
-  }, [sessionIdFromParams, manager]);
+  }, [sessionIdFromParams, manager, closeChangesView]);
 
   // -- Manager atoms --------------------------------------------------------
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
@@ -206,6 +262,7 @@ export default function CloudChatPage({
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  const commits = useAtomValue(manager.atoms.commits);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
@@ -272,10 +329,15 @@ export default function CloudChatPage({
     isCurrentSession &&
     canOpenWorktreeChanges(sessionId, isReadOnly) &&
     fetchedSessionData?.organizationId === (organizationId ?? null);
-  const changesDrawerOpen = canOpenChanges && changesDrawerSessionId === sessionId;
+  const changesViewOpen = canOpenChanges && changesViewSessionId === sessionId;
   const fileScope = JSON.stringify([currentUserId, organizationId, sessionIdFromParams, sessionId]);
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
+  const commitsAfterMessage = useMemo(
+    () =>
+      commitsByMessageAnchor([...staticMessages, ...dynamicMessages], filesVisible ? commits : []),
+    [commits, dynamicMessages, filesVisible, staticMessages]
+  );
   const activeWorkspaceTabId =
     !filesVisible && workspaceTabs.activeTabId.startsWith('file:')
       ? CHAT_TAB_ID
@@ -317,9 +379,24 @@ export default function CloudChatPage({
   }, [sessionIdFromParams]);
 
   useEffect(() => {
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
-  }, [sessionId, currentUserId, organizationId, canOpenChanges]);
+    closeChangesView();
+  }, [sessionId, currentUserId, organizationId, canOpenChanges, closeChangesView]);
+
+  useEffect(() => {
+    const openedTab = changesViewOpenedTabRef.current;
+    if (!changesViewOpen || openedTab === null || activeWorkspaceTabId === openedTab) return;
+    closeChangesView();
+  }, [activeWorkspaceTabId, changesViewOpen, closeChangesView]);
+
+  const previousChangesViewOpenRef = useRef(false);
+  useEffect(() => {
+    const wasOpen = previousChangesViewOpenRef.current;
+    previousChangesViewOpenRef.current = changesViewOpen;
+    if (!wasOpen || changesViewOpen) return;
+    const target = changesViewFocusTargetRef.current;
+    changesViewFocusTargetRef.current = null;
+    if (target?.isConnected) target.focus({ preventScroll: true });
+  }, [changesViewOpen]);
 
   // -- Session models -------------------------------------------------------
   const sessionModels = useSessionModels({
@@ -381,11 +458,17 @@ export default function CloudChatPage({
   const isAutoScrollingRef = useRef(false);
   const autoScrollRunRef = useRef(0);
   const lastScrollTopRef = useRef(0);
+  // Mirrors `chatUI.shouldAutoScroll` so a scroll already scheduled (rAF or
+  // timeout) re-checks the latest intent when it runs, not the value captured
+  // when it was scheduled. The resume sets this false synchronously, before the
+  // atom update lands, so an in-flight auto-scroll cannot override the anchor.
+  const shouldAutoScrollRef = useRef(true);
   const wasNearBottomRef = useRef(true);
   const olderArrivalInitializedRef = useRef(false);
   const olderArrivalCountRef = useRef(0);
   const olderArrivalNewestKeyRef = useRef<string | null>(null);
   const [olderArrivalAnnouncement, setOlderArrivalAnnouncement] = useState('');
+  const resumeStateRef = useRef<ResumeState | null>(null);
 
   const loadOlderMessages = useCallback(() => manager.loadOlderMessages(), [manager]);
   const { requestOlderMessages, tryLoadOlderFromScroll } = useOlderMessagesPagination({
@@ -418,6 +501,7 @@ export default function CloudChatPage({
   const scrollToBottomNow = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el || el.hidden) return;
+    if (!shouldAutoScrollRef.current) return;
 
     const scrollRun = autoScrollRunRef.current + 1;
     autoScrollRunRef.current = scrollRun;
@@ -434,23 +518,34 @@ export default function CloudChatPage({
   }, []);
 
   const scheduleScrollToBottom = useCallback(() => {
+    if (!shouldAutoScrollRef.current) return;
+
     cancelScheduledAutoScroll();
 
     autoScrollFrameRef.current = requestAnimationFrame(() => {
       autoScrollFrameRef.current = 0;
+      if (!shouldAutoScrollRef.current) return;
       scrollToBottomNow();
       followUpAutoScrollFrameRef.current = requestAnimationFrame(() => {
         followUpAutoScrollFrameRef.current = 0;
-        scrollToBottomNow();
+        if (shouldAutoScrollRef.current) scrollToBottomNow();
       });
       delayedAutoScrollRef.current = setTimeout(() => {
         delayedAutoScrollRef.current = null;
-        scrollToBottomNow();
+        if (shouldAutoScrollRef.current) scrollToBottomNow();
       }, 100);
     });
   }, [cancelScheduledAutoScroll, scrollToBottomNow]);
 
   useEffect(() => cancelScheduledAutoScroll, [cancelScheduledAutoScroll]);
+
+  useEffect(() => {
+    // An in-progress resume has already paused auto-scroll and owns the
+    // position; do not let an atom write (e.g. a session reset) re-enable it.
+    const resumeState = resumeStateRef.current;
+    if (resumeState && !resumeState.done) return;
+    shouldAutoScrollRef.current = chatUI.shouldAutoScroll;
+  }, [chatUI.shouldAutoScroll]);
 
   useEffect(() => {
     if (!chatTabActive) cancelScheduledAutoScroll();
@@ -484,7 +579,13 @@ export default function CloudChatPage({
   useEffect(() => {
     if (!sessionIdFromParams) return;
 
-    setChatUI({ shouldAutoScroll: true });
+    // A `?at=` link's resume owns the opening position. Leave auto-scroll paused
+    // for it instead of snapping to the bottom, which would override the anchor.
+    const resuming = Boolean(anchorMessageIdFromParams);
+    if (!resuming) {
+      shouldAutoScrollRef.current = true;
+      setChatUI({ shouldAutoScroll: true });
+    }
     lastScrollTopRef.current = 0;
     wasNearBottomRef.current = true;
     olderArrivalInitializedRef.current = false;
@@ -492,8 +593,8 @@ export default function CloudChatPage({
     olderArrivalNewestKeyRef.current = null;
     setOlderArrivalAnnouncement('');
     setShowScrollButton(false);
-    scheduleScrollToBottom();
-  }, [sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
+    if (!resuming) scheduleScrollToBottom();
+  }, [anchorMessageIdFromParams, sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
 
   useEffect(() => {
     const newest = dynamicMessages.at(-1)?.info.id ?? staticMessages.at(-1)?.info.id ?? null;
@@ -525,12 +626,21 @@ export default function CloudChatPage({
       return;
     }
 
+    // A real user scroll takes over from a resume that is still looking for its
+    // anchor, so the transcript stops moving under the user.
+    const resumeState = resumeStateRef.current;
+    if (resumeState && !resumeState.done) {
+      resumeState.done = true;
+    }
+
     const scrolledUp = el.scrollTop < lastScrollTopRef.current;
     lastScrollTopRef.current = el.scrollTop;
 
     if (scrolledUp) {
+      shouldAutoScrollRef.current = false;
       setChatUI({ shouldAutoScroll: false });
     } else if (distanceFromBottom < OLDER_MESSAGES_NEAR_BOTTOM_PX) {
+      shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });
     }
 
@@ -544,6 +654,7 @@ export default function CloudChatPage({
   }, [manager, setChatUI, tryLoadOlderFromScroll]);
 
   const scrollToBottom = useCallback(() => {
+    shouldAutoScrollRef.current = true;
     setChatUI({ shouldAutoScroll: true });
     scheduleScrollToBottom();
   }, [scheduleScrollToBottom, setChatUI]);
@@ -568,7 +679,12 @@ export default function CloudChatPage({
 
   const handleSendMessage = useCallback(
     async (prompt: string, attachments?: CloudAgentAttachments) => {
-      setChatUI({ shouldAutoScroll: true });
+      // Sending takes the position over only once the send is accepted: end a
+      // resume that is still looking for its anchor, or its effect re-pauses
+      // follow and cancels this scroll when the message lands. A rejected send
+      // produces no output, so the resume keeps the position instead of being
+      // abandoned at the bottom.
+      const resumeStateAtSend = resumeStateRef.current;
       const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
         a => a.slug === sessionConfig?.mode
       );
@@ -592,30 +708,64 @@ export default function CloudChatPage({
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
+      // Pins the tail when the list already follows. While a resume has the
+      // follow off this is a no-op, so a refused send never moves the reader
+      // off the anchor.
       scheduleScrollToBottom();
 
       const accepted = await acceptedPromise;
-      if (accepted) {
-        scheduleScrollToBottom();
+      if (!accepted) {
+        return false;
       }
-      return accepted;
+      // Take the position over for the output this send produces — but only
+      // from the attempt that was live at send time. A `?at=` link that arrived
+      // while the send was in flight owns the position now: its layout effect
+      // already landed its anchor and marked that attempt done, so re-arming
+      // follow here would move the viewport to the bottom and abandon it.
+      if (!sendTakesOverResume(resumeStateAtSend, resumeStateRef.current)) {
+        return true;
+      }
+      if (resumeStateAtSend) {
+        resumeStateAtSend.done = true;
+      }
+      shouldAutoScrollRef.current = true;
+      setChatUI({ shouldAutoScroll: true });
+      scheduleScrollToBottom();
+      return true;
     },
     [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
   );
 
   const handleSendSlashCommand = useCallback(
     async (command: string, args: string, attachments?: CloudAgentAttachments) => {
-      setChatUI({ shouldAutoScroll: true });
+      // A command send takes the position over exactly as a message send does,
+      // and only once it is accepted: end a resume still looking for its anchor,
+      // or the effect re-pauses follow and cancels the scroll for this
+      // command's output. A refused command leaves the resume in place.
+      const resumeStateAtSend = resumeStateRef.current;
       const acceptedPromise = manager.send({
         payload: { type: 'command', command, arguments: args },
         attachments: supportsAttachments ? attachments : undefined,
       });
+      // Pins the tail when the list already follows; a no-op under a resume.
       scheduleScrollToBottom();
       const accepted = await acceptedPromise;
-      if (accepted) {
-        scheduleScrollToBottom();
+      if (!accepted) {
+        return false;
       }
-      return accepted;
+      // As with a message send: the command takes the position over only from
+      // the resume that was live when it was sent. A newer `?at=` link owns the
+      // position and must not be abandoned at the bottom.
+      if (!sendTakesOverResume(resumeStateAtSend, resumeStateRef.current)) {
+        return true;
+      }
+      if (resumeStateAtSend) {
+        resumeStateAtSend.done = true;
+      }
+      shouldAutoScrollRef.current = true;
+      setChatUI({ shouldAutoScroll: true });
+      scheduleScrollToBottom();
+      return true;
     },
     [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
   );
@@ -664,15 +814,106 @@ export default function CloudChatPage({
     }
   };
 
-  const handleSelectWorktreeFile = useCallback(
-    (path: string) => {
-      if (!canOpenChanges) return;
-      changesDrawerFocusTargetRef.current = 'workspace-tab';
-      setWorkspaceTabs(state => openFileTab(state, path));
-      setChangesDrawerSessionId(null);
+  const handleReviewAccepted = useCallback(
+    (destinationKiloSessionId: string) => {
+      closeChangesView();
+      setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+      openSession(destinationKiloSessionId);
     },
-    [canOpenChanges]
+    [closeChangesView, openSession]
   );
+  const review = useWorktreeReview({
+    userId: currentUserId,
+    organizationId,
+    worktreeId: selectedWorktreeId,
+    activeKiloSessionId: sessionIdFromParams,
+    activeSessionConfig:
+      isCurrentSession &&
+      activeSessionType === 'cloud-agent' &&
+      sessionConfig?.sessionId === sessionId
+        ? sessionConfig
+        : null,
+    enabled: Boolean(
+      currentUserId &&
+      selectedWorktreeId &&
+      (!sessionIdFromParams ||
+        (canOpenChanges &&
+          activeSessionType === 'cloud-agent' &&
+          fetchedSessionData?.worktreeId === selectedWorktreeId &&
+          !deletingSessionIds.includes(sessionIdFromParams)))
+    ),
+    worktreeChats,
+    deletingSessionIds,
+    api: reviewApi,
+    onAccepted: handleReviewAccepted,
+  });
+  const reviewCommentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!sessionId) return counts;
+    for (const comment of review.draft?.comments ?? []) {
+      if (comment.anchor.capture.sourceCloudAgentSessionId !== sessionId) continue;
+      counts.set(comment.anchor.path, (counts.get(comment.anchor.path) ?? 0) + 1);
+    }
+    return counts;
+  }, [review.draft?.comments, sessionId]);
+  const reviewAgainFile = useRef<{
+    userId: string;
+    organizationId?: string;
+    workspaceScope: string;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+    path: string;
+  } | null>(null);
+  const handleOpenReviewComment = (comment: WorktreeReviewComment) => {
+    if (!review.scope || review.locked) return;
+    const source = review.destinations.find(
+      destination =>
+        destination.cloudAgentSessionId === comment.anchor.capture.sourceCloudAgentSessionId
+    );
+    if (!source) return;
+    review.setOpen(false);
+    if (source.sessionId === sessionIdFromParams && canOpenChanges) {
+      closeChangesView();
+      setWorkspaceTabs(state =>
+        setFileTabMode(openFileTab(state, comment.anchor.path), comment.anchor.path, 'diff')
+      );
+    } else {
+      reviewAgainFile.current = {
+        ...review.scope,
+        kiloSessionId: source.sessionId,
+        cloudAgentSessionId: source.cloudAgentSessionId,
+        path: comment.anchor.path,
+      };
+      openSession(source.sessionId);
+    }
+  };
+  useEffect(() => {
+    const file = reviewAgainFile.current;
+    if (!file) return;
+    if (
+      file.userId !== currentUserId ||
+      file.organizationId !== organizationId ||
+      file.workspaceScope !== workspaceTabScope
+    ) {
+      reviewAgainFile.current = null;
+      return;
+    }
+    if (
+      !canOpenChanges ||
+      sessionIdFromParams !== file.kiloSessionId ||
+      sessionId !== file.cloudAgentSessionId
+    )
+      return;
+    reviewAgainFile.current = null;
+    setWorkspaceTabs(state => setFileTabMode(openFileTab(state, file.path), file.path, 'diff'));
+  }, [
+    canOpenChanges,
+    currentUserId,
+    organizationId,
+    sessionId,
+    sessionIdFromParams,
+    workspaceTabScope,
+  ]);
 
   const handleCloseFileTab = useCallback((path: string) => {
     setWorkspaceTabs(state => closeFileTab(state, path));
@@ -754,16 +995,18 @@ export default function CloudChatPage({
     [manager]
   );
 
-  const handleOpenTopLevelChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
-    const activeElement = document.activeElement;
-    childSessionDrawerFocusTargetRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    preparationDrawerFocusTargetRef.current = null;
-    setPreparationDrawerAttemptId(null);
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
-    setChildSessionStack([entry]);
-  }, []);
+  const handleOpenTopLevelChildSession = useCallback(
+    (entry: ChildSessionDrawerEntry) => {
+      const activeElement = document.activeElement;
+      childSessionDrawerFocusTargetRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      closeChangesView();
+      setChildSessionStack([entry]);
+    },
+    [closeChangesView]
+  );
 
   const handleOpenNestedChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
     setChildSessionStack(currentStack => [...currentStack, entry]);
@@ -785,16 +1028,18 @@ export default function CloudChatPage({
     focusTarget.focus();
   }, []);
 
-  const handleOpenPreparationDetails = useCallback((attemptId: string) => {
-    const activeElement = document.activeElement;
-    preparationDrawerFocusTargetRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    childSessionDrawerFocusTargetRef.current = null;
-    setChildSessionStack([]);
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
-    setPreparationDrawerAttemptId(attemptId);
-  }, []);
+  const handleOpenPreparationDetails = useCallback(
+    (attemptId: string) => {
+      const activeElement = document.activeElement;
+      preparationDrawerFocusTargetRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      closeChangesView();
+      setPreparationDrawerAttemptId(attemptId);
+    },
+    [closeChangesView]
+  );
 
   const handlePreparationDrawerOpenChange = useCallback((open: boolean) => {
     if (!open) setPreparationDrawerAttemptId(null);
@@ -810,28 +1055,21 @@ export default function CloudChatPage({
 
   const handleToggleChanges = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      changesDrawerFocusTargetRef.current = event.currentTarget;
+      changesViewFocusTargetRef.current = event.currentTarget;
       childSessionDrawerFocusTargetRef.current = null;
       setChildSessionStack([]);
       preparationDrawerFocusTargetRef.current = null;
       setPreparationDrawerAttemptId(null);
-      setChangesDrawerSessionId(current => (current === sessionId ? null : sessionId));
+      if (changesViewOpen) {
+        changesViewOpenedTabRef.current = null;
+        setChangesViewSessionId(null);
+      } else {
+        changesViewOpenedTabRef.current = activeWorkspaceTabId;
+        setChangesViewSessionId(sessionId);
+      }
     },
-    [sessionId]
+    [activeWorkspaceTabId, changesViewOpen, sessionId]
   );
-
-  const handleChangesDrawerOpenChange = useCallback((open: boolean) => {
-    if (!open) setChangesDrawerSessionId(null);
-  }, []);
-
-  const handleChangesDrawerCloseAutoFocus = useCallback((event: Event) => {
-    const target = changesDrawerFocusTargetRef.current;
-    const focusTarget = target === 'workspace-tab' ? activeWorkspaceTabRef.current : target;
-    changesDrawerFocusTargetRef.current = null;
-    if (!focusTarget?.isConnected) return;
-    event.preventDefault();
-    focusTarget.focus();
-  }, []);
 
   // Surface the session's custom agents plus the current visible profile
   // agents to the chat picker. `runtimeAgents` are the agents active when the
@@ -1005,11 +1243,117 @@ export default function CloudChatPage({
     }
     return byMessageId;
   }, [preparationAttempts]);
+
+  // -- Resume position (`?at=`) ---------------------------------------------
+  // One shot per (session, anchor): land the anchor message at the top of the
+  // transcript, loading older pages while it still sits before the loaded
+  // window. A real user scroll or a send ends the attempt, and so does an
+  // anchor the run cannot reach: an id absent from the loaded window after 8
+  // pages, no older history to search, a failed older page, or a group that
+  // renders no element. Each ends it by opening exactly as an anchor-less link
+  // does: at the bottom, following new output. The transcript container starts
+  // at `scrollTop = 0`, so leaving the paused resume behind would strand the
+  // reader on the oldest loaded message with follow off.
+  useLayoutEffect(() => {
+    if (!chatTabActive || !sessionIdFromParams || !anchorMessageIdFromParams) return;
+    if (isLoading) return;
+
+    const key = `${sessionIdFromParams}\u0000${anchorMessageIdFromParams}`;
+    const previous = resumeStateRef.current;
+    const state: ResumeState =
+      previous && previous.key === key ? previous : { key, attempts: 0, done: false };
+    resumeStateRef.current = state;
+    if (state.done) return;
+
+    // The resume owns the scroll for this view: pause auto-scroll now, and
+    // cancel anything already scheduled, so neither an in-flight frame nor the
+    // auto-scroll effect can snap the transcript to the bottom while older
+    // pages load toward the anchor.
+    shouldAutoScrollRef.current = false;
+    setChatUI({ shouldAutoScroll: false });
+    cancelScheduledAutoScroll();
+
+    // The snapshot for this session has not painted yet; wait for its commit.
+    if (staticMessages.length === 0 && dynamicMessages.length === 0 && !hasOlderMessages) return;
+
+    // Group exactly as the transcript renders (same preparation rows and commit
+    // anchors), or the anchor resolves against boundaries the renderer does not
+    // have and lands on an earlier rendered group.
+    const anchor = resumeAnchorForTranscript(
+      [...staticMessages, ...dynamicMessages],
+      preparationByMessageId,
+      commitsAfterMessage,
+      anchorMessageIdFromParams
+    );
+    const container = scrollContainerRef.current;
+    const element = anchor && container ? findAnchorElement(container, anchor.selectorIds) : null;
+
+    const step = planResumeAttempt({
+      anchorRendered: element !== null && container !== null,
+      anchorResolved: anchor !== null,
+      attempts: state.attempts,
+      maxOlderPages: MAX_RESUME_OLDER_PAGES,
+      hasOlderMessages,
+      isLoadingOlderMessages,
+      hasOlderMessagesError: olderMessagesError !== null,
+    });
+
+    if (step === 'scroll' && element && container) {
+      state.done = true;
+      isAutoScrollingRef.current = true;
+      container.scrollTop = element.offsetTop;
+      lastScrollTopRef.current = container.scrollTop;
+      const scrollRun = autoScrollRunRef.current + 1;
+      autoScrollRunRef.current = scrollRun;
+      requestAnimationFrame(() => {
+        if (autoScrollRunRef.current === scrollRun) {
+          isAutoScrollingRef.current = false;
+        }
+      });
+      return;
+    }
+
+    if (step === 'follow-tail') {
+      // The anchor cannot be reached — a deleted or trimmed message, an id past
+      // the page bound, an older page that failed to load, or a group that
+      // renders no element — so no later attempt can reach it. Give up the way
+      // an anchor-less link opens: follow the tail again, so the reader lands
+      // at the bottom instead of staying paused on the oldest loaded message
+      // with follow off (the mobile `?at=` contract).
+      shouldAutoScrollRef.current = true;
+      setChatUI({ shouldAutoScroll: true });
+      scheduleScrollToBottom();
+      state.done = true;
+      return;
+    }
+
+    if (step === 'load-older') {
+      state.attempts += 1;
+      requestOlderMessages();
+    }
+  }, [
+    anchorMessageIdFromParams,
+    cancelScheduledAutoScroll,
+    chatTabActive,
+    commitsAfterMessage,
+    dynamicMessages,
+    hasOlderMessages,
+    isLoading,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    preparationByMessageId,
+    requestOlderMessages,
+    scheduleScrollToBottom,
+    sessionIdFromParams,
+    setChatUI,
+    staticMessages,
+  ]);
   // A running preparation row already shows live progress inline, so the
   // trailing progress row would repeat the same message beneath it.
   const visibleStatusIndicator =
-    statusIndicator?.type === 'progress' &&
-    preparationAttempts.some(attempt => attempt.status === 'running')
+    (statusIndicator?.type === 'progress' &&
+      preparationAttempts.some(attempt => attempt.status === 'running')) ||
+    isCommitSummaryRepresented(statusIndicator, commitsAfterMessage)
       ? null
       : statusIndicator;
   const currentChatProgress =
@@ -1046,9 +1390,10 @@ export default function CloudChatPage({
       sessionInfoTriggerRef={sessionInfoTriggerRef}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
-      changesOpen={changesDrawerOpen}
+      changesOpen={changesViewOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
       sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
+      canForkToCloud={!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId)}
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
         sessionId,
@@ -1146,9 +1491,12 @@ export default function CloudChatPage({
                         onSelectTab={handleSelectWorkspaceTab}
                         onCreateTerminal={handleCreateTerminalTab}
                         onCloseTerminal={handleCloseTerminalTab}
+                        onActivateTab={closeChangesView}
+                        selectionSuppressed={changesViewOpen}
                       />
                     )}
                   </div>
+                  <WorktreeReviewDialog review={review} onOpenComment={handleOpenReviewComment} />
                   {sessionIdFromParams && <div className="ml-auto shrink-0">{sessionActions}</div>}
                 </div>
 
@@ -1157,12 +1505,8 @@ export default function CloudChatPage({
                   className="relative flex min-h-0 flex-1 flex-col"
                 >
                   <div
-                    inert={
-                      childSessionStack.length > 0 ||
-                      preparationDrawerAttemptId !== null ||
-                      changesDrawerOpen
-                    }
-                    className="flex min-h-0 flex-1 flex-col"
+                    inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
+                    className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
                   >
                     <TabsContent
                       value={chatTabValue}
@@ -1228,6 +1572,7 @@ export default function CloudChatPage({
                                 dynamicMessages={dynamicMessages}
                                 pendingMessages={pendingMessages}
                                 preparationByMessageId={preparationByMessageId}
+                                commitsAfterMessage={commitsAfterMessage}
                                 getChildMessages={getChildMessages}
                                 onOpenChildSession={handleOpenTopLevelChildSession}
                                 onOpenPreparationDetails={handleOpenPreparationDetails}
@@ -1403,12 +1748,14 @@ export default function CloudChatPage({
                         const active = activeWorkspaceTabId === tabId;
                         return (
                           <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
-                            {active && (
+                            {active && !changesViewOpen && (
                               <WorktreeFilePane
                                 cloudAgentSessionId={sessionId}
                                 organizationId={organizationId}
                                 path={tab.path}
                                 mode={tab.mode}
+                                review={review.scope ? review.bindings : undefined}
+                                reviewScope={review.scope ?? undefined}
                                 onModeChange={mode =>
                                   setWorkspaceTabs(state => setFileTabMode(state, tab.path, mode))
                                 }
@@ -1418,6 +1765,17 @@ export default function CloudChatPage({
                         );
                       })}
                   </div>
+                  {canOpenChanges && sessionId && (
+                    <WorktreeChangesView
+                      key={`${currentUserId}:${organizationId ?? 'personal'}:${sessionId}`}
+                      cloudAgentSessionId={sessionId}
+                      organizationId={organizationId}
+                      open={changesViewOpen}
+                      commentCounts={reviewCommentCounts}
+                      review={review.scope ? review.bindings : undefined}
+                      reviewScope={review.scope ?? undefined}
+                    />
+                  )}
                 </div>
               </Tabs>
             ) : (
@@ -1441,18 +1799,6 @@ export default function CloudChatPage({
               onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
               portalContainer={childSessionDrawerContainer}
             />
-            {canOpenChanges && sessionId && (
-              <WorktreeChangesDrawer
-                key={`${organizationId ?? 'personal'}:${sessionId}`}
-                cloudAgentSessionId={sessionId}
-                organizationId={organizationId}
-                open={changesDrawerOpen}
-                onOpenChange={handleChangesDrawerOpenChange}
-                onCloseAutoFocus={handleChangesDrawerCloseAutoFocus}
-                onSelectFile={handleSelectWorktreeFile}
-                portalContainer={childSessionDrawerContainer}
-              />
-            )}
           </div>
         </SuggestionContextProvider>
       </PermissionContextProvider>

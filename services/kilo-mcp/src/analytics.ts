@@ -45,6 +45,7 @@ export type ToolErrorClass =
   | 'invalid_params'
   | 'unknown_tool'
   | 'upstream_unreachable'
+  | 'upstream_unreachable_ambiguous'
   | 'upstream_error'
   | 'internal_error'
   | 'unknown';
@@ -239,6 +240,11 @@ export function classifyToolError(error: unknown): string {
     }
     if (error.code === INTERNAL_ERROR && error.data?.['retryable'] === true) {
       return 'upstream_unreachable';
+    }
+    if (error.code === INTERNAL_ERROR && error.data?.['ambiguous'] === true) {
+      // A write whose outcome is unknown is not a plain internal error: the
+      // agent was told to check the current state, not to retry.
+      return 'upstream_unreachable_ambiguous';
     }
     if (error.code === INTERNAL_ERROR && typeof error.data?.['trpcCode'] === 'string') {
       return 'upstream_error';

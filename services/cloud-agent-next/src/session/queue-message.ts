@@ -31,6 +31,7 @@ import {
 import { resolveSecret } from '../auth.js';
 import { fetchSessionMetadata } from '../session-service.js';
 import jwt from 'jsonwebtoken';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -125,6 +126,11 @@ export async function preflightRuntimeAuthorizationRecovery(
   );
   if (state.state === 'legacy' || state.state === 'active') return;
   if (state.state === 'revoked') {
+    logRuntimeAuthorizationDiagnostic(
+      cloudAgentSessionId,
+      'preflight',
+      'stored_authorization_revoked'
+    );
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
   }
   if (!state.id) return;
@@ -157,6 +163,7 @@ export async function preflightRuntimeAuthorizationRecovery(
     'recoverExpiredRuntimeAuthorization'
   );
   if (result.status === 'denied') {
+    logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', 'recovery_denied');
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
   }
   if (result.status === 'busy' || result.status === 'retry') {

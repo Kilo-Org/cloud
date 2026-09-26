@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 
@@ -40,6 +40,13 @@ export type LiveSessionRefreshState = Readonly<{
   /** The last pull/retry failed or ran past the feedback budget. */
   failed: boolean;
   onRetry: () => void;
+  /**
+   * This pull's progress belongs to the surface's centered refreshable body
+   * (the no-match body), which draws it itself while reduced motion is on,
+   * so the reserved line carries the "Updating" copy without a second
+   * spinner: one indicator per pull.
+   */
+  progressInBody?: boolean;
 }>;
 
 /** Notices stay outside the rows so refresh and connection changes cannot remount them. */
@@ -96,7 +103,17 @@ export function LiveSessionFeedback({
   const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
   const unavailable = !context.isResolving && !context.isReady && !context.isError;
   let failure: ReactNode = null;
+  // A whole-surface load failure (no readable rows) is one outage: the block
+  // owns the surface and draws its own Retry for it, so the connection row
+  // stands down while the block is shown. Otherwise the exhausted connection
+  // row stacked a second "Connection lost / Retry" above the error card, two
+  // affordances for one failure (device defect uxs1). The row returns as soon
+  // as the block clears, so the socket's own recovery stays reachable. Rows
+  // that remain readable keep both: the list is still usable there, and the
+  // query retry and the socket retry are separate actions.
+  let failureOwnsRetry = false;
   if (context.isError) {
+    failureOwnsRetry = true;
     failure = (
       <QueryError
         placement="top"
@@ -151,6 +168,10 @@ export function LiveSessionFeedback({
     !statusLineOwnsFailure
   ) {
     const compact = content === 'rows';
+    // The compact form sits beside rows that are still readable, so the two
+    // retries stay separate there; the card form is the whole surface, so it
+    // is the single recovery action (see `failureOwnsRetry` above).
+    failureOwnsRetry = !compact;
     failure = (
       <View className="gap-1">
         {!compact && (
@@ -179,7 +200,11 @@ export function LiveSessionFeedback({
   let connectionLabel: string | null = null;
   if (context.isReady && !isConnected && internet !== 'offline') {
     if (reconnectExhausted) {
-      connectionLabel = t('agentChat.sessionConnection.connectionLost');
+      // The exhausted fact carries the surface's recovery action, so it yields
+      // while the load-failure block already owns one (see `failureOwnsRetry`).
+      // The passive Connecting…/Reconnecting… facts stay: they duplicate
+      // nothing.
+      connectionLabel = failureOwnsRetry ? null : t('agentChat.sessionConnection.connectionLost');
     } else if (!sessions.isPaused) {
       connectionLabel = wasConnected.current
         ? t('agentChat.sessionConnection.reconnecting')
@@ -203,7 +228,7 @@ export function LiveSessionFeedback({
             )}
           />
         )}
-        {context.isReady && !isConnected && reconnectExhausted && (
+        {context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry && (
           <Button
             variant="ghost"
             size="sm"
@@ -228,6 +253,7 @@ export function LiveSessionFeedback({
             busy={refresh.busy}
             failed={refresh.failed}
             onRetry={handleRefreshRetry}
+            progressInBody={refresh.progressInBody}
           />
         </View>
       ) : (
@@ -258,6 +284,15 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const navigateToSession = useAgentSessionNavigator();
+  // One handler shared by every card row: with the row memoised, an unchanged
+  // payload leaves each row's props referentially stable and skips its render.
+  // The handler reads only the id, so it takes the shape it needs.
+  const handleRowPress = useCallback(
+    (session: { id: string }) => {
+      navigateToSession(session.id);
+    },
+    [navigateToSession]
+  );
   const content = liveSessionContent(context, sessions);
 
   return (
@@ -277,7 +312,23 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           sessions={sessions}
           failureLabel={t('home.couldNotLoadActiveSessions')}
         />
-        {content === 'pending' && <Skeleton className="min-h-[72px] w-full rounded-2xl" />}
+        {content === 'pending' && (
+          // The placeholder borrows the real row's geometry: the same card,
+          // the same row padding, and a 3px leading strip glued to the card
+          // edge like `SessionRow`'s `stripMode="edge"` in `AgentBadge`. The
+          // title/eyebrow therefore land on the same x-offset the arriving row
+          // draws, and the leading mark keeps its size, so replacing the
+          // placeholder with the row cannot reflow the LIVE NOW card.
+          <View className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card">
+            <View className="relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3">
+              <Skeleton className="absolute left-0 top-0 bottom-0 w-[3px] rounded-[2px]" />
+              <View className="flex-1 gap-2">
+                <Skeleton className="h-3 w-2/3 rounded" />
+                <Skeleton className="h-3 w-1/3 rounded" />
+              </View>
+            </View>
+          </View>
+        )}
         {content === 'empty' && (
           <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
             <Text variant="muted" className="text-sm">
@@ -295,9 +346,7 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
                 session={session}
                 variant="card"
                 interactive={false}
-                onPress={() => {
-                  navigateToSession(session.id);
-                }}
+                onPress={handleRowPress}
               />
             </View>
           ))}

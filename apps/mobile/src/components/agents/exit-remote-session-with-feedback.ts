@@ -4,6 +4,13 @@ import { type Href } from 'expo-router';
 import { i18n } from '@/i18n';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
+import {
+  isNonRetryableExitError,
+  REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
+  REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
+  REMOTE_SESSION_EXIT_UPGRADE_PREFIX,
+} from './remote-session-exit-messages';
+
 /** Structural subset of Expo Router's router used for post-exit navigation. */
 type ExitRemoteSessionRouter = {
   dismissTo: (href: Href) => void;
@@ -58,29 +65,6 @@ type ExitRemoteSessionWithFeedbackInput = {
 };
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)' as const;
-/**
- * Pinned to the SDK's exported `REMOTE_SESSION_EXIT_NOT_SUPPORTED` constant
- * (see `apps/web/src/lib/cloud-agent-sdk/session.ts`). The barrel import is
- * not used here because the mobile test runner cannot resolve the SDK's
- * transitive web-only `@/...` aliases; the literal must stay in sync with
- * the SDK source. The same pinning rule applies to the two literals below.
- */
-const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
-  'Remote session exit is not supported for the current session';
-/**
- * Internal SDK message: `cli-live-transport` throws this when the live
- * catalog reports a non-`true` `canExitSession`. The SDK does not export the
- * constant, so the literal is matched here. The producer/consumer contract
- * pins these strings — changing them requires updating this classifier.
- */
-const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
-  'Remote session exit is unavailable for the current session';
-const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
-
-const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
-  REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
-  REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
-]);
 
 /** Catalog copy for a pinned SDK exit message, or null when it is not one. */
 function exitErrorCopy(message: string): string | null {
@@ -94,13 +78,6 @@ function exitErrorCopy(message: string): string | null {
     return i18n.t('agentChat.remoteSession.exitNeedsNewerCli');
   }
   return null;
-}
-
-function isNonRetryableExitError(message: string): boolean {
-  if (NON_RETRYABLE_EXIT_MESSAGES.has(message)) {
-    return true;
-  }
-  return message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX);
 }
 
 export async function exitRemoteSessionWithFeedback({
@@ -122,7 +99,8 @@ export async function exitRemoteSessionWithFeedback({
       const message =
         error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToExit');
       // The three pinned SDK messages are a producer/consumer contract, matched
-      // above in English. Once matched, show the reader their own language.
+      // in English by `remote-session-exit-messages`. Once matched, show the
+      // reader their own language.
       const shown = exitErrorCopy(message) ?? message;
       if (isNonRetryableExitError(message)) {
         // Fail-closed: the SDK already signalled "do not send" by rejecting
@@ -172,7 +150,7 @@ export async function exitRemoteSessionWithFeedback({
     // `dismissTo` dispatches POP_TO, which finds the existing `(tabs)` route
     // at the stack root and truncates the stack so a back gesture cannot
     // return to the exited `agent-chat` route.
-    router.dismissTo(SESSIONS_ROUTE);
+    router.dismissTo(SESSIONS_ROUTE as Href);
   };
 
   await runExit();

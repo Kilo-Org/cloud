@@ -9,6 +9,7 @@ import type {
   JsonSchemaValidator,
 } from '@modelcontextprotocol/sdk/validation/types.js';
 import { Effect, unsafeCoerce } from 'effect';
+import { credentialFor, type RemoteMcpToken } from './credential.js';
 import {
   bounded,
   defaultTimeoutMs,
@@ -76,7 +77,7 @@ interface RemoteMcpClientDeps {
    * `RemoteMcpError`, so a source that can fail names the kind. Read only for
    * `bearer`.
    */
-  token?: () => Effect.Effect<string, RemoteMcpError>;
+  token?: RemoteMcpToken;
   /** The caller's own signal, linked into the deadline of every request. */
   signal?: RemoteMcpAbort;
   /** How long one operation may take. 15 seconds by default. */
@@ -127,30 +128,6 @@ const kindOf = (cause: unknown): RemoteMcpFailure => {
 
 const failed = (server: RemoteMcpServer, cause: unknown): RemoteMcpError =>
   new RemoteMcpError({ serverId: server.id, kind: kindOf(cause), cause });
-
-/**
- * The credential header for one operation, asked only where the server wants
- * one. A bearer server with no accessor is a caller's mistake, and it is
- * reported as one rather than sent as an anonymous request.
- */
-const credentialFor = (
-  server: RemoteMcpServer,
-  deps: RemoteMcpClientDeps
-): Effect.Effect<Readonly<Record<string, string>>, RemoteMcpError> => {
-  if (server.auth.type !== 'bearer') {
-    return Effect.succeed({});
-  }
-  if (deps.token === undefined) {
-    return Effect.fail(
-      new RemoteMcpError({
-        serverId: server.id,
-        kind: 'unauthorized',
-        cause: 'this server needs a bearer token and no source for one was given',
-      })
-    );
-  }
-  return deps.token().pipe(Effect.map(token => ({ Authorization: `Bearer ${token}` })));
-};
 
 /** Everything one operation needs, opened once and closed at the end. */
 interface Connection {
@@ -241,7 +218,10 @@ const called = (
     catch: cause => (cause instanceof RemoteMcpError ? cause : failed(server, cause)),
   });
 
-/** One operation: a credential, a deadline, a connection, and it all closed again. */
+/**
+ * One operation: a deadline, a credential, a connection, and it all closed
+ * again. The deadline comes first, so it bounds the credential too.
+ */
 const withServer = <A>(
   server: RemoteMcpServer,
   deps: RemoteMcpClientDeps,
@@ -249,11 +229,11 @@ const withServer = <A>(
 ): Effect.Effect<A, RemoteMcpError> =>
   Effect.scoped(
     Effect.gen(function* () {
-      const credential = yield* credentialFor(server, deps);
       const deadline = yield* Effect.acquireRelease(
         Effect.sync(() => makeDeadline(deps.timeoutMs ?? defaultTimeoutMs, deps.signal)),
         made => Effect.sync(made.stop)
       );
+      const credential = yield* credentialFor(server, deps.token, deadline);
       const connection = yield* Effect.acquireRelease(
         Effect.sync(() => open({ server, deps, credential, deadline })),
         closed => Effect.ignore(Effect.tryPromise(() => closed.client.close()))

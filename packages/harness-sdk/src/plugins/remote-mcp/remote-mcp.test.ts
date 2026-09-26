@@ -87,6 +87,17 @@ describe('a remote server that says no', () => {
     );
     expect(error.kind).toBe('unreachable');
   });
+
+  it('holds a credential that never arrives to the same deadline', async () => {
+    const silent: RemoteMcpClientDeps = {
+      ...deps({ discoverTimeoutMs: 50 }),
+      token: () => Effect.never,
+    };
+    const error = await run(
+      Effect.flip(remoteMcpClient(serverFor('work', fixture.url, token), silent).tools)
+    );
+    expect(error.kind).toBe('unreachable');
+  });
 });
 
 describe('a call', () => {

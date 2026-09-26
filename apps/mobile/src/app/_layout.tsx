@@ -42,7 +42,7 @@ import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -69,6 +69,7 @@ import { markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
@@ -1124,25 +1125,31 @@ function RootLayout() {
   // native listener instead of leaving it alive past the tree that uses it.
   useSystemSearchOpenListener();
 
-  // Reap expired temp files at cold start and whenever the app returns to the
-  // foreground, deferred past the current interaction frame so a navigation
-  // never waits on it. AppState is already `active` at launch, so the change
-  // listener alone never reaps in a launch/use/kill cycle.
+  // Reap expired temp files at cold start, deferred past the current
+  // interaction frame so a navigation never waits on it. AppState is already
+  // `active` at launch, so the foreground edge alone never reaps in a
+  // launch/use/kill cycle.
   useEffect(() => {
     scheduleCacheMaintenance(() => {
       reapTempFiles();
     });
-    const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') {
-        scheduleCacheMaintenance(() => {
-          reapTempFiles();
-        });
-      }
-    });
-    return () => {
-      subscription.remove();
-    };
   }, []);
+
+  // The foreground half of the same reap. The app's shared `useAppLifecycle()`
+  // store is the single foreground subscription for this work, so the edge
+  // fires only on background -> active and never on an active -> active echo.
+  // The reap is idempotent, so dropping the layout's own `AppState` listener
+  // for this loses nothing.
+  const { isActive } = useAppLifecycle();
+  const wasActiveRef = useRef(isActive);
+  useEffect(() => {
+    if (!wasActiveRef.current && isActive) {
+      scheduleCacheMaintenance(() => {
+        reapTempFiles();
+      });
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive]);
 
   return (
     <MotionProvider>

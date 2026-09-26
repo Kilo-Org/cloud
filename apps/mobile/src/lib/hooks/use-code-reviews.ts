@@ -1,10 +1,18 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import { hasInFlightReview, isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
+import { withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 function isPersonal(scope: string) {
@@ -13,7 +21,87 @@ function isPersonal(scope: string) {
 
 export const REVIEW_PAGE_SIZE = 50;
 
+/**
+ * Retention bound for the review-list infinite query.
+ *
+ * The list is browsed by scroll, so a bounded window of pages keeps the
+ * browsable range reachable. The bound matters most on invalidation and app
+ * foreground: a refetch of an infinite query re-requests every retained page,
+ * so the page count is what caps that burst. Ten pages of 50 reviews is far more
+ * than a user scrolls back through, while still stopping an unbounded history
+ * from accumulating for the life of the screen.
+ *
+ * `listCodeReviews` orders `created_at desc`, so page one is the NEWEST page.
+ * React Query's `maxPages` trims the front element on a forward fetch
+ * (`addToEnd(..., maxPages)`), which would evict the newest reviews from the top
+ * of the list. `buildReviewListQueryOptions` therefore also stops forward paging
+ * at this bound, so the bound is reached by refusing the next page and `maxPages`
+ * never has to trim.
+ */
+export const REVIEW_LIST_MAX_PAGES = 10;
+
+/** Poll cadence for page one while a review on it is still running. */
+const REVIEW_POLL_INTERVAL_MS = 5000;
+
+/**
+ * Consecutive failed polls the page-one probe tolerates before its interval
+ * stops.
+ *
+ * The interval must survive a failed poll: one transient error must not stop
+ * live updates for the rest of the review. It must not re-arm forever either —
+ * `probing` is derived from the list's cached page one, and only a delivered
+ * probe page updates that page, so a probe whose endpoint keeps failing can
+ * never turn itself off. Past this bound the poll stops until an external
+ * refresh (foreground/route invalidate, pull-to-refresh, cancel/retrigger)
+ * brings it back. See AGENTS.md "Failure UX": retry within a bound.
+ */
+export const REVIEW_POLL_MAX_CONSECUTIVE_FAILURES = 3;
+
+/**
+ * Next consecutive-failed-poll count for the page-one probe. A poll that settled
+ * with a delivered page clears the count; a poll that settled with an error
+ * advances it.
+ *
+ * The settle timestamps decide, not the presence of `data`: a failed refetch
+ * keeps the last delivered page (and its `dataUpdatedAt`), so "has data" is not
+ * the same as "the last poll delivered". `dataUpdatedAt >= errorUpdatedAt` means
+ * the last settle delivered a page, or nothing has failed yet.
+ */
+export function nextReviewPollFailureStreak(
+  previous: number,
+  probe: { dataUpdatedAt: number; errorUpdatedAt: number }
+): number {
+  return probe.dataUpdatedAt >= probe.errorUpdatedAt ? 0 : previous + 1;
+}
+
+/** Child segment that keeps the page-one probe under the list's invalidate prefix. */
+const REVIEW_FIRST_PAGE_KEY = 'firstPage';
+
 type ReviewListPage = Awaited<ReturnType<typeof trpcClient.codeReviews.listForUser.query>>;
+
+type ReviewListData = InfiniteData<ReviewListPage, number>;
+
+/** Fetch one page of the recent-reviews list at `offset` (personal or org scope). */
+async function fetchReviewListPage(scope: string, offset: number): Promise<ReviewListPage> {
+  const page = isPersonal(scope)
+    ? await trpcClient.codeReviews.listForUser.query({ limit: REVIEW_PAGE_SIZE, offset })
+    : await trpcClient.codeReviews.listForOrganization.query({
+        organizationId: scope,
+        limit: REVIEW_PAGE_SIZE,
+        offset,
+      });
+  return page;
+}
+
+/**
+ * The review-list query key for `scope` — exactly the key `useInvalidateReviews`
+ * invalidates and the key the list infinite query is stored under.
+ */
+export function buildReviewListQueryKey(trpc: ReturnType<typeof useTRPC>, scope: string) {
+  return isPersonal(scope)
+    ? trpc.codeReviews.listForUser.queryKey()
+    : trpc.codeReviews.listForOrganization.queryKey({ organizationId: scope });
+}
 
 /**
  * Build the review-list infinite-query options. Kept as a pure builder so the
@@ -23,50 +111,253 @@ type ReviewListPage = Awaited<ReturnType<typeof trpcClient.codeReviews.listForUs
  *
  * Deliberately not tRPC's `infiniteQueryOptions`: it injects `{ cursor }`, which
  * this offset-based schema does not read.
+ *
+ * The in-flight poll is deliberately NOT here: React Query's interval runs a
+ * full `refetch`, which for an infinite query re-requests every retained page
+ * (see `buildReviewFirstPageQueryOptions`).
  */
 export function buildReviewListQueryOptions(trpc: ReturnType<typeof useTRPC>, scope: string) {
-  const personal = isPersonal(scope);
+  return withInfiniteRetention(
+    {
+      queryKey: buildReviewListQueryKey(trpc, scope),
+      initialPageParam: 0,
+      queryFn: async ({ pageParam }: { pageParam: number }): Promise<ReviewListPage> => {
+        const page = await fetchReviewListPage(scope, pageParam);
+        // The list endpoints resolve handler errors as `{ success: false, error }`
+        // instead of throwing (no tRPC client link converts them). Reject here so
+        // React Query marks the page as an error: a failed first page drives the
+        // screen's transient QueryError, and a failed next page drives the retry
+        // footer via `isFetchNextPageError` while keeping the loaded rows.
+        if (!page.success) {
+          throw new Error(page.error);
+        }
+        return page;
+      },
+      getNextPageParam: (
+        lastPage: ReviewListPage,
+        pages: ReviewListPage[],
+        lastPageParam: number
+      ) =>
+        lastPage.success && lastPage.hasMore && pages.length < REVIEW_LIST_MAX_PAGES
+          ? lastPageParam + lastPage.reviews.length
+          : undefined,
+    },
+    REVIEW_LIST_MAX_PAGES
+  );
+}
+
+/**
+ * Build the page-one probe used while a review is in flight. It fetches offset 0
+ * only, so one poll tick is one request instead of one per retained page; the
+ * result is merged back into the list cache by `useReviewList`.
+ *
+ * The key is a child of the list key, so `useInvalidateReviews` and the
+ * route-level `[['codeReviews']]` foreground invalidate still refresh the probe
+ * along with the list.
+ *
+ * @param probe.enabled Whether a running review on the cached page one makes the
+ *   probe worth running at all.
+ * @param probe.failedPolls Consecutive failed polls so far, counted by
+ *   `useReviewList`; the interval stops at
+ *   `REVIEW_POLL_MAX_CONSECUTIVE_FAILURES`.
+ */
+export function buildReviewFirstPageQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  scope: string,
+  probe: { enabled: boolean; failedPolls?: number }
+) {
+  const { enabled, failedPolls = 0 } = probe;
   return {
-    queryKey: personal
-      ? trpc.codeReviews.listForUser.queryKey()
-      : trpc.codeReviews.listForOrganization.queryKey({ organizationId: scope }),
-    initialPageParam: 0,
-    queryFn: async ({ pageParam }: { pageParam: number }): Promise<ReviewListPage> => {
-      const page = personal
-        ? await trpcClient.codeReviews.listForUser.query({
-            limit: REVIEW_PAGE_SIZE,
-            offset: pageParam,
-          })
-        : await trpcClient.codeReviews.listForOrganization.query({
-            organizationId: scope,
-            limit: REVIEW_PAGE_SIZE,
-            offset: pageParam,
-          });
-      // The list endpoints resolve handler errors as `{ success: false, error }`
-      // instead of throwing (no tRPC client link converts them). Reject here so
-      // React Query marks the page as an error: a failed first page drives the
-      // screen's transient QueryError, and a failed next page drives the retry
-      // footer via `isFetchNextPageError` while keeping the loaded rows.
+    queryKey: [...buildReviewListQueryKey(trpc, scope), REVIEW_FIRST_PAGE_KEY],
+    queryFn: async (): Promise<ReviewListPage> => {
+      const page = await fetchReviewListPage(scope, 0);
+      // Same contract as the list builder: the endpoints resolve handler errors
+      // as `{ success: false, error }`, and a resolved failure must not become
+      // this query's `data`. Throwing keeps the last successful page (React
+      // Query keeps `data` across a failed refetch), so the interval below still
+      // sees the running review it is polling for.
       if (!page.success) {
         throw new Error(page.error);
       }
       return page;
     },
-    getNextPageParam: (lastPage: ReviewListPage, _pages: ReviewListPage[], lastPageParam: number) =>
-      lastPage.success && lastPage.hasMore ? lastPageParam + lastPage.reviews.length : undefined,
-    refetchInterval: (query: { state: { data?: { pages: ReviewListPage[] } } }) => {
-      const firstPage = query.state.data?.pages[0];
-      if (!firstPage?.success) {
+    staleTime: 0,
+    enabled,
+    refetchInterval: (query: { state: { data?: ReviewListPage } }) => {
+      // Bounded retry: this probe is the only writer of the list's page one, so
+      // an endpoint that keeps failing would otherwise keep one request (plus
+      // this query's own retries) going every interval for the life of the
+      // screen. `useReviewList` counts consecutive failed polls and restarts the
+      // count on a delivered list or probe page, on a scope change, and on a
+      // review starting or ending.
+      if (failedPolls >= REVIEW_POLL_MAX_CONSECUTIVE_FAILURES) {
         return false;
       }
-      return hasInFlightReview(firstPage.reviews) ? 5000 : false;
+      // Poll until a successful page one with no running review arrives: the
+      // interval must survive a transient failure (no page delivered yet, or
+      // the last successful page still held after a failed refetch) instead of
+      // clearing on it, or one blip stops the poll for the rest of the review.
+      const page = query.state.data;
+      if (!page?.success) {
+        return REVIEW_POLL_INTERVAL_MS;
+      }
+      return hasInFlightReview(page.reviews) ? REVIEW_POLL_INTERVAL_MS : false;
     },
   };
 }
 
+/**
+ * Whether the probe's fresh page one holds the same rows, in the same order, as
+ * the cached page one — i.e. replacing it cannot shift the page-one/page-two
+ * boundary.
+ *
+ * `listCodeReviews` orders `created_at desc`, so a review added or removed at
+ * the top shifts every later page's offset by one. `mergeReviewFirstPage` keeps
+ * `pageParams` and the later pages, so a changed row set would skip the row that
+ * moved across the boundary, and `dedupeById` cannot recover a gap (the row is
+ * simply absent, not duplicated). When the row set changed the caller refetches
+ * the retained pages instead, re-requesting every page at its offset.
+ */
+function reviewFirstPageBoundaryMatches(
+  existing: ReviewListData | undefined,
+  page: ReviewListPage | undefined
+): boolean {
+  const cachedFirst = existing?.pages[0];
+  if (!cachedFirst?.success || !page?.success) {
+    return false;
+  }
+  return (
+    cachedFirst.reviews.length === page.reviews.length &&
+    cachedFirst.reviews.every((review, index) => review.id === page.reviews[index]?.id)
+  );
+}
+
+/**
+ * What the page-one probe should do with its fresh page. Pure so the decision is
+ * unit-testable.
+ *
+ * `merge` swaps page one in place. `refetch` is for the shifted-boundary case:
+ * with more than one retained page, a changed row set means every later page
+ * starts at a stale offset, so the retained pages are refetched (each at its own
+ * param) instead of skipping the row that moved across the boundary. A single
+ * retained page has no boundary to desync — the next page param is recomputed
+ * from the new page one — so it always merges.
+ */
+export function selectReviewFirstPageAction(
+  existing: ReviewListData | undefined,
+  page: ReviewListPage | undefined
+): 'merge' | 'refetch' {
+  if (!page?.success) {
+    return 'merge';
+  }
+  if (existing && existing.pages.length > 1 && !reviewFirstPageBoundaryMatches(existing, page)) {
+    return 'refetch';
+  }
+  return 'merge';
+}
+
+/**
+ * Replace page one of a cached review list with a fresh page. Pure so the merge
+ * is unit-testable. Returns `existing` unchanged when there is no cache, no
+ * page one, or the incoming page failed — pageParams and later pages are kept.
+ *
+ * The `pageParams[0] === 0` guard keeps the write on the first page. It is also
+ * the guard that would no-op the merge if page one were ever evicted from the
+ * front; `buildReviewListQueryOptions` caps forward paging at
+ * `REVIEW_LIST_MAX_PAGES` so that cannot happen on this list.
+ */
+export function mergeReviewFirstPage(
+  existing: ReviewListData | undefined,
+  page: ReviewListPage | undefined
+): ReviewListData | undefined {
+  if (!existing || existing.pages.length === 0 || existing.pageParams[0] !== 0 || !page?.success) {
+    return existing;
+  }
+  return { ...existing, pages: [page, ...existing.pages.slice(1)] };
+}
+
 export function useReviewList(scope: string) {
   const trpc = useTRPC();
-  return useInfiniteQuery(buildReviewListQueryOptions(trpc, scope));
+  const queryClient = useQueryClient();
+  const list = useInfiniteQuery(buildReviewListQueryOptions(trpc, scope));
+
+  // A running review is created newest-first, so it lands on page one; that
+  // page decides whether a page-one probe is worth running at all. The screen
+  // renders every retained page, but only page one is polled so one tick is one
+  // request instead of one per retained page.
+  const firstPage = list.data?.pages[0];
+  const probing = firstPage?.success === true && hasInFlightReview(firstPage.reviews);
+
+  // Consecutive failed polls for the probe. The interval survives a failed poll
+  // (one transient error must not stop live updates for the rest of the review)
+  // but stops at the bound, so a permanently failing endpoint cannot leave a
+  // request loop running for the life of the screen. React Query keeps no
+  // consecutive-failure counter (`fetchFailureCount` restarts with every fetch),
+  // so the count is advanced here off the probe's own settle signals.
+  //
+  // The budget restarts whenever the surface behind the poll is refreshed: a
+  // delivered list page (a foreground or pull-to-refresh list refetch), the
+  // probe turning on or off (a review starting or ending), or a new scope. A
+  // restart lets a poll that hit the bound recover without remounting.
+  const [failedProbePolls, setFailedProbePolls] = useState(0);
+  const probe = useQuery(
+    buildReviewFirstPageQueryOptions(trpc, scope, {
+      enabled: probing,
+      failedPolls: failedProbePolls,
+    })
+  );
+  const probeBudgetKey = `${scope}|${probing}|${list.dataUpdatedAt}`;
+  const probeBudgetRef = useRef(probeBudgetKey);
+  // Read the settle signals as primitives for the same reason as `listRefetch`
+  // below: the query result object is fresh each render, and an effect that ran
+  // on every render would advance the streak on every render too.
+  const probeDataUpdatedAt = probe.dataUpdatedAt;
+  const probeErrorUpdatedAt = probe.errorUpdatedAt;
+  useEffect(() => {
+    const budgetChanged = probeBudgetRef.current !== probeBudgetKey;
+    probeBudgetRef.current = probeBudgetKey;
+    // Settle deps: `dataUpdatedAt` moves when the probe delivers a page,
+    // `errorUpdatedAt` when a poll fails.
+    setFailedProbePolls(previous =>
+      budgetChanged
+        ? 0
+        : nextReviewPollFailureStreak(previous, {
+            dataUpdatedAt: probeDataUpdatedAt,
+            errorUpdatedAt: probeErrorUpdatedAt,
+          })
+    );
+  }, [probeBudgetKey, probeDataUpdatedAt, probeErrorUpdatedAt]);
+
+  // Memoised: the builder returns a fresh array on every call, and the effect
+  // below must not re-run every render because of a new key reference.
+  const listKey = useMemo<readonly unknown[]>(
+    () => buildReviewListQueryKey(trpc, scope),
+    [trpc, scope]
+  );
+  // React Query memoizes `refetch`, but the result object is fresh each render;
+  // listing the method keeps the effect from re-running on every render.
+  const listRefetch = list.refetch;
+
+  useEffect(() => {
+    const page = probe.data;
+    if (!page?.success) {
+      return;
+    }
+    const existing = queryClient.getQueryData<ReviewListData>(listKey);
+    if (selectReviewFirstPageAction(existing, page) === 'refetch') {
+      // The probe's page one holds a different row set, so the retained later
+      // pages start at stale offsets. Re-request every retained page at its
+      // offset (`cancelRefetch: false` joins an in-flight refetch instead of
+      // cancelling and re-issuing it) so the list stays contiguous.
+      void listRefetch({ cancelRefetch: false });
+      return;
+    }
+    queryClient.setQueryData<ReviewListData>(listKey, current =>
+      mergeReviewFirstPage(current, page)
+    );
+  }, [probe.data, queryClient, listKey, listRefetch]);
+
+  return list;
 }
 
 export function useReviewDetail(reviewId: string) {

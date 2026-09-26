@@ -349,8 +349,21 @@ final class ArtifactsEnumerator: NSObject, NSFileProviderEnumerator {
  Layout and keys mirror `src/lib/artifacts/artifact-mirror.ts` and
  `artifact-mirror-manifest.ts`: `artifacts/manifest.json` plus
  `artifacts/sessions/<sessionId>/<fileId>`. Move the three together.
+
+ A reference type because the decoded index outlives one lookup: every lookup
+ funnels through `manifest()`, and the system asks for one item at a time, so a
+ session folder with N files would otherwise read and decode the whole index up
+ to N times on the extension's main thread. The decode is memoized against the
+ index file's own modification date and size, which change with every rewrite.
+
+ Reading the shared app group is the capability iOS has and Android does not:
+ Android has no app group. Android's counterpart,
+ `ArtifactsDocumentsProvider.kt` (`modules/artifacts-provider`), serves the same
+ index in-process from `filesDir` and memoizes the same decode on the same
+ modification-date-and-size stamp, so one browse costs one parse on either
+ platform.
  */
-struct ArtifactMirror {
+final class ArtifactMirror: @unchecked Sendable {
   /** App group shared with the app; must match the entitlement. */
   static let appGroupIdentifier = "group.com.kilocode.kiloapp"
   static let directoryName = "artifacts"
@@ -359,17 +372,55 @@ struct ArtifactMirror {
   static let supportedManifestVersion = 1
 
   /**
+   The identity of the manifest file a cache entry was read from.
+
+   The app rewrites the index wholesale (`.part` + rename), so the modification
+   date and size together change whenever the content does: an equal stamp means
+   the cached decode is still the file on disk.
+   */
+  private struct ManifestStamp: Equatable {
+    let modified: Date?
+    let size: Int?
+  }
+
+  private let lock = NSLock()
+  private var cachedManifest: ArtifactManifest?
+  private var cachedStamp: ManifestStamp?
+
+  /**
    The manifest, or nil when there is none (signed out, or a first run that has
    not mirrored yet). An unreadable or unknown-version index reads as absent:
    the mirror is derived data, so a reader shows nothing rather than failing.
+
+   The decoded index is memoized on the stamp of the file it was read from. A
+   cache hit needs a stamp of its own, so an absent file — which has none — can
+   never compare equal to the stamp a decode was stored under. Every path that
+   does not end in a manifest that passed the version gate clears the entry, so
+   a first run that has not mirrored yet never pins an empty location, and no
+   decode is ever served for a file nothing backs.
    */
   func manifest() -> ArtifactManifest? {
-    guard let url = Self.manifestURL(), let data = try? Data(contentsOf: url),
+    lock.lock()
+    defer { lock.unlock() }
+    guard let url = Self.manifestURL() else {
+      cachedManifest = nil
+      cachedStamp = nil
+      return nil
+    }
+    let stamp = Self.stamp(of: url)
+    if let cached = cachedManifest, let stamp, cachedStamp == stamp {
+      return cached
+    }
+    guard let data = try? Data(contentsOf: url),
       let manifest = try? JSONDecoder().decode(ArtifactManifest.self, from: data),
       manifest.version == Self.supportedManifestVersion
     else {
+      cachedManifest = nil
+      cachedStamp = nil
       return nil
     }
+    cachedManifest = manifest
+    cachedStamp = stamp
     return manifest
   }
 
@@ -424,6 +475,19 @@ struct ArtifactMirror {
 
   private static func manifestURL() -> URL? {
     rootURL()?.appendingPathComponent(manifestFileName, isDirectory: false)
+  }
+
+  /**
+   The stamp of the manifest file, or nil when it cannot be read — including
+   when it is not there, which is the signed-out and first-run case.
+   */
+  private static func stamp(of url: URL) -> ManifestStamp? {
+    guard
+      let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+    else {
+      return nil
+    }
+    return ManifestStamp(modified: values.contentModificationDate, size: values.fileSize)
   }
 }
 

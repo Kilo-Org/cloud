@@ -1,4 +1,8 @@
-import { type ActiveSessionType, type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import {
+  type ActiveSessionType,
+  type SlashCommandCatalogStatus,
+  type SlashCommandInfo,
+} from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
 import { i18n } from '@/i18n';
@@ -253,6 +257,29 @@ export function createMobileSlashCommandList(
       ? [getLocalExitSlashCommand(), getLocalQuitSlashCommand(), getLocalClearSlashCommand()]
       : []),
   ];
+}
+
+/**
+ * The notice the open slash menu shows for the catalog the wrapper sent, or
+ * `null` when there is nothing to say.
+ *
+ * The wrapper bounds the catalog to the shared 256-command / 512 KiB limits and
+ * never truncates a skill row, so two different things need saying: rows were
+ * dropped (`dropped`), or the rows kept are still over a bound because the
+ * skill rows alone are over it (`dropped === 0` with `overLimit`). An
+ * over-limit catalog that dropped nothing is complete, so it must not claim
+ * that commands are hidden.
+ */
+export function getSlashCommandCatalogNotice(
+  status: SlashCommandCatalogStatus | null | undefined
+): string | null {
+  if (!status) {
+    return null;
+  }
+  if (status.dropped > 0) {
+    return i18n.t('agentChat.slashCommands.catalogFull');
+  }
+  return status.overLimit ? i18n.t('agentChat.slashCommands.catalogOverLimit') : null;
 }
 
 /**

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
 import {
   resolveAppAwareKeyboardPadding,
@@ -191,11 +192,11 @@ export function LoginScreen() {
         </CenteredState>
       );
     }
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color={colors.mutedForeground} />
-      </View>
-    );
+    // The approved hold: the device authorized, and the token write plus the
+    // root layout's redirect are still in flight. Reuse the one branded wait
+    // surface — a bare spinner on an empty background read as an unbranded
+    // blank page (explorer signin-language).
+    return <BootstrapLoadingSurface />;
   }
 
   // One padded wrapper for both platforms: the bottom inset is reserved at

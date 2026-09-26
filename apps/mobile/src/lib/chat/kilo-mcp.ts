@@ -117,9 +117,18 @@ function publish(state: KiloMcpState): void {
 /** The answer already discovered for one account and one auth epoch. */
 let cached: { readonly key: string; readonly state: KiloMcpState } | undefined = undefined;
 
-/** The discovery already running for one key, so two callers do not both connect. */
+/**
+ * The discovery already running for one key and one deadline, so two callers
+ * do not both connect. A caller with another deadline does not join it: it
+ * would wait on a deadline it did not ask for.
+ */
 let inFlight:
-  | { readonly id: number; readonly key: string; readonly promise: Promise<KiloMcpState> }
+  | {
+      readonly id: number;
+      readonly key: string;
+      readonly timeoutMs: number;
+      readonly promise: Promise<KiloMcpState>;
+    }
   | undefined = undefined;
 
 let nextAttempt = 0;
@@ -175,7 +184,7 @@ const reusable = (state: KiloMcpState): boolean =>
  * reported as a server that could not be reached, because a rejected promise
  * here would leave a chat opening with no state to draw.
  */
-async function connect(place: ChatPlace, timeoutMs: number): Promise<KiloMcpState> {
+async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise<KiloMcpState> {
   const started = generation;
   const key = keyFor(place);
   const url = KILO_MCP_URL;
@@ -198,8 +207,10 @@ async function connect(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
     )
   );
   /* A sign-out between the request and the answer dropped the connection. What
-     the old account's server answered must not be published under the new one. */
-  if (started === generation) {
+     the old account's server answered must not be published under the new one.
+     A later discovery answers for the screen now, so this one answers only its
+     own caller. */
+  if (started === generation && id === nextAttempt) {
     cached = reusable(state) ? { key, state } : undefined;
     publish(state);
   }
@@ -217,7 +228,7 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
     }
     return cached.state;
   }
-  if (inFlight?.key === key) {
+  if (inFlight?.key === key && inFlight.timeoutMs === timeoutMs) {
     return inFlight.promise;
   }
   /* No URL means the feature is not built into this app at all. Nothing is
@@ -228,8 +239,8 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
   }
   publish({ status: 'connecting' });
   const id = (nextAttempt += 1);
-  const promise = connect(place, timeoutMs);
-  const entry = { id, key, promise };
+  const promise = connect(place, timeoutMs, id);
+  const entry = { id, key, timeoutMs, promise };
   inFlight = entry;
   try {
     return await promise;
@@ -267,8 +278,10 @@ const deadlineFor = (request: KiloMcpRequest): number =>
  * A failure is not cached as an answer: asking again reconnects. Neither is an
  * answer with no tools in it, because the empty sheet offers no Retry and the
  * next chat asking is what makes a transient empty catalog recoverable. A call
- * made while one is already running joins it rather than opening a second
- * connection.
+ * made while one is already running joins it when it asked for the same
+ * deadline. One with another deadline opens its own connection, so an open that
+ * meets a Retry keeps its four seconds and a Retry that meets an open keeps its
+ * fifteen; the later discovery is the one the screen draws.
  */
 export async function ensureKiloMcp(
   place: ChatPlace,

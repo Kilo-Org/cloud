@@ -177,6 +177,7 @@ export default function RepoPickerScreen() {
             const repo = item.repo;
             const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
             const rowLabel = `${platformName} ${repo.fullName}`;
+            const isSelected = bridge.currentValue === `${repo.platform}:${repo.fullName}`;
             return (
               <Pressable
                 key={item.key}
@@ -186,6 +187,7 @@ export default function RepoPickerScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={rowLabel}
+                accessibilityState={{ selected: isSelected }}
               >
                 {repo.isPrivate ? (
                   <Lock size={14} color={colors.mutedForeground} />
@@ -201,7 +203,7 @@ export default function RepoPickerScreen() {
                 <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
                   {repo.fullName}
                 </Text>
-                {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
+                {isSelected ? (
                   <Check size={18} color={colors.primary} />
                 ) : null}
               </Pressable>

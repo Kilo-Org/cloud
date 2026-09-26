@@ -3284,8 +3284,37 @@
       "unauthorized": "Les outils Kilo ont refusé cette session",
       "unauthorizedDescription": "Reconnectez-vous pour utiliser les outils Kilo dans cette discussion.",
       "unavailable": "Les outils Kilo ne sont pas disponibles",
-      "unavailableDescription": "Le serveur Kilo n'est pas disponible pour ce compte."
+      "unavailableDescription": "Le serveur Kilo n'est pas disponible pour ce compte.",
+      "sheetTitle": "Outils de chat",
+      "addServerTitle": "Ajouter un serveur MCP",
+      "editServerTitle": "Modifier ce serveur MCP",
+      "fieldName": "Nom affiché",
+      "fieldUrl": "URL du serveur",
+      "fieldUrlInvalid": "Saisissez une URL de serveur valide.",
+      "fieldToken": "Jeton Bearer (facultatif)",
+      "enableServer": "Activer ce serveur : {{name}}",
+      "editServer": "Modifier le serveur",
+      "deleteServer": "Supprimer le serveur",
+      "editServerA11y": "Modifier le serveur : {{name}}",
+      "deleteServerA11y": "Supprimer le serveur : {{name}}",
+      "retryServerA11y": "Réessayer ce serveur : {{name}}",
+      "deleteTitle": "Supprimer ce serveur ?",
+      "deleteMessage": "Ses outils quittent toutes les conversations.",
+      "kiloBuiltIn": "Intégré. Activez-le ou désactivez-le pour cette conversation ; il ne peut être ni modifié ni supprimé.",
+      "serversEmptyTitle": "Aucun serveur distant pour l'instant",
+      "serversEmptyDescription": "Ajoutez-en un pour proposer ses outils dans vos conversations.",
+      "settingsToolsTitle": "Autoriser Kilo à modifier les réglages de l'application",
+      "settingsToolsSubtitle": "S'applique au thème, à la langue, aux notifications, aux modèles et au reste des Préférences.",
+      "settingsToolsOn": "Activé — les outils de réglages sont envoyés au modèle",
+      "settingsToolsOff": "Désactivé — aucun outil de réglages n'est envoyé au modèle",
+      "serverChecking": "Vérification de ce serveur…",
+      "serverToolCount": "{{count}} outils",
+      "serverUnreachable": "Impossible de joindre ce serveur",
+      "serverOff": "Ce serveur est désactivé"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Confirmer cette modification ?"
   },
   "appActions": {
     "start": {

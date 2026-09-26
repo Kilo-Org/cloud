@@ -142,6 +142,18 @@ const consentMock = vi.hoisted(() => ({
   clearPendingConsentOutcome: vi.fn(),
 }));
 
+// Hoisted so the sign-out case can seed the remote MCP server store and assert
+// it is cleared, without loading the native-bound store chain (secure-store-
+// preference -> sonner-native -> react-native) into the node test environment.
+const remoteMcpMock = vi.hoisted(() => ({
+  servers: [] as string[],
+  forgetRemoteMcp: vi.fn(),
+  clearRemoteMcpServers: vi.fn(() => {
+    remoteMcpMock.servers.length = 0;
+  }),
+  clearSettingsToolsEnabled: vi.fn(),
+}));
+
 // Hoisted so the sign-out suite can assert the launcher-surface clears without
 // loading the last-opened store's secure-store chain or the native module.
 const lastOpenedSessionMock = vi.hoisted(() => ({
@@ -402,6 +414,19 @@ vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
 vi.mock('@/lib/chat/sign-out', () => ({
   clearChatsForSignOut: vi.fn().mockResolvedValue(undefined),
   releaseChatsForAccountSwitch: vi.fn().mockResolvedValue(undefined),
+}));
+
+// The remote MCP connection and the stored servers behind it ride on the
+// native-bound secure-store preference chain (sonner-native -> react-native),
+// so the sign-out body's clears are stubbed here and asserted by call.
+vi.mock('@/lib/chat/remote-mcp', () => ({
+  forgetRemoteMcp: remoteMcpMock.forgetRemoteMcp,
+}));
+vi.mock('@/lib/chat/remote-mcp-store', () => ({
+  clearRemoteMcpServers: remoteMcpMock.clearRemoteMcpServers,
+}));
+vi.mock('@/lib/chat/settings-tools-switch', () => ({
+  clearSettingsToolsEnabled: remoteMcpMock.clearSettingsToolsEnabled,
 }));
 
 vi.mock('@/lib/pr-review/recent-prs', () => ({
@@ -817,6 +842,23 @@ describe('sign-out teardown ordering', () => {
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();
+  });
+
+  it('clears the remote MCP connection, its stored servers and the group switch on sign-out', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    // The account added a remote server before signing out.
+    remoteMcpMock.servers.push('alpha');
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(remoteMcpMock.forgetRemoteMcp).toHaveBeenCalled();
+    expect(remoteMcpMock.clearRemoteMcpServers).toHaveBeenCalled();
+    expect(remoteMcpMock.clearSettingsToolsEnabled).toHaveBeenCalled();
+    expect(remoteMcpMock.servers).toEqual([]);
+
+    unmount();
   });
 
   it('clears the last-opened session and the launcher surfaces on sign-out', async () => {

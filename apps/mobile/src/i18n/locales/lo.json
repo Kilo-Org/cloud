@@ -3241,8 +3241,37 @@
       "unauthorized": "ເຄື່ອງມື Kilo ປະຕິເສດເຊສຊັນນີ້",
       "unauthorizedDescription": "ເຂົ້າສູ່ລະບົບອີກຄັ້ງເພື່ອໃຊ້ເຄື່ອງມື Kilo ໃນການສົນທະນານີ້.",
       "unavailable": "ເຄື່ອງມື Kilo ບໍ່ມີ",
-      "unavailableDescription": "ເຊີບເວີ Kilo ບໍ່ມີສຳລັບບັນຊີນີ້."
+      "unavailableDescription": "ເຊີບເວີ Kilo ບໍ່ມີສຳລັບບັນຊີນີ້.",
+      "sheetTitle": "ເຄື່ອງມືແຊັດ",
+      "addServerTitle": "ເພີ່ມເຊີບເວີ MCP",
+      "editServerTitle": "ແກ້ໄຂເຊີບເວີ MCP ນີ້",
+      "fieldName": "ຊື່ທີ່ສະແດງ",
+      "fieldUrl": "URL ຂອງເຊີບເວີ",
+      "fieldUrlInvalid": "ປ້ອນ URL ຂອງເຊີບເວີທີ່ຖືກຕ້ອງ.",
+      "fieldToken": "ໂທເຄັນ Bearer (ທາງເລືອກ)",
+      "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້: {{name}}",
+      "editServer": "ແກ້ໄຂເຊີບເວີ",
+      "deleteServer": "ລຶບເຊີບເວີ",
+      "editServerA11y": "ແກ້ໄຂເຊີບເວີ: {{name}}",
+      "deleteServerA11y": "ລຶບເຊີບເວີ: {{name}}",
+      "retryServerA11y": "ລອງໃໝ່ເຊີບເວີນີ້: {{name}}",
+      "deleteTitle": "ລຶບເຊີບເວີນີ້ບໍ?",
+      "deleteMessage": "ເຄື່ອງມືຂອງມັນຈະອອກຈາກທຸກແຊັດ.",
+      "kiloBuiltIn": "ມາພ້ອມແລ້ວ. ເປີດ ຫຼື ປິດມັນສຳລັບແຊັດນີ້; ບໍ່ສາມາດແກ້ໄຂ ຫຼື ລຶບໄດ້.",
+      "serversEmptyTitle": "ຍັງບໍ່ມີເຊີບເວີທາງໄກ",
+      "serversEmptyDescription": "ເພີ່ມໜຶ່ງເພື່ອສະເໜີເຄື່ອງມືຂອງມັນໃນແຊັດຂອງທ່ານ.",
+      "settingsToolsTitle": "ໃຫ້ Kilo ປ່ຽນການຕັ້ງຄ່າແອັບ",
+      "settingsToolsSubtitle": "ນຳໃຊ້ກັບຮູບແບບ, ພາສາ, ການແຈ້ງເຕືອນ, ໂມເດລ ແລະ ສ່ວນທີ່ເຫຼືອຂອງການຕັ້ງຄ່າ.",
+      "settingsToolsOn": "ເປີດ — ເຄື່ອງມືຕັ້ງຄ່າຖືກສົ່ງໄປຫາໂມເດລ",
+      "settingsToolsOff": "ປິດ — ບໍ່ມີເຄື່ອງມືຕັ້ງຄ່າໃດໆຖືກສົ່ງໄປຫາໂມເດລ",
+      "serverChecking": "ກຳລັງກວດສອບເຊີບເວີນີ້…",
+      "serverToolCount": "ເຄື່ອງມື {{count}}",
+      "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້",
+      "serverOff": "ເຊີບເວີນີ້ປິດຢູ່"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ຢືນຢັນການປ່ຽນແປງນີ້ບໍ?"
   },
   "appActions": {
     "start": {

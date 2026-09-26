@@ -3241,8 +3241,37 @@
       "unauthorized": "Kiloツールがこのセッションを拒否しました",
       "unauthorizedDescription": "このチャットでKiloツールを使うには、もう一度サインインしてください。",
       "unavailable": "Kiloツールは利用できません",
-      "unavailableDescription": "このアカウントではKiloサーバーを利用できません。"
+      "unavailableDescription": "このアカウントではKiloサーバーを利用できません。",
+      "sheetTitle": "チャットツール",
+      "addServerTitle": "MCPサーバーを追加",
+      "editServerTitle": "このMCPサーバーを編集",
+      "fieldName": "表示名",
+      "fieldUrl": "サーバーURL",
+      "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
+      "fieldToken": "Bearerトークン（任意）",
+      "enableServer": "このサーバーを有効にする：{{name}}",
+      "editServer": "サーバーを編集",
+      "deleteServer": "サーバーを削除",
+      "editServerA11y": "サーバーを編集：{{name}}",
+      "deleteServerA11y": "サーバーを削除：{{name}}",
+      "retryServerA11y": "このサーバーを再試行：{{name}}",
+      "deleteTitle": "このサーバーを削除しますか？",
+      "deleteMessage": "そのツールはすべてのチャットから削除されます。",
+      "kiloBuiltIn": "組み込みです。このチャットでオンまたはオフにできます。編集も削除もできません。",
+      "serversEmptyTitle": "リモートサーバーはまだありません",
+      "serversEmptyDescription": "追加すると、チャットでそのツールを利用できます。",
+      "settingsToolsTitle": "Kilo にアプリ設定の変更を許可する",
+      "settingsToolsSubtitle": "テーマ、言語、通知、モデル、その他の環境設定に適用されます。",
+      "settingsToolsOn": "オン — 設定ツールがモデルに送信されます",
+      "settingsToolsOff": "オフ — 設定ツールはモデルに送信されません",
+      "serverChecking": "このサーバーを確認しています…",
+      "serverToolCount": "{{count}} 個のツール",
+      "serverUnreachable": "このサーバーに接続できませんでした",
+      "serverOff": "このサーバーはオフです"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "この変更を確認しますか？"
   },
   "appActions": {
     "start": {

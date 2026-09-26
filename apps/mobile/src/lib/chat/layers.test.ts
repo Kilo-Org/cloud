@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { ToolRegistry } from '@kilocode/harness-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { layerTools, modelFactsFor, RELAYED_SHAPE } from './layers';
+import { layerToolsFor, modelFactsFor, RELAYED_SHAPE } from './layers';
 
 // The catalog is read here without the device plugins the runtime builds around
 // it, so the ones that only exist on a device are stubbed.
@@ -14,6 +14,15 @@ vi.mock('./fetch', () => ({ chatFetch: () => undefined }));
 vi.mock('@/lib/intl-cache', () => ({
   dateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: 'Europe/Amsterdam' }) }),
 }));
+// The settings tools are built from the app's settings registry and confirmed
+// through a device dialog, and the remote servers' tools are discovered from
+// the person's own servers; the registry's live view is what is under test.
+vi.mock('@/lib/settings/registry', () => ({
+  settingsService: () => ({ settings: [], read: () => undefined, write: () => undefined }),
+}));
+vi.mock('@/lib/settings/confirm', () => ({ confirmSettingChange: () => undefined }));
+vi.mock('./settings-tools-switch', () => ({ isSettingsToolsEnabled: () => true }));
+vi.mock('./remote-mcp', () => ({ remoteServerTools: () => [], remoteServerToolNames: () => [] }));
 // The Kilo MCP tools are discovered while the app runs; what is under test is
 // that the registry reads them when a session opens, not the discovery itself.
 const mcp = vi.hoisted(() => ({
@@ -69,7 +78,7 @@ const namesHeld = async (): Promise<readonly string[]> => {
     Effect.gen(function* held() {
       const registry = yield* ToolRegistry;
       return registry.tools.map(tool => tool.definition.name);
-    }).pipe(Effect.provide(layerTools))
+    }).pipe(Effect.provide(layerToolsFor()))
   );
   return names;
 };
@@ -77,10 +86,15 @@ const namesHeld = async (): Promise<readonly string[]> => {
 describe('the tools the registry holds', () => {
   it('is a live view, so a tool discovered after the runtime was built is in it', async () => {
     mcp.tools.length = 0;
-    expect(await namesHeld()).toEqual(['time']);
+    expect(await namesHeld()).toEqual(['time', 'settings_list', 'settings_set']);
 
     mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
 
-    expect(await namesHeld()).toEqual(['time', 'mcp_kilo_read-file']);
+    expect(await namesHeld()).toEqual([
+      'time',
+      'settings_list',
+      'settings_set',
+      'mcp_kilo_read-file',
+    ]);
   });
 });

@@ -60,6 +60,16 @@ export function trustHost(host: string): void {
   store.set([...current, host]);
 }
 
+export function getTrustedHosts(): string[] {
+  return store.get();
+}
+
+/** Replace the trusted-host list. Destructive: a caller confirms before writing. */
+export async function setTrustedHosts(next: string[]): Promise<void> {
+  await store.whenLoaded();
+  store.set(next);
+}
+
 export function revokeHost(host: string): void {
   store.set(store.get().filter(item => item !== host));
 }

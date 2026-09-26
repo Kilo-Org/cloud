@@ -3327,8 +3327,37 @@
       "unauthorized": "Orodja Kilo so zavrnila to sejo",
       "unauthorizedDescription": "Prijavi se znova, da boš lahko v tem klepetu uporabljal orodja Kilo.",
       "unavailable": "Orodja Kilo niso na voljo",
-      "unavailableDescription": "Strežnik Kilo ni na voljo za ta račun."
+      "unavailableDescription": "Strežnik Kilo ni na voljo za ta račun.",
+      "sheetTitle": "Orodja za klepet",
+      "addServerTitle": "Dodaj strežnik MCP",
+      "editServerTitle": "Uredi ta strežnik MCP",
+      "fieldName": "Prikazano ime",
+      "fieldUrl": "URL strežnika",
+      "fieldUrlInvalid": "Vnesi veljaven URL strežnika.",
+      "fieldToken": "Žeton Bearer (neobvezno)",
+      "enableServer": "Omogoči ta strežnik: {{name}}",
+      "editServer": "Uredi strežnik",
+      "deleteServer": "Izbriši strežnik",
+      "editServerA11y": "Uredi strežnik: {{name}}",
+      "deleteServerA11y": "Izbriši strežnik: {{name}}",
+      "retryServerA11y": "Poskusi znova ta strežnik: {{name}}",
+      "deleteTitle": "Izbrišem ta strežnik?",
+      "deleteMessage": "Njegova orodja zapustijo vsak klepet.",
+      "kiloBuiltIn": "Vgrajeno. Vklopi ali izklopi ga za ta klepet; ni ga mogoče urejati ali izbrisati.",
+      "serversEmptyTitle": "Ni še oddaljenih strežnikov",
+      "serversEmptyDescription": "Dodaj enega, da ponudiš njegova orodja v svojih klepetih.",
+      "settingsToolsTitle": "Dovoli Kilu spreminjanje nastavitev aplikacije",
+      "settingsToolsSubtitle": "Velja za temo, jezik, obvestila, modele in preostale Nastavitve.",
+      "settingsToolsOn": "Vklopljeno — orodja za nastavitve se pošljejo modelu",
+      "settingsToolsOff": "Izklopljeno — nobeno orodje za nastavitve se ne pošlje modelu",
+      "serverChecking": "Preverjanje tega strežnika…",
+      "serverToolCount": "{{count}} orodij",
+      "serverUnreachable": "Ni bilo mogoče doseči tega strežnika",
+      "serverOff": "Ta strežnik je izklopljen"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Potrdim to spremembo?"
   },
   "appActions": {
     "start": {

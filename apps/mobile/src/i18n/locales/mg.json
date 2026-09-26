@@ -3241,8 +3241,37 @@
       "unauthorized": "Nandà ity sesiona ity ny fitaovana Kilo",
       "unauthorizedDescription": "Hiditra indray ianao hampiasa ny fitaovana Kilo amin'ity resaka ity.",
       "unavailable": "Tsy misy ny fitaovana Kilo",
-      "unavailableDescription": "Tsy misy ny mpizara Kilo ho an'ity kaonty ity."
+      "unavailableDescription": "Tsy misy ny mpizara Kilo ho an'ity kaonty ity.",
+      "sheetTitle": "Fitaovana fifampiresahana",
+      "addServerTitle": "Manampy server MCP",
+      "editServerTitle": "Ovaina ity server MCP ity",
+      "fieldName": "Anarana aseho",
+      "fieldUrl": "URL-n'ny server",
+      "fieldUrlInvalid": "Ampidiro URL server mety.",
+      "fieldToken": "Token Bearer (tsy voatery)",
+      "enableServer": "Alefaso ity server ity: {{name}}",
+      "editServer": "Ovaina ny server",
+      "deleteServer": "Fafao ny server",
+      "editServerA11y": "Ovaina ny server: {{name}}",
+      "deleteServerA11y": "Fafao ny server: {{name}}",
+      "retryServerA11y": "Andramo indray ity server ity: {{name}}",
+      "deleteTitle": "Fafana ity server ity?",
+      "deleteMessage": "Miala amin'ny resaka rehetra ny fitaovanany.",
+      "kiloBuiltIn": "Tafiditra ao. Alefaso na vonoy izy amin'ity resaka ity; tsy azo ovaina na fafana.",
+      "serversEmptyTitle": "Mbola tsy misy server lavitra",
+      "serversEmptyDescription": "Manampia iray hanolorana ny fitaovanany amin'ny resakao.",
+      "settingsToolsTitle": "Avelao i Kilo hanova ny parametatry ny fampiharana",
+      "settingsToolsSubtitle": "Mihatra amin'ny endrika, fiteny, fampahafantarana, maodely ary ny sisa amin'ny Safidy.",
+      "settingsToolsOn": "Alefa — alefa any amin'ny maodely ny fitaovana parametatra",
+      "settingsToolsOff": "Vono — tsy misy fitaovana parametatra alefa any amin'ny maodely",
+      "serverChecking": "Manamarina ity server ity…",
+      "serverToolCount": "fitaovana {{count}}",
+      "serverUnreachable": "Tsy tratra ity server ity",
+      "serverOff": "Mihidy ity server ity"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Hamafiso ity fanovana ity?"
   },
   "appActions": {
     "start": {

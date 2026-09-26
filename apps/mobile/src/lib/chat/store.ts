@@ -12,6 +12,10 @@
  * `parts` tables the SDK's SQLite store plugin owns. The join is the point of
  * the file, and it is why the SQL is here in one place and nowhere else.
  */
+import { z } from 'zod';
+
+/** The tool names the SDK's store writes for a session: a JSON array of names. */
+const toolsSchema = z.array(z.string());
 
 /** What SQLite takes as a bound value here. Chats hold text and numbers. */
 type SqlValue = string | number;
@@ -90,6 +94,33 @@ export function modelOfSession(db: ChatDatabase, sessionId: string): string | nu
     sessionId,
   ]);
   return rows[0]?.model ?? null;
+}
+
+/**
+ * The tool names a session was opened with, which the SDK's store holds.
+ *
+ * A session freezes its tools, so this is what the live session still offers.
+ * Comparing it with the names the switches name now is how a chat already on
+ * them is told from one that has to move: rewriting a session that changed
+ * nothing would churn it for no reason. A session the store never wrote, or one
+ * stored without tools, answers null and the caller moves rather than assuming.
+ */
+export function toolsOfSession(db: ChatDatabase, sessionId: string): readonly string[] | null {
+  const rows = db.getAllSync<{ tools: string | null }>('select tools from sessions where id = ?', [
+    sessionId,
+  ]);
+  const stored = rows[0]?.tools;
+  if (stored === null || stored === undefined) {
+    return null;
+  }
+  try {
+    /* A column this app does not own: the SDK's store writes it, and another
+       build or a crash can leave it holding something else. */
+    const names = toolsSchema.safeParse(JSON.parse(stored));
+    return names.success ? names.data : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Records a chat, so the list has it. */

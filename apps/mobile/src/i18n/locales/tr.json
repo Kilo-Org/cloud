@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo araçları bu oturumu reddetti",
       "unauthorizedDescription": "Bu sohbette Kilo araçlarını kullanmak için tekrar oturum aç.",
       "unavailable": "Kilo araçları kullanılamıyor",
-      "unavailableDescription": "Kilo sunucusu bu hesap için kullanılamıyor."
+      "unavailableDescription": "Kilo sunucusu bu hesap için kullanılamıyor.",
+      "sheetTitle": "Sohbet araçları",
+      "addServerTitle": "MCP sunucusu ekle",
+      "editServerTitle": "Bu MCP sunucusunu düzenle",
+      "fieldName": "Görünen ad",
+      "fieldUrl": "Sunucu URL'si",
+      "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
+      "fieldToken": "Bearer belirteci (isteğe bağlı)",
+      "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
+      "editServer": "Sunucuyu düzenle",
+      "deleteServer": "Sunucuyu sil",
+      "editServerA11y": "Sunucuyu düzenle: {{name}}",
+      "deleteServerA11y": "Sunucuyu sil: {{name}}",
+      "retryServerA11y": "Bu sunucuyu yeniden dene: {{name}}",
+      "deleteTitle": "Bu sunucu silinsin mi?",
+      "deleteMessage": "Araçları her sohbetten çıkar.",
+      "kiloBuiltIn": "Yerleşik. Bu sohbet için açın veya kapatın; düzenlenemez veya silinemez.",
+      "serversEmptyTitle": "Henüz uzak sunucu yok",
+      "serversEmptyDescription": "Araçlarını sohbetlerinizde sunmak için bir tane ekleyin.",
+      "settingsToolsTitle": "Kilo'nun uygulama ayarlarını değiştirmesine izin ver",
+      "settingsToolsSubtitle": "Tema, dil, bildirimler, modeller ve Tercihlerin geri kalanı için geçerlidir.",
+      "settingsToolsOn": "Açık — ayar araçları modele gönderilir",
+      "settingsToolsOff": "Kapalı — modele hiçbir ayar aracı gönderilmez",
+      "serverChecking": "Bu sunucu denetleniyor…",
+      "serverToolCount": "{{count}} araç",
+      "serverUnreachable": "Bu sunucuya ulaşılamadı",
+      "serverOff": "Bu sunucu kapalı"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bu değişiklik onaylansın mı?"
   },
   "appActions": {
     "start": {

@@ -3370,8 +3370,37 @@
       "unauthorized": "L-għodod Kilo rrifjutaw din is-sessjoni",
       "unauthorizedDescription": "Idħol mill-ġdid biex tuża l-għodod Kilo f'dan il-chat.",
       "unavailable": "L-għodod Kilo mhumiex disponibbli",
-      "unavailableDescription": "Is-server Kilo mhuwiex disponibbli għal dan il-kont."
+      "unavailableDescription": "Is-server Kilo mhuwiex disponibbli għal dan il-kont.",
+      "sheetTitle": "Għodod taċ-chat",
+      "addServerTitle": "Żid server MCP",
+      "editServerTitle": "Editja dan is-server MCP",
+      "fieldName": "Isem muri",
+      "fieldUrl": "URL tas-server",
+      "fieldUrlInvalid": "Daħħal URL tas-server validu.",
+      "fieldToken": "Token Bearer (mhux obbligatorju)",
+      "enableServer": "Ippermetti dan is-server: {{name}}",
+      "editServer": "Editja s-server",
+      "deleteServer": "Ħassar is-server",
+      "editServerA11y": "Editja s-server: {{name}}",
+      "deleteServerA11y": "Ħassar is-server: {{name}}",
+      "retryServerA11y": "Erġa' pprova dan is-server: {{name}}",
+      "deleteTitle": "Ħassar dan is-server?",
+      "deleteMessage": "L-għodod tiegħu joħorġu minn kull chat.",
+      "kiloBuiltIn": "Integrat. Xgħelu jew itfih għal dan iċ-chat; ma jistax jiġi editjat jew imħassar.",
+      "serversEmptyTitle": "Għadhom l-ebda servers remoti",
+      "serversEmptyDescription": "Żid wieħed biex toffri l-għodod tiegħu fil-chats tiegħek.",
+      "settingsToolsTitle": "Ħalli lil Kilo jbiddel is-settings tal-app",
+      "settingsToolsSubtitle": "Japplika għat-tema, il-lingwa, in-notifiki, il-mudelli u l-bqija tal-Preferenzi.",
+      "settingsToolsOn": "Mixgħul — l-għodod tas-settings jintbagħtu lill-mudell",
+      "settingsToolsOff": "Mitfi — l-ebda għodda tas-settings ma tintbagħat lill-mudell",
+      "serverChecking": "Qed jiġi ċċekkjat dan is-server…",
+      "serverToolCount": "{{count}} għodod",
+      "serverUnreachable": "Ma setax jintlaħaq dan is-server",
+      "serverOff": "Dan is-server huwa mitfi"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Tikkonferma din il-bidla?"
   },
   "appActions": {
     "start": {

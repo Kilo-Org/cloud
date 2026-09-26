@@ -23,6 +23,11 @@ let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 /** What a clone was moved onto, so the tool set it names can be read back. */
 let clonedWith: { readonly tools?: readonly string[]; readonly model?: string } | undefined =
   undefined;
+/**
+ * What the store says a session was opened with, so a chat already on the names
+ * can be told from one that has to move. Null is a session nothing wrote.
+ */
+let storedTools: readonly string[] | null = null;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
 /** A session id whose reopen fails, so the failed-open path can be exercised. */
@@ -123,8 +128,34 @@ vi.mock('@kilocode/harness-sdk', () => {
     },
   };
 });
-vi.mock('./layers', () => ({ chatLayers: () => Layer.empty }));
+vi.mock('./layers', () => ({
+  chatLayers: () => Layer.empty,
+  /* The registry reads the chat's organization to give the settings tools their
+     defaults context; the layer itself is replaced above. */
+  organizationIdOf: (org: { readonly kind: string; readonly id?: string }) =>
+    org.kind === 'organization' ? org.id : undefined,
+}));
 vi.mock('@/lib/config', () => ({ KILO_MCP_URL: 'https://mcp.example' }));
+
+// The one group switch for the settings tools, so a test can move it and see
+// the chat's names follow.
+const settingsSwitch = vi.hoisted(() => ({ enabled: true }));
+vi.mock('./settings-tools-switch', () => ({
+  isSettingsToolsEnabled: () => settingsSwitch.enabled,
+}));
+vi.mock('@/lib/settings/registry', () => ({
+  settingsService: () => ({ settings: [], read: () => undefined, write: () => undefined }),
+}));
+vi.mock('@/lib/settings/confirm', () => ({ confirmSettingChange: () => undefined }));
+// The person's own remote servers; what is under test is the registry's use of
+// the names, not the discovery.
+const remote = vi.hoisted(() => ({
+  tools: [] as { readonly definition: { readonly name: string } }[],
+}));
+vi.mock('./remote-mcp', () => ({
+  remoteServerTools: () => remote.tools,
+  remoteServerToolNames: () => remote.tools.map(tool => tool.definition.name),
+}));
 vi.mock('./kilo-mcp', () => ({
   ensureKiloMcp: mcp.ensure,
   mcpEnabledFor: async (sessionId: string) => {
@@ -179,14 +210,26 @@ vi.mock('./store', () => ({
   moveChat: () => undefined,
   rememberChat: () => undefined,
   touchChat: () => undefined,
+  toolsOfSession: () => storedTools,
 }));
 
-const { enterChat, releaseChat, retryKiloMcp, say, setMcpEnabled, startChat, stopChat } =
-  await import('./registry');
+const {
+  enterChat,
+  refreshChatTools,
+  releaseChat,
+  retryKiloMcp,
+  say,
+  setMcpEnabled,
+  startChat,
+  stopChat,
+} = await import('./registry');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./use-chat');
 
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
+
+/** The settings tools a chat is opened with while the group switch is on. */
+const SETTINGS = ['settings_list', 'settings_set'];
 
 /** Lets the forked reading fiber run to wherever it gets to. */
 const settled = async () => {
@@ -215,8 +258,11 @@ beforeEach(async () => {
   failHistoryFor = undefined;
   clonedWith = undefined;
   openedWith = undefined;
+  storedTools = null;
+  settingsSwitch.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
+  remote.tools.length = 0;
   opened = await startChat(place, 'kilo/one');
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
@@ -225,7 +271,57 @@ beforeEach(async () => {
 
 describe('what a chat is opened with', () => {
   it('offers the clock, because a model has none and answers from a stale date', () => {
-    expect(openedWith?.tools).toEqual(['time']);
+    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
+  });
+
+  it('moves the open chat onto the names the group switch names now, at its next use', async () => {
+    /* A session freezes its tools, so the switch moving changes what the next
+       session would name and nothing about the one on screen. The chat is moved
+       when it is next used, which is what sends the new list to the model. */
+    expect(snapshotOf(opened).sessionId).toBe('s1');
+
+    settingsSwitch.enabled = false;
+    await refreshChatTools();
+    await settled();
+
+    /* The tap clones nothing: one switch moved one thing, and the chats this
+       run has visited are not each copied for it. */
+    expect(clonedWith).toBeUndefined();
+
+    await say(opened, 'hello', 'kilo/one');
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('drops the settings tools on the next question even if the chat was never marked', async () => {
+    /* A chat that did not exist when the switch moved is not in the map to
+       mark. The store still holds the names it was opened with, so the next
+       question compares those with the switch as it stands now rather than
+       offering a tool the person just took away. */
+    storedTools = ['time', ...SETTINGS];
+    settingsSwitch.enabled = false;
+    await say(opened, 'hello', 'kilo/one');
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('leaves a chat alone when the switch that moved was not its own', async () => {
+    /* A server's flag flipping is not this chat's: it names none of that
+       server's tools, so its set did not move and its session is not copied. */
+    storedTools = ['time', ...SETTINGS];
+    await refreshChatTools();
+    await settled();
+
+    await say(opened, 'hello', 'kilo/one');
+    await settled();
+
+    expect(clonedWith).toBeUndefined();
+    expect(snapshotOf(opened).sessionId).toBe('s1');
+    expect(asked.at(-1)).toEqual({ sessionId: 's1', text: 'hello' });
   });
 });
 
@@ -243,7 +339,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     /* The open asks for the automatic deadline, so a slow server leaves the
        chat opening rather than holding the send on it. */
     expect(mcp.ensure).toHaveBeenCalledWith(place, 'automatic');
-    expect(openedWith?.tools).toEqual(['time', 'mcp_kilo_read-file']);
+    expect(openedWith?.tools).toEqual(['time', ...SETTINGS, 'mcp_kilo_read-file']);
   });
 
   it('opens a chat with the setting off on the clock alone, and reaches no server', async () => {
@@ -253,7 +349,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     opened = await startChat(place, 'kilo/one', false);
     await settled();
 
-    expect(openedWith?.tools).toEqual(['time']);
+    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
     expect(mcp.ensure).not.toHaveBeenCalled();
   });
 
@@ -276,7 +372,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
       expect.objectContaining({ chatScope: 'me:personal' }),
       'automatic'
     );
-    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS, 'mcp_kilo_read-file'] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
@@ -292,7 +388,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
     /* The tool set is frozen for the life of a session, so turning it off is a
        copy onto a session without those tools, and the setting follows it. */
-    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
     expect(mcp.enabled.get('s2')).toBe(false);
   });
@@ -315,7 +411,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     finish?.();
     await settled();
 
-    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
@@ -329,7 +425,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     /* The server's list moved on, or it is down while the session was stored
        with its tools. The chat opens either way rather than failing on a name
        nothing holds. */
-    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS, 'mcp_kilo_read-file'] });
     expect(snapshotOf('stale').status).toBe('idle');
     expect(snapshotOf('stale').failed).toBeNull();
 
@@ -343,7 +439,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await releaseChat(opened);
     opened = await startChat(place, 'kilo/one');
     await settled();
-    expect(openedWith?.tools).toEqual(['time', 'mcp_kilo_read-file']);
+    expect(openedWith?.tools).toEqual(['time', ...SETTINGS, 'mcp_kilo_read-file']);
 
     /* A call that did not reach the server dropped the tools from the registry,
        so the session is stored naming one nothing holds. Switching the model
@@ -354,7 +450,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await say(opened, 'second', 'kilo/two');
     await settled();
 
-    expect(clonedWith).toEqual({ model: 'kilo/two', tools: ['time'] });
+    expect(clonedWith).toEqual({ model: 'kilo/two', tools: ['time', ...SETTINGS] });
     expect(snapshotOf(opened).failed).toBeNull();
     expect(snapshotOf(opened).sessionId).toBe('s2');
     expect(asked.at(-1)).toEqual({ sessionId: 's2', text: 'second' });
@@ -367,7 +463,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await releaseChat(opened);
     opened = await startChat(place, 'kilo/one');
     await settled();
-    expect(openedWith?.tools).toEqual(['time']);
+    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
 
     mcp.tools.push(discovered);
     mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
@@ -378,7 +474,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
       expect.objectContaining({ chatScope: 'me:personal' }),
       'retry'
     );
-    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS, 'mcp_kilo_read-file'] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 

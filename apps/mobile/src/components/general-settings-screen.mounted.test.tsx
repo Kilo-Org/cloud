@@ -38,6 +38,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Switch: 'Switch',
+  Pressable: 'Pressable',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },
@@ -181,26 +182,34 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
     );
     const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
 
-    expect(byLabel('Condense tool calls')?.props).toMatchObject({ value: false, disabled: false });
-    expect(byLabel('Unlock with biometrics')?.props).toMatchObject({
-      value: false,
+    expect(byLabel('Condense tool calls')?.props.accessibilityState).toMatchObject({
+      checked: false,
       disabled: false,
     });
-    expect(byLabel('Auto expand thinking')?.props).toMatchObject({ value: false, disabled: false });
-    expect(byLabel('Keep screen on while on session page')?.props).toMatchObject({
-      value: false,
+    expect(byLabel('Unlock with biometrics')?.props.accessibilityState).toMatchObject({
+      checked: false,
       disabled: false,
     });
-    expect(byLabel('Add app attribution to PR reviews')?.props).toMatchObject({
-      value: true,
+    expect(byLabel('Auto expand thinking')?.props.accessibilityState).toMatchObject({
+      checked: false,
       disabled: false,
     });
-    expect(byLabel('Return key sends message')?.props).toMatchObject({
-      value: false,
+    expect(byLabel('Keep screen on while on session page')?.props.accessibilityState).toMatchObject(
+      {
+        checked: false,
+        disabled: false,
+      }
+    );
+    expect(byLabel('Add app attribution to PR reviews')?.props.accessibilityState).toMatchObject({
+      checked: true,
+      disabled: false,
+    });
+    expect(byLabel('Return key sends message')?.props.accessibilityState).toMatchObject({
+      checked: false,
       disabled: false,
     });
   });
@@ -210,27 +219,33 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
     );
     const condenseSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Condense tool calls'
     );
 
-    expect(condenseSwitch?.props).toMatchObject({ value: false, disabled: true });
+    expect(condenseSwitch?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: true,
+    });
   });
 
   it('renders the biometric switch off by default without prompting native authentication', async () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
     );
     const biometricSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Unlock with biometrics'
     );
 
     expect(biometricSwitch).toBeDefined();
-    expect(biometricSwitch?.props).toMatchObject({ value: false, disabled: false });
+    expect(biometricSwitch?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
     expect(native.authenticateAsync).not.toHaveBeenCalled();
   });
 
@@ -238,13 +253,16 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
     );
     const hideThinkingSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Hide thinking details'
     );
 
     expect(hideThinkingSwitch).toBeDefined();
-    expect(hideThinkingSwitch?.props).toMatchObject({ value: false, disabled: false });
+    expect(hideThinkingSwitch?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
   });
 });

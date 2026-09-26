@@ -8,6 +8,9 @@ import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
+import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
+import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
+import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -90,13 +93,19 @@ function clearRecentPrsBestEffort(): void {
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, confirmed markdown images, media caches, per-session
- * auto-approve and goal-disclosure flags, the browsable artifact mirror,
- * app-owned temp copies, the stored PR recents, and the phone's own search index.
- * Every member is best-effort; one member's throw falls through to the members
- * after it, and to the caller's own sign-in/sign-out state reset. The recents
- * delete and OS search clear are fired without awaiting, so the function stays
- * synchronous; a rejection is reported through telemetry, and the
- * signed-out-launch re-clear retries the index clear.
+ * auto-approve and goal-disclosure flags, the remote MCP connection and the
+ * stored servers behind it, the app-settings-tools group switch, the browsable
+ * artifact mirror, app-owned temp copies, the stored PR recents, and the
+ * phone's own search index. Every member is best-effort; one member's throw
+ * falls through to the members after it, and to the caller's own
+ * sign-in/sign-out state reset. The recents delete and OS search clear are
+ * fired without awaiting, so the function stays synchronous; a rejection is
+ * reported through telemetry, and the signed-out-launch re-clear retries the
+ * index clear.
+ *
+ * Both boundaries call this: the sign-out body and the account switch. A clear
+ * that only the sign-out path ran would let a direct switch hand the next
+ * account the previous one's choice.
  */
 export function clearSessionScopedState(): void {
   runClear(clearTrustedHosts);
@@ -105,6 +114,9 @@ export function clearSessionScopedState(): void {
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
+  runClear(forgetRemoteMcp);
+  runClear(clearRemoteMcpServers);
+  runClear(clearSettingsToolsEnabled);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;

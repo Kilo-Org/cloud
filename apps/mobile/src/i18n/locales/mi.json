@@ -3241,8 +3241,37 @@
       "unauthorized": "I whakakore ngā taputapu Kilo i tēnei wātū",
       "unauthorizedDescription": "Whakauru mai anō ki te whakamahi i ngā taputapu Kilo i tēnei kōrerorero.",
       "unavailable": "Kāore ngā taputapu Kilo i te wātea",
-      "unavailableDescription": "Kāore te tūmau Kilo i te wātea mō tēnei pūkete."
+      "unavailableDescription": "Kāore te tūmau Kilo i te wātea mō tēnei pūkete.",
+      "sheetTitle": "Ngā taputapu kōrerorero",
+      "addServerTitle": "Tāpiri tūmau MCP",
+      "editServerTitle": "Whakatika i tēnei tūmau MCP",
+      "fieldName": "Ingoa whakaatu",
+      "fieldUrl": "URL o te tūmau",
+      "fieldUrlInvalid": "Whakaurua he URL tūmau tika.",
+      "fieldToken": "Tāpaepae Bearer (kōwhiringa)",
+      "enableServer": "Whakahohea tēnei tūmau: {{name}}",
+      "editServer": "Whakatika tūmau",
+      "deleteServer": "Muku tūmau",
+      "editServerA11y": "Whakatika tūmau: {{name}}",
+      "deleteServerA11y": "Muku tūmau: {{name}}",
+      "retryServerA11y": "Whakamātau anō i tēnei tūmau: {{name}}",
+      "deleteTitle": "Muku i tēnei tūmau?",
+      "deleteMessage": "Ka wehe ōna taputapu i ngā kōrerorero katoa.",
+      "kiloBuiltIn": "Kua oti te whakauru. Whakahohea, whakawetohia rānei mō tēnei kōrerorero; kāore e taea te whakatika, te muku rānei.",
+      "serversEmptyTitle": "Kāore anō he tūmau mamao",
+      "serversEmptyDescription": "Tāpirihia tētahi hei tuku i ōna taputapu ki ō kōrerorero.",
+      "settingsToolsTitle": "Tukua a Kilo kia huri i ngā tautuhinga taupānga",
+      "settingsToolsSubtitle": "Ka pā ki te kaupapa, te reo, ngā whakamōhiotanga, ngā tauira me te toenga o ngā Manakohanga.",
+      "settingsToolsOn": "Kā — ka tukuna ngā taputapu tautuhinga ki te tauira",
+      "settingsToolsOff": "Weto — kāore he taputapu tautuhinga e tukuna ana ki te tauira",
+      "serverChecking": "E tirotiro ana i tēnei tūmau…",
+      "serverToolCount": "{{count}} taputapu",
+      "serverUnreachable": "Kāore i taea te toro atu ki tēnei tūmau",
+      "serverOff": "Kua weto tēnei tūmau"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Whakaū i tēnei huringa?"
   },
   "appActions": {
     "start": {

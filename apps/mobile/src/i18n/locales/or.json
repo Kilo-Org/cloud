@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo ସାଧନ ଏହି ଅଧିବେଶନକୁ ଅସ୍ୱୀକାର କଲା",
       "unauthorizedDescription": "ଏହି ଚାଟ୍‌ରେ Kilo ସାଧନ ବ୍ୟବହାର କରିବାକୁ ପୁଣି ସାଇନ୍ ଇନ୍ କର।",
       "unavailable": "Kilo ସାଧନ ଉପଲବ୍ଧ ନାହିଁ",
-      "unavailableDescription": "ଏହି ଖାତା ପାଇଁ Kilo ସର୍ଭର ନାହିଁ।"
+      "unavailableDescription": "ଏହି ଖାତା ପାଇଁ Kilo ସର୍ଭର ନାହିଁ।",
+      "sheetTitle": "ଚାଟ୍ ସାଧନ",
+      "addServerTitle": "MCP ସର୍ଭର ଯୋଡ଼ନ୍ତୁ",
+      "editServerTitle": "ଏହି MCP ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ",
+      "fieldName": "ଦେଖାଯାଉଥିବା ନାମ",
+      "fieldUrl": "ସର୍ଭର URL",
+      "fieldUrlInvalid": "ବୈଧ ସର୍ଭର URL ଦିଅନ୍ତୁ।",
+      "fieldToken": "Bearer ଟୋକନ (ଇଚ୍ଛାଧୀନ)",
+      "enableServer": "ଏହି ସର୍ଭର ସକ୍ଷମ କରନ୍ତୁ: {{name}}",
+      "editServer": "ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ",
+      "deleteServer": "ସର୍ଭର ବିଲୋପ କରନ୍ତୁ",
+      "editServerA11y": "ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ: {{name}}",
+      "deleteServerA11y": "ସର୍ଭର ବିଲୋପ କରନ୍ତୁ: {{name}}",
+      "retryServerA11y": "ଏହି ସର୍ଭର ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ: {{name}}",
+      "deleteTitle": "ଏହି ସର୍ଭର ବିଲୋପ କରିବେ?",
+      "deleteMessage": "ଏହାର ସାଧନ ସବୁ ଚାଟ୍‌ରୁ ବାହାରିଯିବ।",
+      "kiloBuiltIn": "ଅନ୍ତର୍ନିହିତ। ଏହି ଚାଟ୍ ପାଇଁ ଏହାକୁ ଚାଲୁ କିମ୍ବା ବନ୍ଦ କରନ୍ତୁ; ଏହା ସମ୍ପାଦନ କିମ୍ବା ବିଲୋପ କରାଯାଇପାରିବ ନାହିଁ।",
+      "serversEmptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଦୂର ସର୍ଭର ନାହିଁ",
+      "serversEmptyDescription": "ଆପଣଙ୍କ ଚାଟ୍‌ରେ ଏହାର ସାଧନ ଦେବା ପାଇଁ ଗୋଟିଏ ଯୋଡ଼ନ୍ତୁ।",
+      "settingsToolsTitle": "Kilo କୁ ଆପ୍ ସେଟିଂସ୍ ବଦଳାଇବାକୁ ଦିଅନ୍ତୁ",
+      "settingsToolsSubtitle": "ଥିମ୍, ଭାଷା, ବିଜ୍ଞପ୍ତି, ମଡେଲ୍ ଏବଂ ଅବଶିଷ୍ଟ ପସନ୍ଦଗୁଡ଼ିକ ପାଇଁ ପ୍ରଯୁଜ୍ୟ।",
+      "settingsToolsOn": "ଚାଲୁ — ସେଟିଂସ୍ ସାଧନ ମଡେଲ୍‌କୁ ପଠାଯାଏ",
+      "settingsToolsOff": "ବନ୍ଦ — ମଡେଲ୍‌କୁ କୌଣସି ସେଟିଂସ୍ ସାଧନ ପଠାଯାଏ ନାହିଁ",
+      "serverChecking": "ଏହି ସର୍ଭର ଯାଞ୍ଚ କରାଯାଉଛି…",
+      "serverToolCount": "{{count}} ସାଧନ",
+      "serverUnreachable": "ଏହି ସର୍ଭର ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
+      "serverOff": "ଏହି ସର୍ଭର ବନ୍ଦ ଅଛି"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ଏହି ପରିବର୍ତ୍ତନ ନିଶ୍ଚିତ କରିବେ?"
   },
   "appActions": {
     "start": {

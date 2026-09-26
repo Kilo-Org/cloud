@@ -3241,8 +3241,37 @@
       "unauthorized": "Alat Kilo menolak sesi ini",
       "unauthorizedDescription": "Masuk lagi untuk memakai alat Kilo di obrolan ini.",
       "unavailable": "Alat Kilo tidak tersedia",
-      "unavailableDescription": "Server Kilo tidak tersedia untuk akun ini."
+      "unavailableDescription": "Server Kilo tidak tersedia untuk akun ini.",
+      "sheetTitle": "Alat chat",
+      "addServerTitle": "Tambah server MCP",
+      "editServerTitle": "Edit server MCP ini",
+      "fieldName": "Nama tampilan",
+      "fieldUrl": "URL server",
+      "fieldUrlInvalid": "Masukkan URL server yang valid.",
+      "fieldToken": "Token Bearer (opsional)",
+      "enableServer": "Aktifkan server ini: {{name}}",
+      "editServer": "Edit server",
+      "deleteServer": "Hapus server",
+      "editServerA11y": "Edit server: {{name}}",
+      "deleteServerA11y": "Hapus server: {{name}}",
+      "retryServerA11y": "Coba lagi server ini: {{name}}",
+      "deleteTitle": "Hapus server ini?",
+      "deleteMessage": "Alatnya keluar dari setiap chat.",
+      "kiloBuiltIn": "Bawaan. Nyalakan atau matikan untuk chat ini; tidak dapat diedit atau dihapus.",
+      "serversEmptyTitle": "Belum ada server jarak jauh",
+      "serversEmptyDescription": "Tambahkan satu untuk menawarkan alatnya di chat Anda.",
+      "settingsToolsTitle": "Izinkan Kilo mengubah setelan aplikasi",
+      "settingsToolsSubtitle": "Berlaku untuk tema, bahasa, notifikasi, model, dan bagian lain Preferensi.",
+      "settingsToolsOn": "Aktif — alat setelan dikirim ke model",
+      "settingsToolsOff": "Nonaktif — tidak ada alat setelan yang dikirim ke model",
+      "serverChecking": "Memeriksa server ini…",
+      "serverToolCount": "{{count}} alat",
+      "serverUnreachable": "Tidak dapat menjangkau server ini",
+      "serverOff": "Server ini nonaktif"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Konfirmasi perubahan ini?"
   },
   "appActions": {
     "start": {

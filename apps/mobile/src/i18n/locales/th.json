@@ -3241,8 +3241,37 @@
       "unauthorized": "เครื่องมือ Kilo ปฏิเสธเซสชันนี้",
       "unauthorizedDescription": "ลงชื่อเข้าใช้อีกครั้งเพื่อใช้เครื่องมือ Kilo ในแชทนี้",
       "unavailable": "เครื่องมือ Kilo ไม่พร้อมใช้งาน",
-      "unavailableDescription": "เซิร์ฟเวอร์ Kilo ไม่มีสำหรับบัญชีนี้"
+      "unavailableDescription": "เซิร์ฟเวอร์ Kilo ไม่มีสำหรับบัญชีนี้",
+      "sheetTitle": "เครื่องมือแชท",
+      "addServerTitle": "เพิ่มเซิร์ฟเวอร์ MCP",
+      "editServerTitle": "แก้ไขเซิร์ฟเวอร์ MCP นี้",
+      "fieldName": "ชื่อที่แสดง",
+      "fieldUrl": "URL ของเซิร์ฟเวอร์",
+      "fieldUrlInvalid": "ป้อน URL ของเซิร์ฟเวอร์ที่ถูกต้อง",
+      "fieldToken": "โทเค็น Bearer (ไม่บังคับ)",
+      "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้: {{name}}",
+      "editServer": "แก้ไขเซิร์ฟเวอร์",
+      "deleteServer": "ลบเซิร์ฟเวอร์",
+      "editServerA11y": "แก้ไขเซิร์ฟเวอร์: {{name}}",
+      "deleteServerA11y": "ลบเซิร์ฟเวอร์: {{name}}",
+      "retryServerA11y": "ลองอีกครั้งกับเซิร์ฟเวอร์นี้: {{name}}",
+      "deleteTitle": "ลบเซิร์ฟเวอร์นี้หรือไม่",
+      "deleteMessage": "เครื่องมือของมันจะออกจากทุกแชท",
+      "kiloBuiltIn": "มาพร้อมระบบ เปิดหรือปิดสำหรับแชทนี้ได้ แต่แก้ไขหรือลบไม่ได้",
+      "serversEmptyTitle": "ยังไม่มีเซิร์ฟเวอร์ระยะไกล",
+      "serversEmptyDescription": "เพิ่มหนึ่งรายการเพื่อเสนอเครื่องมือของมันในแชทของคุณ",
+      "settingsToolsTitle": "อนุญาตให้ Kilo เปลี่ยนการตั้งค่าแอป",
+      "settingsToolsSubtitle": "ใช้กับการธีม ภาษา การแจ้งเตือน โมเดล และส่วนที่เหลือของการตั้งค่า",
+      "settingsToolsOn": "เปิด — เครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
+      "settingsToolsOff": "ปิด — ไม่มีเครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
+      "serverChecking": "กำลังตรวจสอบเซิร์ฟเวอร์นี้…",
+      "serverToolCount": "{{count}} เครื่องมือ",
+      "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
+      "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่"
   },
   "appActions": {
     "start": {

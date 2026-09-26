@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo-ს ხელსაწყოებმა ეს სესია უარყვეს",
       "unauthorizedDescription": "ხელახლა შედი, რომ ამ ჩატში Kilo-ს ხელსაწყოები გამოიყენო.",
       "unavailable": "Kilo-ს ხელსაწყოები მიუწვდომელია",
-      "unavailableDescription": "Kilo-ს სერვერი ამ ანგარიშისთვის მიუწვდომელია."
+      "unavailableDescription": "Kilo-ს სერვერი ამ ანგარიშისთვის მიუწვდომელია.",
+      "sheetTitle": "ჩატის ხელსაწყოები",
+      "addServerTitle": "MCP სერვერის დამატება",
+      "editServerTitle": "ამ MCP სერვერის რედაქტირება",
+      "fieldName": "ნაჩვენები სახელი",
+      "fieldUrl": "სერვერის URL",
+      "fieldUrlInvalid": "შეიყვანეთ სერვერის სწორი URL.",
+      "fieldToken": "Bearer ტოკენი (არასავალდებულო)",
+      "enableServer": "ამ სერვერის ჩართვა: {{name}}",
+      "editServer": "სერვერის რედაქტირება",
+      "deleteServer": "სერვერის წაშლა",
+      "editServerA11y": "სერვერის რედაქტირება: {{name}}",
+      "deleteServerA11y": "სერვერის წაშლა: {{name}}",
+      "retryServerA11y": "ამ სერვერის ხელახლა ცდა: {{name}}",
+      "deleteTitle": "წავშალოთ ეს სერვერი?",
+      "deleteMessage": "მისი ხელსაწყოები ყველა ჩატიდან გაქრება.",
+      "kiloBuiltIn": "ჩაშენებული. ჩართეთ ან გამორთეთ ამ ჩატისთვის; მისი რედაქტირება ან წაშლა შეუძლებელია.",
+      "serversEmptyTitle": "ჯერ არ არის დისტანციური სერვერები",
+      "serversEmptyDescription": "დაამატეთ ერთი, რომ მისი ხელსაწყოები თქვენს ჩატებში შესთავაზოთ.",
+      "settingsToolsTitle": "ნება მიეცით Kilo-ს აპის პარამეტრების შეცვლა",
+      "settingsToolsSubtitle": "ვრცელდება თემაზე, ენაზე, შეტყობინებებზე, მოდელებსა და დანარჩენ პარამეტრებზე.",
+      "settingsToolsOn": "ჩართულია — პარამეტრების ხელსაწყოები იგზავნება მოდელთან",
+      "settingsToolsOff": "გამორთულია — მოდელთან არცერთი პარამეტრის ხელსაწყო არ იგზავნება",
+      "serverChecking": "ამ სერვერის შემოწმება…",
+      "serverToolCount": "{{count}} ხელსაწყო",
+      "serverUnreachable": "ამ სერვერთან დაკავშირება ვერ მოხერხდა",
+      "serverOff": "ეს სერვერი გამორთულია"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "დავადასტუროთ ეს ცვლილება?"
   },
   "appActions": {
     "start": {

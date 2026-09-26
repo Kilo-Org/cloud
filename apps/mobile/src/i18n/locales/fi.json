@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilon työkalut hylkäsivät tämän istunnon",
       "unauthorizedDescription": "Kirjaudu uudelleen sisään käyttääksesi Kilon työkaluja tässä keskustelussa.",
       "unavailable": "Kilon työkalut eivät ole saatavilla",
-      "unavailableDescription": "Kilo-palvelin ei ole käytettävissä tälle tilille."
+      "unavailableDescription": "Kilo-palvelin ei ole käytettävissä tälle tilille.",
+      "sheetTitle": "Keskustelutyökalut",
+      "addServerTitle": "Lisää MCP-palvelin",
+      "editServerTitle": "Muokkaa tätä MCP-palvelinta",
+      "fieldName": "Näyttönimi",
+      "fieldUrl": "Palvelimen URL",
+      "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
+      "fieldToken": "Bearer-tunnus (valinnainen)",
+      "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
+      "editServer": "Muokkaa palvelinta",
+      "deleteServer": "Poista palvelin",
+      "editServerA11y": "Muokkaa palvelinta: {{name}}",
+      "deleteServerA11y": "Poista palvelin: {{name}}",
+      "retryServerA11y": "Yritä tätä palvelinta uudelleen: {{name}}",
+      "deleteTitle": "Poistetaanko tämä palvelin?",
+      "deleteMessage": "Sen työkalut poistuvat kaikista keskusteluista.",
+      "kiloBuiltIn": "Sisäänrakennettu. Kytke se päälle tai pois tässä keskustelussa; sitä ei voi muokata tai poistaa.",
+      "serversEmptyTitle": "Ei vielä etäpalvelimia",
+      "serversEmptyDescription": "Lisää yksi tarjotaksesi sen työkaluja keskusteluissasi.",
+      "settingsToolsTitle": "Salli Kilon muuttaa sovellusasetuksia",
+      "settingsToolsSubtitle": "Koskee teemaa, kieltä, ilmoituksia, malleja ja muita Asetuksia.",
+      "settingsToolsOn": "Päällä — asetustyökalut lähetetään mallille",
+      "settingsToolsOff": "Pois — mallille ei lähetetä yhtään asetustyökalua",
+      "serverChecking": "Tarkistetaan tätä palvelinta…",
+      "serverToolCount": "{{count}} työkalua",
+      "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
+      "serverOff": "Tämä palvelin on pois päältä"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Vahvistetaanko tämä muutos?"
   },
   "appActions": {
     "start": {

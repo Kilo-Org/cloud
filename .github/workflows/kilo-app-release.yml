@@ -233,6 +233,11 @@ jobs:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+          # The tag pushes below need Workflows: write. GitHub refuses a
+          # GITHUB_TOKEN tag push when the tagged commit's .github/workflows
+          # differs from every branch tip, which happens whenever a workflow
+          # change merges while this job runs.
+          token: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -331,18 +336,12 @@ jobs:
       # same commit pushes a second, distinct marker instead of failing on a
       # name that already exists. An annotated tag needs a tagger identity; the
       # runner has none.
-      # The marker points at the current tip of main, not at this run's commit:
-      # only its name and creatordate are read. GitHub refuses a GITHUB_TOKEN
-      # tag push when the tagged commit's .github/workflows differs from every
-      # branch tip, so tagging HEAD fails whenever a workflow change merges
-      # while this run builds.
       - name: Mark the iOS upload
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           MARKER="kilo-app-upload/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git fetch --no-tags --depth=1 origin main
-          git tag -a "$MARKER" -m "$MARKER" FETCH_HEAD
+          git tag -a "$MARKER" -m "$MARKER"
           git push origin "$MARKER"
 
       - name: Submit iOS

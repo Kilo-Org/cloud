@@ -1,32 +1,38 @@
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/icons';
+import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
+import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
-import { selectRecentPrRowState } from '@/components/pr-review/recent-pr-row-state';
+import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
+  decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
   prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
-import { getRecentPrs, type RecentPr, removeRecentPr } from '@/lib/pr-review/recent-prs';
-
-const URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
+import {
+  getRecentPrs,
+  providerRefFromRecentPr,
+  type RecentPr,
+  recentPrKey,
+  removeRecentPr,
+} from '@/lib/pr-review/recent-prs';
 
 export function PrReviewEntryScreen() {
   const router = useRouter();
@@ -72,16 +78,18 @@ export function PrReviewEntryScreen() {
   };
 
   const handleSubmit = () => {
-    const raw = inputValueRef.current;
-    const parsed = parseGitHubPrUrl(raw.trim());
-    if (!parsed) {
+    const decision = decidePrLinkOpen(inputValueRef.current);
+    if (decision.kind === 'invalid') {
       announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
-    // Navigate straight to the PR route. Recents are written only after an
-    // authorized payload (the PR screen's backfill effect), so a failed or
-    // unauthorized open never persists an entry.
-    router.push(getPrReviewPath(parsed.owner, parsed.repo, parsed.number));
+    // Navigate straight to the ref's own provider route. Recents are written
+    // only after an authorized payload (the review screen's backfill effect),
+    // so a failed or unauthorized open never persists an entry. A
+    // self-managed GitLab host parses to a ref whose instanceHint rides as
+    // the route's `instance` param — the server re-derives the authoritative
+    // instance, so a mismatched host lands on the clear not-authorized state.
+    router.push(providerPrRoutePath(decision.ref));
   };
 
   const handlePaste = async () => {
@@ -105,9 +113,11 @@ export function PrReviewEntryScreen() {
   };
 
   const handleRecentPress = (entry: RecentPr) => {
-    // Navigate only. The PR screen's backfill effect updates `lastOpenedAt`
-    // (and `lastResult`) once an authorized payload loads.
-    router.push(getPrReviewPath(entry.owner, entry.repo, entry.number));
+    // Navigate only. The review screen's backfill effect updates
+    // `lastOpenedAt` (and `lastResult`) once an authorized payload loads.
+    // The entry's platform (legacy entries: GitHub) decides the route, so a
+    // GitLab row opens the GitLab surface, never a same-named GitHub PR.
+    router.push(providerPrRoutePath(providerRefFromRecentPr(entry)));
   };
 
   const handleRemoveRecent = (entry: RecentPr) => {
@@ -132,6 +142,7 @@ export function PrReviewEntryScreen() {
   };
 
   const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
+  const urlPlaceholder = t('prReview.entry.urlPlaceholder');
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
@@ -157,11 +168,12 @@ export function PrReviewEntryScreen() {
           const isLast = index === recent.length - 1;
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
-            repo: `${entry.owner}/${entry.repo}#${entry.number}`,
+            repo: providerPrRefLabel(providerRefFromRecentPr(entry)),
           });
           return (
             <View
-              key={`${entry.owner}/${entry.repo}#${entry.number}`}
+              key={recentPrKey(entry)}
+              testID="recent-row"
               className={isLast ? '' : 'border-b-[0.5px] border-hair-soft'}
             >
               <Pressable
@@ -171,6 +183,12 @@ export function PrReviewEntryScreen() {
                 className="flex-row items-center gap-3 px-3 py-3 active:opacity-70"
               >
                 <View className="flex-1 gap-1">
+                  <Text
+                    variant="small"
+                    className="text-[10px] uppercase tracking-wide text-muted-foreground"
+                  >
+                    {rowState.provider}
+                  </Text>
                   <Text className="text-sm font-medium" numberOfLines={1}>
                     {rowState.primary}
                   </Text>
@@ -223,96 +241,95 @@ export function PrReviewEntryScreen() {
   }
 
   const pasteBlock = (
-    <View className="gap-2">
+    <View className="gap-3">
       <View className="flex-row items-center gap-2">
-        <Link2 size={16} color={colors.mutedForeground} />
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.entry.pastePrLink')}
-        </Text>
-      </View>
-      <View className="gap-3">
-        <View className="flex-row items-center gap-2">
-          <View
-            className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
-            testID="pr-link-input-row"
-            collapsable={false}
-          >
-            <TextInput
-              ref={inputRef}
-              defaultValue=""
-              placeholder={URL_PLACEHOLDER}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={value => {
-                // Don't setState on every keystroke; track only whether the
-                // input has any text. The raw value lives in the ref so
-                // handleSubmit reads the latest text without re-rendering.
-                const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
-                pendingProgrammaticTextsRef.current = [...decision.pending];
-                if (decision.kind === 'echo') {
-                  // Echo of setNativeProps: inputValueRef already holds the
-                  // intentional value from applyFieldText — do not clobber it
-                  // with a delayed/stale echo.
-                  return;
-                }
-                inputValueRef.current = value;
-                setHasInput(value.length > 0);
-              }}
-              // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
-              // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
-              className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[normal]"
-              accessibilityLabel={t('prReview.entry.urlAccessibility')}
-              returnKeyType="go"
-              onSubmitEditing={handleSubmit}
-            />
-            {showClearButton ? (
-              // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
-              // 38pt in this app — do not "simplify" back to h-11/w-11.
-              <Pressable
-                onPress={() => {
-                  // clear() is the iOS-safe native empty after real typing.
-                  // setNativeProps({ text: '' }) loses the most-recent-event-count
-                  // race and leaves the typed text visible while React state
-                  // thinks the field is empty. Do not route through
-                  // applyFieldText('') (paste-only path) and do not push an
-                  // echo for '' — a non-arriving echo would stale the FIFO.
-                  inputValueRef.current = '';
-                  setHasInput(false);
-                  inputRef.current?.clear();
-                  inputRef.current?.focus();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('prReview.entry.clearLink')}
-                className="h-13 w-13 items-center justify-center active:opacity-70"
-              >
-                <X size={16} color={colors.mutedForeground} />
-              </Pressable>
-            ) : null}
-          </View>
-          <Pressable
-            onPress={() => {
-              void handlePaste();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('prReview.entry.pasteLink')}
-            hitSlop={4}
-            className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
-          >
-            <ClipboardIcon size={18} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
-        <Button
-          disabled={!hasInput}
-          onPress={handleSubmit}
-          // i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
-          // this key is the verb CTA — cs/pl/be translate the two apart.
-          accessibilityLabel={t('common.openPullRequest')}
+        <View
+          className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+          testID="pr-link-input-row"
+          collapsable={false}
         >
-          <Text>{t('prReview.entry.open')}</Text>
-        </Button>
+          <Input
+            ref={inputRef}
+            defaultValue=""
+            placeholder={urlPlaceholder}
+            // The native hint is not reliably one line: Android lays it out
+            // on a second line the one-line field clips. Both platforms draw
+            // the visible placeholder with the one-line PrLinkPlaceholder
+            // overlay instead; the hint stays set for the digest and
+            // accessibility text but is invisible.
+            placeholderTextColor="transparent"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            numberOfLines={1}
+            onChangeText={value => {
+              // Don't setState on every keystroke; track only whether the
+              // input has any text. The raw value lives in the ref so
+              // handleSubmit reads the latest text without re-rendering.
+              const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
+              pendingProgrammaticTextsRef.current = [...decision.pending];
+              if (decision.kind === 'echo') {
+                // Echo of setNativeProps: inputValueRef already holds the
+                // intentional value from applyFieldText — do not clobber it
+                // with a delayed/stale echo.
+                return;
+              }
+              inputValueRef.current = value;
+              setHasInput(value.length > 0);
+            }}
+            // The shared single-line box (`@/components/ui/input`) supplies the
+            // height floor, the one line box for the placeholder and the value,
+            // and the RTL content alignment, so this field keeps only its own
+            // chrome and text size.
+            className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
+            accessibilityLabel={t('prReview.entry.urlAccessibility')}
+            returnKeyType="go"
+            onSubmitEditing={handleSubmit}
+          />
+          {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
+          {showClearButton ? (
+            // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
+            // 38pt in this app — do not "simplify" back to h-11/w-11.
+            <Pressable
+              onPress={() => {
+                // clear() is the iOS-safe native empty after real typing.
+                // setNativeProps({ text: '' }) loses the most-recent-event-count
+                // race and leaves the typed text visible while React state
+                // thinks the field is empty. Do not route through
+                // applyFieldText('') (paste-only path) and do not push an
+                // echo for '' — a non-arriving echo would stale the FIFO.
+                inputValueRef.current = '';
+                setHasInput(false);
+                inputRef.current?.clear();
+                inputRef.current?.focus();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('prReview.entry.clearLink')}
+              className="h-13 w-13 items-center justify-center active:opacity-70"
+            >
+              <X size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+        </View>
+        <Pressable
+          onPress={() => {
+            void handlePaste();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('prReview.entry.pasteLink')}
+          hitSlop={4}
+          className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
+        >
+          <ClipboardIcon size={18} color={colors.mutedForeground} />
+        </Pressable>
       </View>
+      <Button
+        disabled={!hasInput}
+        onPress={handleSubmit}
+        accessibilityLabel={t('prReview.entry.openAccessibility')}
+      >
+        <Text>{t('prReview.entry.open')}</Text>
+      </Button>
     </View>
   );
 

@@ -12,6 +12,7 @@ import type {
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   PreparationStepSnapshot,
 } from './types';
 import {
@@ -22,6 +23,7 @@ import {
   messagePartUpdatedDataSchema,
   messagePartDeltaDataSchema,
   messagePartRemovedDataSchema,
+  messageRemovedDataSchema,
   sessionStatusDataSchema,
   sessionCreatedDataSchema,
   sessionUpdatedDataSchema,
@@ -55,7 +57,7 @@ import {
 /** Chat events — data mutations for messages and parts. */
 export type ChatEvent =
   | { type: 'message.updated'; info: Message }
-  | { type: 'message.part.updated'; part: Part }
+  | { type: 'message.part.updated'; part: Part; time?: number | undefined }
   | {
       type: 'message.part.delta';
       sessionId: string;
@@ -69,6 +71,11 @@ export type ChatEvent =
       sessionId: string;
       messageId: string;
       partId: string;
+    }
+  | {
+      type: 'message.removed';
+      sessionId: string;
+      messageId: string;
     };
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
@@ -159,6 +166,11 @@ export type ServiceEvent =
       skipped?: boolean | undefined;
       commitHash?: string | undefined;
       commitMessage?: string | undefined;
+      userMessageId?: string | undefined;
+      committedAt?: string | undefined;
+      pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown' | undefined;
+      commitMessageTruncated?: boolean | undefined;
+      timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
   | {
@@ -168,7 +180,11 @@ export type ServiceEvent =
       cloudStatus?: CloudStatus | undefined;
       activeMessageId?: string | null | undefined;
     }
-  | { type: 'commands.available'; commands: SlashCommandInfo[] }
+  | {
+      type: 'commands.available';
+      commands: SlashCommandInfo[];
+      catalogStatus?: SlashCommandCatalogStatus | undefined;
+    }
   | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
@@ -214,6 +230,7 @@ const CHAT_EVENT_TYPES = new Set([
   'message.part.updated',
   'message.part.delta',
   'message.part.removed',
+  'message.removed',
 ]);
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
@@ -323,7 +340,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'message.part.updated': {
       const r = messagePartUpdatedDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'message.part.updated', part: r.data.part as Part };
+      return {
+        type: 'message.part.updated',
+        part: r.data.part as Part,
+        ...(r.data.time === undefined ? {} : { time: r.data.time }),
+      };
     }
 
     case 'message.part.delta': {
@@ -347,6 +368,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         sessionId: r.data.sessionID,
         messageId: r.data.messageID,
         partId: r.data.partID,
+      };
+    }
+
+    case 'message.removed': {
+      const r = messageRemovedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'message.removed',
+        sessionId: r.data.sessionID,
+        messageId: r.data.messageID,
       };
     }
 
@@ -555,6 +586,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         skipped: r.data.skipped,
         commitHash: r.data.commitHash,
         commitMessage: r.data.commitMessage,
+        userMessageId: r.data.userMessageId,
+        committedAt: r.data.committedAt,
+        pushStatus: r.data.pushStatus,
+        commitMessageTruncated: r.data.commitMessageTruncated,
       };
     }
 
@@ -578,7 +613,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'commands.available', commands: r.data.commands };
+      return {
+        type: 'commands.available',
+        commands: r.data.commands,
+        ...(r.data.catalogStatus ? { catalogStatus: r.data.catalogStatus } : {}),
+      };
     }
 
     case 'cloud.message.queued': {
@@ -685,7 +724,11 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
   }
-  return event;
+  return event?.type === 'autocommit_completed' &&
+    event.commitHash &&
+    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(event.commitHash)
+    ? { ...event, timestamp: raw.timestamp }
+    : event;
 }
 
 /**

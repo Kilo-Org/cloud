@@ -126,17 +126,14 @@ describe('Organization Promotions', () => {
       stripe_payment_id: 'pi_test_123',
     });
 
-    // Check organization transactions
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(2); // payment + bonus
     expectPaymentTransaction(transactions, 'pi_test_123', 10_000_000, org.id);
     expectBonusTransaction(transactions, 1, org.id);
 
-    // Check organization balance increased by payment + bonus
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10_000_000 + 20_000_000); // $10 payment + $20 bonus
 
-    // total_microdollars_acquired should also increase by payment + bonus
     const totalAcquired = await getOrganizationTotalAcquired(org.id);
     expect(totalAcquired).toBe(10_000_000 + 20_000_000); // $10 payment + $20 bonus
   });
@@ -152,17 +149,14 @@ describe('Organization Promotions', () => {
       stripe_payment_id: 'pi_test_123',
     });
 
-    // Check organization transactions
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(1); // only payment, no bonus
     expectPaymentTransaction(transactions, 'pi_test_123', 10_000_000, org.id);
     expectBonusTransaction(transactions, 0);
 
-    // Check organization balance increased by payment only
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10_000_000); // $10 payment only
 
-    // total_microdollars_acquired should also increase by payment only
     const totalAcquired = await getOrganizationTotalAcquired(org.id);
     expect(totalAcquired).toBe(10_000_000); // $10 payment only
   });
@@ -176,7 +170,6 @@ describe('Organization Promotions', () => {
 
     const initialBalance = await getOrganizationBalance(org.id);
 
-    // First and second topups from same user
     await processTopupForOrganization(user.id, org.id, 1000, {
       type: 'stripe',
       stripe_payment_id: 'pi_test_first',
@@ -186,7 +179,6 @@ describe('Organization Promotions', () => {
       stripe_payment_id: 'pi_test_second',
     });
 
-    // Check organization transactions
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(3); // payment1 + bonus + payment2
 
@@ -194,11 +186,9 @@ describe('Organization Promotions', () => {
     expectPaymentTransaction(transactions, 'pi_test_second', 20_000_000, org.id);
     expectBonusTransaction(transactions, 1, org.id); // Only one bonus despite two topups
 
-    // Check organization balance increased by both payments + one bonus
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10_000_000 + 20_000_000 + 20_000_000); // $10 + $20 payments + $20 bonus
 
-    // total_microdollars_acquired should also increase by both payments + one bonus
     const totalAcquired = await getOrganizationTotalAcquired(org.id);
     expect(totalAcquired).toBe(10_000_000 + 20_000_000 + 20_000_000); // $10 + $20 payments + $20 bonus
   });
@@ -212,30 +202,25 @@ describe('Organization Promotions', () => {
 
     const initialBalance = await getOrganizationBalance(org.id);
 
-    // User A tops up
     await processTopupForOrganization(userA.id, org.id, 1000, {
       type: 'stripe',
       stripe_payment_id: 'pi_user_a',
     });
 
-    // User B tops up (different user, same organization)
     await processTopupForOrganization(userB.id, org.id, 1000, {
       type: 'stripe',
       stripe_payment_id: 'pi_user_b',
     });
 
-    // Verify only ONE bonus was granted
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(3); // payment1 + bonus + payment2
     expectPaymentTransaction(transactions, 'pi_user_a', 10_000_000, org.id);
     expectPaymentTransaction(transactions, 'pi_user_b', 10_000_000, org.id);
     expectBonusTransaction(transactions, 1, org.id); // ONLY ONE bonus
 
-    // Check organization balance: two payments + one bonus
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10_000_000 + 10_000_000 + 20_000_000); // $10 + $10 + $20
 
-    // total_microdollars_acquired should also increase by two payments + one bonus
     const totalAcquired = await getOrganizationTotalAcquired(org.id);
     expect(totalAcquired).toBe(10_000_000 + 10_000_000 + 20_000_000); // $10 + $10 + $20
   });

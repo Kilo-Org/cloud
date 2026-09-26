@@ -42,13 +42,14 @@ import '@/i18n';
 import * as Haptics from 'expo-haptics';
 import { PrConversationCommentComposer } from './pr-conversation-comment-composer';
 import { clearDraft, saveDraft } from '@/lib/persist/drafts';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
-function mountComposer(): React.ReactElement {
+function mountComposer(overrides?: { prRef?: ProviderPrRef }): React.ReactElement {
   // One render pass per mount call: the cursor restarts at 0 while the boxes
   // persist, mirroring React's state-across-renders semantics.
   hookState.cursor = 0;
   // eslint-disable-next-line new-cap
-  return PrConversationCommentComposer(baseProps);
+  return PrConversationCommentComposer({ ...baseProps, ...overrides });
 }
 
 describe('PrConversationCommentComposer', () => {
@@ -149,6 +150,25 @@ describe('PrConversationCommentComposer', () => {
     typeBody(mountComposer(), 'hello');
 
     expect(saveDraft).toHaveBeenCalledWith('u1', DRAFT_KEY, 'hello');
+  });
+
+  it('keys the durable draft per provider ref so a same-named GitHub PR and GitLab MR never share one', async () => {
+    const gitlabRef: ProviderPrRef = {
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+    };
+    const refKey = `${DRAFT_KEY}@${providerPrRefKey(gitlabRef)}`;
+
+    const element = mountComposer({ prRef: gitlabRef });
+    typeBody(element, 'hello');
+    expect(saveDraft).toHaveBeenCalledWith('u1', refKey, 'hello');
+
+    addCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    pressButton(element, 'Comment');
+    await flushMicrotasks();
+    expect(clearDraft).toHaveBeenCalledWith('u1', refKey);
+    expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it('clears the draft, dismisses, and fires success haptics on a successful post', async () => {

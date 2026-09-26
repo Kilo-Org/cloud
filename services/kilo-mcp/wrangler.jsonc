@@ -27,6 +27,10 @@
   "observability": {
     "enabled": true,
   },
+  // Send this Worker's Trace Events to Workers Logpush, so the MCP request log
+  // reaches the account's log sink. This flag does not create the Logpush job
+  // itself; the account owns that job.
+  "logpush": true,
 
   // Workers AI: query embedding for the semantic half of hybrid search
   // (src/search-knn.ts). The model is pinned in src/embedding.ts.
@@ -77,11 +81,22 @@
       "vars": {
         "WEB_BASE_URL": "http://localhost:3000",
       },
-      "ai": { "binding": "AI" },
+      // Workers AI and Vectorize have no local emulation in `wrangler dev`:
+      // the binding table reports them "not supported" and every search
+      // degrades to token-only, so semantic search cannot be exercised
+      // locally. Marking them remote proxies the local dev worker to the real
+      // dev resources (same pattern as kilo-chat's MEDIA_BUCKET); the
+      // account's CLOUDFLARE_API_TOKEN must reach the worker's environment
+      // (an `.env*` system file or the process env — a `.dev.vars` entry is
+      // only a Worker secret and does not authenticate wrangler). Without it
+      // `wrangler dev --local` is the credential-free fallback: the worker
+      // still starts and search answers token-only.
+      "ai": { "binding": "AI", "remote": true },
       "vectorize": [
         {
           "binding": "VECTORIZE",
           "index_name": "kilo-mcp-catalog-dev",
+          "remote": true,
         },
       ],
       "durable_objects": {

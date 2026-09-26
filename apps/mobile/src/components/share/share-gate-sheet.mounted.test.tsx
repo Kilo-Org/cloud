@@ -108,7 +108,9 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     activeSessions: [],
     storedIsError: false,
     storedIsSuccess: true,
+    storedIsPaused: false,
     activeIsError: false,
+    activeIsPaused: false,
     isLoading: false,
     refetch: vi.fn(),
   }),
@@ -400,6 +402,26 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     // A non-retryable rejection must not refetch or navigate.
     expect(refetchInstancesMock).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('numbers a staged GitLab merge request with the provider separator', async () => {
+    const shareId = putSharePayload({
+      text: 'https://gitlab.com/group/sub/repo/-/merge_requests/7',
+      files: [],
+      failedFiles: [],
+    });
+    const renderer = await mountGate(shareId);
+
+    // The Review PR row is the row whose subtitle is the destination identity.
+    const subtitles = renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.className === 'text-sm text-muted-foreground')
+      .map(node => node.children.filter(child => typeof child === 'string').join(''));
+    expect(subtitles).toEqual(['group/sub/repo!7']);
 
     act(() => {
       renderer.unmount();

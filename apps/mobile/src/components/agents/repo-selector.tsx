@@ -29,6 +29,12 @@ type RepoSelectorProps = {
   /** Recently used rows, rendered under a "Recently used" section header in the picker. */
   recents: RepoOption[];
   isLoading: boolean;
+  /**
+   * The organization scope the rows were loaded under; `null` is personal.
+   * Published to the picker so its Bitbucket note can key on the LIST's scope
+   * rather than on the app's globally selected organization, which can differ.
+   */
+  organizationId: string | null;
   onChange: (repo: string) => void;
   disabled?: boolean;
 };
@@ -98,6 +104,7 @@ export function RepoSelector({
   repositories,
   recents,
   isLoading,
+  organizationId,
   onChange,
   disabled = false,
 }: Readonly<RepoSelectorProps>) {
@@ -134,6 +141,7 @@ export function RepoSelector({
       repositories: bridgeRepositories,
       sections: buildRepoSections({ repositories, recents }),
       currentValue: value,
+      organizationId,
       onSelect: onChange,
     });
     // See ModelSelector: the sheet never re-anchors after the keyboard hides,

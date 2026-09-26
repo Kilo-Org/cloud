@@ -1,7 +1,8 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace';
 import { CALLBACK_OUTBOX_PREFIX } from '../../src/sandbox-session/message-callbacks';
 import {
@@ -18,14 +19,15 @@ import type { AttachSessionInput, SandboxControl } from '../../src/persistence/S
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential';
 import { sessionCredentialGrantSchema } from '../../src/sandbox-control/session-credentials';
 import {
-  loadDeadlines,
   loadSessionCredentialGrants,
-  saveDeadlines,
-  savePhysicalRecord,
+  loadSessionReferences,
   saveSessionCredentialGrants,
 } from '../../src/sandbox-control/durable-state';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines';
-import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/physical-lifecycle';
+import {
+  WORKTREE_CREDENTIAL_CONTAINMENT,
+  type AllocationRecord,
+} from '../../src/sandbox-state/model/allocation';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider';
 import {
   createVercelProviderAdapter,
@@ -34,12 +36,40 @@ import {
 import { parseVercelSandboxRuntimeConfig } from '../../src/agent-sandbox/vercel/vercel-runtime-config';
 import type { VercelSandboxSession } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client';
 import {
+  RUNTIME_DELETED_KEY,
   loadWorktreeDeletionJournal,
   WORKTREE_DELETION_PREFIX,
 } from '../../src/sandbox-control/worktree-deletion';
-import { resolveSandboxExclusivity } from '../../src/sandbox-control/worktree-ownership';
+import { reconcileSandboxReferences } from '../../src/sandbox-control/worktree-ownership';
 import type { RequestFrame } from '../../src/shared/sandbox-control-protocol';
 
+import {
+  readCanonicalAllocationRecord,
+  readSessionValue,
+  writeSessionValue,
+} from '../../src/sandbox-state/persist/access.js';
+import { seedCanonicalRunning } from './canonical-allocation-fixtures.js';
+
+function canonicalProviderRef(record: AllocationRecord): string | null {
+  const state = record.state;
+  if (state.kind === 'stopped') return state.summary?.providerRef ?? null;
+  return state.target?.providerRef ?? null;
+}
+
+/**
+ * The worktree's allocation is no longer live: the canonical aggregate is
+ * either erased (first boot after cleanup) or a `stopped` tombstone with its
+ * stop proof. The legacy flat key was the old assertion's target and is now
+ * never written.
+ */
+async function expectAllocationSettled(
+  storage: Parameters<typeof readCanonicalAllocationRecord>[0]
+) {
+  const record = (await readCanonicalAllocationRecord(storage)) as
+    | { state?: { kind?: string } }
+    | undefined;
+  expect(record === undefined || record.state?.kind === 'stopped').toBe(true);
+}
 const userId = 'oauth/google:worktree-integration';
 const worktreeId: CloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
 const otherWorktreeId: CloudAgentWorktreeId = 'worktree_22222222-2222-4222-8222-222222222222';
@@ -142,6 +172,8 @@ function createDeletionProvider(sandboxId: string) {
     createVercelProviderAdapter({ sandboxName: allocationName, config, restClient: client });
   return {
     resumable: false,
+    persistentWorkspace: true,
+    destroysOnStop: false,
     ensureBillingAdmission: (ref, billing) => adapter().ensureBillingAdmission(ref, billing),
     create: intent => {
       allocationName = intent.allocationName ?? sandboxId;
@@ -189,16 +221,11 @@ async function seedPhysical(
   intentId: string,
   providerRef: string
 ) {
-  await instance.claimCreate(intentId, false, instance.sandboxId, WORKTREE_CREDENTIAL_CONTAINMENT);
-  await instance.confirmInstance(providerRef);
-  const physical = await instance.getPhysicalRecord();
-  if (!physical.createIntent) throw new Error('Missing fixture create intent');
-  await savePhysicalRecord(state.storage, {
-    ...physical,
-    createIntent: {
-      ...physical.createIntent,
-      createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
-    },
+  await seedCanonicalRunning(state.storage, providerRef, {
+    provider: 'vercel',
+    intentId,
+    allocationName: instance.sandboxId,
+    containment: WORKTREE_CREDENTIAL_CONTAINMENT,
   });
 }
 
@@ -246,6 +273,88 @@ async function attachGrantedSession(
   return instance.attachSession(input);
 }
 
+function installScopedCleanupSocket(instance: SandboxControl) {
+  const handler = instance.socketHandler as unknown as {
+    hasHandshakenSocket: () => boolean;
+    sendRequest: (request: {
+      operation: string;
+      payload: { sessionIds: string[] };
+    }) => Promise<{ type: string; requestId: string; ok: boolean; result: unknown }>;
+  };
+  handler.hasHandshakenSocket = () => true;
+  handler.sendRequest = async request => ({
+    type: 'response',
+    requestId: 'cleanup',
+    ok: true,
+    result:
+      request.operation === 'worktree.prepareDeletion'
+        ? { prepared: true, sessionIds: request.payload.sessionIds }
+        : { deleted: true, sessionIds: request.payload.sessionIds },
+  });
+}
+
+function installLegacyLocator(
+  instance: SandboxControl,
+  locations: (
+    cloudAgentSessionId: string
+  ) => { sandboxId: string; provider: 'cloudflare' | 'vercel' } | null
+) {
+  const original = instance['env'].CLOUD_AGENT_SESSION;
+  Object.assign(instance['env'], {
+    CLOUD_AGENT_SESSION: {
+      idFromName: (name: string) => name,
+      get: (name: string) => ({
+        getRuntimeLocation: async () => {
+          const prefix = `${userId}:`;
+          const cloudAgentSessionId = name.startsWith(prefix) ? name.slice(prefix.length) : name;
+          const location = locations(cloudAgentSessionId);
+          if (!location) return null;
+          return {
+            cloudAgentSessionId,
+            kiloUserId: userId,
+            organizationId: null,
+            sessionId: null,
+            worktreeId: null,
+            location,
+          };
+        },
+      }),
+    },
+  });
+  return () => Object.assign(instance['env'], { CLOUD_AGENT_SESSION: original });
+}
+
+function installControlLocator(
+  instance: SandboxControl,
+  locations: (
+    cloudAgentSessionId: string
+  ) => { sandboxId: string; provider: 'cloudflare' | 'vercel' } | null
+) {
+  const original = instance['env'].SANDBOX_SESSION;
+  Object.assign(instance['env'], {
+    SANDBOX_SESSION: {
+      idFromName: (name: string) => name,
+      get: (name: string) => ({
+        getRuntimeLocation: async () => {
+          const prefix = `${userId}:`;
+          const cloudAgentSessionId = name.startsWith(prefix) ? name.slice(prefix.length) : name;
+          const location = locations(cloudAgentSessionId);
+          if (!location) return null;
+          return {
+            cloudAgentSessionId,
+            kiloUserId: userId,
+            organizationId: null,
+            sessionId: null,
+            worktreeId: null,
+            location,
+          };
+        },
+      }),
+    },
+  });
+  return () => Object.assign(instance['env'], { SANDBOX_SESSION: original });
+}
+
 function registration(
   sessionId: `workspace_${string}`,
   sandboxId: `usr-${string}` | `ses-${string}`
@@ -281,7 +390,7 @@ async function connectControl(sandboxId: string, credential: string, wrapperInst
   if (!response.webSocket) throw new Error('Expected wrapper websocket');
   const socket = response.webSocket;
   socket.accept();
-  const providerInstanceId = (await control.getPhysicalRecord()).providerRef;
+  const providerInstanceId = canonicalProviderRef(await control.getAllocationRecord());
   const hello = nextFrame(socket);
   socket.send(
     JSON.stringify({
@@ -315,40 +424,6 @@ function reply(socket: WebSocket, frame: RequestFrame, result: unknown, ok = tru
   );
 }
 
-// Registered sessions leave dispatch, alarm, and fire-and-forget publication
-// work in the session DO. Interrupt every session a test touched, clear its
-// alarm, and drain its publication tail, or that work wakes after this file
-// closes and its logs race the vitest worker shutdown as pending
-// onUserConsoleLog rejections (EnvironmentTeardownError).
-const touchedSessions = new Set<string>();
-
-function sessionStub(userId: string, sessionId: string) {
-  const sessionName = `${userId}:${sessionId}`;
-  touchedSessions.add(sessionName);
-  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
-}
-
-afterEach(async () => {
-  for (const sessionName of touchedSessions) {
-    await runInDurableObject(
-      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
-      async (instance, state) => {
-        try {
-          await instance.interruptExecution();
-        } catch {
-          // A session that never registered has no work to interrupt.
-        }
-        await state.storage.deleteAlarm();
-        const publicationTail = (instance as any).publicExtensionPublicationTail as
-          | Promise<unknown>
-          | undefined;
-        await publicationTail?.catch(() => undefined);
-      }
-    ).catch(() => undefined);
-  }
-  touchedSessions.clear();
-});
-
 describe('worktree deletion in Durable Objects', () => {
   it('retains never-run child lineage for cold deletion when scoped publication fails', async () => {
     const sessionId = cloudId();
@@ -381,7 +456,10 @@ describe('worktree deletion in Durable Objects', () => {
           { sessionId: kiloId(1), parentSessionId: kiloId(0) },
           { sessionId: kiloId(2), parentSessionId: kiloId(1) },
         ]);
-        expect((await state.storage.get('session_messages')) ?? []).toEqual([]);
+        expect(
+          ((await readSessionValue(state.storage)) as { messages?: unknown[] } | undefined)
+            ?.messages ?? []
+        ).toEqual([]);
         await instance.finishWorktreeDeletion(worktreeId);
         await expect(instance.getWorktreeChildSessions(worktreeId)).resolves.toEqual([]);
       } finally {
@@ -428,61 +506,129 @@ describe('worktree deletion in Durable Objects', () => {
     await stub.finishWorktreeDeletion(worktreeId);
   });
 
-  it.each([true, false])(
-    'uses persisted legacy routing while public metadata is hidden by deletion (shared: %s)',
-    async shared => {
-      const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
-      const otherSandboxId = `usr-${'d'.repeat(48)}`;
-      const legacyId = `agent_${crypto.randomUUID()}`;
-      const legacy = sessionStub(userId, legacyId);
-      await runInDurableObject(legacy, async (instance, state) => {
-        await state.storage.put({
-          metadata: {
-            metadataSchemaVersion: 2,
-            identity: { sessionId: legacyId, userId },
-            auth: { kiloSessionId: kiloId(1) },
-            workspace: { sandboxId: shared ? sandboxId : otherSandboxId },
-            lifecycle: { timestamp: 1, version: 1 },
-          },
-          session_deletion_intent: { reason: 'explicit', startedAt: Date.now() },
-        });
-        await expect(instance.getMetadata()).resolves.toBeNull();
+  it('a matching recorded allocation blocks reconciliation on its own', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
+    const legacyId = `agent_${crypto.randomUUID()}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async instance => {
+      const original = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({
+            kind: 'unresolved',
+            owners: [
+              {
+                worktreeId: null,
+                organizationId: null,
+                allocationLocation: { sandboxId, provider: 'cloudflare' },
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+              },
+            ],
+          }),
+        },
       });
-      const control = env.SANDBOX_CONTROL.getByName(sandboxId);
-      await runInDurableObject(control, async instance => {
-        const original = instance['env'].SESSION_INGEST;
-        Object.assign(instance['env'], {
-          SESSION_INGEST: {
-            canDestroyCloudAgentWorktreeSandbox: async () => ({
-              kind: 'unresolved',
-              owners: [
-                {
-                  worktreeId: null,
-                  organizationId: null,
-                  allocationLocation: {
-                    sandboxId: shared ? otherSandboxId : sandboxId,
-                    provider: 'cloudflare',
-                  },
-                  sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
-                },
-              ],
-            }),
-          },
+      try {
+        await expect(
+          reconcileSandboxReferences(instance['env'], {
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+          })
+        ).resolves.toEqual({
+          complete: false,
+          foreign: true,
+          unavailable: false,
         });
-        try {
-          await expect(
-            resolveSandboxExclusivity(instance['env'], {
-              worktreeId,
-              kiloUserId: userId,
-              location: { sandboxId, provider: 'cloudflare' },
-            })
-          ).resolves.toBe(!shared);
-        } finally {
-          Object.assign(instance['env'], { SESSION_INGEST: original });
-        }
+      } finally {
+        Object.assign(instance['env'], { SESSION_INGEST: original });
+      }
+    });
+  });
+
+  it('does not consult a legacy locator when a matching recorded allocation names the target', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
+    const legacyId = `agent_${crypto.randomUUID()}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async instance => {
+      const locator = vi.fn(() => ({ sandboxId, provider: 'cloudflare' as const }));
+      const restoreLegacy = installLegacyLocator(instance, locator);
+      const original = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({
+            kind: 'unresolved',
+            owners: [
+              {
+                worktreeId: null,
+                organizationId: null,
+                allocationLocation: { sandboxId, provider: 'cloudflare' },
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+              },
+            ],
+          }),
+        },
       });
-    }
-  );
+      try {
+        await expect(
+          reconcileSandboxReferences(instance['env'], {
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+          })
+        ).resolves.toEqual({
+          complete: false,
+          foreign: true,
+          unavailable: false,
+        });
+        expect(locator).not.toHaveBeenCalled();
+      } finally {
+        restoreLegacy();
+        Object.assign(instance['env'], { SESSION_INGEST: original });
+      }
+    });
+  });
+
+  it('ignores a legacy no-worktree root whose persisted locator names the target', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
+    const legacyId = `agent_${crypto.randomUUID()}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async instance => {
+      const locator = vi.fn(() => ({ sandboxId, provider: 'cloudflare' as const }));
+      const restoreLegacy = installLegacyLocator(instance, locator);
+      const original = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({
+            kind: 'unresolved',
+            owners: [
+              {
+                worktreeId: null,
+                organizationId: null,
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+              },
+            ],
+          }),
+        },
+      });
+      try {
+        await expect(
+          reconcileSandboxReferences(instance['env'], {
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+          })
+        ).resolves.toEqual({
+          complete: true,
+          foreign: false,
+          unavailable: false,
+        });
+        expect(locator).not.toHaveBeenCalled();
+      } finally {
+        restoreLegacy();
+        Object.assign(instance['env'], { SESSION_INGEST: original });
+      }
+    });
+  });
 
   it.each(['cloudflare', 'vercel'] as const)(
     'completes an ownership-only %s allocation from fenced empty creation history without provider access',
@@ -526,7 +672,7 @@ describe('worktree deletion in Durable Objects', () => {
           });
           expect(create).not.toHaveBeenCalled();
           expect(stop).not.toHaveBeenCalled();
-          expect(await state.storage.get('physical_record')).toBeUndefined();
+          await expectAllocationSettled(state.storage);
           expect(await state.storage.get('owner_id')).toBe(userId);
           expect(await state.storage.getAlarm()).toBeNull();
           await expect(
@@ -547,23 +693,23 @@ describe('worktree deletion in Durable Objects', () => {
     }
   );
 
-  it('does not block a never-started allocation on unrelated unavailable legacy history or touch its provider', async () => {
+  it('does not block a never-started allocation or touch its provider', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
     const legacyId = `agent_${crypto.randomUUID()}`;
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
     await runInDurableObject(control, async (instance, state) => {
-      expect(await instance.getPhysicalRecord()).toEqual({
-        state: 'stopped',
-        providerRef: null,
-        createIntent: null,
-        stopTombstone: null,
+      expect(await instance.getAllocationRecord()).toEqual({
+        v: 2,
         resumable: false,
+        state: { kind: 'stopped', summary: null },
       });
       expect(await instance.listRoutes()).toEqual([]);
       expect(state.getWebSockets()).toEqual([]);
       let legacyRunning = true;
       const provider: ProviderAdapter = {
         resumable: false,
+        persistentWorkspace: false,
+        destroysOnStop: true,
         ensureBillingAdmission: async () => undefined,
         launch: async () => undefined,
         create: async () => ({ providerRef: sandboxId }),
@@ -606,7 +752,7 @@ describe('worktree deletion in Durable Objects', () => {
           deleted: true,
         });
         expect(legacyRunning).toBe(true);
-        expect(await state.storage.get('physical_record')).toBeUndefined();
+        await expectAllocationSettled(state.storage);
       } finally {
         await state.storage.deleteAlarm();
         Object.assign(instance['env'], { SESSION_INGEST: original });
@@ -706,7 +852,7 @@ describe('worktree deletion in Durable Objects', () => {
         expect(revokedPolicy).not.toContain(grants[0].kilo.alias);
         expect(revokedPolicy).toContain(grants[1].kilo.alias);
         expect(await loadSessionCredentialGrants(state.storage)).toEqual([]);
-        expect(await state.storage.get('physical_record')).toBeUndefined();
+        await expectAllocationSettled(state.storage);
         expect(await loadWorktreeDeletionJournal(state.storage, worktreeId)).toMatchObject({
           destroyed: true,
           completed: true,
@@ -722,10 +868,10 @@ describe('worktree deletion in Durable Objects', () => {
     });
   });
 
-  it('resolves an unrelated legacy runtime from original metadata before destroying the exclusive target', async () => {
+  it('resolves an unrelated control runtime from the locator before destroying the exclusive target', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
     const otherSandboxId = `usr-${'c'.repeat(48)}`;
-    const legacyId = 'agent_44444444-4444-4444-8444-444444444444';
+    const otherSessionId = cloudId();
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
     await runInDurableObject(control, async (instance, state) => {
       const providerRef = encodeCloudflareProviderRef({
@@ -736,6 +882,8 @@ describe('worktree deletion in Durable Objects', () => {
       const running = new Set([providerRef, otherSandboxId]);
       const provider: ProviderAdapter = {
         resumable: false,
+        persistentWorkspace: false,
+        destroysOnStop: true,
         ensureBillingAdmission: async () => undefined,
         launch: async () => undefined,
         create: async () => ({ providerRef: sandboxId }),
@@ -748,8 +896,9 @@ describe('worktree deletion in Durable Objects', () => {
         logs: async () => '',
       };
       const originalIngest = instance['env'].SESSION_INGEST;
-      const originalLegacy = instance['env'].CLOUD_AGENT_SESSION;
       Object.assign(instance, { provider, createProviderAdapter: () => provider });
+      const locator = vi.fn(() => ({ sandboxId: otherSandboxId, provider: 'cloudflare' as const }));
+      const restoreLocator = installControlLocator(instance, locator);
       Object.assign(instance['env'], {
         SESSION_INGEST: {
           canDestroyCloudAgentWorktreeSandbox: async () => ({
@@ -758,22 +907,9 @@ describe('worktree deletion in Durable Objects', () => {
               {
                 worktreeId: null,
                 organizationId: null,
-                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: otherSessionId }],
               },
             ],
-          }),
-        },
-        CLOUD_AGENT_SESSION: {
-          idFromName: (name: string) => name,
-          get: () => ({
-            getRuntimeLocation: async () => ({
-              cloudAgentSessionId: legacyId,
-              kiloUserId: userId,
-              organizationId: null,
-              sessionId: kiloId(1),
-              worktreeId: null,
-              location: { sandboxId: otherSandboxId, provider: 'cloudflare' },
-            }),
           }),
         },
       });
@@ -787,13 +923,425 @@ describe('worktree deletion in Durable Objects', () => {
           sessionIds: [kiloId(0)],
         });
         expect([...running]).toEqual([otherSandboxId]);
-        expect(await state.storage.get('physical_record')).toBeUndefined();
+        await expectAllocationSettled(state.storage);
+        expect(locator).toHaveBeenCalledTimes(1);
       } finally {
         await state.storage.deleteAlarm();
-        Object.assign(instance['env'], {
-          SESSION_INGEST: originalIngest,
-          CLOUD_AGENT_SESSION: originalLegacy,
+        restoreLocator();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('no owner is walked and the sandbox is destroyed for many unrelated legacy roots', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const memory = createDeletionProvider(sandboxId);
+      const created = await memory.create({
+        intentId: 'many-roots',
+        createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+      });
+      if (!('providerRef' in created)) throw new Error('Expected native fixture allocation');
+      await installDeletionProvider(instance, memory);
+      const owners = Array.from({ length: 40 }, (_, index) => ({
+        worktreeId: null,
+        organizationId: null,
+        sessions: [
+          { sessionId: null, cloudAgentSessionId: `agent_${crypto.randomUUID()}${index}` },
+        ],
+      }));
+      const locator = vi.fn(() => null);
+      const restoreLegacy = installLegacyLocator(instance, locator);
+      const ownership = vi.fn(async () => ({ kind: 'unresolved' as const, owners }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'many-roots', created.providerRef);
+        await expect(
+          instance.deleteWorktreeResources({
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'vercel' },
+            sessionIds: [kiloId(0)],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
+        expect(ownership).toHaveBeenCalledTimes(1);
+        expect(ownership).toHaveBeenCalledWith(
+          expect.objectContaining({ releasedWorktreeIds: [] })
+        );
+        expect(locator).not.toHaveBeenCalled();
+        expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'terminal' });
+        await expectAllocationSettled(state.storage);
+      } finally {
+        await state.storage.deleteAlarm();
+        restoreLegacy();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('does not stop the provider for a shared ledger verdict in either check of one deletion', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const memory = createDeletionProvider(sandboxId);
+      const created = await memory.create({
+        intentId: 'shared-both-checks',
+        createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+      });
+      if (!('providerRef' in created)) throw new Error('Expected native fixture allocation');
+      const stop = vi.fn(memory.stop.bind(memory));
+      await installDeletionProvider(instance, { ...memory, stop });
+      installScopedCleanupSocket(instance);
+      const ownership = vi.fn(async () => ({ kind: 'shared' as const }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'shared-both-checks', created.providerRef);
+        await expect(
+          instance.deleteWorktreeResources({
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'vercel' },
+            sessionIds: [kiloId(0)],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
+        expect(ownership).toHaveBeenCalledTimes(2);
+        expect(stop).not.toHaveBeenCalled();
+        expect(await state.storage.get(RUNTIME_DELETED_KEY)).toBeUndefined();
+        expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'active' });
+        expect(await loadSessionReferences(state.storage)).toMatchObject({
+          reconciled: false,
+          overflowed: false,
         });
+      } finally {
+        await state.storage.deleteAlarm();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('does not terminalize a missing control history that is repaired later', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const controlSessionId = cloudId();
+    const otherSandboxId = `usr-${'e'.repeat(48)}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const memory = createDeletionProvider(sandboxId);
+      const created = await memory.create({
+        intentId: 'missing-history',
+        createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+      });
+      if (!('providerRef' in created)) throw new Error('Expected native fixture allocation');
+      await installDeletionProvider(instance, memory);
+      installScopedCleanupSocket(instance);
+      let locator: { sandboxId: string; provider: 'cloudflare' } | null = null;
+      const restoreLocator = installControlLocator(instance, () => locator);
+      const ownership = vi.fn(async () => ({
+        kind: 'unresolved' as const,
+        owners: [
+          {
+            worktreeId: null,
+            organizationId: null,
+            sessions: [{ sessionId: null, cloudAgentSessionId: controlSessionId }],
+          },
+        ],
+      }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'missing-history', created.providerRef);
+        const input = {
+          worktreeId,
+          kiloUserId: userId,
+          location: { sandboxId, provider: 'vercel' as const },
+          sessionIds: [kiloId(0)],
+        };
+        await expect(instance.deleteWorktreeResources(input)).resolves.toEqual({
+          deleted: true,
+          sessionIds: [kiloId(0)],
+        });
+        const blocked = await loadSessionReferences(state.storage);
+        expect(blocked.reconciled).toBe(false);
+        expect(blocked.overflowed).toBe(false);
+        expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(
+          created.providerRef
+        );
+
+        locator = { sandboxId: otherSandboxId, provider: 'cloudflare' };
+        await expect(instance.deleteWorktreeResources(input)).resolves.toMatchObject({
+          deleted: true,
+        });
+        expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'terminal' });
+        await expectAllocationSettled(state.storage);
+      } finally {
+        await state.storage.deleteAlarm();
+        restoreLocator();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('keeps blocking after a referencing sibling detaches', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const sibling = cloudId();
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId,
+      instanceId: 'sibling-detach',
+      containment: true,
+    });
+    await runInDurableObject(control, async (instance, state) => {
+      const stop = vi.fn(async () => 'terminal' as const);
+      const provider: ProviderAdapter = {
+        resumable: false,
+        persistentWorkspace: false,
+        destroysOnStop: true,
+        ensureBillingAdmission: async () => undefined,
+        create: async () => ({ providerRef }),
+        launch: async () => undefined,
+        observe: async () => ({ status: 'active', providerRef }),
+        stop,
+        ensureLeaseAtLeast: async () => undefined,
+        logs: async () => '',
+      };
+      Object.assign(instance, { provider, createProviderAdapter: () => provider });
+      installScopedCleanupSocket(instance);
+      const ownership = vi.fn(async () => ({ kind: 'exclusive' as const }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'sibling-detach', providerRef);
+        await attachGrantedSession(
+          instance,
+          state,
+          {
+            sessionId: sibling,
+            kiloSessionId: kiloId(1),
+            directory: otherDirectory,
+            ownerId: userId,
+            worktreeId: otherWorktreeId,
+          },
+          'cloudflare'
+        );
+        await instance.detachSession(sibling);
+
+        await expect(
+          instance.deleteWorktreeResources({
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+            sessionIds: [kiloId(0)],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
+        expect(stop).not.toHaveBeenCalled();
+        expect(await state.storage.get(RUNTIME_DELETED_KEY)).toBeUndefined();
+        const references = await loadSessionReferences(state.storage);
+        expect(references.entries).toContainEqual({
+          sessionId: sibling,
+          kiloSessionId: kiloId(1),
+          directory: otherDirectory,
+          worktreeId: otherWorktreeId,
+        });
+        expect(references.reconciled).toBe(false);
+      } finally {
+        await state.storage.deleteAlarm();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('blocks an allocated sandbox when the index is absent but a current route is foreign', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const memory = createDeletionProvider(sandboxId);
+      const created = await memory.create({
+        intentId: 'route-only-foreign',
+        createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+      });
+      if (!('providerRef' in created)) throw new Error('Expected native fixture allocation');
+      const stop = vi.fn(memory.stop.bind(memory));
+      await installDeletionProvider(instance, { ...memory, stop });
+      installScopedCleanupSocket(instance);
+      const ownership = vi.fn(async () => ({ kind: 'exclusive' as const }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'route-only-foreign', created.providerRef);
+        await state.storage.put('session_routes', [
+          {
+            sessionId: cloudId(),
+            kiloSessionId: kiloId(1),
+            directory: otherDirectory,
+            ownerId: userId,
+            worktreeId: otherWorktreeId,
+            lastState: null,
+            lastStateAt: null,
+            idleForMs: null,
+            waitingOn: null,
+          },
+        ]);
+        expect(await state.storage.get('session_references')).toBeUndefined();
+
+        await expect(
+          instance.deleteWorktreeResources({
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'vercel' },
+            sessionIds: [kiloId(0)],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
+        expect(stop).not.toHaveBeenCalled();
+        expect(await state.storage.get(RUNTIME_DELETED_KEY)).toBeUndefined();
+        expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(
+          created.providerRef
+        );
+        expect(ownership).not.toHaveBeenCalled();
+      } finally {
+        await state.storage.deleteAlarm();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('destroys when only the deleted worktree\u2019s sessions reference the sandbox', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const memory = createDeletionProvider(sandboxId);
+      const created = await memory.create({
+        intentId: 'own-references',
+        createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+      });
+      if (!('providerRef' in created)) throw new Error('Expected native fixture allocation');
+      await installDeletionProvider(instance, memory);
+      const ownership = vi.fn(async () => ({ kind: 'exclusive' as const }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'own-references', created.providerRef);
+        await attachGrantedSession(instance, state, {
+          sessionId: cloudId(),
+          kiloSessionId: kiloId(0),
+          directory,
+          ownerId: userId,
+          worktreeId,
+        });
+        await expect(
+          instance.deleteWorktreeResources({
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'vercel' },
+            sessionIds: [kiloId(0)],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
+        expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'terminal' });
+        await expectAllocationSettled(state.storage);
+      } finally {
+        await state.storage.deleteAlarm();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      }
+    });
+  });
+
+  it('tombstones a pre-deploy route when it detaches after deploy', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const sessionId = cloudId();
+      await state.storage.put('session_routes', [
+        {
+          sessionId,
+          kiloSessionId: kiloId(0),
+          directory,
+          ownerId: userId,
+          worktreeId,
+          lastState: null,
+          lastStateAt: null,
+          idleForMs: null,
+          waitingOn: null,
+        },
+      ]);
+      await instance.detachSession(sessionId);
+      expect((await loadSessionReferences(state.storage)).entries).toEqual([
+        { sessionId, kiloSessionId: kiloId(0), directory, worktreeId },
+      ]);
+    });
+  });
+
+  it('does not lose a control reference on a shared sandbox', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
+    const controlSessionId = cloudId();
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const memory = createDeletionProvider(sandboxId);
+      const created = await memory.create({
+        intentId: 'predeploy-foreign',
+        createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+      });
+      if (!('providerRef' in created)) throw new Error('Expected native fixture allocation');
+      const stop = vi.fn(memory.stop.bind(memory));
+      await installDeletionProvider(instance, { ...memory, stop });
+      installScopedCleanupSocket(instance);
+      const restoreLocator = installControlLocator(instance, () => ({
+        sandboxId,
+        provider: 'vercel',
+      }));
+      const ownership = vi.fn(async () => ({
+        kind: 'unresolved' as const,
+        owners: [
+          {
+            worktreeId: null,
+            organizationId: null,
+            sessions: [{ sessionId: null, cloudAgentSessionId: controlSessionId }],
+          },
+        ],
+      }));
+      const originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership },
+      });
+      try {
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'predeploy-foreign', created.providerRef);
+        await expect(
+          instance.deleteWorktreeResources({
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'vercel' },
+            sessionIds: [kiloId(0)],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
+        expect(stop).not.toHaveBeenCalled();
+        expect(await state.storage.get(RUNTIME_DELETED_KEY)).toBeUndefined();
+        expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(
+          created.providerRef
+        );
+        expect(await loadSessionReferences(state.storage)).toMatchObject({ reconciled: false });
+      } finally {
+        await state.storage.deleteAlarm();
+        restoreLocator();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
       }
     });
   });
@@ -863,7 +1411,9 @@ describe('worktree deletion in Durable Objects', () => {
           destroyed: false,
           completed: false,
         });
-        expect((await instance.getPhysicalRecord()).providerRef).toBe(created.providerRef);
+        expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(
+          created.providerRef
+        );
         shared = true;
         await expect(
           instance.deleteWorktreeResources({
@@ -874,7 +1424,9 @@ describe('worktree deletion in Durable Objects', () => {
         ).rejects.toThrow('worktree_teardown_in_progress');
         expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
         await instance.alarm();
-        expect((await instance.getPhysicalRecord()).providerRef).toBe(created.providerRef);
+        expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(
+          created.providerRef
+        );
         mayStop = true;
         await instance.deleteWorktreeResources(input);
         expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'terminal' });
@@ -922,32 +1474,30 @@ describe('worktree deletion in Durable Objects', () => {
           },
         ];
         await state.storage.put('acquisition_receipts', receipts);
-        for (let attempt = 1; attempt <= DEADLINE_MS.stopAttemptLadder.length; attempt++) {
-          await expect(instance.deleteWorktreeResources(input)).rejects.toThrow('unconfirmed');
-          expect((await instance.getPhysicalRecord()).stopTombstone?.attempts).toBe(attempt);
-        }
-        const exhausted = await instance.getPhysicalRecord();
-        expect(exhausted.state).toBe('unknown');
-        expect(stop).toHaveBeenCalledTimes(DEADLINE_MS.stopAttemptLadder.length);
-        expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
-        const deadlines = await loadDeadlines(state.storage);
-        expect(deadlines.reconciliation).toEqual(expect.any(Number));
-        expect(await state.storage.getAlarm()).toBe(deadlines.reconciliation);
-        await saveDeadlines(state.storage, { ...deadlines, reconciliation: Date.now() });
-        await instance.alarm();
-        expect(observe).toHaveBeenCalledWith(created.providerRef, exhausted.createIntent);
-        expect(await instance.getPhysicalRecord()).toEqual(exhausted);
+        // One cleanup call drains the reducer-owned stop ladder. `check_required`
+        // has no timer (the flat `reconciliation` deadline is gone), so further
+        // progress is caller-driven and bounded by the reducer's attempt budget.
         await expect(instance.deleteWorktreeResources(input)).rejects.toThrow('unconfirmed');
-        expect(stop).toHaveBeenCalledTimes(DEADLINE_MS.stopAttemptLadder.length);
-        expect((await instance.getPhysicalRecord()).stopTombstone).toEqual(exhausted.stopTombstone);
-        expect(await state.storage.getAlarm()).not.toBeNull();
+        const exhausted = await instance.getAllocationRecord();
+        expect(exhausted.state.kind).toBe('stopping');
+        if (exhausted.state.kind !== 'stopping') throw new Error('Expected stopping allocation');
+        expect(exhausted.state.stopIntent.reason).toBe('worktree_deleted');
+        expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
+        expect(stop.mock.calls.length).toBeGreaterThan(0);
+        expect(await state.storage.getAlarm()).toBeNull();
+
+        // A retry in `check_required` observes the still-live runtime and stays
+        // unconfirmed without reviving the runtime.
+        await expect(instance.deleteWorktreeResources(input)).rejects.toThrow('unconfirmed');
+        expect(observe).toHaveBeenCalled();
+
         await native.stop(created.providerRef);
         await expect(instance.deleteWorktreeResources(input)).resolves.toEqual({
           deleted: true,
           sessionIds: [kiloId(0)],
         });
-        expect(stop).toHaveBeenCalledTimes(DEADLINE_MS.stopAttemptLadder.length);
-        expect(await state.storage.get('physical_record')).toBeUndefined();
+        expect((await instance.getAllocationRecord()).state.kind).toBe('stopped');
+        await expectAllocationSettled(state.storage);
         expect(await state.storage.get('provider_locator')).toBeUndefined();
         expect(await state.storage.get('acquisition_receipts')).toEqual(receipts);
         expect(await loadWorktreeDeletionJournal(state.storage, worktreeId)).toMatchObject({
@@ -968,7 +1518,7 @@ describe('worktree deletion in Durable Objects', () => {
     const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
     await stub.registerSession(registration(sessionId, sandboxId));
     await runInDurableObject(stub, async (_instance, state) => {
-      await state.storage.put('session_messages', [{ messageId: 'msg_active', state: 'accepted' }]);
+      await writeSessionValue(state.storage, [{ messageId: 'msg_active', state: 'accepted' }]);
       await state.storage.setAlarm(Date.now() + 60_000);
       drizzle(state.storage)
         .insert(events)
@@ -997,7 +1547,9 @@ describe('worktree deletion in Durable Objects', () => {
     });
     await expect(closed).resolves.toBe(1001);
     await runInDurableObject(stub, async (_instance, state) => {
-      expect(await state.storage.get('session_messages')).toMatchObject([{ state: 'cancelled' }]);
+      expect(await readSessionValue(state.storage)).toMatchObject({
+        messages: [{ state: { kind: 'cancelled' } }],
+      });
       // Deletion preserves the interrupted report obligation, so its delivery
       // alarm is intentionally armed instead of removed.
       expect(await state.storage.getAlarm()).not.toBeNull();
@@ -1061,7 +1613,7 @@ describe('worktree deletion in Durable Objects', () => {
           deleted: true,
         });
         expect(create).not.toHaveBeenCalled();
-        expect(await state.storage.get('physical_record')).toBeUndefined();
+        await expectAllocationSettled(state.storage);
         expect(await state.storage.getAlarm()).toBeNull();
       } finally {
         Object.assign(instance['env'], { SESSION_INGEST: original });
@@ -1124,7 +1676,7 @@ describe('worktree deletion in Durable Objects', () => {
         await instance.finishWorktreeDeletion(worktreeId);
         expect(attach).not.toHaveBeenCalled();
         expect(request).not.toHaveBeenCalled();
-        expect(await state.storage.get('session_messages')).toBeUndefined();
+        expect(await readSessionValue(state.storage)).toBeUndefined();
         // Deletion preserves report delivery state. The alarm must be armed
         // solely for the interrupted report obligation, not callbacks.
         expect([
@@ -1177,6 +1729,8 @@ describe('worktree deletion in Durable Objects', () => {
       });
       const provider: ProviderAdapter = {
         resumable: false,
+        persistentWorkspace: false,
+        destroysOnStop: true,
         ensureBillingAdmission: async () => undefined,
         create,
         launch: async () => {
@@ -1202,7 +1756,7 @@ describe('worktree deletion in Durable Objects', () => {
       });
       await runInDurableObject(session, async (_instance, state) => {
         const acceptedAt = Date.now() - DEADLINE_MS.acceptedOverdue - 1_000;
-        await state.storage.put('session_messages', [
+        await writeSessionValue(state.storage, [
           {
             messageId: 'msg_waiting_for_answer',
             prompt: 'Wait for my answer',
@@ -1248,7 +1802,7 @@ describe('worktree deletion in Durable Objects', () => {
         })
       );
       try {
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           expect(await control.getStatus()).toMatchObject({
             connection: 'ready',
             wrapperInstanceId,
@@ -1294,7 +1848,7 @@ describe('worktree deletion in Durable Objects', () => {
                 location: { sandboxId, provider: 'cloudflare' },
                 sessionIds: [kiloId(0)],
               });
-              await vi.waitFor(async () => {
+              await waitFor(async () => {
                 expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
               });
               for (const identity of [
@@ -1345,9 +1899,13 @@ describe('worktree deletion in Durable Objects', () => {
                   allowCreate: true,
                 })
               ).rejects.toThrow('worktree_deleting');
-              await expect(instance.claimCreate('blocked-allocation')).rejects.toThrow(
-                'worktree_deleting'
-              );
+              await expect(
+                instance.ensureReady({
+                  ownerId: userId,
+                  sessionId: sibling,
+                  allowCreate: true,
+                })
+              ).rejects.toThrow('worktree_deleting');
               const journal = await loadWorktreeDeletionJournal(state.storage, worktreeId);
               if (!journal) throw new Error('Missing deletion journal');
               await state.storage.put(`${WORKTREE_DELETION_PREFIX}${worktreeId}`, {
@@ -1367,10 +1925,16 @@ describe('worktree deletion in Durable Objects', () => {
                 await state.storage.put(`${WORKTREE_DELETION_PREFIX}${worktreeId}`, journal);
               }
             }
-            const deadlines = await loadDeadlines(state.storage);
+            // The legacy deadline table was removed with the flat record; the
+            // canonical allocation aggregate is now the control's scheduling
+            // evidence, so an unchanged record means the sibling alarm did not
+            // disturb the in-flight deletion.
+            const allocation = await readCanonicalAllocationRecord(state.storage);
             await runInDurableObject(siblingSession, async (siblingInstance, siblingState) => {
               await siblingInstance.alarm();
-              expect(await siblingState.storage.get('session_messages')).toMatchObject([
+              // This sibling is deliberately seeded as a pre-cutover legacy
+              // array, so the raw value stays in the legacy flat shape.
+              expect(await readSessionValue(siblingState.storage)).toMatchObject([
                 { messageId: 'msg_waiting_for_answer', state: 'accepted', wrapperInstanceId },
               ]);
               expect(await siblingState.storage.get('session_pending_interactions')).toMatchObject({
@@ -1382,7 +1946,7 @@ describe('worktree deletion in Durable Objects', () => {
             expect(requests).toEqual([
               expect.objectContaining({ operation: 'session.sync', session: siblingIdentity }),
             ]);
-            expect(await loadDeadlines(state.storage)).toEqual(deadlines);
+            expect(await readCanonicalAllocationRecord(state.storage)).toEqual(allocation);
             expect(await instance.getStatus()).toMatchObject({
               physical: 'running',
               connection: 'ready',
@@ -1403,7 +1967,7 @@ describe('worktree deletion in Durable Objects', () => {
             }
             expect(stop).not.toHaveBeenCalled();
             expect(create).not.toHaveBeenCalled();
-            expect((await instance.getPhysicalRecord()).providerRef).toBe(providerRef);
+            expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(providerRef);
             expect(await instance.listRoutes()).toEqual(
               duringDeletion
                 ? [expect.objectContaining(siblingIdentity)]
@@ -1443,6 +2007,8 @@ describe('worktree deletion in Durable Objects', () => {
     await runInDurableObject(control, async (instance, state) => {
       const provider: ProviderAdapter = {
         resumable: false,
+        persistentWorkspace: false,
+        destroysOnStop: true,
         ensureBillingAdmission: async () => undefined,
         create: async () => {
           throw new Error('Shared cleanup must not allocate');
@@ -1564,7 +2130,7 @@ describe('worktree deletion in Durable Objects', () => {
       otherWorktreeId,
     ]);
     expect(await control.getOwner()).toBe(userId);
-    expect((await control.getPhysicalRecord()).providerRef).toBe(providerRef);
+    expect(canonicalProviderRef(await control.getAllocationRecord())).toBe(providerRef);
     socket.close();
   });
 
@@ -1598,6 +2164,13 @@ describe('worktree deletion in Durable Objects', () => {
         try {
           await instance.initializeOwner(userId);
           await seedPhysical(instance, state, 'exclusive', created.providerRef);
+          await state.storage.put('provider_locator', {
+            teamId: vercelConfig.VERCEL_TEAM_ID,
+            projectId: vercelConfig.VERCEL_PROJECT_ID,
+            snapshotId: vercelConfig.VERCEL_SANDBOX_SNAPSHOT_ID,
+            runtimeBuildId: vercelConfig.VERCEL_SANDBOX_RUNTIME_BUILD_ID,
+            runtime: 'node24',
+          });
           const locator = await state.storage.get('provider_locator');
           expect(locator).toMatchObject({
             teamId: vercelConfig.VERCEL_TEAM_ID,
@@ -1628,7 +2201,9 @@ describe('worktree deletion in Durable Objects', () => {
             sessionIds: [kiloId(0)],
           };
           await expect(instance.deleteWorktreeResources(input)).rejects.toThrow('unconfirmed');
-          expect((await instance.getPhysicalRecord()).providerRef).toBe(created.providerRef);
+          expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(
+            created.providerRef
+          );
           expect(await state.storage.get('provider_locator')).toEqual(locator);
           expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
           await expect(
@@ -1643,7 +2218,7 @@ describe('worktree deletion in Durable Objects', () => {
           expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
           expect(await state.storage.get('owner_id')).toBeUndefined();
           expect(await state.storage.get('provider_locator')).toBeUndefined();
-          expect(await state.storage.get('physical_record')).toBeUndefined();
+          await expectAllocationSettled(state.storage);
           expect(await state.storage.getAlarm()).toBeNull();
           expect(await loadWorktreeDeletionJournal(state.storage, worktreeId)).toMatchObject({
             resourcesCleaned: true,
@@ -1683,13 +2258,15 @@ describe('worktree deletion in Durable Objects', () => {
                 await hashSandboxCredential(generateSandboxCredential())
               );
             }
-            const replacement = await instance.getPhysicalRecord();
+            const replacementRecord = await instance.getAllocationRecord();
+            const replacementRef = canonicalProviderRef(replacementRecord);
             const credential = await state.storage.get('wrapper_credential_hash');
-            expect(await memory.observe(replacement.providerRef)).toMatchObject({
+            if (!replacementRef) throw new Error('Missing replacement provider reference');
+            expect(await memory.observe(replacementRef)).toMatchObject({
               status: 'active',
             });
             await instance.deleteWorktreeResources(input);
-            expect((await instance.getPhysicalRecord()).providerRef).toBe(replacement.providerRef);
+            expect(canonicalProviderRef(await instance.getAllocationRecord())).toBe(replacementRef);
             expect(await state.storage.get('wrapper_credential_hash')).toBe(credential);
             expect(await instance.getOwner()).toBe(userId);
             await state.storage.deleteAlarm();
@@ -1775,10 +2352,41 @@ describe('worktree deletion in Durable Objects', () => {
         expect(stoppedRef).toContain('vsess_');
         expect(await memory.observe(stoppedRef)).toMatchObject({ status: 'terminal' });
         expect(await state.storage.getAlarm()).toBeNull();
-        expect(await state.storage.get('physical_record')).toBeUndefined();
+        await expectAllocationSettled(state.storage);
       } finally {
         Object.assign(instance['env'], { SESSION_INGEST: original, WORKER_URL: workerUrl });
       }
     });
+  });
+
+  it('forwards an isolated sole-owner session metadata to the retirement RPC on deleteSession', async () => {
+    const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}` as const;
+    const sessionId = cloudId();
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    const retire = vi.fn(async () => ({ kind: 'exclusive' as const }));
+    let originalIngest: unknown;
+    await runInDurableObject(control, instance => {
+      originalIngest = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: { retireCloudAgentWorktreeIfSoleMember: retire },
+      });
+    });
+    try {
+      const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+      await runInDurableObject(session, async instance => {
+        await instance.registerSession(registration(sessionId, sandboxId));
+        await instance.deleteSession();
+      });
+
+      expect(retire).toHaveBeenCalledWith({
+        worktreeId,
+        kiloUserId: userId,
+        cloudAgentSessionId: sessionId,
+      });
+    } finally {
+      await runInDurableObject(control, instance => {
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
+      });
+    }
   });
 });

@@ -7,6 +7,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TourScreen } from './tour-screen';
+import { TourStepHeader } from './tour-step-header';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -30,11 +31,7 @@ const backHandler = vi.hoisted(() => {
     handlers,
     add: (handler: () => boolean) => {
       handlers.add(handler);
-      return {
-        remove: () => {
-          handlers.delete(handler);
-        },
-      };
+      return { remove: () => handlers.delete(handler) };
     },
     press: () => {
       let handled = false;
@@ -55,6 +52,7 @@ const focusState = vi.hoisted(() => ({ active: true }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   BackHandler: {
     addEventListener: (_event: string, handler: () => boolean) => backHandler.add(handler),
   },
@@ -116,21 +114,20 @@ vi.mock('@/lib/tour/tour-completion', () => ({
   }),
 }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// Mocked to a host string so the fork-body assertion below can actually match
+// it: an unmocked component is a function, and `findAllByType` by string never
+// finds it, so the check would pass no matter what the shell rendered.
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Cloud: 'Cloud',
   Monitor: 'Monitor',
   Sparkles: 'Sparkles',
 }));
-
-// The computer instructions page is replaced with a controllable stub that
-// exposes `onChooseComputer`, so the shell's hand-off contract is tested
-// without the step's network behavior.
-vi.mock('./tour-remote-step', () => ({ TourRemoteStep: 'TourRemoteStep' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -146,20 +143,12 @@ function hasText(renderer: Renderer, value: string): boolean {
     .some(node => childValues(node).includes(value));
 }
 
-function findControl(
-  renderer: Renderer,
-  type: string,
-  label: string
-): ReactTestInstance | undefined {
-  return renderer.root
-    .findAllByType(type as ElementType)
-    .find(control =>
-      control.findAllByType('Text' as ElementType).some(node => childValues(node).includes(label))
-    );
-}
-
 function requireControl(renderer: Renderer, type: string, label: string): ReactTestInstance {
-  const control = findControl(renderer, type, label);
+  const control = renderer.root
+    .findAllByType(type as ElementType)
+    .find(node =>
+      node.findAllByType('Text' as ElementType).some(entry => childValues(entry).includes(label))
+    );
   if (!control) {
     throw new Error(`control not found: ${type} "${label}"`);
   }
@@ -170,14 +159,6 @@ function pressControl(renderer: Renderer, type: string, label: string): void {
   const control = requireControl(renderer, type, label);
   act(() => {
     (control.props as { onPress?: () => void }).onPress?.();
-  });
-}
-
-/** Drive the computer step's hand-off the way a row tap does. */
-function chooseComputer(renderer: Renderer, connectionId: string): void {
-  const step = renderer.root.findByType('TourRemoteStep' as ElementType);
-  act(() => {
-    (step.props as { onChooseComputer: (value: string) => void }).onChooseComputer(connectionId);
   });
 }
 
@@ -219,18 +200,39 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkSubtitle')).toBe(true);
     expect(hasText(renderer, 'tour.cloudOptionTitle')).toBe(true);
     expect(hasText(renderer, 'tour.remoteOptionTitle')).toBe(true);
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
+
+    // The screen header keeps only the native modal spacing. The eyebrow sits
+    // in the centered step header, directly above the heading it names.
+    const screenHeader = renderer.root.findByType('ScreenHeader' as ElementType);
+    expect(screenHeader.props).not.toHaveProperty('eyebrow');
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
     unmount();
   });
 
-  it('renders the fork body inside a scroll container so it stays above the action bar', async () => {
+  it('centres the fork body in the band between the header and the Skip bar', async () => {
     const { renderer, unmount } = await mountTour();
 
-    // The header and the Skip bar are outside the step's scroll area; the fork
-    // body must live in the scrolling CenteredState so a short screen or a
-    // large system font scrolls instead of covering them.
-    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(1);
+    // One ScrollView owns the fork body. Its content container grows to the
+    // viewport (`grow`) and distributes the header and the two path cards in
+    // the middle (`justify-center`), so the block fills the band between the
+    // header and the Skip bar instead of leaving the empty lower half the owner
+    // reported. `grow` is a minimum, so taller content still scrolls rather
+    // than being clipped.
+    const scroller = renderer.root.findByType('ScrollView' as ElementType);
+    expect(scroller.props.contentContainerClassName).toBe('grow justify-center gap-8 px-6 py-6');
+    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('keeps modal spacing without moving the eyebrow out of the step header', async () => {
+    const { renderer, unmount } = await mountTour();
+
+    const header = renderer.root.findByProps({ modal: true });
+    expect(header.props.showBackButton).toBe(false);
+    expect(header.props.eyebrow).toBeUndefined();
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
     unmount();
   });
@@ -249,37 +251,21 @@ describe('TourScreen', () => {
     expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=cloud');
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
 
     unmount();
   });
 
-  it('opens the computer instructions page when the computer card is chosen', async () => {
+  it('hands off to the new-session page with no preselect when the computer card is chosen', async () => {
     const { renderer, unmount } = await mountTour();
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
 
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
-    expect(hasText(renderer, 'tour.forkTitle')).toBe(false);
-    // Opening the page is not a decision: nothing is recorded until a
-    // computer is tapped or the person skips.
-    expect(recordCompleted).not.toHaveBeenCalled();
-    expect(stackSafeReplace).not.toHaveBeenCalled();
-    expect(routerReplace).not.toHaveBeenCalled();
-    expect(routerBack).not.toHaveBeenCalled();
-
-    unmount();
-  });
-
-  it('hands off the chosen computer to the new-session page', async () => {
-    const { renderer, unmount } = await mountTour();
-
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
-    chooseComputer(renderer, 'conn-1');
-
+    // The computer card records the decision and hands straight to the form
+    // too. It passes no run-on param, so the form restores the stored run-on
+    // preference and the person picks their computer there.
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(stackSafeReplace).toHaveBeenCalledTimes(1);
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new');
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
@@ -379,10 +365,8 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
-
-    chooseComputer(renderer, 'conn-1');
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(recordCompleted).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new');
 
     unmount();
   });

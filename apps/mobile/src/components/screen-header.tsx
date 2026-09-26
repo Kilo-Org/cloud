@@ -1,14 +1,16 @@
 import { type Href, useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { I18nManager, Platform, Pressable, View } from 'react-native';
+import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
-import { OFFLINE_BANNER_HEIGHT, useOfflineBannerSpace } from '@/components/offline-banner-space';
+import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { offlineHeaderReservation } from '@/lib/offline-banner-state';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -20,12 +22,82 @@ import { cn } from '@/lib/utils';
  */
 const MODAL_HEADER_TOP_PADDING = 32;
 
+/**
+ * Content width (dp, at font scale 1) a header needs for its title and its
+ * actions to share one row.
+ *
+ * A narrow window cannot hold both. At the e1 geometry — 160dp wide with a 1.5
+ * font scale — the shared row left the heading 48dp: the 30px list title, its
+ * eyebrow, and the mono link beside it need about 180dp together, which is
+ * about 120dp at scale 1. Every one of them broke into a single-letter column
+ * and grew the header down over the search field. Below this width the actions
+ * take their own row under the title, the reflow the design system asks of
+ * narrow product UI. Wider windows keep the single-row layout byte-identical.
+ */
+const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
+
+/**
+ * The horizontal gutter a header's content sits inside. The list screens use
+ * the widest one in service (`px-[22px]`, 44dp); the default `px-4` is
+ * narrower, so the check reflows a hair early for those callers instead of
+ * squeezing them.
+ */
+const HEADER_CONTENT_GUTTER = 44;
+
+/**
+ * The `ms-3` gap the trailing cluster keeps from the heading, in dp. The
+ * cluster and the heading are separate flex children, so the title loses this
+ * as well whenever the row holds both.
+ */
+const HEADER_ACTIONS_GAP = 12;
+
+/**
+ * Whether the header's actions drop to their own row instead of sharing the
+ * title's. `width` is the window width in dp; `fontScale` is the system font
+ * scale, so a large font reflows before a small one at the same width.
+ * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
+ * dp — the widths the caller renders, not a worst case it may never show. A
+ * cluster wide enough to leave the title below its readable minimum reflows
+ * too: at 320 dp with a font scale of 2 the PR review header's Share, Submit
+ * review and Merge controls left the title a few characters. Fixed-size
+ * children (icon buttons, a label capped at its own max-w) do not grow with the
+ * font scale, so this width is taken as laid out and is not scaled.
+ */
+export function shouldStackHeaderActions(
+  width: number,
+  fontScale: number,
+  headerRightWidth = 0
+): boolean {
+  if (!Number.isFinite(width)) {
+    return false;
+  }
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
+  return titleWidth < HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH * scale;
+}
+
+/**
+ * Ceiling for the header title's line cap. The reserved box grows by a full
+ * line height per cap, so three lines is the most a header should take; the
+ * Text and the reserve are clamped together to keep them in step.
+ */
+const MAX_TITLE_LINES = 3;
+
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
   titleContent?: React.ReactNode;
+  /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
   titleNumberOfLines?: number;
-  /** Reserve two title lines so state changes do not move the screen body. */
+  /**
+   * Cap the eyebrow to this many lines, overriding the header's default single
+   * line. When set the eyebrow ellipsizes in the middle: the repo name is the
+   * distinguishing tail of a path, so a middle ellipsis keeps more of it than a
+   * tail ellipsis. Left undefined every caller keeps the default one-line tail
+   * ellipsis, so a long repository label never reflows the header.
+   */
+  eyebrowNumberOfLines?: number;
+  /** Reserve the title's line cap so state changes do not move the screen body. */
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
@@ -34,7 +106,29 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
-  /** Home, Agents, Quick Chat, and session headers supply context below the title.
+  /**
+   * Width the `headerRight` cluster lays out at, in dp. The stacking decision
+   * reserves it (see `shouldStackHeaderActions`), so a wide cluster reflows the
+   * actions onto their own row instead of squeezing the title to a few
+   * characters. Pass the widths of the controls actually rendered. Omit it for
+   * a cluster no wider than a single icon button.
+   */
+  headerRightWidth?: number;
+  /**
+   * The `headerRight` cluster shrinks and truncates on its own (the session
+   * header's context pill: `min-w-0 shrink`, one-line cost). The slot then
+   * keeps its half-row cap, so an unbounded value truncates inside the cluster
+   * instead of pushing the title to zero width and the pill past the screen
+   * edge. Leave it off for fixed-width controls: a capped box cannot shrink
+   * them, so they would paint past it.
+   */
+  headerRightShrinks?: boolean;
+  /** Controls rendered at the trailing edge of the title row, in the
+   * leading-aligned row and beside a centered title alike. The heading keeps
+   * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
+   * their full width instead of the `headerRight` half-row cap wrapping them. */
+  inlineActions?: React.ReactNode;
+  /** Home, Quick Chat, and session headers supply context below the title.
    * Other callers keep their existing title-only layout when this slot is absent. */
   context?: React.ReactNode;
   modal?: boolean;
@@ -62,15 +156,34 @@ type ScreenHeaderProps = {
   className?: string;
 };
 
+/**
+ * Height of the reserved title box for `reserveTitleSpace`, one title line
+ * height per line the title can paint: the default 18px title's Tailwind line
+ * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
+ * static because NativeWind extracts them at build time. The reserve tracks the
+ * line cap so a title that grows a line (loading -> loaded, rename) cannot move
+ * the body below the header.
+ */
+function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
+  if (size === 'large') {
+    return titleLines > 2 ? 'min-h-[108px]' : 'min-h-[72px]';
+  }
+  return titleLines > 2 ? 'min-h-21' : 'min-h-14';
+}
+
 export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 2,
+  eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
   size = 'default',
   headerRight,
+  headerRightWidth,
+  headerRightShrinks = false,
+  inlineActions,
   context,
   modal,
   centerTitle = modal ?? false,
@@ -87,8 +200,16 @@ export function ScreenHeader({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
   const isOfflineBannerVisible = useOfflineBannerSpace();
+  // A window too narrow to hold the title beside its actions drops the actions
+  // to their own row instead of squeezing the title into a single-letter
+  // column. Only a header that has actions can reflow this way, and a caller
+  // that declares its cluster's width reflows before that cluster eats the
+  // title's readable minimum (see `headerRightWidth`).
+  const stackActions =
+    headerRight != null && shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
 
   // A modal is a native sheet that owns its own top inset; the header keeps the
   // fixed grabber clearance on both platforms. A pinned header adds the app
@@ -102,28 +223,24 @@ export function ScreenHeader({
   // modal is a separate native sheet window above the banner, so a modal header
   // never reserves.
   const reserveOfflineBanner = safeAreaTop && isOfflineBannerVisible && !modal;
-  const paddingTop = baseTopPadding + (reserveOfflineBanner ? OFFLINE_BANNER_HEIGHT : 0);
+  const paddingTop = baseTopPadding + offlineHeaderReservation(reserveOfflineBanner);
 
   // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
   // vertical padding through `className`.
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
   // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // whole chrome off the sensor. They go on an inner wrapper so they ADD to the
-  // `px-4` gutter: an inline padding on the container would beat the className
-  // (inline style wins in React Native) and swallow the gutter, pulling the
-  // back control's `-ml-4` chevron back inside the sensor area. Zero insets
-  // collapse the wrapper style to `undefined`, so portrait geometry is
+  // whole chrome off the sensor. The one shared hook serves both platforms and
+  // every caller: the brand mark on a page root and the sections, cards and
+  // actions below it then share one leading edge. It goes on an inner wrapper so
+  // it ADDS to the `px-4` gutter: an inline padding on the container would beat
+  // the className (inline style wins in React Native) and swallow the gutter,
+  // pulling the back control's `-ms-4` chevron back inside the sensor area. Zero
+  // insets collapse the wrapper style to `undefined`, so portrait geometry is
   // byte-identical and a rotation never moves anything vertically. Side padding
   // applies to every caller — a sheet with `safeAreaTop={false}` still runs
   // edge-to-edge horizontally and must clear the cutout too.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
-      ? {
-          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
-        }
-      : undefined;
+  const sideInsetStyle = useSideInsetStyle();
 
   // When `backIcon` isn't specified, fall back to the historical behaviour
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
@@ -133,6 +250,10 @@ export function ScreenHeader({
     size === 'large'
       ? 'shrink text-[30px] font-bold tracking-tight text-foreground'
       : 'shrink text-lg font-semibold text-foreground';
+
+  // One cap for the Text and the reserved box: a title capped deeper than the
+  // reserve would shift the body the moment it reached the extra line.
+  const titleLines = Math.min(Math.max(titleNumberOfLines, 1), MAX_TITLE_LINES);
 
   // The slop widens the title into the free space beside it. RN does not mirror
   // hitSlop under RTL, so the physical right slop would reach across the
@@ -156,7 +277,7 @@ export function ScreenHeader({
     ) : (
       <Text
         className={cn(titleClass, centerTitle && 'text-center')}
-        numberOfLines={titleNumberOfLines}
+        numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
       >
@@ -164,7 +285,7 @@ export function ScreenHeader({
       </Text>
     );
     const titleLayout = reserveTitleSpace ? (
-      <View className={cn(size === 'large' ? 'min-h-[72px]' : 'min-h-14', 'justify-center')}>
+      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
         {titleText}
       </View>
     ) : (
@@ -196,6 +317,12 @@ export function ScreenHeader({
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
           className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          // A status line is one line: a narrow window truncates it rather than
+          // stacking it into a column beside the title. A caller that raises
+          // `eyebrowNumberOfLines` opts into the extra lines and the middle
+          // ellipsis that keeps a path's distinguishing tail.
+          numberOfLines={eyebrowNumberOfLines ?? 1}
+          ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
           accessible={Boolean(eyebrow)}
           accessibilityElementsHidden={!eyebrow}
           importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
@@ -207,47 +334,110 @@ export function ScreenHeader({
       {context}
     </View>
   );
+  // A centered title shares its row with the leading and trailing controls.
+  // A spacer opposite the back control keeps the title centered on the full
+  // width without placing either control out of flow.
+  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+
+  // The leading control's pull into the gutter is a START-side margin, never a
+  // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
+  // (the default) React Native rewrites margin Left/Right to Yoga Start/End
+  // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
+  // so `-mr-4` under RTL becomes a negative END margin — the side facing the
+  // title — and the heading (the next sibling, whose interactive title fills
+  // it) starts 12 points under the back control's 44-point target. Measured on
+  // the row: the title box covered 0.27 of the back target's area, and the
+  // explorer's `overlapping_controls` scan reports above 0.25. A
+  // `marginInlineStart` is resolved to Yoga Start in both directions, so `-ms-4`
+  // pulls the control into the gutter and leaves the 4-point `gap-1` intact.
+  const backControl = canGoBack ? (
+    <Pressable
+      onPress={() => {
+        if (onBack) {
+          onBack();
+        } else if (backFallback !== undefined && !router.canGoBack()) {
+          router.replace(backFallback);
+        } else {
+          router.back();
+        }
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
+      className={cn(
+        'h-11 w-11 shrink-0 items-center justify-center active:opacity-70',
+        !separateHeading && '-ms-4'
+      )}
+    >
+      {resolvedBackIcon === 'close' ? (
+        <ChevronDown size={24} color={colors.foreground} />
+      ) : (
+        <DirectionalChevronLeft size={24} color={colors.foreground} />
+      )}
+    </Pressable>
+  ) : null;
+  // A fixed-width trailing cluster sizes to its content and never shrinks
+  // (`shrink-0`). A `max-w-[50%] shrink` cap clamped the cluster's box on
+  // narrow screens while its fixed-width children kept painting at their full
+  // width, so the last control's glyphs ran past the right screen edge and were
+  // cut off (device capture, session-compose-kbup). Content sizing moves the
+  // squeeze to the title: `heading` is `min-w-0 flex-1`, so a long title
+  // truncates in place and the controls stay whole inside the screen's own
+  // padding. A window too narrow to hold both drops the actions to their own
+  // row (`stackActions`), and a variable-width button caps itself: PR review's
+  // Submit review (pr-review-screen.tsx) and the Security Agent settings Save
+  // button (settings-save-button.tsx) each carry a 140 dp max-w.
+  //
+  // A cluster that shrinks on its own (`headerRightShrinks`) keeps the
+  // half-row cap: its unbounded text truncates inside the cap, and the title
+  // keeps the other half of the row.
+  const headerRightSlotClassName = headerRightShrinks
+    ? 'ms-3 max-w-[50%] min-w-0 shrink'
+    : 'ms-3 shrink-0';
+  const centeredControls =
+    separateHeading && backControl && !inlineActions && (!headerRight || stackActions) ? (
+      <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
+    ) : null;
+
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
       <View style={sideInsetStyle}>
-        <View className="flex-row items-center">
-          <View className="min-h-11 min-w-0 flex-1 flex-row items-center gap-1">
-            {canGoBack && (
-              <Pressable
-                onPress={() => {
-                  if (onBack) {
-                    onBack();
-                  } else if (backFallback !== undefined && !router.canGoBack()) {
-                    router.replace(backFallback);
-                  } else {
-                    router.back();
-                  }
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')
-                }
-                className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
-              >
-                {resolvedBackIcon === 'close' ? (
-                  <ChevronDown size={24} color={colors.foreground} />
-                ) : (
-                  <DirectionalChevronLeft size={24} color={colors.foreground} />
-                )}
-              </Pressable>
-            )}
-            {heading}
-            {/* A centered title must stay optically centered, so the trailing
-                spacer mirrors the back control's width instead of stacking the
-                control on its own row below the title. */}
-            {centerTitle && canGoBack ? <View className="h-11 w-11 shrink-0" /> : null}
-          </View>
-          {headerRight ? (
-            <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
-              {headerRight}
+        {separateHeading ? (
+          <>
+            <View className="min-h-11 flex-row items-center">
+              {backControl}
+              <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
+              {headerRight && !stackActions ? (
+                <View className={headerRightSlotClassName}>{headerRight}</View>
+              ) : (
+                centeredControls
+              )}
+              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
             </View>
-          ) : null}
-        </View>
+            {headerRight && stackActions ? (
+              // The actions keep the title's own row only while it can hold a
+              // readable title; below that they take a row of their own. They
+              // keep the row's full width so a long translation still wraps
+              // inside it instead of running off the edge.
+              <View className="mt-2 min-w-0">{headerRight}</View>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <View className="flex-row items-center">
+              <View className="min-w-0 flex-1 flex-row items-center gap-1">
+                {backControl}
+                {heading}
+              </View>
+              {headerRight && !stackActions ? (
+                <View className={headerRightSlotClassName}>{headerRight}</View>
+              ) : null}
+              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
+            </View>
+            {headerRight && stackActions ? (
+              <View className="mt-2 min-w-0">{headerRight}</View>
+            ) : null}
+          </>
+        )}
       </View>
     </View>
   );

@@ -3,13 +3,14 @@ import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
+import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 type Params = {
@@ -38,7 +39,7 @@ export default function PrReviewNumberLayout() {
   const owner = parseParam(params.owner);
   const repo = parseParam(params.repo);
   const number = parsePositiveIntParam(params.number);
-  const { fullSheetDetent } = useFormSheetDetents();
+  const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['githubPrReview']]]);
 
@@ -50,36 +51,33 @@ export default function PrReviewNumberLayout() {
   // so the same PR reached with different owner/repo casing keeps one queue.
   const draftEntityKey = pendingReviewDraftKey(owner, repo, number);
 
-  const sheetOptions = {
-    presentation: 'formSheet' as const,
-    sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
-    sheetInitialDetentIndex: 'last' as const,
-    sheetGrabberVisible: true,
-    headerShown: false,
-  };
-
   // The connect gate wraps every PR-review surface, including this nested
   // route reached directly by deep link / chat tap, so a disconnected or
   // revoked user can never reach the authenticated queries and mutations.
+  // The prompt provider sits outside the gate: the review-submit sheet
+  // requests the one-time post-submit prompt through it, and the host must
+  // stay mounted across that sheet's dismissal (see `FeedbackPromptProvider`).
   return (
-    <PrReviewConnectGate>
-      <PendingReviewProvider
-        key={`${draftEntityKey}:${userId ?? ''}`}
-        userId={userId}
-        draftEntityKey={draftEntityKey}
-      >
-        <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
-          {/* Register the overview first: unregistered routes sort after
-              registered siblings, so without this the initial screen is the
-              comment-composer formSheet instead of the PR overview. */}
-          <Stack.Screen name="index" />
-          <Stack.Screen name="comment-composer" options={sheetOptions} />
-          <Stack.Screen name="conversation-comment" options={sheetOptions} />
-          <Stack.Screen name="review-submit" options={sheetOptions} />
-          <Stack.Screen name="merge" options={sheetOptions} />
-          <Stack.Screen name="file-navigator" options={sheetOptions} />
-        </Stack>
-      </PendingReviewProvider>
-    </PrReviewConnectGate>
+    <FeedbackPromptProvider>
+      <PrReviewConnectGate>
+        <PendingReviewProvider
+          key={`${draftEntityKey}:${userId ?? ''}`}
+          userId={userId}
+          draftEntityKey={draftEntityKey}
+        >
+          <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+            {/* Register the overview first: unregistered routes sort after
+                registered siblings, so without this the initial screen is the
+                comment-composer formSheet instead of the PR overview. */}
+            <Stack.Screen name="index" />
+            <Stack.Screen name="comment-composer" options={sheetOptions} />
+            <Stack.Screen name="conversation-comment" options={sheetOptions} />
+            <Stack.Screen name="review-submit" options={sheetOptions} />
+            <Stack.Screen name="merge" options={sheetOptions} />
+            <Stack.Screen name="file-navigator" options={sheetOptions} />
+          </Stack>
+        </PendingReviewProvider>
+      </PrReviewConnectGate>
+    </FeedbackPromptProvider>
   );
 }

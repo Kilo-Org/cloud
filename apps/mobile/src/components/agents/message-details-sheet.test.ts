@@ -363,9 +363,11 @@ describe('getMessageDetailsContent — canSelectText', () => {
   });
 
   it('hides selection while an assistant tool part is running', () => {
-    const message = storedMessage(assistantInfo(), [runningToolPart()]);
+    const message = storedMessage(assistantInfo(), [textPart('finished text'), runningToolPart()]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).not.toBeNull();
+    expect(content.copyText).toBe('finished text');
+    // The select view still carries the tool invocation; only Copy is scoped.
+    expect(content.copyableText).toContain('bash');
     expect(content.canSelectText).toBe(false);
   });
 
@@ -385,6 +387,67 @@ describe('getMessageDetailsContent — canSelectText', () => {
     expect(content.copyableText).toBeNull();
     expect(content.canSelectText).toBe(false);
   });
+
+  it('appends the raw transport text to the copy payload only when delivery failed', () => {
+    // The failure footer never renders transport text; the details Copy action
+    // is where the untranslated original stays reachable (terminal-error split).
+    // The select-text view renders `copyableText`, so it never shows the raw
+    // string either.
+    const message = storedMessage(userInfo(), [textPart('Continue')]);
+    const content = getMessageDetailsContent(message, catalogOptions, {
+      status: 'failed',
+      error: 'Unauthorized: Unauthorized',
+      reason: 'exhausted',
+    });
+    expect(content.copyText).toBe('Continue\n\nUnauthorized: Unauthorized');
+    expect(content.copyableText).toBe('Continue');
+
+    // Without a failed delivery state the copy payload stays the prompt alone.
+    const delivered = getMessageDetailsContent(message, catalogOptions);
+    expect(delivered.copyText).toBe('Continue');
+
+    // A queued state is not a failure either.
+    const queued = getMessageDetailsContent(message, catalogOptions, { status: 'queued' });
+    expect(queued.copyText).toBe('Continue');
+    expect(queued.copyableText).toBe('Continue');
+  });
+});
+
+describe('getMessageDetailsContent — Copy message payload', () => {
+  it('copies the message text without the thinking block above it', () => {
+    const message = storedMessage(assistantInfo(), [
+      reasoningPart('Let me think about this first.', { start: 1, end: 2 }),
+      textPart('Here is the answer.', 'p-answer'),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBe('Here is the answer.');
+    // Select text is a separate affordance: it keeps the thinking block so a
+    // manual selection is not narrowed by the Copy-message scope.
+    expect(content.copyableText).toBe('Let me think about this first.\n\nHere is the answer.');
+  });
+
+  it('drops a tool call that sits between two reply paragraphs', () => {
+    const message = storedMessage(assistantInfo(), [
+      textPart('First paragraph.', 'p-first'),
+      runningToolPart(),
+      textPart('Second paragraph.', 'p-second'),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBe('First paragraph.\n\nSecond paragraph.');
+  });
+
+  it('hides Copy when the only parts are thinking and a tool call', () => {
+    const message = storedMessage(assistantInfo(), [
+      reasoningPart('thinking...', { start: 1, end: 2 }),
+      runningToolPart(),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBeNull();
+    // The thinking block is still selectable content, but the running tool part
+    // keeps selection unavailable and Copy hidden.
+    expect(content.copyableText).not.toBeNull();
+    expect(content.canSelectText).toBe(false);
+  });
 });
 
 describe('MessageDetailsSheet copy button wiring (retryable unhappy)', () => {
@@ -399,10 +462,10 @@ describe('MessageDetailsSheet copy button wiring (retryable unhappy)', () => {
     // Sheet onPress wires to this handler (see message-details-sheet.tsx).
     const message = storedMessage(userInfo(), [textPart('copy me')]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBe('copy me');
+    expect(content.copyText).toBe('copy me');
 
     const { handleMessageDetailsCopy } = await import('./message-details-copy');
-    handleMessageDetailsCopy(content.copyableText);
+    handleMessageDetailsCopy(content.copyText);
 
     expect(performCopyMock).toHaveBeenCalledWith('copy me');
     expect(performCopyMock).toHaveBeenCalledTimes(1);

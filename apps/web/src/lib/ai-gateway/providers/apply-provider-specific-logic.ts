@@ -6,7 +6,7 @@ import {
   type GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
@@ -21,7 +21,6 @@ import {
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
   ReasoningDetailsTransform,
@@ -152,7 +151,10 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isKimiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
+      OpenRouterInferenceProviderIdSchema.enum.alibaba,
+    ];
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
@@ -199,7 +201,7 @@ export async function applyGatewayModelsFallback(
   requestToMutate: GatewayRequest
 ) {
   if (
-    !(await isFreeModel(requestedModel)) &&
+    !isFreeModel(requestedModel) &&
     (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {
@@ -216,8 +218,7 @@ export function applyAnthropicThinkingDefault(
 ) {
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    requestedModel === 'z-ai/glm-5.2' ||
-    requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
+    requestedModel === 'z-ai/glm-5.2';
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&

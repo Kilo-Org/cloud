@@ -62,13 +62,23 @@ interface RemoteMcpFetchHost {
   fetch(url: string | URL, init?: RemoteMcpRequest): Promise<Response>;
 }
 
-/** How long one connection and its calls may take when the caller names none. */
+/** How long discovery may take when the caller names no deadline. */
 const defaultTimeoutMs = 15_000;
+
+/**
+ * How long one call may take when the caller names no deadline. It must stay
+ * above the 15 seconds a remote tool is waited on inline (`tools.ts`): the
+ * session backgrounds a call at that point, and a deadline that ends at the
+ * same moment would fail the call instead of letting it answer.
+ */
+const defaultCallTimeoutMs = 60_000;
 
 /** One deadline, and the ways it ends. */
 interface Deadline {
   readonly signal: RemoteMcpAbort;
   abort: () => void;
+  /** Joins a signal to the deadline until `stop`. A signal joined twice is joined once. */
+  link: (signal: RemoteMcpAbort) => void;
   stop: () => void;
 }
 
@@ -76,8 +86,8 @@ interface Deadline {
  * The deadline every request of one operation shares.
  *
  * `AbortSignal.timeout` and `AbortSignal.any` are not on React Native's
- * `AbortSignal`, so the timer and the caller's signal are joined by hand. The
- * release clears the timer and takes the listener back off, so a finished
+ * `AbortSignal`, so the timer and the joined signals are linked by hand. The
+ * release clears the timer and takes every listener back off, so a finished
  * operation leaves nothing running and nothing listening.
  */
 const makeDeadline = (timeoutMs: number, caller: RemoteMcpAbort | undefined): Deadline => {
@@ -88,13 +98,27 @@ const makeDeadline = (timeoutMs: number, caller: RemoteMcpAbort | undefined): De
   const abort = (): void => {
     controller.abort();
   };
-  caller?.addEventListener?.('abort', abort);
+  const linked = new Set<RemoteMcpAbort>();
+  const link = (signal: RemoteMcpAbort): void => {
+    if (linked.has(signal)) {
+      return;
+    }
+    linked.add(signal);
+    signal.addEventListener?.('abort', abort);
+  };
+  if (caller !== undefined) {
+    link(caller);
+  }
   return {
     signal: controller.signal,
     abort,
+    link,
     stop: () => {
       clearTimeout(timer);
-      caller?.removeEventListener?.('abort', abort);
+      for (const signal of linked) {
+        signal.removeEventListener?.('abort', abort);
+      }
+      linked.clear();
     },
   };
 };
@@ -102,20 +126,20 @@ const makeDeadline = (timeoutMs: number, caller: RemoteMcpAbort | undefined): De
 /**
  * The `fetch` the transport is given: the caller's, under the deadline.
  *
- * The library's own signal is linked in beside it per request. That signal is
- * how `close()` stops a stream that is still open, and dropping it would leave
- * the server sending into nothing.
+ * The library's own signal is joined to the deadline, which is the signal the
+ * request carries. That signal is how `close()` stops a stream that is still
+ * open, and `fetch` resolves when the headers arrive, before the body is read.
+ * So the link stays until the operation ends (`stop`), not until the request
+ * resolves: removing it earlier would leave the server sending into nothing.
  */
 const bounded =
   (host: RemoteMcpFetchHost, deadline: Deadline): RemoteMcpFetch =>
   async (url, init) => {
     const upstream = init?.signal;
-    upstream?.addEventListener?.('abort', deadline.abort);
-    try {
-      return await host.fetch(url, { ...init, signal: deadline.signal });
-    } finally {
-      upstream?.removeEventListener?.('abort', deadline.abort);
+    if (upstream !== undefined && upstream !== null) {
+      deadline.link(upstream);
     }
+    return host.fetch(url, { ...init, signal: deadline.signal });
   };
 
 /**
@@ -131,4 +155,4 @@ const headersFor = (
 ): Readonly<Record<string, string>> => ({ ...server.headers, ...credential });
 
 export type { Deadline, RemoteMcpAbort, RemoteMcpFetch, RemoteMcpFetchHost, RemoteMcpRequest };
-export { bounded, defaultTimeoutMs, headersFor, makeDeadline };
+export { bounded, defaultCallTimeoutMs, defaultTimeoutMs, headersFor, makeDeadline };

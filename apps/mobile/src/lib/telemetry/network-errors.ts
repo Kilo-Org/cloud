@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- cohesive network-error policy: reading the tRPC error, normalizing the URL, and building the fingerprint and event share one set of total helpers */
 /**
  * Warning-level network-error reporting for the mobile app.
  *
@@ -10,6 +11,7 @@
 import { z } from 'zod';
 
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
 type TelemetrySource = 'trpc' | 'fetch';
 
@@ -74,6 +76,17 @@ export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 // key on it so a structured error never needs an `instanceof` across bundles.
 const NamedErrorSchema = z.looseObject({ name: z.string() });
 
+// Expo SDK 57's fetch rejects a canceled request with a
+// `FetchRequestCanceledException`: a raw native error carries it as `name`, an
+// expo-modules-core `CodedError` as `code`, and the `FetchError` wrapper (whose
+// `name` is `Error`) embeds it in `message`.
+const ErrorCodeSchema = z.looseObject({ code: z.string() });
+const ErrorMessageSchema = z.looseObject({ message: z.string() });
+const ErrorCauseSchema = z.looseObject({ cause: z.unknown() });
+
+const EXPO_CANCEL_NAME = 'FetchRequestCanceledException';
+const ABORT_ERROR_NAME = 'AbortError';
+
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
 
@@ -82,6 +95,29 @@ export function stripQueryString(url: string): string {
   try {
     const queryIndex = url.indexOf('?');
     return queryIndex === -1 ? url : url.slice(0, queryIndex);
+  } catch {
+    return '';
+  }
+}
+
+/** The `scheme://host[:port]` prefix of an absolute URL. */
+const URL_ORIGIN_PREFIX_PATTERN = /^[a-z][\da-z+.-]*:\/\/[^/]*/iu;
+
+/**
+ * Reduce a URL to the path that names the endpoint: drop the scheme, the host,
+ * the port, and the query string. A dev backend's port is ephemeral, so
+ * keeping it in a fingerprint splits one defect into one issue per port, and
+ * the same value makes the message title unstable. Total: `''` for a
+ * non-string, `'/'` for an absolute URL with no path.
+ */
+export function normalizeUrlPath(url: string): string {
+  try {
+    const pathOnly = stripQueryString(url);
+    if (pathOnly.length === 0) {
+      return '';
+    }
+    const path = pathOnly.replace(URL_ORIGIN_PREFIX_PATTERN, '');
+    return path.length > 0 ? path : '/';
   } catch {
     return '';
   }
@@ -162,9 +198,40 @@ function errorPropertyOf(value: unknown): TrpcResponseError | undefined {
   return parsed.success ? parsed.data.error : undefined;
 }
 
-/** True when the value is an abort (`AbortError` / `DOMException`). */
+/**
+ * True when the value is an abort: an `AbortError` / `DOMException` or an Expo
+ * `FetchRequestCanceledException`. The Expo cancellation is checked on the
+ * error itself and one level of `cause`, since the SDK wraps it. Total: an
+ * unrecognized value yields `false` and never throws.
+ */
 export function isAbortError(error: unknown): boolean {
-  return hasErrorName(error, 'AbortError');
+  try {
+    if (hasErrorName(error, ABORT_ERROR_NAME) || isExpoCanceledError(error)) {
+      return true;
+    }
+    const parsed = ErrorCauseSchema.safeParse(error);
+    return parsed.success && parsed.data.cause !== undefined
+      ? isExpoCanceledError(parsed.data.cause)
+      : false;
+  } catch {
+    return false;
+  }
+}
+
+function isExpoCanceledError(error: unknown): boolean {
+  try {
+    if (hasErrorName(error, EXPO_CANCEL_NAME)) {
+      return true;
+    }
+    const byCode = ErrorCodeSchema.safeParse(error);
+    if (byCode.success && byCode.data.code === EXPO_CANCEL_NAME) {
+      return true;
+    }
+    const byMessage = ErrorMessageSchema.safeParse(error);
+    return byMessage.success && byMessage.data.message.includes(EXPO_CANCEL_NAME);
+  } catch {
+    return false;
+  }
 }
 
 function hasErrorName(error: unknown, name: string): boolean {
@@ -197,12 +264,65 @@ function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
   return 'failed';
 }
 
-function buildSyntheticError(context: NetworkErrorContext, pathOnly: string): Error {
-  const method = context.method ?? 'GET';
-  if (context.status !== undefined) {
-    return new Error(`${method} ${pathOnly} -> ${context.status}`);
+// tRPC answers a batched call with the multi-status envelope `207`, which only
+// says the body is a batch. It is not the failing procedure's status, so it
+// must not replace the parsed inner status or code.
+const BATCH_ENVELOPE_STATUS = 207;
+
+/**
+ * The status that names the defect: the transport status, except that the tRPC
+ * batch envelope `207` yields to the parsed inner status. `undefined` when
+ * neither is known, so the caller falls through to the tRPC code and the
+ * transport outcome.
+ */
+function effectiveHttpStatus(
+  context: NetworkErrorContext,
+  trpc: TrpcErrorContext
+): number | undefined {
+  const transportStatus = context.status === BATCH_ENVELOPE_STATUS ? undefined : context.status;
+  return transportStatus ?? trpc.httpStatus;
+}
+
+/**
+ * The fingerprint's outcome key: the specific HTTP status when there is one,
+ * otherwise the tRPC code, otherwise the coarse transport outcome. The old
+ * `statusClass` ('4xx') grouped a 401 and a 412 of the same procedure into one
+ * issue, merging two different root causes.
+ */
+function fingerprintOutcome(context: NetworkErrorContext, trpc: TrpcErrorContext): string {
+  const httpStatus = effectiveHttpStatus(context, trpc);
+  if (httpStatus !== undefined) {
+    return `http.${httpStatus}`;
   }
-  return new Error(`${method} ${pathOnly} failed after ${context.durationMs}ms`);
+  if (trpc.code !== undefined) {
+    return trpc.code;
+  }
+  return networkOutcome(context);
+}
+
+/** The exception type of every error this module synthesizes. */
+const SYNTHETIC_ERROR_NAME = 'NetworkError';
+
+/**
+ * A real `Error` with a stable message for a context that carries no `Error`
+ * of its own. Never a plain object: Sentry titles such an event from an SDK
+ * frame (`Scope#captureException`) instead of the defect. The message holds
+ * only the normalized path and the specific status/code, never the ephemeral
+ * port or the query string.
+ */
+function buildSyntheticError(
+  context: NetworkErrorContext,
+  path: string,
+  trpc: TrpcErrorContext
+): Error {
+  const method = context.method ?? 'GET';
+  const status = effectiveHttpStatus(context, trpc);
+  const detail = status === undefined ? trpc.code : String(status);
+  const error = new Error(
+    detail === undefined ? `${method} ${path} failed` : `${method} ${path} -> ${detail}`
+  );
+  error.name = SYNTHETIC_ERROR_NAME;
+  return error;
 }
 
 /**
@@ -212,11 +332,14 @@ function buildSyntheticError(context: NetworkErrorContext, pathOnly: string): Er
 export function reportNetworkError(context: NetworkErrorContext): void {
   try {
     const pathOnly = stripQueryString(context.url);
+    const normalizedPath = normalizeUrlPath(context.url);
     const procedure = trpcProcedureFromUrl(context.url);
-    const trpcCode = readTrpcErrorContext(context.error).code;
+    const trpc = readTrpcErrorContext(context.error);
+    const trpcCode = trpc.code;
     const statusClass = statusClassFor(context.status);
     const outcome = networkOutcome(context);
-    const error = context.error ?? buildSyntheticError(context, pathOnly);
+    const passedError = context.error instanceof Error ? context.error : undefined;
+    const error = passedError ?? buildSyntheticError(context, normalizedPath, trpc);
 
     const tags = {
       'error.subsystem': 'network',
@@ -241,12 +364,30 @@ export function reportNetworkError(context: NetworkErrorContext): void {
       ...(context.timedOut === undefined ? {} : { timedOut: context.timedOut }),
     };
 
+    // A non-`Error` context (a parsed tRPC body) rides in the payload context
+    // `NETWORK_BODY_CONTEXT`, which `scrubEvent` walks and token-redacts.
+    // Passing it to `captureException` would both leak and title the issue from
+    // an SDK frame, and keying it on the synthesized exception's class name
+    // would be overwritten with `{}` by `extraErrorDataIntegration` (which owns
+    // `contexts[error.name]`).
+    const contexts = {
+      network,
+      ...(passedError === undefined && context.error !== undefined
+        ? { [NETWORK_BODY_CONTEXT]: { data: context.error } }
+        : {}),
+    };
+
     captureTelemetry({
       level: 'warning',
       error,
       tags,
-      contexts: { network },
-      fingerprint: ['network-error', context.source, procedure ?? pathOnly, statusClass ?? outcome],
+      contexts,
+      fingerprint: [
+        'network-error',
+        context.source,
+        procedure ?? normalizedPath,
+        fingerprintOutcome(context, trpc),
+      ],
     });
   } catch {
     // Telemetry must never throw into app code.

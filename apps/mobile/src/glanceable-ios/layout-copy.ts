@@ -57,6 +57,22 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
+    newestResult: i18n.t('glanceable.newestResult'),
+    // The Live Activity's two buttons and the widget's in-place actions all read
+    // `common.approve`: the permission card, the wrist control, and the widget
+    // button name the same action, and `check:i18n` forbids a second key with the
+    // same copy. Approve answers the recorded ask; Open navigates to the recorded
+    // session, under the key the Android notification's Open action reads, so the
+    // two surfaces cannot drift. The action copy is baked, not pushed through
+    // props: the press-patch display has to show before any app push can answer
+    // it, and the gallery placeholder has no props at all. The two press lines
+    // are picked by the patch's action marker, so a New agent tap reads
+    // "Starting…" rather than the approving line the approve tap shows.
+    approve: i18n.t('common.approve'),
+    open: i18n.t('glanceable.openSession'),
+    newAgent: i18n.t('glanceable.newAgent'),
+    approving: i18n.t('glanceable.approving'),
+    starting: i18n.t('common.starting'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };
@@ -86,17 +102,6 @@ export function resolveGlanceableLocale(language: string): string {
 }
 
 /**
- * Resolve the copy placeholder inside a stringified `'widget'` layout.
- *
- * This is the same two-representation boundary as `withWidgetLogo`: Babel's
- * widget plugin replaces a `'widget'` function with a template literal of its
- * source, so the layout is a string in the app while a unit test (which runs
- * no widget transform) still holds the real function. Only the string form
- * carries a placeholder to patch. The replacement includes the surrounding
- * quotes, so `JSON.stringify` produces a correctly escaped source literal for
- * copy that contains an apostrophe.
- */
-/**
  * The active language's ten digits, or an empty string when it writes them the
  * way the layout already does.
  *
@@ -111,6 +116,17 @@ function glanceableDigits(): string {
   return digits === '0123456789' ? '' : digits;
 }
 
+/**
+ * Resolve the copy placeholder inside a stringified `'widget'` layout.
+ *
+ * This is the same two-representation boundary as `withWidgetLogo`: Babel's
+ * widget plugin replaces a `'widget'` function with a template literal of its
+ * source, so the layout is a string in the app while a unit test (which runs
+ * no widget transform) still holds the real function. Only the string form
+ * carries a placeholder to patch. The replacement includes the surrounding
+ * quotes, so `JSON.stringify` produces a correctly escaped source literal for
+ * copy that contains an apostrophe.
+ */
 export function withGlanceableCopy<T>(layout: T): T {
   // eslint-disable-next-line anti-slop/no-runtime-typeof -- the two representations are the contract; see above
   if (typeof layout !== 'string') {

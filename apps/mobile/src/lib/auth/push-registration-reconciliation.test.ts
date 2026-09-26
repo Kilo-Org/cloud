@@ -40,6 +40,12 @@ const languageMock = vi.hoisted(() => ({
   getResolvedLanguage: vi.fn(() => 'en'),
 }));
 
+// Mutable so a test can simulate an app upgrade between launches. The
+// reconciliation reads the native version at call time.
+const appMetadataMock = vi.hoisted(() => ({
+  nativeApplicationVersion: '1.0.4' as string | null,
+}));
+
 /* eslint-disable import/first */
 vi.mock('@/lib/auth/logout-reconciliation', () => logoutMock);
 vi.mock('@/lib/notifications', () => notificationsMock);
@@ -58,9 +64,7 @@ vi.mock('@/lib/glanceable/delivery-registration', () => ({}));
 vi.mock('expo-notifications', () => ({
   addPushTokenListener: expoNotificationsMock.addPushTokenListener,
 }));
-vi.mock('expo-application', () => ({
-  nativeApplicationVersion: '1.0.4',
-}));
+vi.mock('expo-application', () => appMetadataMock);
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
@@ -78,6 +82,7 @@ describe('attemptPushRegistrationReconciliation', () => {
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     notificationsMock.getPlatform.mockReturnValue('ios');
     languageMock.getResolvedLanguage.mockReturnValue('en');
+    appMetadataMock.nativeApplicationVersion = '1.0.4';
     queryClientMock.invalidateQueries.mockResolvedValue(undefined);
   });
 
@@ -112,7 +117,7 @@ describe('attemptPushRegistrationReconciliation', () => {
     });
     // A null locale is English, and English is the active language.
     trpcMock.getMyPushTokens.query.mockResolvedValue([
-      { token: 'push-1', platform: 'ios', locale: null },
+      { token: 'push-1', platform: 'ios', locale: null, appVersion: '1.0.4' },
     ]);
     trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
 
@@ -121,6 +126,74 @@ describe('attemptPushRegistrationReconciliation', () => {
     expect(outcome).toEqual({ kind: 'already-registered' });
     expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
     expect(queryClientMock.invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('re-registers after an app upgrade so the row carries the current version', async () => {
+    // The row was written by the pre-split build; the push route classifies the
+    // client by `user_push_tokens.app_version`. Without a refresh an upgraded
+    // client stays classified as pre-split and never gets the named channel.
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([
+      { token: 'push-1', platform: 'android', locale: 'en', appVersion: '1.0.10' },
+    ]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+    notificationsMock.getPlatform.mockReturnValue('android');
+    appMetadataMock.nativeApplicationVersion = '1.0.11';
+
+    const outcome = await attemptPushRegistrationReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'registered' });
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledWith({
+      token: 'push-1',
+      platform: 'android',
+      appVersion: '1.0.11',
+      locale: 'en',
+    });
+  });
+
+  it('refreshes a row whose version is unknown when the client can state one', async () => {
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    // A row written before the version column existed, or by a build that could
+    // not state one.
+    trpcMock.getMyPushTokens.query.mockResolvedValue([
+      { token: 'push-1', platform: 'android', locale: 'en', appVersion: null },
+    ]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+    notificationsMock.getPlatform.mockReturnValue('android');
+    appMetadataMock.nativeApplicationVersion = '1.0.11';
+
+    const outcome = await attemptPushRegistrationReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'registered' });
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledWith({
+      token: 'push-1',
+      platform: 'android',
+      appVersion: '1.0.11',
+      locale: 'en',
+    });
+  });
+
+  it('does not blank a known version when the client cannot state one', async () => {
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([
+      { token: 'push-1', platform: 'android', locale: 'en', appVersion: '1.0.11' },
+    ]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+    appMetadataMock.nativeApplicationVersion = null;
+
+    const outcome = await attemptPushRegistrationReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'already-registered' });
+    expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
   });
 
   it('re-registers when the server row for this account holds a stale locale', async () => {
@@ -404,7 +477,7 @@ describe('attemptPushRegistrationReconciliation', () => {
       token: 'push-1',
     });
     trpcMock.getMyPushTokens.query.mockResolvedValue([
-      { token: 'push-1', platform: 'ios', locale: null },
+      { token: 'push-1', platform: 'ios', locale: null, appVersion: '1.0.4' },
     ]);
     trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
 
@@ -458,6 +531,7 @@ describe('subscribeToPushTokenRotation', () => {
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     notificationsMock.getPlatform.mockReturnValue('ios');
     languageMock.getResolvedLanguage.mockReturnValue('en');
+    appMetadataMock.nativeApplicationVersion = '1.0.4';
     queryClientMock.invalidateQueries.mockResolvedValue(undefined);
   });
 

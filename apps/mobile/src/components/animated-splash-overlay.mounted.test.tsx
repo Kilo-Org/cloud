@@ -3,12 +3,12 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { markStartupComplete } from '@/lib/startup-timing';
-
-import { AnimatedSplashOverlay } from './animated-splash-overlay';
+import * as startupTiming from '@/lib/startup-timing';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
+const platform = vi.hoisted(() => ({ OS: 'ios' }));
+vi.mock('react-native', () => ({ Platform: platform }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   useSharedValue: (v: unknown) => ({ value: v }),
@@ -48,6 +48,7 @@ function findByType(
 }
 
 async function mountOverlay(): Promise<TestRenderer.ReactTestRenderer> {
+  const { AnimatedSplashOverlay } = await import('./animated-splash-overlay');
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
   };
@@ -62,8 +63,14 @@ async function mountOverlay(): Promise<TestRenderer.ReactTestRenderer> {
   return renderer;
 }
 
-describe('AnimatedSplashOverlay mounted', () => {
-  beforeEach(() => {
+describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
+  let startup = startupTiming;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    platform.OS = os;
+    startup = await import('@/lib/startup-timing');
     // React 19 requires the act environment flag before `act` supports
     // updates scheduled from external stores (useSyncExternalStore).
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -73,13 +80,26 @@ describe('AnimatedSplashOverlay mounted', () => {
     vi.useRealTimers();
   });
 
-  it('shows the logo frame, owns hideAsync, and unmounts visuals after completion', async () => {
+  it.each([
+    'app',
+    'login',
+    'consent',
+    'force-update',
+    'user-error',
+    'consent-error',
+    'language-error',
+    'restore-error',
+  ] as const)('hands over the same branded surface to the %s outcome', async outcome => {
     const renderer = await mountOverlay();
 
     // Before completion: the logo frame is mounted and hide has not fired.
     const logoImages = findByType(renderer.root, 'Image');
     expect(logoImages).toHaveLength(1);
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
+    expect(logoImages[0]?.props.className).toBe('h-[100px] w-[100px]');
+    expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
+      'absolute inset-0 items-center justify-center bg-[#FAF74F]'
+    );
 
     // The yellow frame forces dark status bar icons in either theme.
     const statusBars = findByType(renderer.root, 'StatusBar');
@@ -98,7 +118,7 @@ describe('AnimatedSplashOverlay mounted', () => {
 
     // Gates settle.
     act(() => {
-      markStartupComplete('app');
+      startup.markStartupComplete(outcome);
     });
 
     // Flush microtasks so the awaited hideAsync race settles and dismissal lands.
@@ -109,6 +129,53 @@ describe('AnimatedSplashOverlay mounted', () => {
     expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(findByType(renderer.root, 'StatusBar')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps one full-size branded surface until startup settles, even after the logo timeout', async () => {
+    const renderer = await mountOverlay();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
+    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
+    expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
+      'absolute inset-0 items-center justify-center bg-[#FAF74F]'
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not trap the ready screen if the bundled logo never reports loading', async () => {
+    const renderer = await mountOverlay();
+    act(() => {
+      startup.markStartupComplete('app');
+    });
+    expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not replay the splash after an already completed launch', async () => {
+    startup.markStartupComplete('app');
+    const renderer = await mountOverlay();
+
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
 
     act(() => {
       renderer.unmount();

@@ -36,6 +36,7 @@
     "cost": "Kulu",
     "discard": "Loobu",
     "findings": "Leiud",
+    "mergeRequest": "liitmistaotlus",
     "notConnected": "Pole ühendatud",
     "notifications": "Teavitused",
     "pullRequest": "tõmbetaotlus",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Kasuta teist e-posti aadressi",
     "signInWithApple": "Logi sisse Apple'iga",
     "signInWithGoogle": "Logi sisse Google'iga",
+    "signInWithPasskey": "Logi sisse pääsuvõtmega",
     "emailAddress": "E-posti aadress",
     "emailPlaceholder": "sina@example.com",
     "continueWithEmail": "Jätka e-postiga",
@@ -174,6 +176,10 @@
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Rohkem sisselogimisvalikuid",
+    "passkeyCancelled": "Pääsuvõtmega sisselogimine tühistati. Proovi uuesti.",
+    "passkeyNotFound": "Selle seadme jaoks ei ole salvestatud ühtegi pääsuvõtit. Logi selle asemel sisse Apple'i, Google'i või oma e-postiga.",
+    "passkeyUnsupported": "Pääsuvõtmed ei ole selles seadmes saadaval. Logi selle asemel sisse Apple'i, Google'i või oma e-postiga.",
+    "passkeyFailed": "Pääsuvõtmega sisse logimine ei õnnestunud. Proovi uuesti.",
     "couldNotCompleteSignIn": "Sisselogimist ei õnnestunud lõpule viia. Proovi uuesti.",
     "sessionEnded": "Sinu seanss lõppes. Logi uuesti sisse.",
     "signInCodeExpired": "Sinu sisselogimiskood on aegunud. Proovi uuesti.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Testikonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Ettevõtte SSO"
+    "providerEnterpriseSso": "Ettevõtte SSO",
+    "passkeysTitle": "Pääsuvõtmed",
+    "passkeysSubtitle": "Logi sisse ilma paroolita",
+    "passkeysEmpty": "Pääsuvõtmeid veel pole",
+    "passkeysEmptyHint": "$t(profile.addPasskey), et sisse logida ilma paroolita.",
+    "passkeysCouldNotLoad": "Pääsuvõtmete laadimine ebaõnnestus",
+    "passkeysLoadFailed": "Pääsuvõtmed pole saadaval, kuni see laaditakse.",
+    "addPasskey": "Lisa pääsuvõti",
+    "passkeyDefaultName": "Pääsuvõti",
+    "passkeyAddedOn": "Lisatud {{date}}",
+    "passkeyAdded": "Pääsuvõti lisatud.",
+    "passkeyAddFailed": "Pääsuvõtit ei õnnestunud lisada. Proovi uuesti.",
+    "passkeyAddUnsupported": "See seade ei saa pääsuvõtmeid luua.",
+    "passkeyAddCancelled": "Pääsuvõtme loomine tühistati.",
+    "passkeyRemoved": "Pääsuvõti eemaldatud.",
+    "passkeyRemoveFailed": "Seda pääsuvõtit ei õnnestunud eemaldada. Proovi uuesti.",
+    "passkeyRenamed": "Pääsuvõti ümber nimetatud.",
+    "passkeyName": "Pääsuvõtme nimi",
+    "renamePasskey": "Nimeta pääsuvõti ümber",
+    "removePasskey": "Eemalda pääsuvõti",
+    "removePasskeyTitle": "Eemaldada pääsuvõti?",
+    "removePasskeyMessage": "Sa ei saa enam selle pääsuvõtmega sisse logida."
   },
   "preferences": {
     "general": "Üldine",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
     "biometricUnlock": "Biomeetriline lukust avamine",
     "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
-    "featureFlags": "Funktsioonilipud",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} failist laaditud {{displayCount}}",
       "filesStillLoading": "Failide laadimine kestab veel. Värskendamiseks tõmba alla.",
       "goToOverview": "Mine ülevaatesse",
-      "goToOverviewTab": "Mine ülevaate vahekaardile"
+      "goToOverviewTab": "Mine ülevaate vahekaardile",
+      "expandAllLines_one": "Näita kõiki {{displayCount}} rida",
+      "expandAllLines_other": "Näita kõiki {{displayCount}} rida",
+      "expandLines_one": "Näita {{displayCount}} rida ({{start}}–{{end}})",
+      "expandLines_other": "Näita {{displayCount}} rida ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Näita {{displayCount}} kontekstirida",
+      "expandLinesOfContext_other": "Näita {{displayCount}} kontekstirida",
+      "expandMoreLines_one": "Näita veel {{displayCount}} rida ({{start}}–{{end}})",
+      "expandMoreLines_other": "Näita veel {{displayCount}} rida ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} faili laaditud",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} faili laaditud"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "faili lõpus puudub reavahetus.",
@@ -357,6 +389,7 @@
       "merge": "Mestimine",
       "mergeNow": "Ühenda kohe",
       "mergePullRequest": "Tõmbetaotluse ühendamine",
+      "mergeTermTitle": "{{term}}e ühendamine",
       "enableAutoMerge": "Luba automaatne ühendamine",
       "disableAutoMerge": "Keela automaatne ühendamine",
       "autoMergeOn": "Automaatne ühendamine on sisse lülitatud",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "Kustuta haru pärast ühendamist",
       "noEnabledMethods": "Selles hoidlas pole ükski ühendamismeetod lubatud. Palu hoidla administraatoril lubada ühendamine ühendamiskommiti, kommitite koondamise või ümberbaseerimise abil.",
       "confirmTitle": "Kas ühendada tõmbetaotlus?",
+      "confirmTitleTerm": "Kas ühendada {{term}}?",
       "confirmMessage": "Sinu muudatused ühendatakse alusharuga.",
       "enableAutoMergeConfirmTitle": "Kas lubada automaatne ühendamine?",
       "enableAutoMergeConfirmMessage": "GitHub ühendab selle tõmbetaotluse automaatselt, kui kõik nõutud kontrollid on edukalt läbitud.",
+      "enableAutoMergeConfirmMessageTerm": "Kui pipeline õnnestub, liidetakse {{term}} automaatselt.",
+      "enableAutoMergeDescriptionTerm": "GitLab liidab {{term}} automaatselt, kui pipeline õnnestub.",
       "forbidden": "Sul pole õigust seda tõmbetaotlust ühendada.",
       "cannotMerge": "Seda tõmbetaotlust ei saa praegusel kujul ühendada.",
       "couldNotMerge": "Tõmbetaotlust ei õnnestunud ühendada.",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "Juba ühendatud",
-        "closed": "See tõmbetaotlus on suletud"
+        "closed": "See tõmbetaotlus on suletud",
+        "closedMergeRequest": "See liitmistaotlus on suletud"
       },
       "partialSuccessBanner": {
         "body": "Haru ei õnnestunud kustutada. Põhjus: {{reason}}",
@@ -413,6 +450,18 @@
         "behindDetail": "Lähteharus puuduvad alusharu uusimad muudatused. Enne ühendamist baseeri haru ümber või värskenda seda.",
         "notMergeableTitle": "Seda tõmbetaotlust ei saa veel ühendada",
         "notMergeableDetail": "GitHub teatas ühendatavuse olekust {{state}}."
+      },
+      "restrictions": {
+        "title": "Liitmise tingimused",
+        "approvalsRequired_one": "Vajalik on {{displayCount}} heakskiit",
+        "approvalsRequired_other": "Vajalikud on {{displayCount}} heakskiitu",
+        "pipelineMustSucceed": "Enne liitmist peab pipeline õnnestuma."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ebaõnnestub viimase commitiga.",
+        "pendingPipeline": "Pipeline on viimase commitiga veel käimas.",
+        "permission": "Sul pole õigust seda {{term}}t ühendada.",
+        "draft": "Märgi {{term}} enne ühendamist ülevaatuseks valmis."
       },
       "methodLabels": {
         "merge": "Loo ühendamiskommit",
@@ -462,6 +511,8 @@
       "replyBadRequest": "Seda vastust ei saa postitada. Lõim võis muutuda.",
       "replyForbidden": "Sul pole õigust sellele tõmbetaotlusele vastata.",
       "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "fixWithKilo": "Paranda Kiloga",
+      "fixWithKiloPrompt": "Palun tegele järgmise tõmbetaotluse kommentaariga: {{link}}",
       "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
       "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida.",
       "moderation": {
@@ -512,7 +563,10 @@
         "outdatedOnLines": "Aegunud: {{lines}}",
         "outdatedOnPath": "Aegunud: {{path}}"
       },
-      "deletedUser": "kustutatud kasutaja"
+      "deletedUser": "kustutatud kasutaja",
+      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata.",
+      "moreLinesAbove_one": "Ülal on veel {{displayCount}} rida.",
+      "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "Vaata tõmbetaotlus üle",
     "headLine": "{{counts}} · uusim kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Ava tõmbetaotlus URL-i kaudu.",
-      "pastePrLink": "Kleebi PR-i link",
-      "noRecentPrs": "Hiljutisi PR-e pole",
-      "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi PR-i link ülalolevale väljale — järgmisel korral leiad selle siit.",
+      "eyebrow": "Ava tõmbetaotlus või liitmistaotlus URL-i kaudu",
+      "pastePrLink": "Kleebi tõmbetaotluse või liitmistaotluse link",
+      "noRecentPrs": "Hiljutisi ülevaatusi pole",
+      "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi link ülalpool — järgmisel korral ilmub see siin.",
       "couldNotLoad": "Laadimine ebaõnnestus.",
       "removeFromRecentsTitle": "Kas eemaldada hiljutiste hulgast?",
-      "removeFromRecentsMessage": "See tõmbetaotlus eemaldatakse sinu hiljutiste loendist.",
+      "removeFromRecentsMessage": "See ülevaatus eemaldatakse hiljutiste nimekirjast.",
       "removeRecentAccessibility": "Eemalda {{repo}} hiljutiste hulgast",
-      "urlAccessibility": "GitHubi tõmbetaotluse URL",
-      "clearLink": "Eemalda tõmbetaotluse link",
-      "pasteLink": "Kleebi tõmbetaotluse link",
+      "urlAccessibility": "Sisesta tõmbetaotluse või liitmistaotluse URL",
+      "urlPlaceholder": "Tõmbetaotluse või liitmistaotluse URL",
+      "openAccessibility": "Ava tõmbetaotlus või liitmistaotlus",
+      "clearLink": "Eemalda link",
+      "pasteLink": "Kleibi tõmbetaotluse või liitmistaotluse link",
       "open": "Ava"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} ootel",
       "skipped": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
+      "checksCount_one": "{{displayCount}} kontrolli",
+      "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "kontrolli üksikasjad"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "GitHubi ühendust ei õnnestunud kontrollida.",
       "checkFailedMessage": "Sisselogimisolekut saab näha alles pärast laadimise lõppu.",
+      "checkFailedTitleGitLab": "GitLabi ühendust ei õnnestunud kontrollida.",
+      "checkFailedTitleBitbucket": "Bitbucketi ühendust ei õnnestunud kontrollida.",
+      "providerCheckFailedMessage": "Ühenduse olekut saab näha alles pärast laadimise lõppu.",
       "reconnectTitle": "Ühenda GitHub uuesti",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud. Taasta ühendus, et jätkata tõmbetaotluste ülevaatamist mobiilis.",
-      "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata."
+      "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata.",
+      "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
+      "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
+      "bitbucketOrgOnlyDescription": "Vali oma profiilis organisatsioon, et vaadata selle Bitbucketi tõmbetaotlusi."
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "GitHubi ühendus aegus.",
-      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
+      "gitlabTitle": "GitLabi ühendus aegus.",
+      "bitbucketTitle": "Bitbucketi ühendus aegus.",
+      "providerMessage": "Sinu {{provider}}i ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
     },
     "eventChips": {
       "comment": "Kommenteeri",
@@ -672,10 +739,12 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}} rida {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} rida: {{text}}",
-      "emptyLine": "(tühi)"
+      "emptyLine": "(tühi)",
+      "truncationBanner_one": "GitHubi API piirangu tõttu kuvatakse {{total}} muudetud failist esimesed {{limit}}.",
+      "truncationBanner_other": "GitHubi API piirangu tõttu kuvatakse {{total}} muudetud failist esimesed {{limit}}."
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi.",
-    "linkPasteNotAPullRequest": "See pole GitHubi tõmbetaotluse link.",
+    "linkPasteNotAPullRequest": "See pole tõmbetaotluse ega liitmistaotluse link",
     "announce": {
       "commentPosted": "Kommentaar on postitatud",
       "reviewSubmitted": "Ülevaatus on esitatud",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "Seda kommentaari ei saa postitada. Valitud rida võib olla muutunud või PR-i võib olla värskendatud.",
       "reviewNotSubmitted": "Seda ülevaatust ei saa praegusel kujul esitada. PR võib olla muutunud või proovid üle vaadata enda tõmbetaotlust, mis pole lubatud.",
+      "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
       "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "Vastamine ebaõnnestus.",
       "couldNotCompleteAction": "Seda toimingut ei õnnestunud lõpule viia.",
       "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
+      "mergeResultNotCompleted": "{{term}} ei liidetud. Kontrolli olekut ja proovi uuesti.",
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
       "persistenceFailed": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
       "forbidden": "See toiming pole lubatud."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Selle pakkuja juures pole saadaval",
+        "accessibility": "Selle pakkuja juures pole saadaval: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Tõmbetaotlus",
+      "mergeRequest": "Liitmistaotlus",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Jaga liitmistaotlust",
+      "viewOnProvider": "Kuva {{provider}}",
+      "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
+      "unavailableDescription": "See võib olla kustutatud või sul puudub ligipääs.",
+      "accessDeniedMergeRequest": "Sul pole õigust seda liitmistaotlust vaadata.",
+      "couldNotLoadMergeRequest": "Liitmistaotlust ei õnnestunud laadida.",
+      "discussionAccessDenied": "Sul puudub õigus selle liitmistaotluse arutelu vaadata.",
+      "discussionUnavailableMessage": "See liitmistaotlus võib olla eemaldatud.",
+      "noDiscussionDescription": "Selle liitmistaotluse juures pole veel ülevaatuslõime ega arutelukommentaare.",
+      "noFilesChangedDescription": "See liitmistaotlus ei sisalda failimuudatusi."
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "Teavitused näitavad sõnumi teksti lukustuskuval.",
     "previewGenericDescription": "Teavitused annavad märku uuest sündmusest. Sõnumi lugemiseks ava Kilo.",
     "channel": {
-      "agent": "Agendi seansid",
+      "agentProgress": "Agendi edenemine",
       "chat": "Vestlussõnumid",
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
-      "security": "Turvaleiud"
+      "security": "Turvaleiud",
+      "spend": "Kulutushoiatused"
     },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
+      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClawi tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
-      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada saldo hoiatusi.",
+      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
+      "securityFindingsUnavailable": "Luba Kilo turvaagent ühes ulatuses, et saada turvalisuse leide.",
+      "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
+      "spendAlertsToggle": "Kulutushoiatuste kategooria"
+    },
+    "action": {
+      "openSession": "Ava seanss"
+    },
+    "needsInputAction": {
+      "approved": "Taotlus kiideti heaks",
+      "replied": "Vastus on saadetud",
+      "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
+      "unavailable": "See taotlus ei ole enam ootel."
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "Üleslaadimine ebaõnnestus.",
       "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}.",
       "nothingToPaste": "Lõikelaual pole midagi kleepimiseks.",
-      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus."
+      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus.",
+      "limit_one": "Võid lisada kuni {{displayCount}} faili.",
+      "limit_other": "Võid lisada kuni {{displayCount}} faili."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "Sünkrooni leiud",
       "syncNow": "Sünkrooni nüüd",
       "syncQueued": "Sünkroonimine on järjekorras",
-      "syncStatusUnavailable": "Sünkroonimise olek pole saadaval."
+      "syncStatusUnavailable": "Sünkroonimise olek pole saadaval.",
+      "daysOverdue_one": "Tähtaeg ületatud {{displayCount}} päeva",
+      "daysOverdue_other": "Tähtaeg ületatud {{displayCount}} päeva",
+      "findingsCount_one": "{{displayCount}} leidu",
+      "findingsCount_other": "{{displayCount}} leidu"
     },
     "dashboardMetrics": {
       "openFindings": "Avatud leiud",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
+      "stopped": "Seanss peatati",
+      "committing": "Kinnitamine…",
+      "committed": "Kinnitatud",
+      "commitFailed": "Kinnitamine ebaõnnestus",
       "renameSession": "Nimeta seanss ümber",
       "renamePlaceholder": "Seansi nimi",
       "transcriptAccessibility": "Seansi vestlusajalugu",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "Kaugseansi kaldkriipsukäskude kasutamiseks on vaja uuemat Kilo CLI-d. Uuenda Kilo CLI-d ja ühendu uuesti."
     },
     "sessionConnection": {
+      "label": "Ühendus",
       "connecting": "Ühendamine…",
       "reconnecting": "Taasühendamine…",
       "connectionLost": "Ühendus katkes",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "Eemaldada eesmärk?",
       "removeConfirmMessage": "CLI tühjendab selle seansi eesmärgi.",
       "updateFailed": "Eesmärki ei saanud värskendada.",
-      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}"
+      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}",
+      "collapse": "Ahenda eesmärk",
+      "expand": "Laienda eesmärk"
     },
     "newSession": {
+      "recentlyUsed": "Hiljuti kasutatud",
+      "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
+      "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus.",
+      "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
       "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
+      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
+      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
       "openGithub": "Ava GitHub",
+      "openGitlab": "Ava GitLab",
+      "openBitbucket": "Ava Bitbucket",
       "refreshRepositories": "Värskenda hoidlaid",
       "githubConnected": "GitHub on ühendatud",
+      "gitlabConnected": "GitLab on ühendatud",
       "noRepositoriesVisible": "Hoidlaid pole näha. Kontrolli, kas Kilo GitHubi rakendusel on hoidlatele juurdepääs, ja värskenda seejärel loendit.",
+      "noRepositoriesVisibleGitlab": "Hoidlaid pole näha. Kontrolli GitLabi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
+      "noRepositoriesVisibleBitbucket": "Hoidlaid pole näha. Kontrolli Bitbucketi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
+      "bitbucketOrganizationsOnly": "Bitbucket on saadaval ainult organisatsioonidele.",
+      "branchPickerTitle": "Vali haru",
+      "branchDefault": "Vaikimisi",
+      "branchAccessibility": "Haru: {{label}}",
+      "branchLoading": "Harude laadimine",
+      "branchLoadError": "Harude laadimine ebaõnnestus",
+      "branchUnavailable": "Selle hoidla harud pole saadaval. Kontrolli oma õigusi pakkujas ja vali mõni teine hoidla.",
+      "branchEmpty": "Ühtegi haru pole saadaval",
+      "branchPlaceholder": "Vali haru",
       "runOnWithTarget": "Käivituskoht: {{target}}",
       "environment": "Keskkond",
       "couldNotLoadEnvironment": "Sinu keskkonna laadimine ebaõnnestus.",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",
+      "discardWithUploadsMessage": "Sinu viip ja üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
       "remoteHint": "Kohaliku kilo protsessi juhtimiseks käivita arvutis `kilo remote` või töötavas CLI-seansis `/remote`.",
-      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
-      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
-      "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
-      "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
-      "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus.",
-      "gitlabConnected": "GitLab on ühendatud",
-      "noRepositoriesVisibleBitbucket": "Hoidlaid pole näha. Kontrolli Bitbucketi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
-      "noRepositoriesVisibleGitlab": "Hoidlaid pole näha. Kontrolli GitLabi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
-      "openBitbucket": "Ava Bitbucket",
-      "openGitlab": "Ava GitLab",
-      "recentlyUsed": "Hiljuti kasutatud",
-      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
       "continueFrom": "Jätkub seanss „{{title}}“.",
-      "importFailed": "Seda seanssi ei õnnestunud importida.",
       "importingSession": "Imporditakse seanssi",
-      "discardWithUploadsMessage": "Sinu viip ja üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse."
+      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
+      "importFailed": "Seda seanssi ei õnnestunud importida.",
+      "pickProfile": "Valige profiil",
+      "noProfile": "Profiili pole",
+      "manageProfiles": "Profiilide haldamine",
+      "noProfiles": "Profiilid veel puuduvad. Looge see keskkonnamuutujate, MCP-serverite ja oskuste lisamiseks.",
+      "advancedConfig": "Täpsem konfiguratsioon",
+      "advancedConfigDescription": "Valige salvestatud konfiguratsioonide laadimiseks profiil ja konfigureerige käsitsi täiendavaid keskkonnamuutujaid ja häälestuskäske",
+      "saveAsProfile": "Salvesta profiilina",
+      "saveProfileDescription": "Salvestage praegused keskkonnamuutujad ja häälestuskäsud korduvkasutatava profiilina.",
+      "profileSummary": "{{vars}} keskkonnamuutujad · {{commands}} häälestuskäsud",
+      "profileSaved": "Profiil \"{{name}}\" on salvestatud",
+      "organizationProfiles": "Organisatsiooni profiilid",
+      "personalProfiles": "Isiklikud profiilid",
+      "yourProfiles": "Teie profiilid",
+      "failedToLoadProfiles": "Profiilide laadimine ebaõnnestus",
+      "nameTooLong": "Profiili nimi on liiga pikk",
+      "descriptionTooLong": "Kirjeldus on liiga pikk",
+      "secretsEncrypted": "Saladused krüpteeritakse enne salvestamist.",
+      "profileActive": "Profiil aktiivne",
+      "profilesActive": "Profiilid on aktiivsed",
+      "customConfigActive": "Kohandatud konfiguratsioon aktiivne",
+      "configNeedsAttention": "Konfiguratsioon vajab tähelepanu",
+      "repoProfile": "Repo profiil",
+      "selectedProfile": "Valitud profiil",
+      "manualOverrides": "Käsitsi alistamised",
+      "openSettingsToReview": "Avage ülevaatamiseks Seaded",
+      "profileSelection": "Profiili valik"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendati {{displayCount}} fail.",
@@ -2086,15 +2241,18 @@
       "updateTodos": "Uuenda ülesannete loendit",
       "linesBadge": "{{displayCount}} rida",
       "filesBadge": "{{displayCount}} faili",
-      "matchesBadge": "{{displayCount}} vastet"
+      "matchesBadge": "{{displayCount}} vastet",
+      "filesBadge_one": "{{displayCount}} faili",
+      "filesBadge_other": "{{displayCount}} faili",
+      "linesBadge_one": "{{displayCount}} rida",
+      "linesBadge_other": "{{displayCount}} rida",
+      "matchesBadge_one": "{{displayCount}} vastet",
+      "matchesBadge_other": "{{displayCount}} vastet",
+      "noOutput": "Väljund puudub."
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
       "linesOf": "read {{start}}–{{end}} (kokku {{total}})"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agenti toiming „{{action}}“ ebaõnnestus ({{status}}).",
-      "failed": "Cloud Agenti toiming „{{action}}“ ebaõnnestus."
     },
     "collectCopyableText": {
       "unserializableInput": "[serialiseerimatu sisend]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "Pakkuja lükkas päringu tagasi.",
       "assistantStopped": "Vastuse koostamine peatati.",
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
-      "assistantFailed": "Vastuse koostamine ebaõnnestus.",
-      "sendFailed": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
+      "assistantFailed": "Vastuse koostamine ebaõnnestus."
     },
     "filePart": {
       "loadingImage": "Pildi laadimine",
@@ -2376,7 +2533,11 @@
       "files": "Failid",
       "couldNotOpenPhotoPicker": "Fotovalijat ei õnnestunud avada. Taaskäivita Kilo ja proovi uuesti.",
       "maxFilesAllowed": "Lisada saab kuni {{displayCount}} faili.",
-      "onlyAddingFiles": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})"
+      "onlyAddingFiles": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})",
+      "maxFilesAllowed_one": "Lisada saab kuni {{displayCount}} faili.",
+      "maxFilesAllowed_other": "Lisada saab kuni {{displayCount}} faili.",
+      "onlyAddingFiles_one": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})",
+      "onlyAddingFiles_other": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})"
     },
     "composer": {
       "addAttachment": "Lisa manus",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
       "discardAttachmentsTitle": "Kas loobuda manustest?",
       "charactersRemaining": "{{count}} tähemärki jäänud",
-      "insertNewline": "Lisa reavahetus"
+      "insertNewline": "Lisa reavahetus",
+      "charactersRemaining_one": "{{count}} tähemärki jäänud",
+      "charactersRemaining_other": "{{count}} tähemärki jäänud"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",
@@ -2428,7 +2591,17 @@
       "startNewSession": "Alusta uut seanssi",
       "exitSession": "Välju seansist",
       "clearSession": "Lõpeta see seanss ja alusta uut",
+      "compactDescription": "tihenda praeguse seansi kontekst",
+      "goalDescription": "Jätka töötamist seansi eesmärgi suunas. /goal <objective> või pause, resume, clear",
+      "initDescription": "juhitud AGENTS.md seadistamine",
+      "resumeClaudeDescription": "impordi Claude Code'i seansi transkript",
+      "resumeCodexDescription": "impordi OpenAI Codexi seansi transkript",
+      "reviewDescription": "vaata muudatused üle [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Kasuta /{{command}}",
+      "useSkillCommand": "Kasuta oskust /{{command}}",
+      "skillBadge": "Oskus",
+      "catalogFull": "Käskude loend on täis, seega on osa käske peidetud.",
+      "catalogOverLimit": "Oskuste loend ületab suuruspiiri, seega kuvatakse kõik oskused.",
       "insert": "Lisa",
       "upgradeRequiredFallback": "Selle käsu kasutamiseks uuenda CLI-d.",
       "exitCapabilityUnavailable": "Seansist väljumiseks uuenda CLI-d.",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "{{steps}} samm",
       "stepsCount": "{{steps}} sammu",
       "stepsCount_other": "{{steps}} sammu",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Mudel ({{displayCount}})",
+      "modelsCount_other": "Mudelid ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automaatne kinnitamine",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tööriistakutsed",
-      "condensedLabel": "{{itemCount}} üksust; {{last}}"
+      "condensedLabel": "{{itemCount}} üksust; {{last}}",
+      "condensedLabel_one": "{{itemCount}} üksust; {{last}}",
+      "condensedLabel_other": "{{itemCount}} üksust; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida.",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
+    "newTaskFromPicture": "Uus ülesanne pildist",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",
     "noLiveSessions": "Praegu ei tööta midagi"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "See seanss ei saa faile vastu võtta",
     "cliCantReceiveFilesMessage": "Seda seanssi käitav Kilo CLI ei saa faile vastu võtta. Uuenda selle arvuti CLI-d või jaga faile hoopis uude seanssi.",
     "contentlessMessage": "Jagada pole midagi — teksti ega faile ei lisatud.",
-    "couldNotReadContent": "Jagatud sisu ei õnnestunud lugeda."
+    "couldNotReadContent": "Jagatud sisu ei õnnestunud lugeda.",
+    "onlyFirstFilesAttached_one": "Lisatakse ainult esimesed {{displayCount}} faili.",
+    "onlyFirstFilesAttached_other": "Lisatakse ainult esimesed {{displayCount}} faili."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "Sinu viibad, vestlusajalugu ja kõik lisatud failid.",
     "aiProvidersWhy": "AI-vastuste genereerimiseks.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ja teised pakkujad, kelle valid iga päringu jaoks.",
-    "gatewayWhat": "Konto ID, päringute metaandmed ja tokenite kasutus.",
+    "gatewayWhat": "Konto ID, päringute metaandmed, tokenite kasutus ning rakenduse selle kaudu saadetavad promptsid ja häälvestised.",
+    "viaGateway": "Kilo Gateway kaudu",
     "gatewayWhy": "Autentimiseks, päringute suunamiseks ja arveldusandmete kooskõlastamiseks.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Krahhi- ja veaaruanded, millest on eemaldatud rakenduse sisu.",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Sinu salvestus dikteerimise ajal.",
     "voiceTranscriptionWhy": "Kõne tekstiks muutmiseks.",
-    "voiceTranscriptionWho": "Kõnet töödeldakse ainult seadmes või Apple'i või Google'i teenuses, kui seade ei suuda kõnet ilma võrguühenduseta tekstiks muuta.",
+    "voiceTranscriptionWho": "Sinu seade, Kilo Gateway koos sinu valitud transkriptsioonimudeliga või Apple või Google veebipõhiseks tuvastuseks.",
     "installAttributionPromptTitle": "Kas lubada paigaldusallika tuvastamine?",
     "installAttributionPromptMessage": "Kilo kasutab Apple'i jälgimisluba ainult selleks, et teada saada, millisest kanalist sa siia jõudsid. Sinu viipasid ega vestlusi selleks kunagi ei kasutata.",
     "what": "Mis",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaatne Tipptasemel",
+      "balanced": "Automaatne Tasakaalustatud",
+      "efficient": "Automaatne Tõhus",
+      "small": "Automaatne Väike",
+      "free": "Automaatne Tasuta",
+      "organization": "Organisatsiooni automaatne"
+    },
     "dataCollected": "Andmeid kogutakse",
     "free": "Tasuta",
     "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus.",
@@ -2988,8 +3177,17 @@
     "privacy": "Agentide nägemiseks ava Kilo",
     "openAgents": "Ava agendid",
     "needsInput": "Vajab sisendit",
+    "newestSession": "Uusim: {{title}}",
+    "noneWaiting": "Ükski agent ei oota",
+    "newAgent": "Uus agent",
+    "approving": "Kinnitamisel...",
+    "couldNotApprove": "Kinnitamine ebaõnnestus",
+    "couldNotStart": "Käivitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
-    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
+    "openSession": "Ava",
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
+    "newestResult": "Uusim tulemus"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3014,15 +3212,7 @@
     "remoteOptionTitle": "Sinu arvuti",
     "remoteOptionBody": "Käivita Kilo omas arvutis `kilo remote` CLI kaudu.",
     "skip": "Jäta tiivustus vahele",
-    "tutorialLabel": "Õpetus",
-    "remoteTitle": "Alusta oma esimest kaugseanssi",
-    "remoteBody": "Ühenda oma arvuti ja käivita seejärel seanss siit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ühtegi arvutit veel ühendatud pole",
-    "remoteEmptyBody": "Selle ühendamiseks käivita oma arvutis `kilo remote`.",
-    "remoteFound": "Arvuti ühendatud",
-    "checkAgain": "Kontrolli uuesti",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Õpetus"
   },
   "modelChat": {
     "empty": {
@@ -3084,5 +3274,213 @@
   },
   "settingsTools": {
     "confirmTitle": "Kas kinnitada see muudatus?"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
+      "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
+      "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Ava viimane seanss"
+  },
+  "spendAlerts": {
+    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle piirkonna kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
+    "enable": "Luba kulutushoiatused",
+    "thresholdTitle": "Lävendi ületamine",
+    "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
+    "anomalyTitle": "Tunnipõhine tõus",
+    "anomalySubtitle": "Üks tund on selle piirkonna tavapärasest määrast tunduvalt kõrgem",
+    "limitLabel": "Limiit (USD)",
+    "windowLabel": "Aken",
+    "window24h": "24 tundi",
+    "window7d": "7 päeva",
+    "window30d": "30 päeva",
+    "multiplierLabel": "Tõusu kordaja",
+    "saved": "Kulutushoiatuste seaded on salvestatud",
+    "loadError": "Kulutushoiatuste laadimine ebaõnnestus.",
+    "saveError": "Kulutushoiatuste salvestamine ebaõnnestus.",
+    "empty": "Kulutushoiatused on välja lülitatud. Lülita need sisse, et hoiatada selle piirkonna faktureerimiskontakte.",
+    "noSpend": "Kulutusi pole veel registreeritud",
+    "spend24h": "Viimase 24 tunni kulutus",
+    "multiplierError": "Sisesta kordaja 1 või suurem",
+    "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
+    "pushOffByCategory": "Teavitustes väljas"
+  },
+  "profiles": {
+    "title": "Profiilid",
+    "entrySubtitle": "Keskkonnaseadete taaskasutamine seansside jooksul",
+    "newProfile": "Uus profiil",
+    "emptyTitle": "Profiilid veel puuduvad",
+    "emptyDescription": "Looge profiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
+    "loadFailed": "Profiilide laadimine nurjus",
+    "counts": {
+      "vars": "{{count}} muutujat",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} oskust",
+      "commands": "{{count}} käsku",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}o",
+      "commandsShort": "{{count}}k"
+    },
+    "nameLabel": "Profiili nimi",
+    "namePlaceholder": "nt. Taustasüsteemi silumine",
+    "descriptionLabel": "Profiili kirjeldus",
+    "descriptionPlaceholder": "Valikuline kirjeldus",
+    "ownerLabel": "Profiili omanik",
+    "nameRequired": "Sisestage profiili nimi",
+    "createAction": "Loo profiil",
+    "createFailed": "Profiili ei saanud luua",
+    "createdToast": "Profiili \"{{name}}\" loodud",
+    "settingsSectionTitle": "Seadistamine",
+    "defaultSectionTitle": "Vaikeprofiil",
+    "personalDefaultDescription": "Laaditakse automaatselt, kui ühelgi hoidlal pole kinnitatud profiili.",
+    "organizationDefaultDescription": "Automaatselt laaditud liikmetele, kellel pole isiklikku vaikeseadet.",
+    "setAsDefault": "Määra vaikeväärtuseks",
+    "removeDefault": "Eemalda vaikimisi",
+    "saveFailed": "Profiili ei saanud salvestada",
+    "deleteTitle": "Kustuta profiil",
+    "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",
+    "deleteFailed": "Profiili ei saanud kustutada",
+    "deleteBlocked": "Seda profiili kasutab veebihaagi päästik. Esmalt eemaldage see nendelt päästikutelt.",
+    "deletedToast": "Profiil \"{{name}}\" on kustutatud",
+    "variablesTitle": "Keskkonnamuutujad",
+    "addVariable": "Lisa muutuja",
+    "keyLabel": "Võti",
+    "keyTooLong": "Võti võib olla kuni 256 tähemärki",
+    "keyDuplicate": "See võti on profiilis juba olemas",
+    "valueLabel": "Väärtus",
+    "secretLabel": "Saladus",
+    "secrets": {
+      "markSecret": "Märgi salajaseks",
+      "masked": "Varjatud väärtus",
+      "reveal": "Avalda väärtust",
+      "newValuePlaceholder": "Sisesta uus salajane väärtus",
+      "valuePlaceholder": "Salajane väärtus (krüpteeritud)"
+    },
+    "variablesEmpty": "Muutujaid veel pole",
+    "variablesSaveFailed": "Muutujat ei saanud salvestada",
+    "commandsTitle": "Seadistuskäsud",
+    "addCommand": "Lisa käsk",
+    "commandLabel": "Käsk",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Seadistuskäske pole veel",
+    "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
+    "moveUp": "Liigu üles",
+    "moveDown": "Liigu alla",
+    "skillsTitle": "Oskused",
+    "addSkill": "Lisa oskusi",
+    "skillNameLabel": "Oskuste nimi",
+    "skillMarkdownLabel": "Oskuste sisu",
+    "skillsEmpty": "Oskusi veel pole",
+    "skillNameRequired": "Sisestage oskuse nimi",
+    "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
+    "skillContentRequired": "Vajalik on oskuste sisu",
+    "skillSaveFailed": "Oskust ei õnnestunud salvestada",
+    "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
+    "skillEditTitle": "Muuda oskusi",
+    "mcp": {
+      "title": "MCP-serverid",
+      "add": "Lisage MCP-server",
+      "empty": "MCP-servereid veel pole",
+      "name": "Serveri nimi",
+      "type": "Serveri tüüp",
+      "localType": "Kohalik",
+      "remoteType": "Kaugjuhtimispult",
+      "command": "Käsurida",
+      "url": "URL",
+      "environment": "Keskkond (JSON)",
+      "headers": "Päised (JSON)",
+      "timeout": "Aegumine",
+      "secretCount": "Salajane arv",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Sisestage serveri nimi",
+      "nameInvalid": "Nimes võib kasutada ainult tähti, numbreid, allkriipse ja sidekriipse",
+      "commandRequired": "Sisestage käsk",
+      "commandTooLong": "Kasuta kõige rohkem 50 argumenti, igaüks kuni 500 tähemärki",
+      "urlRequired": "Sisestage URL",
+      "urlInvalid": "Sisestage kehtiv URL",
+      "urlTooLong": "URL võib olla kuni 2048 tähemärki",
+      "jsonInvalid": "Sisestage kehtiv JSON – stringiväärtuste objekt",
+      "jsonTooLarge": "Kasuta kõige rohkem 50 kirjet, võtmed kuni 128 ja väärtused kuni 4096 tähemärki",
+      "timeoutInvalid": "Aegumine peab olema täisarv millisekundeid",
+      "edit": "Redigeeri MCP-serverit",
+      "saveFailed": "MCP-serverit ei saanud salvestada"
+    },
+    "agents": {
+      "title": "Profiiliagendid",
+      "add": "Lisa agent",
+      "empty": "Agente veel pole",
+      "name": "Agendi nimi",
+      "slug": "Agent nälkjas",
+      "description": "Agendi kirjeldus",
+      "model": "Mudeli alistamine",
+      "modelPlaceholder": "Kasuta seansi vaikeseadet",
+      "prompt": "Süsteemi viip",
+      "steps": "Maks. sammu",
+      "stepsPlaceholder": "nt 50",
+      "temperature": "Temperatuur",
+      "temperaturePlaceholder": "nt 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "nt 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Minu agent",
+      "promptPlaceholder": "Sa oled...",
+      "tools": "Tööriistad",
+      "visibility": "Nähtavus",
+      "visibilityPrimary": "Esmane – kuvatakse valijas",
+      "visibilitySubagent": "Subagent — ainult teistelt helistatav",
+      "visibilityAll": "Kõik - mõlemad",
+      "saveFailed": "Agenti ei õnnestunud salvestada",
+      "nameRequired": "Sisestage agendi nimi",
+      "slugRequired": "Sisestage agent nälkjas",
+      "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
+      "slugConflict": "See nälkjas on reserveeritud sisseehitatud agenti poolt",
+      "edit": "Redigeeri agenti"
+    },
+    "slashCommands": {
+      "title": "Kaldkriipsuga käsud",
+      "add": "Lisa kaldkriipsu käsk",
+      "empty": "Kaldkriipsu käske pole veel",
+      "name": "Käsu nimi",
+      "description": "Käsu kirjeldus",
+      "template": "Mall",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Selgitage $ARGUMENTS",
+      "agent": "Agent",
+      "subtask": "Käivita alamülesandena",
+      "edit": "Muuda kaldkriipsu käsku",
+      "saveFailed": "Käsku ei saanud salvestada",
+      "nameRequired": "Sisestage käsu nimi",
+      "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
+      "templateRequired": "Sisestage käsumall",
+      "nameConflict": "See nimi on reserveeritud sisseehitatud käsuga"
+    },
+    "repoBindings": {
+      "title": "Repode vaikeprofiilid",
+      "add": "Lisa vaikeseade",
+      "empty": "Vaikimisi pole konfigureeritud",
+      "emptyDescription": "Lisage vaikeseade profiili automaatseks rakendamiseks repo seansside alustamisel.",
+      "repo": "Valige hoidla…",
+      "profile": "Valige profiil",
+      "remove": "Vabasta sidumine",
+      "private": "Privaatne",
+      "search": "Otsi hoidlaid…",
+      "addedToast": "Vaikeprofiil on seatud \"{{repo}}\" jaoks",
+      "addFailed": "Vaikeprofiili ei saanud määrata",
+      "removedToast": "Vaikeprofiil eemaldati \"{{repo}}\" jaoks",
+      "removeFailed": "Vaikeprofiili ei saanud eemaldada",
+      "pinnedTitle": "Kinnitatud hoidlatesse",
+      "pinRepo": "Kinnitage repo",
+      "pinnedEmpty": "Pole kinnitatud ühegi hoidla külge.",
+      "pinnedDescription": "Laaditakse automaatselt, kui seanss sihib mõnda neist hoidlatest.",
+      "pinnedToast": "Kinnitatud \"{{repo}}\"",
+      "pinFailed": "Repot ei saanud kinnitada",
+      "unboundToast": "Repo sidumata",
+      "unbindFailed": "Repot ei saanud lahti siduda"
+    }
   }
 }

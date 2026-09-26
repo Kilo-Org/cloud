@@ -55,35 +55,65 @@ describe('selectMessageFailure', () => {
   });
 
   describe('delivery', () => {
-    it('maps every reason to fixed copy and never emits raw error text', () => {
+    it('maps every delivery reason to fixed copy and never emits raw error text', () => {
       const cases = [
-        { reason: 'interrupted', detail: 'You stopped this message.' },
+        { reason: 'interrupted', title: 'Failed to deliver', detail: 'You stopped this message.' },
         {
           reason: 'exhausted',
+          title: 'Failed to deliver',
           detail: 'We could not deliver this message after several attempts.',
         },
-        { reason: 'execution', detail: 'The agent could not run this message.' },
       ] as const;
 
-      for (const { reason, detail } of cases) {
+      for (const { reason, title, detail } of cases) {
         const result = selectMessageFailure({
           info: userInfo(),
           deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason },
         });
         expect(result).not.toBeNull();
         expect(result?.kind).toBe('delivery');
-        expect(result?.title).toBe('Failed to deliver');
+        expect(result?.title).toBe(title);
         expect(result?.detail).toBe(detail);
+        expect(result?.title).not.toContain('RAW_TRANSPORT_TEXT');
         expect(result?.detail).not.toContain('RAW_TRANSPORT_TEXT');
+        // The raw transport text stays reachable behind the copy action only.
+        expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
         expect(result?.canRetry).toBe(true);
         expect(result?.canCopy).toBe(true);
       }
+    });
+
+    it('states an agent-execution failure once, in the assistant-failure copy', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'execution' },
+      });
+      expect(result).not.toBeNull();
+      expect(result?.kind).toBe('delivery');
+      expect(result?.title).toBe('Response failed');
+      expect(result?.detail).toBeNull();
+      expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
+      expect(result?.canRetry).toBe(true);
+      expect(result?.canCopy).toBe(true);
+    });
+
+    it('exposes no copy detail when the delivery failure carries no transport text', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'exhausted' },
+      });
+      expect(result?.copyDetail).toBe('');
     });
   });
 
   describe('assistant', () => {
     it('returns null for an assistant info with no error', () => {
       expect(selectMessageFailure({ info: assistantInfoWithoutError() })).toBeNull();
+    });
+
+    it('never carries a copy detail for an assistant row', () => {
+      const result = selectMessageFailure({ info: assistantInfo('APIError') });
+      expect(result?.copyDetail).toBe('');
     });
 
     it('derives fixed copy from a known error name and never emits provider text', () => {
@@ -96,10 +126,11 @@ describe('selectMessageFailure', () => {
       expect(result?.canCopy).toBe(false);
     });
 
-    it('falls back to the generic line for an unknown error name', () => {
+    it('adds no detail line for an unknown error name, which the title states', () => {
       const result = selectMessageFailure({ info: assistantInfo('UnknownError') });
-      expect(result?.detail).toBe('The response failed.');
-      expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');
+      expect(result?.title).toBe('Response failed');
+      expect(result?.detail).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
     it('sets canRetry false only for NON_RETRYABLE_ASSISTANT_ERRORS', () => {

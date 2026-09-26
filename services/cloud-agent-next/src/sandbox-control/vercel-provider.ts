@@ -11,11 +11,10 @@ import {
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
-import type { ObserveResult } from './physical-lifecycle.js';
+import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
+import { CONTROL_WRAPPER_LOG_PATH, CONTROL_WRAPPER_PATH } from './container-paths.js';
 
-const CONTROL_WRAPPER_PATH = '/usr/local/bin/kilocode-control-wrapper.js';
-const CONTROL_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
 const LOG_MAX_BYTES = 1024 * 1024;
 
 const ACTIVE_STATUSES = new Set<VercelSandboxSession['status']>([
@@ -97,6 +96,8 @@ export function createVercelProviderAdapter(deps: {
     };
     return {
       resumable: false,
+      persistentWorkspace: true,
+      destroysOnStop: false,
       ensureBillingAdmission: unavailable,
       create: unavailable,
       launch: unavailable,
@@ -134,6 +135,8 @@ export function createVercelProviderAdapter(deps: {
 
   return {
     resumable: false,
+    persistentWorkspace: true,
+    destroysOnStop: false,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
       await ensureBillingAdmission(intent.allocationName ?? deps.sandboxName, intent.billing);

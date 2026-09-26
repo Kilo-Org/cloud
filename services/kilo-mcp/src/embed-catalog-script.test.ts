@@ -33,6 +33,22 @@ function catalogOf(count: number): Catalog {
   );
 }
 
+/**
+ * One well-formed catalog row with an arbitrary `kind`, for validator tests.
+ * Built as a raw record because `parseCatalog` validates unknown JSON before
+ * it is narrowed to `Catalog`.
+ */
+function rowOf(path: string, kind: string): Record<string, unknown> {
+  return {
+    path,
+    kind,
+    summary: `Summary ${path}`,
+    inputSchema: {},
+    tags: [`tag:${path}`],
+    searchBlob: `${path} Summary ${path} tag:${path}`,
+  };
+}
+
 type RecordedCall = {
   url: string;
   method?: string;
@@ -172,6 +188,28 @@ describe('embedAndUpsert', () => {
     expect(outcome.vectors).toBe(count);
   });
 
+  it('indexes a mutation row with kind "mutation" in the vector metadata', async () => {
+    const vector = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.75);
+    const { fetchImpl, calls } = fetchFake([
+      call => (call.url.includes('/ai/run/') ? { data: [vector] } : undefined),
+      call => (call.url.includes('/upsert') ? { count: 1 } : undefined),
+    ]);
+    const catalog = parseCatalog({
+      'agentProfiles.create': rowOf('agentProfiles.create', 'mutation'),
+    });
+    await embedAndUpsert({ ...ENV, catalog, fetchImpl });
+    const upsert = calls.find(call => call.url.includes('/upsert'))!;
+    const record = JSON.parse(upsert.body!.split('\n')[0]!);
+    expect(record).toMatchObject({
+      id: 'agentProfiles.create',
+      metadata: {
+        path: 'agentProfiles.create',
+        kind: 'mutation',
+        tags: ['tag:agentProfiles.create'],
+      },
+    });
+  });
+
   it('fails loudly when the embedding API returns fewer vectors than rows sent', async () => {
     const { fetchImpl } = fetchFake([
       call => (call.url.includes('/ai/run/') ? { data: [] } : undefined),
@@ -203,5 +241,17 @@ describe('parseCatalog', () => {
     expect(() => parseCatalog([])).toThrow(/JSON object/);
     expect(() => parseCatalog({ 'proc0.list': { path: 'proc0.list' } })).toThrow(/not a valid/);
     expect(() => parseCatalog({ wrong: catalog['proc0.list'] })).toThrow(/not a valid/);
+  });
+
+  it('accepts a mutation row and keeps its kind', () => {
+    const mutation = rowOf('agentProfiles.create', 'mutation');
+    const parsed = parseCatalog({ 'agentProfiles.create': mutation });
+    expect(parsed).toEqual({ 'agentProfiles.create': mutation });
+    expect(parsed['agentProfiles.create'].kind).toBe('mutation');
+  });
+
+  it('rejects an unknown kind (subscription)', () => {
+    const subscription = rowOf('agentProfiles.onChanged', 'subscription');
+    expect(() => parseCatalog({ 'agentProfiles.onChanged': subscription })).toThrow(/not a valid/);
   });
 });

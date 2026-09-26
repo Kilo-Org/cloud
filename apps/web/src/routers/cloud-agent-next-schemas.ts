@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -367,7 +368,9 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
  */
 export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
-  sendMessageNextPayloadSchema.options[0].extend({ prompt: z.string() }),
+  sendMessageNextPayloadSchema.options[0].extend({
+    prompt: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
+  }),
   sendMessageNextPayloadSchema.options[1],
 ]);
 
@@ -537,16 +540,30 @@ export const baseInitiateFromPreparedSessionNextSchema = z
   })
   .strict();
 
+const controlPlaneSessionIdNextSchema = z
+  .string()
+  .regex(
+    /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    'Worktree review requires a control-plane session'
+  );
+
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z
   .object({
     cloudAgentSessionId: z.string(),
     payload: sendMessageNextSendPayloadSchema,
+    expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     autoCommit: z.boolean().optional(),
     messageId: messageIdNextSchema.nullish(),
     attachments: cloudAgentAttachmentsSchema.optional(),
     images: cloudAgentImagesSchema,
   })
+  .refine(
+    data =>
+      data.expectedWorktreeId === undefined ||
+      controlPlaneSessionIdNextSchema.safeParse(data.cloudAgentSessionId).success,
+    { message: 'Worktree review requires a control-plane session', path: ['cloudAgentSessionId'] }
+  )
   .refine(hasOnlyOneAttachmentField, {
     message: 'Must not provide both attachments and images',
     path: ['attachments'],
@@ -564,6 +581,19 @@ export const baseSendMessageNextSchema = z
       path: ['payload', 'prompt'],
     }
   );
+
+export const baseGetMessageResultNextSchema = z.object({
+  cloudAgentSessionId: controlPlaneSessionIdNextSchema,
+  expectedWorktreeId: cloudAgentWorktreeIdSchema,
+  messageId: messageIdNextSchema,
+});
+
+export const baseGetMessageResultNextOutputSchema = z.object({
+  cloudAgentSessionId: controlPlaneSessionIdNextSchema,
+  messageId: messageIdNextSchema,
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+  acceptedAt: z.number().optional(),
+});
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({
@@ -586,6 +616,15 @@ export const baseGetSandboxStatusNextSchema = z
     cloudAgentSessionId: SandboxStatusSessionIdSchema,
   })
   .strict();
+
+export const baseGetPendingInteractionsNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+});
+
+export const baseGetPendingInteractionsNextOutputSchema = z.object({
+  questions: z.array(z.unknown()),
+  permissions: z.array(z.unknown()),
+});
 
 export const baseWorktreeChangesNextSchema = z
   .object({
@@ -692,6 +731,11 @@ export const baseGetSessionNextOutputSchema = z.object({
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
+
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId: z.string().nullable().optional(),
+  parentSessionId: z.string().nullable().optional(),
+  cloudAgentSessionScopeId: z.string().nullable().optional(),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional(),

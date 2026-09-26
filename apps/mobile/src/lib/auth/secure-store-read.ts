@@ -1,6 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
-
+import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
+import { E2eInjectedFaultError } from '@/lib/telemetry/e2e-fault';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
  * Bounded retry for a stored credential read.
@@ -9,8 +10,15 @@ import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
  * and the keystore is not unlocked yet, or the platform service is momentarily
  * unavailable. Bootstrap must never read that rejection as "no stored
  * session": doing so presents a signed-in person with the login screen while
- * their credentials are still on the device. Only a rejection is retried; a
- * `null` resolution is a real answer (nothing stored) and returns immediately.
+ * their credentials are still on the device. Only a rejection is retried by
+ * `readStoredValueWithRetry`; a `null` resolution is a real answer (nothing
+ * stored) and returns immediately.
+ *
+ * A `null` is not always a real answer: a `WHEN_UNLOCKED_THIS_DEVICE_ONLY`
+ * item answers `null` while the device is not yet unlocked, which is
+ * indistinguishable from "nothing stored". `readStoredValueRetryingNull`
+ * retries a `null` on the same schedule, for the callers that treat a member
+ * of the credential set as unreadable rather than absent.
  */
 const RETRY_DELAYS_MS = [250, 500, 1000] as const;
 
@@ -18,7 +26,8 @@ const RETRY_DELAYS_MS = [250, 500, 1000] as const;
 // lib/config: while the window is open, every read through this helper
 // rejects, which is what makes the session-restore failure states provable on
 // a live build. Env-gated, so the constant is 0 and this is inert in
-// production.
+// production. The rejection is an `E2eInjectedFaultError`, which the Sentry
+// `beforeSend` gate drops so a harness fault is never filed as a product issue.
 const moduleLoadTime = Date.now();
 
 function isFaultWindowOpen(): boolean {
@@ -31,28 +40,18 @@ async function delay(ms: number): Promise<void> {
   });
 }
 
-/**
- * One read of `key`; a rejection propagates to the caller. This is the single
- * cross-platform entry point for a plain SecureStore read: `expo-secure-store`
- * exists on both iOS and Android, so there is no per-platform storage branch
- * to keep. The retrying credential read below is built on it.
- */
-export async function readStoredValue(
-  key: string,
-  options?: SecureStore.SecureStoreOptions
-): Promise<string | null> {
-  const value = await SecureStore.getItemAsync(key, options);
-  return value;
-}
-
 /** One attempt: the handed-over read if there is one, otherwise a fresh one. */
 async function readOnce(
   key: string,
-  options: SecureStore.SecureStoreOptions | undefined,
+  options: SecureStoreReadOptions | undefined,
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
-    throw new Error(`E2E secure-store fault window is open: read of ${key} rejected`);
+    // No key in the message: the exhausted-read report attaches this error, and
+    // the report must carry no key material, like the real store's error. The
+    // error is an `E2eInjectedFaultError` so the Sentry `beforeSend` gate drops
+    // a harness fault instead of filing it as a product issue.
+    throw new E2eInjectedFaultError('E2E secure-store fault window is open: read rejected');
   }
   const value = await (firstAttempt ?? readStoredValue(key, options));
   return value;
@@ -68,21 +67,69 @@ async function readOnce(
  */
 export async function readStoredValueWithRetry(
   key: string,
-  options?: SecureStore.SecureStoreOptions,
+  options?: SecureStoreReadOptions,
   firstAttempt?: Promise<string | null>
 ): Promise<string | null> {
-  let pending = firstAttempt;
+  const value = await readWithRetry(key, { options, firstAttempt, nullIsFailure: false });
+  return value;
+}
+
+/**
+ * Reads `key` like `readStoredValueWithRetry`, but treats a `null` resolution
+ * as a failed read and retries it on the same 250/500/1000 ms cadence. The
+ * final attempt's `null` is returned when the budget is spent; a rejection
+ * still propagates after the budget, exactly as `readStoredValueWithRetry`
+ * does.
+ *
+ * Use this for a member of the credential set: while the device is not yet
+ * unlocked, a read of a `WHEN_UNLOCKED_THIS_DEVICE_ONLY` key answers `null`,
+ * which must not be read as "no stored session".
+ */
+export async function readStoredValueRetryingNull(
+  key: string,
+  options?: SecureStoreReadOptions,
+  firstAttempt?: Promise<string | null>
+): Promise<string | null> {
+  const value = await readWithRetry(key, { options, firstAttempt, nullIsFailure: true });
+  return value;
+}
+
+/**
+ * The one retry loop both exports share: four attempts (three more after the
+ * first) with 250/500/1000 ms backoff. A rejection always spends an attempt
+ * and backs off; a `null` resolution spends an attempt only when the caller
+ * counts it as a failure (`nullIsFailure`).
+ */
+type RetryRead = {
+  options: SecureStoreReadOptions | undefined;
+  firstAttempt: Promise<string | null> | undefined;
+  nullIsFailure: boolean;
+};
+
+async function readWithRetry(key: string, read: RetryRead): Promise<string | null> {
+  let pending = read.firstAttempt;
   for (const retryDelayMs of RETRY_DELAYS_MS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- retry cadence: each attempt must settle before the next backoff
-      return await readOnce(key, options, pending);
+      const value = await readOnce(key, read.options, pending);
+      if (value !== null || !read.nullIsFailure) {
+        return value;
+      }
     } catch {
-      pending = undefined;
-      // eslint-disable-next-line no-await-in-loop -- backoff between attempts
-      await delay(retryDelayMs);
+      // A rejection spends this attempt; the next one issues a fresh read.
     }
+    pending = undefined;
+    // eslint-disable-next-line no-await-in-loop -- backoff between attempts
+    await delay(retryDelayMs);
   }
-  // Last attempt: its rejection is the final answer and propagates to the
-  // caller, which owns how the failure is surfaced.
-  return readOnce(key, options, pending);
+  // Last attempt: its value is the final answer and its rejection propagates
+  // to the caller, which owns how the failure is surfaced. Report the
+  // rejection once here at warning level with the stable read fingerprint —
+  // reporting per attempt would multiply one failure into four events.
+  try {
+    return await readOnce(key, read.options, pending);
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    throw error;
+  }
 }

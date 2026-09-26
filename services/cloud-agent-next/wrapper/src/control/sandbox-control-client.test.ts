@@ -17,6 +17,7 @@ import { createControlEventFailureHandler } from './control-event-transport';
 import { resetSessionDirectoryState } from './session-directories';
 import {
   MAX_CONTROL_EVENT_OUTBOX_BYTES,
+  MAX_CONTROL_EVENT_OUTBOX_EVENTS,
   type ControlEventOutboxFailure,
 } from './control-event-outbox';
 import {
@@ -262,7 +263,13 @@ describe('heartbeat version rollout compatibility', () => {
       protocolVersion: 1,
       handshakeComplete: true,
     });
-    expect(previousHelloResultSchema.parse(helloResult({ scopedCleanupResult: true }))).toEqual({
+    expect(
+      previousHelloResultSchema.parse({
+        protocolVersion: 1,
+        handshakeComplete: true,
+        capabilities: { scopedCleanupResult: true },
+      })
+    ).toEqual({
       protocolVersion: 1,
       handshakeComplete: true,
     });
@@ -299,14 +306,14 @@ describe('heartbeat version rollout compatibility', () => {
     }
   );
 
-  it('exposes scoped cleanup results only after the Worker grants the capability', async () => {
+  it('does not grant scoped cleanup when the Worker omits the capability', async () => {
     const fake = new FakeWebSocket();
     const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
     try {
       const connecting = client.connect();
-      await handshake(fake, helloResult({ scopedCleanupResult: true }));
+      await handshake(fake, helloResult());
       await connecting;
-      expect(client.supportsScopedCleanupResult?.()).toBe(true);
+      expect(client.supportsScopedCleanupResult?.()).toBe(false);
     } finally {
       client.close();
     }
@@ -399,6 +406,7 @@ describe('createSandboxControlClient', () => {
           eventBatches?: boolean;
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
+          nativeRuntimeIdCapture?: boolean;
         };
       };
     };
@@ -418,6 +426,7 @@ describe('createSandboxControlClient', () => {
         eventBatches: true,
         scopedCleanupResult: true,
         workingBranches: true,
+        nativeRuntimeIdCapture: true,
       },
     });
     fake.respond(
@@ -2376,14 +2385,14 @@ describe('event receipt tracking bounds and reporting', () => {
         ackTimers.push(timers.mock.results.at(-1)?.value);
       };
       const session = identity();
-      for (let index = 0; index < 257; index += 1) {
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS + 1; index += 1) {
         expect(
           client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
         ).toBe(true);
         await waitForReconnect();
       }
 
-      expect(frames).toHaveLength(257);
+      expect(frames).toHaveLength(MAX_CONTROL_EVENT_OUTBOX_EVENTS + 1);
       const evictions = observations.filter(entry => entry.outcome === 'tracking_evicted');
       expect(evictions).toHaveLength(1);
       expect(evictions[0]).toMatchObject({
@@ -2393,7 +2402,7 @@ describe('event receipt tracking bounds and reporting', () => {
       });
       expect(
         Math.max(...observations.map(entry => entry.pendingCount as number))
-      ).toBeLessThanOrEqual(256);
+      ).toBeLessThanOrEqual(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
 
       const acknowledged = (frame: (typeof frames)[number]) => {
         socket.respond(
@@ -2423,9 +2432,11 @@ describe('event receipt tracking bounds and reporting', () => {
       expect(observations.filter(entry => entry.outcome === 'late_reply')).toHaveLength(1);
 
       client.close();
-      expect(observations.filter(entry => entry.outcome === 'connection_closed')).toHaveLength(254);
+      expect(observations.filter(entry => entry.outcome === 'connection_closed')).toHaveLength(
+        MAX_CONTROL_EVENT_OUTBOX_EVENTS - 2
+      );
 
-      expect(ackTimers).toHaveLength(257);
+      expect(ackTimers).toHaveLength(MAX_CONTROL_EVENT_OUTBOX_EVENTS + 1);
       for (const timer of ackTimers) expect(cleared).toHaveBeenCalledWith(timer);
 
       client.snapshotEventDiagnostics?.();
@@ -2436,7 +2447,7 @@ describe('event receipt tracking bounds and reporting', () => {
         acknowledgedCount: 2,
         trackingEvictionCount: 1,
         lateReplyCount: 1,
-        connectionClosedCount: 254,
+        connectionClosedCount: MAX_CONTROL_EVENT_OUTBOX_EVENTS - 2,
         failureCount: 0,
         outstandingEventAcks: 0,
         outstandingEventAckBytes: 0,
@@ -2575,6 +2586,10 @@ describe('event receipt tracking bounds and reporting', () => {
         void publication;
       };
       const preparedAt = Date.now();
+      // Freeze the clock before enqueueing: the outbox stamps `preparedAt` from its own
+      // Date.now() call, so an unfrozen clock can tick between the two reads and make the
+      // queueWaitMs observation one millisecond more than this test prepared.
+      setSystemTime(preparedAt);
       expect(
         client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
       ).toBe(true);
@@ -2890,7 +2905,7 @@ describe('sandbox control event batching', () => {
       const batchFrame = batchFrames(socket)[0];
       if (!batchFrame) throw new Error('Missing batch frame');
       const [firstItem, secondItem] = batchFrame.payload.items;
-      for (let index = 0; index < 255; index += 1) {
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS - 1; index += 1) {
         client.sendEvent?.(
           'session.event',
           { type: 'session.updated', properties: { index } },

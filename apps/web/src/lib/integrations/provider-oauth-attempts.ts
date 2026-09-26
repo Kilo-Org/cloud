@@ -1,0 +1,198 @@
+import 'server-only';
+
+import { createHash } from 'node:crypto';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import type { Owner } from '@/lib/integrations/core/types';
+import { kilocode_users, organizations, provider_oauth_attempts } from '@kilocode/db/schema';
+import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
+
+export type ReservedOAuthProvider = 'slack' | 'linear' | 'discord';
+const ATTEMPT_TTL_MS = 10 * 60_000;
+
+const stateHash = (state: string) => createHash('sha256').update(state).digest('hex');
+const ownerCondition = (owner: Owner) =>
+  owner.type === 'org'
+    ? eq(provider_oauth_attempts.owned_by_organization_id, owner.id)
+    : eq(provider_oauth_attempts.owned_by_user_id, owner.id);
+
+export async function lockProviderOAuthOwnerRow(tx: DrizzleTransaction, owner: Owner) {
+  await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+  await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+  const rows =
+    owner.type === 'org'
+      ? await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.id, owner.id))
+          .for('update')
+      : await tx
+          .select({ id: kilocode_users.id })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, owner.id))
+          .for('update');
+  if (rows.length !== 1) throw new Error('OAuth destination owner not found');
+}
+
+export async function pruneProviderOAuthAttempts(tx: DrizzleTransaction): Promise<void> {
+  const now = new Date().toISOString();
+  await tx.execute(
+    sql`WITH expired AS (SELECT id FROM ${provider_oauth_attempts} WHERE status IN ('pending', 'consumed') AND expires_at < ${now} ORDER BY expires_at LIMIT 100) UPDATE ${provider_oauth_attempts} attempts SET status = 'expired' FROM expired WHERE attempts.id = expired.id`
+  );
+  await tx.execute(
+    sql`DELETE FROM ${provider_oauth_attempts} WHERE id IN (SELECT id FROM ${provider_oauth_attempts} WHERE status = 'expired' AND expires_at < ${new Date(Date.now() - 24 * 60 * 60_000).toISOString()} ORDER BY expires_at LIMIT 100)`
+  );
+}
+
+export async function beginProviderOAuthAttempt(input: {
+  actorUserId: string;
+  owner: Owner;
+  provider: ReservedOAuthProvider;
+  state: string;
+  purpose?: 'provider_install';
+}): Promise<void> {
+  await db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    await pruneProviderOAuthAttempts(tx);
+    const now = new Date().toISOString();
+    // A new attempt supersedes any existing pending attempt for this owner+provider,
+    // even if it hasn't expired yet. Without this, an abandoned-but-unexpired pending
+    // row would collide with the partial unique index on (owner, provider, status =
+    // 'pending') and block a fresh attempt for up to ATTEMPT_TTL_MS. Consumed rows are
+    // only expired once they've actually passed their TTL, since they don't hold that
+    // unique slot and this is otherwise routine retention cleanup.
+    await tx
+      .update(provider_oauth_attempts)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          ownerCondition(input.owner),
+          eq(provider_oauth_attempts.provider, input.provider),
+          or(
+            eq(provider_oauth_attempts.status, 'pending'),
+            and(
+              eq(provider_oauth_attempts.status, 'consumed'),
+              lt(provider_oauth_attempts.expires_at, now)
+            )
+          )
+        )
+      );
+    await tx.insert(provider_oauth_attempts).values({
+      provider: input.provider,
+      purpose: input.purpose ?? 'provider_install',
+      state_hash: stateHash(input.state),
+      initiated_by_user_id: input.actorUserId,
+      owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
+      owned_by_organization_id: input.owner.type === 'org' ? input.owner.id : null,
+      expires_at: new Date(Date.now() + ATTEMPT_TTL_MS).toISOString(),
+    });
+  });
+}
+
+export async function consumeProviderOAuthAttempt(input: {
+  actorUserId: string;
+  owner: Owner;
+  provider: ReservedOAuthProvider;
+  state: string;
+  purpose?: 'provider_install';
+}): Promise<boolean> {
+  return db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    await pruneProviderOAuthAttempts(tx);
+    const now = new Date().toISOString();
+    await tx
+      .update(provider_oauth_attempts)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          ownerCondition(input.owner),
+          eq(provider_oauth_attempts.provider, input.provider),
+          eq(provider_oauth_attempts.purpose, input.purpose ?? 'provider_install'),
+          or(
+            eq(provider_oauth_attempts.status, 'pending'),
+            eq(provider_oauth_attempts.status, 'consumed')
+          ),
+          lt(provider_oauth_attempts.expires_at, now)
+        )
+      );
+    const consumed = await tx
+      .update(provider_oauth_attempts)
+      .set({ status: 'consumed', consumed_at: now })
+      .where(
+        and(
+          ownerCondition(input.owner),
+          eq(provider_oauth_attempts.provider, input.provider),
+          eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
+          eq(provider_oauth_attempts.state_hash, stateHash(input.state)),
+          eq(provider_oauth_attempts.status, 'pending'),
+          gt(provider_oauth_attempts.expires_at, now)
+        )
+      )
+      .returning({ id: provider_oauth_attempts.id });
+    return consumed.length === 1;
+  });
+}
+
+export async function cancelProviderOAuthAttempt(input: {
+  actorUserId: string;
+  owner: Owner;
+  provider: ReservedOAuthProvider;
+  state: string;
+  purpose: 'provider_install';
+}): Promise<boolean> {
+  return db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    await pruneProviderOAuthAttempts(tx);
+    const cancelled = await tx
+      .update(provider_oauth_attempts)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          ownerCondition(input.owner),
+          eq(provider_oauth_attempts.provider, input.provider),
+          eq(provider_oauth_attempts.purpose, input.purpose),
+          eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
+          eq(provider_oauth_attempts.state_hash, stateHash(input.state)),
+          eq(provider_oauth_attempts.status, 'pending')
+        )
+      )
+      .returning({ id: provider_oauth_attempts.id });
+    return cancelled.length === 1;
+  });
+}
+
+export async function hasPendingProviderOAuthAttempt(
+  tx: DrizzleTransaction,
+  owners: Owner[]
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  await pruneProviderOAuthAttempts(tx);
+  const conditions = owners.map(owner => ownerCondition(owner));
+  await tx
+    .update(provider_oauth_attempts)
+    .set({ status: 'expired' })
+    .where(
+      and(
+        or(...conditions),
+        or(
+          eq(provider_oauth_attempts.status, 'pending'),
+          eq(provider_oauth_attempts.status, 'consumed')
+        ),
+        lt(provider_oauth_attempts.expires_at, now)
+      )
+    );
+  const [attempt] = await tx
+    .select({ id: provider_oauth_attempts.id })
+    .from(provider_oauth_attempts)
+    .where(
+      and(
+        or(...conditions),
+        or(
+          eq(provider_oauth_attempts.status, 'pending'),
+          eq(provider_oauth_attempts.status, 'consumed')
+        ),
+        gt(provider_oauth_attempts.expires_at, now)
+      )
+    )
+    .limit(1);
+  return Boolean(attempt);
+}

@@ -21,9 +21,13 @@ import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants'
 import { normalizeAlias } from './session-config';
 import { usePostHog } from 'posthog-js/react';
 import { fetchWebSessionSnapshotPage } from './session-page-adapter';
+import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import { createWorktreeReviewSend, type WorktreeReviewSendApi } from './worktree-review-send';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
+const CloudAgentContext = createContext<WorktreeReviewSendApi | null>(null);
 
 type CloudAgentProviderProps = {
   children: ReactNode;
@@ -82,6 +86,53 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   // Create manager once per provider instance.
   // trpcClient is stable (from context); organizationId is stable per provider mount.
   const managerRef = useRef<SessionManager | null>(null);
+  const reviewSendRef = useRef<WorktreeReviewSendApi | null>(null);
+  const send = async (
+    input: Parameters<CloudAgentApi['send']>[0] & { expectedWorktreeId?: string }
+  ) => {
+    const payload = {
+      cloudAgentSessionId: input.sessionId,
+      payload: input.payload,
+      autoCommit: true,
+      messageId: input.messageId,
+      attachments: input.attachments ?? input.images,
+      expectedWorktreeId: input.expectedWorktreeId
+        ? cloudAgentWorktreeIdSchema.parse(input.expectedWorktreeId)
+        : undefined,
+    };
+    return organizationId
+      ? trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
+          { ...payload, organizationId },
+          { context: { skipBatch: true } }
+        )
+      : trpcClient.cloudAgentNext.sendMessage.mutate(payload, { context: { skipBatch: true } });
+  };
+  if (reviewSendRef.current === null) {
+    reviewSendRef.current = createWorktreeReviewSend({
+      organizationId,
+      getSession: session_id => trpcClient.cliSessionsV2.getWithRuntimeState.query({ session_id }),
+      send: submission =>
+        send({
+          sessionId: submission.destinationCloudAgentSessionId,
+          payload: submission.payload,
+          messageId: submission.messageId,
+          expectedWorktreeId: submission.expectedWorktreeId,
+        }),
+      getMessageResult: submission => {
+        const input = {
+          cloudAgentSessionId: submission.destinationCloudAgentSessionId,
+          messageId: submission.messageId,
+          expectedWorktreeId: cloudAgentWorktreeIdSchema.parse(submission.expectedWorktreeId),
+        };
+        return organizationId
+          ? trpcClient.organizations.cloudAgentNext.getMessageResult.query({
+              ...input,
+              organizationId,
+            })
+          : trpcClient.cloudAgentNext.getMessageResult.query(input);
+      },
+    });
+  }
   if (managerRef.current === null) {
     managerRef.current = createSessionManager({
       store: storeRef.current,
@@ -157,31 +208,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
-        send: async input => {
-          if (organizationId) {
-            return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
-              {
-                cloudAgentSessionId: input.sessionId,
-                payload: input.payload,
-                autoCommit: true,
-                organizationId,
-                messageId: input.messageId,
-                attachments: input.attachments ?? input.images,
-              },
-              { context: { skipBatch: true } }
-            );
-          }
-          return trpcClient.cloudAgentNext.sendMessage.mutate(
-            {
-              cloudAgentSessionId: input.sessionId,
-              payload: input.payload,
-              autoCommit: true,
-              messageId: input.messageId,
-              attachments: input.attachments ?? input.images,
-            },
-            { context: { skipBatch: true } }
-          );
-        },
+        send,
 
         interrupt: async payload => {
           if (organizationId) {
@@ -362,10 +389,20 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   return (
     <JotaiProvider store={storeRef.current}>
       <UserWebConnectionContext.Provider value={sharedConnection}>
-        <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
+        <ManagerContext.Provider value={managerRef.current}>
+          <CloudAgentContext.Provider value={reviewSendRef.current}>
+            {children}
+          </CloudAgentContext.Provider>
+        </ManagerContext.Provider>
       </UserWebConnectionContext.Provider>
     </JotaiProvider>
   );
+}
+
+export function useCloudAgent(): WorktreeReviewSendApi {
+  const api = useContext(CloudAgentContext);
+  if (!api) throw new Error('useCloudAgent must be used within CloudAgentProvider');
+  return api;
 }
 
 export function useOptionalManager(): SessionManager | null {

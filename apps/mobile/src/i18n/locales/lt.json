@@ -36,6 +36,7 @@
     "cost": "Kaina",
     "discard": "Atmesti",
     "findings": "Problemos",
+    "mergeRequest": "merge request",
     "notConnected": "Neprijungta",
     "notifications": "Pranešimai",
     "pullRequest": "pakeitimų užklausa",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Naudoti kitą el. pašto adresą",
     "signInWithApple": "Prisijungti per Apple",
     "signInWithGoogle": "Prisijungti per Google",
+    "signInWithPasskey": "Prisijungti su priėjimo raktu",
     "emailAddress": "El. pašto adresas",
     "emailPlaceholder": "vardas@example.com",
     "continueWithEmail": "Tęsti el. paštu",
@@ -174,6 +176,10 @@
     "termsConnector": " ir ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",
+    "passkeyCancelled": "Prisijungimas su priėjimo raktu atšauktas. Bandykite dar kartą.",
+    "passkeyNotFound": "Šiam įrenginiui neišsaugotas joks priėjimo raktas. Prisijunkite naudodami Apple, Google arba savo el. paštą.",
+    "passkeyUnsupported": "Priėjimo raktai šiame įrenginyje nepasiekiami. Prisijunkite naudodami Apple, Google arba savo el. paštą.",
+    "passkeyFailed": "Nepavyko prisijungti su priėjimo raktu. Bandykite dar kartą.",
     "couldNotCompleteSignIn": "Nepavyko užbaigti prisijungimo. Bandyk dar kartą.",
     "sessionEnded": "Tavo sesija baigėsi. Prisijunk dar kartą.",
     "signInCodeExpired": "Tavo prisijungimo kodas nebegalioja. Bandyk dar kartą.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Įmonės SSO"
+    "providerEnterpriseSso": "Įmonės SSO",
+    "passkeysTitle": "Priėjimo raktai",
+    "passkeysSubtitle": "Prisijunkite be slaptažodžio",
+    "passkeysEmpty": "Kol kas nėra priėjimo raktų",
+    "passkeysEmptyHint": "$t(profile.addPasskey), kad prisijungtumėte be slaptažodžio.",
+    "passkeysCouldNotLoad": "Nepavyko įkelti priėjimo raktų",
+    "passkeysLoadFailed": "Priėjimo raktai nepasiekiami, kol tai nebus įkelta.",
+    "addPasskey": "Pridėti priėjimo raktą",
+    "passkeyDefaultName": "Priėjimo raktas",
+    "passkeyAddedOn": "Pridėta {{date}}",
+    "passkeyAdded": "Priėjimo raktas pridėtas.",
+    "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
+    "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",
+    "passkeyAddCancelled": "Priėjimo rakto kūrimas atšauktas.",
+    "passkeyRemoved": "Priėjimo raktas pašalintas.",
+    "passkeyRemoveFailed": "Nepavyko pašalinti to priėjimo rakto. Bandykite dar kartą.",
+    "passkeyRenamed": "Priėjimo raktas pervardytas.",
+    "passkeyName": "Priėjimo rakto pavadinimas",
+    "renamePasskey": "Pervadyti priėjimo raktą",
+    "removePasskey": "Pašalinti priėjimo raktą",
+    "removePasskeyTitle": "Pašalinti priėjimo raktą?",
+    "removePasskeyMessage": "Daugiau negalėsite prisijungti su šiuo priėjimo raktu."
   },
   "preferences": {
     "general": "Bendra",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "Išjungus šią parinktį, įvesties klavišas agentų žinučių įvesties laukuose įterpia naują eilutę.",
     "biometricUnlock": "Atrakinti naudojant biometrinius duomenis",
     "biometricUnlockSubtitle": "Paleidus programėlę ir jai penkias minutes išbuvus fone, reikia ją atrakinti.",
-    "featureFlags": "Funkcijų vėliavėlės",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribavimas per Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -346,7 +368,27 @@
       "fileLoadedCount_few": "Įkelti {{displayCount}} failai",
       "fileLoadedCount_many": "Įkelta {{displayCount}} failo",
       "fileLoadedOfTotalCount_few": "Įkelti {{displayCount}} failai iš {{total}}",
-      "fileLoadedOfTotalCount_many": "Įkelta {{displayCount}} failo iš {{total}}"
+      "fileLoadedOfTotalCount_many": "Įkelta {{displayCount}} failo iš {{total}}",
+      "expandAllLines_one": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandAllLines_other": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandAllLines_few": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandAllLines_many": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandLines_one": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_few": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_many": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandLinesOfContext_other": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandLinesOfContext_few": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandLinesOfContext_many": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandMoreLines_one": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_few": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_many": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "įkelta {{loaded}} iš {{total}} failų",
+      "loadedOfTotalFiles_other": "įkelta {{loaded}} iš {{total}} failų",
+      "loadedOfTotalFiles_few": "įkelta {{loaded}} iš {{total}} failų",
+      "loadedOfTotalFiles_many": "įkelta {{loaded}} iš {{total}} failų"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ failo pabaigoje nėra naujos eilutės.",
@@ -361,6 +403,7 @@
       "merge": "Sujungimas",
       "mergeNow": "Sujungti dabar",
       "mergePullRequest": "Pakeitimų užklausos sujungimas",
+      "mergeTermTitle": "Sujungti {{term}}",
       "enableAutoMerge": "Įjungti automatinį sujungimą",
       "disableAutoMerge": "Išjungti automatinį sujungimą",
       "autoMergeOn": "Automatinis sujungimas įjungtas",
@@ -379,9 +422,12 @@
       "deleteBranchAfterMerge": "Ištrinti šaką po sujungimo",
       "noEnabledMethods": "Šioje saugykloje neįjungtas nė vienas sujungimo būdas. Paprašyk saugyklos administratoriaus įjungti įprastą sujungimą, įrašų sutraukimą arba perkėlimą į kitą bazę.",
       "confirmTitle": "Sujungti pakeitimų užklausą?",
+      "confirmTitleTerm": "Sujungti {{term}}?",
       "confirmMessage": "Tavo pakeitimai bus sujungti su bazine šaka.",
       "enableAutoMergeConfirmTitle": "Įjungti automatinį sujungimą?",
       "enableAutoMergeConfirmMessage": "GitHub automatiškai sujungs šią pakeitimų užklausą, kai visi privalomi patikrinimai bus sėkmingi.",
+      "enableAutoMergeConfirmMessageTerm": "Automatinis {{term}} sujungimas įvyks sėkmingai įvykdžius pipeline.",
+      "enableAutoMergeDescriptionTerm": "GitLab automatiškai sujungs {{term}}, kai pipeline bus sėkmingas.",
       "forbidden": "Neturi teisės sujungti šios pakeitimų užklausos.",
       "cannotMerge": "Dabartinės būsenos pakeitimų užklausos negalima sujungti.",
       "couldNotMerge": "Nepavyko sujungti pakeitimų užklausos.",
@@ -392,7 +438,8 @@
       },
       "terminal": {
         "alreadyMerged": "Jau sujungta",
-        "closed": "Ši pakeitimų užklausa uždaryta"
+        "closed": "Ši pakeitimų užklausa uždaryta",
+        "closedMergeRequest": "Šis merge request uždarytas"
       },
       "partialSuccessBanner": {
         "body": "Nepavyko ištrinti šakos: {{reason}}.",
@@ -417,6 +464,20 @@
         "behindDetail": "Užklausos šaka atsilieka nuo bazinės šakos. Prieš sujungdamas perkelk pakeitimų įrašus į naują bazę arba atnaujink šaką.",
         "notMergeableTitle": "Šios pakeitimų užklausos dar negalima sujungti",
         "notMergeableDetail": "GitHub nurodė sujungimo būseną: {{state}}."
+      },
+      "restrictions": {
+        "title": "Sujungimo apribojimai",
+        "approvalsRequired_one": "Reikalingas {{displayCount}} patvirtinimas",
+        "approvalsRequired_other": "Reikalingi {{displayCount}} patvirtinimai",
+        "pipelineMustSucceed": "Prieš sujungiant pipeline turi būti sėkmingas.",
+        "approvalsRequired_many": "Reikalinga {{displayCount}} patvirtinimų",
+        "approvalsRequired_few": "Reikalingi {{displayCount}} patvirtinimai"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline nepavyksta paskutiniame commit.",
+        "pendingPipeline": "Pipeline vis dar vykdomas paskutiniame commit.",
+        "permission": "Trūksta teisių sujungti {{term}}.",
+        "draft": "Prieš sujungiant pakeisk {{term}} būseną į paruoštą peržiūrai."
       },
       "methodLabels": {
         "merge": "Sukurti sujungimo įrašą",
@@ -466,6 +527,8 @@
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
       "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "fixWithKilo": "Ištaisyti su Kilo",
+      "fixWithKiloPrompt": "Prašome išspręsti šį pakeitimų užklausos komentarą: {{link}}",
       "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
       "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos.",
       "moderation": {
@@ -520,7 +583,12 @@
         "outdatedOnLines": "Pasenęs komentaras: {{lines}}",
         "outdatedOnPath": "Pasenęs komentaras: {{path}}"
       },
-      "deletedUser": "ištrintas naudotojas"
+      "deletedUser": "ištrintas naudotojas",
+      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}.",
+      "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -532,17 +600,19 @@
     "reviewPullRequest": "Peržiūrėti pakeitimų užklausą",
     "headLine": "{{counts}} · naujausias įrašas {{sha}}",
     "entry": {
-      "eyebrow": "Atidaryk pakeitimų užklausą pagal URL.",
-      "pastePrLink": "Įklijuoti PR nuorodą",
-      "noRecentPrs": "Nėra neseniai peržiūrėtų PR",
-      "noRecentPrsDescription": "Įklijuok PR nuorodą viršuje ir pradėk peržiūrą — kitą kartą PR bus rodomas čia.",
+      "eyebrow": "Atidaryk pakeitimų užklausą arba merge request pagal URL",
+      "pastePrLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
+      "noRecentPrs": "Nėra nesenių peržiūrų",
+      "noRecentPrsDescription": "Įklijuok nuorodą viršuje ir pradėk peržiūrą — kitą kartą ji bus rodoma čia.",
       "couldNotLoad": "Nepavyko įkelti.",
       "removeFromRecentsTitle": "Pašalinti iš neseniai peržiūrėtų?",
-      "removeFromRecentsMessage": "Ši pakeitimų užklausa bus pašalinta iš tavo neseniai peržiūrėtų užklausų sąrašo.",
+      "removeFromRecentsMessage": "Ši peržiūra bus pašalinta iš neseniai peržiūrėtų sąrašo.",
       "removeRecentAccessibility": "Pašalinti {{repo}} iš neseniai peržiūrėtų užklausų sąrašo",
-      "urlAccessibility": "GitHub pakeitimų užklausos URL",
-      "clearLink": "Išvalyti pakeitimų užklausos nuorodą",
-      "pasteLink": "Įklijuoti pakeitimų užklausos nuorodą",
+      "urlAccessibility": "Įvesk pakeitimų užklausos arba merge request URL",
+      "urlPlaceholder": "Pakeitimų užklausos arba merge request URL",
+      "openAccessibility": "Atidaryti pakeitimų užklausą arba merge request",
+      "clearLink": "Išvalyti nuorodą",
+      "pasteLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
       "open": "Atidaryti"
     },
     "checks": {
@@ -559,6 +629,10 @@
       "pending": "laukiama: {{displayCount}}",
       "skipped": "praleista: {{displayCount}}",
       "checksCount": "patikrinimų: {{displayCount}}",
+      "checksCount_one": "patikrinimas: {{displayCount}}",
+      "checksCount_few": "patikrinimai: {{displayCount}}",
+      "checksCount_many": "patikrinimų: {{displayCount}}",
+      "checksCount_other": "patikrinimų: {{displayCount}}",
       "checkDetails": "patikrinimo informacija"
     },
     "inbox": {
@@ -591,9 +665,15 @@
     "connect": {
       "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio.",
       "checkFailedMessage": "Kol duomenys neįkelti, prisijungimo būsena nepasiekiama.",
+      "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio.",
+      "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
+      "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectDescription": "Tavo GitHub prieiga atšaukta. Prisijunk iš naujo, kad galėtum toliau peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
-      "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje."
+      "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
+      "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
+      "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
+      "bitbucketOrgOnlyDescription": "Profilyje pasirink organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas."
     },
     "screen": {
       "title": "#{{number}}",
@@ -617,7 +697,10 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
+      "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
+      "providerMessage": "Tavo {{provider}} ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -686,10 +769,14 @@
       "statusContext": "Kontekstas",
       "lineLabel": "{{status}}, {{line}} eilutė: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(tuščia)"
+      "emptyLine": "(tuščia)",
+      "truncationBanner_one": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner_other": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner_few": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}."
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia.",
-    "linkPasteNotAPullRequest": "Tai ne GitHub pakeitimų užklausos nuoroda.",
+    "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
       "reviewSubmitted": "Peržiūra pateikta",
@@ -698,6 +785,7 @@
     "mutationError": {
       "commentNotPosted": "Šio komentaro paskelbti negalima. Pasirinkta eilutė galėjo pasikeisti arba PR galėjo būti atnaujintas.",
       "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
+      "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
       "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą."
     },
@@ -705,9 +793,31 @@
       "couldNotReply": "Nepavyko atsakyti.",
       "couldNotCompleteAction": "Nepavyko atlikti šio veiksmo.",
       "mergeResultDefaultError": "GitHub neužbaigė sujungimo.",
+      "mergeResultNotCompleted": "Nepavyko sujungti {{term}}. Patikrink būseną ir bandyk dar kartą.",
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink PR.",
       "persistenceFailed": "Nepavyko užfiksuoti šio veiksmo. Bandyk dar kartą vėliau.",
       "forbidden": "Šis veiksmas neleidžiamas."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nepasiekiama šio teikėjo",
+        "accessibility": "Nepasiekiama šio teikėjo: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Pakeitimų užklausa",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Bendrinti merge request",
+      "viewOnProvider": "Peržiūrėti {{provider}}",
+      "mergeRequestUnavailable": "Merge request nepasiekiamas",
+      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos prie jo.",
+      "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
+      "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
+      "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",
+      "discussionUnavailableMessage": "Šis merge request galėjo būti pašalintas.",
+      "noDiscussionDescription": "Šiame merge request nėra peržiūros gijų ar diskusijos komentarų.",
+      "noFilesChangedDescription": "Šiame merge request nėra failų pakeitimų."
     }
   },
   "notifications": {
@@ -740,11 +850,12 @@
     "previewFullDescription": "Užrakinimo ekrane rodomas pranešimų žinučių tekstas.",
     "previewGenericDescription": "Pranešimai tik informuoja apie įvykį. Norėdami perskaityti žinutę, atidarykite Kilo.",
     "channel": {
-      "agent": "Agentų sesijos",
+      "agentProgress": "Agentų eiga",
       "chat": "Pokalbių žinutės",
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
-      "security": "Saugos problemos"
+      "security": "Saugos problemos",
+      "spend": "Išlaidų įspėjimai"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -755,8 +866,22 @@
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
+      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+      "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte balanso įspėjimus.",
+      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
+      "securityFindingsUnavailable": "Įjunkite Kilo saugos agentą apimtyje, kad gautumėte saugos radinius.",
+      "spendAlertsSubtitle": "slenksčių viršijimai ir valandiniai šuoliai",
+      "spendAlertsToggle": "Išlaidų įspėjimų kategorija"
+    },
+    "action": {
+      "openSession": "Atidaryti sesiją"
+    },
+    "needsInputAction": {
+      "approved": "Užklausa patvirtinta",
+      "replied": "Atsakymas išsiųstas",
+      "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
+      "unavailable": "Šios užklausos nebelaukiama."
     }
   },
   "tabs": {
@@ -837,7 +962,11 @@
       "uploadFailed": "Nepavyko įkelti.",
       "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}.",
       "nothingToPaste": "Nėra ko įklijuoti.",
-      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų.",
+      "limit_one": "Gali pridėti iki {{displayCount}} failas.",
+      "limit_other": "Gali pridėti iki {{displayCount}} failų.",
+      "limit_few": "Gali pridėti iki {{displayCount}} failai.",
+      "limit_many": "Gali pridėti iki {{displayCount}} failų."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}. Būsena: {{status}}",
@@ -1587,7 +1716,15 @@
       "syncFindings": "Sinchronizuoti radinius",
       "syncNow": "Sinchronizuoti dabar",
       "syncQueued": "Sinchronizavimas įtrauktas į eilę",
-      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos."
+      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos.",
+      "daysOverdue_one": "Pradelsta diena: {{displayCount}}",
+      "daysOverdue_other": "Pradelsta dienų: {{displayCount}}",
+      "daysOverdue_few": "Pradelsta dienos: {{displayCount}}",
+      "daysOverdue_many": "Pradelsta dienų: {{displayCount}}",
+      "findingsCount_one": "Radinys: {{displayCount}}",
+      "findingsCount_other": "Radinių: {{displayCount}}",
+      "findingsCount_few": "Radiniai: {{displayCount}}",
+      "findingsCount_many": "Radinių: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Atviri radiniai",
@@ -1996,6 +2133,10 @@
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
+      "stopped": "Sesija sustabdyta",
+      "committing": "Įrašoma…",
+      "committed": "Įrašyta",
+      "commitFailed": "Nepavyko įrašyti",
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
@@ -2030,6 +2171,7 @@
       "exitNeedsNewerCli": "Norint nuotoliniu būdu vykdyti komandas su pasviruoju brūkšniu, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "sessionConnection": {
+      "label": "Ryšys",
       "connecting": "Jungiama…",
       "reconnecting": "Jungiama iš naujo…",
       "connectionLost": "Ryšys nutrūko",
@@ -2049,14 +2191,36 @@
       "removeConfirmTitle": "Pašalinti tikslą?",
       "removeConfirmMessage": "CLI išvalo šios sesijos tikslą.",
       "updateFailed": "Nepavyko atnaujinti tikslo.",
-      "sectionAccessibility": "{{status}}. Tikslas: {{text}}"
+      "sectionAccessibility": "{{status}}. Tikslas: {{text}}",
+      "collapse": "Sutraukti tikslą",
+      "expand": "Išskleisti tikslą"
     },
     "newSession": {
+      "recentlyUsed": "Neseniai naudota",
+      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
+      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
+      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
       "connectGithubDescription": "Naršyklėje susiekite GitHub paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
       "openGithub": "Atidaryti GitHub",
+      "openGitlab": "Atidaryti GitLab",
+      "openBitbucket": "Atidaryti Bitbucket",
       "refreshRepositories": "Atnaujinti saugyklas",
       "githubConnected": "GitHub paskyra susieta",
+      "gitlabConnected": "GitLab paskyra susieta",
       "noRepositoriesVisible": "Saugyklų nerasta. Patikrinkite, ar Kilo programėlė turi prieigą prie GitHub saugyklų, tada atnaujinkite sąrašą.",
+      "noRepositoriesVisibleGitlab": "Saugyklų nerasta. Patikrinkite prieigą prie GitLab saugyklų, tada atnaujinkite sąrašą.",
+      "noRepositoriesVisibleBitbucket": "Saugyklų nerasta. Patikrinkite prieigą prie Bitbucket saugyklų, tada atnaujinkite sąrašą.",
+      "bitbucketOrganizationsOnly": "Bitbucket prieinamas tik organizacijoms.",
+      "branchPickerTitle": "Pasirinkti šaką",
+      "branchDefault": "Numatytoji",
+      "branchAccessibility": "Šaka: {{label}}",
+      "branchLoading": "Įkeliamos šakos",
+      "branchLoadError": "Nepavyko įkelti šakų",
+      "branchUnavailable": "Šiai saugyklai šakų nėra. Patikrink prieigos teises pas tiekėją ir pasirink kitą saugyklą.",
+      "branchEmpty": "Nėra prieinamų šakų",
+      "branchPlaceholder": "Pasirinkti šaką",
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
@@ -2077,24 +2241,39 @@
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
+      "discardWithUploadsMessage": "Jūsų užklausa ir visi prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
       "remoteHint": "Norėdami valdyti vietinį kilo procesą, kompiuteryje vykdykite `kilo remote` arba veikiančioje CLI sesijoje vykdykite `/remote`.",
-      "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
-      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
-      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
-      "gitlabConnected": "GitLab paskyra susieta",
-      "noRepositoriesVisibleBitbucket": "Saugyklų nerasta. Patikrinkite prieigą prie Bitbucket saugyklų, tada atnaujinkite sąrašą.",
-      "noRepositoriesVisibleGitlab": "Saugyklų nerasta. Patikrinkite prieigą prie GitLab saugyklų, tada atnaujinkite sąrašą.",
-      "openBitbucket": "Atidaryti Bitbucket",
-      "openGitlab": "Atidaryti GitLab",
-      "recentlyUsed": "Neseniai naudota",
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
       "importFailed": "Nepavyko importuoti šios sesijos.",
-      "discardWithUploadsMessage": "Jūsų užklausa ir visi prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti."
+      "pickProfile": "Pasirinkite profilį",
+      "noProfile": "Nėra profilio",
+      "manageProfiles": "Tvarkyti profilius",
+      "noProfiles": "Dar nėra profilių. Sukurkite vieną, kad pridėtumėte aplinkos kintamuosius, MCP serverius ir įgūdžius.",
+      "advancedConfig": "Išplėstinė konfigūracija",
+      "advancedConfigDescription": "Pasirinkite profilį, kad įkeltumėte išsaugotas konfigūracijas, ir rankiniu būdu sukonfigūruokite papildomus aplinkos kintamuosius bei sąrankos komandas",
+      "saveAsProfile": "Išsaugoti kaip profilį",
+      "saveProfileDescription": "Išsaugokite esamus aplinkos kintamuosius ir sąrankos komandas kaip pakartotinai naudojamą profilį.",
+      "profileSummary": "{{vars}} aplinkos kintamieji · {{commands}} sąrankos komandos",
+      "profileSaved": "Profilis „{{name}}“ išsaugotas",
+      "organizationProfiles": "Organizacijos profiliai",
+      "personalProfiles": "Asmeniniai profiliai",
+      "yourProfiles": "Jūsų profiliai",
+      "failedToLoadProfiles": "Nepavyko įkelti profilių",
+      "nameTooLong": "Profilio pavadinimas per ilgas",
+      "descriptionTooLong": "Aprašymas per ilgas",
+      "secretsEncrypted": "Paslaptys užšifruojamos prieš išsaugant.",
+      "profileActive": "Profilis aktyvus",
+      "profilesActive": "Profiliai aktyvūs",
+      "customConfigActive": "Pasirinktinė konfigūracija aktyvi",
+      "configNeedsAttention": "Konfigūracijai reikia dėmesio",
+      "repoProfile": "Repo profilis",
+      "selectedProfile": "Pasirinktas profilis",
+      "manualOverrides": "Rankiniai nepaisymai",
+      "openSettingsToReview": "Norėdami peržiūrėti, atidarykite nustatymus",
+      "profileSelection": "Profilio pasirinkimas"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -2120,15 +2299,24 @@
       "updateTodos": "Atnaujinti užduočių sąrašą",
       "linesBadge": "eil.: {{displayCount}}",
       "filesBadge": "failų: {{displayCount}}",
-      "matchesBadge": "atitikčių: {{displayCount}}"
+      "matchesBadge": "atitikčių: {{displayCount}}",
+      "filesBadge_one": "failas: {{displayCount}}",
+      "filesBadge_other": "failų: {{displayCount}}",
+      "filesBadge_few": "failai: {{displayCount}}",
+      "filesBadge_many": "failų: {{displayCount}}",
+      "linesBadge_one": "eil.: {{displayCount}}",
+      "linesBadge_other": "eil.: {{displayCount}}",
+      "linesBadge_few": "eil.: {{displayCount}}",
+      "linesBadge_many": "eil.: {{displayCount}}",
+      "matchesBadge_one": "atitiktis: {{displayCount}}",
+      "matchesBadge_other": "atitikčių: {{displayCount}}",
+      "matchesBadge_few": "atitiktys: {{displayCount}}",
+      "matchesBadge_many": "atitikčių: {{displayCount}}",
+      "noOutput": "Nėra išvesties."
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
       "linesOf": "eilutės {{start}}–{{end}} iš {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "„Cloud Agent“ veiksmas nepavyko: {{action}} ({{status}}).",
-      "failed": "„Cloud Agent“ veiksmas nepavyko: {{action}}."
     },
     "collectCopyableText": {
       "unserializableInput": "[neserializuojama įvestis]",
@@ -2225,8 +2413,7 @@
       "assistantProviderRejected": "Teikėjas atmetė užklausą.",
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
-      "assistantFailed": "Nepavyko sugeneruoti atsakymo.",
-      "sendFailed": "Nepavyko išsiųsti žinutės. Bandykite dar kartą."
+      "assistantFailed": "Nepavyko sugeneruoti atsakymo."
     },
     "filePart": {
       "loadingImage": "Įkeliamas paveikslėlis",
@@ -2416,7 +2603,15 @@
       "files": "Failai",
       "couldNotOpenPhotoPicker": "Nepavyko atidaryti nuotraukų parinkiklio. Iš naujo paleiskite Kilo ir bandykite dar kartą.",
       "maxFilesAllowed": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
-      "onlyAddingFiles": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})"
+      "onlyAddingFiles": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "maxFilesAllowed_one": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_other": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_few": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_many": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "onlyAddingFiles_one": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "onlyAddingFiles_other": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "onlyAddingFiles_few": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "onlyAddingFiles_many": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})"
     },
     "composer": {
       "addAttachment": "Pridėti priedą",
@@ -2434,7 +2629,11 @@
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
       "discardAttachmentsTitle": "Atmesti priedus?",
       "charactersRemaining": "Liko simbolių: {{count}}",
-      "insertNewline": "Įterpti naują eilutę"
+      "insertNewline": "Įterpti naują eilutę",
+      "charactersRemaining_one": "Liko simbolis: {{count}}",
+      "charactersRemaining_other": "Liko simbolių: {{count}}",
+      "charactersRemaining_few": "Liko simboliai: {{count}}",
+      "charactersRemaining_many": "Liko simbolių: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",
@@ -2468,7 +2667,17 @@
       "startNewSession": "Pradėti naują sesiją",
       "exitSession": "Baigti sesiją",
       "clearSession": "Baigti šią sesiją ir pradėti naują",
+      "compactDescription": "suspausti dabartinės sesijos kontekstą",
+      "goalDescription": "Toliau dirbk siekdamas sesijos tikslo. /goal <objective> arba pause, resume, clear",
+      "initDescription": "vedamas AGENTS.md nustatymas",
+      "resumeClaudeDescription": "importuok Claude Code sesijos transkriptą",
+      "resumeCodexDescription": "importuok OpenAI Codex sesijos transkriptą",
+      "reviewDescription": "peržiūrėk pakeitimus [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Naudoti /{{command}}",
+      "useSkillCommand": "Naudoti įgūdį /{{command}}",
+      "skillBadge": "Įgūdis",
+      "catalogFull": "Komandų katalogas pilnas, todėl kai kurios komandos paslėptos.",
+      "catalogOverLimit": "Įgūdžių katalogas viršija dydžio limitą, todėl rodomi visi įgūdžiai.",
       "insert": "Įterpti",
       "upgradeRequiredFallback": "Norėdami naudoti šią komandą, atnaujinkite CLI.",
       "exitCapabilityUnavailable": "Norėdami baigti sesiją, atnaujinkite CLI.",
@@ -2502,7 +2711,11 @@
       "stepsCount_other": "{{steps}} žingsnių",
       "modelAccessibilityLabel": "Modelis {{name}}, teikėjas {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} žingsniai",
-      "stepsCount_many": "{{steps}} žingsnio"
+      "stepsCount_many": "{{steps}} žingsnio",
+      "modelsCount_one": "Modelis ({{displayCount}})",
+      "modelsCount_other": "Modeliai ({{displayCount}})",
+      "modelsCount_few": "Modeliai ({{displayCount}})",
+      "modelsCount_many": "Modeliai ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatinis tvirtinimas",
@@ -2542,7 +2755,11 @@
     },
     "toolRun": {
       "sheetTitle": "Įrankių iškvietimai",
-      "condensedLabel": "{{itemCount}} elementų; {{last}}"
+      "condensedLabel": "{{itemCount}} elementų; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elementas; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementų; {{last}}",
+      "condensedLabel_few": "{{itemCount}} elementai; {{last}}",
+      "condensedLabel_many": "{{itemCount}} elementų; {{last}}"
     }
   },
   "bootstrap": {
@@ -2587,6 +2804,7 @@
     "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų.",
     "agentSessions": "Vyksta dabar",
     "newCodingTask": "Nauja programavimo užduotis",
+    "newTaskFromPicture": "Nauja užduotis iš nuotraukos",
     "explore": "Naršyti",
     "seeAll": "Rodyti viską",
     "noLiveSessions": "Šiuo metu niekas nevykdoma"
@@ -2676,7 +2894,11 @@
     "cliCantReceiveFilesTitle": "Ši sesija negali gauti failų",
     "cliCantReceiveFilesMessage": "Šią sesiją vykdanti Kilo CLI negali gauti failų. Atnaujink CLI tame įrenginyje arba bendrink turinį naujoje sesijoje.",
     "contentlessMessage": "Nėra ką bendrinti — nepridėta nei teksto, nei failų.",
-    "couldNotReadContent": "Nepavyko perskaityti bendrinamo turinio."
+    "couldNotReadContent": "Nepavyko perskaityti bendrinamo turinio.",
+    "onlyFirstFilesAttached_one": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
+    "onlyFirstFilesAttached_other": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
+    "onlyFirstFilesAttached_few": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
+    "onlyFirstFilesAttached_many": "Bus pridėti tik pirmieji failai ({{displayCount}})."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2808,7 +3030,8 @@
     "aiProvidersWhat": "Jūsų užklausos, pokalbių istorija ir visi pridedami failai.",
     "aiProvidersWhy": "AI atsakymams generuoti.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ir kiti teikėjai, kuriuos pasirenkate kiekvienai užklausai.",
-    "gatewayWhat": "Paskyros ID, užklausų metaduomenys, žetonų naudojimas.",
+    "gatewayWhat": "Paskyros ID, užklausų metaduomenys, žetonų naudojimas bei raginimai ir balso įrašai, kuriuos programėlė siunčia per jį.",
+    "viaGateway": "Per Kilo Gateway",
     "gatewayWhy": "Tapatybės patvirtinimas, užklausų nukreipimas ir atsiskaitymų suderinimas.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Strigčių ir klaidų ataskaitos, iš kurių pašalintas programėlės turinys.",
@@ -2828,7 +3051,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Jūsų balso įrašas diktuojant.",
     "voiceTranscriptionWhy": "Kalbai paversti tekstu.",
-    "voiceTranscriptionWho": "Tik jūsų įrenginys. Jei jis negali transkribuoti be interneto ryšio, įrašas siunčiamas Apple arba Google.",
+    "voiceTranscriptionWho": "Jūsų įrenginys, Kilo Gateway su pasirinktu transkripcijos modeliu arba Apple ar Google atpažinimui internete.",
     "installAttributionPromptTitle": "Leisti nustatyti įdiegimo šaltinį?",
     "installAttributionPromptMessage": "Kilo naudoja Apple sekimo leidimą tik tam, kad sužinotų, per kurį kanalą radote programėlę. Jūsų užklausos ir pokalbiai tam niekada nenaudojami.",
     "what": "Kokie duomenys",
@@ -3002,6 +3225,14 @@
     "tooManySignInAttempts": "Per daug bandymų prisijungti. Palauk ir bandyk dar kartą."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatinis Pažangiausias",
+      "balanced": "Automatinis Subalansuotas",
+      "efficient": "Automatinis Efektyvus",
+      "small": "Automatinis Mažas",
+      "free": "Automatinis Nemokamas",
+      "organization": "Organizacijos automatinis"
+    },
     "dataCollected": "Duomenys renkami",
     "free": "Nemokama",
     "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių modelių.",
@@ -3032,8 +3263,17 @@
     "privacy": "Atidaryk Kilo, kad matytum agentus",
     "openAgents": "Atidaryti agentus",
     "needsInput": "Laukia atsakymo",
+    "newestSession": "Naujausia: {{title}}",
+    "noneWaiting": "Nė vienas agentas nelaukia",
+    "newAgent": "Naujas agentas",
+    "approving": "Tvirtinama...",
+    "couldNotApprove": "Nepavyko patvirtinti",
+    "couldNotStart": "Nepavyko paleisti",
     "channelName": "Aktyvūs agentai",
-    "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
+    "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
+    "openSession": "Atidaryti",
+    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
+    "newestResult": "Naujausias rezultatas"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3058,15 +3298,7 @@
     "remoteOptionTitle": "Jūsų kompiuteris",
     "remoteOptionBody": "Paleiskite Kilo savo kompiuteryje per `kilo remote` CLI.",
     "skip": "Praleisti apžvalgą",
-    "tutorialLabel": "Pamoka",
-    "remoteTitle": "Pradėkite pirmąją nuotolinę sesiją",
-    "remoteBody": "Prijunkite savo kompiuterį, tada pradėkite sesiją čia.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dar nėra prijungto kompiuterio",
-    "remoteEmptyBody": "Norėdami prijungti, kompiuteryje vykdykite `kilo remote`.",
-    "remoteFound": "Kompiuteris prijungtas",
-    "checkAgain": "Kartoti patikrinimą",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Pamoka"
   },
   "modelChat": {
     "empty": {
@@ -3128,5 +3360,213 @@
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
+      "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
+      "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Atidaryti paskutinę sesiją"
+  },
+  "spendAlerts": {
+    "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
+    "enable": "Įjungti išlaidų įspėjimus",
+    "thresholdTitle": "Slenksčio viršijimas",
+    "thresholdSubtitle": "Einamosios išlaidos viršija tavo limitą",
+    "anomalyTitle": "Valandinis šuolis",
+    "anomalySubtitle": "Viena valanda gerokai viršija įprastą šios srities tempą",
+    "limitLabel": "Limitas (USD)",
+    "windowLabel": "Langas",
+    "window24h": "24 valandos",
+    "window7d": "7 dienos",
+    "window30d": "30 dienų",
+    "multiplierLabel": "Šuolio daugiklis",
+    "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
+    "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
+    "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
+    "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
+    "noSpend": "Išlaidų dar neužregistruota",
+    "spend24h": "Išlaidos per paskutines 24 valandas",
+    "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
+    "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
+    "pushOffByCategory": "Išjungta pranešimuose"
+  },
+  "profiles": {
+    "title": "Profiliai",
+    "entrySubtitle": "Pakartotinai naudokite aplinkos nustatymus per seansus",
+    "newProfile": "Naujas profilis",
+    "emptyTitle": "Dar nėra profilių",
+    "emptyDescription": "Sukurkite profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
+    "loadFailed": "Nepavyko įkelti profilių",
+    "counts": {
+      "vars": "{{count}} kintamųjų",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} įgūdžių",
+      "commands": "{{count}} komandų",
+      "varsShort": "{{count}}k",
+      "skillsShort": "{{count}}į",
+      "commandsShort": "{{count}}kom"
+    },
+    "nameLabel": "Profilio pavadinimas",
+    "namePlaceholder": "pvz. Backend derinimas",
+    "descriptionLabel": "Profilio aprašymas",
+    "descriptionPlaceholder": "Neprivalomas aprašymas",
+    "ownerLabel": "Profilio savininkas",
+    "nameRequired": "Įveskite profilio pavadinimą",
+    "createAction": "Sukurti profilį",
+    "createFailed": "Nepavyko sukurti profilio",
+    "createdToast": "Profilis „{{name}}“ sukurtas",
+    "settingsSectionTitle": "Konfigūracija",
+    "defaultSectionTitle": "Numatytasis profilis",
+    "personalDefaultDescription": "Automatiškai įkeliama, kai jokia saugykla neturi prisegto profilio.",
+    "organizationDefaultDescription": "Automatiškai įkeliama nariams, kurie neturi asmeninių įsipareigojimų.",
+    "setAsDefault": "Nustatyti kaip numatytąjį",
+    "removeDefault": "Pašalinti kaip numatytąjį",
+    "saveFailed": "Nepavyko išsaugoti profilio",
+    "deleteTitle": "Ištrinti profilį",
+    "deleteMessage": "Tai visam laikui pašalins profilį ir jo nustatymus. To negalima anuliuoti.",
+    "deleteFailed": "Nepavyko ištrinti profilio",
+    "deleteBlocked": "Šį profilį naudoja „Webhook“ aktyviklis. Pirmiausia pašalinkite jį iš tų trigerių.",
+    "deletedToast": "Profilis „{{name}}“ ištrintas",
+    "variablesTitle": "Aplinkos kintamieji",
+    "addVariable": "Pridėti kintamąjį",
+    "keyLabel": "Raktas",
+    "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
+    "keyDuplicate": "Šis raktas jau yra profilyje",
+    "valueLabel": "Vertė",
+    "secretLabel": "Paslaptis",
+    "secrets": {
+      "markSecret": "Pažymėti kaip paslaptį",
+      "masked": "Paslėpta vertė",
+      "reveal": "Atskleiskite vertę",
+      "newValuePlaceholder": "Įveskite naują slaptą reikšmę",
+      "valuePlaceholder": "Slapta reikšmė (užšifruota)"
+    },
+    "variablesEmpty": "Dar nėra kintamųjų",
+    "variablesSaveFailed": "Nepavyko išsaugoti kintamojo",
+    "commandsTitle": "Sąrankos komandos",
+    "addCommand": "Pridėti komandą",
+    "commandLabel": "komandą",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Dar nėra sąrankos komandų",
+    "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
+    "moveUp": "Judėti aukštyn",
+    "moveDown": "Judėti žemyn",
+    "skillsTitle": "Įgūdžiai",
+    "addSkill": "Pridėkite įgūdžių",
+    "skillNameLabel": "Įgūdžio pavadinimas",
+    "skillMarkdownLabel": "Įgūdžių turinys",
+    "skillsEmpty": "Įgūdžių dar nėra",
+    "skillNameRequired": "Įveskite įgūdžių pavadinimą",
+    "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
+    "skillContentRequired": "Reikalingas įgūdžių turinys",
+    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
+    "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
+    "skillEditTitle": "Redaguoti įgūdžius",
+    "mcp": {
+      "title": "MCP serveriai",
+      "add": "Pridėti MCP serverį",
+      "empty": "Dar nėra MCP serverių",
+      "name": "Serverio pavadinimas",
+      "type": "Serverio tipas",
+      "localType": "Vietinis",
+      "remoteType": "Nuotolinis",
+      "command": "Komandinė eilutė",
+      "url": "URL",
+      "environment": "Aplinka (JSON)",
+      "headers": "Antraštės (JSON)",
+      "timeout": "Skirtasis laikas",
+      "secretCount": "Slaptas skaičius",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Įveskite serverio pavadinimą",
+      "nameInvalid": "Varde gali būti naudojamos tik raidės, skaičiai, apatiniai brūkšniai ir brūkšniai",
+      "commandRequired": "Įveskite komandą",
+      "commandTooLong": "Naudokite ne daugiau kaip 50 argumentų, kurių kiekvienas 500 simbolių",
+      "urlRequired": "Įveskite URL",
+      "urlInvalid": "Įveskite tinkamą URL",
+      "urlTooLong": "URL gali būti ne ilgesnis kaip 2048 simboliai",
+      "jsonInvalid": "Įveskite galiojantį JSON – eilutės reikšmių objektą",
+      "jsonTooLarge": "Naudokite ne daugiau kaip 50 įrašų, raktai iki 128 ir reikšmės iki 4096 simbolių",
+      "timeoutInvalid": "Skirtasis laikas turi būti sveikas milisekundžių skaičius",
+      "edit": "Redaguoti MCP serverį",
+      "saveFailed": "Nepavyko išsaugoti MCP serverio"
+    },
+    "agents": {
+      "title": "Profilio agentai",
+      "add": "Pridėti agentą",
+      "empty": "Agentų dar nėra",
+      "name": "Agento vardas",
+      "slug": "Agentinis šliužas",
+      "description": "Agento aprašymas",
+      "model": "Modelio nepaisymas",
+      "modelPlaceholder": "Naudoti numatytuosius seansus",
+      "prompt": "Sistemos raginimas",
+      "steps": "Maks. žingsniai",
+      "stepsPlaceholder": "pvz. 50",
+      "temperature": "Temperatūra",
+      "temperaturePlaceholder": "pvz. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "pvz. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Mano agentas",
+      "promptPlaceholder": "Tu esi...",
+      "tools": "Įrankiai",
+      "visibility": "Matomumas",
+      "visibilityPrimary": "Pagrindinis – rodomas rinkiklyje",
+      "visibilitySubagent": "Subagentas – skambinama tik iš kitų",
+      "visibilityAll": "Visi - abu",
+      "saveFailed": "Nepavyko išsaugoti agento",
+      "nameRequired": "Įveskite agento pavadinimą",
+      "slugRequired": "Įveskite agento šliužą",
+      "slugInvalid": "Slug turi prasidėti raide ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
+      "slugConflict": "Tą šliužą rezervuoja įmontuotas agentas",
+      "edit": "Redaguoti agentą"
+    },
+    "slashCommands": {
+      "title": "Pasvirosios komandos",
+      "add": "Pridėti pasvirojo brūkšnio komandą",
+      "empty": "Dar nėra pasvirojo brūkšnio komandų",
+      "name": "Komandos pavadinimas",
+      "description": "Komandos aprašymas",
+      "template": "Šablonas",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
+      "agent": "Agentas",
+      "subtask": "Vykdyti kaip papildomą užduotį",
+      "edit": "Redaguoti pasvirojo brūkšnio komandą",
+      "saveFailed": "Nepavyko išsaugoti komandos",
+      "nameRequired": "Įveskite komandos pavadinimą",
+      "nameInvalid": "Pavadinimas turi prasidėti mažosiomis raidėmis ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
+      "templateRequired": "Įveskite komandos šabloną",
+      "nameConflict": "Šį pavadinimą rezervuoja įmontuota komanda"
+    },
+    "repoBindings": {
+      "title": "Numatytieji atpirkimo sandorių profiliai",
+      "add": "Pridėti numatytąjį",
+      "empty": "Jokių numatytųjų sukonfigūruotų",
+      "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant atpirkimo seansus.",
+      "repo": "Pasirinkite saugyklą…",
+      "profile": "Pasirinkite profilį",
+      "remove": "Atsieti",
+      "private": "Privatus",
+      "search": "Ieškoti saugyklų…",
+      "addedToast": "Numatytasis profilis nustatytas „{{repo}}“",
+      "addFailed": "Nepavyko nustatyti numatytojo profilio",
+      "removedToast": "Numatytasis „{{repo}}“ profilis pašalintas",
+      "removeFailed": "Nepavyko pašalinti numatytojo profilio",
+      "pinnedTitle": "Prisegta prie saugyklų",
+      "pinRepo": "Prisegti atpirkimo sandorį",
+      "pinnedEmpty": "Neprisegta prie jokių saugyklų.",
+      "pinnedDescription": "Automatiškai įkeliama, kai seansas nukreipiamas į vieną iš šių saugyklų.",
+      "pinnedToast": "Prisegta prie „{{repo}}“",
+      "pinFailed": "Nepavyko prisegti atpirkimo sandorio",
+      "unboundToast": "Atpirkimas neapribotas",
+      "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
+    }
   }
 }

@@ -21,7 +21,9 @@ describe('buildInstallationLookupQuery', () => {
   it('requires the current repository owner to match installation account metadata', () => {
     const query = buildQuery();
 
-    expect(query.sql).toContain('lower("platform_integrations"."platform_account_login") =');
+    expect(query.sql).toContain(
+      'lower(COALESCE("github_app_installations"."account_login", "platform_integrations"."platform_account_login")) ='
+    );
     expect(query.params).toContain('renamed-owner');
   });
 
@@ -30,6 +32,11 @@ describe('buildInstallationLookupQuery', () => {
 
     expect(query.sql).toContain('"platform_integrations"."platform_installation_id" is not null');
     expect(query.sql).toContain('"platform_integrations"."github_disconnected_at" is null');
+    expect(query.sql).toContain('"github_app_installations"."lifecycle_state" =');
+    expect(query.sql).toContain('"github_app_installations"."deleted_at" is null');
+    expect(query.sql).toContain('"github_app_installations"."auth_invalid_at" is null');
+    expect(query.sql).toContain('left join "github_app_installations"');
+    expect(query.sql).toContain('COALESCE("github_app_installations"."installation_id"');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
     expect(query.sql).toContain('"organizations"."deleted_at" is null');
     expect(query.sql).toContain('"organization_memberships"."kilo_user_id" =');
@@ -39,6 +46,8 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params.filter(param => param === 'user-1')).toHaveLength(4);
     expect(query.params).toContain('00000000-0000-4000-8000-000000000001');
     expect(query.params).toContain(2);
+    expect(query.params).toContain('workflow');
+    expect(query.params).not.toContain('agent_only');
   });
 
   it('requires current membership for every organization-scoped credential candidate', () => {
@@ -68,6 +77,7 @@ describe('buildInstallationLookupQuery', () => {
     }).toSQL();
 
     expect(query.sql).toContain('"platform_integrations"."id" =');
+    expect(query.params).not.toContain('exclusive');
     expect(query.sql).toContain('"platform_integrations"."integration_status" =');
     expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
     expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
@@ -77,6 +87,35 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(params.orgId);
     expect(query.params).toContain('renamed-owner');
     expect(query.params).toContain(1);
+  });
+
+  it('requires workflow authority for managed lookups without an exact association ID', () => {
+    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+    const query = buildManagedInstallationLookupQuery(db, params).toSQL();
+
+    expect(query.params).toContain('workflow');
+    expect(query.params).not.toContain('agent_only');
+  });
+
+  it('only admits agent-only associations for an exact, trusted managed purpose', () => {
+    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+    const agent = {
+      ...params,
+      accessPurpose: 'agent' as const,
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+    };
+    expect(buildManagedInstallationLookupQuery(db, agent).toSQL().params).toContain('agent_only');
+    expect(buildInstallationLookupQuery(db, agent).toSQL().params).not.toContain('agent_only');
+    expect(
+      buildManagedInstallationLookupQuery(db, {
+        ...agent,
+        expectedIntegrationId: undefined,
+      }).toSQL().params
+    ).not.toContain('agent_only');
+    expect(
+      buildManagedInstallationLookupQuery(db, { ...agent, accessPurpose: 'workflow' }).toSQL()
+        .params
+    ).not.toContain('agent_only');
   });
 
   it('uses a supplied integration ID as an exact personal authorization fence', () => {

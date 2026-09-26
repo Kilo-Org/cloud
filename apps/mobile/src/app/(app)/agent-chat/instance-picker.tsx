@@ -1,9 +1,10 @@
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Cloud, Server, Terminal } from '@/components/ui/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -30,6 +32,12 @@ const INSTANCE_GROUP_LABEL_KEYS = {
   remote: 'agentChat.instancePicker.remotes',
   cli: 'agentChat.instancePicker.terminals',
 };
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body. FlashList takes `style`/`contentContainerStyle`
+// (never `className`), and the list carries the sheet background itself because
+// no wrapping View may sit between the formSheet header and the list.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 type PickerListItem =
   | { key: string; type: 'header'; kind: InstancePickerInstance['kind'] }
@@ -50,10 +58,12 @@ export default function InstancePickerScreen() {
 
   // The instances query lives IN the picker (per the slice spec) so an
   // already-open picker self-populates as CLIs connect/disconnect without
-  // needing the parent new-agent screen to keep it warm. `refetchOnWindowFocus`
-  // plus the 10s poll covers the AC1 "an already-open picker populates
-  // without closing" requirement from both directions (foreground return
-  // and steady background ticking).
+  // needing the parent new-agent screen to keep it warm. The 10s poll
+  // (`refetchInterval`) already covers an OS-level foreground return, and
+  // returning to the picker route is covered by the `refetchInstances()`
+  // call in the `useFocusEffect` below, so this query deliberately omits
+  // `refetchOnWindowFocus` — no second fetch is issued at the same moment
+  // as a poll tick.
   const trpc = useTRPC();
   const {
     data: instancesData,
@@ -63,7 +73,6 @@ export default function InstancePickerScreen() {
     refetch: refetchInstances,
   } = useQuery({
     ...trpc.activeSessions.listInstances.queryOptions(undefined, {
-      refetchOnWindowFocus: true,
       refetchInterval: POLL_INTERVAL_MS,
       refetchIntervalInBackground: false,
     }),
@@ -139,6 +148,73 @@ export default function InstancePickerScreen() {
     [closePicker]
   );
 
+  const currentConnectionId = bridge?.currentValue?.connectionId ?? null;
+
+  // Hoisted so the list keeps one renderer identity across unrelated screen
+  // renders (a poll tick, the bridge refresh); FlashList's memoized cell
+  // compares `renderItem` by identity before re-rendering a mounted row.
+  const renderItem = useCallback(
+    ({ item: row }: ListRenderItemInfo<PickerListItem>) => {
+      if (row.type === 'header') {
+        return (
+          <Text
+            accessibilityRole="header"
+            className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            {t(INSTANCE_GROUP_LABEL_KEYS[row.kind])}
+          </Text>
+        );
+      }
+      const item = row.instance;
+      const selected = item.connectionId === currentConnectionId;
+      const InstanceIcon = item.kind === 'remote' ? Server : Terminal;
+      const identity = item.dedupSuffix
+        ? t('agentChat.instancePicker.instanceOnProjectSuffix', {
+            name: item.name,
+            project: item.projectName,
+            suffix: item.dedupSuffix,
+          })
+        : t('agentChat.instancePicker.instanceOnProject', {
+            name: item.name,
+            project: item.projectName,
+          });
+      const label = formatList(
+        [t(INSTANCE_GROUP_LABEL_KEYS[item.kind]), identity, item.displayFacts].filter(Boolean),
+        i18n.language
+      );
+      return (
+        <Pressable
+          testID={item.testID}
+          className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+          onPress={() => {
+            handleSelectInstance(item);
+          }}
+          {...radioItemA11y({ label, checked: selected })}
+        >
+          <InstanceIcon size={18} color={colors.foreground} />
+          <View className="flex-1">
+            <Text className="text-base text-foreground">{item.name}</Text>
+            <Text variant="muted" className="text-sm">
+              {item.projectName}
+            </Text>
+            {item.displayFacts ? (
+              <Text variant="muted" className="text-sm">
+                {item.displayFacts}
+              </Text>
+            ) : null}
+            {item.dedupSuffix ? (
+              <Text variant="mono" className="text-xs text-muted-foreground">
+                #{item.dedupSuffix}
+              </Text>
+            ) : null}
+          </View>
+          {selected ? <Check size={18} color={colors.primary} /> : null}
+        </Pressable>
+      );
+    },
+    [currentConnectionId, colors, handleSelectInstance, t, i18n.language]
+  );
+
   if (!bridge) {
     return (
       <PickerSheet
@@ -149,9 +225,6 @@ export default function InstancePickerScreen() {
       />
     );
   }
-
-  const current = bridge.currentValue;
-  const currentConnectionId = current?.connectionId ?? null;
 
   // Loading: query has never produced data. The empty-snapshot state is
   // "we know the list is empty" — that's success with an empty array, not
@@ -207,65 +280,6 @@ export default function InstancePickerScreen() {
     );
   }
 
-  const renderItem = ({ item: row }: { item: PickerListItem }) => {
-    if (row.type === 'header') {
-      return (
-        <Text
-          accessibilityRole="header"
-          className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-        >
-          {t(INSTANCE_GROUP_LABEL_KEYS[row.kind])}
-        </Text>
-      );
-    }
-    const item = row.instance;
-    const selected = item.connectionId === currentConnectionId;
-    const InstanceIcon = item.kind === 'remote' ? Server : Terminal;
-    const identity = item.dedupSuffix
-      ? t('agentChat.instancePicker.instanceOnProjectSuffix', {
-          name: item.name,
-          project: item.projectName,
-          suffix: item.dedupSuffix,
-        })
-      : t('agentChat.instancePicker.instanceOnProject', {
-          name: item.name,
-          project: item.projectName,
-        });
-    const label = formatList(
-      [t(INSTANCE_GROUP_LABEL_KEYS[item.kind]), identity, item.displayFacts].filter(Boolean),
-      i18n.language
-    );
-    return (
-      <Pressable
-        testID={item.testID}
-        className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
-        onPress={() => {
-          handleSelectInstance(item);
-        }}
-        {...radioItemA11y({ label, checked: selected })}
-      >
-        <InstanceIcon size={18} color={colors.foreground} />
-        <View className="flex-1">
-          <Text className="text-base text-foreground">{item.name}</Text>
-          <Text variant="muted" className="text-sm">
-            {item.projectName}
-          </Text>
-          {item.displayFacts ? (
-            <Text variant="muted" className="text-sm">
-              {item.displayFacts}
-            </Text>
-          ) : null}
-          {item.dedupSuffix ? (
-            <Text variant="mono" className="text-xs text-muted-foreground">
-              #{item.dedupSuffix}
-            </Text>
-          ) : null}
-        </View>
-        {selected ? <Check size={18} color={colors.primary} /> : null}
-      </Pressable>
-    );
-  };
-
   // Success: even if zero CLI instances are connected, we still render the
   // Cloud Agent default row first (it's always selectable) and append a
   // refreshable "no instances" empty card below. This matches the spec
@@ -279,13 +293,14 @@ export default function InstancePickerScreen() {
     >
       {/* The list must stay a direct child of the sheet header for native
           formSheet sizing, so the radiogroup role and the visible "Run on"
-          group name live on the FlatList container instead of a wrapper. */}
-      <FlatList
-        className="flex-1 bg-background"
+          group name live on the FlashList container instead of a wrapper. */}
+      <FlashList<PickerListItem>
+        style={[listStyle, { backgroundColor: colors.background }]}
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
         data={listItems}
         keyExtractor={item => item.key}
+        getItemType={item => item.type}
         contentContainerStyle={{ paddingBottom: bottom }}
         ListHeaderComponent={
           <Pressable
@@ -314,7 +329,9 @@ export default function InstancePickerScreen() {
               icon={Server}
               placement="top"
               title={t('agentChat.instancePicker.noCliInstances')}
-              description={t('agentChat.instancePicker.noCliInstancesDescription')}
+              description={stripInlineCodeMarkers(
+                t('agentChat.instancePicker.noCliInstancesDescription')
+              )}
               action={
                 <Button
                   variant="outline"

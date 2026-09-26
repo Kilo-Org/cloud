@@ -1503,6 +1503,130 @@ describe('api routes', () => {
     }
   });
 
+  describe('GET /session/:sessionId/messages read-outcome logging', () => {
+    it('logs outcome ok for a page and invalid_data for a page the contract rejects, without changing the response', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const app = makeApiApp();
+
+      const sdkStoredMessage = {
+        info: {
+          id: 'msg_user_01',
+          sessionID: 'ses_12345678901234567890123456',
+          role: 'user',
+          time: { created: 1761000000100 },
+          agent: 'build',
+          model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+        },
+        parts: [
+          {
+            id: 'prt_user_01',
+            sessionID: 'ses_12345678901234567890123456',
+            messageID: 'msg_user_01',
+            type: 'text',
+            text: 'hello',
+          },
+        ],
+      };
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => ({
+          messages: [sdkStoredMessage],
+          nextCursor: 'opaque-cursor',
+          omittedItemCount: 2,
+        })),
+      } as never);
+
+      const pageRes = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      expect(pageRes.status).toBe(200);
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'kilo_sdk_history_read',
+          sessionId: 'ses_12345678901234567890123456',
+          limit: 10,
+          hasCursor: false,
+          outcome: 'ok',
+          messageCount: 1,
+          omittedItemCount: 2,
+          hasNextCursor: true,
+        })
+      );
+
+      log.mockClear();
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => ({ kind: 'invalid_data' })),
+      } as never);
+
+      const invalidRes = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      expect(invalidRes.status).toBe(200);
+      expect(await invalidRes.json()).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history: { kind: 'invalid_data' },
+      });
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'kilo_sdk_history_read',
+          sessionId: 'ses_12345678901234567890123456',
+          limit: 10,
+          outcome: 'invalid_data',
+          messageCount: 0,
+          omittedItemCount: 0,
+          hasNextCursor: false,
+        })
+      );
+      log.mockRestore();
+    });
+
+    it('logs a thrown read at warn with its error and still surfaces the failure', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => {
+          throw new Error('Durable Object is overloaded');
+        }),
+      } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(500);
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'kilo_sdk_history_read_failed',
+          sessionId: 'ses_12345678901234567890123456',
+          limit: 10,
+          hasCursor: false,
+          error: 'Durable Object is overloaded',
+        })
+      );
+      expect(log).not.toHaveBeenCalled();
+      log.mockRestore();
+      warn.mockRestore();
+    });
+  });
+
   it('GET /session/:sessionId/messages normalizes a persisted textless reasoning part instead of degrading to invalid_data', async () => {
     // Mirrors the e1 device seed (e1-seed.log): the DO holds a reasoning part
     // with NO text field. Before the read-seam normalization the strict part
@@ -1609,6 +1733,265 @@ describe('api routes', () => {
         nextCursor: null,
         omittedItemCount: 0,
       },
+    });
+  });
+
+  it('keeps the newest messages when a persisted part cannot be parsed while the session keeps streaming', async () => {
+    // A CLI-driven session keeps writing parts after the app has read the page
+    // once. The ingest seam (`SessionItemSchema`) deliberately enforces only
+    // `id` + `messageID` on a part, so a later part can carry a shape this read
+    // contract cannot parse. One such part must not degrade the WHOLE page to
+    // `invalid_data`: the app would keep its older transcript (its context %
+    // stuck with it) while the separately projected session cost kept updating.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: sessionId,
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    const questionPart = {
+      id: 'prt_q',
+      sessionID: sessionId,
+      messageID: 'msg_user_01',
+      type: 'text',
+      text: 'Question about the queue',
+    };
+    // Both shapes carry a well-formed persisted identity but a body this
+    // client cannot parse: a known type whose required `state` never arrived,
+    // and a part type this build does not know yet.
+    const toolPartWithoutState = {
+      id: 'prt_tool_no_state',
+      sessionID: sessionId,
+      messageID: 'msg_asst_01',
+      type: 'tool',
+      callID: 'call_1',
+      tool: 'bash',
+    };
+    const unknownTypePart = {
+      id: 'prt_future_01',
+      sessionID: sessionId,
+      messageID: 'msg_asst_01',
+      type: 'future-safe-part',
+    };
+
+    const readKiloSdkMessages = vi.fn();
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+    const app = makeApiApp();
+
+    // First read: the app loads the transcript once, before the new parts land.
+    readKiloSdkMessages.mockResolvedValueOnce({
+      messages: [{ info: userInfo, parts: [questionPart] }],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+    const first = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [{ info: { id: 'msg_user_01' } }],
+        omittedItemCount: 0,
+      },
+    });
+
+    // The session keeps receiving parts: the newest assistant message now
+    // carries parts the read contract cannot parse alongside a parseable text
+    // part. The page must still render the newest messages.
+    readKiloSdkMessages.mockResolvedValueOnce({
+      messages: [
+        { info: userInfo, parts: [questionPart] },
+        {
+          info: assistantInfo,
+          parts: [
+            toolPartWithoutState,
+            unknownTypePart,
+            {
+              id: 'prt_t_ok',
+              sessionID: sessionId,
+              messageID: 'msg_asst_01',
+              type: 'text',
+              text: 'latest answer',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+    const second = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [
+          { info: { id: 'msg_user_01' } },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [{ id: 'prt_t_ok', type: 'text', text: 'latest answer' }],
+          },
+        ],
+        omittedItemCount: 2,
+      },
+    });
+  });
+
+  it('drops-and-counts a part whose persisted identity is well-formed but carries no sessionID', async () => {
+    // The ingest seam (`SessionItemSchema` needs `id` + `messageID` on a part)
+    // and the Durable Object's own part reader (`readPartIdentity`) both define
+    // a persisted part's identity without `sessionID`
+    // (services/session-ingest/src/util/compaction.ts stores `messageID/id`). A
+    // stored part that omits `sessionID` is therefore well-formed persisted
+    // data; its body still fails this read contract's union (every variant
+    // declares `sessionID`). It must be dropped and counted, not pushed back
+    // through to degrade the whole page to `invalid_data`.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: sessionId,
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [
+        {
+          info: userInfo,
+          parts: [
+            {
+              id: 'prt_q',
+              sessionID: sessionId,
+              messageID: 'msg_user_01',
+              type: 'text',
+              text: 'Question about the queue',
+            },
+          ],
+        },
+        {
+          info: assistantInfo,
+          parts: [
+            // Persisted identity `id` + `messageID`, no `sessionID`, unknown body.
+            { id: 'prt_future_01', messageID: 'msg_asst_01', type: 'future-safe-part' },
+            {
+              id: 'prt_t_ok',
+              sessionID: sessionId,
+              messageID: 'msg_asst_01',
+              type: 'text',
+              text: 'latest answer',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [
+          { info: { id: 'msg_user_01' } },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [{ id: 'prt_t_ok', type: 'text', text: 'latest answer' }],
+          },
+        ],
+        omittedItemCount: 1,
+      },
+    });
+  });
+
+  it('still degrades the page to invalid_data when a part has no persisted identity', async () => {
+    // `SessionItemSchema` rejects a part without both `id` and `messageID`, so
+    // such a part is corrupt rather than merely unreadable by this build: the
+    // page keeps surfacing it as `invalid_data` instead of dropping it.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [
+        {
+          info: userInfo,
+          parts: [{ id: 'prt_orphan', type: 'text', text: 'orphan messageID' }],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'invalid_data' },
     });
   });
 

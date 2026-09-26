@@ -25,13 +25,17 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
-import { usePrInbox } from '@/lib/pr-review/use-pr-inbox';
+import {
+  providerPrRefLabel,
+  providerPrRoutePath,
+  providerPrTermKey,
+} from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderInboxRow, useProviderInbox } from '@/lib/pr-review/use-provider-inbox';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 5;
 
-type InboxItem = ReturnType<typeof usePrInbox>['items'][number];
+type InboxItem = ProviderInboxRow;
 
 type PrReviewInboxListProps = {
   /** The "Paste a PR link" block, rendered above the Inbox eyebrow. */
@@ -41,13 +45,31 @@ type PrReviewInboxListProps = {
 };
 
 export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxListProps>) {
-  const { query, items, firstPageErrorState, laterPageError } = usePrInbox(true);
+  const inbox = useProviderInbox(true);
+  // Two different retries, because they recover two different failures: the
+  // empty-state CTA re-runs the inbox from scratch, while the footer CTA must
+  // load only the page (or the provider) that failed — re-fetching pages the
+  // list already shows would never load the missing one.
+  const handleRetry = () => {
+    inbox.refetch();
+  };
+  const handleRetryMore = () => {
+    inbox.retryFailedPages();
+  };
+  const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
   const view = selectPrInboxView({
-    isLoading: query.isPending,
-    itemCount: items.length,
-    firstPageErrorState,
-    laterPageError,
+    isLoading: inbox.isPending,
+    itemCount: inbox.items.length,
+    firstPageErrorState:
+      inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),
+    laterPageError: inbox.laterPageError,
   });
+  // A provider outage that left the merged list empty is the retryable view
+  // itself (`selectPrInboxView`), so the empty state can no longer sit beside
+  // this footer. Only the reconnect notice stays a first-page state: a provider
+  // that also failed beside it keeps the inline retry for its own page.
+  const showLoadMoreRetry =
+    view.showLoadMoreRetry || (view.kind === 'reconnect' && inbox.laterPageError);
 
   // Landscape: side insets keep inbox rows and the px-6 header/footer
   // content clear of the sensor housing; portrait insets are zero, so the
@@ -60,8 +82,8 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
 
   return (
     <FlashList
-      data={view.kind === 'happy' ? items : []}
-      keyExtractor={item => `${item.owner}/${item.repo}#${item.number}`}
+      data={view.kind === 'happy' ? inbox.items : []}
+      keyExtractor={item => item.key}
       renderItem={({ item }) => <InboxRow item={item} />}
       ListHeaderComponent={
         <View className="gap-6 px-6 pt-4">
@@ -70,30 +92,21 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         </View>
       }
       ListEmptyComponent={
-        <InboxEmpty
-          view={view}
-          onRetry={() => {
-            void query.refetch();
-          }}
-          isRetrying={query.isFetching}
-        />
+        <InboxEmpty view={view} onRetry={handleRetry} isRetrying={inbox.isFetching} />
       }
       ListFooterComponent={
         <View className="gap-6 px-6 pb-12 pt-4">
-          {view.showLoadMoreRetry ? (
-            <LoadMoreRetry
-              onRetry={() => {
-                void query.fetchNextPage();
-              }}
-            />
+          {inbox.githubNeedsReconnect && view.kind !== 'reconnect' ? (
+            <PrReviewReconnectNotice />
           ) : null}
+          {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
           <RecentEyebrow />
           {recents}
         </View>
       }
       onEndReached={() => {
-        if (query.hasNextPage && !query.isFetchingNextPage) {
-          void query.fetchNextPage();
+        if (inbox.hasNextPage && !inbox.isFetchingNextPage) {
+          inbox.fetchNextPage();
         }
       }}
       onEndReachedThreshold={0.5}
@@ -135,12 +148,14 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const updatedLabel = timeAgo(parseTimestamp(item.updatedAt));
-  const rowLabel = `${item.owner}/${item.repo}#${item.number}`;
+  // `group/sub/repo!12` on GitLab, `owner/repo#7` elsewhere — the row says
+  // which provider it came from before the term chip repeats it in words.
+  const rowLabel = providerPrRefLabel(item.ref);
 
   return (
     <Pressable
       onPress={() => {
-        router.push(getPrReviewPath(item.owner, item.repo, item.number));
+        router.push(providerPrRoutePath(item.ref));
       }}
       accessibilityRole="button"
       accessibilityLabel={rowLabel}
@@ -151,20 +166,35 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.title}
         </Text>
         <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
-            {item.owner}/{item.repo}#{item.number} · {updatedLabel}
+          {/* The ref · age is the row's flexible value: without `min-w-0 shrink`
+              it takes the whole row, pushing the chip past the right edge where
+              the row clips it (pr-review-home, font scale 2) — and a nested
+              GitLab path or a long owner/repo (#2
+              `discussion-conversation-only`) is wider than the row, so the px-6
+              parent clips the pill to "Pull re" and hides its rounded end.
+              Truncate the metadata to one line instead; the chip is the row's
+              identity and must stay whole. Same pattern as `PrRefsRow` in
+              pr-review-overview-parts.tsx. */}
+          <Text variant="muted" className="min-w-0 shrink text-xs" numberOfLines={1}>
+            {rowLabel} · {updatedLabel}
           </Text>
-          {item.isDraft ? (
-            <View className="rounded-full bg-secondary px-2 py-0.5">
-              <Text variant="muted" className="text-[10px] font-medium">
-                {t('common.draft')}
-              </Text>
-            </View>
-          ) : null}
+          <InboxChip label={t(providerPrTermKey(item.ref.platform))} />
+          {item.isDraft ? <InboxChip label={t('common.draft')} /> : null}
         </View>
       </View>
       <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
+  );
+}
+
+function InboxChip({ label }: Readonly<{ label: string }>) {
+  // shrink-0 keeps the chip at its label width while the row's text truncates.
+  return (
+    <View className="shrink-0 rounded-full bg-secondary px-2 py-0.5">
+      <Text variant="muted" className="text-[10px] font-medium">
+        {label}
+      </Text>
+    </View>
   );
 }
 

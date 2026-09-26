@@ -199,6 +199,7 @@ describe('sandbox status presentation', () => {
     ['stopping', 'sandbox_stopping', 'Stopping'],
     ['error', 'sandbox_failed', 'Error'],
     ['unreachable', 'connection_unavailable', 'Unreachable'],
+    ['unreachable', 'check_needed', 'Unreachable'],
     ['unknown', 'insufficient_evidence', 'Unknown'],
   ] as const)(
     'presents authoritative %s lifecycle without raw diagnostics',

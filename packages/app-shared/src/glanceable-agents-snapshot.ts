@@ -14,22 +14,15 @@ import { z } from 'zod';
 export const GLANCEABLE_SNAPSHOT_SCHEMA_VERSION = 1;
 /** 8 hours: matches the usual Live Activity lifetime. */
 export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = 28_800_000;
-/** Later happy updates are coalesced for at most this long. */
-export const GLANCEABLE_COALESCE_MS = 1000;
+/**
+ * Later happy updates are coalesced for at most this long. A tray with many
+ * running sessions heartbeats every few seconds, and each emit re-renders the
+ * native surfaces, so a counts-only change may lag by at most one window. An
+ * actionable needs-input change never waits (the publisher emits it at once).
+ */
+export const GLANCEABLE_COALESCE_MS = 10_000;
 /** Terminal empty lasts at most this long before the activity ends. */
 export const GLANCEABLE_TERMINAL_MS = 8000;
-/**
- * Idle-only work holds the Live Activity for at most this long. A connected
- * agent that is doing nothing is worth a glance for a few minutes, not for the
- * whole 8 hour lifetime, so the surface retires itself. The widget keeps
- * showing idle work: placing one is the user asking for exactly that.
- */
-export const GLANCEABLE_IDLE_ONLY_MS = 600_000;
-/**
- * Delay before an idle-only Live Activity is handed to ActivityKit. Brief
- * idle↔busy flips must update the same card, not end it and start another.
- */
-export const GLANCEABLE_IDLE_END_DEBOUNCE_MS = 5_000;
 /**
  * A Live Activity that has taken no update for this long reads as unknown, not
  * as current: ActivityKit dims stale content. Every real transition pushes an
@@ -68,6 +61,12 @@ export const glanceableAgentsSnapshotSchema = z.object({
   running: z.number().int().min(0),
   /** Sessions waiting on the user, including one whose CLI dropped mid-question. */
   needsInput: z.number().int().min(0),
+  /**
+   * Sessions waiting on a permission prompt: the needs-input rows that can be
+   * approved without choosing an option. Optional on the wire — an older
+   * producer omits it — and every reader treats absent as 0.
+   */
+  needsApproval: z.number().int().min(0).optional(),
   /** Sessions connected but doing nothing. */
   idle: z.number().int().min(0),
   /**
@@ -77,6 +76,25 @@ export const glanceableAgentsSnapshotSchema = z.object({
    * the one interval the user can act on — see `oldestNeedsInputSince`.
    */
   needsInputSince: z.string().nullable(),
+  /**
+   * The kind of the most recent agent state change, in the one vocabulary every
+   * surface shows. Null when no row carried a usable status timestamp. A
+   * completed or unknown status folds into `running`, the same fold the counts
+   * use, so the newest-result line can never disagree with the row above it —
+   * see `newestGlanceableResult`.
+   *
+   * Optional on input with a null default: a version-1 snapshot persisted by
+   * the release before this fact carried no such key, and every reader treats
+   * absent as null. Remove the optional and the default when every producer
+   * sends it.
+   */
+  newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable().default(null),
+  /**
+   * ISO 8601 timestamp or null: when that newest change happened. Null exactly
+   * when `newestResultKind` is null. Optional on input with a null default for
+   * the same reason as the kind.
+   */
+  newestResultAt: z.string().nullable().default(null),
 });
 
 export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSchema>;
@@ -139,6 +157,25 @@ export function countGlanceableSessions(
 }
 
 /**
+ * The number of session rows whose status is exactly `permission`. A
+ * permission wait is the one needs-input kind the user can clear without
+ * choosing an option, so the wrist control offers Approve only against this
+ * count.
+ *
+ * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
+ * `retry` needs the provider to come back, so neither is approvable.
+ */
+export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
+  let approvals = 0;
+  for (const session of sessions) {
+    if (session.status === 'permission') {
+      approvals += 1;
+    }
+  }
+  return approvals;
+}
+
+/**
  * The earliest `statusUpdatedAt` among the needs-input sessions, or null when
  * none waits or none carried a usable timestamp.
  *
@@ -162,6 +199,37 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
     oldestIso = session.statusUpdatedAt;
   }
   return oldestIso;
+}
+
+/**
+ * The most recent status change across the rows, or null when no row carried a
+ * usable timestamp.
+ *
+ * The counts and the newest-result line must agree, so the kind maps through
+ * `glanceableStatusKind`: a completed or unknown status reads as `running`
+ * exactly as it counts. A row with a missing or unparseable timestamp is
+ * skipped rather than treated as changing now, which would overstate how new
+ * the newest change is.
+ */
+export function newestGlanceableResult(
+  sessions: readonly GlanceableSessionRow[]
+): { kind: GlanceableStatusKind; at: string } | null {
+  let newest: number | null = null;
+  let newestIso: string | null = null;
+  let newestKind: GlanceableStatusKind | null = null;
+  for (const session of sessions) {
+    if (session.statusUpdatedAt === undefined) {
+      continue;
+    }
+    const at = Date.parse(session.statusUpdatedAt);
+    if (Number.isNaN(at) || (newest !== null && at <= newest)) {
+      continue;
+    }
+    newest = at;
+    newestIso = session.statusUpdatedAt;
+    newestKind = glanceableStatusKind(session.status);
+  }
+  return newestIso === null || newestKind === null ? null : { kind: newestKind, at: newestIso };
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across
@@ -208,7 +276,8 @@ export type BuildGlanceableSnapshotInput = {
 /**
  * Build a snapshot from the current session rows. Revision increases by one
  * on every build. `needsInputSince` comes straight from the rows, so it needs
- * no carry-forward across revisions: it is data, not a latch.
+ * no carry-forward across revisions: it is data, not a latch. The newest-result
+ * fact reads the rows the same way.
  */
 export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
@@ -219,6 +288,7 @@ export function buildGlanceableSnapshot(
   const eligible = counts.running + counts.needsInput + counts.idle > 0;
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
+  const newest = newestGlanceableResult(input.sessions);
 
   return {
     schemaVersion: GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
@@ -231,8 +301,11 @@ export function buildGlanceableSnapshot(
     status: input.status ?? (eligible ? 'happy' : 'empty'),
     running: counts.running,
     needsInput: counts.needsInput,
+    needsApproval: countGlanceableApprovals(input.sessions),
     idle: counts.idle,
     needsInputSince: oldestNeedsInputSince(input.sessions),
+    newestResultKind: newest?.kind ?? null,
+    newestResultAt: newest?.at ?? null,
   };
 }
 

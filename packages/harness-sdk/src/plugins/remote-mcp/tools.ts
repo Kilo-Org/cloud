@@ -91,7 +91,9 @@ const argumentsOf = (
  * `inlineFor` is 15 seconds: a call to somebody else's server is the case the
  * deadline exists for, and a slow one is backgrounded by the session rather
  * than holding the send open. The model is told the call is still running and
- * the result arrives in a round of its own.
+ * the result arrives in a round of its own. That needs the call's own deadline
+ * to end later than `inlineFor`, which is why a call's default deadline is 60
+ * seconds (`defaultCallTimeoutMs`).
  */
 const toolFor = (
   server: RemoteMcpServer,

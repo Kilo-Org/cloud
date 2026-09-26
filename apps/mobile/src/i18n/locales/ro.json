@@ -36,6 +36,7 @@
     "cost": "Costuri",
     "discard": "Renunță",
     "findings": "Probleme detectate",
+    "mergeRequest": "merge request",
     "notConnected": "Neconectat",
     "notifications": "Notificări",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Folosește o altă adresă de e-mail",
     "signInWithApple": "Autentifică-te cu Apple",
     "signInWithGoogle": "Autentifică-te cu Google",
+    "signInWithPasskey": "Autentifică-te cu o cheie de acces",
     "emailAddress": "Adresă de e-mail",
     "emailPlaceholder": "tu@exemplu.com",
     "continueWithEmail": "Continuă cu adresa de e-mail",
@@ -174,6 +176,10 @@
     "termsConnector": " și ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",
+    "passkeyCancelled": "Autentificarea cu cheie de acces a fost anulată. Încearcă din nou.",
+    "passkeyNotFound": "Nu există nicio cheie de acces salvată pentru acest dispozitiv. Autentifică-te în schimb cu Apple, Google sau e-mailul tău.",
+    "passkeyUnsupported": "Cheile de acces nu sunt disponibile pe acest dispozitiv. Autentifică-te în schimb cu Apple, Google sau e-mailul tău.",
+    "passkeyFailed": "Nu s-a putut face autentificarea cu o cheie de acces. Încearcă din nou.",
     "couldNotCompleteSignIn": "Nu s-a putut finaliza autentificarea. Încearcă din nou.",
     "sessionEnded": "Sesiunea ta s-a încheiat. Autentifică-te din nou.",
     "signInCodeExpired": "Codul tău de autentificare a expirat. Încearcă din nou.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Cont de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO pentru companii"
+    "providerEnterpriseSso": "SSO pentru companii",
+    "passkeysTitle": "Chei de acces",
+    "passkeysSubtitle": "Autentifică-te fără parolă",
+    "passkeysEmpty": "Încă nicio cheie de acces",
+    "passkeysEmptyHint": "$t(profile.addPasskey) pentru a te autentifica fără parolă.",
+    "passkeysCouldNotLoad": "Cheile de acces nu au putut fi încărcate",
+    "passkeysLoadFailed": "Cheile de acces sunt indisponibile până când se încarcă.",
+    "addPasskey": "Adaugă o cheie de acces",
+    "passkeyDefaultName": "Cheie de acces",
+    "passkeyAddedOn": "Adăugată {{date}}",
+    "passkeyAdded": "Cheie de acces adăugată.",
+    "passkeyAddFailed": "Nu s-a putut adăuga o cheie de acces. Încearcă din nou.",
+    "passkeyAddUnsupported": "Acest dispozitiv nu poate crea chei de acces.",
+    "passkeyAddCancelled": "Crearea cheii de acces a fost anulată.",
+    "passkeyRemoved": "Cheie de acces eliminată.",
+    "passkeyRemoveFailed": "Nu s-a putut elimina acea cheie de acces. Încearcă din nou.",
+    "passkeyRenamed": "Cheie de acces redenumită.",
+    "passkeyName": "Numele cheii de acces",
+    "renamePasskey": "Redenumește cheia de acces",
+    "removePasskey": "Elimină cheia de acces",
+    "removePasskeyTitle": "Elimini cheia de acces?",
+    "removePasskeyMessage": "Nu te vei mai putea autentifica cu această cheie de acces."
   },
   "preferences": {
     "general": "General",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților.",
     "biometricUnlock": "Deblocare prin autentificare biometrică",
     "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal.",
-    "featureFlags": "Fanioane de funcții",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriere cu Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -325,7 +347,7 @@
       "expandMoreLines": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
       "expandLinesOfContext": "Afișează {{displayCount}} linii de context",
       "expandAll": "Extinde tot",
-      "expandAllLines": "Afișează toate cele {{displayCount}} linii",
+      "expandAllLines": "Afișează toate liniile ({{displayCount}})",
       "loadingMoreFiles": "Se încarcă mai multe fișiere…",
       "retryLoadingNextPage": "Reîncearcă încărcarea paginii următoare",
       "failedToLoadMoreFiles": "Nu s-au putut încărca mai multe fișiere — atinge pentru a încerca din nou",
@@ -344,7 +366,22 @@
       "goToOverview": "Mergi la prezentarea generală",
       "goToOverviewTab": "Mergi la fila de prezentare generală",
       "fileLoadedCount_few": "{{displayCount}} fișiere încărcate",
-      "fileLoadedOfTotalCount_few": "{{displayCount}} fișiere încărcate din {{total}}"
+      "fileLoadedOfTotalCount_few": "{{displayCount}} fișiere încărcate din {{total}}",
+      "expandAllLines_one": "Afișează toate liniile ({{displayCount}})",
+      "expandAllLines_other": "Afișează toate liniile ({{displayCount}})",
+      "expandAllLines_few": "Afișează toate liniile ({{displayCount}})",
+      "expandLines_one": "Afișează {{displayCount}} linie ({{start}}–{{end}})",
+      "expandLines_other": "Afișează {{displayCount}} linii ({{start}}–{{end}})",
+      "expandLines_few": "Afișează {{displayCount}} linii ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Afișează {{displayCount}} linie de context",
+      "expandLinesOfContext_other": "Afișează {{displayCount}} linii de context",
+      "expandLinesOfContext_few": "Afișează {{displayCount}} linii de context",
+      "expandMoreLines_one": "Afișează încă {{displayCount}} linie ({{start}}–{{end}})",
+      "expandMoreLines_other": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
+      "expandMoreLines_few": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} din {{total}} fișiere încărcate",
+      "loadedOfTotalFiles_other": "{{loaded}} din {{total}} fișiere încărcate",
+      "loadedOfTotalFiles_few": "{{loaded}} din {{total}} fișiere încărcate"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ fără linie nouă la sfârșitul fișierului",
@@ -359,6 +396,7 @@
       "merge": "Îmbinare",
       "mergeNow": "Îmbină acum",
       "mergePullRequest": "Îmbinarea PR-ului",
+      "mergeTermTitle": "Îmbinarea {{term}}-ului",
       "enableAutoMerge": "Activează îmbinarea automată",
       "disableAutoMerge": "Dezactivează îmbinarea automată",
       "autoMergeOn": "Îmbinare automată activată",
@@ -377,9 +415,12 @@
       "deleteBranchAfterMerge": "Șterge ramura după îmbinare",
       "noEnabledMethods": "Acest depozit nu are nicio metodă de îmbinare activată. Cere unui administrator al depozitului să activeze îmbinarea printr-un commit nou, prin comasarea commiturilor sau prin rebazare.",
       "confirmTitle": "Îmbini PR-ul?",
+      "confirmTitleTerm": "Îmbini {{term}}-ul?",
       "confirmMessage": "Modificările tale vor fi îmbinate în ramura de bază.",
       "enableAutoMergeConfirmTitle": "Activezi îmbinarea automată?",
       "enableAutoMergeConfirmMessage": "GitHub va îmbina automat acest PR după ce toate verificările obligatorii se încheie cu succes.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} va fi îmbinat automat după ce pipeline-ul său are succes.",
+      "enableAutoMergeDescriptionTerm": "GitLab îmbină automat acest {{term}} după ce pipeline-ul său are succes.",
       "forbidden": "Nu ai permisiunea să îmbini acest PR.",
       "cannotMerge": "Acest PR nu poate fi îmbinat în forma actuală.",
       "couldNotMerge": "Nu s-a putut îmbina PR-ul.",
@@ -390,7 +431,8 @@
       },
       "terminal": {
         "alreadyMerged": "Deja îmbinat",
-        "closed": "PR închis"
+        "closed": "PR închis",
+        "closedMergeRequest": "Merge request închis"
       },
       "partialSuccessBanner": {
         "body": "Nu s-a putut șterge ramura: {{reason}}.",
@@ -415,6 +457,19 @@
         "behindDetail": "Ramura sursă nu include cele mai recente modificări din ramura de bază. Rebazează sau actualizează ramura înainte de îmbinare.",
         "notMergeableTitle": "Acest PR nu poate fi îmbinat încă",
         "notMergeableDetail": "GitHub a raportat următoarea stare pentru îmbinare: {{state}}."
+      },
+      "restrictions": {
+        "title": "Restricții de îmbinare",
+        "approvalsRequired_one": "{{displayCount}} aprobare necesară",
+        "approvalsRequired_other": "{{displayCount}} aprobări necesare",
+        "pipelineMustSucceed": "Pipeline-ul trebuie să aibă succes înainte de îmbinare.",
+        "approvalsRequired_few": "{{displayCount}} aprobări necesare"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline-ul eșuează la cel mai recent commit.",
+        "pendingPipeline": "Pipeline-ul încă rulează la cel mai recent commit.",
+        "permission": "Nu ai permisiunea să îmbini acest {{term}}.",
+        "draft": "Marchează {{term}}-ul ca pregătit pentru revizuire înainte de îmbinare."
       },
       "methodLabels": {
         "merge": "Creează un commit de îmbinare",
@@ -464,6 +519,8 @@
       "replyBadRequest": "Acest răspuns nu poate fi publicat. Este posibil ca firul de discuție să se fi modificat.",
       "replyForbidden": "Nu ai permisiunea să răspunzi la acest PR.",
       "addCommentCta": "Comentează acest PR",
+      "fixWithKilo": "Rezolvă cu Kilo",
+      "fixWithKiloPrompt": "Te rog rezolvă următorul comentariu din acest PR: {{link}}",
       "commentBadRequest": "Acest comentariu nu poate fi publicat. Este posibil ca PR-ul să se fi modificat.",
       "commentForbidden": "Nu ai permisiunea să comentezi acest PR.",
       "moderation": {
@@ -516,7 +573,11 @@
         "outdatedOnLines": "Depășit: {{lines}}",
         "outdatedOnPath": "Depășit: {{path}}"
       },
-      "deletedUser": "utilizator șters"
+      "deletedUser": "utilizator șters",
+      "replyForbiddenTerm": "Nu ai permisiunea să răspunzi la acest {{term}}.",
+      "moreLinesAbove_one": "… încă {{displayCount}} linie mai sus",
+      "moreLinesAbove_other": "… încă {{displayCount}} linii mai sus",
+      "moreLinesAbove_few": "… încă {{displayCount}} linii mai sus"
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub.",
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",
@@ -528,17 +589,19 @@
     "reviewPullRequest": "Revizuiește PR-ul",
     "headLine": "{{counts}} · ultimul commit {{sha}}",
     "entry": {
-      "eyebrow": "Deschide un PR folosind adresa URL.",
-      "pastePrLink": "Lipește o legătură către un PR",
-      "noRecentPrs": "Fără PR-uri recente",
-      "noRecentPrsDescription": "Lipește mai sus o legătură către un PR pentru a începe revizuirea. PR-ul va apărea aici data viitoare.",
+      "eyebrow": "Deschide un PR sau un merge request folosind adresa URL",
+      "pastePrLink": "Lipește o legătură către un PR sau un merge request",
+      "noRecentPrs": "Nicio revizuire recentă",
+      "noRecentPrsDescription": "Lipește o legătură mai sus pentru a începe o revizuire — va apărea aici data viitoare.",
       "couldNotLoad": "Nu s-au putut încărca datele.",
       "removeFromRecentsTitle": "Elimini din lista de PR-uri recente?",
-      "removeFromRecentsMessage": "Acest PR va fi eliminat din lista ta de PR-uri recente.",
+      "removeFromRecentsMessage": "Această revizuire va fi eliminată din recente.",
       "removeRecentAccessibility": "Elimină {{repo}} din lista de PR-uri recente",
-      "urlAccessibility": "Adresa URL a PR-ului de pe GitHub",
-      "clearLink": "Șterge legătura către PR",
-      "pasteLink": "Lipește legătura către PR",
+      "urlAccessibility": "Introdu URL-ul unui PR sau al unui merge request",
+      "urlPlaceholder": "URL pentru PR sau merge request",
+      "openAccessibility": "Deschide un PR sau un merge request",
+      "clearLink": "Șterge legătura",
+      "pasteLink": "Lipește legătura către PR sau merge request",
       "open": "Deschidere"
     },
     "checks": {
@@ -555,6 +618,9 @@
       "pending": "{{displayCount}} în așteptare",
       "skipped": "{{displayCount}} omise",
       "checksCount": "{{displayCount}} verificări",
+      "checksCount_one": "{{displayCount}} verificare",
+      "checksCount_few": "{{displayCount}} verificări",
+      "checksCount_other": "{{displayCount}} verificări",
       "checkDetails": "detaliile verificării"
     },
     "inbox": {
@@ -587,9 +653,15 @@
     "connect": {
       "checkFailedTitle": "Nu s-a putut verifica conexiunea la GitHub.",
       "checkFailedMessage": "Starea autentificării nu este disponibilă până la încărcarea acestor date.",
+      "checkFailedTitleGitLab": "Nu s-a putut verifica conexiunea la GitLab.",
+      "checkFailedTitleBitbucket": "Nu s-a putut verifica conexiunea la Bitbucket.",
+      "providerCheckFailedMessage": "Starea conexiunii nu este disponibilă până când se încarcă.",
       "reconnectTitle": "Reconectare la GitHub",
       "reconnectDescription": "Accesul la contul tău GitHub a fost revocat. Reconectează-te pentru a continua să revizuiești PR-uri pe mobil.",
-      "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil."
+      "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil.",
+      "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
+      "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
+      "bitbucketOrgOnlyDescription": "Selectează o organizație în profilul tău pentru a-i revizui PR-urile Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -612,7 +684,10 @@
     },
     "reconnectNotice": {
       "title": "Conexiunea la GitHub a expirat.",
-      "message": "Conexiunea ta la GitHub nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
+      "message": "Conexiunea ta la GitHub nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar.",
+      "gitlabTitle": "Conexiunea la GitLab a expirat.",
+      "bitbucketTitle": "Conexiunea la Bitbucket a expirat.",
+      "providerMessage": "Conexiunea ta la {{provider}} nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
     },
     "eventChips": {
       "comment": "Comentariu",
@@ -679,10 +754,13 @@
       "statusContext": "Neschimbat",
       "lineLabel": "linia {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(gol)"
+      "emptyLine": "(gol)",
+      "truncationBanner_one": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub.",
+      "truncationBanner_other": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub.",
+      "truncationBanner_few": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub."
     },
     "linkPasteClipboardEmpty": "Clipboardul este gol.",
-    "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR de pe GitHub.",
+    "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR sau un merge request",
     "announce": {
       "commentPosted": "Comentariu publicat",
       "reviewSubmitted": "Revizuire trimisă",
@@ -691,6 +769,7 @@
     "mutationError": {
       "commentNotPosted": "Acest comentariu nu poate fi publicat. Este posibil ca linia selectată să se fi modificat sau PR-ul să fi fost actualizat.",
       "reviewNotSubmitted": "Această revizuire nu poate fi trimisă în forma actuală. Este posibil ca PR-ul să se fi modificat sau să fie propriul tău PR, pe care nu îl poți revizui.",
+      "reviewNotSubmittedTerm": "Această revizuire nu poate fi trimisă în starea curentă. E posibil ca {{term}} să se fi modificat sau nu îți poți revizui propriul {{term}}.",
       "couldNotPostComment": "Nu s-a putut publica comentariul.",
       "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou."
     },
@@ -698,9 +777,31 @@
       "couldNotReply": "Nu s-a putut trimite răspunsul.",
       "couldNotCompleteAction": "Nu s-a putut finaliza această acțiune.",
       "mergeResultDefaultError": "GitHub nu a finalizat îmbinarea.",
+      "mergeResultNotCompleted": "{{term}} nu a fost îmbinat. Verifică starea lui și încearcă din nou.",
       "ambiguous": "Nu s-a putut confirma rezultatul — verifică PR-ul înainte de a încerca din nou.",
       "persistenceFailed": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
       "forbidden": "Accesul este interzis."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nu este disponibil pentru acest furnizor",
+        "accessibility": "Nu este disponibil pentru acest furnizor: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Distribuie merge request-ul",
+      "viewOnProvider": "Vezi pe {{provider}}",
+      "mergeRequestUnavailable": "Merge request indisponibil",
+      "unavailableDescription": "S-ar putea să fi fost șters sau să nu ai acces la el.",
+      "accessDeniedMergeRequest": "Nu ai permisiunea să vezi acest merge request.",
+      "couldNotLoadMergeRequest": "Nu s-a putut încărca merge request-ul.",
+      "discussionAccessDenied": "Nu ai permisiunea să vezi discuția acestui merge request.",
+      "discussionUnavailableMessage": "Este posibil ca acest merge request să fi fost eliminat.",
+      "noDiscussionDescription": "Acest merge request nu are încă fire de discuție pentru revizuire sau comentarii generale.",
+      "noFilesChangedDescription": "Acest merge request nu conține modificări ale fișierelor."
     }
   },
   "notifications": {
@@ -733,11 +834,12 @@
     "previewFullDescription": "Notificările afișează textul mesajului pe ecranul de blocare.",
     "previewGenericDescription": "Notificările semnalează activitatea fără a afișa textul mesajului. Deschide Kilo pentru a-l citi.",
     "channel": {
-      "agent": "Sesiuni ale agenților",
+      "agentProgress": "Progresul agenților",
       "chat": "Mesaje din conversații",
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
-      "security": "Probleme de securitate detectate"
+      "security": "Probleme de securitate detectate",
+      "spend": "Alerte de cheltuieli"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
@@ -748,8 +850,22 @@
       "sessionStatusTitle": "Starea sesiunii",
       "sessionStatusSubtitle": "finalizată / eșuată / pregătită pentru control",
       "kiloclawActivitySubtitle": "instanță pregătită sau eșuată, acțiuni programate",
+      "kiloclawActivityUnavailable": "Pornește o instanță KiloClaw pentru a primi activitate KiloClaw.",
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
-      "securityFindingsSubtitle": "constatări noi și mementouri SLA"
+      "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold.",
+      "securityFindingsSubtitle": "constatări noi și mementouri SLA",
+      "securityFindingsUnavailable": "Activează Agentul de securitate Kilo într-un domeniu pentru a primi constatări de securitate.",
+      "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
+      "spendAlertsToggle": "Categoria alerte de cheltuieli"
+    },
+    "action": {
+      "openSession": "Deschide sesiunea"
+    },
+    "needsInputAction": {
+      "approved": "Cerere aprobată",
+      "replied": "Răspuns trimis",
+      "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
+      "unavailable": "Această cerere nu mai așteaptă."
     }
   },
   "tabs": {
@@ -830,7 +946,10 @@
       "uploadFailed": "Încărcarea a eșuat.",
       "failedToUploadFile": "Nu s-a putut încărca fișierul: {{reason}}.",
       "nothingToPaste": "Nu există nimic de lipit.",
-      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei."
+      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei.",
+      "limit_one": "Poți atașa cel mult {{displayCount}} fișier.",
+      "limit_other": "Poți atașa cel mult {{displayCount}} fișiere.",
+      "limit_few": "Poți atașa cel mult {{displayCount}} fișiere."
     },
     "attachmentPreview": {
       "accessibility": "Fișier: {{filename}}, stare: {{status}}",
@@ -1577,7 +1696,13 @@
       "syncFindings": "Sincronizează constatările",
       "syncNow": "Sincronizează acum",
       "syncQueued": "Sincronizare în așteptare",
-      "syncStatusUnavailable": "Starea sincronizării nu este disponibilă."
+      "syncStatusUnavailable": "Starea sincronizării nu este disponibilă.",
+      "daysOverdue_one": "{{displayCount}} zi întârziere",
+      "daysOverdue_other": "{{displayCount}} zile întârziere",
+      "daysOverdue_few": "{{displayCount}} zile întârziere",
+      "findingsCount_one": "{{displayCount}} constatare",
+      "findingsCount_other": "{{displayCount}} constatări",
+      "findingsCount_few": "{{displayCount}} constatări"
     },
     "dashboardMetrics": {
       "openFindings": "Constatări deschise",
@@ -1980,6 +2105,10 @@
       "couldNotLoad": "Nu s-a putut încărca sesiunea.",
       "failedToLoadDetails": "Nu s-au putut încărca detaliile sesiunii.",
       "failedToStopExecution": "Nu s-a putut opri execuția.",
+      "stopped": "Sesiune oprită",
+      "committing": "Se creează commitul…",
+      "committed": "Commit creat",
+      "commitFailed": "Crearea commitului a eșuat",
       "renameSession": "Redenumește sesiunea",
       "renamePlaceholder": "Numele sesiunii",
       "transcriptAccessibility": "Transcrierea sesiunii",
@@ -2014,6 +2143,7 @@
       "exitNeedsNewerCli": "Comenzile cu / executate de la distanță necesită o versiune mai nouă de Kilo CLI. Actualizează Kilo CLI și reconectează-te."
     },
     "sessionConnection": {
+      "label": "Conexiune",
       "connecting": "Se conectează…",
       "reconnecting": "Se reconectează…",
       "connectionLost": "Conexiune pierdută",
@@ -2033,14 +2163,36 @@
       "removeConfirmTitle": "Elimini obiectivul?",
       "removeConfirmMessage": "CLI șterge obiectivul acestei sesiuni.",
       "updateFailed": "Obiectivul nu a putut fi actualizat.",
-      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}"
+      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}",
+      "collapse": "Restrânge obiectivul",
+      "expand": "Extinde obiectivul"
     },
     "newSession": {
+      "recentlyUsed": "Folosite recent",
+      "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
+      "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab.",
+      "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
       "connectGithubDescription": "Conectează contul GitHub în browser, apoi revino aici pentru a alege un depozit.",
+      "connectGitlabDescription": "Conectează contul GitLab în browser, apoi revino aici pentru a alege un depozit.",
+      "connectBitbucketDescription": "Conectează contul Bitbucket în browser, apoi revino aici pentru a alege un depozit.",
       "openGithub": "Deschide GitHub",
+      "openGitlab": "Deschide GitLab",
+      "openBitbucket": "Deschide Bitbucket",
       "refreshRepositories": "Reîmprospătează depozitele",
       "githubConnected": "GitHub conectat",
+      "gitlabConnected": "GitLab conectat",
       "noRepositoriesVisible": "Nu este vizibil niciun depozit. Verifică accesul aplicației Kilo pentru GitHub la depozite, apoi reîmprospătează lista.",
+      "noRepositoriesVisibleGitlab": "Nu este vizibil niciun depozit. Verifică accesul la depozitele GitLab, apoi reîmprospătează lista.",
+      "noRepositoriesVisibleBitbucket": "Nu este vizibil niciun depozit. Verifică accesul la depozitele Bitbucket, apoi reîmprospătează lista.",
+      "bitbucketOrganizationsOnly": "Bitbucket este disponibil doar pentru organizații.",
+      "branchPickerTitle": "Selectează ramura",
+      "branchDefault": "Implicit",
+      "branchAccessibility": "Ramură: {{label}}",
+      "branchLoading": "Se încarcă ramurile",
+      "branchLoadError": "Nu s-au putut încărca ramurile",
+      "branchUnavailable": "Nu există ramuri disponibile pentru acest depozit. Verifică-ți accesul la furnizor, apoi alege alt depozit.",
+      "branchEmpty": "Nicio ramură disponibilă",
+      "branchPlaceholder": "Selectează o ramură",
       "runOnWithTarget": "Rulează pe: {{target}}",
       "environment": "Mediu",
       "couldNotLoadEnvironment": "Nu s-a putut încărca mediul tău.",
@@ -2061,24 +2213,39 @@
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",
+      "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardFailed": "Nu s-a putut șterge ciorna. Încearcă din nou.",
       "remoteHint": "Rulează `kilo remote` pe computerul tău sau `/remote` într-o sesiune CLI activă pentru a controla un proces kilo local.",
-      "connectBitbucketDescription": "Conectează contul Bitbucket în browser, apoi revino aici pentru a alege un depozit.",
-      "connectGitlabDescription": "Conectează contul GitLab în browser, apoi revino aici pentru a alege un depozit.",
-      "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
-      "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
-      "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab.",
-      "gitlabConnected": "GitLab conectat",
-      "noRepositoriesVisibleBitbucket": "Nu este vizibil niciun depozit. Verifică accesul la depozitele Bitbucket, apoi reîmprospătează lista.",
-      "noRepositoriesVisibleGitlab": "Nu este vizibil niciun depozit. Verifică accesul la depozitele GitLab, apoi reîmprospătează lista.",
-      "openBitbucket": "Deschide Bitbucket",
-      "openGitlab": "Deschide GitLab",
-      "recentlyUsed": "Folosite recent",
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
       "importFailed": "Nu s-a putut importa această sesiune.",
-      "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse."
+      "pickProfile": "Alegeți un profil",
+      "noProfile": "Nici un profil",
+      "manageProfiles": "Gestionați profilurile",
+      "noProfiles": "Niciun profil încă. Creați unul pentru a adăuga variabile de mediu, servere MCP și abilități.",
+      "advancedConfig": "Configurare avansată",
+      "advancedConfigDescription": "Selectați un profil pentru a încărca configurațiile salvate și configurați manual variabilele de mediu suplimentare și comenzile de configurare",
+      "saveAsProfile": "Salvați ca profil",
+      "saveProfileDescription": "Salvați variabilele de mediu curente și setați comenzile ca profil reutilizabil.",
+      "profileSummary": "{{vars}} variabile de mediu · {{commands}} comenzi de configurare",
+      "profileSaved": "Profilul „{{name}}” a fost salvat",
+      "organizationProfiles": "Profiluri organizației",
+      "personalProfiles": "Profiluri personale",
+      "yourProfiles": "Profilurile dvs",
+      "failedToLoadProfiles": "Nu s-au încărcat profilurile",
+      "nameTooLong": "Numele profilului este prea lung",
+      "descriptionTooLong": "Descrierea este prea lungă",
+      "secretsEncrypted": "Secretele sunt criptate înainte de stocare.",
+      "profileActive": "Profil activ",
+      "profilesActive": "Profiluri active",
+      "customConfigActive": "Configurație personalizată activă",
+      "configNeedsAttention": "Configurația necesită atenție",
+      "repoProfile": "Profil Repo",
+      "selectedProfile": "Profilul selectat",
+      "manualOverrides": "Anulări manuale",
+      "openSettingsToReview": "Deschide Setări pentru a revizui",
+      "profileSelection": "Selectarea profilului"
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",
@@ -2103,15 +2270,21 @@
       "updateTodos": "Actualizează sarcinile",
       "linesBadge": "{{displayCount}} linii",
       "filesBadge": "{{displayCount}} fișiere",
-      "matchesBadge": "{{displayCount}} potriviri"
+      "matchesBadge": "{{displayCount}} potriviri",
+      "filesBadge_one": "{{displayCount}} fișier",
+      "filesBadge_other": "{{displayCount}} fișiere",
+      "filesBadge_few": "{{displayCount}} fișiere",
+      "linesBadge_one": "{{displayCount}} linie",
+      "linesBadge_other": "{{displayCount}} linii",
+      "linesBadge_few": "{{displayCount}} linii",
+      "matchesBadge_one": "{{displayCount}} potrivire",
+      "matchesBadge_other": "{{displayCount}} potriviri",
+      "matchesBadge_few": "{{displayCount}} potriviri",
+      "noOutput": "Nicio ieșire."
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
       "linesOf": "liniile {{start}}–{{end}} din {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Acțiunea {{action}} pentru Cloud Agent a eșuat ({{status}}).",
-      "failed": "Acțiunea {{action}} pentru Cloud Agent a eșuat."
     },
     "collectCopyableText": {
       "unserializableInput": "[date de intrare care nu pot fi serializate]",
@@ -2208,8 +2381,7 @@
       "assistantProviderRejected": "Furnizorul a respins cererea.",
       "assistantStopped": "Generarea răspunsului a fost oprită.",
       "assistantContextOverflow": "Conversația este prea lungă pentru model.",
-      "assistantFailed": "Generarea răspunsului a eșuat.",
-      "sendFailed": "Nu s-a putut trimite mesajul. Încearcă din nou."
+      "assistantFailed": "Generarea răspunsului a eșuat."
     },
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
@@ -2396,7 +2568,13 @@
       "files": "Fișiere",
       "couldNotOpenPhotoPicker": "Selectorul de fotografii nu a putut fi deschis. Repornește Kilo și încearcă din nou.",
       "maxFilesAllowed": "Poți adăuga cel mult {{displayCount}} fișiere.",
-      "onlyAddingFiles": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})"
+      "onlyAddingFiles": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})",
+      "maxFilesAllowed_one": "Poți adăuga cel mult {{displayCount}} fișier.",
+      "maxFilesAllowed_other": "Poți adăuga cel mult {{displayCount}} fișiere.",
+      "maxFilesAllowed_few": "Poți adăuga cel mult {{displayCount}} fișiere.",
+      "onlyAddingFiles_one": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})",
+      "onlyAddingFiles_other": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})",
+      "onlyAddingFiles_few": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})"
     },
     "composer": {
       "addAttachment": "Adaugă un atașament",
@@ -2414,7 +2592,10 @@
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardAttachmentsTitle": "Renunți la atașamente?",
       "charactersRemaining": "{{count}} caractere rămase",
-      "insertNewline": "Inserează o linie nouă"
+      "insertNewline": "Inserează o linie nouă",
+      "charactersRemaining_one": "{{count}} caracter rămas",
+      "charactersRemaining_other": "{{count}} caractere rămase",
+      "charactersRemaining_few": "{{count}} caractere rămase"
     },
     "chatLink": {
       "linkCopied": "Link copiat",
@@ -2448,7 +2629,17 @@
       "startNewSession": "Începe o sesiune nouă",
       "exitSession": "Închide sesiunea",
       "clearSession": "Încheie această sesiune și începe una nouă",
+      "compactDescription": "compactează contextul sesiunii curente",
+      "goalDescription": "Continuă să lucrezi la un obiectiv de sesiune. /goal <objective> sau pause, resume, clear",
+      "initDescription": "configurare ghidată AGENTS.md",
+      "resumeClaudeDescription": "importă transcrierea unei sesiuni Claude Code",
+      "resumeCodexDescription": "importă transcrierea unei sesiuni OpenAI Codex",
+      "reviewDescription": "revizuiește modificările [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Folosește /{{command}}",
+      "useSkillCommand": "Folosește competența /{{command}}",
+      "skillBadge": "Competență",
+      "catalogFull": "Catalogul de comenzi este plin, așa că unele comenzi sunt ascunse.",
+      "catalogOverLimit": "Catalogul de competențe depășește limita de dimensiune, așa că toate competențele sunt listate.",
       "insert": "Inserează",
       "upgradeRequiredFallback": "Actualizează CLI-ul pentru a folosi această comandă.",
       "exitCapabilityUnavailable": "Actualizează CLI-ul pentru a închide sesiunea.",
@@ -2481,7 +2672,10 @@
       "stepsCount": "{{steps}} de pași",
       "stepsCount_other": "{{steps}} de pași",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_few": "{{steps}} pași"
+      "stepsCount_few": "{{steps}} pași",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modele ({{displayCount}})",
+      "modelsCount_few": "Modele ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Aprobare automată",
@@ -2521,7 +2715,10 @@
     },
     "toolRun": {
       "sheetTitle": "Apeluri ale instrumentelor",
-      "condensedLabel": "{{itemCount}} elemente; {{last}}"
+      "condensedLabel": "{{itemCount}} elemente; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elemente; {{last}}",
+      "condensedLabel_few": "{{itemCount}} elemente; {{last}}"
     }
   },
   "bootstrap": {
@@ -2566,6 +2763,7 @@
     "couldNotLoadActiveSessions": "Nu s-au putut încărca sesiunile active.",
     "agentSessions": "În curs acum",
     "newCodingTask": "Sarcină nouă de programare",
+    "newTaskFromPicture": "Sarcină nouă dintr-o imagine",
     "explore": "Explorează",
     "seeAll": "Vezi toate",
     "noLiveSessions": "Nimic nu rulează în acest moment"
@@ -2655,7 +2853,10 @@
     "cliCantReceiveFilesTitle": "Această sesiune nu poate primi fișiere",
     "cliCantReceiveFilesMessage": "Instanța Kilo CLI care rulează această sesiune nu poate primi fișiere. Actualizează CLI-ul pe sistemul respectiv sau distribuie conținutul într-o sesiune nouă.",
     "contentlessMessage": "Nu există nimic de distribuit — nu s-au inclus nici text, nici fișiere.",
-    "couldNotReadContent": "Nu s-a putut citi conținutul distribuit."
+    "couldNotReadContent": "Nu s-a putut citi conținutul distribuit.",
+    "onlyFirstFilesAttached_one": "Doar primele {{displayCount}} fișier vor fi atașate.",
+    "onlyFirstFilesAttached_other": "Doar primele {{displayCount}} fișiere vor fi atașate.",
+    "onlyFirstFilesAttached_few": "Doar primele {{displayCount}} fișiere vor fi atașate."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2787,7 +2988,8 @@
     "aiProvidersWhat": "Instrucțiunile tale, istoricul conversațiilor și fișierele pe care le atașezi.",
     "aiProvidersWhy": "Pentru a genera răspunsuri AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google și alți furnizori pe care îi selectezi pentru fiecare cerere.",
-    "gatewayWhat": "ID-ul contului, metadatele cererilor, utilizarea tokenurilor.",
+    "gatewayWhat": "ID-ul contului, metadatele cererilor, utilizarea tokenurilor, precum și prompturile și înregistrările vocale pe care aplicația le trimite prin el.",
+    "viaGateway": "Prin Kilo Gateway",
     "gatewayWhy": "Autentificare, direcționarea cererilor, reconcilierea datelor de facturare.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapoarte despre închideri neașteptate și erori, din care eliminăm conținutul aplicației.",
@@ -2807,7 +3009,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Înregistrarea ta în timp ce dictezi.",
     "voiceTranscriptionWhy": "Pentru a transforma vorbirea în text.",
-    "voiceTranscriptionWho": "Exclusiv pe dispozitiv sau prin Apple ori Google când dispozitivul nu poate transcrie fără conexiune la internet.",
+    "voiceTranscriptionWho": "Dispozitivul tău, Kilo Gateway cu modelul de transcriere ales, sau Apple ori Google pentru recunoaștere online.",
     "installAttributionPromptTitle": "Permiți identificarea sursei instalării?",
     "installAttributionPromptMessage": "Kilo folosește permisiunea de urmărire de la Apple doar pentru a afla prin ce canal ai ajuns aici. Instrucțiunile și conversațiile tale nu sunt niciodată folosite în acest scop.",
     "what": "Ce",
@@ -2980,6 +3182,14 @@
     "tooManySignInAttempts": "Prea multe încercări de autentificare. Așteaptă și încearcă din nou."
   },
   "models": {
+    "auto": {
+      "frontier": "Automat Avansat",
+      "balanced": "Automat Echilibrat",
+      "efficient": "Automat Eficient",
+      "small": "Automat Mic",
+      "free": "Automat Gratuit",
+      "organization": "Automat de organizație"
+    },
     "dataCollected": "Date colectate",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele.",
@@ -3010,8 +3220,17 @@
     "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
     "needsInput": "Așteaptă un răspuns",
+    "newestSession": "Cea mai recentă: {{title}}",
+    "noneWaiting": "Niciun agent în așteptare",
+    "newAgent": "Agent nou",
+    "approving": "Se aprobă...",
+    "couldNotApprove": "Aprobarea nu a reușit",
+    "couldNotStart": "Pornirea nu a reușit",
     "channelName": "Agenți activi",
-    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
+    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
+    "openSession": "Deschide",
+    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
+    "newestResult": "Cel mai recent rezultat"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3036,15 +3255,7 @@
     "remoteOptionTitle": "Computerul tău",
     "remoteOptionBody": "Rulează Kilo pe propria ta mașină prin CLI-ul `kilo remote`.",
     "skip": "Sari peste tur",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Pornește prima ta sesiune la distanță",
-    "remoteBody": "Conectează computerul și apoi pornește sesiunea de aici.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Niciun computer conectat încă",
-    "remoteEmptyBody": "Pentru a-l conecta, rulează `kilo remote` pe computerul tău.",
-    "remoteFound": "Computer conectat",
-    "checkAgain": "Verifică din nou",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "modelChat": {
     "empty": {
@@ -3106,5 +3317,213 @@
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
+      "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Deschide ultima sesiune"
+  },
+  "spendAlerts": {
+    "subtitle": "Trimite o alertă prin e-mail sau push către contactele de facturare când cheltuielile acestui domeniu depășesc o limită sau sar peste ritmul orar obișnuit.",
+    "enable": "Activează alertele de cheltuieli",
+    "thresholdTitle": "Depășirea pragului",
+    "thresholdSubtitle": "Cheltuielile cumulate depășesc limita ta",
+    "anomalyTitle": "Vârf orar",
+    "anomalySubtitle": "O oră este mult peste ritmul obișnuit al acestui domeniu",
+    "limitLabel": "Limită (USD)",
+    "windowLabel": "Fereastră",
+    "window24h": "24 de ore",
+    "window7d": "7 zile",
+    "window30d": "30 de zile",
+    "multiplierLabel": "Multiplicatorul vârfului",
+    "saved": "Setările alertelor de cheltuieli au fost salvate",
+    "loadError": "Alertele de cheltuieli nu au putut fi încărcate.",
+    "saveError": "Alertele de cheltuieli nu au putut fi salvate.",
+    "empty": "Alertele de cheltuieli sunt oprite. Activează-le pentru a-i avertiza pe contactele de facturare ale acestui domeniu.",
+    "noSpend": "Încă nu s-a înregistrat nicio cheltuială",
+    "spend24h": "Cheltuieli din ultimele 24 de ore",
+    "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
+    "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
+    "pushOffByCategory": "Oprit în Notificări"
+  },
+  "profiles": {
+    "title": "Profiluri",
+    "entrySubtitle": "Reutilizați setările de mediu între sesiuni",
+    "newProfile": "Profil nou",
+    "emptyTitle": "Niciun profil încă",
+    "emptyDescription": "Creați un profil pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
+    "loadFailed": "Profilurile nu au putut fi încărcate",
+    "counts": {
+      "vars": "{{count}} variabile",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} abilități",
+      "commands": "{{count}} comenzi",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}a",
+      "commandsShort": "{{count}}c"
+    },
+    "nameLabel": "Numele profilului",
+    "namePlaceholder": "de ex. Depanare backend",
+    "descriptionLabel": "Descrierea profilului",
+    "descriptionPlaceholder": "Descriere opțională",
+    "ownerLabel": "Proprietarul profilului",
+    "nameRequired": "Introduceți un nume de profil",
+    "createAction": "Creați un profil",
+    "createFailed": "Nu s-a putut crea profilul",
+    "createdToast": "Profilul „{{name}}” a fost creat",
+    "settingsSectionTitle": "Configurare",
+    "defaultSectionTitle": "Profil implicit",
+    "personalDefaultDescription": "Se încarcă automat când niciun depozit nu are un profil fixat.",
+    "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
+    "setAsDefault": "Setați ca implicit",
+    "removeDefault": "Eliminați implicit",
+    "saveFailed": "Profilul nu a putut fi salvat",
+    "deleteTitle": "Ștergeți profilul",
+    "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",
+    "deleteFailed": "Nu s-a putut șterge profilul",
+    "deleteBlocked": "Acest profil este utilizat de un declanșator webhook. Scoateți-l mai întâi de pe acele declanșatoare.",
+    "deletedToast": "Profilul „{{name}}” a fost șters",
+    "variablesTitle": "Variabile de mediu",
+    "addVariable": "Adăugați o variabilă",
+    "keyLabel": "Cheie",
+    "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
+    "keyDuplicate": "Această cheie există deja în profil",
+    "valueLabel": "Valoare",
+    "secretLabel": "Secret",
+    "secrets": {
+      "markSecret": "Marcați ca secret",
+      "masked": "Valoare ascunsă",
+      "reveal": "Dezvăluie valoarea",
+      "newValuePlaceholder": "Introdu o nouă valoare secretă",
+      "valuePlaceholder": "Valoare secretă (criptată)"
+    },
+    "variablesEmpty": "Încă nu există variabile",
+    "variablesSaveFailed": "Variabila nu a putut fi salvată",
+    "commandsTitle": "Configurați comenzi",
+    "addCommand": "Adăugați comanda",
+    "commandLabel": "Comanda",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Încă nu există comenzi de configurare",
+    "commandsSaveFailed": "Comenzile de configurare nu au putut fi salvate",
+    "moveUp": "Mișcă-te în sus",
+    "moveDown": "Deplasați-vă în jos",
+    "skillsTitle": "Abilități",
+    "addSkill": "Adăugați abilitate",
+    "skillNameLabel": "Numele aptitudinii",
+    "skillMarkdownLabel": "Conținut de abilități",
+    "skillsEmpty": "Nu există încă abilități",
+    "skillNameRequired": "Introduceți un nume de abilitate",
+    "skillNameInvalid": "Numele aptitudinii trebuie să înceapă cu o literă sau o cifră și să folosească numai litere mici, cifre și liniuțe",
+    "skillContentRequired": "Conținutul de calificare este necesar",
+    "skillSaveFailed": "Nu s-a putut salva calificarea",
+    "skillsHint": "Lipiți un SKILL.md și numele acestuia se completează; adăugați o abilitate de pe telefon fără glisare și plasare.",
+    "skillEditTitle": "Editați abilitate",
+    "mcp": {
+      "title": "servere MCP",
+      "add": "Adăugați server MCP",
+      "empty": "Încă nu există servere MCP",
+      "name": "Numele serverului",
+      "type": "Tip server",
+      "localType": "Local",
+      "remoteType": "Telecomanda",
+      "command": "Linia de comandă",
+      "url": "URL",
+      "environment": "Mediu (JSON)",
+      "headers": "Anteturi (JSON)",
+      "timeout": "Pauză",
+      "secretCount": "Numărarea secretă",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Introduceți un nume de server",
+      "nameInvalid": "Numele poate folosi numai litere, cifre, litere de subliniere și liniuțe",
+      "commandRequired": "Introduceți o comandă",
+      "commandTooLong": "Folosiți cel mult 50 de argumente de 500 de caractere fiecare",
+      "urlRequired": "Introduceți o adresă URL",
+      "urlInvalid": "Introduceți o adresă URL validă",
+      "urlTooLong": "URL-ul trebuie să aibă 2048 de caractere sau mai puțin",
+      "jsonInvalid": "Introduceți JSON valid — un obiect cu valori de șir",
+      "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
+      "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
+      "edit": "Editați serverul MCP",
+      "saveFailed": "Serverul MCP nu a putut fi salvat"
+    },
+    "agents": {
+      "title": "Agenți de profil",
+      "add": "Adăugați agent",
+      "empty": "Încă nu există agenți",
+      "name": "Numele agentului",
+      "slug": "Agent melc",
+      "description": "Descrierea agentului",
+      "model": "Anularea modelului",
+      "modelPlaceholder": "Utilizați sesiunea implicită",
+      "prompt": "prompt de sistem",
+      "steps": "Pași maximi",
+      "stepsPlaceholder": "de ex. 50",
+      "temperature": "Temperatură",
+      "temperaturePlaceholder": "de ex. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "de ex. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Agentul meu",
+      "promptPlaceholder": "esti un...",
+      "tools": "Instrumente",
+      "visibility": "Vizibilitate",
+      "visibilityPrimary": "Primar — afișat în selector",
+      "visibilitySubagent": "Subagent - apelabil numai de la alții",
+      "visibilityAll": "Toate — ambele",
+      "saveFailed": "Agentul nu a putut fi salvat",
+      "nameRequired": "Introduceți un nume de agent",
+      "slugRequired": "Introduceți un melc de agent",
+      "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
+      "slugConflict": "Acest melc este rezervat de un agent încorporat",
+      "edit": "Editați agentul"
+    },
+    "slashCommands": {
+      "title": "Comenzi Slash",
+      "add": "Adăugați comanda slash",
+      "empty": "Nicio comandă bară oblică încă",
+      "name": "Numele comenzii",
+      "description": "Descrierea comenzii",
+      "template": "Șablon",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Explicați $ARGUMENTS",
+      "agent": "Agent",
+      "subtask": "Rulați ca subsarcină",
+      "edit": "Comanda Editați slash",
+      "saveFailed": "Comanda nu a putut fi salvată",
+      "nameRequired": "Introduceți un nume de comandă",
+      "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
+      "templateRequired": "Introduceți un șablon de comandă",
+      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată"
+    },
+    "repoBindings": {
+      "title": "Profiluri implicite pentru Repos",
+      "add": "Adăugați implicit",
+      "empty": "Nu sunt configurate implicite",
+      "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",
+      "repo": "Selectați depozitul...",
+      "profile": "Selectați profilul",
+      "remove": "Desface",
+      "private": "Privat",
+      "search": "Căutați în depozite...",
+      "addedToast": "Profil implicit setat pentru „{{repo}}”",
+      "addFailed": "Nu s-a putut seta profilul implicit",
+      "removedToast": "Profilul implicit a fost eliminat pentru „{{repo}}”",
+      "removeFailed": "Nu s-a putut elimina profilul implicit",
+      "pinnedTitle": "Fixat în depozite",
+      "pinRepo": "Fixați un repo",
+      "pinnedEmpty": "Nu este fixat în niciun depozit.",
+      "pinnedDescription": "Se încarcă automat ori de câte ori o sesiune vizează unul dintre aceste depozite.",
+      "pinnedToast": "Fixat la „{{repo}}”",
+      "pinFailed": "Nu s-a putut fixa repo",
+      "unboundToast": "Repo nelegat",
+      "unbindFailed": "Nu s-a putut dezlega repo"
+    }
   }
 }

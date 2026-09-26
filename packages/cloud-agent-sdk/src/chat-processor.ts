@@ -1,4 +1,8 @@
-import { normalizeMissingPartText, stripPartContentIfFile } from './part-utils';
+import {
+  normalizeMissingPartText,
+  normalizeMissingPatchFiles,
+  stripPartContentIfFile,
+} from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
 import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
@@ -110,10 +114,11 @@ function createChatProcessor(
           break;
         case 'message.part.updated': {
           // Normalize BEFORE the strip/guard logic: the wire can omit `text` on
-          // text/reasoning parts (KILO-APP-99), and the empty-text guard below
-          // must also see textless updates so they cannot clobber already
-          // streamed text. Identity-preserving for everything else.
-          const normalized = normalizeMissingPartText(event.part);
+          // text/reasoning parts (KILO-APP-99) and `files` on patch parts
+          // (KILO-APP-BZ), and the empty-text guard below must also see
+          // textless updates so they cannot clobber already streamed text.
+          // Identity-preserving for everything else.
+          const normalized = normalizeMissingPatchFiles(normalizeMissingPartText(event.part));
           if (options?.onToolAttachment) {
             emitToolAttachmentsBeforeStrip(normalized, options.onToolAttachment);
           }
@@ -128,7 +133,7 @@ function createChatProcessor(
               break;
             }
           }
-          sessionStorage.upsertPart(stripped.messageID, stripped);
+          sessionStorage.upsertPart(stripped.messageID, stripped, event.time);
           break;
         }
         case 'message.part.delta':
@@ -136,6 +141,13 @@ function createChatProcessor(
           break;
         case 'message.part.removed':
           sessionStorage.deletePart(event.messageId, event.partId);
+          break;
+        // The CLI drops messages it no longer serves (compaction scaffolding,
+        // reverted turns). Keep the local store in step with the durable
+        // transcript so a removed message cannot keep supplying state — e.g. a
+        // context reading — that a reopened session no longer has.
+        case 'message.removed':
+          sessionStorage.deleteMessage(event.messageId);
           break;
       }
     },
@@ -146,6 +158,11 @@ function createChatProcessor(
       if (!content) return;
       if (sessionStorage.getMessageInfo(messageId)) return;
 
+      // Same unconfirmed marker as the optimistic send-time row: the
+      // authoritative `message.updated` for this id replaces the info (role and
+      // synthetic flag) and its non-synthetic parts drop this placeholder part
+      // (`upsertPartDroppingStaleSyntheticParts`), so a confirmed record wins
+      // the role and the parts.
       const syntheticMessage: UserMessage = {
         id: messageId,
         sessionID: sessionId,
@@ -153,6 +170,7 @@ function createChatProcessor(
         time: { created: Date.now() },
         agent: '',
         model: { providerID: '', modelID: '' },
+        synthetic: true,
       };
       sessionStorage.upsertMessage(syntheticMessage);
 

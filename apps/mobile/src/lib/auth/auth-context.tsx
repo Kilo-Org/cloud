@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 import {
   createContext,
@@ -46,8 +45,15 @@ import {
   setSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  deleteStoredValue,
+  readStoredValue,
+  readStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
+import { type AuthSignOutCause, reportAuthBranch } from '@/lib/auth/sign-out-telemetry';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -55,9 +61,14 @@ import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-prefe
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
-import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
+import {
+  clearSessionScopedState,
+  clearSystemSearchIndexOnSignedOutLaunch,
+} from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   isSignOutActive,
@@ -65,6 +76,8 @@ import {
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
+import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
+import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { clearSessionAttentionForSignOut } from '@/lib/session-attention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
@@ -74,6 +87,7 @@ import {
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
+  ORGANIZATION_PERSONAL_STORAGE_KEY,
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
@@ -85,11 +99,15 @@ import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
-import { beginAuthenticatedOwner } from '@/lib/context-scope';
+import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/context-scope';
 
-// Pre-load tokens at module level so they're available before React mounts
-export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+// Pre-load tokens at module level so they're available before React mounts.
+// The raw throwing read is deliberate: a rejection here must reach the
+// bootstrap read below, not settle as "nothing stored", so the retry helper —
+// not this preload — owns the failure outcome (it reports the exhausted read at
+// warning level with the stable read fingerprint).
+export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
+const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -134,6 +152,19 @@ function readUserIdFromToken(token: string): string | null {
   }
 }
 
+/**
+ * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
+ * independent: a throw in one must never abort the transition or reject
+ * `signOut`, so each call site is guarded by this wrapper.
+ */
+function runBestEffortTeardown(step: () => void): void {
+  try {
+    step();
+  } catch {
+    // Best effort: a failed clear never aborts sign-out.
+  }
+}
+
 type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
@@ -154,7 +185,7 @@ type AuthContextValue = {
    *  until the fresh reads resolve. */
   retryRestore: () => void;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
-  signOut: (ended?: boolean) => Promise<void>;
+  signOut: (ended?: boolean, cause?: AuthSignOutCause) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -214,6 +245,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // yet, so the exchange's own epoch checks pass — the sign-out flag
             // must stop this publish, exactly like the one below.
             if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
+              markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
@@ -251,13 +283,33 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // signed-in user to the login screen.
           if (currentStored !== stored) {
             const published = getActiveToken()?.token ?? currentStored ?? undefined;
+            if (published) {
+              markRestoredAuthenticatedOwner();
+            }
             setToken(published);
             setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
             return;
           }
+          markRestoredAuthenticatedOwner();
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
+        } else if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+          // A launch that positively restored no session owns the index: the
+          // sign-out teardown's clear is fire-and-forget and the process can
+          // be killed before it lands, so a failure there would leave the
+          // previous account's titles searchable for the whole signed-out
+          // window with nothing to retry it. Re-run the idempotent clear; the
+          // index sync is gated off while signed out, and the next sign-in
+          // re-indexes its own account from its own cache. A sign-out or
+          // sign-in in flight owns the index instead and fires its own clear,
+          // so the epoch and sign-out fences hold here as for every other
+          // publish in this bootstrap.
+          clearSystemSearchIndexOnSignedOutLaunch();
+          // The account is now known to be none: a system-search destination
+          // captured before this point is not this process's to open, so the
+          // settle drops it instead of holding it for whoever signs in next.
+          setCurrentDeepLinkUserId(null);
         }
       } catch {
         // Every read exhausted its retries. The session is not known to be
@@ -315,6 +367,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         setAuthEpoch(currentAuthEpoch());
         setToken(undefined);
         clearActiveToken();
+        // Clear behind any in-flight hint write before persisting new credentials.
+        // If this fails, fail sign-in closed: a restart must never restore B's
+        // token alongside A's cache identity, even before B's getMe can answer.
+        await deleteAccountMetadata(ACTIVE_USER_ID_KEY);
+        // The Personal-choice marker is the same account-scoped selection
+        // state as the organization key: a login — including a direct account
+        // switch — must resolve its own default instead of inheriting the
+        // prior account's explicit Personal choice. Awaited before the new
+        // credentials publish, while still inside the FIFO auth-transition
+        // run, so the provider's restore can never read the prior account's
+        // marker.
+        await deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY);
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -359,7 +423,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     []
   );
 
-  const signOut = useCallback(async (ended = false) => {
+  const signOut = useCallback(async (ended = false, cause: AuthSignOutCause = 'user') => {
     // The ENTIRE sign-out body runs inside the FIFO auth-transition queue.
     // Dedupe inside the queued run, not at enqueue: a sign-out queued behind
     // an in-flight sign-out (or after a completed teardown) no-ops, so
@@ -407,6 +471,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // response cannot write the previous account's answer during
         // teardown.
         gateKiloClawOwned();
+        // Record the branch that fired immediately before the logout event,
+        // so exactly one row lands per actual sign-out — a deduped sign-out
+        // returned above and writes nothing — and it is attributed to the
+        // user. A server-refused refresh is the only ended-session path.
+        reportAuthBranch({
+          cause,
+          branch: cause === 'session_ended' ? 'refresh_401' : 'explicit',
+        });
         // Capture the logout event before any telemetry teardown step.
         captureEvent(LOGOUT_EVENT);
         // Remote cleanup (session revoke + push unregister + tombstone)
@@ -455,16 +527,20 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // deletion are members of the same always-attempted batch.
           await Promise.allSettled([
             writeCredentials(async () => {
-              await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-              await SecureStore.deleteItemAsync(
-                TOKEN_EXPIRES_AT_KEY,
-                IOS_BEARER_SECURE_STORE_OPTIONS
-              );
-              await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+              await deleteStoredValue(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
+            // The Personal-choice marker is account-scoped selection state
+            // beside the organization key. Clearing it here (and never on the
+            // token-less cold-launch render, which has no account yet) means
+            // the next account on this device resolves its own default
+            // instead of inheriting the signed-out account's explicit
+            // Personal choice.
+            deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY),
             deleteAccountMetadata(SESSION_FILTERS_KEY),
             deleteAccountMetadata(LIVE_SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
@@ -486,6 +562,24 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
+            // The offline translation cache holds the signed-out account's tool
+            // text (paths, commands, descriptions) and is refetchable, so it is
+            // a cache row that must not outlive the account. The runtime reset
+            // runs first and drains the writes it already dispatched (bounded,
+            // so a hung write cannot hold teardown); the write fence in the
+            // store then keeps a persist that settles after this clear from
+            // recreating its entry. The scope clear itself is bounded too, so a
+            // native clear that never answers still lets the batch settle.
+            // Best effort: both helpers swallow a storage failure.
+            (async () => {
+              try {
+                await clearToolSummaryTranslationMemoryForSignOut();
+              } finally {
+                // The allSettled batch contains a reset rejection, but the
+                // independent disk clear must still run before it settles.
+                await clearToolSummaryTranslationsForSignOut();
+              }
+            })(),
           ]);
           // Synchronous preference clears (best-effort) so nothing leaks to
           // the next signed-in account.
@@ -504,6 +598,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearRemoteMcpServers();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
+          clearCollapsedConnectCtasPreference();
+          // The launcher surfaces belong to the signed-out account: drop the
+          // dynamic shortcuts/tile natively and the durable last-opened record,
+          // so the next account never sees the previous account's session.
+          // Both are synchronous best-effort clears, guarded so neither can
+          // throw into sign-out.
+          runBestEffortTeardown(clearLauncherSurfaces);
+          runBestEffortTeardown(clearLastOpenedSession);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);
@@ -529,8 +631,41 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
-      if (!outcome.ok && outcome.refused && !isSignedOutReference.current) {
-        await signOut(true);
+      // A refresh-token read that spent its budget on null while another
+      // member of the credential set is present is an unreadable credential
+      // read, not an absent session: never sign out, surface the existing
+      // retryable restore error, and record the branch. An EMPTY credential
+      // set is not an unreadable member — it is genuinely no session, and the
+      // bootstrap gate already routes to login — so it must never raise the
+      // restore error. A sign-out that owns the tree also owns this surface:
+      // its escape hatch already cleared the flag, and a deduped second
+      // sign-out (isSignedOutReference) would dead-end the overlay's Sign out.
+      if (
+        !outcome.ok &&
+        outcome.unreadable &&
+        outcome.presentKeys.length > 0 &&
+        !isSignedOutReference.current
+      ) {
+        reportAuthBranch({
+          cause: 'credentials_unreadable',
+          branch: 'refresh_token_unreadable',
+          keyNames: outcome.presentKeys,
+        });
+        setRestoreFailed(true);
+        return;
+      }
+
+      // A refusal belongs to the session that owned the refresh. The epoch can
+      // move while the refresh awaited — or this call can join an in-flight
+      // refresh from an older session — so re-check before tearing down: a
+      // newer session must not be signed out by an older refusal.
+      if (
+        !outcome.ok &&
+        outcome.refused &&
+        isCurrentAuthEpoch(outcome.sessionVersion) &&
+        !isSignedOutReference.current
+      ) {
+        await signOut(true, 'session_ended');
       }
     };
 
@@ -553,7 +688,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
       void (async () => {
         try {
-          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          const expiresAtStr = await readStoredValueSafe(TOKEN_EXPIRES_AT_KEY);
           if (!expiresAtStr) {
             return;
           }
@@ -573,9 +708,24 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
           if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
             setToken(outcome.token);
+            return;
           }
-          // Transient or refused: do not sign out — the user did not trigger
-          // an authenticated request. Let the next real 401 handle it.
+          // A refused refresh means the stored pair is gone. The proactive path
+          // used to keep the dead token and wait for "the next real 401", which
+          // is exactly the retry the refresh refused: every foreground asked
+          // again. Stop the loop here and send the person to sign in. A
+          // transient failure leaves the session alone. The refusal is scoped
+          // to the session that owned it: the epoch can move while the clear
+          // inside the refresh awaits, so a refusal from a superseded session
+          // must not sign out the newer one.
+          if (
+            !outcome.ok &&
+            outcome.refused &&
+            isCurrentAuthEpoch(outcome.sessionVersion) &&
+            !isSignedOutReference.current
+          ) {
+            await signOut(true, 'session_ended');
+          }
         } catch {
           // A rejected expiry read (or refresh) must not escape as an
           // unhandled rejection. Return silently, exactly as the null-expiry
@@ -587,7 +737,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     return () => {
       subscription.remove();
     };
-  }, [token]);
+  }, [signOut, token]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

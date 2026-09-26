@@ -7,9 +7,9 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 
-const MAX_CONTROL_EVENT_OUTBOX_EVENTS = 256;
+export const MAX_CONTROL_EVENT_OUTBOX_EVENTS = 2048;
 export const MAX_CONTROL_EVENT_OUTBOX_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
-const PUBLICATION_DEADLINE_MS = 30_000;
+const PUBLICATION_DEADLINE_MS = 60_000;
 export const CONTROL_EVENT_BATCH_WINDOW_MS = 25;
 
 const URGENT_EVENT_TYPES = new Set([
@@ -95,6 +95,13 @@ type SquashKey = {
   identity: SessionEventIdentity;
 };
 
+type TailReplacement = {
+  previous: PreparedControlEventPublication;
+  payload: unknown;
+  bytes: number;
+  deadlineAt: number;
+};
+
 type BatchSelection = {
   items: PreparedControlEventPublication[];
   byteFull: boolean;
@@ -178,6 +185,46 @@ function sameSquashKey(left: SquashKey | undefined, right: SquashKey | undefined
     left.entityId === right.entityId &&
     sameSessionEventIdentity(left.identity, right.identity)
   );
+}
+
+type DeltaEnvelopeParts = {
+  left: Record<string, unknown>;
+  leftProperties: Record<string, unknown>;
+  leftDelta: string;
+  rightDelta: string;
+};
+
+function deltaEnvelopeParts(left: unknown, right: unknown): DeltaEnvelopeParts | undefined {
+  if (!isRecord(left) || !isRecord(right)) return undefined;
+  if (left.type !== 'message.part.delta' || right.type !== 'message.part.delta') return undefined;
+  const leftProperties = left.properties;
+  const rightProperties = right.properties;
+  if (!isRecord(leftProperties) || !isRecord(rightProperties)) return undefined;
+  if (leftProperties.field !== 'text' || rightProperties.field !== 'text') return undefined;
+  for (const key of ['sessionID', 'messageID', 'partID'] as const) {
+    const value = leftProperties[key];
+    if (typeof value !== 'string' || value !== rightProperties[key]) return undefined;
+  }
+  const leftDelta = leftProperties.delta;
+  const rightDelta = rightProperties.delta;
+  if (typeof leftDelta !== 'string' || typeof rightDelta !== 'string') return undefined;
+  const keys = Object.keys(leftProperties);
+  if (keys.length !== Object.keys(rightProperties).length) return undefined;
+  for (const key of keys) {
+    if (!Object.hasOwn(rightProperties, key)) return undefined;
+    if (key !== 'delta' && !Object.is(leftProperties[key], rightProperties[key])) return undefined;
+  }
+  return { left, leftProperties, leftDelta, rightDelta };
+}
+
+function mergedDeltaPayload(parts: DeltaEnvelopeParts): unknown {
+  return {
+    ...parts.left,
+    properties: {
+      ...parts.leftProperties,
+      delta: `${parts.leftDelta}${parts.rightDelta}`,
+    },
+  };
 }
 
 function serializedPublicationBytes(publication: ControlEventPublication): number {
@@ -308,26 +355,55 @@ export function createControlEventOutbox(options: {
     }
   };
 
-  const squashTarget = (
-    lane: Lane,
-    publication: PreparedControlEventPublication
-  ): PreparedControlEventPublication | undefined => {
+  const tailCandidate = (lane: Lane): PreparedControlEventPublication | undefined => {
     const previous = lane.entries.at(-1);
     if (!previous || previous === lane.pendingEntry) return undefined;
     if (lane.pendingBatch?.includes(previous)) return undefined;
-    return sameSquashKey(squashKeyFor(previous), squashKeyFor(publication)) ? previous : undefined;
+    return previous;
+  };
+
+  const squashTarget = (
+    lane: Lane,
+    publication: PreparedControlEventPublication
+  ): TailReplacement | undefined => {
+    const previous = tailCandidate(lane);
+    if (!previous) return undefined;
+    if (!sameSquashKey(squashKeyFor(previous), squashKeyFor(publication))) return undefined;
+    return {
+      previous,
+      payload: publication.payload,
+      bytes: serializedPublicationBytes({ ...previous, payload: publication.payload }),
+      deadlineAt: previous.deadlineAt,
+    };
+  };
+
+  // Retaining the older deadline would expire a still-growing group and lose its fresh text.
+  const deltaMergeTarget = (
+    lane: Lane,
+    publication: PreparedControlEventPublication
+  ): TailReplacement | undefined => {
+    const previous = tailCandidate(lane);
+    if (!previous) return undefined;
+    if (previous.event !== 'session.event' || publication.event !== 'session.event')
+      return undefined;
+    if (!sameSessionEventIdentity(previous.session, publication.session)) return undefined;
+    const parts = deltaEnvelopeParts(previous.payload, publication.payload);
+    if (!parts) return undefined;
+    const payload = mergedDeltaPayload(parts);
+    const bytes = serializedPublicationBytes({ ...previous, payload });
+    // Declining is not unconditionally lossless: the fallback append can still drop the
+    // delta as queue_overflow when the lane is already at its entry cap.
+    if (bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES) return undefined;
+    return { previous, payload, bytes, deadlineAt: publication.deadlineAt };
   };
 
   const hasSpaceFor = (
-    lane: Lane,
     publication: PreparedControlEventPublication,
-    replacement = squashTarget(lane, publication)
+    replacement: TailReplacement | undefined
   ): boolean => {
     const count = pendingCount - (replacement ? 1 : 0);
-    const bytes = pendingBytes - (replacement?.bytes ?? 0);
-    const publicationBytes = replacement
-      ? serializedPublicationBytes({ ...replacement, payload: publication.payload })
-      : publication.bytes;
+    const bytes = pendingBytes - (replacement?.previous.bytes ?? 0);
+    const publicationBytes = replacement ? replacement.bytes : publication.bytes;
     return (
       count < MAX_CONTROL_EVENT_OUTBOX_EVENTS &&
       bytes + publicationBytes <= MAX_CONTROL_EVENT_OUTBOX_BYTES
@@ -719,19 +795,23 @@ export function createControlEventOutbox(options: {
         cleanupLane(lane);
         return false;
       }
-      const replacement = squashTarget(lane, publication);
-      if (!hasSpaceFor(lane, publication, replacement)) {
+      const replacement = squashTarget(lane, publication) ?? deltaMergeTarget(lane, publication);
+      if (!hasSpaceFor(publication, replacement)) {
         reportFailure(publication, 'queue_overflow', false, 0);
         return false;
       }
       if (replacement) {
         const index = lane.entries.length - 1;
-        const bytes = serializedPublicationBytes({ ...replacement, payload: publication.payload });
-        pendingBytes += bytes - replacement.bytes;
-        const replaced = { ...replacement, payload: publication.payload, bytes };
-        if (replacement.preparedAt !== undefined)
+        pendingBytes += replacement.bytes - replacement.previous.bytes;
+        const replaced = {
+          ...replacement.previous,
+          payload: replacement.payload,
+          bytes: replacement.bytes,
+          deadlineAt: replacement.deadlineAt,
+        };
+        if (replacement.previous.preparedAt !== undefined)
           Object.defineProperty(replaced, 'preparedAt', {
-            value: replacement.preparedAt,
+            value: replacement.previous.preparedAt,
             enumerable: false,
           });
         lane.entries[index] = replaced;

@@ -108,11 +108,44 @@ export type SessionActivity =
   | { type: 'idle' }
   | { type: 'retrying'; attempt: number; message: string };
 
+/**
+ * Stable, locale-free code for every user-visible string the SDK writes
+ * itself. A localized client renders its own copy from the code; the web app
+ * keeps rendering `message` unchanged.
+ */
+export type SdkStatusMessageCode =
+  | 'agent-connection-lost'
+  | 'session-stopped'
+  | 'session-terminated'
+  | 'setting-up-environment'
+  | 'wrapping-up'
+  | 'committing'
+  | 'committed'
+  | 'commit-failed'
+  | 'message-delivery-failed'
+  | 'failed-to-stop-execution'
+  | 'child-session-not-found'
+  | 'selected-model-unavailable'
+  | 'insufficient-credits'
+  | 'not-authorized'
+  | 'service-unavailable'
+  | 'previous-task-in-progress'
+  | 'service-temporarily-unavailable'
+  | 'generic-error'
+  | 'connection-lost'
+  | 'connection-failed';
+
 /** Lifecycle outcome — drives bottom bar content (one thing at a time). */
 export type AgentStatus =
   | { type: 'idle' }
-  | { type: 'autocommit'; step: string; message: string }
-  | { type: 'error'; message: string }
+  | {
+      type: 'autocommit';
+      step: string;
+      message: string;
+      commitHash?: string;
+      code?: SdkStatusMessageCode;
+    }
+  | { type: 'error'; message: string; code?: SdkStatusMessageCode }
   | { type: 'disconnected' }
   | { type: 'interrupted' };
 
@@ -165,6 +198,20 @@ export type SlashCommandInfo = {
   subtask?: boolean | undefined;
 };
 
+/**
+ * Bound status the wrapper reports beside a `commands.available` catalog.
+ *
+ * Present only when the wrapper bounded the catalog to the shared 256-command
+ * and 512 KiB limits: `dropped` counts the non-skill rows it removed, and
+ * `overLimit` means the rows it kept still exceed a bound because the skill
+ * rows alone are over it (a skill row is never truncated). A consumer shows a
+ * notice for it, so a catalog that is missing rows is never silent.
+ */
+export type SlashCommandCatalogStatus = {
+  dropped: number;
+  overLimit: boolean;
+};
+
 /** Per-user-message delivery state, tracked via server-emitted cloud.message.* events. */
 export type MessageDeliveryState =
   | { status: 'queued' }
@@ -174,6 +221,17 @@ export type MessageDeliveryState =
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
     };
+
+export type SessionCommit = {
+  commitHash: string;
+  commitMessage: string;
+  messageId: string;
+  userMessageId: string;
+  committedAt: string;
+  timestamp?: string | undefined;
+  pushStatus: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
+  commitMessageTruncated?: true | undefined;
+};
 
 export type PreparationAttemptStatus = 'running' | 'completed' | 'failed';
 export type PreparationStepKind = 'phase' | 'setup_command';
@@ -217,6 +275,7 @@ export type ServiceStateSnapshot = {
   /** @deprecated Legacy transient setup output. v2 preparation uses preparationAttempts. */
   setupLog: readonly string[];
   preparationAttempts: readonly PreparationAttempt[];
+  commits: readonly SessionCommit[];
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
@@ -234,10 +293,11 @@ export type ResolvedSession =
       kiloSessionId: KiloSessionId;
       /**
        * Per-session capabilities reported by the owning CLI's most recent
-       * heartbeat or `sessions.list`. A `remote` session supports attachments
-       * only when `capabilities?.attachments === true`; absent / false is a
-       * structural no-attachments state (older CLIs, CLIs that have not yet
-       * advertised the capability, or CLIs that have downgraded).
+       * heartbeat or `sessions.list`. The gate is optimistic: a `remote`
+       * session supports attachments while the capability is unknown
+       * (`undefined` — older CLIs, CLIs that have not yet advertised it, or a
+       * mid-reconnect snapshot). Only an explicit `attachments: false`
+       * downgrades it.
        */
       capabilities?: { attachments?: boolean };
     }

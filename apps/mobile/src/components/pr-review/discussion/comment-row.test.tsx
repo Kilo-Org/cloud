@@ -1,8 +1,10 @@
+/* eslint-disable max-lines -- one suite for the row's moderation overflow, its capability gates, its CTA wiring and the shared-mutation provider (Fix 19) */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CommentRow, moderationFailure } from './comment-row';
+import { CommentRow } from './comment-row';
+import { CommentModerationProvider, moderationFailure } from './comment-moderation';
 import { type ReviewComment } from '@/lib/pr-review/discussion/review-discussion-types';
 
 // ── Fixture ──────────────────────────────────────────────────────────
@@ -21,7 +23,6 @@ function makeComment(overrides: Partial<ReviewComment> = {}): ReviewComment {
 }
 
 // ── Mocks ────────────────────────────────────────────────────────────
-
 type AlertButton = { text?: string; onPress?: () => void };
 type MutationOptions = {
   onSuccess?: (result: unknown, input?: unknown) => void;
@@ -67,6 +68,9 @@ vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownTex
 vi.mock('@/components/ui/icons', () => ({ MoreHorizontal: 'MoreHorizontal' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/pr-review/discussion/pr-comment-fix-with-kilo', () => ({
+  PrCommentFixWithKilo: 'PrCommentFixWithKilo',
+}));
 vi.mock('@/components/pr-review/discussion/reactions-row', () => ({
   ReactionsRow: 'ReactionsRow',
 }));
@@ -105,20 +109,60 @@ vi.mock('@/lib/utils', () => ({
 
 async function render(
   comment: ReviewComment,
-  viewerLogin: string | null = 'bob'
+  viewerLogin: string | null = 'bob',
+  extra: { readOnly?: boolean; reactionsSupported?: boolean } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
     await Promise.resolve();
     renderer = TestRenderer.create(
-      createElement(CommentRow, {
-        comment,
-        onToggleReaction: vi.fn<() => void>(),
-        viewerLogin,
-      })
+      createElement(
+        CommentModerationProvider,
+        null,
+        createElement(CommentRow, {
+          comment,
+          owner: 'octocat',
+          repo: 'hello',
+          number: 7,
+          commentKind: 'review',
+          onToggleReaction: vi.fn<() => void>(),
+          viewerLogin,
+          ...extra,
+        })
+      )
     );
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+  if (!renderer) {
+    throw new Error('Failed to create test renderer');
+  }
+  return renderer;
+}
+
+/** Mounts `count` rows under ONE provider (Fix 19: the mutations are shared). */
+async function renderRows(count: number): Promise<TestRenderer.ReactTestRenderer> {
+  let renderer: TestRenderer.ReactTestRenderer | null = null;
+  await act(async () => {
+    await Promise.resolve();
+    renderer = TestRenderer.create(
+      createElement(
+        CommentModerationProvider,
+        null,
+        ...Array.from({ length: count }, (_, index) =>
+          createElement(CommentRow, {
+            comment: makeComment({ commentId: index + 1, nodeId: `C${index + 1}` }),
+            owner: 'octocat',
+            repo: 'hello',
+            number: 7,
+            commentKind: 'review',
+            onToggleReaction: vi.fn<() => void>(),
+            viewerLogin: 'bob',
+          })
+        )
+      )
+    );
+  });
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- act() may not assign
   if (!renderer) {
     throw new Error('Failed to create test renderer');
   }
@@ -299,6 +343,70 @@ describe('CommentRow overflow actions', () => {
     expect(disabledButtonIndices()).toEqual([1, 2, 3]);
 
     renderer.unmount();
+  });
+});
+
+// Fix 19: the four moderation `useMutation` hooks used to mount once per row
+// (4N observers for N mounted rows). One provider owns them and every row
+// shares that set.
+describe('CommentModerationProvider sharing (Fix 19)', () => {
+  beforeEach(() => {
+    mutateFns.length = 0;
+    capturedOptions.length = 0;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('mounts four mutations once for a provider holding several rows, not once per row', async () => {
+    const renderer = await renderRows(3);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'MarkdownText')).toHaveLength(3);
+    expect(mutateFns).toHaveLength(4);
+    expect(capturedOptions).toHaveLength(4);
+
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow reactions capability gate (s6)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // eslint-disable-next-line typescript-eslint/promise-function-async -- thin wrapper around the shared renderer
+  function renderWithCapabilities(
+    reactionsSupported: boolean
+  ): Promise<TestRenderer.ReactTestRenderer> {
+    return render(makeComment(), null, { readOnly: true, reactionsSupported });
+  }
+
+  it('supported (default): renders the reactions row', async () => {
+    const renderer = await renderWithCapabilities(true);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('unsupported: renders no reactions row at all — never an empty or failing one', async () => {
+    const renderer = await renderWithCapabilities(false);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow Fix with Kilo CTA (s2)', () => {
+  it('passes the provider triple, the comment id and the kind to the row CTA', async () => {
+    const renderer = await render(makeComment({ commentId: 42 }));
+
+    const cta = renderer.root.find(node => String(node.type) === 'PrCommentFixWithKilo');
+    expect(cta.props).toMatchObject({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      commentId: 42,
+      kind: 'review',
+    });
   });
 });
 

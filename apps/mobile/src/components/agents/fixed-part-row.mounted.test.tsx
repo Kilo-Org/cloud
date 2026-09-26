@@ -8,12 +8,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
 import { FixedPartRow } from './fixed-part-row';
+import {
+  findContentRow,
+  findHost,
+  renderRow,
+  textWithContent,
+} from './fixed-part-row.mounted.test-helpers';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so this suite stays native-free.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -39,49 +55,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 type RowProps = Parameters<typeof FixedPartRow>[0];
-
-async function renderRow(props: RowProps): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
-  await act(async () => {
-    await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(FixedPartRow, props));
-  });
-  const renderer = rendererRef.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function findHost(
-  root: TestRenderer.ReactTestInstance,
-  type: string
-): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => node.type === type);
-}
-
-/** The inner row that carries the label and, when present, the badge. */
-function findContentRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  const row = findHost(root, 'View').find(
-    node =>
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('flex-1') &&
-      node.props.className.includes('flex-row')
-  );
-  if (!row) {
-    throw new Error('label/badge content row not found');
-  }
-  return row;
-}
-
-function textWithContent(
-  root: TestRenderer.ReactTestInstance,
-  content: string
-): TestRenderer.ReactTestInstance[] {
-  return findHost(root, 'Text').filter(node => node.props.children === content);
-}
 
 describe('FixedPartRow mounted', () => {
   it('renders a pressable row with a details hint and chevron when onPress is set', async () => {
@@ -164,6 +137,39 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(1);
   });
 
+  it('pins the loading spinner to the status-icon square so the row height is status-independent', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'running',
+      accessibilityLabel: 'bash tool, running',
+    });
+
+    const spinner = findHost(renderer.root, 'ActivityIndicator')[0];
+    expect(spinner).toBeDefined();
+    if (!spinner) {
+      throw new Error('activity indicator not found');
+    }
+    // RN's small spinner is 20x20 while the status icons are 16x16. Without the
+    // fixed square the spinner sizes the row and the transcript row is ~2.5dp
+    // taller while a tool runs than after it resolves. The spinner must render
+    // inside the same 16x16 slot the completed/error icons occupy.
+    const slot = spinner.parent;
+    expect(slot?.type).toBe('View');
+    expect(slot?.props.className).toContain('size-[16px]');
+    expect(slot?.props.className).toContain('items-center');
+    expect(slot?.props.className).toContain('justify-center');
+
+    const completed = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'completed',
+      accessibilityLabel: 'bash tool, completed',
+    });
+    const completedIcon = findHost(completed.root, 'Eye')[0];
+    expect(completedIcon?.props.size).toBe(16);
+  });
+
   it('renders the completed icon when status is completed and an icon is provided', async () => {
     const renderer = await renderRow({
       icon: Eye,
@@ -189,6 +195,52 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
     const labels = findHost(renderer.root, 'Text');
     expect(labels.some(node => node.props.children === 'app.ts')).toBe(true);
+  });
+
+  it('forwards a long press to the message-details handler through the context', async () => {
+    const onPress = vi.fn(() => undefined);
+    const messageLongPress = vi.fn(() => undefined);
+    const renderer = await renderRow(
+      {
+        label: 'Thinking',
+        labelKind: 'eyebrow',
+        variant: 'dashed',
+        onPress,
+        accessibilityLabel: 'Thinking',
+      },
+      messageLongPress
+    );
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    expect(pressable).toBeDefined();
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+    expect(pressable.props.onLongPress).toBe(messageLongPress);
+
+    // The row stays enabled for taps: long-press opens the message details,
+    // a plain tap still opens the part detail.
+    expect(pressable.props.disabled).toBe(false);
+    expect(pressable.props.onPress).toBe(onPress);
+  });
+
+  it('keeps tap-only behavior when no message long-press is mounted', async () => {
+    const onPress = vi.fn(() => undefined);
+    const renderer = await renderRow({
+      label: 'Thinking',
+      labelKind: 'eyebrow',
+      variant: 'dashed',
+      onPress,
+      accessibilityLabel: 'Thinking',
+    });
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    expect(pressable).toBeDefined();
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+    expect(pressable.props.onLongPress).toBeUndefined();
+    expect(pressable.props.onPress).toBe(onPress);
   });
 
   it('renders no leading slot at all when status is absent (reasoning rows)', async () => {
@@ -266,7 +318,11 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
   };
   act(() => {
     rendererRef.current = TestRenderer.create(
-      createElement(ToolSummaryTranslationScope, null, createElement(FixedPartRow, props))
+      createElement(ToolSummaryTranslationScope, {
+        itemId: 'part-1',
+        // eslint-disable-next-line no-children-prop -- the scope's props require children; the variadic form does not typecheck
+        children: createElement(FixedPartRow, props),
+      })
     );
   });
   const renderer = rendererRef.current;
@@ -279,9 +335,9 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -290,11 +346,15 @@ async function settleTranslation(): Promise<void> {
 describe('FixedPartRow tool-summary translation', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: MODEL });
   });
 
   it('translates the visible label and the spoken summary inside the scope', async () => {
-    requestMock.mockResolvedValue('Lire le fichier');
+    requestMock.mockResolvedValue(['Lire le fichier']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,
@@ -315,7 +375,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request outside the scope while enabled', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = await renderRow({
       icon: Eye,
@@ -354,7 +414,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request inside the scope while disabled', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: false, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,
@@ -374,7 +434,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request for a non-translatable label', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,

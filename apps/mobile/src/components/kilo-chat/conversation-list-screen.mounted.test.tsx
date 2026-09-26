@@ -75,7 +75,7 @@ vi.mock('./app-aware-keyboard-padding', () => ({ AppAwareKeyboardPaddingView: 'K
 vi.mock('./hooks/use-kilo-chat-client', () => ({ useKiloChatClient: vi.fn() }));
 vi.mock('./hooks/use-instance-presence', () => ({ useInstancePresence: vi.fn() }));
 vi.mock('./hooks/use-app-active-and-focused', () => ({ useAppActiveAndFocused: () => true }));
-vi.mock('./hooks/use-now-ticker', () => ({ useNowTicker: () => 1_800_000_000_000 }));
+vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => 1_800_000_000_000 }));
 vi.mock('./hooks/use-conversations', () => ({
   useConversations: mocks.list,
   useCreateConversation: () => ({ mutate: mocks.create, isPending: false }),
@@ -100,6 +100,20 @@ function refresh(node: { props: unknown }) {
     refreshControl: ReactElement<{ onRefresh: () => void }>;
   };
   refreshControl.props.onRefresh();
+}
+
+type RenderedRow = ReactElement<{ now: number; conversation: unknown }>;
+
+/**
+ * FlashList is stubbed in these tests, so its `renderItem` never runs. Call it
+ * directly to inspect the row element the list would mount.
+ */
+function renderItemElement(list: { props: Record<string, unknown> }, item: unknown): RenderedRow {
+  const renderItem = list.props.renderItem as (args: {
+    item: unknown;
+    index: number;
+  }) => ReactElement<{ children: RenderedRow }>;
+  return renderItem({ item, index: 0 }).props.children;
 }
 
 beforeEach(() => {
@@ -147,6 +161,38 @@ describe('Kilo Chat full-body states', () => {
     refresh(list);
     expect(mocks.refresh).toHaveBeenCalledOnce();
     expect(root.findAllByType('Plus' as ElementType)).toHaveLength(1);
+  });
+
+  it('passes the ticker clock to every row so the timestamp label can advance', async () => {
+    // A relative label must be derived from a traced prop. If the row reads
+    // `Date.now()` itself, React Compiler memoizes the label against the
+    // unchanged conversation and the on-screen text freezes.
+    mocks.list.mockReturnValue({
+      data: {
+        conversations: [
+          { conversationId: 'conversation-1', joinedAt: 1_800_000_000_000 },
+          { conversationId: 'conversation-2', joinedAt: 1_800_000_000_000 },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      refetch: mocks.refetch,
+    });
+    const root = await mountList();
+    const list = root.findByType('FlashList' as ElementType);
+    const entries = list.props.data as {
+      kind: string;
+      conversation?: { conversationId: string };
+    }[];
+    const conversationEntries = entries.filter(entry => entry.kind === 'conversation');
+    expect(conversationEntries).toHaveLength(2);
+
+    for (const entry of conversationEntries) {
+      const row = renderItemElement(list, entry);
+      expect(row.type).toBe('ConversationRow');
+      expect(row.props.now).toBe(1_800_000_000_000);
+      expect(row.props.conversation).toBe(entry.conversation);
+    }
   });
 
   it('centers list failures without rendering the empty-list creation action', async () => {

@@ -32,6 +32,10 @@ const state = vi.hoisted(() => ({
   internet: 'online' as BannerState,
   connection: { isConnected: true, reconnectExhausted: false },
   prReviewEnabled: true,
+  /** Landscape side safe areas (notch/sensor); portrait is all zeros. */
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  /** The platform value the safe-area layout must be identical under. */
+  platformOS: 'ios' as 'ios' | 'android',
   refetch: vi.fn<() => Promise<boolean>>(),
   boundaryRefetch: vi.fn(),
   socketRetry: vi.fn(),
@@ -53,13 +57,19 @@ vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+  useSafeAreaInsets: () => state.insets,
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  // A getter so a test can flip the platform and re-render: the safe-area
+  // layout must not depend on it.
+  Platform: {
+    get OS() {
+      return state.platformOS;
+    },
+  },
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -83,6 +93,9 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+vi.mock('@/components/home/new-task-from-picture-button', () => ({
+  NewTaskFromPictureButton: 'NewTaskFromPictureButton',
+}));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
@@ -227,6 +240,8 @@ beforeEach(() => {
     terminalError: null,
   });
   Object.assign(state.connection, { isConnected: true, reconnectExhausted: false });
+  Object.assign(state.insets, { top: 0, bottom: 0, left: 0, right: 0 });
+  state.platformOS = 'ios';
   state.internet = 'online';
   state.prReviewEnabled = true;
   state.destination = '';
@@ -302,6 +317,21 @@ describe('HomeScreen composition', () => {
     }
   });
 
+  it('shows the picture entry beside the new task action once the Home surface is ready', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+    state.boundary.org = state.boundary.orgs[0];
+    await renderHome();
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+    expect(nodes('NewTaskFromPictureButton')).toHaveLength(1);
+    expect(nodes('NewTaskFromPictureButton')[0]?.props.organizationId).toBe('org-1');
+
+    state.auth.isLoading = true;
+    await renderHome();
+    expect(nodes('NewTaskFromPictureButton')).toHaveLength(0);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+  });
+
   it.each([false, true])('admits rows and actions with organization readiness=%s', async loaded => {
     state.organization.organizationId = 'org-1';
     state.organization.isLoaded = loaded;
@@ -313,7 +343,7 @@ describe('HomeScreen composition', () => {
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
     expect(nodes('RemoteSessionRow')).toHaveLength(loaded ? 1 : 0);
     expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
-    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 1);
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 3);
   });
 
   it.each([false, true])(
@@ -381,9 +411,21 @@ describe('Home live presentation', () => {
   ])('keeps valid actions and truthful content during $name', async test => {
     Object.assign(state.live, test.patch);
     await renderHome();
-    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 1 : 0);
+    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 3 : 0);
     if (test.skeleton) {
-      expect(nodes('Skeleton')[0]?.props.className).toContain('min-h-[72px]');
+      // The placeholder keeps the row frame: a reserved min-height card, and
+      // no full-width skeleton block standing in for the whole surface.
+      expect(
+        nodes('View').some(view => {
+          const className = String(view.props.className ?? '');
+          return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+        })
+      ).toBe(true);
+      expect(
+        nodes('Skeleton').some(skeleton =>
+          String(skeleton.props.className ?? '').includes('w-full')
+        )
+      ).toBe(false);
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
     expect(text().includes("Couldn't load active sessions")).toBe(Boolean(test.error));
@@ -431,7 +473,7 @@ describe('Home live presentation', () => {
     state.connection.isConnected = false;
     state.live.isPaused = true;
     await renderHome();
-    expect(nodes('Skeleton')).toHaveLength(1);
+    expect(nodes('Skeleton')).toHaveLength(3);
     expect(text()).not.toContain('Nothing running right now');
     expect(text()).not.toContain('Connecting…');
     expect(text()).not.toContain('No internet connection');
@@ -549,6 +591,10 @@ describe('Home live presentation', () => {
     });
     const unsubscribe = observer.subscribe(() => undefined);
     try {
+      // An accepted-empty surface paints no loading card, so the native pull
+      // indicator is its only in-flight indicator and round-trips `refreshing`
+      // there (the `pending` surface withholds it; see the case below).
+      state.live.hasAcceptedSuccess = true;
       const pending = Promise.withResolvers<boolean>();
       state.refetch.mockReturnValue(pending.promise);
       await renderHome();
@@ -599,6 +645,52 @@ describe('Home live presentation', () => {
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(text()).toContain('Nothing running right now');
     expect(state.announcements).toEqual(['Loading…']);
+  });
+
+  it('withholds the platform pull indicator while the live section shows its own loading card', async () => {
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    state.live.hasAcceptedSuccess = false;
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // The section's own loading card is the surface's single in-flight
+    // indicator while the live content is pending, so the platform pull
+    // control must not also hold the scroll inset open for a second one.
+    expect(refresh().props.refreshing).toBe(false);
+    expect(
+      nodes('View').some(view => {
+        const className = String(view.props.className ?? '');
+        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+      })
+    ).toBe(true);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+
+    // Control: an accepted empty card paints no loading card, so the native
+    // pull indicator is the surface's only in-flight indicator there.
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    const control = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(control.promise);
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      control.resolve(true);
+      await control.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
   });
 });
 
@@ -715,7 +807,7 @@ describe('Home admission', () => {
       expect(text()).not.toContain('Engineering');
     }
     if (mode === 'membership paused') {
-      expect(nodes('Skeleton')).toHaveLength(1);
+      expect(nodes('Skeleton')).toHaveLength(3);
       expect(text()).not.toContain('Organization unavailable');
     }
     if (
@@ -837,5 +929,105 @@ describe('Home admission', () => {
     expect(nodes('RemoteSessionRow')).toHaveLength(0);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     expect(text()).not.toContain('Nothing running right now');
+  });
+});
+
+describe('Home leading edge', () => {
+  /** The outer header chrome: the first `bg-background` container above the logo. */
+  function headerContainerClass() {
+    let node = nodes('Image')[0]?.parent ?? null;
+    while (node) {
+      if (
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('bg-background')
+      ) {
+        return node.props.className;
+      }
+      node = node.parent;
+    }
+    throw new Error('Missing the header container above the logo');
+  }
+
+  /** Host views that carry the landscape side safe area as inline padding. */
+  function sideInsetViews(side: number) {
+    return nodes('View').filter(node => {
+      const { paddingLeft, paddingRight } = (node.props.style ?? {}) as {
+        paddingLeft?: number;
+        paddingRight?: number;
+      };
+      return paddingLeft === side && paddingRight === side;
+    });
+  }
+
+  it('clears the landscape side safe area on the page body, exactly as the header chrome does', async () => {
+    // The reporter's device reports a large left cutout in landscape (47pt is
+    // the fleet's worst case, see `tab-bar-layout.test.ts`).
+    state.insets.left = 47;
+    state.insets.right = 47;
+    await renderHome();
+
+    // The header chrome and the page body must clear the SAME sensor by the
+    // same amount, or the brand mark sits inside the leading edge of the
+    // sections, cards and actions below it.
+    const inset = sideInsetViews(47);
+    expect(inset).toHaveLength(2);
+    const scroll = nodes('ScrollView')[0];
+    expect(scroll).toBeDefined();
+    expect(inset.some(view => view.findAll(node => node === scroll).length > 0)).toBe(true);
+  });
+
+  it('renders the same landscape inset on iOS and Android, one implementation for both', async () => {
+    state.insets.left = 47;
+    state.insets.right = 47;
+    state.platformOS = 'ios';
+    await renderHome();
+    const ios = sideInsetViews(47);
+
+    state.platformOS = 'android';
+    await renderHome();
+    const android = sideInsetViews(47);
+
+    // One implementation for both platforms: the platform value never changes
+    // the header chrome's or the page body's leading edge.
+    expect(ios).toHaveLength(2);
+    expect(android.map(view => view.props.style)).toEqual(ios.map(view => view.props.style));
+  });
+
+  it('clears the landscape side safe area around the centered feedback body too', async () => {
+    state.insets.left = 47;
+    state.insets.right = 47;
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [];
+    state.boundary.isError = true;
+    await renderHome();
+    state.prReviewEnabled = false;
+    await renderHome();
+
+    const centered = nodes('CenteredState')[0];
+    expect(centered).toBeDefined();
+    expect(
+      sideInsetViews(47).some(view => view.findAll(node => node === centered).length > 0)
+    ).toBe(true);
+  });
+
+  it('leaves portrait geometry untouched when the side insets are zero', async () => {
+    await renderHome();
+    const positivePadding = nodes('View').filter(node => {
+      const style = node.props.style as { paddingLeft?: number; paddingRight?: number } | undefined;
+      return (style?.paddingLeft ?? 0) > 0 || (style?.paddingRight ?? 0) > 0;
+    });
+    expect(positivePadding).toHaveLength(0);
+  });
+
+  it('keeps the brand mark on the page gutter that the sections and cards use', async () => {
+    await renderHome();
+    const bodyGutter = nodes('View').find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.split(' ').includes('mx-4')
+    );
+    expect(bodyGutter).toBeDefined();
+    // The logo is the header's only visible child, so the header's px-4 is the
+    // brand mark's leading edge; the body's leading edge is the mx-4 above.
+    expect(headerContainerClass()).toContain('px-4');
   });
 });

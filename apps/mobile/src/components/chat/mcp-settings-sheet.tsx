@@ -310,7 +310,7 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
             title={t('modelChat.mcp.use')}
             subtitle={t('modelChat.mcp.useDescription')}
             value={kilo.enabled}
-            disabled={false}
+            disabled={!kilo.toggleable}
             busy={kilo.busy}
             onValueChange={next => {
               settings.setEnabled(next);

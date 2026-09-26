@@ -49,25 +49,30 @@ import {
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
 // clause forces new entries here whenever a provider is added to
-// VercelUserByokInferenceProviderIdSchema.
-const VERCEL_BYOK_PROVIDER_NAMES = {
+// VercelUserByokInferenceProviderIdSchema. The `openai` entry names the pasted
+// API key: the personal BYOK page also renders the "Sign in with ChatGPT"
+// connection card, so a bare 'OpenAI' there and here would be two different
+// things with one name.
+export const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
-  azure: 'Azure Foundry (experimental)',
+  azure: 'Azure Foundry',
   bedrock: 'AWS Bedrock',
   deepseek: 'DeepSeek',
-  openai: 'OpenAI',
+  openai: 'OpenAI API key',
   inception: 'Inception',
   fireworks: 'Fireworks',
   google: 'Google AI Studio',
   minimax: 'MiniMax',
   mistral: 'Mistral AI',
   moonshotai: 'Moonshot AI',
+  nebius: 'Nebius Token Factory',
   novita: 'Novita',
   perplexity: 'Perplexity',
   vertex: 'Google Vertex AI',
@@ -92,6 +97,15 @@ const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS]
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
+
+/**
+ * The object of a key-row action ("Anthropic API key"). A display name that
+ * already ends in 'API key' is used as-is, so an entry named for the kind of
+ * credential it holds never produces 'OpenAI API key API key'.
+ */
+function apiKeyObjectLabel(providerName: string): string {
+  return providerName.endsWith('API key') ? providerName : `${providerName} API key`;
+}
 
 function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
   return (
@@ -356,7 +370,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const handleDelete = async (keyId: string, providerName: string) => {
     if (
       await confirm({
-        title: `Delete the ${providerName} API key?`,
+        title: `Delete the ${apiKeyObjectLabel(providerName)}?`,
         description: 'This key will be removed and can no longer be used for requests.',
         confirmLabel: 'Delete key',
         destructive: true,
@@ -395,6 +409,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     );
   }
 
+  // The "Sign in with ChatGPT" connection is stored in this table under its own
+  // provider id, but it is not a pasted key: the card above the list owns it, so
+  // it never appears here with edit, toggle, test or delete controls.
+  const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
+
   // Map provider IDs to display names
   const getProviderDisplayName = (providerId: string) => {
     const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
@@ -422,7 +441,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           </Button>
         </CardHeader>
         <CardContent>
-          {keys && keys.length > 0 ? (
+          {listedKeys && listedKeys.length > 0 ? (
             <div className="rounded-md border">
               <table className="w-full">
                 <thead>
@@ -434,7 +453,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {keys.map(
+                  {listedKeys.map(
                     (key: {
                       id: string;
                       provider_id: string;
@@ -475,7 +494,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     handleToggleEnabled(key.id, isEnabled)
                                   }
                                   disabled={setEnabledMutation.isPending}
-                                  aria-label={`Toggle ${getProviderDisplayName(key.provider_id)} BYOK key`}
+                                  aria-label={`Toggle ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
                                 />
                               ) : null}
                               <span className="text-sm">
@@ -495,7 +514,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                               }
                               disabled={testMutation.isPending}
                               title="Test API key"
-                              aria-label={`Test ${getProviderDisplayName(key.provider_id)} API key`}
+                              aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
                             >
                               <FlaskConical className="size-4" />
                             </Button>
@@ -506,7 +525,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                   size="sm"
                                   onClick={() => handleEdit(key.id)}
                                   disabled={updateMutation.isPending}
-                                  aria-label={`Update ${getProviderDisplayName(key.provider_id)} API key`}
+                                  aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
                                 >
                                   <Edit className="size-4" />
                                 </Button>
@@ -517,7 +536,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     handleDelete(key.id, getProviderDisplayName(key.provider_id))
                                   }
                                   disabled={deleteMutation.isPending}
-                                  aria-label={`Delete ${getProviderDisplayName(key.provider_id)} API key`}
+                                  aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
                                 >
                                   <Trash2 className="size-4" />
                                 </Button>

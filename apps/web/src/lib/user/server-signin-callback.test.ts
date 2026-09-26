@@ -29,6 +29,11 @@ jest.mock('@/lib/organizations/organization-sso-policy', () => ({
 jest.mock('@/lib/organizations/verified-domain-membership', () => ({
   ensureVerifiedDomainOrganizationMembership: jest.fn(),
 }));
+jest.mock('@/lib/organizations/organizations', () => ({
+  ...(jest.requireActual('@/lib/organizations/organizations') as object),
+  getUserOrgMemberships: jest.fn(),
+  getOrganizationById: jest.fn(),
+}));
 jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
@@ -41,6 +46,7 @@ import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
+import { getOrganizationById, getUserOrgMemberships } from '@/lib/organizations/organizations';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -49,8 +55,13 @@ const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomai
 const mockEnsureVerifiedDomainOrganizationMembership = jest.mocked(
   ensureVerifiedDomainOrganizationMembership
 );
+const mockGetUserOrgMemberships = jest.mocked(getUserOrgMemberships);
+const mockGetOrganizationById = jest.mocked(getOrganizationById);
 
 const signIn = authOptions.callbacks!.signIn!;
+
+/** The organization a shared-services linking session targets. */
+const SHARED_SERVICES_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000002';
 
 function setValidTurnstileCookie() {
   cookieStore.set('turnstile_jwt', {
@@ -72,6 +83,8 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     });
     mockLinkAccountToExistingUser.mockReset();
     mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    mockGetUserOrgMemberships.mockReset();
+    mockGetOrganizationById.mockReset();
     mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
       status: 'not_required',
       domain: 'example.com',
@@ -237,6 +250,104 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
+  it('admits a passkey without Turnstile or user settlement, after the SSO-authority block', async () => {
+    // No Turnstile cookie is set: the redeemed ticket is the identity proof.
+    const result = await signIn({
+      user: { id: 'passkey-user', email: 'passkey@example.com', name: 'Passkey User', image: '' },
+      account: { provider: 'passkey', providerAccountId: 'passkey-user', type: 'credentials' },
+      profile: undefined,
+    } as never);
+
+    expect(result).toBe(true);
+    expect(cookieStore.has('turnstile_jwt')).toBe(false);
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
+  });
+
+  it('still enforces SSO for a passkey sign-in on an SSO-protected domain', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-org',
+    });
+
+    const result = await signIn({
+      user: { id: 'passkey-user', email: 'passkey@example.com', name: 'Passkey User', image: '' },
+      account: { provider: 'passkey', providerAccountId: 'passkey-user', type: 'credentials' },
+      profile: undefined,
+    } as never);
+
+    expect(result).toContain('/users/sign_in?domain=example.com');
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('skips ordinary SSO enforcement during provider-account linking', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-org',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({
+      success: true,
+      user: { id: 'existing-user', blocked_reason: null },
+    } as never);
+
+    const result = await signIn({
+      user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
+      },
+      profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
+    } as never);
+
+    expect(result).toBe(true);
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+    expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+      organizationId: '00000000-0000-4000-8000-000000000001',
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({
+      success: true,
+      user: { id: 'existing-user', blocked_reason: null },
+    } as never);
+
+    const profile: Record<string, unknown> = {
+      sub: 'openai-org-sub',
+      email: 'org-link@example.com',
+    };
+
+    const result = await signIn({
+      user: { id: 'x', email: 'org-link@example.com', name: 'Org Link', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
+      },
+      profile,
+    } as never);
+
+    expect(result).toBe(true);
+    expect(profile.openAiChatGptOrganizationId).toBe('00000000-0000-4000-8000-000000000001');
+  });
+
   it('does not run verified-domain admission during provider-account linking', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: 'existing-user',
@@ -256,5 +367,73 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(result).toBe(true);
     expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
     expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
+  });
+  // The link start authorized the connect, but the OpenAI consent round-trip
+  // can outlive that role, so the callback re-reads the current membership
+  // before the jwt callback stores the organization's shared-services
+  // connection.
+  async function openAiSharedServicesSignIn() {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+      organizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      chatGptScope: 'shared_services',
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({
+      success: true,
+      user: { id: 'existing-user', blocked_reason: null },
+    } as never);
+
+    return signIn({
+      user: { id: 'x', email: 'shared-services@example.com', name: 'Shared', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
+      },
+      profile: { sub: 'openai-shared-services-sub', email: 'shared-services@example.com' },
+    } as never);
+  }
+
+  it('refuses the shared-services connect when the connector role was revoked', async () => {
+    mockGetUserOrgMemberships.mockResolvedValueOnce([
+      { orgId: SHARED_SERVICES_ORGANIZATION_ID, role: 'member' },
+    ]);
+    mockGetOrganizationById.mockResolvedValueOnce({ parent_organization_id: null } as never);
+
+    const result = await openAiSharedServicesSignIn();
+
+    // NextAuth stops before the jwt callback when the `signIn` callback returns
+    // a redirect string, so the refused connect writes no connection row. The
+    // redirect is the organization BYOK page, whose card renders the code.
+    expect(result).toBe(
+      `/organizations/${SHARED_SERVICES_ORGANIZATION_ID}/byok?openai_error=LINKING-FAILED`
+    );
+  });
+
+  it('admits the shared-services connect while the connector still manages the organization', async () => {
+    mockGetUserOrgMemberships.mockResolvedValueOnce([
+      { orgId: SHARED_SERVICES_ORGANIZATION_ID, role: 'admin' },
+    ]);
+    mockGetOrganizationById.mockResolvedValueOnce({ parent_organization_id: null } as never);
+
+    await expect(openAiSharedServicesSignIn()).resolves.toBe(true);
+  });
+
+  it('admits the shared-services connect for a manager of the parent organization', async () => {
+    // The link start grants this through the organization-access helper, which
+    // inherits parent-organization management roles, so the callback must not
+    // refuse a connect the start admitted.
+    mockGetUserOrgMemberships.mockResolvedValueOnce([
+      { orgId: '00000000-0000-4000-8000-000000000003', role: 'owner' },
+    ]);
+    mockGetOrganizationById.mockResolvedValueOnce({
+      parent_organization_id: '00000000-0000-4000-8000-000000000003',
+    } as never);
+
+    await expect(openAiSharedServicesSignIn()).resolves.toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
-import type { KiloSessionId } from './types';
+import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -399,7 +399,6 @@ export const remoteCommandCatalogV1Schema = z
     protocolVersion: 1 as const,
     canExitSession: catalog.canExitSession,
     commands: catalog.commands
-      .filter(command => command.source !== 'skill')
       // SlashCommandInfo requires a `hints` array; remote commands with no
       // hints still have an empty array after the strict shape parse above.
       .map(command => ({
@@ -462,9 +461,10 @@ export const activeSessionSchema = z
     parentSessionId: z.string().optional(),
     /**
      * Per-session capabilities advertised by the owning CLI in its
-     * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
-     * gates the remote-CLI attachment path; absent / false means the CLI
-     * either predates the capability or has not yet reported it.
+     * `sessions.heartbeat` / `sessions.list` payload. Only an explicit
+     * `attachments: false` closes the remote-CLI attachment path; absent
+     * (the CLI predates the capability or has not yet reported it) is
+     * treated as supported.
      *
      * Declared here (rather than relying on `.passthrough()`) so typed
      * consumers can reason about the shape without an extra `as` cast. The
@@ -644,6 +644,7 @@ export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
 export const messagePartUpdatedDataSchema = z.object({
   part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
 
@@ -662,6 +663,12 @@ export const messagePartRemovedDataSchema = z.object({
   partID: z.string(),
 });
 export type MessagePartRemovedData = z.infer<typeof messagePartRemovedDataSchema>;
+
+export const messageRemovedDataSchema = z.object({
+  sessionID: z.string(),
+  messageID: z.string(),
+});
+export type MessageRemovedData = z.infer<typeof messageRemovedDataSchema>;
 
 export const sessionStatusDataSchema = z.object({
   sessionID: z.string(),
@@ -873,6 +880,22 @@ export const autocommitStartedDataSchema = z.object({
 });
 export type AutocommitStartedData = z.infer<typeof autocommitStartedDataSchema>;
 
+const commitPushStatusSchema = z.enum(['pushed', 'failed', 'not_attempted', 'unknown']);
+const maxCommitMessageBytes = 16 * 1024;
+
+export const sessionCommitDataSchema = z.object({
+  commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
+  commitMessage: z
+    .string()
+    .max(maxCommitMessageBytes)
+    .refine(value => new TextEncoder().encode(value).byteLength <= maxCommitMessageBytes),
+  messageId: z.string().min(1).max(256),
+  userMessageId: z.string().min(1).max(256),
+  committedAt: z.iso.datetime({ offset: true }),
+  pushStatus: commitPushStatusSchema,
+  commitMessageTruncated: z.literal(true).optional(),
+});
+
 export const autocommitCompletedDataSchema = z.object({
   messageId: z.string(),
   success: z.boolean().catch(false),
@@ -880,6 +903,10 @@ export const autocommitCompletedDataSchema = z.object({
   skipped: z.boolean().optional(),
   commitHash: z.string().optional(),
   commitMessage: z.string().optional(),
+  userMessageId: z.string().optional().catch(undefined),
+  committedAt: sessionCommitDataSchema.shape.committedAt.optional().catch(undefined),
+  pushStatus: commitPushStatusSchema.optional().catch(undefined),
+  commitMessageTruncated: z.boolean().optional().catch(undefined),
 });
 export type AutocommitCompletedData = z.infer<typeof autocommitCompletedDataSchema>;
 
@@ -909,8 +936,16 @@ export const slashCommandInfoSchema = z.object({
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
 
+export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatus> = z.object({
+  dropped: z.number().int().nonnegative(),
+  overLimit: z.boolean(),
+});
+
 export const commandsAvailableDataSchema = z.object({
   commands: z.array(slashCommandInfoSchema),
+  // The notice is a nicety and the catalog is essential, so a malformed status
+  // is dropped instead of failing the whole event and losing the catalog.
+  catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
 

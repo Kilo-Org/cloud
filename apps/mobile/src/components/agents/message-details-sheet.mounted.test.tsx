@@ -261,6 +261,32 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('marks the queued-message cancel action as destructive while Copy and Select text stay neutral', async () => {
+    const message = storedMessage(userInfo(), [textPart('queued')]);
+    const renderer = await mountSheet(message, {
+      canCancelQueued: true,
+      onCancelQueued: vi.fn<(value: StoredMessage) => void>(),
+    });
+
+    const cancel = findByTestID(renderer.root, 'message-details-cancel-queued')[0];
+    expect(cancel?.props.className).toContain('border-destructive');
+    expect(cancel?.findAllByType(Text)[0]?.props.className).toContain('text-destructive');
+
+    const copy = findByTestID(renderer.root, 'message-details-copy')[0];
+    expect(copy?.props.className).toContain('border-border');
+    expect(copy?.props.className).not.toContain('destructive');
+    expect(copy?.findAllByType(Text)[0]?.props.className).toContain('text-foreground');
+    expect(copy?.findAllByType(Text)[0]?.props.className).not.toContain('destructive');
+
+    const selectText = findByTestID(renderer.root, 'message-details-select-text')[0];
+    expect(selectText?.props.className).toContain('border-border');
+    expect(selectText?.props.className).not.toContain('destructive');
+    expect(selectText?.findAllByType(Text)[0]?.props.className).toContain('text-foreground');
+    expect(selectText?.findAllByType(Text)[0]?.props.className).not.toContain('destructive');
+
+    await unmount(renderer);
+  });
+
   it('announces an identical failure again after a cleared retry, without speech on hiding', async () => {
     const message = storedMessage(userInfo(), [textPart('queued')]);
     const failure = 'Could not cancel the queued message.';
@@ -354,6 +380,112 @@ describe('MessageDetailsSheet mounted', () => {
       );
     });
     expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(1);
+    await unmount(renderer);
+  });
+
+  it('puts the message text alone on the clipboard when a thinking block precedes it', async () => {
+    const message = storedMessage(assistantInfo(), [
+      {
+        id: 'p-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning',
+        text: 'I should reason about this first.',
+        time: { start: 1, end: 2 },
+      },
+      textPart('The actual reply.'),
+    ]);
+    const renderer = await mountSheet(message);
+    await act(async () => {
+      press(findByTestID(renderer.root, 'message-details-copy')[0]);
+      await Promise.resolve();
+    });
+    expect(native.clipboard).toBe('The actual reply.');
+    await unmount(renderer);
+  });
+
+  it('keeps the thinking block in the Select text view while Copy stays message-text only', async () => {
+    const message = storedMessage(assistantInfo(), [
+      {
+        id: 'p-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning',
+        text: 'I should reason about this first.',
+        time: { start: 1, end: 2 },
+      },
+      textPart('The actual reply.'),
+    ]);
+    const renderer = await mountSheet(message);
+
+    await act(async () => {
+      await Promise.resolve();
+      press(findByTestID(renderer.root, 'message-details-select-text')[0]);
+    });
+
+    // Select text is a separate affordance from Copy: it still offers the
+    // thinking block, so manual selection is not narrowed by the Copy scope.
+    const selectable = renderer.root.findAll(node => node.type === SelectableText);
+    expect(selectable).toHaveLength(1);
+    expect(selectable[0]?.props.children).toBe(
+      'I should reason about this first.\n\nThe actual reply.'
+    );
+
+    await unmount(renderer);
+  });
+
+  it('offers Select text, without Copy message, for a finished reasoning-only message', async () => {
+    const message = storedMessage(assistantInfo(), [
+      {
+        id: 'p-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning',
+        text: 'Only a thought.',
+        time: { start: 1, end: 2 },
+      },
+    ]);
+    const renderer = await mountSheet(message);
+
+    // Copy is scoped to the message text, so a reasoning-only message hides it;
+    // Select text still sees the reasoning, so the affordance must render.
+    expect(findByTestID(renderer.root, 'message-details-copy')).toHaveLength(0);
+    expect(findByTestID(renderer.root, 'message-details-select-text')).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      press(findByTestID(renderer.root, 'message-details-select-text')[0]);
+    });
+    const selectable = renderer.root.findAll(node => node.type === SelectableText);
+    expect(selectable[0]?.props.children).toBe('Only a thought.');
+
+    await unmount(renderer);
+  });
+
+  it('offers Select text, without Copy message, for a completed tool-only message', async () => {
+    const message = storedMessage(assistantInfo(), [
+      {
+        id: 'p-tool',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        callID: 'call-1',
+        tool: 'bash',
+        state: {
+          status: 'completed',
+          input: { command: 'echo hi' },
+          output: 'hi',
+          title: 'bash',
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+      },
+    ]);
+    const renderer = await mountSheet(message);
+
+    expect(findByTestID(renderer.root, 'message-details-copy')).toHaveLength(0);
+    expect(findByTestID(renderer.root, 'message-details-select-text')).toHaveLength(1);
+
     await unmount(renderer);
   });
 

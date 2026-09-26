@@ -12,12 +12,15 @@ export default defineProject({
   plugins: [inlineSqlPlugin()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': fileURLToPath(new URL('src', import.meta.url)),
     },
   },
   test: {
     name: 'mobile-mounted',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
     // Mounted suites pay the same loaded-machine import cost as `mobile-pure`
     // when the gate runs them beside Metro, the simulator, and the local
     // services; keep one budget for both projects (see vitest.pure.config.ts).

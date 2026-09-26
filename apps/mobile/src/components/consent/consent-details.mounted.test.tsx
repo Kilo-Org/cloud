@@ -55,6 +55,7 @@ const useCurrentUserIdMock = vi.hoisted(() => ({
     email: 'a@b.c',
     isLoading: false,
     isError: false,
+    isFetchError: false,
     refetch: vi.fn(),
   })),
 }));
@@ -83,10 +84,29 @@ const voiceNetworkConsentMock = vi.hoisted(() => ({
 
 vi.mock('@/lib/voice-input/voice-network-consent', () => voiceNetworkConsentMock);
 
+// The real preference module reads expo-secure-store at import time; the row
+// only needs the hook's three values.
+const gatewayTranscriptionPreferenceMock = vi.hoisted(() => ({
+  gatewayTranscriptionEnabled: false,
+  hasLoaded: true,
+  setGatewayTranscriptionEnabled: vi.fn(),
+}));
+
+vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
+  useGatewayTranscriptionPreference: () => ({
+    gatewayTranscriptionEnabled: gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled,
+    hasLoaded: gatewayTranscriptionPreferenceMock.hasLoaded,
+    setGatewayTranscriptionEnabled:
+      gatewayTranscriptionPreferenceMock.setGatewayTranscriptionEnabled,
+  }),
+}));
+
 // ---- helpers ----
 
 type SectionProps = {
   title?: string;
+  what?: string;
+  who?: string;
   footer?: React.ReactElement;
 };
 
@@ -255,6 +275,22 @@ describe('ConsentDetails copy', () => {
       )
     ).toBe(true);
   });
+
+  it('names the gateway voice-transcription destination and what the gateway carries', () => {
+    const renderer = mount();
+    const sections = findAllSectionProps(renderer.root);
+    const voiceTranscription = sections.find(s => s.title === 'Voice transcription');
+    const gateway = sections.find(s => s.title === 'Kilo Gateway (our backend)');
+    expect(voiceTranscription).toBeDefined();
+    expect(gateway).toBeDefined();
+
+    expect(voiceTranscription?.who).toBe(
+      'Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.'
+    );
+    expect(gateway?.what).toBe(
+      'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
+    );
+  });
 });
 
 describe('Voice transcription section', () => {
@@ -262,11 +298,14 @@ describe('Voice transcription section', () => {
     vi.clearAllMocks();
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
     voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = false;
+    gatewayTranscriptionPreferenceMock.hasLoaded = true;
     useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
       userId: 'u1',
       email: 'a@b.c',
       isLoading: false,
       isError: false,
+      isFetchError: false,
       refetch: vi.fn(),
     });
   });
@@ -291,6 +330,31 @@ describe('Voice transcription section', () => {
     // to an "On device" value contradicted itself (vr1 review, 2026-09-07).
     expect(strings).toContain('Voice transcription');
     expect(strings).not.toContain('Online transcription');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('names the Kilo gateway and drops the On device claim when gateway transcription is on', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = true;
+    const renderer = mountVoiceControl();
+
+    const strings = findTextStrings(renderer.root);
+    // Regression: the row printed "On device" from supportsOnDevice() while
+    // the gateway engine was the one that actually ran.
+    expect(strings).toContain('Via the Kilo gateway');
+    expect(strings).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the loading placeholder while the gateway preference is read', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    gatewayTranscriptionPreferenceMock.hasLoaded = false;
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Via the Kilo gateway');
     expect(findSwitches(renderer.root).length).toBe(0);
   });
 
@@ -329,7 +393,9 @@ describe('Voice transcription section', () => {
   it('rolls back the switch and toasts when the write fails', async () => {
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
     voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
-    voiceNetworkConsentMock.writeVoiceNetworkConsent.mockRejectedValue(new Error('boom'));
+    // The real write resolves `false` on a keychain failure (it reports at
+    // warning level and stays total); the row owns the rollback.
+    voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(false);
     const renderer = mountVoiceControl();
     await TestRenderer.act(flush);
 
@@ -366,6 +432,7 @@ describe('Voice transcription section', () => {
       email: 'a@b.c',
       isLoading: false,
       isError: false,
+      isFetchError: false,
       refetch: vi.fn(),
     });
     const renderer = mountVoiceControl();
@@ -382,6 +449,7 @@ describe('Voice transcription section', () => {
       email: 'a@b.c',
       isLoading: true,
       isError: false,
+      isFetchError: false,
       refetch: vi.fn(),
     });
     const renderer = mountVoiceControl();
@@ -400,6 +468,7 @@ describe('Voice transcription section', () => {
       email: 'a@b.c',
       isLoading: false,
       isError: true,
+      isFetchError: true,
       refetch,
     });
     const renderer = mountVoiceControl();
@@ -407,6 +476,99 @@ describe('Voice transcription section', () => {
     const texts = findTextStrings(renderer.root);
     expect(texts).toContain('Could not load your transcription setting.');
     expect(texts).not.toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    const buttons = renderer.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    );
+    expect(buttons.length).toBe(1);
+    const button = buttons[0];
+    if (!button) {
+      throw new Error('expected a Retry Button');
+    }
+    TestRenderer.act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('shows the retry CTA instead of the on-device claim when loading the user fails', () => {
+    // The device's on-device support is not a substitute for the account read:
+    // with the account unreachable the row must not claim "On device", it must
+    // surface the retryable error and its Retry (vr1 e1 device repro: the
+    // on-device branch shadowed this one).
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    const refetch = vi.fn();
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: false,
+      isError: true,
+      isFetchError: true,
+      refetch,
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Could not load your transcription setting.');
+    expect(texts).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    const buttons = renderer.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    );
+    expect(buttons.length).toBe(1);
+    const button = buttons[0];
+    if (!button) {
+      throw new Error('expected a Retry Button');
+    }
+    TestRenderer.act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('shows the loading placeholder instead of the on-device claim while the user loads', () => {
+    // Same precedence while the account read is still in flight: the row waits
+    // for it before claiming an on-device destination.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: true,
+      isError: false,
+      isFetchError: false,
+      refetch: vi.fn(),
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the retry CTA instead of a cached on-device claim when the account refetch fails', () => {
+    // Offline with a warm read cache: the identity is still cached, so the
+    // hook's `isError` stays false, but the latest account fetch failed. The
+    // row must not present the cached destination as current — it shows the
+    // retryable error and its Retry (vr1 e1 device repro: the API killed after
+    // the state was restored left the row on "On device").
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    const refetch = vi.fn();
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: 'u1',
+      email: 'a@b.c',
+      isLoading: false,
+      isError: false,
+      isFetchError: true,
+      refetch,
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Could not load your transcription setting.');
+    expect(texts).not.toContain('On device');
     expect(findSwitches(renderer.root).length).toBe(0);
 
     const buttons = renderer.root.findAll(

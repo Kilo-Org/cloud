@@ -19,3 +19,37 @@ export function resolveSessionConnectionState(input: {
   }
   return 'none';
 }
+
+export type SessionConnectionDisplay = 'connected' | 'connecting' | 'reconnecting' | 'lost';
+
+export function resolveSessionConnectionDisplay(input: {
+  transport: SessionConnectionState;
+  userWebConnected: boolean;
+  reconnectExhausted: boolean;
+  everConnected: boolean;
+  /** Cached transcript is readable, but session metadata still needs a refresh. */
+  sessionRefresh?: { isLoading: boolean };
+}): SessionConnectionDisplay {
+  const downDisplay: SessionConnectionDisplay = input.everConnected ? 'reconnecting' : 'connecting';
+  // A pending metadata refresh reads as connecting; a failed one reads as lost.
+  if (input.sessionRefresh) {
+    return input.sessionRefresh.isLoading ? downDisplay : 'lost';
+  }
+  let state = input.transport;
+  if (state === 'none') {
+    // A session with no live transport (read-only, unresolved) still has the
+    // app-wide user-web leg to report, so the row always has a reading.
+    if (input.reconnectExhausted) {
+      state = 'exhausted';
+    } else {
+      state = input.userWebConnected ? 'up' : 'down';
+    }
+  }
+  if (state === 'up') {
+    return 'connected';
+  }
+  if (state === 'exhausted') {
+    return 'lost';
+  }
+  return downDisplay;
+}

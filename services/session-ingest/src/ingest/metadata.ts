@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
@@ -14,6 +14,17 @@ import { isWorktreeDeleting } from '../services/worktree-deletion';
 
 /** Stored status written when a CLI disconnects while the session is waiting on input. */
 export const CLI_DISCONNECT_ATTENTION_RESET_STATUS = 'retry' as const;
+
+/**
+ * How stale a `busy` row's `status_updated_at` must be before a CLI disconnect may
+ * clear it. A status write from a live CLI — or one that just re-attached — inside
+ * this window is never consumed: the write is fresher than the gate, so it keeps
+ * its `busy` and the CLI's next status write stands. The hold that reaches
+ * `resetAttentionStatusOnCliDisconnect` is already at least
+ * `CLI_ABSENCE_ATTENTION_RESET_MS` (600 s) old, so this 60 s gate is a second line
+ * of defence for the re-attach/cancel race, not the primary guard.
+ */
+export const CLI_DISCONNECT_STALE_BUSY_WINDOW_MS = 60_000;
 
 type SessionMetadataUpdates = Partial<
   Pick<
@@ -445,6 +456,14 @@ export async function applyMetadataChanges(
       const delivery = refreshGlanceableSessions(env, {
         userId: kiloUserId,
         cliSessionIds: [sessionId],
+        // A permission wait appearing or clearing gates the Approve control on
+        // the locked/background surfaces, so it must not wait for the shared
+        // delivery window. This caller is the one that saw the previous status.
+        approvalChangedSessionIds:
+          notification.previousStatus === 'permission' ||
+          notification.session.status === 'permission'
+            ? [sessionId]
+            : [],
       });
       if (ctx) ctx.waitUntil(delivery);
       else await delivery;
@@ -471,12 +490,17 @@ export async function flushPartialMetadataChanges(
 }
 
 /**
- * Clear a stored attention status when the owning CLI disconnects.
+ * Clear a stored attention status, or a busy status older than
+ * `CLI_DISCONNECT_STALE_BUSY_WINDOW_MS`, when the owning CLI disconnects.
  *
- * Only rows currently in `question`/`permission` are updated (to `retry`). Uses a
- * conditional write so concurrent non-attention updates are not overwritten. Emits
- * `session.status.updated` via the metadata path only — never enters the ingest
- * completion pipeline, so no "Task completed" push can fire.
+ * Only rows currently in `question`/`permission`, or `busy` rows whose
+ * `status_updated_at` is at least `CLI_DISCONNECT_STALE_BUSY_WINDOW_MS` old, are
+ * updated (to `retry`). Uses a conditional write so concurrent non-attention
+ * updates are not overwritten. Emits `session.status.updated` via the metadata
+ * path only — never enters the ingest completion pipeline, so no "Task
+ * completed" push can fire. A cleared `permission` also asks for an
+ * approval-exempt glanceable refresh: the Approve control must disappear here,
+ * ten minutes after the CLI that held it left.
  */
 export async function resetAttentionStatusOnCliDisconnect(
   env: Env,
@@ -486,10 +510,28 @@ export async function resetAttentionStatusOnCliDisconnect(
 ): Promise<void> {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const statusUpdatedAt = new Date().toISOString();
+  const cutoff = new Date(Date.now() - CLI_DISCONNECT_STALE_BUSY_WINDOW_MS).toISOString();
+  // A busy row is only eligible once its own status write is at least the window
+  // old, so a live CLI's recent write (or a just-re-attached CLI's) is never
+  // consumed. A busy row with `status_updated_at IS NULL` is left alone: nothing
+  // can prove it stale. That case is unreachable in production — every writer of
+  // `status` stamps `status_updated_at` together (`computeSessionMetadataUpdates`)
+  // and no insert sets `status` — so the null branch is only a safety net.
+  const eligible = (
+    status: string | null,
+    statusUpdatedAtValue: string | null | undefined
+  ): boolean =>
+    isNeedsInputStatus(status) ||
+    (status === 'busy' &&
+      statusUpdatedAtValue != null &&
+      new Date(statusUpdatedAtValue).getTime() <= new Date(cutoff).getTime());
 
   const notification = await db.transaction(async tx => {
     const [statusRow] = await tx
-      .select({ status: cli_sessions_v2.status })
+      .select({
+        status: cli_sessions_v2.status,
+        statusUpdatedAt: cli_sessions_v2.status_updated_at,
+      })
       .from(cli_sessions_v2)
       .where(
         and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
@@ -500,7 +542,7 @@ export async function resetAttentionStatusOnCliDisconnect(
     if (!statusRow) return null;
 
     const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
-    if (!isNeedsInputStatus(previousStatus)) return null;
+    if (!eligible(previousStatus, statusRow.statusUpdatedAt)) return null;
 
     await tx
       .update(cli_sessions_v2)
@@ -512,8 +554,15 @@ export async function resetAttentionStatusOnCliDisconnect(
         and(
           eq(cli_sessions_v2.session_id, sessionId),
           eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-          // Re-check in WHERE so a concurrent non-attention write wins.
-          inArray(cli_sessions_v2.status, ['question', 'permission'])
+          // Re-check in WHERE so a concurrent non-eligible write wins.
+          or(
+            inArray(cli_sessions_v2.status, ['question', 'permission']),
+            and(
+              eq(cli_sessions_v2.status, 'busy'),
+              isNotNull(cli_sessions_v2.status_updated_at),
+              sql`${cli_sessions_v2.status_updated_at} <= ${cutoff}::timestamptz`
+            )
+          )
         )
       );
 
@@ -565,4 +614,21 @@ export async function resetAttentionStatusOnCliDisconnect(
     },
     ctx
   );
+
+  if (notification.previousStatus === 'permission') {
+    // This is the deferred half of a CLI disconnect: the live session left the
+    // aggregate when the socket closed, but a session that stays
+    // snapshot-visible (a cloud agent, whose row is merged from Postgres rather
+    // than the live list) kept showing the permission the whole absence window.
+    // The Approve control gates on `permission`, so clearing it must not wait
+    // for the shared delivery window — the same exemption an in-band
+    // `permission -> busy` move gets in `applyMetadataChanges`.
+    const delivery = refreshGlanceableSessions(env, {
+      userId: kiloUserId,
+      cliSessionIds: [sessionId],
+      approvalChangedSessionIds: [sessionId],
+    });
+    if (ctx) ctx.waitUntil(delivery);
+    else await delivery;
+  }
 }

@@ -5,13 +5,15 @@ import type {
   CompleteAuthorizationOptions,
   OAuthHelpers,
 } from '@cloudflare/workers-oauth-provider';
-import { createDefaultHandler } from './consent';
+import { createDefaultHandler, type ConsentDeps } from './consent';
 import type { McpAnalytics, OAuthSignInInput } from '../analytics';
 import type {
   NewPendingAuthorization,
   OAuthStoreApi,
   PendingAuthorization,
 } from '../store/oauth-store';
+import type { AuthenticatorEnrollmentApi } from '../types';
+import { totpCode } from '../otp/totp';
 
 /**
  * The library throws this at /authorize for an invalid request; reproduce its
@@ -35,6 +37,19 @@ const CLIENT_ID = 'client-abc';
 const REDIRECT = 'https://client.test/cb';
 const STATE = 'st-1';
 const NOW = new Date('2026-09-11T00:00:00.000Z');
+
+/** The RFC 6238 Appendix B shared secret, so a test code is deterministic. */
+const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+
+/** The code the seeded secret produces at NOW. */
+function currentCode(): Promise<string> {
+  return totpCode(SECRET, NOW.getTime());
+}
+
+/** A six-digit code that is provably not the current one. */
+async function wrongCode(): Promise<string> {
+  return (await currentCode()) === '000000' ? '111111' : '000000';
+}
 
 function iso(offsetMs: number): string {
   return new Date(NOW.getTime() + offsetMs).toISOString();
@@ -64,16 +79,32 @@ function clientInfo(): ClientInfo {
 }
 
 /**
- * In-memory OAuthStoreApi. The methods the consent routes reach are real; the
- * rest throw so a new dependency fails loudly.
+ * In-memory OAuthStoreApi plus the authenticator enrolment the picker's opt-in
+ * reads. The methods the consent routes reach are real; the rest throw so a new
+ * dependency fails loudly.
  */
-function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthorization> } {
+function createFakeStore(): OAuthStoreApi &
+  AuthenticatorEnrollmentApi & {
+    pending: Map<string, PendingAuthorization>;
+    authenticators: Map<string, { secret: string; verified: boolean }>;
+    ensureCalls: number;
+    confirmCalls: number;
+  } {
   const pending = new Map<string, PendingAuthorization>();
+  const authenticators = new Map<string, { secret: string; verified: boolean }>();
+  const counters = { ensureCalls: 0, confirmCalls: 0 };
   const unused = (): never => {
     throw new Error('not reachable from these tests');
   };
   return {
     pending,
+    authenticators,
+    get ensureCalls() {
+      return counters.ensureCalls;
+    },
+    get confirmCalls() {
+      return counters.confirmCalls;
+    },
     recordPairingApproval: async (deviceAuthCode, identity, nowIso) => {
       for (const [id, record] of pending) {
         if (
@@ -166,7 +197,35 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       return true;
     },
     purgeExpired: unused,
+    ensureAuthenticator: async kiloUserId => {
+      counters.ensureCalls += 1;
+      let row = authenticators.get(kiloUserId);
+      if (!row) {
+        row = { secret: SECRET, verified: false };
+        authenticators.set(kiloUserId, row);
+      }
+      return { secret: row.secret, verified: row.verified };
+    },
+    confirmAuthenticator: async (kiloUserId, code, nowIso) => {
+      counters.confirmCalls += 1;
+      const row = authenticators.get(kiloUserId);
+      if (!row || code !== (await totpCode(row.secret, Date.parse(nowIso)))) {
+        return false;
+      }
+      row.verified = true;
+      return true;
+    },
   };
+}
+
+/** Seed a known authenticator for the paired identity (a prior GET enrolled it). */
+function seedAuthenticator(
+  store: ReturnType<typeof createFakeStore>,
+  kiloUserId: string,
+  options: { verified?: boolean } = {}
+): string {
+  store.authenticators.set(kiloUserId, { secret: SECRET, verified: options.verified === true });
+  return SECRET;
 }
 
 async function seedPending(
@@ -201,8 +260,15 @@ function fakeHelpers(config: {
   redirectTo?: string;
   /** Injected provider-completion failure (the library owns that call). */
   completeError?: unknown;
-}): { helpers: OAuthHelpers; completes: CompleteAuthorizationOptions[] } {
+  /** Injected client-record renewal failure (the consent completion owns that call). */
+  updateError?: unknown;
+}): {
+  helpers: OAuthHelpers;
+  completes: CompleteAuthorizationOptions[];
+  updates: string[];
+} {
   const completes: CompleteAuthorizationOptions[] = [];
+  const updates: string[] = [];
   const helpers = {
     async parseAuthRequest() {
       if (config.parseError !== undefined) throw config.parseError;
@@ -212,13 +278,18 @@ function fakeHelpers(config: {
     async lookupClient() {
       return config.client ?? null;
     },
+    async updateClient(clientId: string) {
+      if (config.updateError !== undefined) throw config.updateError;
+      updates.push(clientId);
+      return null;
+    },
     async completeAuthorization(options: CompleteAuthorizationOptions) {
       if (config.completeError !== undefined) throw config.completeError;
       completes.push(options);
       return { redirectTo: config.redirectTo ?? `${REDIRECT}?code=lib-code` };
     },
   } as unknown as OAuthHelpers;
-  return { helpers, completes };
+  return { helpers, completes, updates };
 }
 
 function envWith(helpers: OAuthHelpers): Env {
@@ -238,7 +309,7 @@ function fakeAnalytics(): { analytics: McpAnalytics; calls: OAuthSignInInput[] }
 }
 
 function deps(
-  store: OAuthStoreApi,
+  store: ConsentDeps['store'],
   fetchImpl: typeof fetch | undefined,
   extra: { analytics?: McpAnalytics } = {}
 ) {
@@ -257,8 +328,14 @@ async function run(handler: ExportedHandler<Env>, request: Request, env: Env): P
   return handler.fetch!(request as unknown as CfRequest, env, {} as ExecutionContext);
 }
 
-/** A fetch fake routed by URL for the whole device-auth + org-list flow. */
-function flowFetch(overrides: Record<string, () => Response | Promise<Response>> = {}) {
+/**
+ * A fetch fake routed by URL for the whole device-auth + org-list + admin
+ * flow. `isAdmin` answers the paired identity's `user.getMe` read.
+ */
+function flowFetch(
+  overrides: Record<string, () => Response | Promise<Response>> = {},
+  options: { isAdmin?: boolean } = {}
+) {
   return vi.fn(async (input: string | URL) => {
     const url = String(input);
     for (const [suffix, response] of Object.entries(overrides)) {
@@ -267,6 +344,9 @@ function flowFetch(overrides: Record<string, () => Response | Promise<Response>>
     if (url.endsWith('/api/device-auth/codes')) return Response.json({ code: 'PAIR-1' });
     if (url.endsWith('/api/device-auth/codes/PAIR-1')) {
       return Response.json({ status: 'approved', token: 'kilo-tok-1', userId: 'u-1' });
+    }
+    if (url.includes('/api/trpc/user.getMe')) {
+      return Response.json({ result: { data: { isAdmin: options.isAdmin ?? false } } });
     }
     if (url.includes('/api/trpc/organizations.list')) {
       return Response.json({
@@ -687,6 +767,48 @@ describe('GET/POST /authorize/org', () => {
     expect(store.pending.get(id)?.status).toBe('completed');
   });
 
+  it('re-anchors the DCR client record to the grant it completes', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers, completes, updates } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch())),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'personal' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    // The record's TTL is anchored at registration; re-putting it here anchors
+    // the session+margin lifetime to the grant this completion mints.
+    expect(updates).toEqual([CLIENT_ID]);
+    expect(completes).toHaveLength(1);
+    expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('keeps a failed client-record renewal retryable instead of promising the session', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const failing = fakeHelpers({ client: clientInfo(), updateError: new Error('kv down') });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch())),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'personal' }).toString(),
+      }),
+      envWith(failing.helpers)
+    );
+    // Nothing was minted and the record is released, so the same user can retry
+    // rather than being stranded on a terminal 'approved'.
+    expect(failing.completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+    expect(response.status).toBe(200);
+    expect(await response.text()).toMatch(/Could not finish connecting/);
+  });
+
   it('emits exactly one succeeded event bound to the chosen member organization', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
@@ -889,6 +1011,532 @@ describe('GET/POST /authorize/org', () => {
     await expect(
       run(handler, new Request(`${ISSUER}/authorize/org?id=`), env).then(r => r.status)
     ).resolves.toBe(400);
+  });
+
+  it('shows the admin opt-in unchecked, with the hidden authenticator subsection', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('name="admin_enabled"');
+    expect(html).toContain('Enable admin and debug actions');
+    expect(html).toContain(
+      'Off by default. Admin and debug actions stay hidden until enabled, and each one needs a code from your authenticator app.'
+    );
+    // Off by default, in every render: the option never arrives pre-checked.
+    expect(html).not.toMatch(/<input[^>]*name="admin_enabled"[^>]*checked/);
+    // The subsection is hidden by default and carries the enrolment material
+    // (the secret the store just minted) plus the code field.
+    expect(html).toContain('<div id="otp-section" hidden>');
+    expect(html).toContain('Add an authenticator');
+    expect(html).toContain(`<code>${store.authenticators.get('u-1')?.secret}</code>`);
+    expect(html).toContain('<code>otpauth://totp/');
+    expect(html).toContain(
+      '<label for="otp_code">Code from your authenticator app</label>' +
+        '<input id="otp_code" name="otp_code" inputmode="numeric" autocomplete="one-time-code">'
+    );
+    // Nothing on the page names the dropped approval queue.
+    expect(html).not.toContain('queue');
+  });
+
+  it('reuses the stored authenticator on a re-render instead of minting a new secret', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
+    const env = envWith(fakeHelpers({ client: clientInfo() }).helpers);
+    const first = await run(handler, new Request(`${ISSUER}/authorize/org?id=${id}`), env);
+    const secret = store.authenticators.get('u-1')?.secret;
+    const second = await run(handler, new Request(`${ISSUER}/authorize/org?id=${id}`), env);
+    expect(store.authenticators.get('u-1')?.secret).toBe(secret);
+    expect(await second.text()).toContain(`<code>${secret}</code>`);
+    expect(first.status).toBe(200);
+    expect(store.ensureCalls).toBe(2);
+  });
+
+  it('fails closed like a failed admin check when the authenticator read throws', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    store.ensureAuthenticator = async () => {
+      throw new Error('do storage down');
+    };
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    // A throw is an internal failure of the admin option, never a reason to
+    // block a plain connection: org list and Connect stay, nothing admin shows.
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      'We could not check admin access for this account. Reload this page to try again.'
+    );
+    expect(html).toContain('Nova');
+    expect(html).toContain('Connect');
+    expect(html).not.toContain('admin_enabled');
+    expect(html).not.toContain('id="otp-section"');
+    expect(html.match(/We could not check admin access/g)).toHaveLength(1);
+  });
+
+  it('shows the notice without a grant when the authenticator read throws on the ticked submit', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    store.ensureAuthenticator = async () => {
+      throw new Error('do storage down');
+    };
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      'We could not check admin access for this account. Reload this page to try again.'
+    );
+    expect(html).toContain('Connect');
+    expect(html).not.toContain('name="admin_enabled"');
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+  });
+
+  it('still connects without the box when the authenticator read throws', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    store.ensureAuthenticator = async () => {
+      throw new Error('do storage down');
+    };
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: false, adminEligible: false });
+    expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('omits the admin opt-in for a non-admin and does not raise the notice', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: false })));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    // Empty state: nothing else on the page changes.
+    expect(html).toContain('Personal account');
+    expect(html).toContain('Connect');
+    expect(html).not.toContain('admin_enabled');
+    expect(html).not.toContain('Enable admin and debug actions');
+    expect(html).not.toContain('Code from your authenticator app');
+    expect(html).not.toContain('id="otp-section"');
+    expect(html).not.toContain('queue');
+    // A valid `false` is not a failed check: no reload notice.
+    expect(html).not.toContain('We could not check admin access');
+    // A non-admin's page never touches the authenticator store.
+    expect(store.ensureCalls).toBe(0);
+  });
+
+  it('grants adminEnabled: true and a sessionId only when the code verifies', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          organization_id: 'org-2',
+          admin_enabled: 'on',
+          otp_code: await currentCode(),
+        }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: true, adminEligible: true });
+    const sessionId = completes[0]?.props.sessionId;
+    expect(typeof sessionId).toBe('string');
+    expect((sessionId as string).length).toBeGreaterThan(0);
+  });
+
+  it('re-renders asking for a code when the opt-in is submitted empty, minting nothing', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('Enter the code from your authenticator app.');
+    // The prompt survives the re-render even though the box is never pre-ticked.
+    expect(html).toContain('<div id="otp-section">');
+    expect(html).toContain('id="otp_code"');
+    expect(html).toContain('value="org-2"');
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+    // An unknown code is never even checked against the authenticator.
+    expect(store.confirmCalls).toBe(0);
+  });
+
+  it('re-renders with the invalid-code error and mints no grant for a wrong code', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          organization_id: 'org-2',
+          admin_enabled: 'on',
+          otp_code: await wrongCode(),
+        }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('That code is not valid. Check your authenticator app and try again.');
+    // The code field is still shown so the same submit can be retried.
+    expect(html).toContain('<div id="otp-section">');
+    expect(html).toContain('id="otp_code"');
+    // No grant, no approval, and the pending record is untouched.
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+    expect(store.confirmCalls).toBe(1);
+  });
+
+  it('lets the same pending request complete once the code is corrected', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
+    const env = envWith(helpers);
+    const post = (code: string) =>
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            organization_id: 'org-2',
+            admin_enabled: 'on',
+            otp_code: code,
+          }).toString(),
+        }),
+        env
+      );
+
+    const refused = await post(await wrongCode());
+    expect(refused.status).toBe(200);
+
+    const accepted = await post(await currentCode());
+    expect(accepted.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: true, adminEligible: true });
+    expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('renders the ticked checkbox and no code prompt for an already enrolled admin', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1', { verified: true });
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    // The tick is the enrolled state; there is nothing else to show.
+    expect(html).toContain('name="admin_enabled" value="on" checked');
+    expect(html).not.toContain('Code from your authenticator app');
+    expect(html).not.toContain('Enter the code');
+    expect(html).not.toContain('id="otp-section"');
+    expect(html).not.toContain(SECRET);
+  });
+
+  it('mints with no code when an already enrolled admin ticks the box', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1', { verified: true });
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        // No otp_code at all: the verified authenticator's checkbox is the gate.
+        body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: true, adminEligible: true });
+    const sessionId = completes[0]?.props.sessionId;
+    expect(typeof sessionId).toBe('string');
+    expect((sessionId as string).length).toBeGreaterThan(0);
+    // The already-verified path never checks a code again.
+    expect(store.confirmCalls).toBe(0);
+  });
+
+  it('connects with admin disabled when an already enrolled admin leaves the box unticked', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1', { verified: true });
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: false, adminEligible: true });
+    const sessionId = completes[0]?.props.sessionId;
+    expect(typeof sessionId).toBe('string');
+    expect((sessionId as string).length).toBeGreaterThan(0);
+    expect(store.confirmCalls).toBe(0);
+  });
+
+  it('never grants admin to a non-admin who submits the checkbox (fail-closed)', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: false }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          organization_id: 'org-2',
+          admin_enabled: 'on',
+          otp_code: await currentCode(),
+        }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: false, adminEligible: false });
+    // A non-admin's code is never verified.
+    expect(store.confirmCalls).toBe(0);
+  });
+
+  it('connects with adminEnabled: false and a sessionId when the box is left unticked', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        // Even a valid code is ignored without the opt-in.
+        body: new URLSearchParams({
+          organization_id: 'org-2',
+          otp_code: await currentCode(),
+        }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: false, adminEligible: true });
+    const sessionId = completes[0]?.props.sessionId;
+    expect(typeof sessionId).toBe('string');
+    expect((sessionId as string).length).toBeGreaterThan(0);
+    expect(store.confirmCalls).toBe(0);
+  });
+
+  it('shows the reload notice and keeps the org list on the GET when the admin check is unreachable', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const fetchImpl = flowFetch({
+      '/api/trpc/user.getMe': () => {
+        throw new Error('down');
+      },
+    });
+    const handler = createDefaultHandler(deps(store, fetchImpl));
+    // Retryable unhappy: the org list and the Connect CTA still render, the
+    // checkbox is absent, and the notice tells the user to reload.
+    const page = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain(
+      'We could not check admin access for this account. Reload this page to try again.'
+    );
+    expect(html).toContain('Nova');
+    expect(html).toContain('Connect');
+    expect(html).not.toContain('admin_enabled');
+    // Never render the notice twice in one response.
+    expect(html.match(/We could not check admin access/g)).toHaveLength(1);
+  });
+
+  it('re-renders the picker with the notice instead of silently dropping a submitted admin opt-in', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const fetchImpl = flowFetch({
+      '/api/trpc/user.getMe': () => {
+        throw new Error('down');
+      },
+    });
+    const handler = createDefaultHandler(deps(store, fetchImpl));
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    // Retryable unhappy, never a silent downgrade to the happy path: no
+    // redirect, no grant minted, and the pending record stays retryable.
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      'We could not check admin access for this account. Reload this page to try again.'
+    );
+    expect(html).toContain('value="org-2"');
+    expect(html).toContain('Connect');
+    expect(html).not.toContain('name="admin_enabled"');
+    expect(html.match(/We could not check admin access/g)).toHaveLength(1);
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+  });
+
+  it('connects with adminEnabled: true when the retried submit carries a valid code', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const downFetch = flowFetch({
+      '/api/trpc/user.getMe': () => {
+        throw new Error('down');
+      },
+    });
+    const code = await currentCode();
+    const post = (env: Env, fetchImpl: typeof fetch) =>
+      run(
+        createDefaultHandler(deps(store, fetchImpl)),
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            organization_id: 'org-2',
+            admin_enabled: 'on',
+            otp_code: code,
+          }).toString(),
+        }),
+        env
+      );
+
+    const blocked = await post(envWith(fakeHelpers({ client: clientInfo() }).helpers), downFetch);
+    expect(blocked.status).toBe(200);
+    expect(await blocked.text()).toContain('We could not check admin access');
+
+    // Recovery: the same submit retries against a reachable check and connects.
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const recovered = await post(envWith(helpers), flowFetch({}, { isAdmin: true }));
+    expect(recovered.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: true, adminEligible: true });
+  });
+
+  it('still completes a submit without the box while the admin check is unreachable', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const fetchImpl = flowFetch({
+      '/api/trpc/user.getMe': () => {
+        throw new Error('down');
+      },
+    });
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, fetchImpl)),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    // Required absence: leaving the box unticked always connects.
+    expect(response.status).toBe(302);
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.props).toMatchObject({ adminEnabled: false, adminEligible: false });
+    expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('ignores an absent or junk admin_enabled value without failing the form', async () => {
+    for (const adminEnabled of [undefined, 'junk', 'true', 'off']) {
+      const store = createFakeStore();
+      const id = await seedPaired(store);
+      const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+      const body = new URLSearchParams({ organization_id: 'org-2' });
+      if (adminEnabled !== undefined) body.set('admin_enabled', adminEnabled);
+      const response = await run(
+        createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        }),
+        envWith(helpers)
+      );
+      expect(response.status).toBe(302);
+      expect(completes).toHaveLength(1);
+      expect(completes[0]?.props).toMatchObject({ adminEnabled: false });
+    }
   });
 });
 

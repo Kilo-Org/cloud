@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { ChevronDown, ExternalLink, Github, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -23,13 +24,9 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
-import { InstallationCustomizations } from './GitHubRepositoryCustomizationsPreview';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
-  /** Reveals the Repository Customizations UI (default AI model / PR review
-   *  mode plus per-repository overrides) behind the PER_REPO_SETTINGS flag. */
-  perRepoSettingsEnabled?: boolean;
 };
 
 const statusLabel = {
@@ -42,7 +39,6 @@ const statusLabel = {
 
 export function OrganizationGitHubInstallations({
   organizationId,
-  perRepoSettingsEnabled,
 }: OrganizationGitHubInstallationsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -169,7 +165,30 @@ export function OrganizationGitHubInstallations({
     }
   };
 
+  // A user has no way to know ahead of time whether the App is already
+  // installed somewhere they can access, so there is exactly one primary
+  // entry point. When connection management is enabled it always begins
+  // the OAuth-first connection attempt (discover-then-pick), matching
+  // "Connect existing" today; the resulting picker also offers installing
+  // on a different org. When management is disabled, this preserves
+  // today's direct-to-installer behavior unchanged, since the OAuth-first
+  // procedures are gated behind connection management and would reject it.
+  const startPrimaryAction = async () => {
+    if (query.data?.connectionManagementEnabled) {
+      await startConnection();
+    } else {
+      await startInstall();
+    }
+  };
+
   const confirmConnection = async (installationId: string) => {
+    const confirmed = await confirm({
+      title: `Connect GitHub to ${organization?.name ?? 'this organization'}?`,
+      description:
+        'This organization will use the repositories and permissions granted to the existing GitHub App installation. Other Kilo connections keep separate settings, sessions, billing, and disconnect controls.',
+      confirmLabel: 'Connect existing installation',
+    });
+    if (!confirmed) return;
     try {
       const result = await selectConnection.mutateAsync({
         attemptId: connectionAttemptId ?? '',
@@ -201,7 +220,6 @@ export function OrganizationGitHubInstallations({
   }
 
   const installations = query.data?.installations ?? [];
-  const connectionManagementEnabled = query.data?.connectionManagementEnabled ?? false;
   return (
     <section className="min-w-0" aria-labelledby="github-organizations-heading">
       <Card className="overflow-hidden">
@@ -209,57 +227,63 @@ export function OrganizationGitHubInstallations({
           <h2 id="github-organizations-heading" className="type-heading">
             GitHub organizations
           </h2>
-          {(query.data?.canAdd || query.data?.canConnectExisting) && (
+          {!connectionAttemptId && (query.data?.canAdd || query.data?.canConnectExisting) && (
             <div className="flex gap-2">
-              {query.data?.canConnectExisting && (
-                <Button
-                  variant="outline"
-                  onClick={startConnection}
-                  disabled={beginConnection.isPending}
-                >
-                  Connect existing
-                </Button>
-              )}
-              {query.data?.canAdd && (
-                <Button
-                  onClick={startInstall}
-                  disabled={starting}
-                  className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
-                >
-                  <Github className="size-4" />
-                  {starting
-                    ? 'Opening GitHub...'
-                    : installations.length
-                      ? 'Add organization'
-                      : 'Connect GitHub'}
-                </Button>
-              )}
+              <Button
+                onClick={startPrimaryAction}
+                disabled={starting || beginConnection.isPending}
+                className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
+              >
+                <Github className="size-4" />
+                {starting || beginConnection.isPending
+                  ? 'Opening GitHub...'
+                  : installations.length
+                    ? 'Add organization'
+                    : 'Connect GitHub'}
+              </Button>
             </div>
           )}
         </div>
         {connectionError && (
           <p className="border-border border-t px-5 py-4 text-sm text-destructive sm:px-6">
-            {connectionError === 'claimed_by_other_owner'
-              ? 'This GitHub installation is already connected to another Kilo account or organization. Sharing is not available yet.'
-              : connectionError === 'authorization_revoked'
-                ? 'GitHub ownership or Kilo administration could not be verified. Start again to reconnect.'
-                : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
+            {connectionError === 'shared_installation_disabled'
+              ? 'This GitHub installation is already connected elsewhere and shared access is not approved for this organization.'
+              : connectionError === 'incompatible_workflow'
+                ? 'This GitHub installation has an existing workflow that is not yet compatible with shared access.'
+                : connectionError === 'claimed_by_other_owner'
+                  ? 'This GitHub installation is already connected to another Kilo account or organization.'
+                  : connectionError === 'authorization_revoked'
+                    ? 'GitHub ownership or Kilo administration could not be verified. Start again to reconnect.'
+                    : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
           </p>
         )}
         {connectionAttemptId && (
           <div className="border-border border-t px-5 py-5 sm:px-6">
-            <h3 className="font-medium">Choose a GitHub organization</h3>
+            <h3 className="font-medium">Connect a GitHub organization</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Only organizations where you are an active GitHub owner are shown.
+              Attach an installation where you are an active GitHub owner, or install the App on a
+              different organization.
             </p>
             <GitHubConnectionAttemptState
               isLoading={connectionAttempt.isLoading}
-              isError={connectionAttempt.isError}
+              error={
+                connectionAttempt.isError
+                  ? connectionAttempt.error instanceof TRPCClientError &&
+                    connectionAttempt.error.data?.code === 'NOT_FOUND'
+                    ? { kind: 'not_found' }
+                    : { kind: 'other' }
+                  : null
+              }
               candidates={connectionAttempt.data?.candidates}
               isSelecting={selectConnection.isPending}
               isRestarting={beginConnection.isPending}
               onRestart={startConnection}
+              onRetry={() => void connectionAttempt.refetch()}
+              isRetrying={connectionAttempt.isFetching}
               onSelect={confirmConnection}
+              canInstallNew={Boolean(query.data?.canAdd)}
+              onInstallNew={startInstall}
+              isInstalling={starting}
             />
           </div>
         )}
@@ -276,6 +300,9 @@ export function OrganizationGitHubInstallations({
         ) : (
           <div className="divide-border border-border divide-y border-t">
             {installations.map(installation => {
+              const hasConnectionRole =
+                installation.connectionRole === 'workflow' ||
+                installation.connectionRole === 'agent_only';
               const selectedCount = installation.repositories.length;
               const repositoryScope =
                 installation.repositorySelection === 'all'
@@ -301,8 +328,32 @@ export function OrganizationGitHubInstallations({
                           {installation.isPrimary && installations.length > 1 && (
                             <Badge variant="outline">Primary</Badge>
                           )}
+                          {installation.status === 'connected' &&
+                            installation.connectionRole === 'agent_only' && (
+                              <Badge variant="outline">Agent access</Badge>
+                            )}
+                          {installation.status === 'connected' && !hasConnectionRole && (
+                            <Badge variant="outline">Access unavailable</Badge>
+                          )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
+                        {installation.connectionRole === 'agent_only' &&
+                          (installation.status === 'connected' ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Slack and Cloud Agent only. The original connection keeps its
+                              workflows.
+                            </p>
+                          ) : installation.status === 'disconnected' ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Disconnected from this Kilo organization. Slack and Cloud Agent access
+                              is unavailable until fresh verification.
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Slack and Cloud Agent access is unavailable until this connection is
+                              healthy.
+                            </p>
+                          ))}
                       </div>
                       {installation.repositorySelection === 'selected' && selectedCount > 0 && (
                         <CollapsibleTrigger asChild>
@@ -349,9 +400,9 @@ export function OrganizationGitHubInstallations({
                               Refresh access <RefreshCw className="ml-auto size-3.5" />
                             </DropdownMenuItem>
                           )}
-                          {(installation.canCancel || installation.canUninstall) && (
-                            <DropdownMenuSeparator />
-                          )}
+                          {(installation.canCancel ||
+                            installation.canDisconnect ||
+                            installation.canUninstall) && <DropdownMenuSeparator />}
                           {installation.canCancel && (
                             <DropdownMenuItem
                               onSelect={() =>
@@ -361,57 +412,52 @@ export function OrganizationGitHubInstallations({
                               Remove pending request
                             </DropdownMenuItem>
                           )}
-                          {installation.canUninstall && installation.installationId && (
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onSelect={async () => {
-                                const account =
-                                  installation.accountLogin ?? 'this GitHub organization';
-                                if (
-                                  await confirm({
-                                    title: connectionManagementEnabled
-                                      ? `Disconnect ${account}?`
-                                      : `Uninstall Kilo from ${account}?`,
-                                    description: connectionManagementEnabled
-                                      ? `This disconnects ${account} from this Kilo organization. The GitHub App stays installed and can be reconnected after fresh verification.`
-                                      : `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`,
-                                    confirmLabel: connectionManagementEnabled
-                                      ? `Disconnect ${account}`
-                                      : `Uninstall from ${account}`,
-                                    destructive: true,
-                                  })
-                                ) {
-                                  if (connectionManagementEnabled) {
-                                    disconnect.mutate({
-                                      organizationId,
-                                      integrationId: installation.id,
-                                    });
-                                  } else {
-                                    uninstall.mutate({
-                                      organizationId,
-                                      integrationId: installation.id,
-                                    });
+                          {(installation.canDisconnect || installation.canUninstall) &&
+                            installation.installationId && (
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={async () => {
+                                  const account =
+                                    installation.accountLogin ?? 'this GitHub organization';
+                                  const useUninstall = !installation.canDisconnect;
+                                  if (
+                                    await confirm({
+                                      title: useUninstall
+                                        ? `Uninstall Kilo from ${account}?`
+                                        : `Disconnect ${account}?`,
+                                      description: useUninstall
+                                        ? `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`
+                                        : `This disconnects ${account} from this Kilo organization. The GitHub App stays installed and can be reconnected after fresh verification.`,
+                                      confirmLabel: useUninstall
+                                        ? `Uninstall from ${account}`
+                                        : `Disconnect ${account}`,
+                                      destructive: true,
+                                    })
+                                  ) {
+                                    if (useUninstall) {
+                                      uninstall.mutate({
+                                        organizationId,
+                                        integrationId: installation.id,
+                                      });
+                                    } else {
+                                      disconnect.mutate({
+                                        organizationId,
+                                        integrationId: installation.id,
+                                      });
+                                    }
                                   }
-                                }
-                              }}
-                            >
-                              {connectionManagementEnabled
-                                ? 'Disconnect from Kilo'
-                                : 'Uninstall GitHub App'}
-                            </DropdownMenuItem>
-                          )}
+                                }}
+                              >
+                                {!installation.canDisconnect
+                                  ? 'Uninstall GitHub App'
+                                  : 'Disconnect from Kilo'}
+                              </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                     {installation.status === 'connected' &&
-                      (perRepoSettingsEnabled ? (
-                        <InstallationCustomizations
-                          integrationId={installation.id}
-                          organizationId={organizationId}
-                          models={modelOptions}
-                          initiallyOpen={false}
-                        />
-                      ) : (
+                      installation.connectionRole === 'workflow' && (
                         <div className="space-y-3 rounded-lg border p-4">
                           <ModelCombobox
                             id={`model-combobox-${installation.id}`}
@@ -432,7 +478,20 @@ export function OrganizationGitHubInstallations({
                             triggerAriaLabel={`AI model for ${accountName}`}
                           />
                         </div>
-                      ))}
+                      )}
+                    {installation.status === 'connected' &&
+                      installation.connectionRole === 'agent_only' && (
+                        <p className="rounded-lg border p-4 text-sm text-muted-foreground">
+                          Choose the Slack model in Slack integration settings and the Cloud Agent
+                          model in the session.
+                        </p>
+                      )}
+                    {installation.status === 'connected' && !hasConnectionRole && (
+                      <p className="rounded-lg border p-4 text-sm text-muted-foreground">
+                        This connection needs role reconciliation before agent or workflow access is
+                        available.
+                      </p>
+                    )}
                   </div>
                   {installation.repositorySelection === 'selected' && (
                     <CollapsibleContent>

@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- The mounted tests keep the refresh boundary, error mapping, globe, and draft-restore contracts together. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type AppStateStatus, Keyboard, type KeyboardEvent, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
 // The refresh boundary contract is verified through the useDeviceAuth hook's
@@ -9,14 +11,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // the native modules stubbed.
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,
 } from '@/lib/login-draft';
 import { LoginScreen } from './login-screen';
-import { errorMessage } from './login-screen-state';
+import { errorMessage, resolveKeyboardBottomPadding } from './login-screen-state';
 
 // ── Hoisted mocks for the mounted globe tests ──────────────────────────────
 
@@ -32,6 +34,16 @@ const deviceAuth = vi.hoisted(() => ({
 }));
 const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+const addAppStateListener = vi.hoisted(() =>
+  vi.fn((_event: 'change', _listener: (state: AppStateStatus) => void) => ({ remove: vi.fn() }))
+);
+// The session-ended announcement is asserted through this spy, so it must
+// outlive a single render: the mock factory below runs per import, the spy is
+// cleared per test.
+const announcingWarning = vi.hoisted(() => vi.fn());
+// `sessionEnded` is toggled per test to drive the login screen's announcement
+// effect without re-mocking the module.
+const authState = vi.hoisted(() => ({ sessionEnded: false }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -40,25 +52,20 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  AppState: { addEventListener: addAppStateListener },
   I18nManager: { isRTL: false },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
 }));
 vi.mock('sonner-native', () => ({ toast: vi.fn() }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding-state', () => ({
-  resolveAppAwareKeyboardPadding: vi.fn(),
-  resolveKeyboardPaddingEventsForPlatform: () => null,
-}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/login/idle-auth', () => ({ IdleAuth: 'IdleAuth' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -66,9 +73,11 @@ vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Globe: 'Globe', ExternalLink: 'ExternalLink' }));
-vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { warning: vi.fn() } }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { warning: announcingWarning },
+}));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ sessionEnded: false, signIn: vi.fn() }),
+  useAuth: () => ({ sessionEnded: authState.sessionEnded, signIn: vi.fn() }),
 }));
 vi.mock('@/lib/auth/use-device-auth', () => ({
   useDeviceAuth: () => ({
@@ -116,6 +125,25 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+function findButtonByLabel(
+  root: TestRenderer.ReactTestInstance,
+  label: string
+): TestRenderer.ReactTestInstance {
+  const control = findByType(root, 'Button').find(
+    button => button.props.accessibilityLabel === label
+  );
+  if (!control) {
+    throw new Error(`button ${label} not found`);
+  }
+  return control;
+}
+
+function keyboardEventsFor(platform: 'android' | 'ios') {
+  return platform === 'ios'
+    ? ({ show: 'keyboardWillShow', hide: 'keyboardWillHide' } as const)
+    : ({ show: 'keyboardDidShow', hide: 'keyboardDidHide' } as const);
 }
 
 async function mountLoginScreen(): Promise<TestRenderer.ReactTestRenderer> {
@@ -226,6 +254,35 @@ describe('login-screen error mapping', () => {
 
   it('falls back to default when no error is provided', () => {
     expect(errorMessage('error', undefined)).toBe('Something went wrong. Please try again.');
+  });
+});
+
+describe('login-screen keyboard bottom padding', () => {
+  it.each(['android', 'ios'] as const)(
+    'reserves the bottom inset alone for the %s keyboard-down state',
+    platform => {
+      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28, platform })).toBe(
+        28
+      );
+    }
+  );
+
+  it('adds the bottom inset to Android, whose keyboard metric stops at the navigation bar', () => {
+    expect(
+      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'android' })
+    ).toBe(328);
+  });
+
+  it('keeps the iOS keyboard frame height, which already includes the home indicator', () => {
+    expect(
+      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'ios' })
+    ).toBe(300);
+  });
+
+  it('ignores a negative reported height', () => {
+    expect(
+      resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28, platform: 'android' })
+    ).toBe(28);
   });
 });
 
@@ -345,6 +402,51 @@ describe('login-screen language globe', () => {
   });
 });
 
+describe('login-screen device-code actions', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'pending';
+    deviceAuth.token = undefined;
+    deviceAuth.code = 'UC-1234';
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = 'https://kilo.example/device';
+    deviceAuth.resumed = false;
+  });
+
+  it('renders both device-code actions as icon-free label-only buttons', async () => {
+    const renderer = await mountLoginScreen();
+
+    const openInBrowser = findButtonByLabel(renderer.root, 'Open sign-in page in browser');
+    const copyLink = findButtonByLabel(renderer.root, 'Copy sign-in link');
+
+    // The pair reads as one iconography: each action is a single label child.
+    expect(openInBrowser.children).toHaveLength(1);
+    expect(copyLink.children).toHaveLength(1);
+
+    const openChild = openInBrowser.children[0];
+    const copyChild = copyLink.children[0];
+    if (
+      !openChild ||
+      !copyChild ||
+      typeof openChild === 'string' ||
+      typeof copyChild === 'string'
+    ) {
+      throw new Error('expected a rendered label child for each action');
+    }
+    expect(openChild.type).toBe('Text');
+    expect(copyChild.type).toBe('Text');
+    expect(
+      openInBrowser.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'ExternalLink'
+      )
+    ).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
 describe('login-screen idle skeleton', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -408,5 +510,271 @@ describe('login-screen idle skeleton', () => {
     expect(clearPersistedLoginDrafts).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
+  });
+});
+
+describe('login-screen approved wait surface', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'approved';
+    deviceAuth.token = 'tok';
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+  });
+
+  // The hold between the device approving and the root layout redirecting used
+  // to be a bare spinner on the app background: the explorer read it as an
+  // unbranded blank page (signin-language). It is now the shared branded wait
+  // surface, the same one the root layout paints over its hidden windows.
+  it('renders the branded wait surface while the approved token is written', async () => {
+    const renderer = await mountLoginScreen();
+
+    const progress = renderer.root.findAll(node => node.props.accessibilityRole === 'progressbar');
+    expect(progress).toHaveLength(1);
+    expect(progress[0]?.props.accessibilityLabel).toBe('Loading…');
+
+    const logo = findByType(renderer.root, 'Image').find(
+      node => node.props.accessibilityLabel === 'Kilo logo'
+    );
+    expect(logo).toBeDefined();
+    expect(findByType(renderer.root, 'Text').some(node => node.children[0] === 'Loading…')).toBe(
+      true
+    );
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen bottom-bar clearance', () => {
+  beforeEach(() => {
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    Platform.OS = 'android';
+    vi.mocked(Keyboard.addListener).mockClear();
+    addAppStateListener.mockClear();
+    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom: 28, left: 0, right: 0 });
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+  });
+
+  afterEach(() => {
+    Platform.OS = 'ios';
+    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+  });
+
+  function scrollViewport(renderer: TestRenderer.ReactTestRenderer) {
+    const scroll = findByType(renderer.root, 'ScrollView')[0];
+    if (!scroll?.parent) {
+      throw new Error('login scroll viewport not found');
+    }
+    expect(scroll.props.className).toContain('flex-1');
+    expect(scroll.props.contentContainerClassName).toContain('flex-grow');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    return scroll.parent;
+  }
+
+  function emitKeyboard(
+    eventName: 'keyboardDidShow' | 'keyboardDidHide' | 'keyboardWillShow' | 'keyboardWillHide',
+    height = 0
+  ) {
+    const subscription = vi
+      .mocked(Keyboard.addListener)
+      .mock.calls.find(([name]) => name === eventName);
+    if (!subscription) {
+      throw new Error(`missing ${eventName} listener`);
+    }
+    const event: KeyboardEvent = {
+      duration: 0,
+      easing: 'keyboard',
+      endCoordinates: { height, width: 360, screenX: 0, screenY: 640 - height },
+    };
+    act(() => {
+      subscription[1](event);
+    });
+  }
+
+  it.each(['android', 'ios'] as const)(
+    'keeps the %s bottom bar outside the scroll viewport with a long email',
+    async platform => {
+      Platform.OS = platform;
+      const email = 'long.email.address@subdomain.example-very-long-domain-name.co.uk';
+      vi.mocked(restoreLoginDrafts).mockResolvedValue({ email, ssoRecovery: null });
+      const renderer = await mountLoginScreen();
+
+      expect(findByType(renderer.root, 'IdleAuth')[0]?.props.initialEmail).toBe(email);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      // One padded wrapper for both platforms; the platform-gated
+      // KeyboardAvoidingView is gone.
+      expect(findByType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(0);
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['idle', 'pending', 'expired', 'error', 'denied'])(
+    'reserves the bottom bar for the %s auth state',
+    async status => {
+      deviceAuth.status = status;
+      const renderer = await mountLoginScreen();
+
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      renderer.unmount();
+    }
+  );
+
+  it('reserves the bottom bar while the draft placeholder is visible', async () => {
+    const draft = Promise.withResolvers<Awaited<ReturnType<typeof restoreLoginDrafts>>>();
+    vi.mocked(restoreLoginDrafts).mockReturnValue(draft.promise);
+    const renderer = await mountLoginScreen();
+
+    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    await act(async () => {
+      draft.resolve({ email: '', ssoRecovery: null });
+      await draft.promise;
+    });
+    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    renderer.unmount();
+  });
+
+  it.each(['android', 'ios'] as const)(
+    'pads the %s keyboard height through the same listener pair',
+    async platform => {
+      const events = keyboardEventsFor(platform);
+      Platform.OS = platform;
+      const renderer = await mountLoginScreen();
+
+      // Same wrapper, one listener pair per platform: the only keyboard-event
+      // difference is which pair that platform fires.
+      expect(vi.mocked(Keyboard.addListener).mock.calls.map(([name]) => name)).toEqual([
+        events.show,
+        events.hide,
+      ]);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      // Android's reported height excludes the navigation bar, so the reserved
+      // inset is added on top; iOS reports the keyboard window frame, whose
+      // height already covers the home indicator, so the inset is not added
+      // twice while the keyboard is up (it would leave a gap above the IME).
+      emitKeyboard(events.show, 300);
+      expect(scrollViewport(renderer).props.style).toEqual({
+        paddingBottom: platform === 'android' ? 328 : 300,
+      });
+
+      emitKeyboard(events.hide);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      emitKeyboard(events.show, 0);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['android', 'ios'] as const)(
+    'clears stale %s keyboard occlusion on background without dropping the bottom bar',
+    async platform => {
+      Platform.OS = platform;
+      const renderer = await mountLoginScreen();
+      emitKeyboard(keyboardEventsFor(platform).show, 300);
+      const subscription = addAppStateListener.mock.calls[0];
+      if (!subscription) {
+        throw new Error('missing app state listener');
+      }
+
+      act(() => {
+        subscription[1]('background');
+      });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      renderer.unmount();
+    }
+  );
+
+  it('keeps the iOS keyboard occlusion through a transient inactive state', async () => {
+    Platform.OS = 'ios';
+    const renderer = await mountLoginScreen();
+    emitKeyboard(keyboardEventsFor('ios').show, 300);
+    const subscription = addAppStateListener.mock.calls[0];
+    if (!subscription) {
+      throw new Error('missing app state listener');
+    }
+
+    // Control Center, the app switcher preview, a call banner, and system
+    // permission alerts report `inactive` while the keyboard stays up, and no
+    // fresh `keyboardWillShow` follows on the way back to `active`; collapsing
+    // the occlusion here left the form under an open keyboard.
+    act(() => {
+      subscription[1]('inactive');
+    });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
+
+    act(() => {
+      subscription[1]('active');
+    });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
+
+    renderer.unmount();
+  });
+
+  it('tracks bottom inset changes, including devices without a bottom bar', async () => {
+    const renderer = await mountLoginScreen();
+
+    for (const bottom of [48, 0]) {
+      vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom, left: 0, right: 0 });
+      act(() => {
+        renderer.update(createElement(LoginScreen));
+      });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: bottom });
+    }
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen session-ended announcement', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    announcingWarning.mockClear();
+    authState.sessionEnded = false;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+  });
+
+  it('announces the ended session once and stays silent while it is live', async () => {
+    // s2 reaches `signOut(true)` only on a server-confirmed 401, so `sessionEnded`
+    // is the only signal that the stored session is gone. The login screen must
+    // announce it once, keyed so a remount while still signed out does not
+    // repeat the toast.
+    authState.sessionEnded = true;
+    const ended = await mountLoginScreen();
+
+    expect(announcingWarning).toHaveBeenCalledTimes(1);
+    expect(announcingWarning).toHaveBeenCalledWith(i18n.t('login.sessionEnded'), {
+      id: 'session-ended',
+    });
+    ended.unmount();
+
+    announcingWarning.mockClear();
+    authState.sessionEnded = false;
+    const live = await mountLoginScreen();
+
+    expect(announcingWarning).not.toHaveBeenCalled();
+    live.unmount();
   });
 });

@@ -36,6 +36,7 @@
     "cost": "Trošak",
     "discard": "Odbaci",
     "findings": "Nalazi",
+    "mergeRequest": "merge request",
     "notConnected": "Nije povezano",
     "notifications": "Obavijesti",
     "pullRequest": "zahtjev za spajanje",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Koristi drugu adresu e-pošte",
     "signInWithApple": "Prijavi se putem Apple računa",
     "signInWithGoogle": "Prijavi se putem Google računa",
+    "signInWithPasskey": "Prijavi se pristupnim ključem",
     "emailAddress": "Adresa e-pošte",
     "emailPlaceholder": "ti@primjer.com",
     "continueWithEmail": "Nastavi s e-poštom",
@@ -174,6 +176,10 @@
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Više opcija za prijavu",
+    "passkeyCancelled": "Prijava pristupnim ključem je otkazana. Pokušaj ponovo.",
+    "passkeyNotFound": "Za ovaj uređaj nije sačuvan nijedan pristupni ključ. Prijavi se umjesto toga putem Apple, Google ili svoje e-pošte.",
+    "passkeyUnsupported": "Pristupni ključevi nisu dostupni na ovom uređaju. Prijavi se umjesto toga putem Apple, Google ili svoje e-pošte.",
+    "passkeyFailed": "Prijava pristupnim ključem nije uspjela. Pokušaj ponovo.",
     "couldNotCompleteSignIn": "Nije moguće završiti prijavu. Pokušaj ponovo.",
     "sessionEnded": "Tvoja sesija je završena. Prijavi se ponovo.",
     "signInCodeExpired": "Tvoj kod za prijavu je istekao. Pokušaj ponovo.",
@@ -224,7 +230,28 @@
     "providerTestAccount": "Testni nalog",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Poslovna jedinstvena prijava (SSO)"
+    "providerEnterpriseSso": "Poslovna jedinstvena prijava (SSO)",
+    "passkeysTitle": "Pristupni ključevi",
+    "passkeysSubtitle": "Prijavi se bez lozinke",
+    "passkeysEmpty": "Još nema pristupnih ključeva",
+    "passkeysEmptyHint": "$t(profile.addPasskey) da se prijaviš bez lozinke.",
+    "passkeysCouldNotLoad": "Pristupni ključevi se ne mogu učitati",
+    "passkeysLoadFailed": "Pristupni ključevi nisu dostupni dok se ovo ne učita.",
+    "addPasskey": "Dodaj pristupni ključ",
+    "passkeyDefaultName": "Pristupni ključ",
+    "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyAdded": "Pristupni ključ dodan.",
+    "passkeyAddFailed": "Pristupni ključ nije mogao biti dodan. Pokušaj ponovo.",
+    "passkeyAddUnsupported": "Ovaj uređaj ne može kreirati pristupne ključeve.",
+    "passkeyAddCancelled": "Kreiranje pristupnog ključa je otkazano.",
+    "passkeyRemoved": "Pristupni ključ uklonjen.",
+    "passkeyRemoveFailed": "Taj pristupni ključ nije mogao biti uklonjen. Pokušaj ponovo.",
+    "passkeyRenamed": "Pristupni ključ preimenovan.",
+    "passkeyName": "Naziv pristupnog ključa",
+    "renamePasskey": "Preimenuj pristupni ključ",
+    "removePasskey": "Ukloni pristupni ključ",
+    "removePasskeyTitle": "Ukloniti pristupni ključ?",
+    "removePasskeyMessage": "Više se nećeš moći prijaviti ovim pristupnim ključem."
   },
   "preferences": {
     "general": "Općenito",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "Kada je isključeno, tipka za novi red umeće novi red u polja za unos poruke agentima.",
     "biometricUnlock": "Otključavanje biometrijom",
     "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta provedenih u pozadini.",
-    "featureFlags": "Zastavice funkcija",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -344,7 +366,22 @@
       "goToOverview": "Otvori pregled",
       "goToOverviewTab": "Otvori karticu Pregled",
       "fileLoadedCount_few": "Učitane {{displayCount}} datoteke",
-      "fileLoadedOfTotalCount_few": "Učitane {{displayCount}} datoteke od {{total}}"
+      "fileLoadedOfTotalCount_few": "Učitane {{displayCount}} datoteke od {{total}}",
+      "expandAllLines_one": "Prikaži sve redove ({{displayCount}})",
+      "expandAllLines_other": "Prikaži sve redove ({{displayCount}})",
+      "expandAllLines_few": "Prikaži sve redove ({{displayCount}})",
+      "expandLines_one": "Prikaži {{displayCount}} red ({{start}}–{{end}})",
+      "expandLines_other": "Prikaži {{displayCount}} redova ({{start}}–{{end}})",
+      "expandLines_few": "Prikaži {{displayCount}} reda ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Prikaži {{displayCount}} red konteksta",
+      "expandLinesOfContext_other": "Prikaži {{displayCount}} redova konteksta",
+      "expandLinesOfContext_few": "Prikaži {{displayCount}} reda konteksta",
+      "expandMoreLines_one": "Prikaži još {{displayCount}} red ({{start}}–{{end}})",
+      "expandMoreLines_other": "Prikaži još {{displayCount}} redova ({{start}}–{{end}})",
+      "expandMoreLines_few": "Prikaži još {{displayCount}} reda ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "Učitano {{loaded}} od {{total}} datoteka",
+      "loadedOfTotalFiles_other": "Učitano {{loaded}} od {{total}} datoteka",
+      "loadedOfTotalFiles_few": "Učitano {{loaded}} od {{total}} datoteka"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ nema novog reda na kraju datoteke",
@@ -359,6 +396,7 @@
       "merge": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahtjeva",
+      "mergeTermTitle": "Spoji {{term}}",
       "enableAutoMerge": "Uključi automatsko spajanje",
       "disableAutoMerge": "Isključi automatsko spajanje",
       "autoMergeOn": "Automatsko spajanje je uključeno",
@@ -377,9 +415,12 @@
       "deleteBranchAfterMerge": "Obriši granu nakon spajanja",
       "noEnabledMethods": "U ovom repozitoriju nije omogućena nijedna metoda spajanja. Zamoli administratora repozitorija da omogući spajanje uz novu reviziju, objedinjavanje revizija ili promjenu osnove.",
       "confirmTitle": "Spojiti zahtjev?",
+      "confirmTitleTerm": "Spojiti {{term}}?",
       "confirmMessage": "Ovim će se tvoje promjene spojiti s osnovnom granom.",
       "enableAutoMergeConfirmTitle": "Uključiti automatsko spajanje?",
       "enableAutoMergeConfirmMessage": "GitHub će automatski spojiti ovaj zahtjev za spajanje kada sve obavezne provjere prođu.",
+      "enableAutoMergeConfirmMessageTerm": "Kada pipeline uspije, {{term}} će se automatski spojiti.",
+      "enableAutoMergeDescriptionTerm": "GitLab automatski spaja ovaj {{term}} kada pipeline uspije.",
       "forbidden": "Nemaš dozvolu za spajanje ovog zahtjeva.",
       "cannotMerge": "Ovaj zahtjev za spajanje ne može se spojiti u trenutnom stanju.",
       "couldNotMerge": "Spajanje zahtjeva nije uspjelo.",
@@ -390,7 +431,8 @@
       },
       "terminal": {
         "alreadyMerged": "Već spojeno",
-        "closed": "Ovaj zahtjev za spajanje je zatvoren"
+        "closed": "Ovaj zahtjev za spajanje je zatvoren",
+        "closedMergeRequest": "Ovaj merge request je zatvoren"
       },
       "partialSuccessBanner": {
         "body": "Brisanje grane nije uspjelo. Razlog: {{reason}}",
@@ -415,6 +457,19 @@
         "behindDetail": "Izvorna grana zaostaje za osnovnom. Prije spajanja promijeni osnovu izvorne grane ili je ažuriraj.",
         "notMergeableTitle": "Ovaj zahtjev za spajanje još se ne može spojiti",
         "notMergeableDetail": "GitHub je prijavio sljedeće stanje spajanja: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ograničenja spajanja",
+        "approvalsRequired_one": "Potrebno je {{displayCount}} odobrenje",
+        "approvalsRequired_other": "Potrebno je {{displayCount}} odobrenja",
+        "pipelineMustSucceed": "Prije spajanja pipeline mora uspjeti.",
+        "approvalsRequired_few": "Potrebna su {{displayCount}} odobrenja"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ne uspijeva na zadnjem commitu.",
+        "pendingPipeline": "Pipeline je još u toku na zadnjem commitu.",
+        "permission": "Nemaš dozvolu za spajanje ovog {{term}}.",
+        "draft": "Prije spajanja označi {{term}} kao spreman za pregled."
       },
       "methodLabels": {
         "merge": "Kreiraj reviziju spajanja",
@@ -464,6 +519,8 @@
       "replyBadRequest": "Ovaj odgovor se ne može objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dozvolu da odgovoriš na ovaj zahtjev za spajanje.",
       "addCommentCta": "Komentariši ovaj zahtjev za spajanje",
+      "fixWithKilo": "Popravi s Kilo",
+      "fixWithKiloPrompt": "Molim te riješi sljedeći komentar na zahtjevu za spajanje: {{link}}",
       "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtjev za spajanje se možda promijenio.",
       "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtjev za spajanje.",
       "moderation": {
@@ -516,7 +573,11 @@
         "outdatedOnLines": "Zastarjelo na {{lines}}",
         "outdatedOnPath": "Zastarjelo na {{path}}"
       },
-      "deletedUser": "obrisani korisnik"
+      "deletedUser": "obrisani korisnik",
+      "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
+      "moreLinesAbove_one": "… još {{displayCount}} red iznad",
+      "moreLinesAbove_other": "… još {{displayCount}} redova iznad",
+      "moreLinesAbove_few": "… još {{displayCount}} reda iznad"
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti postavke GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -528,17 +589,19 @@
     "reviewPullRequest": "Pregledaj zahtjev za spajanje",
     "headLine": "{{counts}} · najnovija revizija {{sha}}",
     "entry": {
-      "eyebrow": "Otvori zahtjev za spajanje putem URL-a.",
-      "pastePrLink": "Zalijepi poveznicu na PR",
-      "noRecentPrs": "Nema nedavnih PR-ova",
-      "noRecentPrsDescription": "Zalijepi poveznicu na PR iznad da započneš pregled — sljedeći put će se pojaviti ovdje.",
+      "eyebrow": "Otvori zahtjev za spajanje ili merge request putem URL-a",
+      "pastePrLink": "Zalijepi povezanicu na zahtjev za spajanje ili merge request",
+      "noRecentPrs": "Nema nedavnih pregleda",
+      "noRecentPrsDescription": "Da započnete pregled, zalijepite povezanicu gore — sljedeći put će se pojaviti ovdje.",
       "couldNotLoad": "Učitavanje nije uspjelo.",
       "removeFromRecentsTitle": "Ukloniti iz nedavnih zahtjeva?",
-      "removeFromRecentsMessage": "Ovaj zahtjev za spajanje bit će uklonjen s tvoje liste nedavnih zahtjeva.",
+      "removeFromRecentsMessage": "Ovaj pregled će biti uklonjen iz nedavnih.",
       "removeRecentAccessibility": "Ukloni {{repo}} iz nedavnih zahtjeva",
-      "urlAccessibility": "URL zahtjeva za spajanje na GitHubu",
-      "clearLink": "Obriši poveznicu na zahtjev za spajanje",
-      "pasteLink": "Zalijepi poveznicu na zahtjev za spajanje",
+      "urlAccessibility": "Unesite URL zahtjeva za spajanje ili merge requesta",
+      "urlPlaceholder": "URL zahtjeva za spajanje ili merge requesta",
+      "openAccessibility": "Otvori zahtjev za spajanje ili merge request",
+      "clearLink": "Izbriši povezanicu",
+      "pasteLink": "Zalijepi povezanicu na zahtjev za spajanje ili merge request",
       "open": "Otvori"
     },
     "checks": {
@@ -555,6 +618,9 @@
       "pending": "na čekanju: {{displayCount}}",
       "skipped": "preskočeno: {{displayCount}}",
       "checksCount": "provjera: {{displayCount}}",
+      "checksCount_one": "provjera: {{displayCount}}",
+      "checksCount_few": "provjere: {{displayCount}}",
+      "checksCount_other": "provjera: {{displayCount}}",
       "checkDetails": "detalji provjere"
     },
     "inbox": {
@@ -587,9 +653,15 @@
     "connect": {
       "checkFailedTitle": "Provjera veze s GitHubom nije uspjela.",
       "checkFailedMessage": "Status prijave nije dostupan dok se podaci ne učitaju.",
+      "checkFailedTitleGitLab": "Provjera veze s GitLabom nije uspjela.",
+      "checkFailedTitleBitbucket": "Provjera veze s Bitbucketom nije uspjela.",
+      "providerCheckFailedMessage": "Status povezave dostupan je nakon učitavanja.",
       "reconnectTitle": "Ponovo poveži GitHub",
       "reconnectDescription": "Pristup tvom GitHub računu je opozvan. Ponovo poveži račun da nastaviš pregledati zahtjeve za spajanje na mobitelu.",
-      "description": "Poveži svoj GitHub račun da pregledaš zahtjeve za spajanje na mobitelu."
+      "description": "Poveži svoj GitHub račun da pregledaš zahtjeve za spajanje na mobitelu.",
+      "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
+      "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
+      "bitbucketOrgOnlyDescription": "Odaberi organizaciju u svom profilu da pregledaš njene zahtjeve za spajanje na Bitbucketu."
     },
     "screen": {
       "title": "#{{number}}",
@@ -612,7 +684,10 @@
     },
     "reconnectNotice": {
       "title": "Veza s GitHubom je istekla.",
-      "message": "Tvoja veza s GitHubom više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje."
+      "message": "Tvoja veza s GitHubom više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje.",
+      "gitlabTitle": "Veza s GitLabom je istekla.",
+      "bitbucketTitle": "Veza s Bitbucketom je istekla.",
+      "providerMessage": "Tvoja veza s {{provider}}om više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -679,10 +754,13 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}}, red {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}, tekst: {{text}}",
-      "emptyLine": "(prazno)"
+      "emptyLine": "(prazno)",
+      "truncationBanner_one": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja.",
+      "truncationBanner_other": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja.",
+      "truncationBanner_few": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja."
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan.",
-    "linkPasteNotAPullRequest": "Ovo nije poveznica na zahtjev za spajanje na GitHubu.",
+    "linkPasteNotAPullRequest": "Ovo nije povezanica na zahtjev za spajanje niti merge request",
     "announce": {
       "commentPosted": "Komentar objavljen",
       "reviewSubmitted": "Pregled poslan",
@@ -691,6 +769,7 @@
     "mutationError": {
       "commentNotPosted": "Ovaj komentar se ne može objaviti. Odabrani red je možda promijenjen ili je PR ažuriran.",
       "reviewNotSubmitted": "Ovaj pregled se ne može poslati u trenutnom obliku. PR je možda promijenjen ili pokušavaš pregledati vlastiti zahtjev za spajanje.",
+      "reviewNotSubmittedTerm": "Ovaj pregled se ne može poslati u trenutnom obliku. {{term}} je možda promijenjen ili ne možeš pregledati vlastiti {{term}}.",
       "couldNotPostComment": "Objavljivanje komentara nije uspjelo.",
       "couldNotSubmitReview": "Slanje pregleda nije uspjelo. Provjeri vezu i pokušaj ponovo."
     },
@@ -698,9 +777,31 @@
       "couldNotReply": "Nije moguće poslati odgovor.",
       "couldNotCompleteAction": "Nije moguće dovršiti ovu radnju.",
       "mergeResultDefaultError": "GitHub nije dovršio spajanje.",
+      "mergeResultNotCompleted": "{{term}} nije spojen. Provjeri njegovo stanje i pokušaj ponovo.",
       "ambiguous": "Nije moguće potvrditi ishod radnje — provjeri PR prije ponovnog pokušaja.",
       "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovo kasnije.",
       "forbidden": "Radnja nije dozvoljena."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nije dostupno kod ovog pružatelja usluga",
+        "accessibility": "Nije dostupno kod ovog pružatelja usluga: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Zahtjev za spajanje",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Podijeli merge request",
+      "viewOnProvider": "Pogledaj na {{provider}}",
+      "mergeRequestUnavailable": "Merge request nije dostupan",
+      "unavailableDescription": "Možda je obrisan ili nemaš pristup njemu.",
+      "accessDeniedMergeRequest": "Nemaš dozvolu za pregled ovog merge requesta.",
+      "couldNotLoadMergeRequest": "Učitavanje merge requesta nije uspjelo.",
+      "discussionAccessDenied": "Nemaš dozvolu za pregled rasprave o ovom merge requestu.",
+      "discussionUnavailableMessage": "Ovaj merge request je možda uklonjen.",
+      "noDiscussionDescription": "Ovaj merge request još nema niti za pregled koda ni komentara u raspravi.",
+      "noFilesChangedDescription": "Ovaj merge request ne sadrži promjene u datotekama."
     }
   },
   "notifications": {
@@ -733,11 +834,12 @@
     "previewFullDescription": "Obavijesti prikazuju tekst poruke na tvom zaključanom ekranu.",
     "previewGenericDescription": "Obavijesti pokazuju samo da se nešto dogodilo. Otvori Kilo da pročitaš poruku.",
     "channel": {
-      "agent": "Sesije agenta",
+      "agentProgress": "Napredak agenta",
       "chat": "Poruke u razgovoru",
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju",
-      "security": "Sigurnosni nalazi"
+      "security": "Sigurnosni nalazi",
+      "spend": "Upozorenja o potrošnji"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -748,8 +850,22 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspjelo / spremno za upravljanje",
       "kiloclawActivitySubtitle": "instance spremne/neuspjele, zakazane radnje",
+      "kiloclawActivityUnavailable": "Pokrenite KiloClaw instancu da biste dobili KiloClaw aktivnost.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici"
+      "balanceAlertsUnavailable": "Pridružite se organizaciji da biste dobili upozorenja o saldu.",
+      "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici",
+      "securityFindingsUnavailable": "Omogućite Kilo sigurnosnog agenta na opsegu da biste dobili sigurnosne nalaze.",
+      "spendAlertsSubtitle": "prekoračenja pragova i skokovi na sat",
+      "spendAlertsToggle": "Kategorija upozorenja o potrošnji"
+    },
+    "action": {
+      "openSession": "Otvori sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Zahtjev je odobren",
+      "replied": "Odgovor je poslan",
+      "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da pokušate.",
+      "unavailable": "Ovaj zahtjev više ne čeka."
     }
   },
   "tabs": {
@@ -830,7 +946,10 @@
       "uploadFailed": "Otpremanje nije uspjelo.",
       "failedToUploadFile": "Otpremanje datoteke nije uspjelo: {{reason}}.",
       "nothingToPaste": "Nema sadržaja za lijepljenje.",
-      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije."
+      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije.",
+      "limit_one": "Možeš priložiti do {{displayCount}} datoteka.",
+      "limit_other": "Možeš priložiti do {{displayCount}} datoteka.",
+      "limit_few": "Možeš priložiti do {{displayCount}} datoteke."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1577,7 +1696,13 @@
       "syncFindings": "Sinhroniziraj nalaze",
       "syncNow": "Sinhroniziraj sada",
       "syncQueued": "Sinhronizacija je dodana u red.",
-      "syncStatusUnavailable": "Status sinhronizacije nije dostupan."
+      "syncStatusUnavailable": "Status sinhronizacije nije dostupan.",
+      "daysOverdue_one": "{{displayCount}} dan zakašnjenja",
+      "daysOverdue_other": "{{displayCount}} dana zakašnjenja",
+      "daysOverdue_few": "{{displayCount}} dana zakašnjenja",
+      "findingsCount_one": "{{displayCount}} nalaz",
+      "findingsCount_other": "{{displayCount}} nalaza",
+      "findingsCount_few": "{{displayCount}} nalaza"
     },
     "dashboardMetrics": {
       "openFindings": "Otvoreni nalazi",
@@ -1980,6 +2105,10 @@
       "couldNotLoad": "Nije moguće učitati sesiju.",
       "failedToLoadDetails": "Nije moguće učitati detalje sesije.",
       "failedToStopExecution": "Nije moguće zaustaviti izvršavanje.",
+      "stopped": "Sesija je zaustavljena",
+      "committing": "Potvrđuje se…",
+      "committed": "Potvrđeno",
+      "commitFailed": "Potvrda nije uspjela",
       "renameSession": "Preimenuj sesiju",
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
@@ -2014,6 +2143,7 @@
       "exitNeedsNewerCli": "Udaljene naredbe s kosom crtom zahtijevaju noviju verziju alata Kilo CLI. Ažuriraj Kilo CLI i ponovo se poveži."
     },
     "sessionConnection": {
+      "label": "Veza",
       "connecting": "Povezivanje…",
       "reconnecting": "Ponovno povezivanje…",
       "connectionLost": "Veza izgubljena",
@@ -2033,14 +2163,36 @@
       "removeConfirmTitle": "Ukloniti cilj?",
       "removeConfirmMessage": "CLI briše cilj ove sesije.",
       "updateFailed": "Nije bilo moguće ažurirati cilj.",
-      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}",
+      "collapse": "Sažmi cilj",
+      "expand": "Proširi cilj"
     },
     "newSession": {
+      "recentlyUsed": "Nedavno korišteno",
+      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorije.",
+      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorije.",
+      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorije.",
       "connectGithubDescription": "Poveži GitHub u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
+      "connectGitlabDescription": "Poveži GitLab u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
       "openGithub": "Otvori GitHub",
+      "openGitlab": "Otvori GitLab",
+      "openBitbucket": "Otvori Bitbucket",
       "refreshRepositories": "Osvježi repozitorije",
       "githubConnected": "GitHub povezan",
+      "gitlabConnected": "GitLab povezan",
       "noRepositoriesVisible": "Nema vidljivih repozitorija. Provjeri ima li aplikacija Kilo GitHub pristup repozitorijima, zatim osvježi spisak.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup GitLab repozitorijima, zatim osvježi spisak.",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup Bitbucket repozitorijima, zatim osvježi spisak.",
+      "bitbucketOrganizationsOnly": "Bitbucket je dostupan samo za organizacije.",
+      "branchPickerTitle": "Odaberi granu",
+      "branchDefault": "Zadano",
+      "branchAccessibility": "Grana: {{label}}",
+      "branchLoading": "Učitavanje grana",
+      "branchLoadError": "Učitavanje grana nije uspjelo",
+      "branchUnavailable": "Grane nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluga, pa odaberi drugi repozitorij.",
+      "branchEmpty": "Nema dostupnih grana",
+      "branchPlaceholder": "Odaberi granu",
       "runOnWithTarget": "Pokreni na: {{target}}",
       "environment": "Okruženje",
       "couldNotLoadEnvironment": "Nije moguće učitati tvoje okruženje.",
@@ -2061,24 +2213,39 @@
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",
+      "discardWithUploadsMessage": "Tvoj upit i sve otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisani.",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušaj ponovo.",
       "remoteHint": "Pokreni `kilo remote` na računaru ili `/remote` u aktivnoj CLI sesiji da upravljaš lokalnim procesom kilo.",
-      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
-      "connectGitlabDescription": "Poveži GitLab u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
-      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorije.",
-      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorije.",
-      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorije.",
-      "gitlabConnected": "GitLab povezan",
-      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup Bitbucket repozitorijima, zatim osvježi spisak.",
-      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup GitLab repozitorijima, zatim osvježi spisak.",
-      "openBitbucket": "Otvori Bitbucket",
-      "openGitlab": "Otvori GitLab",
-      "recentlyUsed": "Nedavno korišteno",
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Nije moguće uvesti ovu sesiju.",
-      "discardWithUploadsMessage": "Tvoj upit i sve otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisani."
+      "pickProfile": "Odaberite profil",
+      "noProfile": "Nema profila",
+      "manageProfiles": "Upravljajte profilima",
+      "noProfiles": "Još nema profila. Napravite jedan za dodavanje varijabli okruženja, MCP servera i vještina.",
+      "advancedConfig": "Napredna konfiguracija",
+      "advancedConfigDescription": "Odaberite profil za učitavanje sačuvanih konfiguracija i ručno konfigurirajte dodatne varijable okruženja i naredbe za postavljanje",
+      "saveAsProfile": "Sačuvaj kao profil",
+      "saveProfileDescription": "Sačuvajte trenutne varijable okruženja i naredbe za podešavanje kao profil za višekratnu upotrebu.",
+      "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za podešavanje",
+      "profileSaved": "Profil \"{{name}}\" je sačuvan",
+      "organizationProfiles": "Profili organizacije",
+      "personalProfiles": "Lični profili",
+      "yourProfiles": "Vaši profili",
+      "failedToLoadProfiles": "Učitavanje profila nije uspjelo",
+      "nameTooLong": "Ime profila je predugačko",
+      "descriptionTooLong": "Opis je predugačak",
+      "secretsEncrypted": "Tajne se šifriraju prije skladištenja.",
+      "profileActive": "Profil aktivan",
+      "profilesActive": "Profili aktivni",
+      "customConfigActive": "Prilagođena konfiguracija aktivna",
+      "configNeedsAttention": "Konfiguraciji treba obratiti pažnju",
+      "repoProfile": "Repo profil",
+      "selectedProfile": "Odabrani profil",
+      "manualOverrides": "Ručno nadjačavanje",
+      "openSettingsToReview": "Otvorite Postavke za pregled",
+      "profileSelection": "Izbor profila"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",
@@ -2103,15 +2270,21 @@
       "updateTodos": "Ažuriraj zadatke",
       "linesBadge": "{{displayCount}} redova",
       "filesBadge": "{{displayCount}} datoteka",
-      "matchesBadge": "{{displayCount}} podudaranja"
+      "matchesBadge": "{{displayCount}} podudaranja",
+      "filesBadge_one": "{{displayCount}} datoteka",
+      "filesBadge_other": "{{displayCount}} datoteka",
+      "filesBadge_few": "{{displayCount}} datoteke",
+      "linesBadge_one": "{{displayCount}} red",
+      "linesBadge_other": "{{displayCount}} redova",
+      "linesBadge_few": "{{displayCount}} reda",
+      "matchesBadge_one": "{{displayCount}} podudaranje",
+      "matchesBadge_other": "{{displayCount}} podudaranja",
+      "matchesBadge_few": "{{displayCount}} podudaranja",
+      "noOutput": "Nema izlaza."
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
       "linesOf": "redovi {{start}}–{{end}} od {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Radnja {{action}} u usluzi Cloud Agent nije uspjela ({{status}}).",
-      "failed": "Radnja {{action}} u usluzi Cloud Agent nije uspjela."
     },
     "collectCopyableText": {
       "unserializableInput": "[ulazni podaci koji se ne mogu serijalizirati]",
@@ -2208,8 +2381,7 @@
       "assistantProviderRejected": "Pružalac usluge je odbio zahtjev.",
       "assistantStopped": "Generisanje odgovora je zaustavljeno.",
       "assistantContextOverflow": "Razgovor je predug za model.",
-      "assistantFailed": "Generisanje odgovora nije uspjelo.",
-      "sendFailed": "Slanje poruke nije uspjelo. Pokušaj ponovo."
+      "assistantFailed": "Generisanje odgovora nije uspjelo."
     },
     "filePart": {
       "loadingImage": "Učitavanje slike",
@@ -2396,7 +2568,13 @@
       "files": "Datoteke",
       "couldNotOpenPhotoPicker": "Nije moguće otvoriti odabir fotografija. Ponovo pokreni Kilo i pokušaj ponovo.",
       "maxFilesAllowed": "Dozvoljeno je najviše {{displayCount}} datoteka.",
-      "onlyAddingFiles": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})"
+      "onlyAddingFiles": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})",
+      "maxFilesAllowed_one": "Dozvoljeno je najviše {{displayCount}} datoteka.",
+      "maxFilesAllowed_other": "Dozvoljeno je najviše {{displayCount}} datoteka.",
+      "maxFilesAllowed_few": "Dozvoljeno je najviše {{displayCount}} datoteke.",
+      "onlyAddingFiles_one": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})",
+      "onlyAddingFiles_other": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})",
+      "onlyAddingFiles_few": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})"
     },
     "composer": {
       "addAttachment": "Dodaj prilog",
@@ -2414,7 +2592,10 @@
       "discardAttachmentsMessage": "Otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisane.",
       "discardAttachmentsTitle": "Odbaciti priloge?",
       "charactersRemaining": "Preostalo znakova: {{count}}",
-      "insertNewline": "Umetni novi red"
+      "insertNewline": "Umetni novi red",
+      "charactersRemaining_one": "Preostalo znak: {{count}}",
+      "charactersRemaining_other": "Preostalo znakova: {{count}}",
+      "charactersRemaining_few": "Preostalo znaka: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Link kopiran",
@@ -2448,7 +2629,17 @@
       "startNewSession": "Započni novu sesiju",
       "exitSession": "Izađi iz sesije",
       "clearSession": "Okončaj ovu sesiju i započni novu",
+      "compactDescription": "sažmi kontekst trenutne sesije",
+      "goalDescription": "Nastavi raditi na cilju sesije. /goal <objective> ili pause, resume, clear",
+      "initDescription": "vođeno podešavanje AGENTS.md",
+      "resumeClaudeDescription": "uvezi transkript sesije Claude Code",
+      "resumeCodexDescription": "uvezi transkript sesije OpenAI Codex",
+      "reviewDescription": "pregledaj promjene [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Koristi /{{command}}",
+      "useSkillCommand": "Koristi vještinu /{{command}}",
+      "skillBadge": "Vještina",
+      "catalogFull": "Katalog komandi je pun, pa su neke komande skrivene.",
+      "catalogOverLimit": "Katalog vještina premašuje ograničenje veličine, pa se prikazuju sve vještine.",
       "insert": "Umetni",
       "upgradeRequiredFallback": "Ažuriraj CLI da koristiš ovu naredbu.",
       "exitCapabilityUnavailable": "Ažuriraj CLI da izađeš iz sesije.",
@@ -2481,7 +2672,10 @@
       "stepsCount": "{{steps}} koraka",
       "stepsCount_other": "{{steps}} koraka",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_few": "{{steps}} koraka"
+      "stepsCount_few": "{{steps}} koraka",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modeli ({{displayCount}})",
+      "modelsCount_few": "Modeli ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatsko odobravanje",
@@ -2521,7 +2715,10 @@
     },
     "toolRun": {
       "sheetTitle": "Pozivi alata",
-      "condensedLabel": "{{itemCount}} stavki; {{last}}"
+      "condensedLabel": "{{itemCount}} stavki; {{last}}",
+      "condensedLabel_one": "{{itemCount}} stavka; {{last}}",
+      "condensedLabel_other": "{{itemCount}} stavki; {{last}}",
+      "condensedLabel_few": "{{itemCount}} stavke; {{last}}"
     }
   },
   "bootstrap": {
@@ -2566,6 +2763,7 @@
     "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak programiranja",
+    "newTaskFromPicture": "Novi zadatak sa slike",
     "explore": "Istraži",
     "seeAll": "Pogledaj sve",
     "noLiveSessions": "Trenutno ništa nije pokrenuto"
@@ -2655,7 +2853,10 @@
     "cliCantReceiveFilesTitle": "Ova sesija ne može primiti datoteke",
     "cliCantReceiveFilesMessage": "Kilo CLI koji pokreće ovu sesiju ne može primati datoteke. Ažuriraj CLI na tom računaru ili pošalji sadržaj u novu sesiju.",
     "contentlessMessage": "Nema sadržaja za dijeljenje — nisu priloženi ni tekst ni datoteke.",
-    "couldNotReadContent": "Čitanje podijeljenog sadržaja nije uspjelo."
+    "couldNotReadContent": "Čitanje podijeljenog sadržaja nije uspjelo.",
+    "onlyFirstFilesAttached_one": "Samo prvih {{displayCount}} datoteka bit će priloženo.",
+    "onlyFirstFilesAttached_other": "Samo prvih {{displayCount}} datoteka bit će priloženo.",
+    "onlyFirstFilesAttached_few": "Samo prvih {{displayCount}} datoteke bit će priloženo."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2787,7 +2988,8 @@
     "aiProvidersWhat": "Tvoji upiti, historija razgovora i sve datoteke koje priložiš.",
     "aiProvidersWhy": "Za generisanje AI odgovora.",
     "aiProvidersWho": "Anthropic, OpenAI, Google i drugi pružaoci usluga koje odabereš za svaki zahtjev.",
-    "gatewayWhat": "ID naloga, metapodaci zahtjeva, potrošnja tokena.",
+    "gatewayWhat": "ID naloga, metapodaci zahtjeva, potrošnja tokena, te promptovi i audio-snimci koje aplikacija šalje preko njega.",
+    "viaGateway": "Preko Kilo Gatewayja",
     "gatewayWhy": "Autentifikacija, usmjeravanje zahtjeva, usaglašavanje naplate.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Izvještaji o rušenjima i greškama iz kojih je uklonjen sadržaj aplikacije.",
@@ -2807,7 +3009,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Tvoj snimak dok diktiraš.",
     "voiceTranscriptionWhy": "Za pretvaranje govora u tekst.",
-    "voiceTranscriptionWho": "Samo na uređaju, ili Apple ili Google kada uređaj ne može pretvoriti govor u tekst bez interneta.",
+    "voiceTranscriptionWho": "Tvoj uređaj, Kilo Gateway s modelom za transkripciju koji odabereš ili Apple ili Google za prepoznavanje na mreži.",
     "installAttributionPromptTitle": "Dozvoliti praćenje izvora instalacije?",
     "installAttributionPromptMessage": "Kilo koristi dozvolu kompanije Apple za praćenje samo da sazna kojim kanalom dolaziš. Tvoji upiti i razgovori nikada se ne koriste u tu svrhu.",
     "what": "Šta",
@@ -2980,6 +3182,14 @@
     "tooManySignInAttempts": "Previše pokušaja prijave. Sačekaj pa pokušaj ponovo."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatski Napredni",
+      "balanced": "Automatski Uravnotežen",
+      "efficient": "Automatski Efikasni",
+      "small": "Automatski Mali",
+      "free": "Automatski Besplatni",
+      "organization": "Automatski organizacije"
+    },
     "dataCollected": "Prikuplja podatke",
     "free": "Besplatno",
     "couldNotUpdateFavorites": "Nije moguće ažurirati omiljene modele.",
@@ -3010,8 +3220,17 @@
     "privacy": "Otvori Kilo da vidiš agente",
     "openAgents": "Otvori agente",
     "needsInput": "Čeka unos",
+    "newestSession": "Najnovija: {{title}}",
+    "noneWaiting": "Nema agenata koji čekaju",
+    "newAgent": "Novi agent",
+    "approving": "Odobrava se...",
+    "couldNotApprove": "Odobravanje nije uspjelo",
+    "couldNotStart": "Pokretanje nije uspjelo",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu."
+    "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu.",
+    "openSession": "Otvori",
+    "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovo.",
+    "newestResult": "Najnoviji rezultat"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3036,15 +3255,7 @@
     "remoteOptionTitle": "Tvoj računar",
     "remoteOptionBody": "Pokreni Kilo na vlastitoj mašini putem `kilo remote` CLI-ja.",
     "skip": "Preskoči obilazak",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
-    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Još nema povezanog računara",
-    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
-    "remoteFound": "Računar povezan",
-    "checkAgain": "Provjeri ponovo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "modelChat": {
     "empty": {
@@ -3106,5 +3317,213 @@
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promjenu?"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorij. Odaberi drugi repozitorij u Kilo.",
+      "repositoryUnsupported": "{{repository}} je Bitbucket repozitorij — Pokreni agenta ga još ne može koristiti. Odaberi drugi repozitorij u Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Otvori posljednju sesiju"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošalji upozorenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog obuhvata pređe limit ili skoči iznad uobičajene satne stope.",
+    "enable": "Omogući upozorenja o potrošnji",
+    "thresholdTitle": "Prekoračenje praga",
+    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "anomalyTitle": "Satni skok",
+    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog obuhvata",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Prozor",
+    "window24h": "24 sata",
+    "window7d": "7 dana",
+    "window30d": "30 dana",
+    "multiplierLabel": "Množilac skoka",
+    "saved": "Postavke upozorenja o potrošnji su sačuvane",
+    "loadError": "Upozorenja o potrošnji nisu učitana.",
+    "saveError": "Upozorenja o potrošnji nisu sačuvana.",
+    "empty": "Upozorenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog obuhvata.",
+    "noSpend": "Još nema zabilježene potrošnje",
+    "spend24h": "Potrošnja u posljednja 24 sata",
+    "multiplierError": "Unesi množilac 1 ili veći",
+    "permissionDenied": "Nemaš dozvolu za upravljanje upozorenjima o potrošnji.",
+    "pushOffByCategory": "Isključeno u Obavijestima"
+  },
+  "profiles": {
+    "title": "Profili",
+    "entrySubtitle": "Ponovo koristite postavke okruženja u svim sesijama",
+    "newProfile": "Novi profil",
+    "emptyTitle": "Još nema profila",
+    "emptyDescription": "Kreirajte profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama.",
+    "loadFailed": "Učitavanje profila nije uspjelo",
+    "counts": {
+      "vars": "{{count}} varijabli",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} vještina",
+      "commands": "{{count}} komandi",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}vje",
+      "commandsShort": "{{count}}kom"
+    },
+    "nameLabel": "Ime profila",
+    "namePlaceholder": "npr. Backend debugging",
+    "descriptionLabel": "Opis profila",
+    "descriptionPlaceholder": "Opcioni opis",
+    "ownerLabel": "Vlasnik profila",
+    "nameRequired": "Unesite naziv profila",
+    "createAction": "Kreirajte profil",
+    "createFailed": "Nije moguće kreirati profil",
+    "createdToast": "Profil \"{{name}}\" kreiran",
+    "settingsSectionTitle": "Konfiguracija",
+    "defaultSectionTitle": "Zadani profil",
+    "personalDefaultDescription": "Automatski se učitava kada nijedno spremište nema zakačeni profil.",
+    "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju lične postavke.",
+    "setAsDefault": "Postavi kao zadano",
+    "removeDefault": "Ukloni kao zadano",
+    "saveFailed": "Nije moguće sačuvati profil",
+    "deleteTitle": "Izbriši profil",
+    "deleteMessage": "Ovo trajno uklanja profil i njegove postavke. Ovo se ne može poništiti.",
+    "deleteFailed": "Nije moguće izbrisati profil",
+    "deleteBlocked": "Ovaj profil koristi webhook okidač. Prvo ga uklonite sa tih okidača.",
+    "deletedToast": "Profil \"{{name}}\" je izbrisan",
+    "variablesTitle": "Varijable okruženja",
+    "addVariable": "Dodaj varijablu",
+    "keyLabel": "Ključ",
+    "keyTooLong": "Ključ može imati najviše 256 znakova",
+    "keyDuplicate": "Ovaj ključ već postoji u profilu",
+    "valueLabel": "Vrijednost",
+    "secretLabel": "Tajna",
+    "secrets": {
+      "markSecret": "Označi kao tajnu",
+      "masked": "Skrivena vrijednost",
+      "reveal": "Otkrijte vrijednost",
+      "newValuePlaceholder": "Unesite novu tajnu vrijednost",
+      "valuePlaceholder": "Tajna vrijednost (šifrovana)"
+    },
+    "variablesEmpty": "Još nema varijabli",
+    "variablesSaveFailed": "Nije moguće sačuvati varijablu",
+    "commandsTitle": "Komande za podešavanje",
+    "addCommand": "Dodaj naredbu",
+    "commandLabel": "Zapovjedi",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "Još nema naredbi za postavljanje",
+    "commandsSaveFailed": "Nije moguće sačuvati naredbe za postavljanje",
+    "moveUp": "Kreni gore",
+    "moveDown": "Pomeri se dole",
+    "skillsTitle": "Vještine",
+    "addSkill": "Dodajte vještinu",
+    "skillNameLabel": "Naziv vještine",
+    "skillMarkdownLabel": "Sadržaj vještina",
+    "skillsEmpty": "Još nema vještina",
+    "skillNameRequired": "Unesite naziv vještine",
+    "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
+    "skillContentRequired": "Sadržaj vještina je obavezan",
+    "skillSaveFailed": "Nije moguće sačuvati vještinu",
+    "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
+    "skillEditTitle": "Uredi vještinu",
+    "mcp": {
+      "title": "MCP serveri",
+      "add": "Dodajte MCP server",
+      "empty": "Još nema MCP servera",
+      "name": "Ime servera",
+      "type": "Tip servera",
+      "localType": "Lokalno",
+      "remoteType": "Daljinski",
+      "command": "Komandna linija",
+      "url": "URL",
+      "environment": "Okruženje (JSON)",
+      "headers": "Zaglavlja (JSON)",
+      "timeout": "Timeout",
+      "secretCount": "Tajni broj",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "Unesite ime servera",
+      "nameInvalid": "Ime može koristiti samo slova, brojeve, donje crte i crtice",
+      "commandRequired": "Unesite komandu",
+      "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
+      "urlRequired": "Unesite URL",
+      "urlInvalid": "Unesite važeći URL",
+      "urlTooLong": "URL može imati najviše 2048 znakova",
+      "jsonInvalid": "Unesite važeći JSON — objekt vrijednosti niza",
+      "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
+      "timeoutInvalid": "Vremensko ograničenje mora biti cijeli broj milisekundi",
+      "edit": "Uredite MCP server",
+      "saveFailed": "Nije moguće sačuvati MCP server"
+    },
+    "agents": {
+      "title": "Profil agenti",
+      "add": "Dodaj agenta",
+      "empty": "Još nema agenata",
+      "name": "Ime agenta",
+      "slug": "Agent puž",
+      "description": "Opis agenta",
+      "model": "Nadjačavanje modela",
+      "modelPlaceholder": "Koristi zadanu sesiju",
+      "prompt": "Sistemski prompt",
+      "steps": "Maks. koraka",
+      "stepsPlaceholder": "npr. 50",
+      "temperature": "Temperatura",
+      "temperaturePlaceholder": "npr. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "npr. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "Moj agent",
+      "promptPlaceholder": "ti si...",
+      "tools": "Alati",
+      "visibility": "Vidljivost",
+      "visibilityPrimary": "Primarni — prikazano u biraču",
+      "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
+      "visibilityAll": "Sve — oboje",
+      "saveFailed": "Nije moguće sačuvati agenta",
+      "nameRequired": "Unesite ime agenta",
+      "slugRequired": "Unesite puž agenta",
+      "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
+      "slugConflict": "Taj puž je rezervisan od strane ugrađenog agenta",
+      "edit": "Uredi agenta"
+    },
+    "slashCommands": {
+      "title": "Slash komande",
+      "add": "Dodaj naredbu kose crte",
+      "empty": "Još nema komandi kose crte",
+      "name": "Ime komande",
+      "description": "Opis komande",
+      "template": "Predložak",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "Objasnite $ARGUMENTS",
+      "agent": "Agent",
+      "subtask": "Pokreni kao podzadatak",
+      "edit": "Uredi naredbu kose crte",
+      "saveFailed": "Nije moguće sačuvati naredbu",
+      "nameRequired": "Unesite naziv komande",
+      "nameInvalid": "Ime mora početi malim slovom i koristiti samo mala slova, cifre i crtice",
+      "templateRequired": "Unesite predložak komande",
+      "nameConflict": "To ime je rezervisano ugrađenom komandom"
+    },
+    "repoBindings": {
+      "title": "Zadani profili za Repos",
+      "add": "Dodaj zadano",
+      "empty": "Nema konfiguriranih zadanih postavki",
+      "emptyDescription": "Dodajte zadano za automatsku primjenu profila pri pokretanju sesija za repo.",
+      "repo": "Odaberite spremište…",
+      "profile": "Odaberite profil",
+      "remove": "Odveži",
+      "private": "Privatno",
+      "search": "Pretražite spremišta…",
+      "addedToast": "Zadani profil postavljen za \"{{repo}}\"",
+      "addFailed": "Nije moguće postaviti zadani profil",
+      "removedToast": "Zadani profil je uklonjen za \"{{repo}}\"",
+      "removeFailed": "Nije moguće ukloniti zadani profil",
+      "pinnedTitle": "Zakačeno u spremišta",
+      "pinRepo": "Zakačite repo",
+      "pinnedEmpty": "Nije zakačeno ni za jedno spremište.",
+      "pinnedDescription": "Automatski se učitava kad god sesija cilja jedno od ovih spremišta.",
+      "pinnedToast": "Zakačeno na \"{{repo}}\"",
+      "pinFailed": "Nije moguće zakačiti repo",
+      "unboundToast": "Repo nevezan",
+      "unbindFailed": "Nije moguće poništiti vezivanje repo"
+    }
   }
 }

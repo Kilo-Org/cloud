@@ -65,6 +65,11 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  spend_alert_settings,
+  spend_alert_rules,
+  spend_alert_rule_state,
+  spend_alert_hourly,
+  spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
@@ -95,10 +100,6 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
   system_prompt_prefix,
-  model_experiment,
-  model_experiment_variant,
-  model_experiment_variant_version,
-  model_experiment_request,
   stripe_dispute_actions,
   stripe_dispute_cases,
   stripe_early_fraud_warning_cases,
@@ -107,6 +108,7 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   byok_api_keys,
+  openai_chatgpt_connections,
   mcp_gateway_configs,
   mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
@@ -133,9 +135,12 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  passkey_credentials,
+  passkey_challenges,
+  passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
 
-import { eq, count, inArray, sql } from 'drizzle-orm';
+import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
@@ -146,6 +151,9 @@ import {
   createOrUpdateUser,
   getAllUserProviders,
   getCrossAccountEmailConflicts,
+  getUserAuthProviders,
+  linkAuthProviderToUser,
+  unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
@@ -193,7 +201,6 @@ jest.mock('@/lib/r2/client', () => ({
   r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
   r2CliSessionsBucketName: 'cli-sessions-bucket',
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
-  r2ExperimentPromptsBucketName: 'experiment-prompts-bucket',
 }));
 
 const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
@@ -265,10 +272,6 @@ describe('User', () => {
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
     await db.delete(free_model_usage);
-    await db.delete(model_experiment_request);
-    await db.delete(model_experiment_variant_version);
-    await db.delete(model_experiment_variant);
-    await db.delete(model_experiment);
     await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
@@ -1461,6 +1464,24 @@ describe('User', () => {
           distinct_id: user.id,
           properties: { email: 'reintroduced@example.com' },
         });
+        await db.insert(passkey_credentials).values({
+          kilo_user_id: user.id,
+          credential_id: `credential-${randomUUID()}`,
+          public_key: 'public-key',
+          name: 'Reintroduced Device',
+        });
+        await db.insert(passkey_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kind: 'authentication',
+          kilo_user_id: user.id,
+          expires_at: new Date().toISOString(),
+        });
+        await db.insert(passkey_sign_in_tickets).values({
+          ticket_hash: `ticket-${randomUUID()}`,
+          kilo_user_id: user.id,
+          expires_at: new Date().toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -1499,9 +1520,107 @@ describe('User', () => {
             .from(analytics_event_outbox)
             .where(eq(analytics_event_outbox.distinct_id, user.id))
         ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_credentials)
+            .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_challenges)
+            .where(
+              and(
+                eq(passkey_challenges.kilo_user_id, user.id),
+                isNull(passkey_challenges.consumed_at)
+              )
+            )
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_sign_in_tickets)
+            .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id))
+        ).toHaveLength(0);
         expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
       }
     );
+
+    it('removes the ChatGPT connection rows for the deleted user', async () => {
+      const user = await insertTestUser({
+        google_user_email: `chatgpt-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const encrypted_connection = encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY);
+      await db.insert(openai_chatgpt_connections).values([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          encrypted_connection,
+          created_by: user.id,
+        },
+        {
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          encrypted_connection,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(openai_chatgpt_connections)
+          .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
+
+    it("keeps the organization's shared-services row when the connector is deleted", async () => {
+      const connector = await insertTestUser({
+        google_user_email: `chatgpt-shared-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT shared cleanup ${randomUUID()}`,
+        connector.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: connector.id,
+        organization_id: organization.id,
+        is_shared_services: true,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        created_by: connector.id,
+      });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, connector.id));
+
+      // The organization's connection belongs to the organization, so the
+      // deletion keeps it: only the reference to the deleted connector is
+      // cleared, and `created_by` keeps the record of who connected it.
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.organization_id, organization.id),
+            eq(openai_chatgpt_connections.is_shared_services, true)
+          )
+        );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].kilo_user_id).toBeNull();
+      expect(rows[0].created_by).toBe(connector.id);
+    });
   });
 
   describe('softDeleteUser', () => {
@@ -3160,6 +3279,117 @@ describe('User', () => {
       expect(providers).toHaveLength(0);
     });
 
+    it('should delete passkey credentials, passkey challenges and sign-in tickets for the user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+
+      await db.insert(passkey_credentials).values([
+        {
+          kilo_user_id: user.id,
+          credential_id: `credential-${user.id}`,
+          public_key: 'public-key',
+          name: 'Test Laptop',
+        },
+        {
+          kilo_user_id: otherUser.id,
+          credential_id: `credential-${otherUser.id}`,
+          public_key: 'public-key',
+        },
+      ]);
+      await db.insert(passkey_challenges).values([
+        {
+          id: randomUUID(),
+          challenge: 'open-challenge',
+          kind: 'registration',
+          kilo_user_id: user.id,
+          expires_at: now,
+        },
+        {
+          id: randomUUID(),
+          challenge: 'consumed-challenge',
+          kind: 'registration',
+          kilo_user_id: user.id,
+          expires_at: now,
+          consumed_at: now,
+        },
+        {
+          id: randomUUID(),
+          challenge: 'other-open-challenge',
+          kind: 'authentication',
+          kilo_user_id: otherUser.id,
+          expires_at: now,
+        },
+      ]);
+      await db.insert(passkey_sign_in_tickets).values([
+        {
+          ticket_hash: `open-ticket-${user.id}`,
+          kilo_user_id: user.id,
+          expires_at: now,
+        },
+        {
+          ticket_hash: `consumed-ticket-${user.id}`,
+          kilo_user_id: user.id,
+          expires_at: now,
+          consumed_at: now,
+        },
+        {
+          ticket_hash: `other-ticket-${otherUser.id}`,
+          kilo_user_id: otherUser.id,
+          expires_at: now,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(passkey_credentials)
+          .where(eq(passkey_credentials.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_credentials)
+          .where(eq(passkey_credentials.kilo_user_id, otherUser.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(passkey_challenges)
+          .where(
+            and(
+              eq(passkey_challenges.kilo_user_id, user.id),
+              isNull(passkey_challenges.consumed_at)
+            )
+          )
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_challenges)
+          .where(
+            and(
+              eq(passkey_challenges.kilo_user_id, otherUser.id),
+              isNull(passkey_challenges.consumed_at)
+            )
+          )
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(passkey_sign_in_tickets)
+          .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_sign_in_tickets)
+          .where(eq(passkey_sign_in_tickets.kilo_user_id, otherUser.id))
+      ).toHaveLength(1);
+    });
+
     it('should delete affiliate attributions for the user', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
@@ -4810,6 +5040,90 @@ describe('User', () => {
       expect(rows).toHaveLength(0);
     });
 
+    it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {
+      const user = await insertTestUser();
+      const scopeKey = `user:${user.id}`;
+      const [settings] = await db
+        .insert(spend_alert_settings)
+        .values({ scope_key: scopeKey, kilo_user_id: user.id, enabled: true })
+        .returning();
+      const [rule] = await db
+        .insert(spend_alert_rules)
+        .values({
+          settings_id: settings.id,
+          kind: 'threshold',
+          threshold_microdollars: 5_000_000,
+        })
+        .returning();
+      await db.insert(spend_alert_rule_state).values({ rule_id: rule.id, firing: true });
+      await db.insert(spend_alert_hourly).values({
+        scope_key: scopeKey,
+        hour_start: new Date().toISOString(),
+        cost_microdollars: 4_200_000,
+      });
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: `spend-alert-test-${crypto.randomUUID()}`,
+        scope_key: scopeKey,
+        channel: 'email',
+        recipients: [{ email: 'billing-contact@example.com' }],
+      });
+
+      await softDeleteUser(user.id);
+
+      const settingsRows = await db
+        .select()
+        .from(spend_alert_settings)
+        .where(eq(spend_alert_settings.kilo_user_id, user.id));
+      expect(settingsRows).toHaveLength(0);
+      // Deleting the settings row cascades to its rules and per-rule state.
+      const ruleRows = await db
+        .select()
+        .from(spend_alert_rules)
+        .where(eq(spend_alert_rules.settings_id, settings.id));
+      expect(ruleRows).toHaveLength(0);
+      const ruleStateRows = await db
+        .select()
+        .from(spend_alert_rule_state)
+        .where(eq(spend_alert_rule_state.rule_id, rule.id));
+      expect(ruleStateRows).toHaveLength(0);
+      const hourlyRows = await db
+        .select()
+        .from(spend_alert_hourly)
+        .where(eq(spend_alert_hourly.scope_key, scopeKey));
+      expect(hourlyRows).toHaveLength(0);
+      const deliveryRows = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.scope_key, scopeKey));
+      expect(deliveryRows).toHaveLength(0);
+    });
+
+    it('should strip a deleted billing contact from organization scope delivery recipients', async () => {
+      const user = await insertTestUser();
+      const otherUserId = `test-other-${crypto.randomUUID()}`;
+      const otherEmail = 'other-billing@example.com';
+      const dedupeKey = `spend-alert-org-test-${crypto.randomUUID()}`;
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: dedupeKey,
+        scope_key: `org:${crypto.randomUUID()}`,
+        channel: 'email',
+        recipients: {
+          userIds: [user.id, otherUserId],
+          emails: [user.google_user_email, otherEmail],
+        },
+      });
+
+      await softDeleteUser(user.id);
+
+      // Organization-scoped rows belong to the organization and stay, but the
+      // deleted member's id and address are their PII and must be removed.
+      const [row] = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.dedupe_key, dedupeKey));
+      expect(row?.recipients).toEqual({ userIds: [otherUserId], emails: [otherEmail] });
+    });
+
     it('should delete Coding Plan availability notification intents', async () => {
       const user = await insertTestUser();
       await db.insert(coding_plan_availability_intents).values({
@@ -4916,6 +5230,61 @@ describe('User', () => {
           .from(github_app_installations)
           .where(eq(github_app_installations.id, canonical.id))
       ).resolves.toHaveLength(0);
+    });
+
+    it('deletes a personal association but preserves a canonical shared with an organization', async () => {
+      const user = await insertTestUser();
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Shared personal deletion organization',
+        organizationOwner.id,
+        0
+      );
+      const [canonical] = await db
+        .insert(github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: '9876510',
+          account_id: '110',
+          lifecycle_state: 'active',
+          sharing_mode: 'web_cloud_agent',
+        })
+        .returning();
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: user.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '9876510',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '9876510',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      await expect(
+        db
+          .select()
+          .from(github_app_installations)
+          .where(eq(github_app_installations.id, canonical.id))
+      ).resolves.toHaveLength(1);
+      const retainedAssociations = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.github_installation_id, canonical.id));
+      expect(retainedAssociations).toHaveLength(1);
+      expect(retainedAssociations[0]?.owned_by_organization_id).toBe(organization.id);
     });
 
     it('deletes migration-created personal canonical PII but preserves organizations', async () => {
@@ -5030,91 +5399,6 @@ describe('User', () => {
       expect(softDeletedCreator?.google_user_name).toBe('Deleted User');
       expect(softDeletedCreator?.is_admin).toBe(false);
       expect(softDeletedCreator?.can_manage_credits).toBe(false);
-    });
-
-    it('should preserve model experiment attribution and prompt hashes', async () => {
-      const user = await insertTestUser();
-      const usageId = randomUUID();
-      const createdAt = '2026-05-25T12:00:00.000Z';
-      const requestBodySha256 = 'a'.repeat(64);
-
-      await db.insert(microdollar_usage).values({
-        id: usageId,
-        kilo_user_id: user.id,
-        cost: 0,
-        input_tokens: 100,
-        output_tokens: 50,
-        cache_write_tokens: 0,
-        cache_hit_tokens: 0,
-        created_at: createdAt,
-        provider: 'custom',
-        model: 'partner/checkpoint-rc1',
-        requested_model: 'kilo/preview-experiment-test',
-        has_error: false,
-      });
-
-      const [experiment] = await db
-        .insert(model_experiment)
-        .values({
-          public_model_id: 'kilo/preview-experiment-test',
-          name: 'Soft-delete retention test',
-          status: 'active',
-          created_by_user_id: user.id,
-        })
-        .returning({ id: model_experiment.id });
-      if (!experiment) throw new Error('Failed to insert model experiment');
-
-      const [variant] = await db
-        .insert(model_experiment_variant)
-        .values({
-          experiment_id: experiment.id,
-          label: 'A',
-          weight: 1,
-        })
-        .returning({ id: model_experiment_variant.id });
-      if (!variant) throw new Error('Failed to insert model experiment variant');
-
-      const [variantVersion] = await db
-        .insert(model_experiment_variant_version)
-        .values({
-          variant_id: variant.id,
-          upstream: {
-            internal_id: 'partner/checkpoint-rc1',
-            base_url: 'https://partner.example.com/v1',
-          },
-          encrypted_api_key: { iv: 'iv', data: 'data', authTag: 'authTag' },
-          created_by: user.id,
-        })
-        .returning({ id: model_experiment_variant_version.id });
-      if (!variantVersion) throw new Error('Failed to insert model experiment variant version');
-
-      await db.insert(model_experiment_request).values({
-        usage_id: usageId,
-        variant_version_id: variantVersion.id,
-        allocation_subject: 'user',
-        client_request_id: 'client-message-id',
-        request_kind: 'chat_completions',
-        request_body_sha256: requestBodySha256,
-        was_truncated: false,
-        created_at: createdAt,
-      });
-
-      await softDeleteUser(user.id);
-
-      const [usage] = await db
-        .select()
-        .from(microdollar_usage)
-        .where(eq(microdollar_usage.id, usageId));
-      expect(usage?.kilo_user_id).toBe(user.id);
-
-      const [attribution] = await db
-        .select()
-        .from(model_experiment_request)
-        .where(eq(model_experiment_request.usage_id, usageId));
-      if (!attribution) throw new Error('Expected model experiment attribution to be retained');
-      expect(attribution.request_body_sha256).toBe(requestBodySha256);
-      expect(attribution.client_request_id).toBe('client-message-id');
-      expect(new Date(attribution.created_at).toISOString()).toBe(createdAt);
     });
 
     it('should preserve Kilo Pass subscriptions and issuance chain', async () => {
@@ -6233,6 +6517,172 @@ describe('User', () => {
 
       expect(result.size).toBe(0);
       expect(result).toEqual(new Map());
+    });
+  });
+
+  describe('unlinkAuthProviderFromUser ChatGPT connection', () => {
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: `openai-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    async function seedOpenAiConnection(userId: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: userId,
+        organization_id: null,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        created_by: userId,
+      });
+    }
+
+    async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: createdBy,
+        organization_id: organizationId,
+        encrypted_connection: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
+        created_by: createdBy,
+      });
+    }
+
+    test('deletes the personal ChatGPT connection when unlinking openai', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
+          )
+        );
+      expect(rows).toHaveLength(0);
+    });
+
+    test('keeps an organization ChatGPT connection created by the same person when unlinking openai', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+      const organization = await createTestOrganization(`Keep ${randomUUID()}`, user.id, 0);
+      await seedOpenAiOrganizationConnection(organization.id, user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(eq(openai_chatgpt_connections.organization_id, organization.id));
+      expect(rows).toHaveLength(1);
+    });
+
+    test('keeps the ChatGPT connection when unlinking another provider', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'google');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
+          )
+        );
+      expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('linkAuthProviderToUser identical re-link', () => {
+    // The issuer-qualified subject the OpenAI flow stores (`<issuer>#<sub>`).
+    const OPENAI_ACCOUNT_ID = 'https://auth.openai.com#cb-openai-sub';
+
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: OPENAI_ACCOUNT_ID,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    test('re-linking the identical account id succeeds and keeps one row', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: OPENAI_ACCOUNT_ID,
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(true);
+      const providers = await getUserAuthProviders(user.id);
+      expect(providers.filter(p => p.provider === 'openai')).toHaveLength(1);
+    });
+
+    test('re-linking a different account id for the same provider still fails', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: 'https://auth.openai.com#other-sub',
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('PROVIDER-ALREADY-LINKED');
+      }
     });
   });
 });

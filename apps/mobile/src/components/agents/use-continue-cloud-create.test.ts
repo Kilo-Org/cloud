@@ -137,6 +137,13 @@ const GITLAB_REPO: NewSessionRepository = {
   fullName: 'group/project',
   isPrivate: false,
 };
+const BITBUCKET_REPO: NewSessionRepository = {
+  platform: 'bitbucket',
+  fullName: 'workspace/repo',
+  isPrivate: true,
+  workspaceUuid: 'ws-1234',
+  repositoryUuid: 'repo-5678',
+};
 const DEST = { repository: GITHUB_REPO, model: 'claude-x', variant: 'high' };
 const SESSION_RESULT = { kiloSessionId: 'ses_12345678901234567890123456' };
 
@@ -207,6 +214,51 @@ describe('useContinueCloudCreate', () => {
     const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(input).toMatchObject({ gitlabProject: 'group/project' });
     expect(input).not.toHaveProperty('githubRepo');
+  });
+
+  it('writes bitbucketRepo (only) with both uuids for a Bitbucket repository, and never upstreamBranch', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, { ...DEST, repository: BITBUCKET_REPO }, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      bitbucketRepo: {
+        fullName: 'workspace/repo',
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+    expect(input).not.toHaveProperty('githubRepo');
+    expect(input).not.toHaveProperty('gitlabProject');
+    expect(input).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('writes no repository field for a Bitbucket repository missing its uuids', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(
+        SOURCE_SESSION,
+        {
+          ...DEST,
+          repository: {
+            platform: 'bitbucket',
+            fullName: 'workspace/repo',
+            isPrivate: true,
+          },
+        },
+        'code'
+      );
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).not.toHaveProperty('githubRepo');
+    expect(input).not.toHaveProperty('gitlabProject');
+    expect(input).not.toHaveProperty('bitbucketRepo');
+    expect(input).not.toHaveProperty('upstreamBranch');
   });
 
   it('rethrows a retryable prepare error without rotating the key or removing the row (route toasts cloneFailedRetry and re-enables)', async () => {

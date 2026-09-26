@@ -1,9 +1,9 @@
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, type AppStateStatus, Platform } from 'react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
+import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
 import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
@@ -27,16 +27,6 @@ type DeviceAuthResult = DeviceAuthState & {
 };
 
 const START_TIMEOUT_MS = 15_000;
-
-// Android has no native auth session; expo-web-browser's polyfill keeps
-// module-level state that can get stuck and reject every future call
-// (KILO-APP-22). We poll the server for approval instead of relying on a
-// redirect, so a plain browser open is all Android needs.
-async function openAuthBrowser(url: string) {
-  await (Platform.OS === 'android'
-    ? WebBrowser.openBrowserAsync(url)
-    : WebBrowser.openAuthSessionAsync(url));
-}
 
 export function useDeviceAuth(): DeviceAuthResult {
   const [state, setState] = useState<DeviceAuthState>(idleDeviceAuthState());
@@ -123,6 +113,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         signal: abort.signal,
         setState,
         cleanup,
+        browserKind: resolveAuthBrowserKind(record.verificationUrl),
         startedAt: record.startedAt,
       });
     }
@@ -230,6 +221,10 @@ export function useDeviceAuth(): DeviceAuthResult {
           signal: abort.signal,
           setState,
           cleanup,
+          // Approval dismisses the page the flow opened, so the poll has to know
+          // which API opened it: the plain browser on a non-product host (or on
+          // Android) needs its own dismissal.
+          browserKind: resolveAuthBrowserKind(browserUrl),
         });
 
         await openAuthBrowser(browserUrl);

@@ -1,5 +1,10 @@
-import type { Part, ReasoningPart, StepFinishPart, TextPart, ToolPart } from './types';
-import { getStepFinishRoutedModel, normalizeMissingPartText } from './part-utils';
+import type { Part, PatchPart, ReasoningPart, StepFinishPart, TextPart, ToolPart } from './types';
+import {
+  getStepFinishRoutedModel,
+  normalizeMissingPartText,
+  normalizeMissingPatchFiles,
+  partSettledAt,
+} from './part-utils';
 
 function stepFinishPart(overrides: Partial<StepFinishPart> = {}): StepFinishPart {
   return {
@@ -190,5 +195,117 @@ describe('normalizeMissingPartText', () => {
 
     expect(normalizeMissingPartText(toolPart)).toBe(toolPart);
     expect(normalizeMissingPartText(stepFinishPart)).toBe(stepFinishPart);
+  });
+});
+
+describe('partSettledAt', () => {
+  function settledToolPart(status: 'completed' | 'error', time?: { start: number; end: number }) {
+    return {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status,
+        input: {},
+        raw: '',
+        ...(status === 'completed'
+          ? { output: 'ok', title: 'task', metadata: {} }
+          : { error: 'boom' }),
+        ...(time === undefined ? {} : { time }),
+      },
+    } as unknown as Part;
+  }
+
+  it('returns the settle time of a completed tool part', () => {
+    expect(partSettledAt(settledToolPart('completed', { start: 1, end: 2 }))).toBe(2);
+  });
+
+  it('returns the settle time of an errored tool part', () => {
+    expect(partSettledAt(settledToolPart('error', { start: 3, end: 4 }))).toBe(4);
+  });
+
+  // Ingest-frame compaction strips `state.time` down to `state.status`, so a
+  // persisted terminal part can arrive with no settle time at all.
+  it('returns undefined for a compacted terminal tool part with no time', () => {
+    expect(partSettledAt(settledToolPart('completed'))).toBeUndefined();
+    expect(partSettledAt(settledToolPart('error'))).toBeUndefined();
+  });
+
+  it('returns undefined for a running tool part and for non-tool parts', () => {
+    const running: Part = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: { status: 'running', input: {}, time: { start: 5 } },
+    };
+    const text: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hi',
+    };
+    expect(partSettledAt(running)).toBeUndefined();
+    expect(partSettledAt(text)).toBeUndefined();
+  });
+});
+
+describe('normalizeMissingPatchFiles', () => {
+  function patchPart(overrides: Partial<PatchPart> = {}): PatchPart {
+    return {
+      id: 'p-patch',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'patch',
+      hash: 'abc',
+      files: ['src/a.ts'],
+      ...overrides,
+    };
+  }
+
+  it('returns the identical object when files is already an array', () => {
+    const part = patchPart();
+
+    // Identity is preserved so memoized stored messages keep their reference.
+    expect(normalizeMissingPatchFiles(part)).toBe(part);
+  });
+
+  it('fills an empty array for a patch part the wire sent without files', () => {
+    const part = {
+      id: 'p-patch',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as PatchPart;
+
+    const normalized = normalizeMissingPatchFiles(part);
+    expect(normalized).not.toBe(part);
+    expect((normalized satisfies Part as PatchPart).files).toEqual([]);
+    expect(normalized.id).toBe('p-patch');
+  });
+
+  it('fills an empty array for a files field that is not an array', () => {
+    const part = { ...patchPart(), files: null } as unknown as PatchPart;
+
+    expect((normalizeMissingPatchFiles(part) satisfies Part as PatchPart).files).toEqual([]);
+  });
+
+  it('passes non-patch parts through unchanged', () => {
+    const textPart: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hello',
+    };
+
+    expect(normalizeMissingPatchFiles(textPart)).toBe(textPart);
   });
 });

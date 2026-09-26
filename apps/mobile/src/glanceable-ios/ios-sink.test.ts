@@ -12,6 +12,14 @@ import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
 } from '@/lib/glanceable/live-activity-switch';
+import {
+  _resetGlanceablePersistForTests,
+  _setGlanceableRestoreUnavailableForTests,
+  _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests,
+  restorePersistedGlanceable,
+} from '@/lib/glanceable/persist';
+import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
@@ -19,6 +27,11 @@ import {
   setGlanceableDelivery,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import {
+  _resetWaitingAskForTests,
+  recordWaitingAsk,
+  type WaitingAsk,
+} from '@/lib/glanceable/waiting-ask';
 
 import {
   _resetIosSinkForTests,
@@ -26,11 +39,16 @@ import {
   clearActivityKitDeniedIfAvailable,
   getActivityKitDenied,
   iosSink,
+  renderStoredSnapshotWithNotice,
+  setGlanceableActionNotice,
+  sweepStrayActivities,
 } from './ios-sink';
 import {
+  buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
   type GlanceableViewProps,
+  staleTimelineFrame,
   toWidgetProps,
 } from './view-props';
 
@@ -160,6 +178,20 @@ vi.mock('expo-widgets', () => ({
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
 
+// Fake SecureStore surface so the persisted-snapshot read never loads the
+// native module; the notice path reads the mirror a background press leaves.
+const secureStore = new Map<string, string>();
+const secureStoreMock = {
+  setItemAsync: async (key: string, value: string) => {
+    secureStore.set(key, value);
+    await Promise.resolve();
+  },
+  getItemAsync: async (key: string) => {
+    await Promise.resolve();
+    return secureStore.get(key) ?? null;
+  },
+};
+
 const subscriptions = new Set<string>();
 const delivery = {
   registerScopeTokens: vi.fn(() => subscriptions.add('scope')),
@@ -195,9 +227,19 @@ function snapshotFor(
   });
 }
 
+/** How many of the given native cards were asked to end. */
+function endedCount(cards: { end: ReturnType<typeof vi.fn> }[]): number {
+  return cards.filter(card => card.end.mock.calls.length > 0).length;
+}
+
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  _resetGlanceablePersistForTests();
+  _resetWaitingAskForTests();
+  _resetGlanceablePersistForTests();
+  secureStore.clear();
+  _setSecureStoreForTests(secureStoreMock);
   mockAppState.currentState = 'active';
   mockAppState.listeners.clear();
   subscriptions.clear();
@@ -226,7 +268,7 @@ describe('iosSink start and update', () => {
     publisher.handleSessions([], CTX);
 
     expect(mockState.started).toEqual([]);
-    expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No work in progress' });
+    expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No agents waiting' });
     expect(subscriptions).toEqual(new Set(['scope']));
 
     publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
@@ -835,7 +877,7 @@ describe('iosSink widget publish', () => {
     iosSink.publish(snapshotFor([]));
 
     expect(mockState.timeline).toHaveLength(2);
-    expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No work in progress' });
+    expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No agents waiting' });
   });
 
   it.each([
@@ -885,7 +927,9 @@ describe('iosSink widget publish', () => {
       number,
       boolean,
     ][] = [
-      ['empty', [], 'No work in progress', 0, false],
+      // The empty surface is the one that offers `New agent`, so its copy says
+      // that instead of the generic no-work copy.
+      ['empty', [], 'No agents waiting', 0, false],
       // Stale draws rows, and all three draw whenever rows draw, so the
       // surface never reflows as work moves between states.
       ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
@@ -900,6 +944,37 @@ describe('iosSink widget publish', () => {
       expect(props.countLines).toHaveLength(counts);
       expect(props.primaryKind === undefined).toBe(!hasPrimary);
     }
+  });
+
+  it('writes the newest-result fields for the large card and drops them on locked frames', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const newestAt = new Date(NOW - 180_000).toISOString();
+    iosSink.publish(snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }]));
+
+    // Every publish replaces the snapshot and the timeline, so a state change
+    // repaints the card at once; no timer carries the newest result.
+    const happy = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
+    expect(happy).toMatchObject({
+      newestResultKind: 'needsInput',
+      newestResultLabel: 'Needs input',
+      newestResultAt: newestAt,
+    });
+
+    // The stale frame keeps the counts and the delayed copy; the layout prefers
+    // that copy over a relative time claiming freshness the snapshot lost.
+    const stale = mockState.timeline[1]?.props as Partial<GlanceableViewProps>;
+    expect(stale).toMatchObject({
+      statusLine: "Can't update now",
+      newestResultKind: 'needsInput',
+      newestResultAt: newestAt,
+    });
+
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+    const empty = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
+    expect(empty.newestResultKind).toBeUndefined();
+    expect(empty.newestResultLabel).toBeUndefined();
+    expect(empty.newestResultAt).toBeUndefined();
   });
 });
 
@@ -973,6 +1048,196 @@ describe('iosSink Live Activity content-state', () => {
   });
 });
 
+describe('iosSink Approve gate', () => {
+  const recordedAsk = (overrides: Partial<WaitingAsk> = {}): WaitingAsk => ({
+    kiloSessionId: 'session-1',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  });
+
+  it('carries canApprove only while a cloud-agent permission ask waits', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    expect(mockState.started.at(-1)?.props).toMatchObject({ canApprove: true });
+
+    // A question ask resolves to `none`, so the layout must not offer Approve.
+    recordWaitingAsk(recordedAsk({ status: 'question' }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'question' }], 1), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    // A legacy wrapper session has no single approval either.
+    recordWaitingAsk(recordedAsk({ isCloudAgent: false }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 2), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(null);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 3), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+  });
+
+  it('carries the flag through a publish update', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+
+    recordWaitingAsk(null);
+    iosSink.publish(snapshotFor([{ status: 'permission' }], 1));
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(recordedAsk());
+    iosSink.publish(snapshotFor([{ status: 'permission' }], 2));
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true });
+  });
+});
+
+describe('iosSink approve-failed notice', () => {
+  const recordedAsk = (overrides: Partial<WaitingAsk> = {}): WaitingAsk => ({
+    kiloSessionId: 'session-1',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  });
+
+  const stored = () => snapshotFor([{ status: 'permission' }], 1);
+
+  it('draws the failure line on the stored snapshot when the press cannot reach the backend', async () => {
+    // The press runs with the app closed, so the only snapshot it has is the
+    // persisted one: the counts already on the card, plus the failure line.
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+
+    setGlanceableActionNotice("Couldn't approve. Tap Approve to try again.");
+    await renderStoredSnapshotWithNotice();
+
+    expect(mockState.updated.at(-1)).toMatchObject({
+      needsInput: 1,
+      canApprove: true,
+      notice: "Couldn't approve. Tap Approve to try again.",
+    });
+  });
+
+  it('renders nothing when no snapshot was ever published', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(null);
+
+    setGlanceableActionNotice('failed');
+    await renderStoredSnapshotWithNotice();
+
+    expect(mockState.started).toEqual([]);
+    expect(mockState.updated).toEqual([]);
+  });
+
+  it('does not finish a background notice render before ActivityKit applies it', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    setGlanceableActionNotice('failed');
+    let finished = false;
+    const render = (async () => {
+      await renderStoredSnapshotWithNotice();
+      finished = true;
+    })();
+
+    try {
+      await vi.waitFor(() => {
+        expect(mockState.updated).toHaveLength(1);
+      });
+      expect(finished).toBe(false);
+      expect(mockState.started[0]?.props).not.toHaveProperty('notice');
+    } finally {
+      update.resolve(undefined);
+      await render;
+    }
+
+    expect(finished).toBe(true);
+    expect(mockState.started[0]?.props).toMatchObject({ notice: 'failed', canApprove: true });
+  });
+
+  it('drops the notice when a different ask is recorded', () => {
+    recordWaitingAsk(recordedAsk());
+    setGlanceableActionNotice('failed');
+    recordWaitingAsk(recordedAsk({ kiloSessionId: 'session-2' }));
+
+    iosSink.startOrUpdate(stored(), CTX);
+
+    // A failure line must never describe the ask that replaced it.
+    expect(mockState.started.at(-1)?.props).not.toHaveProperty('notice');
+  });
+
+  it('reports a rejected native notice update to the interaction error handler', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    setGlanceableActionNotice('failed');
+    const render = renderStoredSnapshotWithNotice();
+
+    await vi.waitFor(() => {
+      expect(mockState.updated).toHaveLength(1);
+    });
+    const rejected = expect(render).rejects.toThrow('native notice update failed');
+    update.reject(new Error('native notice update failed'));
+    await rejected;
+
+    mockState.updatePromise = null;
+    await renderStoredSnapshotWithNotice();
+    expect(mockState.started[0]?.props).toMatchObject({ notice: 'failed', canApprove: true });
+  });
+
+  it('does not start a replacement card when the notice has no native activity to update', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    setGlanceableActionNotice('failed');
+
+    await renderStoredSnapshotWithNotice();
+
+    expect(mockState.started).toEqual([]);
+    expect(mockState.updated).toEqual([]);
+  });
+
+  it('drops the notice once no work needs input', () => {
+    recordWaitingAsk(recordedAsk());
+    setGlanceableActionNotice('failed');
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+
+    iosSink.startOrUpdate(stored(), CTX);
+
+    expect(mockState.started.at(-1)?.props).not.toHaveProperty('notice');
+  });
+
+  it('keeps the notice when an older revision is discarded unrendered', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    setGlanceableActionNotice('failed');
+
+    // The revision guard drops this snapshot without rendering it: it must not
+    // prune the line the card on screen is still carrying (its zero needs-input
+    // count would clear the notice).
+    const stale = {
+      ...snapshotFor([{ status: 'busy' }], 0),
+      updatedAt: new Date(NOW - 60_000).toISOString(),
+    };
+    iosSink.startOrUpdate(stale, CTX);
+    expect(mockState.updated).toEqual([]);
+
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 1), CTX);
+
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true, notice: 'failed' });
+  });
+});
+
 describe('iosSink idle updates', () => {
   it('keeps the same card when every agent goes idle', async () => {
     vi.useFakeTimers();
@@ -1041,6 +1306,10 @@ describe('clearActivityKitDeniedIfAvailable', () => {
 });
 
 describe('buildGlanceableViewProps', () => {
+  afterEach(() => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+  });
+
   it('ranks the compact primary count as needs-input, then running, then idle', () => {
     const props = buildGlanceableViewProps(
       snapshotFor(
@@ -1059,7 +1328,7 @@ describe('buildGlanceableViewProps', () => {
     ]);
   });
 
-  it('carries no title, organization name, or raw id into the widget JSON', () => {
+  it('carries no organization name or raw id into the widget JSON', () => {
     // A waiting row with its own status timestamp, so the assertion below
     // covers the one field that carries a time into the widget payload.
     const snapshot = buildGlanceableSnapshot({
@@ -1074,8 +1343,13 @@ describe('buildGlanceableViewProps', () => {
 
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actions',
       'countLines',
       'needsInputSince',
+      'newestResultAt',
+      'newestResultKind',
+      'newestResultLabel',
+      'newestTitle',
       'primaryCount',
       'primaryKind',
       'primaryLabel',
@@ -1086,7 +1360,10 @@ describe('buildGlanceableViewProps', () => {
     expect(json).not.toContain(snapshot.scopeKey);
     expect(json).not.toContain(snapshot.updatedAt);
     expect(json).not.toContain('revision');
-    expect(json).not.toContain('title');
+    // The newest session's title is the one exception the owner granted, and
+    // it never rides in the snapshot: without the surface extra there is no
+    // title payload at all.
+    expect(props.newestTitle).toBeNull();
   });
 
   it('carries the oldest wait through the stale status', () => {
@@ -1110,6 +1387,18 @@ describe('buildGlanceableViewProps', () => {
     expect(buildGlanceableLiveActivityContentState(empty).needsInputSince).toBeNull();
   });
 
+  it('carries a notice only when a caller sets one', () => {
+    const waiting = snapshotFor([{ status: 'permission' }], 0);
+
+    // A server-written state and a card with nothing to say omit the field, so
+    // the layout draws no line rather than an empty one.
+    expect(buildGlanceableLiveActivityContentState(waiting).notice).toBeUndefined();
+
+    expect(buildGlanceableLiveActivityContentState(waiting, true, 'Could not approve').notice).toBe(
+      'Could not approve'
+    );
+  });
+
   it('speaks the status word, numeric counts, then Open agents', () => {
     const stale = buildGlanceableViewProps(
       snapshotFor([{ status: 'busy' }, { status: 'busy' }, { status: 'question' }], 1, 'stale'),
@@ -1123,10 +1412,176 @@ describe('buildGlanceableViewProps', () => {
     const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
     expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
-    const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
-    expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');
+    const empty = buildGlanceableSnapshot({
+      ...CTX,
+      sessions: [],
+      now: NOW,
+      previousRevision: 1,
+      status: 'empty',
+    });
+    expect(buildGlanceableViewProps(empty, {}, key => key).accessibilityLabel).toBe(
+      'glanceable.noneWaiting, glanceable.openAgents'
+    );
+  });
+
+  it('offers Approve for a permission wait and nothing else', () => {
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'permission' }], 0),
+      {},
+      key => key
+    );
+    expect(props.actions).toEqual({ approve: true, newAgent: false });
+    expect(props.statusLine).toBeNull();
+  });
+
+  it.each(['question', 'retry'] as const)(
+    'offers no Approve for a %s wait the action cannot answer',
+    status => {
+      const props = buildGlanceableViewProps(snapshotFor([{ status }], 0), {}, key => key);
+      expect(props.actions).toEqual({ approve: false, newAgent: false });
+    }
+  );
+
+  it('offers no action for a tray that is working and needs nothing', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    expect(props.actions).toEqual({ approve: false, newAgent: false });
+  });
+
+  it('offers New agent and none of the others for the empty state', () => {
+    const props = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
+    expect(props.actions).toEqual({ approve: false, newAgent: true });
+    expect(props.statusLine).toBe('glanceable.noneWaiting');
+  });
+
+  it.each(['waiting', 'expired', 'signed_out', 'privacy'] as const)(
+    'offers no action and no title for a locked %s surface',
+    status => {
+      const props = buildGlanceableViewProps(snapshotFor([], 1, status), {}, key => key);
+      expect(props.actions).toEqual({ approve: false, newAgent: false });
+      expect(props.newestTitle).toBeNull();
+      expect(toWidgetProps(props).actions).toEqual({ approve: false, newAgent: false });
+    }
+  );
+
+  it('keeps Approve available and names the failure in the reserved slot', () => {
+    setSurfaceExtras({
+      newestSessionTitle: 'Fix the flaky test',
+      actionFeedback: 'couldNotApprove',
+    });
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'permission' }], 0),
+      {},
+      key => key
+    );
+    expect(props.newestTitle).toBe('glanceable.couldNotApprove');
+    expect(props.actions).toEqual({ approve: true, newAgent: false });
+  });
+
+  it('holds the in-flight action in the reserved slot', () => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'approving' });
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      key => key
+    );
+    expect(props.newestTitle).toBe('glanceable.approving');
+  });
+
+  it('composes the newest-session line and drops a null one on the widget write', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, translateCopy);
+    expect(props.newestTitle).toBe('Newest: Fix the flaky test');
+    expect(toWidgetProps(props)).toMatchObject({ newestTitle: 'Newest: Fix the flaky test' });
+
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+    const untitled = buildGlanceableViewProps(
+      snapshotFor([{ status: 'busy' }], 0),
+      {},
+      translateCopy
+    );
+    expect(untitled.newestTitle).toBeNull();
+    expect('newestTitle' in toWidgetProps(untitled)).toBe(false);
+  });
+
+  it('inserts a title containing replacement patterns literally', () => {
+    setSurfaceExtras({ newestSessionTitle: 'A $& and $` title', actionFeedback: null });
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, translateCopy);
+
+    expect(props.newestTitle).toBe('Newest: A $& and $` title');
+  });
+
+  it('keeps the title on the stale frame and off the expired and terminal frames', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const happy = snapshotFor([{ status: 'busy' }], 0);
+    // Stale still draws rows, so the reserved slot keeps its line; the expired
+    // and terminal frames assert no work at all, title included.
+    expect(staleTimelineFrame(happy, translateCopy)[0]?.props.newestTitle).toBe(
+      'Newest: Fix the flaky test'
+    );
+    expect(buildExpiredWidgetProps(happy, key => key).newestTitle).toBeUndefined();
+  });
+
+  it('carries the newest-result fact and the label of its count row', () => {
+    const newestAt = new Date(NOW - 120_000).toISOString();
+    const props = buildGlanceableViewProps(
+      snapshotFor([
+        { status: 'busy', statusUpdatedAt: new Date(NOW - 600_000).toISOString() },
+        { status: 'question', statusUpdatedAt: newestAt },
+      ]),
+      {},
+      key => key
+    );
+
+    expect(props.newestResultKind).toBe('needsInput');
+    expect(props.newestResultAt).toBe(newestAt);
+    // The label is the mapped row's own, not a second translation of the word.
+    expect(props.newestResultLabel).toBe('glanceable.needsInput');
+    expect(props.newestResultLabel).toBe(
+      props.countLines.find(line => line.kind === 'needsInput')?.label
+    );
+  });
+
+  it('keeps the newest-result fact on the stale frame beside the counts', () => {
+    const newestAt = new Date(NOW - 120_000).toISOString();
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }], 1, 'stale'),
+      {},
+      key => key
+    );
+
+    expect(props.countLines).toHaveLength(3);
+    expect(props.statusLine).toBe('glanceable.stale');
+    // The layout's footer prefers `statusLine`, but the props still carry the
+    // fact so a later fresh publish needs no second build.
+    expect(props.newestResultKind).toBe('needsInput');
+    expect(props.newestResultAt).toBe(newestAt);
+  });
+
+  it('reports no newest result while counts show but no row has a timestamp', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    expect(props.countLines).toHaveLength(3);
+    expect(props.newestResultKind).toBeNull();
+    expect(props.newestResultLabel).toBeNull();
+    expect(props.newestResultAt).toBeNull();
+  });
+
+  it('reports no newest result on any locked or waiting frame', () => {
+    for (const status of ['waiting', 'empty', 'expired', 'signed_out', 'privacy'] as const) {
+      const props = buildGlanceableViewProps(snapshotFor([], 0, status), {}, key => key);
+      expect(props.newestResultKind).toBeNull();
+      expect(props.newestResultLabel).toBeNull();
+      expect(props.newestResultAt).toBeNull();
+    }
   });
 });
+
+const COPY: Record<string, string> = {
+  'glanceable.newestSession': 'Newest: {{title}}',
+};
+
+function translateCopy(key: string): string {
+  return COPY[key] ?? key;
+}
 
 describe('toWidgetProps', () => {
   it('omits every null field so the UserDefaults write cannot throw', () => {
@@ -1138,7 +1593,28 @@ describe('toWidgetProps', () => {
     expect('primaryLabel' in props).toBe(false);
     expect('primaryKind' in props).toBe(false);
     expect('needsInputSince' in props).toBe(false);
-    expect(props.statusLine).toBe('glanceable.empty');
+    expect('newestResultKind' in props).toBe(false);
+    expect('newestResultLabel' in props).toBe(false);
+    expect('newestResultAt' in props).toBe(false);
+    expect('newestTitle' in props).toBe(false);
+    expect(props.statusLine).toBe('glanceable.noneWaiting');
+  });
+
+  it('keeps the newest-result fields the large card draws', () => {
+    const newestAt = new Date(NOW - 60_000).toISOString();
+    const props = toWidgetProps(
+      buildGlanceableViewProps(
+        snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }], 0),
+        {},
+        key => key
+      )
+    );
+
+    expect(props).toMatchObject({
+      newestResultKind: 'needsInput',
+      newestResultLabel: 'glanceable.needsInput',
+      newestResultAt: newestAt,
+    });
   });
 
   it('keeps every non-null field', () => {
@@ -1158,5 +1634,246 @@ describe('toWidgetProps', () => {
         { kind: 'idle', count: 0 },
       ],
     });
+  });
+});
+
+describe('iosSink stray sweep', () => {
+  /** A card this process never started, as native discovery reports it. */
+  function nativeStray(): { end: ReturnType<typeof vi.fn>; updated: unknown[] } {
+    const end = vi.fn();
+    const updated: unknown[] = [];
+    mockState.instances.push({
+      getPushToken: vi.fn().mockResolvedValue(null),
+      update: (next: unknown) => updated.push(next),
+      end,
+    });
+    return { end, updated };
+  }
+
+  /** A persisted snapshot stamped now, so its claim has not expired. */
+  function freshSnapshot(
+    sessions: { status: string }[] = [{ status: 'busy' }],
+    status?: GlanceableAgentsSnapshot['status']
+  ): GlanceableAgentsSnapshot {
+    return buildGlanceableSnapshot({
+      sessions,
+      userId: 'u1',
+      organizationId: null,
+      now: Date.now(),
+      ...(status === undefined ? {} : { status }),
+    });
+  }
+
+  it('keeps one card and ends the rest on launch while the persisted work claims one', async () => {
+    const cards = [nativeStray(), nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot());
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+    // The single survivor is adopted, never replaced by a second start.
+    expect(mockState.started).toHaveLength(0);
+  });
+
+  it('keeps one card for an empty unexpired snapshot, for a push-to-start it has not adopted', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot([], 'empty'));
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+  });
+
+  it('ends every card on launch when the persisted claim has expired', async () => {
+    const cards = [nativeStray(), nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests({
+      ...freshSnapshot(),
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    });
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(3);
+    });
+  });
+
+  it('ends every card for an expired snapshot whose expiry was renewed', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // `applyExpiry` stamps the lapsed snapshot eight hours out, so the timestamp
+    // alone reads as unexpired; the status is what says nothing owns a card.
+    _setLastGlanceableSnapshotForTests(freshSnapshot([], 'expired'));
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('ends every card on launch when no snapshot claims one', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(null);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('keeps one card when the persisted owner could not be read', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // A locked keychain at launch: the record may name an owner, so the card a
+    // push-to-start just raised must not be swept away as if none existed.
+    _setLastGlanceableSnapshotForTests(null);
+    _setGlanceableRestoreUnavailableForTests(true);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+  });
+
+  it('keeps one card while the persisted owner is still being restored', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // Launch: the AppState listener can reach the sweep before the SecureStore
+    // read lands, so a null in-memory snapshot means "not read yet", not
+    // "nothing persisted". The cards the mirror may still name must survive.
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
+
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+
+    gate.resolve(null);
+    await restore;
+  });
+
+  it('sweeps again once the deferred restore lands, so an unowned card cannot survive it', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // Launch: the foreground edge reaches the sweep before the SecureStore read
+    // lands, so the sweep defers with the duplicates collapsed. That read is
+    // the only thing that will settle it, and it then reports an empty mirror,
+    // so no snapshot owns the surface and the card the sweep kept is unowned.
+    // The deferred sweep must run again instead of waiting for some later
+    // foreground or publisher update.
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
+
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+
+    gate.resolve(null);
+    await restore;
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('keeps one card while a later restore is in flight, not only the first', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // The first restore settles against an empty mirror, so the in-memory
+    // snapshot stays null and a caller would read it as "nothing persisted".
+    await restorePersistedGlanceable();
+
+    // A later restore re-opens the read window. A sweep landing in it must not
+    // read the still-null snapshot as "nothing persisted": the record this read
+    // is about to consult may name an owner.
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+
+    gate.resolve(null);
+    await restore;
+  });
+
+  it.each(['signed_out', 'privacy'] as const)(
+    'ends every card on launch after a %s blank',
+    async status => {
+      const cards = [nativeStray(), nativeStray()];
+      _setLastGlanceableSnapshotForTests({ ...freshSnapshot(), status });
+
+      sweepStrayActivities();
+
+      await vi.waitFor(() => {
+        expect(endedCount(cards)).toBe(2);
+      });
+    }
+  );
+
+  it('ends every card on foreground while the in-app switch is off', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot());
+    setLiveActivityEnabledValue(false);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('gives the surviving card the current counts instead of starting a second one', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot());
+
+    sweepStrayActivities();
+
+    // The sweep is what collapses the duplicates before the publish: without it
+    // both stale cards would still hold the surface when the counts arrive.
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    const survivors = cards.filter(card => card.end.mock.calls.length === 0);
+    expect(survivors).toHaveLength(1);
+    const card = survivors[0];
+
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }, { status: 'busy' }], 1), CTX);
+
+    expect(mockState.started).toHaveLength(0);
+    expect(card?.updated).toHaveLength(1);
+    expect(card?.updated[0]).toMatchObject({ running: 2 });
   });
 });

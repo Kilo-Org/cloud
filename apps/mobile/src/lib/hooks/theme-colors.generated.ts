@@ -5,6 +5,7 @@ export const lightColors = {
   foreground: '#14130F',
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
+  primaryDisabled: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
   muted: '#F0EEE6',
@@ -28,6 +29,12 @@ export const lightColors = {
   agentKilocode: '#B27214',
   agentCoral: '#C25647',
   agentSky: '#2C7FB0',
+  rowHoney: '#7C6C1D',
+  rowGold: '#7A7C1D',
+  rowLime: '#697C1D',
+  rowSage: '#587C1D',
+  rowMoss: '#467C1D',
+  rowFern: '#357C1D',
 } as const;
 
 export const darkColors = {
@@ -35,6 +42,7 @@ export const darkColors = {
   foreground: '#F2F0EB',
   primary: '#E8F27A',
   primaryForeground: '#1A1A10',
+  primaryDisabled: '#8A8680',
   secondary: '#1F1F24',
   secondaryForeground: '#F2F0EB',
   muted: '#1F1F24',
@@ -58,4 +66,10 @@ export const darkColors = {
   agentKilocode: '#F2B05F',
   agentCoral: '#F28B7A',
   agentSky: '#6BB5E0',
+  rowHoney: '#EBDA84',
+  rowGold: '#E9EB84',
+  rowLime: '#D6EB84',
+  rowSage: '#C4EB84',
+  rowMoss: '#B1EB84',
+  rowFern: '#9EEB84',
 } as const;

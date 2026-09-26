@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   getFiletypeFromFileName,
   getHighlighterOptions,
-  parsePatchFiles,
   preloadHighlighter,
   type FileDiffMetadata,
   type FileOptions,
@@ -14,9 +13,11 @@ import { File, FileDiff } from '@pierre/diffs/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { FoldVertical, LockKeyhole, RefreshCw, UnfoldVertical } from 'lucide-react';
+import { Columns2, FoldVertical, UnfoldVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -24,7 +25,18 @@ import {
   isWorktreeMarkdownPath,
   worktreeFileOmissionMessages,
 } from './worktree-file';
-import { getWorktreeDiffExpansion } from './worktree-file-diff';
+import {
+  getWorktreeDiffExpansion,
+  parseSavedWorktreePatch,
+  selectWorktreeRenderedDiff,
+} from './worktree-file-diff';
+import type { WorktreeReviewDiffProps } from './WorktreeReviewEditor';
+import type { WorktreeReviewCapture } from './worktree-review';
+import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
+
+const WorktreeReviewEditor = lazy(() =>
+  import('./WorktreeReviewEditor').then(module => ({ default: module.WorktreeReviewEditor }))
+);
 
 const rendererCSS = `
 :host {
@@ -37,8 +49,9 @@ const rendererCSS = `
   --diffs-addition-color-override: var(--diff-add-text);
   --diffs-deletion-color-override: var(--diff-delete-text);
 }
-[data-line-type="change-addition"] { background-color: var(--diff-add-surface); }
-[data-line-type="change-deletion"] { background-color: var(--diff-delete-surface); }
+[data-line-type="change-addition"]:not([data-selected-line]) { background-color: var(--diff-add-surface); }
+[data-line-type="change-deletion"]:not([data-selected-line]) { background-color: var(--diff-delete-surface); }
+[data-code] [data-line][tabindex]:focus-visible,
 [data-expand-index] [data-expand-button]:focus-visible,
 [data-expand-index] [data-unmodified-lines]:focus-visible {
   outline: 2px solid var(--ring);
@@ -71,6 +84,17 @@ const fileOptions = {
   unsafeCSS: rendererCSS,
 } satisfies FileOptions<undefined>;
 
+export type WorktreeDiffStyle = 'unified' | 'split';
+
+export function parseWorktreeDiffStyle(value: string): WorktreeDiffStyle {
+  try {
+    const style: unknown = JSON.parse(value);
+    return style === 'unified' || style === 'split' ? style : 'unified';
+  } catch {
+    return 'unified';
+  }
+}
+
 export type WorktreeFileHighlighterResult =
   | { status: 'ready'; lang: SupportedLanguages }
   | { status: 'error' };
@@ -99,18 +123,15 @@ export function prepareWorktreeFileHighlighter(
   };
 }
 
+type WorktreeFileHighlighterState = WorktreeFileHighlighterResult | { status: 'loading' };
+
 function WorktreeFileHighlighter({
-  path,
+  result,
   children,
 }: {
-  path: string;
+  result: WorktreeFileHighlighterState;
   children: (lang: SupportedLanguages) => ReactNode;
 }) {
-  const [result, setResult] = useState<WorktreeFileHighlighterResult | { status: 'loading' }>({
-    status: 'loading',
-  });
-  useEffect(() => prepareWorktreeFileHighlighter(path, setResult), [path]);
-
   if (result.status !== 'ready') {
     return (
       <p
@@ -124,76 +145,6 @@ function WorktreeFileHighlighter({
     );
   }
   return children(result.lang);
-}
-
-const canonicalGitHeader =
-  /^diff --git [^\n]+\n(?:(?:old mode|new mode|new file mode|deleted file mode) 100(?:644|755)\n|index [0-9a-f]+\.\.[0-9a-f]+(?: 100(?:644|755))?\n)*(?:--- [^\n]+\n\+\+\+ [^\n]+\n)?$/;
-const emptyGitBlobIds = [
-  'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391',
-  '473a0f4c3be8a93681a267e3b1e9a7dcda1185436fe141f7749120a303721813',
-];
-
-export function parseSavedWorktreePatch(patch: string, path: string): FileDiffMetadata | null {
-  try {
-    if (!patch.endsWith('\n')) return null;
-    const firstHunk = patch.indexOf('\n@@ ');
-    const header = firstHunk < 0 ? patch : patch.slice(0, firstHunk + 1);
-    if (!canonicalGitHeader.test(header)) return null;
-    const patches = parsePatchFiles(patch, undefined, true);
-    const parsed = patches[0];
-    const file = parsed?.files[0];
-    if (patches.length !== 1 || parsed?.patchMetadata || parsed?.files.length !== 1 || !file) {
-      return null;
-    }
-    if (file.hunks.length === 0) {
-      if (header.includes('\n--- ')) return null;
-      const modeChange =
-        file.type === 'change' &&
-        file.prevMode &&
-        file.mode &&
-        file.prevMode !== file.mode &&
-        !file.prevObjectId &&
-        !file.newObjectId;
-      const objectId = file.type === 'new' ? file.newObjectId : file.prevObjectId;
-      const missingObjectId = file.type === 'new' ? file.prevObjectId : file.newObjectId;
-      const emptyFileChange =
-        (file.type === 'new' || file.type === 'deleted') &&
-        file.mode &&
-        objectId &&
-        missingObjectId &&
-        /^0+$/.test(missingObjectId) &&
-        emptyGitBlobIds.some(emptyId => emptyId.startsWith(objectId));
-      if (!modeChange && !emptyFileChange) return null;
-    } else if (!/\n--- [^\n]+\n\+\+\+ [^\n]+\n$/.test(header)) {
-      return null;
-    }
-    let parsedLines = header.split('\n').length - 1;
-    for (const hunk of file.hunks) {
-      if (
-        !Number.isSafeInteger(hunk.additionStart + hunk.additionCount) ||
-        !Number.isSafeInteger(hunk.deletionStart + hunk.deletionCount) ||
-        (hunk.additionCount > 0 && hunk.additionStart === 0) ||
-        (hunk.deletionCount > 0 && hunk.deletionStart === 0)
-      ) {
-        return null;
-      }
-      const newlineMarkers =
-        hunk.hunkContent.at(-1)?.type === 'context'
-          ? Number(hunk.noEOFCRAdditions || hunk.noEOFCRDeletions)
-          : Number(hunk.noEOFCRAdditions) + Number(hunk.noEOFCRDeletions);
-      parsedLines += 1 + hunk.unifiedLineCount + newlineMarkers;
-    }
-    const lines = patch.split('\n');
-    if (
-      parsedLines !== lines.length - 1 ||
-      lines.some(line => line.startsWith('\\') && line !== '\\ No newline at end of file')
-    ) {
-      return null;
-    }
-    return { ...file, name: path, prevName: undefined };
-  } catch {
-    return null;
-  }
 }
 
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -248,24 +199,43 @@ function HighlightedWorktreeDiff({
   lang,
   revision,
   expanded,
+  reviewProps,
+  diffStyle,
 }: {
   diff: FileDiffMetadata;
   lang: SupportedLanguages;
   revision: number;
   expanded: boolean;
+  reviewProps?: WorktreeReviewDiffProps;
+  diffStyle: WorktreeDiffStyle;
 }) {
   const fileDiff = useMemo(() => ({ ...diff, lang }), [diff, lang]);
+  const reviewPostRender = reviewProps?.options?.onPostRender;
+  const onPostRender = useCallback<
+    NonNullable<NonNullable<WorktreeReviewDiffProps['options']>['onPostRender']>
+  >(
+    (node, instance, phase) => {
+      if (phase !== 'unmount') prepareExpansionControls(node);
+      reviewPostRender?.(node, instance, phase);
+    },
+    [reviewPostRender]
+  );
   return (
     <FileDiff
       key={JSON.stringify([diff.name, revision, expanded])}
       fileDiff={fileDiff}
+      {...reviewProps}
       options={{
         ...fileOptions,
-        diffStyle: 'unified',
-        diffIndicators: 'classic',
+        ...reviewProps?.options,
+        unsafeCSS: [fileOptions.unsafeCSS, reviewProps?.options?.unsafeCSS]
+          .filter(Boolean)
+          .join('\n'),
+        diffStyle,
+        diffIndicators: 'none',
         hunkSeparators: 'line-info-basic',
         expandUnchanged: expanded,
-        onPostRender: prepareExpansionControls,
+        onPostRender,
       }}
       disableWorkerPool
     />
@@ -275,17 +245,15 @@ function HighlightedWorktreeDiff({
 export default function WorktreeFileRenderer({
   file,
   mode,
-  capturedAt,
   onModeChange,
-  isFetching = false,
-  onReload,
+  review,
+  reviewCapture,
 }: {
   file: WorktreeFileRecord;
   mode: WorktreeFileViewMode;
-  capturedAt?: string;
   onModeChange?: (mode: WorktreeFileViewMode) => void;
-  isFetching?: boolean;
-  onReload?: () => void;
+  review?: WorktreeFileReviewBindings;
+  reviewCapture?: WorktreeReviewCapture;
 }) {
   const patch = file.diff.status === 'available' ? file.diff.patch : undefined;
   const parsed = useMemo(
@@ -300,8 +268,14 @@ export default function WorktreeFileRenderer({
   const requestedMode = getWorktreeFileViewMode(file, mode);
   const viewMode = requestedMode === 'expanded' && !canExpand ? 'diff' : requestedMode;
   const expanded = viewMode === 'expanded';
+  const [diffStyle, setDiffStyle] = useLocalStorage<WorktreeDiffStyle>(
+    'cloud-agent:worktree-diff-style',
+    'unified',
+    { initializeWithValue: false, deserializer: parseWorktreeDiffStyle }
+  );
   const canPreview = file.content.status === 'available';
   const expandLabel = expanded ? 'Hide unchanged lines' : 'Show all lines';
+  const diffStyleLabel = diffStyle === 'split' ? 'Show unified diff' : 'Show side-by-side diff';
   const expansionHint =
     expansion?.status === 'unavailable'
       ? `Full content unavailable. ${worktreeFileOmissionMessages[expansion.reason]}`
@@ -317,103 +291,112 @@ export default function WorktreeFileRenderer({
         ? 'Show changes'
         : 'Preview Markdown';
   const highlighterKey = JSON.stringify([file.path, file.revision]);
+  const renderedDiff = parsed === null ? null : selectWorktreeRenderedDiff(parsed, expansion);
+  const needsHighlighter = parsed !== null && (parsed.hunks.length > 0 || expanded);
+  const [highlighter, setHighlighter] = useState<{
+    key: string;
+    result: WorktreeFileHighlighterResult;
+  }>();
+  const highlighterResult: WorktreeFileHighlighterState =
+    highlighter?.key === highlighterKey ? highlighter.result : { status: 'loading' };
 
   useEffect(() => {
     if (mode !== viewMode) onModeChange?.(viewMode);
   }, [mode, viewMode, onModeChange]);
 
-  let body: ReactNode;
-  if (viewMode === 'preview' && file.content.status === 'available') {
-    body =
-      file.content.text === '' ? (
+  useEffect(() => {
+    if (!needsHighlighter) return;
+    return prepareWorktreeFileHighlighter(file.path, result => {
+      setHighlighter({ key: highlighterKey, result });
+    });
+  }, [file.path, highlighterKey, needsHighlighter]);
+
+  function renderBody(reviewProps?: WorktreeReviewDiffProps) {
+    let body: ReactNode;
+    if (viewMode === 'preview' && file.content.status === 'available') {
+      body =
+        file.content.text === '' ? (
+          <p role="status" className="text-muted-foreground p-4 text-sm">
+            This saved file is empty.
+          </p>
+        ) : (
+          <div className="prose prose-sm prose-invert max-w-none p-4 break-words [&_pre]:whitespace-pre-wrap">
+            <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {file.content.text}
+            </ReactMarkdown>
+          </div>
+        );
+    } else if (file.diff.status === 'omitted') {
+      body = (
         <p role="status" className="text-muted-foreground p-4 text-sm">
-          This saved file is empty.
+          Diff omitted. {worktreeFileOmissionMessages[file.diff.reason]}
         </p>
-      ) : (
-        <div className="prose prose-sm prose-invert max-w-none p-4 break-words [&_pre]:whitespace-pre-wrap">
-          <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {file.content.text}
-          </ReactMarkdown>
-        </div>
       );
-  } else if (file.diff.status === 'omitted') {
-    body = (
-      <p role="status" className="text-muted-foreground p-4 text-sm">
-        Diff omitted. {worktreeFileOmissionMessages[file.diff.reason]}
-      </p>
-    );
-  } else if (!parsed) {
-    body = (
-      <p role="alert" className="text-muted-foreground p-4 text-sm">
-        This saved diff could not be rendered.
-      </p>
-    );
-  } else if (parsed.hunks.length === 0) {
-    const text = expanded && file.content.status === 'available' ? file.content.text : undefined;
-    body = (
-      <>
-        <div className="text-muted-foreground space-y-2 p-4 text-sm">
-          <p role="status">Metadata-only change. No text hunks were saved.</p>
-          {parsed.type === 'new' && <p>Empty file added.</p>}
-          {parsed.type === 'deleted' && <p>Empty file deleted.</p>}
-          {parsed.prevMode && parsed.mode && parsed.prevMode !== parsed.mode && (
-            <p>
-              File mode: <code>{parsed.prevMode}</code> → <code>{parsed.mode}</code>
-            </p>
-          )}
-        </div>
-        {text !== undefined && (
-          <WorktreeFileHighlighter key={highlighterKey} path={file.path}>
-            {lang => (
-              <File
-                file={{ name: file.path, contents: text, lang }}
-                options={fileOptions}
-                disableWorkerPool
-              />
+    } else if (!parsed) {
+      body = (
+        <p role="alert" className="text-muted-foreground p-4 text-sm">
+          This saved diff could not be rendered.
+        </p>
+      );
+    } else if (parsed.hunks.length === 0) {
+      const text = expanded && file.content.status === 'available' ? file.content.text : undefined;
+      body = (
+        <>
+          <div className="text-muted-foreground space-y-2 p-4 text-sm">
+            <p role="status">Metadata-only change. No text hunks were saved.</p>
+            {parsed.type === 'new' && <p>Empty file added.</p>}
+            {parsed.type === 'deleted' && <p>Empty file deleted.</p>}
+            {parsed.prevMode && parsed.mode && parsed.prevMode !== parsed.mode && (
+              <p>
+                File mode: <code>{parsed.prevMode}</code> → <code>{parsed.mode}</code>
+              </p>
             )}
-          </WorktreeFileHighlighter>
-        )}
-      </>
-    );
-  } else {
-    body = (
-      <WorktreeFileHighlighter key={highlighterKey} path={file.path}>
-        {lang => (
-          <HighlightedWorktreeDiff
-            diff={expansion?.status === 'available' ? expansion.diff : parsed}
-            lang={lang}
-            revision={file.revision}
-            expanded={expanded}
-          />
-        )}
-      </WorktreeFileHighlighter>
-    );
+          </div>
+          {text !== undefined && (
+            <WorktreeFileHighlighter result={highlighterResult}>
+              {lang => (
+                <File
+                  file={{ name: file.path, contents: text, lang }}
+                  options={fileOptions}
+                  disableWorkerPool
+                />
+              )}
+            </WorktreeFileHighlighter>
+          )}
+        </>
+      );
+    } else {
+      body = (
+        <WorktreeFileHighlighter result={highlighterResult}>
+          {lang => (
+            <HighlightedWorktreeDiff
+              diff={renderedDiff ?? parsed}
+              lang={lang}
+              revision={file.revision}
+              expanded={expanded}
+              reviewProps={reviewProps}
+              diffStyle={diffStyle}
+            />
+          )}
+        </WorktreeFileHighlighter>
+      );
+    }
+    return <div className="min-h-0 min-w-0 flex-1 overflow-auto">{body}</div>;
   }
 
   return (
     <>
       <div className="flex h-12 shrink-0 items-center gap-1 border-b px-2 sm:h-10">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              tabIndex={0}
-              className="focus-visible:ring-ring flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:ring-2 focus-visible:outline-none sm:h-8"
-            >
-              <span className="min-w-0 truncate font-mono text-xs">{file.path}</span>
-              <LockKeyhole aria-hidden="true" className="text-muted-foreground size-3 shrink-0" />
-              <span className="sr-only">Saved file, read-only</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="start" className="max-w-sm space-y-1">
-            <p className="font-mono whitespace-pre-wrap break-all">{file.path}</p>
-            <p>Saved file · read-only, not live</p>
-            {capturedAt && (
-              <p>
-                <time dateTime={capturedAt}>Saved {new Date(capturedAt).toLocaleString()}</time>
-              </p>
-            )}
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex min-w-0 flex-1 items-center">
+          <p className="min-w-0 truncate px-1 font-mono text-xs" title={file.path}>
+            {file.path}
+          </p>
+          <CopyMessageButton
+            getText={() => file.path}
+            label="Copy path"
+            className="h-11 w-11 shrink-0 sm:h-8 sm:w-8"
+          />
+        </div>
         {viewMode !== 'diff' &&
           file.content.status === 'available' &&
           file.content.source === 'deleted-original' && (
@@ -444,6 +427,24 @@ export default function WorktreeFileRenderer({
             {canExpand ? expandLabel : expansionHint}
           </TooltipContent>
         </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant={diffStyle === 'split' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="text-muted-foreground h-11 w-11 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent motion-reduce:transition-none sm:h-8 sm:w-8"
+              aria-label={diffStyleLabel}
+              aria-pressed={diffStyle === 'split'}
+              onClick={() => setDiffStyle(diffStyle === 'split' ? 'unified' : 'split')}
+            >
+              <Columns2 aria-hidden="true" className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs">
+            {diffStyleLabel}
+          </TooltipContent>
+        </Tooltip>
         {isWorktreeMarkdownPath(file.path) && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -467,33 +468,23 @@ export default function WorktreeFileRenderer({
             </TooltipContent>
           </Tooltip>
         )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground h-11 w-11 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 motion-reduce:transition-none sm:h-8 sm:w-8"
-              aria-label="Reload saved file"
-              aria-disabled={isFetching}
-              onClick={() => {
-                if (!isFetching) onReload?.();
-              }}
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={`size-4 ${isFetching ? 'animate-spin motion-reduce:animate-none' : ''}`}
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Reload saved file without starting the workspace
-          </TooltipContent>
-        </Tooltip>
       </div>
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto" aria-busy={isFetching}>
-        {body}
-      </div>
+      {review && reviewCapture && viewMode !== 'preview' ? (
+        <Suspense fallback={renderBody()}>
+          <WorktreeReviewEditor
+            key={JSON.stringify([file.path, reviewCapture])}
+            file={file}
+            diff={renderedDiff}
+            capture={reviewCapture}
+            review={review}
+            renderStatus={highlighterResult.status}
+          >
+            {renderBody}
+          </WorktreeReviewEditor>
+        </Suspense>
+      ) : (
+        renderBody()
+      )}
     </>
   );
 }

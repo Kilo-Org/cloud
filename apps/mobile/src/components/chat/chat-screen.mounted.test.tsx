@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
 const mcpModel = vi.hoisted(() => ({
   view: {
     enabled: false,
+    toggleable: true,
     statusKey: 'modelChat.mcp.off',
     descriptionKey: null,
     toolCount: 0,

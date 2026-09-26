@@ -138,6 +138,19 @@ describe('partRendersContent', () => {
   it('returns false for a patch part with no files', () => {
     expect(partRendersContent(patchPart([]))).toBe(false);
   });
+
+  it('returns false for a patch part whose files field the wire omitted', () => {
+    // Sentry KILO-APP-BZ: the live `message.part.updated` payload is parsed
+    // with `.passthrough()`, so a patch part can reach storage without `files`.
+    const part = {
+      id: 'p4',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as Part;
+    expect(partRendersContent(part)).toBe(false);
+  });
 });
 
 describe('messageRendersContent', () => {

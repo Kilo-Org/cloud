@@ -36,6 +36,7 @@
     "cost": "ਲਾਗਤ",
     "discard": "ਰੱਦ ਕਰੋ",
     "findings": "ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
+    "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
     "notConnected": "ਜੁੜਿਆ ਨਹੀਂ",
     "notifications": "ਸੂਚਨਾਵਾਂ",
     "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "ਕੋਈ ਹੋਰ ਈਮੇਲ ਪਤਾ ਵਰਤੋ",
     "signInWithApple": "Apple ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ",
     "signInWithGoogle": "Google ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ",
+    "signInWithPasskey": "ਪਾਸਕੀ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ",
     "emailAddress": "ਈਮੇਲ ਪਤਾ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ਈਮੇਲ ਨਾਲ ਜਾਰੀ ਰੱਖੋ",
@@ -174,6 +176,10 @@
     "termsConnector": " ਅਤੇ ",
     "termsSuffix": "।",
     "moreSignInOptions": "ਹੋਰ ਸਾਈਨ-ਇਨ ਵਿਕਲਪ",
+    "passkeyCancelled": "ਪਾਸਕੀ ਨਾਲ ਸਾਈਨ ਇਨ ਰੱਦ ਹੋ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "passkeyNotFound": "ਇਸ ਡਿਵਾਈਸ ਲਈ ਕੋਈ ਪਾਸਕੀ ਸੰਭਾਲੀ ਨਹੀਂ ਗਈ। ਇਸ ਦੀ ਬਜਾਏ Apple, Google ਜਾਂ ਆਪਣੇ ਈਮੇਲ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "passkeyUnsupported": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਪਾਸਕੀ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। ਇਸ ਦੀ ਬਜਾਏ Apple, Google ਜਾਂ ਆਪਣੇ ਈਮੇਲ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "passkeyFailed": "ਪਾਸਕੀ ਨਾਲ ਸਾਈਨ ਇਨ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "couldNotCompleteSignIn": "ਸਾਈਨ ਇਨ ਪੂਰਾ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "sessionEnded": "ਤੁਹਾਡਾ ਸੈਸ਼ਨ ਖਤਮ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "signInCodeExpired": "ਤੁਹਾਡੇ ਸਾਈਨ-ਇਨ ਕੋਡ ਦੀ ਮਿਆਦ ਪੁੱਗ ਚੁੱਕੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -224,7 +230,28 @@
     "providerTestAccount": "ਟੈਸਟ ਖਾਤਾ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "ਐਂਟਰਪ੍ਰਾਈਜ਼ SSO"
+    "providerEnterpriseSso": "ਐਂਟਰਪ੍ਰਾਈਜ਼ SSO",
+    "passkeysTitle": "ਪਾਸਕੀ",
+    "passkeysSubtitle": "ਪਾਸਵਰਡ ਤੋਂ ਬਿਨਾਂ ਸਾਈਨ ਇਨ ਕਰੋ",
+    "passkeysEmpty": "ਹਾਲੇ ਕੋਈ ਪਾਸਕੀ ਨਹੀਂ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ਕਰਕੇ ਪਾਸਵਰਡ ਤੋਂ ਬਿਨਾਂ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "passkeysCouldNotLoad": "ਪਾਸਕੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
+    "passkeysLoadFailed": "ਇਹ ਲੋਡ ਹੋਣ ਤੱਕ ਪਾਸਕੀ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+    "addPasskey": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਕਰੋ",
+    "passkeyDefaultName": "ਪਾਸਕੀ",
+    "passkeyAddedOn": "{{date}} ਨੂੰ ਸ਼ਾਮਲ ਕੀਤੀ",
+    "passkeyAdded": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਕੀਤੀ ਗਈ।",
+    "passkeyAddFailed": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "passkeyAddUnsupported": "ਇਹ ਡਿਵਾਈਸ ਪਾਸਕੀ ਨਹੀਂ ਬਣਾ ਸਕਦੀ।",
+    "passkeyAddCancelled": "ਪਾਸਕੀ ਬਣਾਉਣਾ ਰੱਦ ਹੋ ਗਿਆ।",
+    "passkeyRemoved": "ਪਾਸਕੀ ਹਟਾ ਦਿੱਤੀ ਗਈ।",
+    "passkeyRemoveFailed": "ਉਹ ਪਾਸਕੀ ਹਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "passkeyRenamed": "ਪਾਸਕੀ ਦਾ ਨਾਮ ਬਦਲ ਦਿੱਤਾ ਗਿਆ।",
+    "passkeyName": "ਪਾਸਕੀ ਦਾ ਨਾਮ",
+    "renamePasskey": "ਪਾਸਕੀ ਦਾ ਨਾਮ ਬਦਲੋ",
+    "removePasskey": "ਪਾਸਕੀ ਹਟਾਓ",
+    "removePasskeyTitle": "ਪਾਸਕੀ ਹਟਾਉਣੀ?",
+    "removePasskeyMessage": "ਹੁਣ ਤੁਸੀਂ ਇਸ ਪਾਸਕੀ ਨਾਲ ਸਾਈਨ ਇਨ ਨਹੀਂ ਕਰ ਸਕੋਗੇ।"
   },
   "preferences": {
     "general": "ਆਮ",
@@ -248,11 +275,6 @@
     "returnSendsMessageSubtitle": "ਇਹ ਸੈਟਿੰਗ ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਕੁੰਜੀ ਏਜੰਟ ਨੂੰ ਸੁਨੇਹਾ ਲਿਖਣ ਵਾਲੇ ਖਾਨੇ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।",
     "biometricUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ ਨਾਲ ਅਨਲੌਕ ਕਰੋ",
     "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।",
-    "featureFlags": "ਫ਼ੀਚਰ ਫ਼ਲੈਗ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
     "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -342,7 +364,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} ਵਿੱਚੋਂ {{displayCount}} ਫਾਈਲਾਂ ਲੋਡ ਹੋਈਆਂ",
       "filesStillLoading": "ਫਾਈਲਾਂ ਅਜੇ ਵੀ ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ। ਰੀਫ੍ਰੈਸ਼ ਕਰਨ ਲਈ ਹੇਠਾਂ ਖਿੱਚੋ।",
       "goToOverview": "ਸੰਖੇਪ 'ਤੇ ਜਾਓ",
-      "goToOverviewTab": "ਸੰਖੇਪ ਟੈਬ 'ਤੇ ਜਾਓ"
+      "goToOverviewTab": "ਸੰਖੇਪ ਟੈਬ 'ਤੇ ਜਾਓ",
+      "expandAllLines_one": "ਸਾਰੀਆਂ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ",
+      "expandAllLines_other": "ਸਾਰੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ",
+      "expandLines_one": "{{displayCount}} ਲਾਈਨ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ਆਸ-ਪਾਸ ਦੇ ਕੋਡ ਦੀਆਂ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ",
+      "expandLinesOfContext_other": "ਆਸ-ਪਾਸ ਦੇ ਕੋਡ ਦੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ",
+      "expandMoreLines_one": "ਹੋਰ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ਹੋਰ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ",
+      "loadedOfTotalFiles_other": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ਫਾਈਲ ਦੇ ਅੰਤ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਨਹੀਂ ਹੈ।",
@@ -357,6 +389,7 @@
       "merge": "ਮਰਜ",
       "mergeNow": "ਹੁਣੇ ਮਰਜ ਕਰੋ",
       "mergePullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰਨਾ",
+      "mergeTermTitle": "{{term}} ਮਰਜ ਕਰਨਾ",
       "enableAutoMerge": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਕਰੋ",
       "disableAutoMerge": "ਆਟੋ-ਮਰਜ ਬੰਦ ਕਰੋ",
       "autoMergeOn": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਹੈ",
@@ -375,9 +408,12 @@
       "deleteBranchAfterMerge": "ਮਰਜ ਤੋਂ ਬਾਅਦ ਬ੍ਰਾਂਚ ਮਿਟਾਓ",
       "noEnabledMethods": "ਇਸ ਰਿਪੋਜ਼ਿਟਰੀ ਵਿੱਚ ਮਰਜ ਕਰਨ ਦੀ ਕੋਈ ਵਿਧੀ ਚਾਲੂ ਨਹੀਂ ਹੈ। ਰਿਪੋਜ਼ਿਟਰੀ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ ਮਰਜ, ਸਕੁਐਸ਼ ਜਾਂ ਰੀਬੇਸ ਵਿਧੀ ਚਾਲੂ ਕਰਨ ਲਈ ਕਹੋ।",
       "confirmTitle": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰੀਏ?",
+      "confirmTitleTerm": "{{term}} ਮਰਜ ਕਰੀਏ?",
       "confirmMessage": "ਇਸ ਨਾਲ ਤੁਹਾਡੇ ਬਦਲਾਅ ਬੇਸ ਬ੍ਰਾਂਚ ਵਿੱਚ ਮਰਜ ਹੋ ਜਾਣਗੇ।",
       "enableAutoMergeConfirmTitle": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਕਰੀਏ?",
       "enableAutoMergeConfirmMessage": "ਸਾਰੀਆਂ ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਸਫਲ ਹੋਣ 'ਤੇ GitHub ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਆਪਣੇ ਆਪ ਮਰਜ ਕਰੇਗਾ।",
+      "enableAutoMergeConfirmMessageTerm": "ਪਾਈਪਲਾਈਨ ਸਫ਼ਲ ਹੁੰਦਿਆਂ ਹੀ {{term}} ਆਪਣੇ ਆਪ ਮਰਜ਼ ਹੋ ਜਾਵੇਗੀ।",
+      "enableAutoMergeDescriptionTerm": "ਪਾਈਪਲਾਈਨ ਸਫ਼ਲ ਹੁੰਦਿਆਂ ਹੀ GitLab ਇਸ {{term}} ਨੂੰ ਆਪਣੇ ਆਪ ਮਰਜ਼ ਕਰ ਦਿੰਦਾ ਹੈ।",
       "forbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਮਰਜ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "cannotMerge": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਇਸ ਦੀ ਮੌਜੂਦਾ ਸਥਿਤੀ ਵਿੱਚ ਮਰਜ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
       "couldNotMerge": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
@@ -388,7 +424,8 @@
       },
       "terminal": {
         "alreadyMerged": "ਪਹਿਲਾਂ ਹੀ ਮਰਜ ਹੋ ਗਈ",
-        "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
+        "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ",
+        "closedMergeRequest": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
       },
       "partialSuccessBanner": {
         "body": "ਬ੍ਰਾਂਚ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ: {{reason}}।",
@@ -413,6 +450,18 @@
         "behindDetail": "ਹੈੱਡ ਬ੍ਰਾਂਚ ਬੇਸ ਬ੍ਰਾਂਚ ਤੋਂ ਪਿੱਛੇ ਹੈ। ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬ੍ਰਾਂਚ ਨੂੰ ਰੀਬੇਸ ਜਾਂ ਅੱਪਡੇਟ ਕਰੋ।",
         "notMergeableTitle": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਅਜੇ ਮਰਜ ਨਹੀਂ ਹੋ ਸਕਦੀ",
         "notMergeableDetail": "GitHub ਮੁਤਾਬਕ ਮਰਜ ਦੀ ਸਥਿਤੀ {{state}} ਹੈ।"
+      },
+      "restrictions": {
+        "title": "ਮਰਜ਼ ਪਾਬੰਦੀਆਂ",
+        "approvalsRequired_one": "{{displayCount}} ਮਨਜ਼ੂਰੀ ਚਾਹੀਦੀ",
+        "approvalsRequired_other": "{{displayCount}} ਮਨਜ਼ੂਰੀਆਂ ਚਾਹੀਦੀਆਂ",
+        "pipelineMustSucceed": "ਮਰਜ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਪਾਈਪਲਾਈਨ ਦਾ ਸਫ਼ਲ ਹੋਣਾ ਜ਼ਰੂਰੀ ਹੈ।"
+      },
+      "providerBlocked": {
+        "failingPipeline": "ਸਭ ਤੋਂ ਨਵੇਂ ਕਮਿਟ ਉੱਤੇ ਪਾਈਪਲਾਈਨ ਫੇਲ੍ਹ ਹੋ ਰਹੀ ਹੈ।",
+        "pendingPipeline": "ਸਭ ਤੋਂ ਨਵੇਂ ਕਮਿਟ ਉੱਤੇ ਪਾਈਪਲਾਈਨ ਹਾਲੇ ਵੀ ਚੱਲ ਰਹੀ ਹੈ।",
+        "permission": "ਤੁਹਾਨੂੰ ਇਸ {{term}} ਨੂੰ ਮਰਜ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+        "draft": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ {{term}} ਨੂੰ ਸਮੀਖਿਆ ਲਈ ਤਿਆਰ ਵਜੋਂ ਚਿੰਨ੍ਹਿਤ ਕਰੋ।"
       },
       "methodLabels": {
         "merge": "ਮਰਜ ਕਮਿਟ ਬਣਾਓ",
@@ -462,6 +511,8 @@
       "replyBadRequest": "ਇਹ ਜਵਾਬ ਪੋਸਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਥ੍ਰੈਡ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "replyForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "addCommentCta": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰੋ",
+      "fixWithKilo": "Kilo ਨਾਲ ਠੀਕ ਕਰੋ",
+      "fixWithKiloPrompt": "ਕਿਰਪਾ ਕਰਕੇ ਹੇਠਾਂ ਦਿੱਤੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਟਿੱਪਣੀ ਨੂੰ ਹੱਲ ਕਰੋ: {{link}}",
       "commentBadRequest": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਪੁੱਲ ਰਿਕਵੈਸਟ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "commentForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moderation": {
@@ -512,7 +563,10 @@
         "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
       },
-      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ"
+      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
+      "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "moreLinesAbove_one": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨ ਹੈ।",
+      "moreLinesAbove_other": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ ਹਨ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀਆਂ।",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -524,17 +578,19 @@
     "reviewPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
     "headLine": "{{counts}} · ਹੈੱਡ {{sha}}",
     "entry": {
-      "eyebrow": "URL ਰਾਹੀਂ ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ।",
-      "pastePrLink": "PR ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
-      "noRecentPrs": "ਹਾਲ ਹੀ ਦੀ ਕੋਈ PR ਨਹੀਂ",
-      "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਪਰ PR ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਇਹ ਅਗਲੀ ਵਾਰ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
+      "eyebrow": "URL ਰਾਹੀਂ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+      "pastePrLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
+      "noRecentPrs": "ਕੋਈ ਹਾਲੀਆ ਸਮੀਖਿਆ ਨਹੀਂ",
+      "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਤੇ ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਅਗਲੀ ਵਾਰ ਇਹ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
       "couldNotLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "removeFromRecentsTitle": "ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਈਏ?",
-      "removeFromRecentsMessage": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
+      "removeFromRecentsMessage": "ਇਹ ਸਮੀਖਿਆ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
       "removeRecentAccessibility": "{{repo}} ਨੂੰ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਓ",
-      "urlAccessibility": "GitHub ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ URL",
-      "clearLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਹਟਾਓ",
-      "pasteLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
+      "urlAccessibility": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ URL ਦਰਜ ਕਰੋ",
+      "urlPlaceholder": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ URL",
+      "openAccessibility": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+      "clearLink": "ਲਿੰਕ ਹਟਾਓ",
+      "pasteLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
       "open": "ਖੋਲ੍ਹੋ"
     },
     "checks": {
@@ -551,6 +607,8 @@
       "pending": "{{displayCount}} ਬਾਕੀ",
       "skipped": "{{displayCount}} ਛੱਡੀਆਂ ਗਈਆਂ",
       "checksCount": "{{displayCount}} ਜਾਂਚਾਂ",
+      "checksCount_one": "{{displayCount}} ਜਾਂਚ",
+      "checksCount_other": "{{displayCount}} ਜਾਂਚਾਂ",
       "checkDetails": "ਜਾਂਚ ਦੇ ਵੇਰਵੇ"
     },
     "inbox": {
@@ -583,9 +641,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "checkFailedMessage": "ਇਹ ਲੋਡ ਹੋਣ ਤੱਕ ਸਾਈਨ-ਇਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੋਵੇਗੀ।",
+      "checkFailedTitleGitLab": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "checkFailedTitleBitbucket": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "providerCheckFailedMessage": "ਇਸ ਦੇ ਲੋਡ ਹੋਣ ਤੱਕ ਕਨੈਕਸ਼ਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "reconnectTitle": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectDescription": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ। ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਜਾਰੀ ਰੱਖਣ ਲਈ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ।",
-      "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
+      "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
+      "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
+      "bitbucketOrgOnlyDescription": "ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਕੋਈ ਸੰਗਠਨ ਚੁਣੋ ਤਾਂ ਜੋ ਉਸ ਦੀਆਂ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕੇ।"
     },
     "screen": {
       "title": "#{{number}}",
@@ -607,7 +671,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "message": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।"
+      "message": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
+      "gitlabTitle": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
+      "bitbucketTitle": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
+      "providerMessage": "ਤੁਹਾਡਾ {{provider}} ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।"
     },
     "eventChips": {
       "comment": "ਟਿੱਪਣੀ",
@@ -672,10 +739,12 @@
       "statusContext": "ਬਿਨਾਂ ਬਦਲਾਅ ਵਾਲੀ",
       "lineLabel": "{{status}} ਲਾਈਨ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ਖਾਲੀ)"
+      "emptyLine": "(ਖਾਲੀ)",
+      "truncationBanner_one": "ਬਦਲੀਆਂ {{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੀਆਂ {{limit}} ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ — GitHub API ਦੀ ਸੀਮਾ ਹੈ।",
+      "truncationBanner_other": "ਬਦਲੀਆਂ {{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੀਆਂ {{limit}} ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ — GitHub API ਦੀ ਸੀਮਾ ਹੈ।"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ।",
-    "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ।",
+    "linkPasteNotAPullRequest": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ",
     "announce": {
       "commentPosted": "ਟਿੱਪਣੀ ਪੋਸਟ ਹੋ ਗਈ",
       "reviewSubmitted": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਹੋ ਗਈ",
@@ -684,6 +753,7 @@
     "mutationError": {
       "commentNotPosted": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚੁਣੀ ਲਾਈਨ ਬਦਲ ਗਈ ਹੋਵੇ ਜਾਂ PR ਅੱਪਡੇਟ ਹੋ ਗਈ ਹੋਵੇ।",
       "reviewNotSubmitted": "ਇਸ ਸਮੀਖਿਆ ਨੂੰ ਇਸ ਦੇ ਮੌਜੂਦਾ ਰੂਪ ਵਿੱਚ ਜਮ੍ਹਾਂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਹੋ ਸਕਦਾ ਹੈ ਕਿ PR ਬਦਲ ਗਈ ਹੋਵੇ ਜਾਂ ਇਹ ਤੁਹਾਡੀ ਆਪਣੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਹੋਵੇ, ਜਿਸ ਦੀ ਸਮੀਖਿਆ ਤੁਸੀਂ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
+      "reviewNotSubmittedTerm": "ਇਹ ਸਮੀਖਿਆ ਇਵੇਂ ਸਬਮਿਟ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ {{term}} ਬਦਲ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਸੀਂ ਆਪਣੀ ਖ਼ੁਦ ਦੀ {{term}} ਦੀ ਸਮੀਖਿਆ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
       "couldNotPostComment": "ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "couldNotSubmitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਨਹੀਂ ਹੋ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
@@ -691,9 +761,31 @@
       "couldNotReply": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ।",
       "couldNotCompleteAction": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "mergeResultDefaultError": "GitHub ਨੇ ਮਰਜ ਪੂਰਾ ਨਹੀਂ ਕੀਤਾ।",
+      "mergeResultNotCompleted": "{{term}} ਮਰਜ਼ ਨਹੀਂ ਹੋਈ। ਇਸ ਦੀ ਸਥਿਤੀ ਜਾਂਚੋ ਅਤੇ ਫਿਰ ਤੋਂ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "ambiguous": "ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ PR ਦੀ ਜਾਂਚ ਕਰੋ।",
       "persistenceFailed": "ਅਸੀਂ ਇਹ ਕਾਰਵਾਈ ਰਿਕਾਰਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "forbidden": "ਇਸ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ",
+        "accessibility": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
+      "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
+      "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
+      "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
+      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਦੀ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
+      "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "discussionUnavailableMessage": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋ ਸਕਦੀ ਹੈ।",
+      "noDiscussionDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ 'ਤੇ ਸਮੀਖਿਆ ਦਾ ਕੋਈ ਥ੍ਰੈਡ ਜਾਂ ਗੱਲਬਾਤ ਦੀ ਕੋਈ ਟਿੱਪਣੀ ਨਹੀਂ ਹੈ।",
+      "noFilesChangedDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।"
     }
   },
   "notifications": {
@@ -726,11 +818,12 @@
     "previewFullDescription": "ਸੂਚਨਾਵਾਂ ਤੁਹਾਡੀ ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸੁਨੇਹੇ ਦਾ ਟੈਕਸਟ ਦਿਖਾਉਂਦੀਆਂ ਹਨ।",
     "previewGenericDescription": "ਸੂਚਨਾਵਾਂ ਸਿਰਫ਼ ਇਹ ਦੱਸਦੀਆਂ ਹਨ ਕਿ ਕੋਈ ਗਤੀਵਿਧੀ ਹੋਈ ਹੈ। ਸੁਨੇਹਾ ਪੜ੍ਹਨ ਲਈ Kilo ਖੋਲ੍ਹੋ।",
     "channel": {
-      "agent": "ਏਜੰਟ ਦੇ ਸੈਸ਼ਨ",
+      "agentProgress": "ਏਜੰਟ ਦੀ ਪ੍ਰਗਤੀ",
       "chat": "ਚੈਟ ਦੇ ਸੁਨੇਹੇ",
       "kiloclaw": "KiloClaw ਦੀ ਗਤੀਵਿਧੀ",
       "balance": "ਬਚੀ ਰਕਮ ਬਾਰੇ ਚੇਤਾਵਨੀਆਂ",
-      "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ"
+      "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
+      "spend": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ"
     },
     "category": {
       "chatMessagesSubtitle": "ਤੁਹਾਡੀਆਂ ਗੱਲਬਾਤਾਂ ਵਿੱਚ ਜਵਾਬ",
@@ -741,8 +834,22 @@
       "sessionStatusTitle": "ਸੈਸ਼ਨ ਦੀ ਸਥਿਤੀ",
       "sessionStatusSubtitle": "ਪੂਰਾ ਹੋਇਆ / ਅਸਫਲ / ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ",
       "kiloclawActivitySubtitle": "ਇੰਸਟੈਂਸ ਤਿਆਰ/ਅਸਫਲ, ਨਿਰਧਾਰਤ ਕਾਰਵਾਈਆਂ",
+      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਲੈਣ ਲਈ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
       "balanceAlertsSubtitle": "ਸੰਸਥਾ ਦਾ ਬੈਲੰਸ ਘੱਟ ਹੋਣ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
-      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ"
+      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਲੈਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ",
+      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਲੈਣ ਲਈ ਇੱਕ ਦਾਇਰੇ 'ਤੇ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।",
+      "spendAlertsSubtitle": "ਸੀਮਾ ਟੱਪਣਾ ਅਤੇ ਹਰ ਘੰਟੇ ਵਾਧਾ",
+      "spendAlertsToggle": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਦੀ ਸ਼੍ਰੇਣੀ"
+    },
+    "action": {
+      "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
+    },
+    "needsInputAction": {
+      "approved": "ਬੇਨਤੀ ਮਨਜ਼ੂਰ ਹੋ ਗਈ",
+      "replied": "ਜਵਾਬ ਭੇਜ ਦਿੱਤਾ ਗਿਆ",
+      "failed": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਦੁਬਾਰਾ ਟੈਪ ਕਰੋ।",
+      "unavailable": "ਇਹ ਬੇਨਤੀ ਹੁਣ ਉਡੀਕ ਨਹੀਂ ਕਰਦੀ।"
     }
   },
   "tabs": {
@@ -823,7 +930,9 @@
       "uploadFailed": "ਅੱਪਲੋਡ ਅਸਫਲ ਰਿਹਾ।",
       "failedToUploadFile": "ਫਾਈਲ ਅੱਪਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ: {{reason}}।",
       "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ।",
-      "metadataStripFailed": "ਫੋਟੋ ਦਾ ਮੈਟਾਡੇਟਾ ਹਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।"
+      "metadataStripFailed": "ਫੋਟੋ ਦਾ ਮੈਟਾਡੇਟਾ ਹਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "limit_one": "ਤੁਸੀਂ ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲ ਨੱਥੀ ਕਰ ਸਕਦੇ ਹੋ।",
+      "limit_other": "ਤੁਸੀਂ ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਨੱਥੀ ਕਰ ਸਕਦੇ ਹੋ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1567,7 +1676,11 @@
       "syncFindings": "ਸਮੱਸਿਆਵਾਂ ਸਿੰਕ ਕਰੋ",
       "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ",
       "syncQueued": "ਸਿੰਕ ਕਰਨ ਦੀ ਬੇਨਤੀ ਕਤਾਰ ਵਿੱਚ ਪਾਈ ਗਈ",
-      "syncStatusUnavailable": "ਸਿੰਕ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "syncStatusUnavailable": "ਸਿੰਕ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "daysOverdue_one": "ਮਿਆਦ ਤੋਂ {{displayCount}} ਦਿਨ ਵੱਧ",
+      "daysOverdue_other": "ਮਿਆਦ ਤੋਂ {{displayCount}} ਦਿਨ ਵੱਧ",
+      "findingsCount_one": "{{displayCount}} ਸਮੱਸਿਆ",
+      "findingsCount_other": "{{displayCount}} ਸਮੱਸਿਆਵਾਂ"
     },
     "dashboardMetrics": {
       "openFindings": "ਖੁੱਲ੍ਹੀਆਂ ਸਮੱਸਿਆਵਾਂ",
@@ -1964,6 +2077,10 @@
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "failedToLoadDetails": "ਸੈਸ਼ਨ ਦੇ ਵੇਰਵੇ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
       "failedToStopExecution": "ਚੱਲ ਰਿਹਾ ਕੰਮ ਰੋਕਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "stopped": "ਸੈਸ਼ਨ ਰੋਕ ਦਿੱਤਾ ਗਿਆ",
+      "committing": "ਕਮਿਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…",
+      "committed": "ਕਮਿਟ ਹੋ ਗਿਆ",
+      "commitFailed": "ਕਮਿਟ ਅਸਫਲ ਰਿਹਾ",
       "renameSession": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ",
       "renamePlaceholder": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ",
       "transcriptAccessibility": "ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ",
@@ -1998,6 +2115,7 @@
       "exitNeedsNewerCli": "ਰਿਮੋਟ ਸਲੈਸ਼ ਕਮਾਂਡਾਂ ਲਈ Kilo CLI ਦੇ ਨਵੇਂ ਸੰਸਕਰਣ ਦੀ ਲੋੜ ਹੈ। Kilo CLI ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਮੁੜ ਕਨੈਕਟ ਕਰੋ।"
     },
     "sessionConnection": {
+      "label": "ਕਨੈਕਸ਼ਨ",
       "connecting": "ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
       "reconnecting": "ਮੁੜ ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
@@ -2017,14 +2135,36 @@
       "removeConfirmTitle": "ਟੀਚਾ ਹਟਾਉਣਾ?",
       "removeConfirmMessage": "CLI ਇਸ ਸੈਸ਼ਨ ਦਾ ਟੀਚਾ ਮਿਟਾਉਂਦਾ ਹੈ।",
       "updateFailed": "ਟੀਚਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}"
+      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}",
+      "collapse": "ਟੀਚਾ ਸਮੇਟੋ",
+      "expand": "ਟੀਚਾ ਫੈਲਾਓ"
     },
     "newSession": {
+      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
+      "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
+      "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
+      "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
+      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
       "refreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਕਰੋ",
       "githubConnected": "GitHub ਕਨੈਕਟ ਹੈ",
+      "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੈ",
       "noRepositoriesVisible": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। ਜਾਂਚੋ ਕਿ Kilo GitHub ਐਪ ਨੂੰ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਹੈ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "bitbucketOrganizationsOnly": "Bitbucket ਸਿਰਫ਼ ਸੰਗਠਨਾਂ ਲਈ ਉਪਲਬਧ ਹੈ।",
+      "branchPickerTitle": "ਬ੍ਰਾਂਚ ਚੁਣੋ",
+      "branchDefault": "ਡਿਫ਼ੌਲਟ",
+      "branchAccessibility": "ਬ੍ਰਾਂਚ: {{label}}",
+      "branchLoading": "ਬ੍ਰਾਂਚ ਲੋਡ ਹੋ ਰਹੇ ਹਨ",
+      "branchLoadError": "ਬ੍ਰਾਂਚ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
+      "branchUnavailable": "ਇਸ ਰਿਪੋਜ਼ਟਰੀ ਲਈ ਬ੍ਰਾਂਚ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। ਪ੍ਰਦਾਤਾ ਕੋਲ ਆਪਣੀ ਪਹੁੰਚ ਜਾਂਚੋ, ਫਿਰ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
+      "branchEmpty": "ਕੋਈ ਬ੍ਰਾਂਚ ਉਪਲਬਧ ਨਹੀਂ",
+      "branchPlaceholder": "ਇੱਕ ਬ੍ਰਾਂਚ ਚੁਣੋ",
       "runOnWithTarget": "{{target}} 'ਤੇ ਚਲਾਓ",
       "environment": "ਵਾਤਾਵਰਣ",
       "couldNotLoadEnvironment": "ਤੁਹਾਡਾ ਵਾਤਾਵਰਣ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
@@ -2045,24 +2185,39 @@
       "couldNotRefreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "discardDraftTitle": "ਕੀ ਡਰਾਫਟ ਰੱਦ ਕਰਨਾ ਹੈ?",
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਮਿਟ ਜਾਵੇਗਾ।",
+      "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਅਤੇ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "remoteHint": "ਆਪਣੇ ਕੰਪਿਊਟਰ 'ਤੇ ਚੱਲ ਰਹੀ kilo ਪ੍ਰਕਿਰਿਆ ਨੂੰ ਕੰਟਰੋਲ ਕਰਨ ਲਈ `kilo remote` ਚਲਾਓ ਜਾਂ ਚੱਲ ਰਹੇ CLI ਸੈਸ਼ਨ ਵਿੱਚ `/remote` ਚਲਾਓ।",
-      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੈ",
-      "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
-      "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
-      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
-      "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
-      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
-      "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
       "continueFrom": "{{title}} ਨੂੰ ਜਾਰੀ ਰੱਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
-      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
-      "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਅਤੇ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।"
+      "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
+      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "pickProfile": "ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
+      "noProfile": "ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
+      "manageProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
+      "noProfiles": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ। ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, MCP ਸਰਵਰ, ਅਤੇ ਹੁਨਰ ਜੋੜਨ ਲਈ ਇੱਕ ਬਣਾਓ।",
+      "advancedConfig": "ਉੱਨਤ ਸੰਰਚਨਾ",
+      "advancedConfigDescription": "ਸੁਰੱਖਿਅਤ ਕੀਤੀਆਂ ਸੰਰਚਨਾਵਾਂ ਨੂੰ ਲੋਡ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ, ਅਤੇ ਵਾਧੂ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ ਅਤੇ ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਹੱਥੀਂ ਕੌਂਫਿਗਰ ਕਰੋ",
+      "saveAsProfile": "ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+      "saveProfileDescription": "ਮੌਜੂਦਾ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ ਅਤੇ ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਮੁੜ ਵਰਤੋਂ ਯੋਗ ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ।",
+      "profileSummary": "{{vars}} ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ · {{commands}} ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
+      "profileSaved": "ਪ੍ਰੋਫਾਈਲ \"{{name}}\" ਸੁਰੱਖਿਅਤ ਕੀਤੀ ਗਈ",
+      "organizationProfiles": "ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ",
+      "personalProfiles": "ਨਿੱਜੀ ਪ੍ਰੋਫਾਈਲਾਂ",
+      "yourProfiles": "ਤੁਹਾਡੇ ਪ੍ਰੋਫਾਈਲ",
+      "failedToLoadProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਨੂੰ ਲੋਡ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ",
+      "nameTooLong": "ਪ੍ਰੋਫਾਈਲ ਨਾਮ ਬਹੁਤ ਲੰਮਾ ਹੈ",
+      "descriptionTooLong": "ਵਰਣਨ ਬਹੁਤ ਲੰਮਾ ਹੈ",
+      "secretsEncrypted": "ਭੇਦ ਸਟੋਰੇਜ ਤੋਂ ਪਹਿਲਾਂ ਏਨਕ੍ਰਿਪਟ ਕੀਤੇ ਜਾਂਦੇ ਹਨ।",
+      "profileActive": "ਪ੍ਰੋਫਾਈਲ ਕਿਰਿਆਸ਼ੀਲ ਹੈ",
+      "profilesActive": "ਪ੍ਰੋਫਾਈਲ ਕਿਰਿਆਸ਼ੀਲ ਹਨ",
+      "customConfigActive": "ਕਸਟਮ ਸੰਰਚਨਾ ਕਿਰਿਆਸ਼ੀਲ ਹੈ",
+      "configNeedsAttention": "ਸੰਰਚਨਾ ਨੂੰ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਹੈ",
+      "repoProfile": "ਰੇਪੋ ਪ੍ਰੋਫਾਈਲ",
+      "selectedProfile": "ਚੁਣਿਆ ਗਿਆ ਪ੍ਰੋਫਾਈਲ",
+      "manualOverrides": "ਮੈਨੁਅਲ ਓਵਰਰਾਈਡ",
+      "openSettingsToReview": "ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੋ",
+      "profileSelection": "ਪ੍ਰੋਫਾਈਲ ਦੀ ਚੋਣ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ ਹੈ।",
@@ -2086,15 +2241,18 @@
       "updateTodos": "ਕੰਮਾਂ ਦੀ ਸੂਚੀ ਅੱਪਡੇਟ ਕਰੋ",
       "linesBadge": "{{displayCount}} ਲਾਈਨਾਂ",
       "filesBadge": "{{displayCount}} ਫਾਈਲਾਂ",
-      "matchesBadge": "{{displayCount}} ਮੇਲ"
+      "matchesBadge": "{{displayCount}} ਮੇਲ",
+      "filesBadge_one": "{{displayCount}} ਫਾਈਲ",
+      "filesBadge_other": "{{displayCount}} ਫਾਈਲਾਂ",
+      "linesBadge_one": "{{displayCount}} ਲਾਈਨ",
+      "linesBadge_other": "{{displayCount}} ਲਾਈਨਾਂ",
+      "matchesBadge_one": "{{displayCount}} ਮੇਲ",
+      "matchesBadge_other": "{{displayCount}} ਮੇਲ",
+      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।"
     },
     "readToolMarkdown": {
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",
       "linesOf": "ਕੁੱਲ {{total}} ਵਿੱਚੋਂ ਲਾਈਨਾਂ {{start}}–{{end}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent ਦੀ {{action}} ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ ({{status}})।",
-      "failed": "Cloud Agent ਦੀ {{action}} ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ।"
     },
     "collectCopyableText": {
       "unserializableInput": "[ਇਨਪੁੱਟ ਨੂੰ ਸੀਰੀਅਲਾਈਜ਼ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ]",
@@ -2191,8 +2349,7 @@
       "assistantProviderRejected": "ਪ੍ਰਦਾਤਾ ਨੇ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ।",
       "assistantStopped": "ਜਵਾਬ ਰੋਕ ਦਿੱਤਾ ਗਿਆ।",
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
-      "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "sendFailed": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
     },
     "filePart": {
       "loadingImage": "ਚਿੱਤਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",
@@ -2376,7 +2533,11 @@
       "files": "ਫਾਈਲਾਂ",
       "couldNotOpenPhotoPicker": "ਫੋਟੋ ਚੁਣਨ ਵਾਲੀ ਸਕ੍ਰੀਨ ਨਹੀਂ ਖੋਲ੍ਹੀ ਜਾ ਸਕੀ। Kilo ਮੁੜ ਚਾਲੂ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "maxFilesAllowed": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
-      "onlyAddingFiles": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})"
+      "onlyAddingFiles": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})",
+      "maxFilesAllowed_one": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
+      "maxFilesAllowed_other": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
+      "onlyAddingFiles_one": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})"
     },
     "composer": {
       "addAttachment": "ਫਾਈਲ ਨੱਥੀ ਕਰੋ",
@@ -2394,7 +2555,9 @@
       "discardAttachmentsMessage": "ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
       "discardAttachmentsTitle": "ਕੀ ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਉਣੀਆਂ ਹਨ?",
       "charactersRemaining": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ",
-      "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ"
+      "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ",
+      "charactersRemaining_one": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹੈ",
+      "charactersRemaining_other": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ"
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",
@@ -2428,7 +2591,17 @@
       "startNewSession": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
       "exitSession": "ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਨਿਕਲੋ",
       "clearSession": "ਇਹ ਸੈਸ਼ਨ ਖ਼ਤਮ ਕਰੋ ਅਤੇ ਨਵਾਂ ਸ਼ੁਰੂ ਕਰੋ",
+      "compactDescription": "ਮੌਜੂਦਾ ਸੈਸ਼ਨ ਦੇ ਸੰਦਰਭ ਨੂੰ ਕੰਪੈਕਟ ਕਰੋ",
+      "goalDescription": "ਸੈਸ਼ਨ ਟੀਚੇ ਵੱਲ ਕੰਮ ਕਰਦੇ ਰਹੋ। /goal <objective> ਜਾਂ pause, resume, clear",
+      "initDescription": "ਸੇਧਿਤ AGENTS.md ਸੈਟਅੱਪ",
+      "resumeClaudeDescription": "Claude Code ਸੈਸ਼ਨ ਦੀ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਆਯਾਤ ਕਰੋ",
+      "resumeCodexDescription": "OpenAI Codex ਸੈਸ਼ਨ ਦੀ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਆਯਾਤ ਕਰੋ",
+      "reviewDescription": "ਬਦਲਾਵਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ਵਰਤੋ",
+      "useSkillCommand": "/{{command}} ਹੁਨਰ ਵਰਤੋ",
+      "skillBadge": "ਹੁਨਰ",
+      "catalogFull": "ਕਮਾਂਡ ਸੂਚੀ ਭਰ ਗਈ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਕਮਾਂਡ ਲੁਕੇ ਹੋਏ ਹਨ।",
+      "catalogOverLimit": "ਹੁਨਰ ਸੂਚੀ ਆਕਾਰ ਸੀਮਾ ਤੋਂ ਵੱਧ ਹੈ, ਇਸ ਲਈ ਹਰ ਹੁਨਰ ਦਿਖਾਈ ਦਿੰਦਾ ਹੈ।",
       "insert": "ਸ਼ਾਮਲ ਕਰੋ",
       "upgradeRequiredFallback": "ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਕਮਾਂਡ ਨੂੰ ਵਰਤਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਗਰੇਡ ਕਰੋ।",
       "exitCapabilityUnavailable": "ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਨਿਕਲਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਡੇਟ ਕਰੋ।",
@@ -2460,7 +2633,9 @@
       "stepsCount_one": "{{steps}} ਕਦਮ",
       "stepsCount": "{{steps}} ਕਦਮ",
       "stepsCount_other": "{{steps}} ਕਦਮ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ਮਾਡਲ ({{displayCount}})",
+      "modelsCount_other": "ਮਾਡਲ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ਆਟੋ-ਪ੍ਰਵਾਨਗੀ",
@@ -2500,7 +2675,9 @@
     },
     "toolRun": {
       "sheetTitle": "ਟੂਲ ਕਾਲਾਂ",
-      "condensedLabel": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}"
+      "condensedLabel": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ਆਈਟਮ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2545,6 +2722,7 @@
     "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "agentSessions": "ਹੁਣ ਚੱਲ ਰਹੇ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
+    "newTaskFromPicture": "ਤਸਵੀਰ ਤੋਂ ਨਵਾਂ ਕੰਮ",
     "explore": "ਪੜਚੋਲ",
     "seeAll": "ਸਭ ਦੇਖੋ",
     "noLiveSessions": "ਇਸ ਵੇਲੇ ਕੁਝ ਵੀ ਨਹੀਂ ਚੱਲ ਰਿਹਾ"
@@ -2634,7 +2812,9 @@
     "cliCantReceiveFilesTitle": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ",
     "cliCantReceiveFilesMessage": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਚਲਾਉਣ ਵਾਲਾ Kilo CLI ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਉਸ ਮਸ਼ੀਨ 'ਤੇ CLI ਅੱਪਡੇਟ ਕਰੋ, ਜਾਂ ਇਸ ਦੀ ਬਜਾਏ ਨਵੇਂ ਸੈਸ਼ਨ ਵਿੱਚ ਸਾਂਝਾ ਕਰੋ।",
     "contentlessMessage": "ਸਾਂਝਾ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ — ਕੋਈ ਟੈਕਸਟ ਜਾਂ ਫਾਈਲ ਸ਼ਾਮਲ ਨਹੀਂ ਸੀ।",
-    "couldNotReadContent": "ਸਾਂਝੀ ਕੀਤੀ ਸਮੱਗਰੀ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।"
+    "couldNotReadContent": "ਸਾਂਝੀ ਕੀਤੀ ਸਮੱਗਰੀ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+    "onlyFirstFilesAttached_one": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।",
+    "onlyFirstFilesAttached_other": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲਾਂ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2766,7 +2946,8 @@
     "aiProvidersWhat": "ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ, ਗੱਲਬਾਤ ਦਾ ਇਤਿਹਾਸ ਅਤੇ ਤੁਹਾਡੇ ਵੱਲੋਂ ਅਟੈਚ ਕੀਤੀਆਂ ਫਾਈਲਾਂ।",
     "aiProvidersWhy": "AI ਦੇ ਜਵਾਬ ਤਿਆਰ ਕਰਨ ਲਈ।",
     "aiProvidersWho": "Anthropic, OpenAI, Google ਅਤੇ ਹੋਰ ਪ੍ਰਦਾਤਾ ਜੋ ਤੁਸੀਂ ਹਰ ਬੇਨਤੀ ਲਈ ਚੁਣਦੇ ਹੋ।",
-    "gatewayWhat": "ਖਾਤੇ ਦਾ ID, ਬੇਨਤੀ ਦਾ ਮੈਟਾਡੇਟਾ, ਟੋਕਨਾਂ ਦੀ ਵਰਤੋਂ।",
+    "gatewayWhat": "ਖਾਤੇ ਦਾ ID, ਬੇਨਤੀ ਦਾ ਮੈਟਾਡੇਟਾ, ਟੋਕਨਾਂ ਦੀ ਵਰਤੋਂ, ਅਤੇ ਐਪ ਇਸ ਰਾਹੀਂ ਭੇਜਦੀ ਪ੍ਰੋਂਪਟ ਅਤੇ ਵੌਇਸ ਰਿਕਾਰਡਿੰਗ।",
+    "viaGateway": "Kilo Gateway ਰਾਹੀਂ",
     "gatewayWhy": "ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ, ਬੇਨਤੀਆਂ ਸਹੀ ਥਾਂ ਭੇਜਣਾ, ਬਿਲਿੰਗ ਦੇ ਹਿਸਾਬ ਦਾ ਮਿਲਾਨ।",
     "gatewayWho": "Kilo (kilo.ai)।",
     "crashReportingWhat": "ਕਰੈਸ਼ ਅਤੇ ਗਲਤੀਆਂ ਦੀਆਂ ਰਿਪੋਰਟਾਂ, ਜਿਨ੍ਹਾਂ ਵਿੱਚੋਂ ਐਪ ਦੀ ਸਮੱਗਰੀ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੈ।",
@@ -2786,7 +2967,7 @@
     "installAttributionWho": "AppsFlyer।",
     "voiceTranscriptionWhat": "ਤੁਹਾਡੀ ਬੋਲ ਕੇ ਲਿਖਾਉਣ ਵੇਲੇ ਦੀ ਰਿਕਾਰਡਿੰਗ।",
     "voiceTranscriptionWhy": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ।",
-    "voiceTranscriptionWho": "ਸਿਰਫ਼ ਡਿਵਾਈਸ 'ਤੇ ਹੀ, ਜਾਂ Apple ਜਾਂ Google ਰਾਹੀਂ ਜੇ ਇਹ ਡਿਵਾਈਸ ਬੋਲੀ ਨੂੰ ਔਫਲਾਈਨ ਲਿਖਤ ਵਿੱਚ ਨਹੀਂ ਬਦਲ ਸਕਦੀ।",
+    "voiceTranscriptionWho": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ, ਤੁਹਾਡੇ ਚੁਣੇ ਹੋਏ ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਮਾਡਲ ਨਾਲ Kilo Gateway, ਜਾਂ ਆਨਲਾਈਨ ਪਛਾਣ ਲਈ Apple ਜਾਂ Google।",
     "installAttributionPromptTitle": "ਕੀ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਪਛਾਣ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦੇਣੀ ਹੈ?",
     "installAttributionPromptMessage": "Kilo ਸਿਰਫ਼ ਇਹ ਜਾਣਨ ਲਈ Apple ਦੀ ਟ੍ਰੈਕਿੰਗ ਇਜਾਜ਼ਤ ਵਰਤਦਾ ਹੈ ਕਿ ਤੁਸੀਂ ਕਿਸ ਸਰੋਤ ਰਾਹੀਂ ਇੱਥੇ ਆਏ ਹੋ। ਇਸ ਲਈ ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ ਅਤੇ ਗੱਲਬਾਤਾਂ ਕਦੇ ਨਹੀਂ ਵਰਤੇ ਜਾਂਦੇ।",
     "what": "ਕੀ",
@@ -2958,6 +3139,14 @@
     "tooManySignInAttempts": "ਸਾਈਨ-ਇਨ ਦੀਆਂ ਬਹੁਤ ਜ਼ਿਆਦਾ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਚੁੱਕੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਉਡੀਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "models": {
+    "auto": {
+      "frontier": "ਆਟੋ ਫਰੰਟੀਅਰ",
+      "balanced": "ਆਟੋ ਸੰਤੁਲਿਤ",
+      "efficient": "ਆਟੋ ਕੁਸ਼ਲ",
+      "small": "ਆਟੋ ਛੋਟਾ",
+      "free": "ਆਟੋ ਮੁਫ਼ਤ",
+      "organization": "ਸੰਸਥਾ ਆਟੋ"
+    },
     "dataCollected": "ਡੇਟਾ ਇਕੱਠਾ ਹੁੰਦਾ ਹੈ",
     "free": "ਮੁਫ਼ਤ",
     "couldNotUpdateFavorites": "ਪਸੰਦੀਦਾ ਸੂਚੀ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
@@ -2988,8 +3177,17 @@
     "privacy": "ਏਜੰਟ ਵੇਖਣ ਲਈ Kilo ਖੋਲ੍ਹੋ",
     "openAgents": "ਏਜੰਟ ਖੋਲ੍ਹੋ",
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+    "newestSession": "ਸਭ ਤੋਂ ਨਵਾਂ: {{title}}",
+    "noneWaiting": "ਕੋਈ ਏਜੰਟ ਉਡੀਕ ਨਹੀਂ ਰਿਹਾ",
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "approving": "ਮਨਜ਼ੂਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
+    "couldNotApprove": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "couldNotStart": "ਸ਼ੁਰੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
-    "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
+    "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।",
+    "openSession": "ਖੋਲ੍ਹੋ",
+    "approveFailed": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ $t(common.approve) 'ਤੇ ਟੈਪ ਕਰੋ।",
+    "newestResult": "ਸਭ ਤੋਂ ਨਵਾਂ ਨਤੀਜਾ"
   },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",
@@ -3014,15 +3212,7 @@
     "remoteOptionTitle": "ਤੁਹਾਡਾ ਕੰਪਿਊਟਰ",
     "remoteOptionBody": "ਆਪਣੀ ਮਸ਼ੀਨ ਉੱਤੇ `kilo remote` CLI ਰਾਹੀਂ Kilo ਚਲਾਓ।",
     "skip": "ਟੂਰ ਛੱਡੋ",
-    "tutorialLabel": "ਟਿਊਟੋਰੀਅਲ",
-    "remoteTitle": "ਆਪਣਾ ਪਹਿਲਾ ਰਿਮੋਟ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
-    "remoteBody": "ਆਪਣਾ ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਇੱਥੋਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ਹਾਲੇ ਕੋਈ ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਨਹੀਂ ਹੋਇਆ",
-    "remoteEmptyBody": "ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰਨ ਲਈ ਆਪਣੇ ਕੰਪਿਊਟਰ ਉੱਤੇ `kilo remote` ਚਲਾਓ।",
-    "remoteFound": "ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਹੋਇਆ",
-    "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ਟਿਊਟੋਰੀਅਲ"
   },
   "modelChat": {
     "empty": {
@@ -3084,5 +3274,213 @@
   },
   "settingsTools": {
     "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ਏਜੰਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਪ੍ਰੌਂਪਟ ਲੋੜੀਂਦਾ ਹੈ। ਇੱਕ ਪ੍ਰੌਂਪਟ ਸ਼ਾਮਲ ਕਰੋ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਲਾਓ।",
+      "repositoryUnknown": "Kilo, {{repository}} ਨੂੰ GitHub ਜਾਂ GitLab ਰਿਪੋਜ਼ਿਟਰੀ ਵਜੋਂ ਨਹੀਂ ਪਛਾਣਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।",
+      "repositoryUnsupported": "{{repository}} ਇੱਕ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀ ਹੈ — ਏਜੰਟ ਸ਼ੁਰੂ ਕਰੋ ਅਜੇ ਇਸਨੂੰ ਵਰਤ ਨਹੀਂ ਸਕਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।"
+    }
+  },
+  "launcher": {
+    "openLastSession": "ਆਖਰੀ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
+  },
+  "spendAlerts": {
+    "subtitle": "ਜਦੋਂ ਇਸ ਸਕੋਪ ਦਾ ਖਰਚਾ ਕੋਈ ਸੀਮਾ ਟੱਪ ਜਾਵੇ ਜਾਂ ਆਪਣੀ ਆਮ ਪ੍ਰਤੀ ਘੰਟਾ ਦਰ ਤੋਂ ਉੱਪਰ ਚੜ੍ਹ ਜਾਵੇ, ਤਾਂ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਈਮੇਲ ਜਾਂ ਪੁਸ਼ ਰਾਹੀਂ ਚੇਤਾਵਨੀ ਭੇਜੋ।",
+    "enable": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਚਾਲੂ ਕਰੋ",
+    "thresholdTitle": "ਸੀਮਾ ਟੱਪਣਾ",
+    "thresholdSubtitle": "ਚਾਲੂ ਖਰਚਾ ਤੁਹਾਡੀ ਸੀਮਾ ਟੱਪ ਰਿਹਾ ਹੈ",
+    "anomalyTitle": "ਪ੍ਰਤੀ ਘੰਟਾ ਵਾਧਾ",
+    "anomalySubtitle": "ਇੱਕ ਘੰਟਾ ਇਸ ਸਕੋਪ ਦੀ ਆਮ ਦਰ ਤੋਂ ਬਹੁਤ ਉੱਪਰ ਹੈ",
+    "limitLabel": "ਸੀਮਾ (USD)",
+    "windowLabel": "ਸਮਾਂ",
+    "window24h": "24 ਘੰਟੇ",
+    "window7d": "7 ਦਿਨ",
+    "window30d": "30 ਦਿਨ",
+    "multiplierLabel": "ਵਾਧੇ ਦਾ ਗੁਣਕ",
+    "saved": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀ ਸੈਟਿੰਗਾਂ ਸੰਭਾਲੀਆਂ ਗਈਆਂ",
+    "loadError": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+    "saveError": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਸੰਭਾਲੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ।",
+    "empty": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਹਨ। ਇਸ ਸਕੋਪ ਦੇ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਸੂਚਿਤ ਕਰਨ ਲਈ ਇਨ੍ਹਾਂ ਨੂੰ ਚਾਲੂ ਕਰੋ।",
+    "noSpend": "ਹਾਲੇ ਕੋਈ ਖਰਚਾ ਦਰਜ ਨਹੀਂ ਹੋਇਆ",
+    "spend24h": "ਪਿਛਲੇ 24 ਘੰਟਿਆਂ ਦਾ ਖਰਚਾ",
+    "multiplierError": "1 ਜਾਂ ਵੱਧ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
+    "permissionDenied": "ਤੁਹਾਨੂੰ ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਪ੍ਰਬੰਧਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+    "pushOffByCategory": "ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਬੰਦ"
+  },
+  "profiles": {
+    "title": "ਪ੍ਰੋਫਾਈਲਾਂ",
+    "entrySubtitle": "ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਸੈਟਿੰਗਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰੋ",
+    "newProfile": "ਨਵਾਂ ਪ੍ਰੋਫਾਈਲ",
+    "emptyTitle": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
+    "emptyDescription": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
+    "loadFailed": "ਪ੍ਰੋਫਾਈਲਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "counts": {
+      "vars": "{{count}} ਵੇਰੀਏਬਲ",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ਹੁਨਰ",
+      "commands": "{{count}} ਕਮਾਂਡਾਂ",
+      "varsShort": "{{count}}ਵ",
+      "skillsShort": "{{count}}ਹ",
+      "commandsShort": "{{count}}ਕ"
+    },
+    "nameLabel": "ਪ੍ਰੋਫਾਈਲ ਨਾਮ",
+    "namePlaceholder": "ਜਿਵੇਂ ਕਿ ਬੈਕਐਂਡ ਡੀਬੱਗਿੰਗ",
+    "descriptionLabel": "ਪ੍ਰੋਫਾਈਲ ਵਰਣਨ",
+    "descriptionPlaceholder": "ਵਿਕਲਪਿਕ ਵਰਣਨ",
+    "ownerLabel": "ਪ੍ਰੋਫਾਈਲ ਮਾਲਕ",
+    "nameRequired": "ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਨਾਮ ਦਰਜ ਕਰੋ",
+    "createAction": "ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ",
+    "createFailed": "ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ ਬਣਾਇਆ ਜਾ ਸਕਿਆ",
+    "createdToast": "ਪ੍ਰੋਫਾਈਲ \"{{name}}\" ਬਣਾਇਆ ਗਿਆ",
+    "settingsSectionTitle": "ਸੰਰਚਨਾ",
+    "defaultSectionTitle": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ",
+    "personalDefaultDescription": "ਜਦੋਂ ਕਿਸੇ ਰਿਪੋਜ਼ਟਰੀ ਵਿੱਚ ਪਿੰਨ ਕੀਤਾ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ ਹੁੰਦਾ ਹੈ ਤਾਂ ਆਟੋ-ਲੋਡ ਹੁੰਦਾ ਹੈ।",
+    "organizationDefaultDescription": "ਉਹਨਾਂ ਮੈਂਬਰਾਂ ਲਈ ਸਵੈ-ਲੋਡ ਕੀਤਾ ਗਿਆ ਜਿਨ੍ਹਾਂ ਕੋਲ ਕੋਈ ਨਿੱਜੀ ਡਿਫੌਲਟ ਨਹੀਂ ਹੈ।",
+    "setAsDefault": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਵਜੋਂ ਸੈੱਟ ਕਰੋ",
+    "removeDefault": "ਡਿਫੌਲਟ ਵਜੋਂ ਹਟਾਓ",
+    "saveFailed": "ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "deleteTitle": "ਪ੍ਰੋਫਾਈਲ ਮਿਟਾਓ",
+    "deleteMessage": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਇਸਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨੂੰ ਸਥਾਈ ਤੌਰ 'ਤੇ ਹਟਾਉਂਦਾ ਹੈ। ਇਸ ਨੂੰ ਅਣਕੀਤਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
+    "deleteFailed": "ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+    "deleteBlocked": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਵੈੱਬਹੁੱਕ ਟਰਿੱਗਰ ਦੁਆਰਾ ਵਰਤੀ ਜਾਂਦੀ ਹੈ। ਇਸਨੂੰ ਪਹਿਲਾਂ ਉਹਨਾਂ ਟਰਿਗਰਾਂ ਤੋਂ ਹਟਾਓ।",
+    "deletedToast": "ਪ੍ਰੋਫਾਈਲ \"{{name}}\" ਮਿਟਾਇਆ ਗਿਆ",
+    "variablesTitle": "ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ",
+    "addVariable": "ਵੇਰੀਏਬਲ ਸ਼ਾਮਲ ਕਰੋ",
+    "keyLabel": "ਕੁੰਜੀ",
+    "keyTooLong": "ਕੁੰਜੀ 256 ਅੱਖਰਾਂ ਜਾਂ ਘੱਟ ਦੀ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ",
+    "keyDuplicate": "ਇਹ ਕੁੰਜੀ ਪਹਿਲਾਂ ਹੀ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਮੌਜੂਦ ਹੈ",
+    "valueLabel": "ਮੁੱਲ",
+    "secretLabel": "ਗੁਪਤ",
+    "secrets": {
+      "markSecret": "ਗੁਪਤ ਵਜੋਂ ਮਾਰਕ ਕਰੋ",
+      "masked": "ਲੁਕਿਆ ਹੋਇਆ ਮੁੱਲ",
+      "reveal": "ਮੁੱਲ ਪ੍ਰਗਟ ਕਰੋ",
+      "newValuePlaceholder": "ਨਵਾਂ ਗੁਪਤ ਮੁੱਲ ਦਰਜ ਕਰੋ",
+      "valuePlaceholder": "ਗੁਪਤ ਮੁੱਲ (ਐਨਕ੍ਰਿਪਟ ਕੀਤਾ)"
+    },
+    "variablesEmpty": "ਹਾਲੇ ਕੋਈ ਵੇਰੀਏਬਲ ਨਹੀਂ",
+    "variablesSaveFailed": "ਵੇਰੀਏਬਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "commandsTitle": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
+    "addCommand": "ਕਮਾਂਡ ਸ਼ਾਮਲ ਕਰੋ",
+    "commandLabel": "ਹੁਕਮ",
+    "commandPlaceholder": "e.g. pnpm install",
+    "commandsEmpty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸੈੱਟਅੱਪ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
+    "commandsSaveFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "moveUp": "ਉੱਪਰ ਜਾਓ",
+    "moveDown": "ਹੇਠਾਂ ਚਲੇ ਜਾਓ",
+    "skillsTitle": "ਹੁਨਰ",
+    "addSkill": "ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ",
+    "skillNameLabel": "ਹੁਨਰ ਦਾ ਨਾਮ",
+    "skillMarkdownLabel": "ਹੁਨਰ ਸਮੱਗਰੀ",
+    "skillsEmpty": "ਅਜੇ ਕੋਈ ਹੁਨਰ ਨਹੀਂ ਹੈ",
+    "skillNameRequired": "ਇੱਕ ਹੁਨਰ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
+    "skillNameInvalid": "ਹੁਨਰ ਦਾ ਨਾਮ ਇੱਕ ਅੱਖਰ ਜਾਂ ਅੰਕ ਨਾਲ ਸ਼ੁਰੂ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ",
+    "skillContentRequired": "ਹੁਨਰ ਸਮੱਗਰੀ ਦੀ ਲੋੜ ਹੈ",
+    "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ",
+    "skillsHint": "ਇੱਕ SKILL.md ਪੇਸਟ ਕਰੋ ਅਤੇ ਇਸਦਾ ਨਾਮ ਭਰੋ; ਬਿਨਾਂ ਡਰੈਗ ਐਂਡ ਡ੍ਰੌਪ ਦੇ ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ।",
+    "skillEditTitle": "ਹੁਨਰ ਨੂੰ ਸੋਧੋ",
+    "mcp": {
+      "title": "MCP ਸਰਵਰ",
+      "add": "MCP ਸਰਵਰ ਸ਼ਾਮਲ ਕਰੋ",
+      "empty": "ਅਜੇ ਤੱਕ ਕੋਈ MCP ਸਰਵਰ ਨਹੀਂ ਹੈ",
+      "name": "ਸਰਵਰ ਦਾ ਨਾਮ",
+      "type": "ਸਰਵਰ ਦੀ ਕਿਸਮ",
+      "localType": "ਸਥਾਨਕ",
+      "remoteType": "ਰਿਮੋਟ",
+      "command": "ਕਮਾਂਡ ਲਾਈਨ",
+      "url": "URL",
+      "environment": "ਵਾਤਾਵਰਨ (JSON)",
+      "headers": "ਸਿਰਲੇਖ (JSON)",
+      "timeout": "ਸਮਾਂ ਖ਼ਤਮ",
+      "secretCount": "ਗੁਪਤ ਗਿਣਤੀ",
+      "namePlaceholder": "my-server",
+      "commandPlaceholder": "npx @example/mcp-server",
+      "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "nameRequired": "ਇੱਕ ਸਰਵਰ ਨਾਮ ਦਰਜ ਕਰੋ",
+      "nameInvalid": "ਨਾਮ ਸਿਰਫ਼ ਅੱਖਰਾਂ, ਸੰਖਿਆਵਾਂ, ਅੰਡਰਸਕੋਰਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰ ਸਕਦਾ ਹੈ",
+      "commandRequired": "ਇੱਕ ਕਮਾਂਡ ਦਿਓ",
+      "commandTooLong": "ਵੱਧ ਤੋਂ ਵੱਧ 50 ਆਰਗੂਮੈਂਟ ਵਰਤੋ, ਹਰ ਇੱਕ 500 ਅੱਖਰਾਂ ਦਾ",
+      "urlRequired": "ਇੱਕ URL ਦਾਖਲ ਕਰੋ",
+      "urlInvalid": "ਇੱਕ ਵੈਧ URL ਦਾਖਲ ਕਰੋ",
+      "urlTooLong": "URL 2048 ਅੱਖਰਾਂ ਜਾਂ ਘੱਟ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ",
+      "jsonInvalid": "ਵੈਧ JSON ਦਾਖਲ ਕਰੋ — ਸਟ੍ਰਿੰਗ ਮੁੱਲਾਂ ਦੀ ਇੱਕ ਵਸਤੂ",
+      "jsonTooLarge": "ਵੱਧ ਤੋਂ ਵੱਧ 50 ਐਂਟਰੀਆਂ ਵਰਤੋ, ਕੁੰਜੀਆਂ 128 ਤੱਕ ਅਤੇ ਮੁੱਲ 4096 ਅੱਖਰਾਂ ਤੱਕ",
+      "timeoutInvalid": "ਸਮਾਂ ਸਮਾਪਤੀ ਮਿਲੀਸਕਿੰਟ ਦੀ ਪੂਰੀ ਸੰਖਿਆ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ",
+      "edit": "MCP ਸਰਵਰ ਦਾ ਸੰਪਾਦਨ ਕਰੋ",
+      "saveFailed": "MCP ਸਰਵਰ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"
+    },
+    "agents": {
+      "title": "ਪ੍ਰੋਫਾਈਲ ਏਜੰਟ",
+      "add": "ਏਜੰਟ ਸ਼ਾਮਲ ਕਰੋ",
+      "empty": "ਅਜੇ ਤੱਕ ਕੋਈ ਏਜੰਟ ਨਹੀਂ",
+      "name": "ਏਜੰਟ ਦਾ ਨਾਮ",
+      "slug": "ਏਜੰਟ ਸਲੱਗ",
+      "description": "ਏਜੰਟ ਦਾ ਵੇਰਵਾ",
+      "model": "ਮਾਡਲ ਓਵਰਰਾਈਡ",
+      "modelPlaceholder": "ਸ਼ੈਸ਼ਨ ਡਿਫੌਲਟ ਵਰਤੋ",
+      "prompt": "ਸਿਸਟਮ ਪ੍ਰੋਂਪਟ",
+      "steps": "ਵੱਧ ਤੋਂ ਵੱਧ ਕਦਮ",
+      "stepsPlaceholder": "ਉਦਾ. 50",
+      "temperature": "ਤਾਪਮਾਨ",
+      "temperaturePlaceholder": "ਉਦਾ. 0.2",
+      "topP": "top_p",
+      "topPPlaceholder": "ਉਦਾ. 0.95",
+      "slugPlaceholder": "my-agent",
+      "namePlaceholder": "ਮੇਰਾ ਏਜੰਟ",
+      "promptPlaceholder": "ਤੁਸੀਂ ਇੱਕ...",
+      "tools": "ਸੰਦ",
+      "visibility": "ਦਿੱਖ",
+      "visibilityPrimary": "ਪ੍ਰਾਇਮਰੀ — ਚੋਣਕਾਰ ਵਿੱਚ ਦਿਖਾਇਆ ਗਿਆ ਹੈ",
+      "visibilitySubagent": "ਸਬਜੈਂਟ — ਸਿਰਫ਼ ਦੂਜਿਆਂ ਤੋਂ ਕਾਲ ਕਰਨ ਯੋਗ",
+      "visibilityAll": "ਸਾਰੇ — ਦੋਵੇਂ",
+      "saveFailed": "ਏਜੰਟ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+      "nameRequired": "ਇੱਕ ਏਜੰਟ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
+      "slugRequired": "ਇੱਕ ਏਜੰਟ ਸਲੱਗ ਦਾਖਲ ਕਰੋ",
+      "slugInvalid": "ਸਲੱਗ ਨੂੰ ਇੱਕ ਅੱਖਰ ਨਾਲ ਸ਼ੁਰੂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ਼ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨੀ ਚਾਹੀਦੀ ਹੈ",
+      "slugConflict": "ਉਹ ਸਲੱਗ ਇੱਕ ਬਿਲਟ-ਇਨ ਏਜੰਟ ਦੁਆਰਾ ਰਾਖਵੀਂ ਹੈ",
+      "edit": "ਏਜੰਟ ਦਾ ਸੰਪਾਦਨ ਕਰੋ"
+    },
+    "slashCommands": {
+      "title": "ਸਲੈਸ਼ ਕਮਾਂਡਾਂ",
+      "add": "ਸਲੈਸ਼ ਕਮਾਂਡ ਸ਼ਾਮਲ ਕਰੋ",
+      "empty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸਲੈਸ਼ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
+      "name": "ਕਮਾਂਡ ਦਾ ਨਾਮ",
+      "description": "ਕਮਾਂਡ ਦਾ ਵੇਰਵਾ",
+      "template": "ਟੈਂਪਲੇਟ",
+      "namePlaceholder": "explain",
+      "templatePlaceholder": "$ARGUMENTS ਦੀ ਵਿਆਖਿਆ ਕਰੋ",
+      "agent": "ਏਜੰਟ",
+      "subtask": "ਸਬਟਾਸਕ ਵਜੋਂ ਚਲਾਓ",
+      "edit": "ਸਲੈਸ਼ ਕਮਾਂਡ ਨੂੰ ਸੋਧੋ",
+      "saveFailed": "ਕਮਾਂਡ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+      "nameRequired": "ਇੱਕ ਕਮਾਂਡ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
+      "nameInvalid": "ਨਾਮ ਇੱਕ ਛੋਟੇ ਅੱਖਰ ਨਾਲ ਸ਼ੁਰੂ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ",
+      "templateRequired": "ਇੱਕ ਕਮਾਂਡ ਟੈਮਪਲੇਟ ਦਰਜ ਕਰੋ",
+      "nameConflict": "ਇਹ ਨਾਮ ਬਿਲਟ-ਇਨ ਕਮਾਂਡ ਦੁਆਰਾ ਰਾਖਵਾਂ ਹੈ"
+    },
+    "repoBindings": {
+      "title": "ਰਿਪੋਜ਼ ਲਈ ਡਿਫਾਲਟ ਪ੍ਰੋਫਾਈਲ",
+      "add": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਸ਼ਾਮਲ ਕਰੋ",
+      "empty": "ਕੋਈ ਡਿਫੌਲਟ ਕੌਂਫਿਗਰ ਨਹੀਂ ਕੀਤਾ ਗਿਆ",
+      "emptyDescription": "ਇੱਕ ਰੇਪੋ ਲਈ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ ਵੇਲੇ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਆਪਣੇ ਆਪ ਲਾਗੂ ਕਰਨ ਲਈ ਇੱਕ ਡਿਫੌਲਟ ਜੋੜੋ।",
+      "repo": "ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ...",
+      "profile": "ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
+      "remove": "ਅਨਬੰਧ",
+      "private": "ਨਿਜੀ",
+      "search": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਖੋਜੋ…",
+      "addedToast": "\"{{repo}}\" ਲਈ ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ ਸੈੱਟ ਕੀਤਾ ਗਿਆ",
+      "addFailed": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ ਸੈੱਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+      "removedToast": "\"{{repo}}\" ਲਈ ਡਿਫੌਲਟ ਪ੍ਰੋਫਾਈਲ ਹਟਾਇਆ ਗਿਆ",
+      "removeFailed": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਹਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+      "pinnedTitle": "ਰਿਪੋਜ਼ਟਰੀਆਂ 'ਤੇ ਪਿੰਨ ਕੀਤਾ ਗਿਆ",
+      "pinRepo": "ਇੱਕ ਰੈਪੋ ਪਿੰਨ ਕਰੋ",
+      "pinnedEmpty": "ਕਿਸੇ ਵੀ ਰਿਪੋਜ਼ਟਰੀਆਂ ਵਿੱਚ ਪਿੰਨ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।",
+      "pinnedDescription": "ਜਦੋਂ ਵੀ ਇੱਕ ਸੈਸ਼ਨ ਇਹਨਾਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਵਿੱਚੋਂ ਇੱਕ ਨੂੰ ਨਿਸ਼ਾਨਾ ਬਣਾਉਂਦਾ ਹੈ ਤਾਂ ਆਟੋ-ਲੋਡ ਹੁੰਦਾ ਹੈ।",
+      "pinnedToast": "\"{{repo}}\" 'ਤੇ ਪਿੰਨ ਕੀਤਾ ਗਿਆ",
+      "pinFailed": "ਰੈਪੋ ਨੂੰ ਪਿੰਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+      "unboundToast": "ਰੇਪੋ ਅਨਬਾਉਂਡ",
+      "unbindFailed": "ਰੈਪੋ ਨੂੰ ਅਨਬਾਈਂਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"
+    }
   }
 }

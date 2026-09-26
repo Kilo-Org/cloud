@@ -26,8 +26,8 @@ const IOS_BUILD_NUMBER = '42';
 const ANDROID_BUILD_NUMBER = '43';
 const IOS_BUILD_ID = '11111111-2222-3333-4444-555555555555';
 const ANDROID_BUILD_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-// Stands in for the signed token an applicationArchiveUrl carries; it must never
-// reach an output file.
+// Stands in for the signed token the build record's artifact URLs carry; it must
+// never reach an output file or the console.
 const TOKEN = 'application-archive-token-secret';
 
 const INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
@@ -42,12 +42,18 @@ const INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+const REACT_CHECKSUM = '4f1ba1b2a3b94ba77d4b0c9d5ebcd2c9fd9d2d8e';
 const PODFILE_LOCK = `PODS:
-  - React (0.72.0)
-  - MissingPod (9.9.9)
+  - React (0.72.0):
+    - React-Core (= 0.72.0)
+  - React-Core/Default (0.72.0)
+  - SDWebImage (5.19.0)
 
 DEPENDENCIES:
   - React (from \`../node_modules/react-native\`)
+
+SPEC CHECKSUMS:
+  React: ${REACT_CHECKSUM}
 
 COCOAPODS: 1.14.3
 `;
@@ -263,7 +269,10 @@ function buildRecords({
     id: IOS_BUILD_ID,
     appVersion: APP_VERSION,
     appBuildVersion: IOS_BUILD_NUMBER,
-    artifacts: { applicationArchiveUrl: `https://example.invalid/${TOKEN}/app.ipa` },
+    artifacts: {
+      applicationArchiveUrl: `https://example.invalid/${TOKEN}/app.ipa`,
+      buildArtifactsUrl: `https://example.invalid/${TOKEN}/build-artifacts.tar.gz`,
+    },
   };
   if (omitIosBuildNumber) {
     delete ios.appBuildVersion;
@@ -289,13 +298,15 @@ function withFixture(options, run) {
   const ipaPath = join(work, 'app.ipa');
   const aabPath = join(work, 'app.aab');
   const buildJsonPath = join(work, 'build.json');
+  const podfileLockPath = join(work, 'Podfile.lock');
   const outDir = join(work, 'out');
   mkdirSync(outDir, { recursive: true });
   writeZip(ipaPath, ipaEntries());
   writeZip(aabPath, aabEntries({ corruptAabMetadata: options.corruptAabMetadata }));
   writeFileSync(buildJsonPath, JSON.stringify(options.buildJson ?? buildRecords()));
+  writeFileSync(podfileLockPath, PODFILE_LOCK);
   try {
-    return run({ work, ipaPath, aabPath, buildJsonPath, outDir });
+    return run({ work, ipaPath, aabPath, buildJsonPath, podfileLockPath, outDir });
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -334,8 +345,14 @@ function fileSha256(path) {
 }
 
 test('writes one CycloneDX document per platform with the ecosystems that platform ships', () => {
-  withFixture({}, ({ ipaPath, aabPath, buildJsonPath, outDir }) => {
-    const { ios, android } = generateMobileSboms({ ipaPath, aabPath, buildJsonPath, outDir });
+  withFixture({}, ({ ipaPath, aabPath, buildJsonPath, podfileLockPath, outDir }) => {
+    const { ios, android } = generateMobileSboms({
+      ipaPath,
+      aabPath,
+      buildJsonPath,
+      podfileLockPath,
+      outDir,
+    });
 
     assert.equal(ios.sbomFile, 'kilo-app-ios-1.0.12-build42.cyclonedx.json');
     assert.equal(android.sbomFile, 'kilo-app-android-1.0.12-build43.cyclonedx.json');
@@ -363,6 +380,41 @@ test('writes one CycloneDX document per platform with the ecosystems that platfo
       assert.equal(iosNames.includes(name), true, `ios document is missing ${name}`);
     }
 
+    // Every root pod of the build's Podfile.lock, including the statically
+    // linked ones the IPA scan cannot see (React-Core, SDWebImage).
+    const pods = iosDocument.components.filter(component =>
+      component.properties.some(
+        property => property.name === 'kilo:sbom:ios-kind' && property.value === 'podfile-lock'
+      )
+    );
+    assert.deepEqual(
+      pods.map(({ name, version, purl, hashes }) => ({ name, version, purl, hashes })),
+      [
+        {
+          name: 'React',
+          version: '0.72.0',
+          purl: 'pkg:cocoapods/React@0.72.0',
+          hashes: [{ alg: 'SHA-1', content: REACT_CHECKSUM }],
+        },
+        {
+          name: 'React-Core',
+          version: '0.72.0',
+          purl: 'pkg:cocoapods/React-Core@0.72.0',
+          hashes: [],
+        },
+        {
+          name: 'SDWebImage',
+          version: '5.19.0',
+          purl: 'pkg:cocoapods/SDWebImage@5.19.0',
+          hashes: [],
+        },
+      ]
+    );
+    assert.match(
+      metaProperty(iosDocument, 'kilo:sbom:source:cocoapods'),
+      /Podfile\.lock.*IPA scan/
+    );
+
     // The EAS artifact URL carries a download token; it must never reach an output file.
     assert.equal(JSON.stringify(iosDocument).includes(TOKEN), false);
     assert.equal(JSON.stringify(androidDocument).includes(TOKEN), false);
@@ -377,8 +429,14 @@ test('writes one CycloneDX document per platform with the ecosystems that platfo
 });
 
 test('links each document to its artifact bytes and its build record', () => {
-  withFixture({}, ({ ipaPath, aabPath, buildJsonPath, outDir }) => {
-    const { ios, android } = generateMobileSboms({ ipaPath, aabPath, buildJsonPath, outDir });
+  withFixture({}, ({ ipaPath, aabPath, buildJsonPath, podfileLockPath, outDir }) => {
+    const { ios, android } = generateMobileSboms({
+      ipaPath,
+      aabPath,
+      buildJsonPath,
+      podfileLockPath,
+      outDir,
+    });
     const iosDocument = JSON.parse(readFileSync(join(outDir, ios.sbomFile), 'utf8'));
     const androidDocument = JSON.parse(readFileSync(join(outDir, android.sbomFile), 'utf8'));
 
@@ -433,7 +491,7 @@ test('links each document to its artifact bytes and its build record', () => {
 });
 
 test('a missing artifact or an incomplete build record fails without writing an SBOM', () => {
-  withFixture({}, ({ work, aabPath, buildJsonPath, outDir }) => {
+  withFixture({}, ({ work, aabPath, buildJsonPath, podfileLockPath, outDir }) => {
     const missing = runCli([
       '--ipa',
       join(work, 'missing.ipa'),
@@ -441,6 +499,8 @@ test('a missing artifact or an incomplete build record fails without writing an 
       aabPath,
       '--build-json',
       buildJsonPath,
+      '--podfile-lock',
+      podfileLockPath,
       '--out-dir',
       outDir,
     ]);
@@ -456,6 +516,8 @@ test('a missing artifact or an incomplete build record fails without writing an 
       fixture.aabPath,
       '--build-json',
       fixture.buildJsonPath,
+      '--podfile-lock',
+      fixture.podfileLockPath,
       '--out-dir',
       fixture.outDir,
     ]);
@@ -472,6 +534,8 @@ test('a missing artifact or an incomplete build record fails without writing an 
       fixture.aabPath,
       '--build-json',
       fixture.buildJsonPath,
+      '--podfile-lock',
+      fixture.podfileLockPath,
       '--out-dir',
       fixture.outDir,
     ]);
@@ -488,6 +552,8 @@ test('a missing artifact or an incomplete build record fails without writing an 
       fixture.aabPath,
       '--build-json',
       fixture.buildJsonPath,
+      '--podfile-lock',
+      fixture.podfileLockPath,
       '--out-dir',
       fixture.outDir,
     ]);
@@ -498,26 +564,31 @@ test('a missing artifact or an incomplete build record fails without writing an 
 });
 
 test('corrupted dependencies.pb fails loudly and writes no document', () => {
-  withFixture({ corruptAabMetadata: true }, ({ ipaPath, aabPath, buildJsonPath, outDir }) => {
-    const result = runCli([
-      '--ipa',
-      ipaPath,
-      '--aab',
-      aabPath,
-      '--build-json',
-      buildJsonPath,
-      '--out-dir',
-      outDir,
-    ]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /dependencies\.pb/);
-    assert.deepEqual(cyclonedxFiles(outDir), []);
-    assert.equal(existsSync(join(outDir, 'mobile-sbom-summary.json')), false);
-  });
+  withFixture(
+    { corruptAabMetadata: true },
+    ({ ipaPath, aabPath, buildJsonPath, podfileLockPath, outDir }) => {
+      const result = runCli([
+        '--ipa',
+        ipaPath,
+        '--aab',
+        aabPath,
+        '--build-json',
+        buildJsonPath,
+        '--podfile-lock',
+        podfileLockPath,
+        '--out-dir',
+        outDir,
+      ]);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /dependencies\.pb/);
+      assert.deepEqual(cyclonedxFiles(outDir), []);
+      assert.equal(existsSync(join(outDir, 'mobile-sbom-summary.json')), false);
+    }
+  );
 });
 
 test('the CLI writes both documents, prints them, and rejects a missing --build-json', () => {
-  withFixture({}, ({ ipaPath, aabPath, buildJsonPath, outDir }) => {
+  withFixture({}, ({ ipaPath, aabPath, buildJsonPath, podfileLockPath, outDir }) => {
     const stdout = execFileSync(
       'node',
       [
@@ -528,6 +599,8 @@ test('the CLI writes both documents, prints them, and rejects a missing --build-
         aabPath,
         '--build-json',
         buildJsonPath,
+        '--podfile-lock',
+        podfileLockPath,
         '--out-dir',
         outDir,
       ],
@@ -540,33 +613,55 @@ test('the CLI writes both documents, prints them, and rejects a missing --build-
       'kilo-app-ios-1.0.12-build42.cyclonedx.json',
     ]);
 
-    const missing = runCli(['--ipa', ipaPath, '--aab', aabPath, '--out-dir', outDir]);
+    assert.equal(stdout.includes(TOKEN), false, 'a signed artifact URL must never be printed');
+
+    const missing = runCli([
+      '--ipa',
+      ipaPath,
+      '--aab',
+      aabPath,
+      '--podfile-lock',
+      podfileLockPath,
+      '--out-dir',
+      outDir,
+    ]);
     assert.notEqual(missing.status, 0);
     assert.match(missing.stderr, /Usage/);
   });
 });
 
-test('the CLI prints the Podfile.lock coverage gap when --podfile-lock is given', () => {
+test('a missing or unreadable Podfile.lock fails without writing an SBOM', () => {
   withFixture({}, ({ work, ipaPath, aabPath, buildJsonPath, outDir }) => {
-    const podfileLockPath = join(work, 'Podfile.lock');
-    writeFileSync(podfileLockPath, PODFILE_LOCK);
-    const stdout = execFileSync(
-      'node',
-      [
-        'scripts/mobile-sbom.mjs',
-        '--ipa',
-        ipaPath,
-        '--aab',
-        aabPath,
-        '--build-json',
-        buildJsonPath,
-        '--out-dir',
-        outDir,
-        '--podfile-lock',
-        podfileLockPath,
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' }
-    );
-    assert.match(stdout, /ios podfile-lock: declared=2 visible=1 missing=\[MissingPod\]/);
+    const omitted = runCli([
+      '--ipa',
+      ipaPath,
+      '--aab',
+      aabPath,
+      '--build-json',
+      buildJsonPath,
+      '--out-dir',
+      outDir,
+    ]);
+    assert.notEqual(omitted.status, 0);
+    assert.match(omitted.stderr, /--podfile-lock is required/);
+    assert.deepEqual(cyclonedxFiles(outDir), []);
+
+    const unreadable = runCli([
+      '--ipa',
+      ipaPath,
+      '--aab',
+      aabPath,
+      '--build-json',
+      buildJsonPath,
+      '--podfile-lock',
+      join(work, 'missing', 'Podfile.lock'),
+      '--out-dir',
+      outDir,
+    ]);
+    assert.notEqual(unreadable.status, 0);
+    assert.match(unreadable.stderr, /cannot read Podfile\.lock/);
+    assert.equal(unreadable.stderr.includes(TOKEN), false);
+    assert.deepEqual(cyclonedxFiles(outDir), []);
+    assert.equal(existsSync(join(outDir, 'mobile-sbom-summary.json')), false);
   });
 });

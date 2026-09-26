@@ -2,16 +2,22 @@
 /**
  * iOS ecosystem reader for the per-artifact SBOM.
  *
- * The shipped IPA is the source, not apps/mobile/ios/Podfile.lock: Expo CNG
- * generates apps/mobile/ios (nothing under it is tracked in git) and
- * `pod install` needs macOS, which the ubuntu release runner does not have.
+ * Two sources, both scoped to one EAS build:
+ *
+ * - The Podfile.lock EAS resolved for that build (uploaded next to the IPA via
+ *   eas.json `buildArtifactPaths`). Expo CNG generates apps/mobile/ios, so the
+ *   lockfile exists only on the EAS builder. It is the only source that sees
+ *   pods statically linked into the executable, which leave no file or load
+ *   command in the IPA.
+ * - The shipped IPA: each executable's dylib load commands and each bundle's
+ *   Frameworks/ directory, i.e. what the artifact demonstrably carries.
  *
  * Exports:
- *   parseMachODylibs(buffer)        pure Mach-O LC_LOAD_DYLIB/weak/reexport/upward reader
- *   readIpaComponents({ ipaPath })  unzip the IPA, walk the app and every embedded
- *                                   app extension: each executable's load commands
- *                                   and each bundle's Frameworks/ directory
- *   comparePodfileLock(...)         gap measurement against a real Podfile.lock (printed only)
+ *   parseMachODylibs(buffer)                      pure Mach-O LC_LOAD_DYLIB/weak/reexport/upward reader
+ *   readIpaComponents({ ipaPath })                unzip the IPA, walk the app and every embedded
+ *                                                 app extension: each executable's load commands
+ *                                                 and each bundle's Frameworks/ directory
+ *   readPodfileLockComponents({ podfileLockPath }) one component per root pod in PODS:
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -54,6 +60,14 @@ const MAX_FAT_DEPTH = 1;
 const KILO_IOS_KIND = 'kilo:sbom:ios-kind';
 const KIND_LOAD_COMMAND = 'dylib-load-command';
 const KIND_DYNAMIC_FRAMEWORK = 'dynamic-framework';
+const KIND_PODFILE_LOCK = 'podfile-lock';
+const SHA1_RE = /^[0-9a-f]{40}$/;
+// A top-level PODS: entry, `  - Name (1.2.3)`, with a trailing `:` when it lists
+// dependencies. Its dependency lines are indented further and never match.
+const POD_ENTRY_RE = /^ {2}- (.+?):?$/;
+// `Name (1.2.3)` or a subspec `Name/Sub/Spec (1.2.3)`, captured as root and version.
+const POD_SPEC_RE = /^([^\s/()]+)(?:\/[^\s()]+)? \(([^\s()]+)\)$/;
+const CHECKSUM_RE = /^ {2}(.+?): (.+)$/;
 
 // iOS resolves its own libraries from /usr/lib/ (libSystem, libc++, the Swift
 // runtime) and its system frameworks from /System/Library/, including
@@ -414,54 +428,63 @@ export function readIpaComponents({ ipaPath } = {}) {
   }
 }
 
-function parseDeclaredPods(text) {
-  const pods = [];
-  const seen = new Set();
-  let inPodsSection = false;
+// CocoaPods quotes a YAML scalar that would otherwise be misread.
+function unquote(value) {
+  return value.length >= 2 && value.startsWith('"') && value.endsWith('"')
+    ? value.slice(1, -1)
+    : value;
+}
+
+function parsePodfileLock(text, podfileLockPath) {
+  const versions = new Map();
+  const checksums = new Map();
+  let section = null;
   for (const line of text.split(/\r?\n/)) {
-    // Podfile.lock section headers are unindented; only PODS: holds the graph.
-    if (/^[A-Za-z]/.test(line)) {
-      inPodsSection = line === 'PODS:';
+    // Section headers are unindented; PODS: holds the resolved pods and
+    // SPEC CHECKSUMS: the podspec SHA-1 of each root pod.
+    if (/^\S/.test(line)) {
+      section = line;
       continue;
     }
-    if (!inPodsSection) {
-      continue;
-    }
-    const match = /^ {2}- ([A-Za-z0-9_+./-]+)/.exec(line);
-    if (!match) {
-      continue;
-    }
-    // Sub-specs (`ExpoImagePicker/Core`) collapse to their pod.
-    const pod = match[1].split('/')[0];
-    if (!seen.has(pod)) {
-      seen.add(pod);
-      pods.push(pod);
+    if (section === 'PODS:') {
+      const entry = POD_ENTRY_RE.exec(line);
+      if (!entry) {
+        continue;
+      }
+      const spec = POD_SPEC_RE.exec(unquote(entry[1]));
+      if (!spec) {
+        throw new Error(
+          `Podfile.lock ${podfileLockPath} has an unparseable PODS entry ${JSON.stringify(line.trim())}`
+        );
+      }
+      // Subspecs (`React-Core/Default`) are parts of their root pod and share its version.
+      const [, pod, version] = spec;
+      const known = versions.get(pod);
+      if (known !== undefined && known !== version) {
+        throw new Error(
+          `Podfile.lock ${podfileLockPath} locks ${pod} at both ${known} and ${version}`
+        );
+      }
+      versions.set(pod, version);
+    } else if (section === 'SPEC CHECKSUMS:') {
+      const entry = CHECKSUM_RE.exec(line);
+      if (entry) {
+        checksums.set(unquote(entry[1]), unquote(entry[2].trim()));
+      }
     }
   }
-  return pods;
-}
-
-function normalizePodName(pod) {
-  return pod.toLowerCase().replace(/-/g, '_');
-}
-
-function normalizeComponentName(name) {
-  const withoutFramework = name.endsWith('.framework') ? name.slice(0, -'.framework'.length) : name;
-  return normalizePodName(withoutFramework);
+  return { versions, checksums };
 }
 
 /**
- * Measure how many pods a real Podfile.lock declares against the components the
- * IPA carries. This is reported only; it is never written into an SBOM, because
- * a lockfile pod that is statically linked into the executable is invisible to
- * any file scan.
+ * Read one CocoaPods component per root pod the Podfile.lock resolved, in
+ * lockfile order: subspecs collapse into their root pod, the version is the
+ * locked one, and the hash is the pod's `SPEC CHECKSUMS` SHA-1 when listed.
+ * An unreadable lockfile, or one that declares no pods, throws.
  */
-export function comparePodfileLock({ podfileLockPath, components } = {}) {
+export function readPodfileLockComponents({ podfileLockPath } = {}) {
   if (!isNonEmptyString(podfileLockPath)) {
-    throw new Error('comparePodfileLock: podfileLockPath must be a non-empty string');
-  }
-  if (!Array.isArray(components)) {
-    throw new Error('comparePodfileLock: components must be an array');
+    throw new Error('readPodfileLockComponents: podfileLockPath must be a non-empty string');
   }
   let text;
   try {
@@ -469,16 +492,25 @@ export function comparePodfileLock({ podfileLockPath, components } = {}) {
   } catch (error) {
     throw new Error(`cannot read Podfile.lock ${podfileLockPath}: ${error.message}`);
   }
-  const declared = parseDeclaredPods(text);
-  const visible = new Set(
-    components
-      .filter(component => component && isNonEmptyString(component.name))
-      .map(component => normalizeComponentName(component.name))
-  );
-  const missing = declared.filter(pod => !visible.has(normalizePodName(pod)));
-  return {
-    declaredCount: declared.length,
-    visibleCount: declared.length - missing.length,
-    missing: [...missing].sort(),
-  };
+  const { versions, checksums } = parsePodfileLock(text, podfileLockPath);
+  if (versions.size === 0) {
+    throw new Error(`Podfile.lock ${podfileLockPath} declares no pods under PODS:`);
+  }
+  const components = [...versions].map(([pod, version]) => {
+    const checksum = checksums.get(pod);
+    if (checksum !== undefined && !SHA1_RE.test(checksum)) {
+      throw new Error(
+        `Podfile.lock ${podfileLockPath} has a malformed SPEC CHECKSUMS entry for ${pod}: ${JSON.stringify(checksum)}`
+      );
+    }
+    return {
+      ecosystem: 'cocoapods',
+      name: pod,
+      version,
+      purl: `pkg:cocoapods/${encodeURIComponent(pod)}@${encodeURIComponent(version)}`,
+      hashes: checksum === undefined ? [] : [{ alg: 'SHA-1', content: checksum }],
+      extraProperties: [{ name: KILO_IOS_KIND, value: KIND_PODFILE_LOCK }],
+    };
+  });
+  return { components };
 }

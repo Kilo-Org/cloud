@@ -5,7 +5,11 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { comparePodfileLock, parseMachODylibs, readIpaComponents } from './mobile-sbom-ipa.mjs';
+import {
+  parseMachODylibs,
+  readIpaComponents,
+  readPodfileLockComponents,
+} from './mobile-sbom-ipa.mjs';
 
 const LC_LOAD_DYLIB = 0x0c;
 const LC_ID_DYLIB = 0x0d;
@@ -398,54 +402,116 @@ test('readIpaComponents rejects an IPA without a Payload bundle', () => {
   );
 });
 
-test('comparePodfileLock reports declared, visible and missing pods', () => {
-  const podfileLock = `PODS:
-  - ExpoModulesCore (1.5.0)
-  - MissingPod (9.9.9)
-  - React (0.72.0)
-
-DEPENDENCIES:
-  - React (from \`../node_modules/react-native\`)
-  - ExpoModulesCore (from \`../node_modules/expo-modules-core\`)
-
-COCOAPODS: 1.14.3
-`;
+function withPodfileLock(text, run) {
   const work = mkdtempSync(join(tmpdir(), 'kilo-podfile-test-'));
   const podfileLockPath = join(work, 'Podfile.lock');
   try {
-    writeFileSync(podfileLockPath, podfileLock);
-    const result = comparePodfileLock({
-      podfileLockPath,
-      components: [
-        { name: 'React.framework' },
-        { name: 'ExpoModulesCore' },
-        { name: 'Unrelated.framework' },
-      ],
-    });
-    assert.deepEqual(result, { declaredCount: 3, visibleCount: 2, missing: ['MissingPod'] });
+    writeFileSync(podfileLockPath, text);
+    return run(podfileLockPath);
   } finally {
     rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('readPodfileLockComponents lists one versioned, hashed component per root pod', () => {
+  const podfileLock = `PODS:
+  - EXConstants (17.0.8):
+    - ExpoModulesCore
+  - hermes-engine (0.76.9):
+    - hermes-engine/Pre-built (= 0.76.9)
+  - hermes-engine/Pre-built (0.76.9)
+  - React-Core (0.76.9):
+    - React-Core/Default (= 0.76.9)
+  - React-Core/Default (0.76.9):
+    - glog
+  - React-Core/RCTWebSocket (0.76.9)
+  - "RCT-Folly (2024.10.14.00)"
+  - Sentry/HybridSDK (8.48.0)
+
+DEPENDENCIES:
+  - NotAPod (from \`../node_modules/not-a-pod\`)
+
+SPEC CHECKSUMS:
+  EXConstants: fcfc75800824ac2d5c592b5bc74130bad17b146b
+  hermes-engine: 06a9c6900587420b90accc394199527c64259db4
+  RCT-Folly: 84578c8756030547307e4572ab1947de1685c599
+  React-Core: 4f1ba1b2a3b94ba77d4b0c9d5ebcd2c9fd9d2d8e
+
+COCOAPODS: 1.15.2
+`;
+  const { components } = withPodfileLock(podfileLock, podfileLockPath =>
+    readPodfileLockComponents({ podfileLockPath })
+  );
+
+  assert.deepEqual(
+    components.map(({ name, version, purl, hashes }) => ({ name, version, purl, hashes })),
+    [
+      {
+        name: 'EXConstants',
+        version: '17.0.8',
+        purl: 'pkg:cocoapods/EXConstants@17.0.8',
+        hashes: [{ alg: 'SHA-1', content: 'fcfc75800824ac2d5c592b5bc74130bad17b146b' }],
+      },
+      {
+        name: 'hermes-engine',
+        version: '0.76.9',
+        purl: 'pkg:cocoapods/hermes-engine@0.76.9',
+        hashes: [{ alg: 'SHA-1', content: '06a9c6900587420b90accc394199527c64259db4' }],
+      },
+      {
+        name: 'React-Core',
+        version: '0.76.9',
+        purl: 'pkg:cocoapods/React-Core@0.76.9',
+        hashes: [{ alg: 'SHA-1', content: '4f1ba1b2a3b94ba77d4b0c9d5ebcd2c9fd9d2d8e' }],
+      },
+      {
+        name: 'RCT-Folly',
+        version: '2024.10.14.00',
+        purl: 'pkg:cocoapods/RCT-Folly@2024.10.14.00',
+        hashes: [{ alg: 'SHA-1', content: '84578c8756030547307e4572ab1947de1685c599' }],
+      },
+      // Listed only as a subspec and absent from SPEC CHECKSUMS.
+      {
+        name: 'Sentry',
+        version: '8.48.0',
+        purl: 'pkg:cocoapods/Sentry@8.48.0',
+        hashes: [],
+      },
+    ]
+  );
+  for (const component of components) {
+    assert.equal(component.ecosystem, 'cocoapods');
+    assert.deepEqual(component.extraProperties, [
+      { name: 'kilo:sbom:ios-kind', value: 'podfile-lock' },
+    ]);
   }
 });
 
-test('comparePodfileLock collapses sub-specs and stops at the next section', () => {
-  const podfileLock = `PODS:
-  - ExpoImagePicker/Core (1.0.0)
-  - ExpoImagePicker/Expo (1.0.0)
-
-DEPENDENCIES:
-  - NotInPods (1.0.0)
-`;
-  const work = mkdtempSync(join(tmpdir(), 'kilo-podfile-test-'));
-  const podfileLockPath = join(work, 'Podfile.lock');
-  try {
-    writeFileSync(podfileLockPath, podfileLock);
-    const result = comparePodfileLock({
-      podfileLockPath,
-      components: [{ name: 'ExpoImagePicker' }],
-    });
-    assert.deepEqual(result, { declaredCount: 1, visibleCount: 1, missing: [] });
-  } finally {
-    rmSync(work, { recursive: true, force: true });
-  }
+test('readPodfileLockComponents rejects a missing, empty or malformed Podfile.lock', () => {
+  assert.throws(
+    () => readPodfileLockComponents({ podfileLockPath: join(tmpdir(), 'kilo-missing-Podfile.lock') }),
+    /cannot read Podfile\.lock/
+  );
+  assert.throws(
+    () =>
+      withPodfileLock('DEPENDENCIES:\n  - React (0.76.9)\n', podfileLockPath =>
+        readPodfileLockComponents({ podfileLockPath })
+      ),
+    /declares no pods/
+  );
+  assert.throws(
+    () =>
+      withPodfileLock(
+        'PODS:\n  - React (0.76.9)\n\nSPEC CHECKSUMS:\n  React: not-a-sha1\n',
+        podfileLockPath => readPodfileLockComponents({ podfileLockPath })
+      ),
+    /malformed SPEC CHECKSUMS entry for React/
+  );
+  assert.throws(
+    () =>
+      withPodfileLock('PODS:\n  - React (0.76.9)\n  - React/Core (0.77.0)\n', podfileLockPath =>
+        readPodfileLockComponents({ podfileLockPath })
+      ),
+    /locks React at both 0\.76\.9 and 0\.77\.0/
+  );
 });

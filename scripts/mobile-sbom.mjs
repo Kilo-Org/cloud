@@ -5,14 +5,17 @@
  * One CycloneDX JSON document per shipped artifact, plus a summary linking each
  * document to the EAS build record it came from:
  *
- *   node scripts/mobile-sbom.mjs --ipa <app.ipa> --aab <app.aab> --build-json <build.json> --out-dir <dir> [--podfile-lock <Podfile.lock>]
+ *   node scripts/mobile-sbom.mjs --ipa <app.ipa> --aab <app.aab> --build-json <build.json> --out-dir <dir> --podfile-lock <Podfile.lock>
  *
  * The inputs are the bytes that get submitted to the stores, so each document
  * is scoped to one artifact (never the repo-wide pnpm tree) and carries the
- * artifact's SHA-256, platform, version, build number and EAS build ID.
+ * artifact's SHA-256, platform, version, build number and EAS build ID. The
+ * Podfile.lock is the one EAS resolved for that iOS build (its build artifacts
+ * archive): it lists the pods statically linked into the executable, which no
+ * scan of the IPA can see.
  *
- * The EAS build record is read for identity only. `artifacts.applicationArchiveUrl`
- * carries a signed download token, so it is never read, printed or persisted.
+ * The EAS build record is read for identity only. Its `artifacts` URLs carry a
+ * signed download token, so they are never read, printed or persisted.
  *
  * Every artifact/record/metadata failure throws before anything is written:
  * both documents are built in memory first, so a failure can never leave a
@@ -29,21 +32,21 @@ import {
   sha256File,
   toCycloneDxComponents,
 } from './mobile-sbom-cyclonedx.mjs';
-import { comparePodfileLock, readIpaComponents } from './mobile-sbom-ipa.mjs';
+import { readIpaComponents, readPodfileLockComponents } from './mobile-sbom-ipa.mjs';
 import { readPnpmProductionClosure } from './mobile-sbom-pnpm.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PNPM_LOCKFILE_PATH = join(REPO_ROOT, 'pnpm-lock.yaml');
 const SUMMARY_FILE_NAME = 'mobile-sbom-summary.json';
 const USAGE =
-  'Usage: node scripts/mobile-sbom.mjs --ipa <app.ipa> --aab <app.aab> --build-json <build.json> --out-dir <dir> [--podfile-lock <Podfile.lock>]';
+  'Usage: node scripts/mobile-sbom.mjs --ipa <app.ipa> --aab <app.aab> --build-json <build.json> --out-dir <dir> --podfile-lock <Podfile.lock>';
 
 // Source of each ecosystem, written into each document that carries it.
 const ECOSYSTEM_ORDER = ['npm', 'cocoapods', 'maven', 'native-library'];
 const ECOSYSTEM_SOURCES = {
   npm: 'pnpm-lock.yaml production dependency closure of apps/mobile (the minified shipped JS bundle carries no package metadata)',
   cocoapods:
-    'IPA scan: Mach-O LC_LOAD_DYLIB/weak/reexport install names plus Payload/*.app/Frameworks/ (OS-provided /usr/lib and /System/Library libraries excluded)',
+    'Podfile.lock of the EAS build (one component per root pod in PODS:, subspecs collapsed, hash = SPEC CHECKSUMS podspec SHA-1) plus an IPA scan: Mach-O LC_LOAD_DYLIB/weak/reexport install names and Payload/*.app/Frameworks/ (OS-provided /usr/lib and /System/Library libraries excluded)',
   maven:
     'AAB BUNDLE-METADATA/com.android.tools.build.libraries/dependencies.pb (Android Gradle Plugin resolved Maven artifacts)',
   'native-library': 'AAB base/lib/**/*.so',
@@ -83,8 +86,8 @@ function parseBuildJson(buildJsonPath) {
   return builds;
 }
 
-// Identity only. `artifacts.applicationArchiveUrl` is deliberately never touched:
-// it is a signed URL that carries a download token.
+// Identity only. `artifacts` is deliberately never touched: its URLs are signed
+// and carry a download token.
 function requireRecordField(record, field, platform) {
   const value = record[field];
   if (isNonEmptyString(value)) {
@@ -172,33 +175,9 @@ function buildPlatform({
   };
 }
 
-function summaryEntry(entry) {
-  const {
-    platform,
-    artifactName,
-    artifactSha256,
-    appVersion,
-    appBuildVersion,
-    easBuildId,
-    sbomFile,
-    counts,
-  } = entry;
-  return {
-    platform,
-    artifactName,
-    artifactSha256,
-    appVersion,
-    appBuildVersion,
-    easBuildId,
-    sbomFile,
-    counts,
-  };
-}
-
 /**
  * Generate the ios and android SBOM documents and the summary for one build.
- * Returns `{ ios, android }`, each entry carrying its file name and counts (and,
- * when a Podfile.lock was supplied, the iOS coverage gap under `podfileLock`).
+ * Returns `{ ios, android }`, each entry carrying its file name and counts.
  * Throws instead of writing anything if any input is missing or malformed.
  */
 export function generateMobileSboms({
@@ -212,9 +191,11 @@ export function generateMobileSboms({
   requirePath(aabPath, 'aabPath');
   requirePath(buildJsonPath, 'buildJsonPath');
   requirePath(outDir, 'outDir');
+  requirePath(podfileLockPath, 'podfileLockPath');
   const records = readBuildRecords(buildJsonPath);
 
   const npmClosure = readPnpmProductionClosure({ lockfilePath: PNPM_LOCKFILE_PATH });
+  const pods = readPodfileLockComponents({ podfileLockPath });
   const ipa = readIpaComponents({ ipaPath });
   const aab = readAabComponents({ aabPath });
 
@@ -222,7 +203,7 @@ export function generateMobileSboms({
     platform: 'ios',
     artifactPath: ipaPath,
     ...records.ios,
-    readerComponents: [...npmClosure.components, ...ipa.components],
+    readerComponents: [...npmClosure.components, ...pods.components, ...ipa.components],
   });
   const android = buildPlatform({
     platform: 'android',
@@ -230,13 +211,6 @@ export function generateMobileSboms({
     ...records.android,
     readerComponents: [...npmClosure.components, ...aab.components],
   });
-
-  if (isNonEmptyString(podfileLockPath)) {
-    ios.entry.podfileLock = comparePodfileLock({
-      podfileLockPath,
-      components: ipa.components,
-    });
-  }
 
   // Nothing has been written yet: a failure above this line leaves no file.
   mkdirSync(outDir, { recursive: true });
@@ -247,7 +221,7 @@ export function generateMobileSboms({
   );
   writeFileSync(
     join(outDir, SUMMARY_FILE_NAME),
-    `${JSON.stringify({ ios: summaryEntry(ios.entry), android: summaryEntry(android.entry) }, null, 2)}\n`
+    `${JSON.stringify({ ios: ios.entry, android: android.entry }, null, 2)}\n`
   );
 
   return { ios: ios.entry, android: android.entry };
@@ -260,14 +234,6 @@ function printReport(entries) {
       .join(' ');
     console.log(
       `${entry.platform}: ${entry.artifactName} sha256=${entry.artifactSha256} sbom=${entry.sbomFile} ${ecosystems}`
-    );
-  }
-  const ios = entries.find(entry => entry.platform === 'ios');
-  if (ios && ios.podfileLock) {
-    const { declaredCount, visibleCount, missing } = ios.podfileLock;
-    const missingNames = missing.length > 0 ? ` missing=[${missing.join(', ')}]` : ' missing=[]';
-    console.log(
-      `ios podfile-lock: declared=${declaredCount} visible=${visibleCount}${missingNames}`
     );
   }
 }
@@ -294,7 +260,7 @@ function parseArgs(argv) {
     options[key] = value;
     index += 1;
   }
-  for (const flag of ['--ipa', '--aab', '--build-json', '--out-dir']) {
+  for (const flag of ['--ipa', '--aab', '--build-json', '--out-dir', '--podfile-lock']) {
     if (!options[flags[flag]]) {
       throw new UsageError(`${flag} is required`);
     }

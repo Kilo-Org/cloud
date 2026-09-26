@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Padà sẹ́yìn",
     "idle": "Kò ṣiṣẹ́ lọ́wọ́",
+    "scheduled": "Ti ṣètò",
     "keepEditing": "Tẹ̀síwájú pẹ̀lú àtúnṣe",
     "keepRunning": "Jẹ́ kí ó máa ṣiṣẹ́ nìṣó",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Padà sẹ́yìn kí o sì tún ààyè àṣàyàn yìí ṣí láti iboju tó ṣáájú."
   },
   "sessionRow": {
-    "needsInput": "NÍLÒ ÈSÌ RẸ"
+    "needsInput": "NÍLÒ ÈSÌ RẸ",
+    "scheduled": "TI ṢÈTÒ"
   },
   "voiceInput": {
     "listening": "A ń fetí sílẹ̀...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
     "openSession": "Ṣí",
     "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú.",
-    "newestResult": "Àbájáde tuntun jùlọ"
+    "newestResult": "Àbájáde tuntun jùlọ",
+    "scheduledWakes": "yoo ji {{time}}"
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",

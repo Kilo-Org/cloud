@@ -2,7 +2,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { buildGlanceableSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { describe, expect, it } from 'vitest';
+
+import { buildGlanceableLiveActivityContentState } from './view-props';
 
 const LAYOUT_FILE = 'active-agents-live-activity.tsx';
 const INTERACTION_FILE = 'interaction.ts';
@@ -167,5 +170,48 @@ describe('Active Agents Live Activity actions', () => {
     expect(patch).toContain('@Field var openAppWhenRun: Bool?');
     expect(patch).toContain('static var openAppWhenRun: Bool = true');
     expect(patch).toContain('intent: LiveActivityOpenInteraction(');
+  });
+});
+
+/**
+ * The scheduled row reaches the card over two paths: the app builds the content
+ * state from a snapshot, and the notifications Worker pushes the same raw shape
+ * for a card that was never woken by the app. Both carry the count and the ISO
+ * wake, and the layout draws the wake as a clock time beside the row — never
+ * when a scheduled row had no wake to report.
+ */
+describe('Active Agents Live Activity scheduled row', () => {
+  const source = read(LAYOUT_FILE);
+
+  it('carries the scheduled count and its ISO wake in the built content state', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' }],
+      userId: 'u1',
+      organizationId: null,
+      now: Date.parse('2026-01-02T00:00:00.000Z'),
+    });
+    const contentState = buildGlanceableLiveActivityContentState(snapshot);
+    expect(contentState.scheduled).toBe(1);
+    expect(contentState.scheduledAt).toBe('2026-09-24T09:00:00.000Z');
+  });
+
+  it('draws the wake as a clock time beside the scheduled row', () => {
+    // The row itself draws from the pushed count, and the wake is gated on that
+    // count being non-zero: a scheduled state without a wake renders the row
+    // with no time rather than a stale or invented one.
+    expect(source).toContain("kind: 'scheduled'");
+    expect(source).toContain('count: props.scheduled ?? 0');
+    expect(source).toContain(
+      'const scheduledAt = (props.scheduled ?? 0) > 0 ? (props.scheduledAt ?? null) : null;'
+    );
+    expect(source).toMatch(
+      /showWait && line\.kind === 'scheduled' && scheduledAt !== null[\s\S]*?date=\{new Date\(scheduledAt\)\}[\s\S]*?dateStyle="time"/
+    );
+    // The wait row above it stays a relative duration, and the small watch row
+    // takes no time at all.
+    expect(source).toMatch(
+      /line\.kind === 'needsInput' && needsInputSince !== null[\s\S]*?dateStyle="relative"/
+    );
+    expect(source).toContain('countRow(primary, true, false)');
   });
 });

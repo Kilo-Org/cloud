@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Voltar",
     "idle": "Em espera",
+    "scheduled": "Agendada",
     "keepEditing": "Continuar editando",
     "keepRunning": "Manter em execução",
     "kiloclaw": "KiloClaw",
@@ -2281,7 +2282,8 @@
     "optionsExpiredDescription": "Volte e reabra este seletor na tela anterior."
   },
   "sessionRow": {
-    "needsInput": "AGUARDANDO RESPOSTA"
+    "needsInput": "AGUARDANDO RESPOSTA",
+    "scheduled": "AGENDADA"
   },
   "voiceInput": {
     "listening": "Ouvindo...",
@@ -3238,7 +3240,8 @@
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
     "openSession": "Abrir",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
-    "newestResult": "Resultado mais recente"
+    "newestResult": "Resultado mais recente",
+    "scheduledWakes": "acorda {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

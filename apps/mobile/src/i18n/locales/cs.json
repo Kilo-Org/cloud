@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Zpět",
     "idle": "Nečinný",
+    "scheduled": "Naplánováno",
     "keepEditing": "Pokračovat v úpravách",
     "keepRunning": "Nechat běžet",
     "kiloclaw": "KiloClaw",
@@ -2842,7 +2843,8 @@
     "optionsExpiredDescription": "Vraťte se na předchozí obrazovku a znovu otevřete tento výběr."
   },
   "sessionRow": {
-    "needsInput": "ČEKÁ NA REAKCI"
+    "needsInput": "ČEKÁ NA REAKCI",
+    "scheduled": "NAPLÁNOVÁNO"
   },
   "voiceInput": {
     "listening": "Poslouchám…",
@@ -3281,7 +3283,8 @@
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
     "openSession": "Otevřít",
     "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
-    "newestResult": "Nejnovější výsledek"
+    "newestResult": "Nejnovější výsledek",
+    "scheduledWakes": "probudí se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model přepisu",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Terug",
     "idle": "Inactief",
+    "scheduled": "Gepland",
     "keepEditing": "Verder bewerken",
     "keepRunning": "Laten doorgaan",
     "kiloclaw": "KiloClaw",
@@ -2256,7 +2257,8 @@
     "optionsExpiredDescription": "Ga terug naar het vorige scherm en open deze keuzelijst opnieuw."
   },
   "sessionRow": {
-    "needsInput": "INVOER NODIG"
+    "needsInput": "INVOER NODIG",
+    "scheduled": "GEPLAND"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "newestResult": "Nieuwste resultaat"
+    "newestResult": "Nieuwste resultaat",
+    "scheduledWakes": "wordt wakker {{time}}"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

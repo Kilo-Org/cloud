@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ወደ ኋላ ተመለስ",
     "idle": "በእረፍት",
+    "scheduled": "የተያዘ",
     "keepEditing": "ማርትዕህን ቀጥል",
     "keepRunning": "እንዲሠራ ተወው",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "ወደ ኋላ ይመለሱና ይህን መምረጫ ከቀደመው ገጽ እንደገና ይክፈቱ።"
   },
   "sessionRow": {
-    "needsInput": "ምላሽ ይፈልጋል"
+    "needsInput": "ምላሽ ይፈልጋል",
+    "scheduled": "የተያዘ"
   },
   "voiceInput": {
     "listening": "በማዳመጥ ላይ...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
     "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
-    "newestResult": "አዲሱ ውጤት"
+    "newestResult": "አዲሱ ውጤት",
+    "scheduledWakes": "{{time}} ይነቃል"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",

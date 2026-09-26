@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gå tilbage",
     "idle": "Inaktiv",
+    "scheduled": "Planlagt",
     "keepEditing": "Fortsæt med at redigere",
     "keepRunning": "Lad køre",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Gå tilbage til den forrige skærm og åbn valgmulighederne igen."
   },
   "sessionRow": {
-    "needsInput": "AFVENTER SVAR"
+    "needsInput": "AFVENTER SVAR",
+    "scheduled": "PLANLAGT"
   },
   "voiceInput": {
     "listening": "Lytter...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
-    "newestResult": "Nyeste resultat"
+    "newestResult": "Nyeste resultat",
+    "scheduledWakes": "vågner {{time}}"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",

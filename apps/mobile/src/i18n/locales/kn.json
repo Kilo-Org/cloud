@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ಹಿಂದೆ ಹೋಗಿ",
     "idle": "ಕೆಲಸವಿಲ್ಲ",
+    "scheduled": "ನಿಗದಿತ",
     "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
     "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "ಹಿಂದಿನ ಪರದೆಗೆ ಹಿಂತಿರುಗಿ ಈ ಆಯ್ಕೆ ಪಟ್ಟಿಯನ್ನು ಮತ್ತೆ ತೆರೆಯಿರಿ."
   },
   "sessionRow": {
-    "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ"
+    "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+    "scheduled": "ನಿಗದಿತ"
   },
   "voiceInput": {
     "listening": "ಆಲಿಸಲಾಗುತ್ತಿದೆ...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
     "openSession": "ತೆರೆಯಿರಿ",
     "approveFailed": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು $t(common.approve) ಟ್ಯಾಪ್ ಮಾಡಿ.",
-    "newestResult": "ಇತ್ತೀಚಿನ ಫಲಿತಾಂಶ"
+    "newestResult": "ಇತ್ತೀಚಿನ ಫಲಿತಾಂಶ",
+    "scheduledWakes": "{{time}} ಎಚ್ಚರಗೊಳ್ಳುತ್ತದೆ"
   },
   "transcriptionModel": {
     "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",

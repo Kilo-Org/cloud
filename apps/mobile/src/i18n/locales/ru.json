@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Ожидание",
+    "scheduled": "Запланировано",
     "keepEditing": "Продолжить редактирование",
     "keepRunning": "Продолжить выполнение",
     "kiloclaw": "KiloClaw",
@@ -2306,7 +2307,8 @@
     "optionsExpiredDescription": "Вернитесь на предыдущий экран и снова откройте список выбора."
   },
   "sessionRow": {
-    "needsInput": "ОЖИДАНИЕ ВВОДА"
+    "needsInput": "ОЖИДАНИЕ ВВОДА",
+    "scheduled": "ЗАПЛАНИРОВАНО"
   },
   "voiceInput": {
     "listening": "Говорите…",
@@ -3281,7 +3283,8 @@
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
     "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
-    "newestResult": "Последний результат"
+    "newestResult": "Последний результат",
+    "scheduledWakes": "просыпается {{time}}"
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",

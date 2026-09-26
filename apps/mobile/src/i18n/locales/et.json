@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mine tagasi",
     "idle": "Ooterežiimis",
+    "scheduled": "Ajastatud",
     "keepEditing": "Jätka muutmist",
     "keepRunning": "Jätka tööd",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Mine tagasi ja ava see valik eelmiselt ekraanilt uuesti."
   },
   "sessionRow": {
-    "needsInput": "VAJAB SISENDIT"
+    "needsInput": "VAJAB SISENDIT",
+    "scheduled": "AJASTATUD"
   },
   "voiceInput": {
     "listening": "Kuulamine...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
-    "newestResult": "Uusim tulemus"
+    "newestResult": "Uusim tulemus",
+    "scheduledWakes": "ärkab {{time}}"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",

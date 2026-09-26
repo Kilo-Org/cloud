@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Tounen",
     "idle": "San aktivite",
+    "scheduled": "Pwograme",
     "keepEditing": "Kontinye modifye",
     "keepRunning": "Kite l kontinye fonksyone",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Tounen nan ekran anvan an epi relouvri selektè sa a."
   },
   "sessionRow": {
-    "needsInput": "BEZWEN REPONS"
+    "needsInput": "BEZWEN REPONS",
+    "scheduled": "PWOGRAME"
   },
   "voiceInput": {
     "listening": "Ap koute...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
-    "newestResult": "Dènye rezilta"
+    "newestResult": "Dènye rezilta",
+    "scheduledWakes": "leve {{time}}"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",

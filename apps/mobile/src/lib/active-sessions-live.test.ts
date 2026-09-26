@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  mergeHeartbeatForActiveSessions,
+  mergeSnapshotForActiveSessions,
   parseCliConnectionPayload,
   parseHeartbeatPayload,
   parseSessionsListPayload,
@@ -136,5 +138,81 @@ describe('parseSessionStatusUpdatedPayload', () => {
   it('rejects a malformed payload', () => {
     expect(parseSessionStatusUpdatedPayload({ sessionId: 'ses-1' })).toBeNull();
     expect(parseSessionStatusUpdatedPayload(null)).toBeNull();
+  });
+
+  it('forwards scheduledAt from a lightweight or full-row payload', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    expect(
+      parseSessionStatusUpdatedPayload({
+        source: 'v2',
+        sessionId: 'ses-1',
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: 'now',
+        changedAt: 'now',
+      })
+    ).toEqual({ sessionId: 'ses-1', status: 'scheduled', scheduledAt });
+
+    expect(
+      parseSessionStatusUpdatedPayload({
+        source: 'v2',
+        session: {
+          source: 'v2',
+          sessionId: 'ses-2',
+          createdAt: 'now',
+          updatedAt: 'now',
+          title: 't',
+          createdOnPlatform: null,
+          organizationId: null,
+          gitUrl: null,
+          gitBranch: null,
+          parentSessionId: null,
+          status: 'scheduled',
+          scheduledAt,
+          statusUpdatedAt: 'now',
+        },
+        previousStatus: 'busy',
+        status: 'scheduled',
+        statusUpdatedAt: 'now',
+        changedAt: 'now',
+      })
+    ).toEqual({ sessionId: 'ses-2', status: 'scheduled', scheduledAt });
+  });
+});
+
+// ── Scheduled wake carried through the WS merges ─────────────────────
+
+describe('scheduledAt survives the WS merge', () => {
+  const scheduledAt = '2026-09-24T09:00:00.000Z';
+
+  it('keeps the wake time a sessions.list snapshot row carries', () => {
+    const merged = mergeSnapshotForActiveSessions(
+      [],
+      [{ id: 's1', status: 'scheduled', title: 't', connectionId: 'c1', scheduledAt }]
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ id: 's1', status: 'scheduled', scheduledAt });
+  });
+
+  it('keeps the wake time a heartbeat row carries', () => {
+    const merged = mergeHeartbeatForActiveSessions([], {
+      connectionId: 'c1',
+      sessions: [{ id: 's1', status: 'scheduled', title: 't', scheduledAt }],
+    });
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ id: 's1', status: 'scheduled', scheduledAt });
+  });
+
+  it('does not drop the wake time when a later heartbeat still reports it', () => {
+    const first = mergeSnapshotForActiveSessions(
+      [],
+      [{ id: 's1', status: 'scheduled', title: 't', connectionId: 'c1', scheduledAt }]
+    );
+    const merged = mergeHeartbeatForActiveSessions(first, {
+      connectionId: 'c1',
+      sessions: [{ id: 's1', status: 'scheduled', title: 't', scheduledAt }],
+    });
+    expect(merged[0]?.scheduledAt).toBe(scheduledAt);
   });
 });

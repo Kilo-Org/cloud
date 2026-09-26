@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Очікування",
+    "scheduled": "Заплановано",
     "keepEditing": "Продовжити редагування",
     "keepRunning": "Продовжити виконання",
     "kiloclaw": "KiloClaw",
@@ -2306,7 +2307,8 @@
     "optionsExpiredDescription": "Поверніться на попередній екран і знову відкрийте це вікно вибору."
   },
   "sessionRow": {
-    "needsInput": "ОЧІКУЄ ВІДПОВІДІ"
+    "needsInput": "ОЧІКУЄ ВІДПОВІДІ",
+    "scheduled": "ЗАПЛАНОВАНО"
   },
   "voiceInput": {
     "listening": "Слухаємо…",
@@ -3281,7 +3283,8 @@
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
     "openSession": "Відкрити",
     "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз.",
-    "newestResult": "Найновіший результат"
+    "newestResult": "Найновіший результат",
+    "scheduledWakes": "прокидається {{time}}"
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",

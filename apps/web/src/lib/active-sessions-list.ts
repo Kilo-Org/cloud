@@ -42,6 +42,14 @@ export const activeSessionSchema = z.object({
    */
   statusUpdatedAt: z.string().optional(),
   /**
+   * Wake time for a `scheduled` session, as an ISO 8601 string relayed on the
+   * live worker row. `z.object` strips undeclared keys, so the field must be
+   * declared here or the worker's value never reaches the client or the
+   * server-built glanceable snapshot. The cloud-agent candidate path has no
+   * wake time and omits the key; a `scheduled` row without one omits it too.
+   */
+  scheduledAt: z.string().optional(),
+  /**
    * Capabilities advertised by the CLI connection that owns this session.
    * Omitted when the owning connection's latest heartbeat did not include a
    * capabilities object (legacy CLI, or a CLI that predates the field).

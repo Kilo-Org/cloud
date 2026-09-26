@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Чакае",
+    "scheduled": "Запланавана",
     "keepEditing": "Працягнуць рэдагаванне",
     "keepRunning": "Працягнуць працу",
     "kiloclaw": "KiloClaw",
@@ -2842,7 +2843,8 @@
     "optionsExpiredDescription": "Вярніцеся на папярэдні экран і зноў адкрыйце акно выбару."
   },
   "sessionRow": {
-    "needsInput": "ЧАКАЕ АДКАЗУ"
+    "needsInput": "ЧАКАЕ АДКАЗУ",
+    "scheduled": "ЗАПЛАНАВАНА"
   },
   "voiceInput": {
     "listening": "Слухаем…",
@@ -3281,7 +3283,8 @@
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
     "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
-    "newestResult": "Найноўшы вынік"
+    "newestResult": "Найноўшы вынік",
+    "scheduledWakes": "прачынаецца {{time}}"
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",

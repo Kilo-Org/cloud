@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "နောက်သို့ ပြန်သွားပါ",
     "idle": "အလုပ်မလုပ်နေ",
+    "scheduled": "စီစဉ်ထားသည်",
     "keepEditing": "ဆက်လက်တည်းဖြတ်ပါ",
     "keepRunning": "ဆက်လက်လုပ်ဆောင်ပါ",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "ယခင်မျက်နှာပြင်သို့ ပြန်သွားပြီး ရွေးချယ်သည့်အကွက်ကို ထပ်ဖွင့်ပါ။"
   },
   "sessionRow": {
-    "needsInput": "တုံ့ပြန်ချက် လိုအပ်"
+    "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
+    "scheduled": "စီစဉ်ထားသည်"
   },
   "voiceInput": {
     "listening": "နားထောင်နေသည်...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
     "openSession": "ဖွင့်ပါ",
     "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။",
-    "newestResult": "အသစ်ဆုံး ရလဒ်"
+    "newestResult": "အသစ်ဆုံး ရလဒ်",
+    "scheduledWakes": "{{time}} နိုးမည်"
   },
   "transcriptionModel": {
     "title": "အသံမှစာသားပြောင်းမော်ဒယ်",

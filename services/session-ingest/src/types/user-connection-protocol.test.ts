@@ -25,6 +25,40 @@ describe('CLIOutboundMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses a heartbeat session with a scheduled status and wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          id: 'ses_scheduled',
+          status: 'scheduled',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+          title: 'Wake later',
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).toMatchObject({
+        status: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+    }
+  });
+
+  it('parses a scheduled heartbeat session without a wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_scheduled', status: 'scheduled', title: 'Wake later' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).not.toHaveProperty('scheduledAt');
+    }
+  });
+
   it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
     const msg = {
       type: 'heartbeat',
@@ -689,6 +723,58 @@ describe('SessionEventPayloadSchema', () => {
     expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
   });
 
+  it('preserves a wake time in session rows', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.created',
+      data: {
+        source: 'v2',
+        session: { ...session, status: 'scheduled', scheduledAt },
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect(result.data).toHaveProperty('session.scheduledAt', scheduledAt);
+  });
+
+  it('parses status-updated payloads carrying scheduled and scheduledAt', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const fullRow = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, status: 'scheduled', scheduledAt },
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: '2026-09-23T00:00:02.000Z',
+        changedAt: '2026-09-23T00:00:02.000Z',
+      },
+    });
+    expect(fullRow.success).toBe(true);
+    if (fullRow.success) {
+      expect(fullRow.data.data).toHaveProperty('session.scheduledAt', scheduledAt);
+      expect(fullRow.data.data).toHaveProperty('scheduledAt', scheduledAt);
+    }
+
+    const lightweight = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        sessionId: validSessionId,
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: '2026-09-23T00:00:02.000Z',
+        changedAt: '2026-09-23T00:00:02.000Z',
+      },
+    });
+    expect(lightweight.success).toBe(true);
+    if (lightweight.success) {
+      expect(lightweight.data.data).toHaveProperty('scheduledAt', scheduledAt);
+    }
+  });
+
   it.each([null, undefined])('accepts legacy sessions with worktree ID %s', worktreeId => {
     const result = SessionEventPayloadSchema.parse({
       type: 'session.created',
@@ -719,7 +805,7 @@ describe('SessionEventPayloadSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects invalid v2 session statuses', () => {
+  it('accepts unknown v2 session statuses instead of dropping the event', () => {
     const events = [
       {
         type: 'session.updated',
@@ -754,7 +840,7 @@ describe('SessionEventPayloadSchema', () => {
     ];
 
     for (const event of events) {
-      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(false);
+      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(true);
     }
   });
 

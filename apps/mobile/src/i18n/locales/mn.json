@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Буцах",
     "idle": "Хүлээж байна",
+    "scheduled": "Товлосон",
     "keepEditing": "Үргэлжлүүлэн засварлах",
     "keepRunning": "Үргэлжлүүлэн ажиллуулах",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Өмнөх дэлгэц рүү буцаад энэ сонгох цонхыг дахин нээнэ үү."
   },
   "sessionRow": {
-    "needsInput": "ХАРИУ ХҮЛЭЭЖ БАЙНА"
+    "needsInput": "ХАРИУ ХҮЛЭЭЖ БАЙНА",
+    "scheduled": "ТОВЛОСОН"
   },
   "voiceInput": {
     "listening": "Сонсож байна...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү.",
     "openSession": "Нээх",
     "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу.",
-    "newestResult": "Хамгийн сүүлийн үр дүн"
+    "newestResult": "Хамгийн сүүлийн үр дүн",
+    "scheduledWakes": "{{time}} сэрнэ"
   },
   "transcriptionModel": {
     "title": "Яриаг бичвэр болгох загвар",

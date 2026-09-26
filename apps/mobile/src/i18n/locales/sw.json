@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Rudi nyuma",
     "idle": "Bila kazi",
+    "scheduled": "Imepangwa",
     "keepEditing": "Endelea kuhariri",
     "keepRunning": "Acha iendelee",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Rudi nyuma na ufungue kichagua hiki tena kutoka kwenye skrini iliyopita."
   },
   "sessionRow": {
-    "needsInput": "INASUBIRI JIBU"
+    "needsInput": "INASUBIRI JIBU",
+    "scheduled": "IMEPANGWA"
   },
   "voiceInput": {
     "listening": "Inasikiliza...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
     "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
-    "newestResult": "Matokeo mapya zaidi"
+    "newestResult": "Matokeo mapya zaidi",
+    "scheduledWakes": "itaamka {{time}}"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Laghachi azụ",
     "idle": "Anaghị arụ ọrụ",
+    "scheduled": "Ahaziri",
     "keepEditing": "Nọgide na-edezi",
     "keepRunning": "Hapụ ka ọ na-arụ ọrụ",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Laghachi azụ wee mepee ihe ịhọrọ a ọzọ site n'ihuenyo gara aga."
   },
   "sessionRow": {
-    "needsInput": "CHỌRỌ NZAGHACHI"
+    "needsInput": "CHỌRỌ NZAGHACHI",
+    "scheduled": "AHAZIRI"
   },
   "voiceInput": {
     "listening": "Na-ege ntị...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
     "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ.",
-    "newestResult": "Nsonaazụ kacha ọhụrụ"
+    "newestResult": "Nsonaazụ kacha ọhụrụ",
+    "scheduledWakes": "ga-eteta {{time}}"
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",

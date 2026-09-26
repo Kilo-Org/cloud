@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "వెనక్కి వెళ్లండి",
     "idle": "పని లేదు",
+    "scheduled": "షెడ్యూల్ చేయబడింది",
     "keepEditing": "సవరించడం కొనసాగించండి",
     "keepRunning": "అమలు కొనసాగించండి",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "వెనక్కి వెళ్లి మునుపటి స్క్రీన్ నుండి ఈ ఎంపిక తెరను మళ్లీ తెరవండి."
   },
   "sessionRow": {
-    "needsInput": "మీ స్పందన అవసరం"
+    "needsInput": "మీ స్పందన అవసరం",
+    "scheduled": "షెడ్యూల్ చేయబడింది"
   },
   "voiceInput": {
     "listening": "వింటోంది...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
     "openSession": "తెరవండి",
     "approveFailed": "ఆమోదించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి $t(common.approve) ని నొక్కండి.",
-    "newestResult": "సరికొత్త ఫలితం"
+    "newestResult": "సరికొత్త ఫలితం",
+    "scheduledWakes": "{{time}} మేల్కొంటుంది"
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gå tillbaka",
     "idle": "Väntar",
+    "scheduled": "Schemalagd",
     "keepEditing": "Fortsätt redigera",
     "keepRunning": "Fortsätt köra",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna väljaren igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "VÄNTAR PÅ SVAR"
+    "needsInput": "VÄNTAR PÅ SVAR",
+    "scheduled": "SCHEMALAGD"
   },
   "voiceInput": {
     "listening": "Lyssnar…",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
-    "newestResult": "Nyaste resultatet"
+    "newestResult": "Nyaste resultatet",
+    "scheduledWakes": "vaknar {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ආපසු යන්න",
     "idle": "නිෂ්ක්‍රීයයි",
+    "scheduled": "නියමිතයි",
     "keepEditing": "දිගටම සංස්කරණය කරන්න",
     "keepRunning": "දිගටම ක්‍රියාත්මක කරන්න",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "ආපසු ගොස් පෙර තිරයෙන් මෙම තේරීම් කොටස නැවත විවෘත කරන්න."
   },
   "sessionRow": {
-    "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි"
+    "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+    "scheduled": "නියමිතයි"
   },
   "voiceInput": {
     "listening": "සවන් දෙමින්...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
     "openSession": "විවෘත කරන්න",
     "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න.",
-    "newestResult": "නවතම ප්‍රතිඵලය"
+    "newestResult": "නවතම ප්‍රතිඵලය",
+    "scheduledWakes": "{{time}} අවදි වේ"
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",

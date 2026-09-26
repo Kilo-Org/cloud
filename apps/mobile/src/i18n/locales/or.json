@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ଫେରିଯାନ୍ତୁ",
     "idle": "ଅପେକ୍ଷାରେ",
+    "scheduled": "ନିର୍ଧାରିତ",
     "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
     "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "ପୂର୍ବ ସ୍କ୍ରିନ୍‌କୁ ଫେରି ଏହି ଚୟନ ତାଲିକା ପୁଣି ଖୋଲନ୍ତୁ।"
   },
   "sessionRow": {
-    "needsInput": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ"
+    "needsInput": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+    "scheduled": "ନିର୍ଧାରିତ"
   },
   "voiceInput": {
     "listening": "ଶୁଣୁଛି...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
     "openSession": "ଖୋଲନ୍ତୁ",
     "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।",
-    "newestResult": "ନୂତନତମ ଫଳାଫଳ"
+    "newestResult": "ନୂତନତମ ଫଳାଫଳ",
+    "scheduledWakes": "{{time}} ଉଠିବ"
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",

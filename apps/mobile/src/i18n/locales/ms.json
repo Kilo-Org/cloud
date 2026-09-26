@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Kembali",
     "idle": "Melahu",
+    "scheduled": "Dijadualkan",
     "keepEditing": "Teruskan menyunting",
     "keepRunning": "Teruskan proses",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Kembali dan buka semula pemilih ini daripada skrin sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "PERLU INPUT"
+    "needsInput": "PERLU INPUT",
+    "scheduled": "DIJADUALKAN"
   },
   "voiceInput": {
     "listening": "Mendengar...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
-    "newestResult": "Hasil terbaharu"
+    "newestResult": "Hasil terbaharu",
+    "scheduledWakes": "bangun {{time}}"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Geri dön",
     "idle": "Boşta",
+    "scheduled": "Zamanlandı",
     "keepEditing": "Düzenlemeye devam et",
     "keepRunning": "Çalıştırmaya devam et",
     "kiloclaw": "KiloClaw",
@@ -2256,7 +2257,8 @@
     "optionsExpiredDescription": "Geri dön ve bu seçim penceresini önceki ekrandan yeniden aç."
   },
   "sessionRow": {
-    "needsInput": "YANIT BEKLİYOR"
+    "needsInput": "YANIT BEKLİYOR",
+    "scheduled": "ZAMANLANDI"
   },
   "voiceInput": {
     "listening": "Dinleniyor...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
-    "newestResult": "En yeni sonuç"
+    "newestResult": "En yeni sonuç",
+    "scheduledWakes": "{{time}} uyanır"
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",

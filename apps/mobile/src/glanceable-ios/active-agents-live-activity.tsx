@@ -25,6 +25,7 @@ import { withGlanceableCopy } from './layout-copy';
 import { withWidgetLogo } from './widget-logo';
 
 /* eslint-disable new-cap -- PlatformColor is a React Native factory function, not a constructor */
+/* eslint-disable max-lines -- the 'widget' layout function is stringified whole, so its helpers cannot be extracted to module scope; the surface stays in one function */
 
 // The layout function below is marked with the `'widget'` directive, so Babel
 // stringifies it and the watcher extension re-evaluates the source. Everything
@@ -104,6 +105,13 @@ const layout: LiveActivityComponent<ContentState> = props => {
       color: PlatformColor('systemGreen'),
     },
     {
+      kind: 'scheduled',
+      label: COPY.scheduled,
+      count: props.scheduled ?? 0,
+      icon: 'clock',
+      color: PlatformColor('label'),
+    },
+    {
       kind: 'idle',
       label: COPY.idle,
       count: props.idle ?? 0,
@@ -123,6 +131,9 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // blocked agent is the one interval the user can act on. Working and idle
   // durations tell the user nothing they can use.
   const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
+  // The soonest wake, drawn only beside a non-zero scheduled row: a scheduled
+  // count with no wake time is representable, and the row then carries no time.
+  const scheduledAt = (props.scheduled ?? 0) > 0 ? (props.scheduledAt ?? null) : null;
   // Approval is offered only while an ask actually waits and the app recorded
   // one Approve can answer: an Approve that cannot answer anything is a dead
   // control, and a card whose ask was just answered elsewhere would keep
@@ -250,6 +261,23 @@ const layout: LiveActivityComponent<ContentState> = props => {
             // unit in the banner, two in the expanded island. A fixed width
             // cannot force the short form — it only truncates it — so the
             // text keeps its natural width.
+            lineLimit(1),
+            mutedForeground,
+          ]}
+        />
+      ) : null}
+      {showWait && line.kind === 'scheduled' && scheduledAt !== null ? (
+        <Text
+          date={new Date(scheduledAt)}
+          // The wait row above counts a duration ("28 min"); a wake is the
+          // moment the user asked for, so it reads as an absolute clock time
+          // ("9:00 AM"), the way the session list shows it. One style per row:
+          // a relative style here would say "in 2 hours" where the user picked
+          // the time of day.
+          dateStyle="time"
+          modifiers={[
+            font({ textStyle: 'subheadline' }),
+            monospacedDigit(),
             lineLimit(1),
             mutedForeground,
           ]}

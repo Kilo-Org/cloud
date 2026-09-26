@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "واپس جائیں",
     "idle": "فارغ",
+    "scheduled": "شیڈول شدہ",
     "keepEditing": "ترمیم جاری رکھیں",
     "keepRunning": "جاری رہنے دیں",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "پچھلی اسکرین پر واپس جائیں اور انتخاب کا یہ خانہ دوبارہ کھولیں۔"
   },
   "sessionRow": {
-    "needsInput": "ان پٹ درکار"
+    "needsInput": "ان پٹ درکار",
+    "scheduled": "شیڈول شدہ"
   },
   "voiceInput": {
     "listening": "سن رہے ہیں...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
-    "newestResult": "تازہ ترین نتیجہ"
+    "newestResult": "تازہ ترین نتیجہ",
+    "scheduledWakes": "{{time}} بیدار ہوگا"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",

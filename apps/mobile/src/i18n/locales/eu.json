@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Itzuli",
     "idle": "Geldirik",
+    "scheduled": "Programatuta",
     "keepEditing": "Jarraitu editatzen",
     "keepRunning": "Jarraitu exekutatzen",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Itzuli aurreko pantailara eta ireki hautatzaile hau berriro."
   },
   "sessionRow": {
-    "needsInput": "ZURE ERANTZUNAREN ZAIN"
+    "needsInput": "ZURE ERANTZUNAREN ZAIN",
+    "scheduled": "PROGRAMATUTA"
   },
   "voiceInput": {
     "listening": "Entzuten...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
     "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
-    "newestResult": "Emaitza berriena"
+    "newestResult": "Emaitza berriena",
+    "scheduledWakes": "{{time}} esnatuko da"
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",

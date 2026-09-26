@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Palaa takaisin",
     "idle": "Valmiina",
+    "scheduled": "Ajastettu",
     "keepEditing": "Jatka muokkausta",
     "keepRunning": "Jatka suoritusta",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Palaa takaisin ja avaa tämä valitsin uudelleen edellisestä näkymästä."
   },
   "sessionRow": {
-    "needsInput": "ODOTTAA VASTAUSTA"
+    "needsInput": "ODOTTAA VASTAUSTA",
+    "scheduled": "AJASTETTU"
   },
   "voiceInput": {
     "listening": "Kuunnellaan…",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
-    "newestResult": "Uusin tulos"
+    "newestResult": "Uusin tulos",
+    "scheduledWakes": "herää {{time}}"
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",

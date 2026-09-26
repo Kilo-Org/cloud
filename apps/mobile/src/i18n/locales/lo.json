@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ກັບຄືນ",
     "idle": "ວ່າງ",
+    "scheduled": "ກຳນົດເວລາ",
     "keepEditing": "ແກ້ໄຂຕໍ່",
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "ກັບໄປທີ່ໜ້າຈໍກ່ອນໜ້າ ແລ້ວເປີດໜ້າເລືອກນີ້ອີກຄັ້ງ."
   },
   "sessionRow": {
-    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ"
+    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "scheduled": "ກຳນົດເວລາ"
   },
   "voiceInput": {
     "listening": "ກຳລັງຟັງ...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
-    "newestResult": "ຜົນຫຼ້າສຸດ"
+    "newestResult": "ຜົນຫຼ້າສຸດ",
+    "scheduledWakes": "ຕື່ນ {{time}}"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",

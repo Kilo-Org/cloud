@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "חזרה",
     "idle": "בהמתנה",
+    "scheduled": "מתוזמן",
     "keepEditing": "המשך עריכה",
     "keepRunning": "המשך הרצה",
     "kiloclaw": "KiloClaw",
@@ -2281,7 +2282,8 @@
     "optionsExpiredDescription": "חזור למסך הקודם ופתח מחדש את חלון הבחירה."
   },
   "sessionRow": {
-    "needsInput": "נדרש קלט"
+    "needsInput": "נדרש קלט",
+    "scheduled": "מתוזמן"
   },
   "voiceInput": {
     "listening": "בהאזנה...",
@@ -3238,7 +3240,8 @@
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
     "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
-    "newestResult": "התוצאה החדשה ביותר"
+    "newestResult": "התוצאה החדשה ביותר",
+    "scheduledWakes": "מתעורר {{time}}"
   },
   "transcriptionModel": {
     "title": "מודל תמלול",

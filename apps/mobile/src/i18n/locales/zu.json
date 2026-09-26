@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Buyela emuva",
     "idle": "Akumatasa",
+    "scheduled": "Kuhleliwe",
     "keepEditing": "Qhubeka uhlela",
     "keepRunning": "Yeka kuqhubeke",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Buyela esikrinini sangaphambilini bese uvula kabusha lesi sikhethi."
   },
   "sessionRow": {
-    "needsInput": "KUDINGA IMPENDULO"
+    "needsInput": "KUDINGA IMPENDULO",
+    "scheduled": "KUHLELIWE"
   },
   "voiceInput": {
     "listening": "Kulalelwa...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
     "openSession": "Vula",
     "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
-    "newestResult": "Umphumela wakamuva"
+    "newestResult": "Umphumela wakamuva",
+    "scheduledWakes": "ivuka {{time}}"
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",

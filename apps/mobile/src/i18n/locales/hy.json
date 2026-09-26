@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Վերադառնալ",
     "idle": "Սպասում է",
+    "scheduled": "Պլանավորված",
     "keepEditing": "Շարունակել խմբագրել",
     "keepRunning": "Շարունակել կատարումը",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Վերադարձեք նախորդ էկրան և կրկին բացեք այս ընտրիչը։"
   },
   "sessionRow": {
-    "needsInput": "ՍՊԱՍՈՒՄ Է ՊԱՏԱՍԽԱՆԻ"
+    "needsInput": "ՍՊԱՍՈՒՄ Է ՊԱՏԱՍԽԱՆԻ",
+    "scheduled": "ՊԼԱՆԱՎՈՐՎԱԾ"
   },
   "voiceInput": {
     "listening": "Լսում ենք...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։",
     "openSession": "Բացիր",
     "approveFailed": "Չհաջողվեց հաստատել։ Կրկին փորձելու համար հպեք $t(common.approve)-ին։",
-    "newestResult": "Նորագույն արդյունքը"
+    "newestResult": "Նորագույն արդյունքը",
+    "scheduledWakes": "արթնանում է {{time}}"
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",

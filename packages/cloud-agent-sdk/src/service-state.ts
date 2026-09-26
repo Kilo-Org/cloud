@@ -225,7 +225,20 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       if (isRootSession(sessionId) && activity.type !== 'idle') {
         activity = { type: 'idle' };
       }
+    } else if (sessionStatus.type === 'scheduled') {
+      // A scheduled session does nothing now, so the activity reads idle while
+      // the lifecycle status carries the wake time. Like `busy`, a child
+      // session's status must not repaint the root's status.
+      if (isRootSession(sessionId)) {
+        if (activity.type !== 'idle') activity = { type: 'idle' };
+        status = {
+          type: 'scheduled',
+          ...(sessionStatus.scheduledAt ? { scheduledAt: sessionStatus.scheduledAt } : {}),
+        };
+      }
     }
+    // Any other (unknown) status string leaves the previous status untouched —
+    // it is never coerced to idle.
 
     notify();
   }

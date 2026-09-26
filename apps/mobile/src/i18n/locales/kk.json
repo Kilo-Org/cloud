@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Артқа қайту",
     "idle": "Бос",
+    "scheduled": "Жоспарланған",
     "keepEditing": "Өңдеуді жалғастыру",
     "keepRunning": "Жұмысты жалғастыру",
     "kiloclaw": "KiloClaw",
@@ -2760,7 +2761,8 @@
     "optionsExpiredDescription": "Артқа қайтып, алдыңғы экраннан бұл таңдау құралын қайта ашыңыз."
   },
   "sessionRow": {
-    "needsInput": "ЖАУАП ҚАЖЕТ"
+    "needsInput": "ЖАУАП ҚАЖЕТ",
+    "scheduled": "ЖОСПАРЛАНҒАН"
   },
   "voiceInput": {
     "listening": "Тыңдалуда...",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
     "openSession": "Ашыңыз",
     "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз.",
-    "newestResult": "Ең жаңа нәтиже"
+    "newestResult": "Ең жаңа нәтиже",
+    "scheduledWakes": "{{time}} оянады"
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",

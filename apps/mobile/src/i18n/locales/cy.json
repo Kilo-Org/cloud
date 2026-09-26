@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mynd yn ôl",
     "idle": "Segur",
+    "scheduled": "Wedi'i drefnu",
     "keepEditing": "Parhau i olygu",
     "keepRunning": "Parhau i redeg",
     "kiloclaw": "KiloClaw",
@@ -2924,7 +2925,8 @@
     "optionsExpiredDescription": "Ewch yn ôl ac ailagorwch y dewisydd hwn o'r sgrin flaenorol."
   },
   "sessionRow": {
-    "needsInput": "ANGEN MEWNBWN"
+    "needsInput": "ANGEN MEWNBWN",
+    "scheduled": "WEDI'I DREFNU"
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
@@ -3367,7 +3369,8 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
-    "newestResult": "Canlyniad diweddaraf"
+    "newestResult": "Canlyniad diweddaraf",
+    "scheduledWakes": "yn deffro {{time}}"
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",

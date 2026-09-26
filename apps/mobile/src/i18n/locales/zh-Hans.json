@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "返回",
     "idle": "空闲",
+    "scheduled": "已计划",
     "keepEditing": "继续编辑",
     "keepRunning": "继续运行",
     "kiloclaw": "KiloClaw",
@@ -2256,7 +2257,8 @@
     "optionsExpiredDescription": "请返回上一页面，重新打开此选择器。"
   },
   "sessionRow": {
-    "needsInput": "等待输入"
+    "needsInput": "等待输入",
+    "scheduled": "已计划"
   },
   "voiceInput": {
     "listening": "正在收听…",
@@ -3195,7 +3197,8 @@
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
     "approveFailed": "无法批准。点按$t(common.approve)重试。",
-    "newestResult": "最新结果"
+    "newestResult": "最新结果",
+    "scheduledWakes": "{{time}}唤醒"
   },
   "transcriptionModel": {
     "title": "转写模型",

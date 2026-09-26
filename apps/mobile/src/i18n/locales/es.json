@@ -1522,6 +1522,7 @@
       "couldNotLoadActive": "No se pudieron cargar las sesiones activas.",
       "couldNotRefresh": "No se pudo actualizar",
       "noSessionsYetDescription": "Inicia una tarea de programación desde tu teléfono. Tus sesiones aparecerán aquí.",
+      "viewHistory": "Historial de sesiones",
       "noMatches": "No hay sesiones que coincidan con los filtros",
       "tryDifferentSearch": "Prueba con otro término de búsqueda.",
       "tryAdjustFilters": "Prueba a cambiar o quitar los filtros.",

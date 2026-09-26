@@ -1513,6 +1513,7 @@
       "couldNotLoadActive": "无法加载进行中的会话。",
       "couldNotRefresh": "无法刷新",
       "noSessionsYetDescription": "在手机上发起编程任务，会话就会显示在这里。",
+      "viewHistory": "会话历史",
       "noMatches": "暂无匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除筛选条件。",

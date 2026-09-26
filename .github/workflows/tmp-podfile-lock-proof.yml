@@ -1,0 +1,70 @@
+name: tmp podfile lock proof
+
+on:
+  push:
+    branches: [fix/kilo-app-upload-marker-race]
+    paths: ['.github/workflows/tmp-podfile-lock-proof.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: EAS iOS production build (no submission)
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          pnpx eas-cli@21.8.0 build --profile production --platform ios --non-interactive --json --wait > build.json
+          echo "artifacts keys: $(jq -c '[.[] | {platform, keys: (.artifacts | keys)}]' build.json)"
+      - name: Download and read the Podfile.lock the way the release job does
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          download() {
+            url="$1"; out="$2"; label="$3"
+            if curl -fL -H "Authorization: Bearer $EXPO_TOKEN" -o "$out" "$url"; then
+              echo "$label: downloaded with Authorization header"
+            elif curl -fL -o "$out" "$url"; then
+              echo "$label: downloaded without Authorization header"
+            else
+              echo "::error::$label download failed"; return 1
+            fi
+          }
+          download "$(jq -r '.[] | select(.platform=="IOS") | .artifacts.applicationArchiveUrl' build.json)" artifacts/app.ipa "iOS"
+          download "$(jq -r '.[] | select(.platform=="IOS") | .artifacts.buildArtifactsUrl' build.json)" artifacts/ios-build-artifacts "iOS build artifacts"
+          file artifacts/ios-build-artifacts
+          if gzip -t artifacts/ios-build-artifacts 2>/dev/null; then
+            echo "archive members:"; tar -tzf artifacts/ios-build-artifacts
+            MEMBER=$(tar -tzf artifacts/ios-build-artifacts | grep -E '(^|/)Podfile\.lock$' || true)
+            if [ "$(printf '%s' "$MEMBER" | grep -c '')" -ne 1 ]; then
+              echo "::error::the iOS build artifacts archive must hold exactly one Podfile.lock, found: ${MEMBER:-none}"
+              exit 1
+            fi
+            tar -xzf artifacts/ios-build-artifacts -O "$MEMBER" > artifacts/Podfile.lock
+          else
+            mv artifacts/ios-build-artifacts artifacts/Podfile.lock
+          fi
+          grep -q '^PODS:' artifacts/Podfile.lock
+          node --input-type=module -e "
+          import { readPodfileLockComponents, readIpaComponents } from '../../scripts/mobile-sbom-ipa.mjs';
+          const pods = readPodfileLockComponents({ podfileLockPath: 'artifacts/Podfile.lock' }).components;
+          const ipa = readIpaComponents({ ipaPath: 'artifacts/app.ipa' });
+          const scan = Array.isArray(ipa) ? ipa : ipa.components;
+          console.log('lockfile pods:', pods.length, 'ipa scan components:', scan.length);
+          console.log('sample:', pods.filter(p => /^(React-Core|hermes-engine|RNSentry|EXConstants)$/.test(p.name)).map(p => p.purl).join(' '));
+          "

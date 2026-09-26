@@ -8,7 +8,7 @@ import {
   resolveSearchRestoreDecision,
   type SessionSearchController,
 } from '@/components/agents/session-search-state';
-import { SESSION_SEARCH_DRAFT_KEY, saveDraft } from '@/lib/persist/drafts';
+import { saveDraft, SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 /** TextInput remount key while the durable draft is still loading / empty. */

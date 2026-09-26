@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Nem sikerült elindítani a bejelentkezést. Próbáld újra.",
     "couldNotOpenBrowser": "Nem sikerült megnyitni a böngészőt. Próbáld újra.",
     "signInTimedOut": "A bejelentkezés időtúllépés miatt megszakadt. Próbáld újra.",
-    "networkError": "Hálózati hiba történt. Próbáld újra.",
     "accessDeniedByUser": "Megtagadtad a hozzáférést.",
     "codeExpired": "A kód lejárt.",
     "tooManySignInAttempts": "Túl sok bejelentkezési kísérlet történt. Várj egy kicsit, majd próbáld újra."

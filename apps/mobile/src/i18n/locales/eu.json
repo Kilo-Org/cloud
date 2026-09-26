@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Ezin izan da saioa hasteko prozesua abiarazi. Saiatu berriro.",
     "couldNotOpenBrowser": "Ezin izan da nabigatzailea ireki. Saiatu berriro.",
     "signInTimedOut": "Saioa hasteko denbora agortu da. Saiatu berriro.",
-    "networkError": "Sare-errorea. Saiatu berriro.",
     "accessDeniedByUser": "Erabiltzaileak sarbidea ukatu du.",
     "codeExpired": "Kodea iraungi da.",
     "tooManySignInAttempts": "Saioa hasteko saiakera gehiegi egin dira. Itxaron eta saiatu berriro."

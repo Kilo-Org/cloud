@@ -3219,7 +3219,6 @@
     "startSignInFailed": "Prijave ni bilo mogoče začeti. Poskusi znova.",
     "couldNotOpenBrowser": "Brskalnika ni bilo mogoče odpreti. Poskusi znova.",
     "signInTimedOut": "Čas za prijavo je potekel. Poskusi znova.",
-    "networkError": "Napaka v omrežju. Poskusi znova.",
     "accessDeniedByUser": "Uporabnik je zavrnil dostop.",
     "codeExpired": "Koda je potekla.",
     "tooManySignInAttempts": "Preveč poskusov prijave. Počakaj in poskusi znova."

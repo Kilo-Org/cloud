@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Kon nie aanmelding begin nie. Probeer asseblief weer.",
     "couldNotOpenBrowser": "Kon nie die blaaier oopmaak nie. Probeer asseblief weer.",
     "signInTimedOut": "Die tyd vir aanmelding het verstryk. Probeer asseblief weer.",
-    "networkError": "Netwerkfout. Probeer asseblief weer.",
     "accessDeniedByUser": "Die gebruiker het toegang geweier.",
     "codeExpired": "Die kode het verval.",
     "tooManySignInAttempts": "Te veel aanmeldpogings. Wag asseblief en probeer weer."

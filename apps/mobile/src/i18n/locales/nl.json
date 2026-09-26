@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Het aanmelden kon niet worden gestart. Probeer het opnieuw.",
     "couldNotOpenBrowser": "De browser kon niet worden geopend. Probeer het opnieuw.",
     "signInTimedOut": "Het aanmelden duurde te lang. Probeer het opnieuw.",
-    "networkError": "Netwerkfout. Probeer het opnieuw.",
     "accessDeniedByUser": "De gebruiker heeft de toegang geweigerd.",
     "codeExpired": "De code is verlopen.",
     "tooManySignInAttempts": "Te veel aanmeldpogingen. Wacht even en probeer het opnieuw."

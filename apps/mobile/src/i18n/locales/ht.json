@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Pa t ka kòmanse koneksyon an. Tanpri eseye ankò.",
     "couldNotOpenBrowser": "Pa t ka louvri navigatè a. Tanpri eseye ankò.",
     "signInTimedOut": "Tan pou konekte a fini. Tanpri eseye ankò.",
-    "networkError": "Erè rezo. Tanpri eseye ankò.",
     "accessDeniedByUser": "Itilizatè a refize aksè a.",
     "codeExpired": "Kòd la ekspire.",
     "tooManySignInAttempts": "Twòp tantativ koneksyon. Tanpri tann epi eseye ankò."

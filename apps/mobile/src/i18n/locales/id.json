@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Gagal memulai proses masuk. Silakan coba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka peramban. Coba lagi.",
     "signInTimedOut": "Waktu untuk masuk telah habis. Coba lagi.",
-    "networkError": "Kesalahan jaringan. Silakan coba lagi.",
     "accessDeniedByUser": "Pengguna menolak akses.",
     "codeExpired": "Kode sudah kedaluwarsa.",
     "tooManySignInAttempts": "Terlalu banyak percobaan masuk. Tunggu sebentar dan coba lagi."

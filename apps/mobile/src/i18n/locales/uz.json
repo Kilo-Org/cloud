@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Kirishni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "couldNotOpenBrowser": "Brauzerni ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "signInTimedOut": "Kirish uchun ajratilgan vaqt tugadi. Qayta urinib ko'ring.",
-    "networkError": "Tarmoq xatosi. Iltimos, qayta urinib ko'ring.",
     "accessDeniedByUser": "Foydalanuvchi kirishga ruxsat bermadi.",
     "codeExpired": "Kodning amal qilish muddati tugadi.",
     "tooManySignInAttempts": "Kirish urinishlari juda ko'p. Iltimos, kuting va qayta urinib ko'ring."

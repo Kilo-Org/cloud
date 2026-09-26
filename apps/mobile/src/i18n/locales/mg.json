@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Tsy afaka nanomboka ny fidirana. Andramo indray azafady.",
     "couldNotOpenBrowser": "Tsy voasokatra ny mpitety tranonkala. Andramo indray azafady.",
     "signInTimedOut": "Tapitra ny fotoana nomena hidirana. Andramo indray azafady.",
-    "networkError": "Hadisoan'ny tambajotra. Andramo indray azafady.",
     "accessDeniedByUser": "Nolavin'ny mpampiasa ny fidirana.",
     "codeExpired": "Lany daty ny kaody.",
     "tooManySignInAttempts": "Betsaka loatra ny andrana fidirana. Miandrasa kely ary andramo indray azafady."

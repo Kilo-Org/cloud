@@ -3262,7 +3262,6 @@
     "startSignInFailed": "Ma setax jibda d-dħul. Jekk jogħġbok erġa' pprova.",
     "couldNotOpenBrowser": "Ma setax jinfetaħ il-brawżer. Erġa' pprova.",
     "signInTimedOut": "Il-ħin biex tidħol skada. Erġa' pprova.",
-    "networkError": "Żball tan-netwerk. Jekk jogħġbok erġa' pprova.",
     "accessDeniedByUser": "L-utent ċaħad l-aċċess.",
     "codeExpired": "Il-kodiċi skada.",
     "tooManySignInAttempts": "Wisq tentattivi ta' dħul. Jekk jogħġbok stenna u erġa' pprova."

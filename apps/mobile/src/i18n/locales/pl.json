@@ -3219,7 +3219,6 @@
     "startSignInFailed": "Nie udało się rozpocząć logowania. Spróbuj ponownie.",
     "couldNotOpenBrowser": "Nie udało się otworzyć przeglądarki. Spróbuj ponownie.",
     "signInTimedOut": "Upłynął limit czasu logowania. Spróbuj ponownie.",
-    "networkError": "Błąd sieci. Spróbuj ponownie.",
     "accessDeniedByUser": "Użytkownik odmówił dostępu.",
     "codeExpired": "Kod wygasł.",
     "tooManySignInAttempts": "Zbyt wiele prób logowania. Poczekaj i spróbuj ponownie."

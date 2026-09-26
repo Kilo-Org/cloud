@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Giriş prosesini başlatmaq mümkün olmadı. Yenidən cəhd et.",
     "couldNotOpenBrowser": "Brauzeri açmaq mümkün olmadı. Yenidən cəhd et.",
     "signInTimedOut": "Giriş üçün ayrılmış vaxt bitdi. Yenidən cəhd et.",
-    "networkError": "Şəbəkə xətası baş verdi. Yenidən cəhd et.",
     "accessDeniedByUser": "İstifadəçi girişə icazə vermədi.",
     "codeExpired": "Kodun etibarlılıq müddəti bitib.",
     "tooManySignInAttempts": "Həddindən çox giriş cəhdi edilib. Bir az gözlə və yenidən cəhd et."

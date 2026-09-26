@@ -3133,7 +3133,6 @@
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",
-    "networkError": "网络错误。请重试。",
     "accessDeniedByUser": "你已拒绝访问。",
     "codeExpired": "验证码已过期。",
     "tooManySignInAttempts": "登录尝试次数过多。请稍等片刻再试。"

@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Seensaa jalqabuun hin milkoofne. Irra deebi'ii yaali.",
     "couldNotOpenBrowser": "Biraawzarii banuun hin danda'amne. Irra deebi'ii yaali.",
     "signInTimedOut": "Yeroon seensaaf kenname darbeera. Irra deebi'ii yaali.",
-    "networkError": "Dogoggorri neetwoorkii jira. Irra deebi'ii yaali.",
     "accessDeniedByUser": "Fayyadamaan hayyama dhorkeera.",
     "codeExpired": "Yeroon koodichaa darbeera.",
     "tooManySignInAttempts": "Yaalii seensaa baay'etu godhame. Xiqqoo eegiitii irra deebi'ii yaali."

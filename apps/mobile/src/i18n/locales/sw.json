@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Imeshindikana kuanzisha mchakato wa kuingia. Tafadhali jaribu tena.",
     "couldNotOpenBrowser": "Imeshindikana kufungua kivinjari. Tafadhali jaribu tena.",
     "signInTimedOut": "Muda wa kusubiri kuingia umeisha. Tafadhali jaribu tena.",
-    "networkError": "Hitilafu ya mtandao. Tafadhali jaribu tena.",
     "accessDeniedByUser": "Mtumiaji amekataa kuruhusu ufikiaji.",
     "codeExpired": "Muda wa kutumia msimbo umeisha.",
     "tooManySignInAttempts": "Majaribio ya kuingia ni mengi mno. Tafadhali subiri kisha ujaribu tena."

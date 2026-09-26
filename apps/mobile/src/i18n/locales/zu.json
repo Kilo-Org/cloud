@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Asikwazanga ukuqala ukungena. Sicela uzame futhi.",
     "couldNotOpenBrowser": "Asikwazanga ukuvula isiphequluli. Sicela uzame futhi.",
     "signInTimedOut": "Ukungena kuphelelwe yisikhathi. Sicela uzame futhi.",
-    "networkError": "Iphutha lenethiwekhi. Sicela uzame futhi.",
     "accessDeniedByUser": "Umsebenzisi unqabele ukufinyelela.",
     "codeExpired": "Ikhodi iphelelwe yisikhathi.",
     "tooManySignInAttempts": "Imizamo eminingi kakhulu yokungena. Sicela ulinde bese uzama futhi."

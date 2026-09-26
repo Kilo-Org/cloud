@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Kirjautumisen aloittaminen epäonnistui. Yritä uudelleen.",
     "couldNotOpenBrowser": "Selaimen avaaminen epäonnistui. Yritä uudelleen.",
     "signInTimedOut": "Kirjautuminen aikakatkaistiin. Yritä uudelleen.",
-    "networkError": "Verkkovirhe. Yritä uudelleen.",
     "accessDeniedByUser": "Käyttäjä ei antanut käyttöoikeutta.",
     "codeExpired": "Koodi on vanhentunut.",
     "tooManySignInAttempts": "Liian monta kirjautumisyritystä. Odota hetki ja yritä uudelleen."

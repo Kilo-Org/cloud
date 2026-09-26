@@ -3305,7 +3305,6 @@
     "startSignInFailed": "Ni lwyddwyd i ddechrau mewngofnodi. Rhowch gynnig eto.",
     "couldNotOpenBrowser": "Ni lwyddwyd i agor y porwr. Rhowch gynnig eto.",
     "signInTimedOut": "Daeth yr amser ar gyfer mewngofnodi i ben. Rhowch gynnig eto.",
-    "networkError": "Gwall rhwydwaith. Rhowch gynnig eto.",
     "accessDeniedByUser": "Gwrthododd y defnyddiwr fynediad.",
     "codeExpired": "Mae'r cod wedi dod i ben.",
     "tooManySignInAttempts": "Rydych wedi ceisio mewngofnodi gormod o weithiau. Arhoswch a rhowch gynnig eto."

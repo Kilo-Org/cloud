@@ -3176,7 +3176,6 @@
     "startSignInFailed": "Impossibile avviare l'accesso. Riprova.",
     "couldNotOpenBrowser": "Impossibile aprire il browser. Riprova.",
     "signInTimedOut": "Il tempo disponibile per accedere è scaduto. Riprova.",
-    "networkError": "Errore di rete. Riprova.",
     "accessDeniedByUser": "L'utente ha negato l'accesso.",
     "codeExpired": "Il codice è scaduto.",
     "tooManySignInAttempts": "Troppi tentativi di accesso. Attendi e riprova."

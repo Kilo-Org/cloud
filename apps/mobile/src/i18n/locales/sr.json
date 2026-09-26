@@ -3176,7 +3176,6 @@
     "startSignInFailed": "Nije moguće započeti prijavu. Pokušaj ponovo.",
     "couldNotOpenBrowser": "Nije moguće otvoriti pregledač. Pokušaj ponovo.",
     "signInTimedOut": "Vreme za prijavu je isteklo. Pokušaj ponovo.",
-    "networkError": "Greška na mreži. Pokušaj ponovo.",
     "accessDeniedByUser": "Korisnik je odbio pristup.",
     "codeExpired": "Kod je istekao.",
     "tooManySignInAttempts": "Previše pokušaja prijave. Sačekaj i pokušaj ponovo."

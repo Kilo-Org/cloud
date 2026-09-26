@@ -3133,7 +3133,6 @@
     "startSignInFailed": "የመግቢያ ሂደቱን መጀመር አልተቻለም። እንደገና ሞክር።",
     "couldNotOpenBrowser": "አሳሹን መክፈት አልተቻለም። እንደገና ሞክር።",
     "signInTimedOut": "ለመግባት የተፈቀደው ጊዜ አልቋል። እንደገና ሞክር።",
-    "networkError": "የአውታረ መረብ ስህተት አለ። እንደገና ሞክር።",
     "accessDeniedByUser": "ተጠቃሚው ፈቃድ አልሰጠም።",
     "codeExpired": "የኮዱ ጊዜ አልፏል።",
     "tooManySignInAttempts": "በጣም ብዙ የመግቢያ ሙከራዎች ተደርገዋል። ትንሽ ጠብቅና እንደገና ሞክር።"

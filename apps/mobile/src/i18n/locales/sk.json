@@ -3219,7 +3219,6 @@
     "startSignInFailed": "Prihlásenie sa nepodarilo spustiť. Skús to znova.",
     "couldNotOpenBrowser": "Prehliadač sa nepodarilo otvoriť. Skús to znova.",
     "signInTimedOut": "Čas na prihlásenie vypršal. Skús to znova.",
-    "networkError": "Chyba siete. Skús to znova.",
     "accessDeniedByUser": "Používateľ zamietol prístup.",
     "codeExpired": "Platnosť kódu vypršala.",
     "tooManySignInAttempts": "Príliš veľa pokusov o prihlásenie. Chvíľu počkaj a skús to znova."

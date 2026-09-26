@@ -3176,7 +3176,6 @@
     "startSignInFailed": "לא ניתן היה להתחיל את ההתחברות. נסה שוב.",
     "couldNotOpenBrowser": "לא ניתן היה לפתוח את הדפדפן. נסה שוב.",
     "signInTimedOut": "תם הזמן שהוקצב להתחברות. נסה שוב.",
-    "networkError": "שגיאת רשת. נסה שוב.",
     "accessDeniedByUser": "המשתמש דחה את בקשת הגישה.",
     "codeExpired": "תוקף הקוד פג.",
     "tooManySignInAttempts": "יותר מדי ניסיונות התחברות. המתן ונסה שוב."

@@ -3262,7 +3262,6 @@
     "startSignInFailed": "Theip ar an síniú isteach a thosú. Bain triail as arís le do thoil.",
     "couldNotOpenBrowser": "Níorbh fhéidir an brabhsálaí a oscailt. Bain triail as arís le do thoil.",
     "signInTimedOut": "Chuaigh an síniú isteach thar am. Bain triail as arís le do thoil.",
-    "networkError": "Earráid líonra. Bain triail as arís le do thoil.",
     "accessDeniedByUser": "Dhiúltaigh an t-úsáideoir rochtain.",
     "codeExpired": "Tá an cód imithe in éag.",
     "tooManySignInAttempts": "An iomarca iarrachtaí sínithe isteach. Fan agus bain triail as arís le do thoil."

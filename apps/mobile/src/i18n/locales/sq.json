@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Nuk u nis procesi i hyrjes. Provo përsëri.",
     "couldNotOpenBrowser": "Nuk u arrit të hapej shfletuesi. Provo përsëri.",
     "signInTimedOut": "Koha për të hyrë ka mbaruar. Provo përsëri.",
-    "networkError": "Gabim rrjeti. Provo përsëri.",
     "accessDeniedByUser": "Përdoruesi e refuzoi qasjen.",
     "codeExpired": "Kodi ka skaduar.",
     "tooManySignInAttempts": "Ke bërë shumë përpjekje për të hyrë. Prit pak dhe provo përsëri."

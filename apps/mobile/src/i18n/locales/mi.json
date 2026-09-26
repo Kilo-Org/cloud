@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Kāore i taea te tīmata i te takiuru. Whakamātau anō.",
     "couldNotOpenBrowser": "Kāore i taea te whakatuwhera i te pūtirotiro. Whakamātau anō.",
     "signInTimedOut": "Kua pau te wā mō te takiuru. Whakamātau anō.",
-    "networkError": "He hapa whatunga. Whakamātau anō.",
     "accessDeniedByUser": "Kāore te kaiwhakamahi i whakaae ki te uru.",
     "codeExpired": "Kua pau te wā o te waehere.",
     "tooManySignInAttempts": "He nui rawa ngā whakamātau takiuru. Tatari, ka whakamātau anō."

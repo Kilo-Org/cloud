@@ -3149,7 +3149,6 @@
     "startSignInFailed": "Failed to start sign in. Please try again.",
     "couldNotOpenBrowser": "Could not open browser. Please try again.",
     "signInTimedOut": "Sign-in timed out. Please try again.",
-    "networkError": "Network error. Please try again.",
     "accessDeniedByUser": "Access denied by user",
     "codeExpired": "Code expired",
     "tooManySignInAttempts": "Too many sign-in attempts. Please wait and try again."

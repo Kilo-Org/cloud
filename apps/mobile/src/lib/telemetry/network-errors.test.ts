@@ -227,6 +227,33 @@ describe('isAbortError', () => {
     const cause = { code: 'FetchRequestCanceledException' };
     expect(isAbortError({ message: 'wrapped', cause })).toBe(true);
   });
+
+  // Production shape: Expo's `FetchError.createFromError` rebuilds the native
+  // cancel as `new FetchError(error.message)`, and `FetchError` does
+  // `super(\`fetch failed: ${message}\`)` while the native exception's message
+  // is exactly `Fetch request has been canceled`. Neither `name` nor `code`
+  // survives the wrap, so only the message can identify the abort.
+  it('is true for the production FetchError message without the class name', () => {
+    const error = new Error('fetch failed: Fetch request has been canceled');
+    expect(error.name).toBe('Error');
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('is true for the production FetchError with a FetchRequestCanceledException cause', () => {
+    const error = {
+      message: 'fetch failed: Fetch request has been canceled',
+      cause: { name: 'FetchRequestCanceledException' },
+    };
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('is true for a value whose code is undefined and carries the production message', () => {
+    const error = {
+      message: 'fetch failed: Fetch request has been canceled',
+      code: undefined,
+    };
+    expect(isAbortError(error)).toBe(true);
+  });
 });
 
 describe('createNetworkErrorFetch', () => {
@@ -270,6 +297,43 @@ describe('createNetworkErrorFetch', () => {
     const cancel = new Error(
       'fetch failed: FetchRequestCanceledException: Fetch request has been canceled'
     );
+    const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });
+
+    await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(cancel);
+
+    expect(events).toHaveLength(0);
+  });
+
+  // Production shape: the native cancel is rebuilt as
+  // `Error('fetch failed: Fetch request has been canceled')`, with neither
+  // `name` nor `code` surviving the wrap. These are the shapes the store build
+  // reports as KILO-APP-GX; they must not emit a warning event.
+  it('(b3) does not report the production FetchError message and re-throws it', async () => {
+    const cancel = new Error('fetch failed: Fetch request has been canceled');
+    const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });
+
+    await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(cancel);
+
+    expect(events).toHaveLength(0);
+  });
+
+  it('(b4) does not report the production FetchError with a FetchRequestCanceledException cause', async () => {
+    const cancel = {
+      message: 'fetch failed: Fetch request has been canceled',
+      cause: { name: 'FetchRequestCanceledException' },
+    };
+    const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });
+
+    await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(cancel);
+
+    expect(events).toHaveLength(0);
+  });
+
+  it('(b5) does not report the production FetchError with an undefined code and re-throws it', async () => {
+    const cancel = {
+      message: 'fetch failed: Fetch request has been canceled',
+      code: undefined,
+    };
     const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });
 
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(cancel);

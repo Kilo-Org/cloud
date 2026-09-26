@@ -7,7 +7,7 @@
       "instanceLifecycle": "Tvoja instanca ima posodobitev",
       "scheduledAction": "Načrtovano dejanje ima posodobitev",
       "lowBalance": "Tvoje stanje potrebuje pozornost",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Tvoja poraba potrebuje pozornost",
       "securityFinding": "Varnostna najdba potrebuje pozornost",
       "activeAgentsGlanceable": "Aktivni agenti imajo posodobitev"
     }
@@ -44,8 +44,8 @@
       "body": "Stanje organizacije {{organizationName}} je padlo pod ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Opozorilo o porabi",
+      "body": "Poraba za {{scopeName}} je presegla ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nova varnostna najdba ({{severity}})",

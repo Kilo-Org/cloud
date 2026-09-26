@@ -7,7 +7,7 @@
       "instanceLifecycle": "Forekomsten din har en oppdatering",
       "scheduledAction": "En planlagt handling har en oppdatering",
       "lowBalance": "Saldoen din krever oppmerksomhet",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Forbruket ditt krever oppmerksomhet",
       "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
       "activeAgentsGlanceable": "Aktive agenter har en oppdatering"
     }
@@ -44,8 +44,8 @@
       "body": "Saldoen til {{organizationName}} falt under ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Forbruksvarsel",
+      "body": "Forbruket til {{scopeName}} oversteg ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nytt sikkerhetsfunn ({{severity}})",

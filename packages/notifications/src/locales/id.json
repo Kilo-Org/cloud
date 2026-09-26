@@ -7,7 +7,7 @@
       "instanceLifecycle": "Instance Anda memiliki pembaruan",
       "scheduledAction": "Tindakan terjadwal memiliki pembaruan",
       "lowBalance": "Saldo Anda perlu diperhatikan",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Pengeluaran Anda perlu diperhatikan",
       "securityFinding": "Temuan keamanan perlu diperhatikan",
       "activeAgentsGlanceable": "Agen aktif memiliki pembaruan"
     }
@@ -44,8 +44,8 @@
       "body": "Saldo {{organizationName}} turun di bawah ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Peringatan pengeluaran",
+      "body": "Pengeluaran {{scopeName}} melewati ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Temuan keamanan baru ({{severity}})",

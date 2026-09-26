@@ -7,7 +7,7 @@
       "instanceLifecycle": "Instance kee keessa bakka jijjiiramni jira",
       "scheduledAction": "Sochiin karoorfame keessa bakka jijjiiramni jira",
       "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Baasiin kee xiyyeeffannaa barbaada",
       "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
       "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
     }
@@ -44,8 +44,8 @@
       "body": "Baalansiin {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Akeekkachiisa baasii",
+      "body": "Baasiin {{scopeName}} ${{amountUsd}} darbee"
     },
     "securityFindingNew": {
       "title": "Arganni nagaa haaraa ({{severity}})",

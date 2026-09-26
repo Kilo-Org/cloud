@@ -7,7 +7,7 @@
       "instanceLifecycle": "Tavas instances ir atjauninājums",
       "scheduledAction": "Plānotajai darbībai ir atjauninājums",
       "lowBalance": "Tava bilancei nepieciešama uzmanība",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Taviem izdevumiem nepieciešama uzmanība",
       "securityFinding": "Drošības atradumam nepieciešama uzmanība",
       "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} bilance nokrita zem ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Izdevumu brīdinājums",
+      "body": "{{scopeName}} izdevumi pārsniedza ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Jauns drošības atradums ({{severity}})",

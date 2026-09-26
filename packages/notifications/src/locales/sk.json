@@ -7,7 +7,7 @@
       "instanceLifecycle": "Vaša inštancia má aktualizáciu",
       "scheduledAction": "Naplánovaná akcia má aktualizáciu",
       "lowBalance": "Váš zostatok si vyžaduje pozornosť",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Vaša útrata si vyžaduje pozornosť",
       "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť",
       "activeAgentsGlanceable": "Aktívni agenti majú aktualizáciu"
     }
@@ -44,8 +44,8 @@
       "body": "Zostatok {{organizationName}} klesol pod ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Upozornenie na útratu",
+      "body": "Útrata {{scopeName}} prekročila ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nový bezpečnostný problém ({{severity}})",

@@ -13,7 +13,10 @@ export function resolveRemoteSpawnAdmission(input: {
   if (payload === null) {
     return { allowed: true };
   }
-  if (payload.files.length > 0 && instance.capabilities?.attachments !== true) {
+  // Optimistic CLI-capability gate: an instance whose `attachments`
+  // capability is still unknown (`undefined`) may receive files; only an
+  // explicit `attachments: false` blocks the file payload.
+  if (payload.files.length > 0 && instance.capabilities?.attachments === false) {
     return { allowed: false, toast: remoteSpawnFilesNotSupportedToast() };
   }
 

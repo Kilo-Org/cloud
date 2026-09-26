@@ -10,6 +10,12 @@ export class SessionForwardingError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean,
+    /**
+     * True when the frame was reported as delivered before the fence check
+     * failed. A delivered frame must not be retained and replayed: a
+     * non-receipted frame has no dedupe guard at the session DO.
+     */
+    readonly forwarded = false,
     readonly stage?: 'before_forward' | 'after_forward'
   ) {
     super(message);
@@ -40,10 +46,41 @@ export type SessionForward<TItem, TResult> = {
   item: TItem;
   /** Forwards one contiguous run in arrival order; returns one result per member. */
   run: (members: readonly SessionForwardRunMember<TItem>[]) => Promise<readonly TResult[]>;
+  /**
+   * Whether the frame consumes the shared forwarding admission budget. A
+   * replayed frame is already bounded by the retained-event queue, so charging
+   * it to the live budget would reject new live frames for every session while a
+   * backlog drains. An exempt frame still joins its session's chain, so a
+   * replayed prefix stays ahead of the live frames for that session.
+   */
+  admissionExempt?: boolean;
+};
+
+/**
+ * A single fenced frame: its deadline and fence are re-checked before and after
+ * the forward, so a fence that changes mid-flight is reported as a
+ * non-retryable `SessionForwardingError` that carries whether the send ran.
+ */
+export type FencedSessionForward<T> = {
+  sessionId: string;
+  bytes: number;
+  deadlineAt: number;
+  fence: () => Promise<boolean>;
+  forward: () => Promise<T>;
+  /**
+   * Whether a resolved `forward()` reached its destination. A fence rejection
+   * after `forward()` resolved is only marked delivered when this reports true,
+   * so a forward that never attempted its send stays retainable for replay.
+   * Defaults to true for callers that never inspect `forwarded`.
+   */
+  delivered?: (result: T) => boolean;
+  /** See `SessionForward.admissionExempt`. */
+  admissionExempt?: boolean;
 };
 
 export type SessionForwarding = {
   enqueue: <TItem, TResult>(input: SessionForward<TItem, TResult>) => Promise<TResult>;
+  enqueueFenced: <T>(input: FencedSessionForward<T>) => Promise<T>;
   stats: () => SessionForwardingStats;
   get: (sessionId: string) => Promise<void> | undefined;
 };
@@ -52,6 +89,7 @@ type Entry = {
   readonly identity: string | null;
   readonly bytes: number;
   readonly items: number;
+  readonly metered: boolean;
   readonly admissionDepth: number;
   readonly item: unknown;
   readonly run: (
@@ -90,8 +128,9 @@ export function createSessionForwarding(): SessionForwarding {
   };
 
   const executeRun = async (run: readonly Entry[]): Promise<void> => {
-    stats.waiting -= run.length;
-    stats.inFlight += run.length;
+    const metered = run.filter(member => member.metered);
+    stats.waiting -= metered.length;
+    stats.inFlight += metered.length;
     try {
       const members: SessionForwardRunMember<unknown>[] = run.map(member => ({
         item: member.item,
@@ -104,13 +143,14 @@ export function createSessionForwarding(): SessionForwarding {
         throw new SessionForwardingError(
           'Forwarding results are inconsistent',
           false,
+          false,
           'after_forward'
         );
       for (let index = 0; index < run.length; index++) run[index].settle(results[index]);
     } catch (error) {
       for (const member of run) member.fail(error);
     } finally {
-      for (const member of run) {
+      for (const member of metered) {
         stats.inFlight--;
         stats.bufferedBytes -= member.bytes;
       }
@@ -132,13 +172,14 @@ export function createSessionForwarding(): SessionForwarding {
   const enqueue = <TItem, TResult>(input: SessionForward<TItem, TResult>): Promise<TResult> => {
     if (input.bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
       return Promise.reject(
-        new SessionForwardingError('Forwarded frame is too large', false, 'before_forward')
+        new SessionForwardingError('Forwarded frame is too large', false, false, 'before_forward')
       );
     if (input.items > SANDBOX_EVENT_BATCH_MAX_ITEMS)
       return Promise.reject(
-        new SessionForwardingError('Forwarded batch is too large', false, 'before_forward')
+        new SessionForwardingError('Forwarded batch is too large', false, false, 'before_forward')
       );
-    if (!capacityAvailable(input.bytes))
+    const metered = input.admissionExempt !== true;
+    if (metered && !capacityAvailable(input.bytes))
       return Promise.reject(new SessionForwardingError('Forwarding capacity is unavailable', true));
     let session = sessions.get(input.sessionId);
     if (session === undefined) {
@@ -150,6 +191,7 @@ export function createSessionForwarding(): SessionForwarding {
       identity: input.identity,
       bytes: input.bytes,
       items: input.items,
+      metered,
       admissionDepth: session.queue.length,
       item: input.item,
       run: input.run as (
@@ -158,14 +200,44 @@ export function createSessionForwarding(): SessionForwarding {
       settle: result => deferred.resolve(result as TResult),
       fail: error => deferred.reject(error),
     });
-    stats.waiting++;
-    stats.bufferedBytes += input.bytes;
+    if (metered) {
+      stats.waiting++;
+      stats.bufferedBytes += input.bytes;
+    }
     if (session.pump === undefined) session.pump = pump(session, input.sessionId);
     return deferred.promise;
   };
 
+  const runFenced = async <T>(input: FencedSessionForward<T>): Promise<T> => {
+    if (Date.now() >= input.deadlineAt || !(await input.fence()) || Date.now() >= input.deadlineAt)
+      throw new SessionForwardingError('Forwarding fence changed', false);
+    const result = await input.forward();
+    if (Date.now() >= input.deadlineAt || !(await input.fence()) || Date.now() >= input.deadlineAt)
+      throw new SessionForwardingError(
+        'Forwarding fence changed',
+        false,
+        input.delivered?.(result) ?? true
+      );
+    return result;
+  };
+
   return {
     enqueue,
+    enqueueFenced<T>(input: FencedSessionForward<T>): Promise<T> {
+      if (input.bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+        return Promise.reject(
+          new SessionForwardingError('Forwarded frame is too large', false, false, 'before_forward')
+        );
+      return enqueue<FencedSessionForward<T>, T>({
+        sessionId: input.sessionId,
+        identity: null,
+        bytes: input.bytes,
+        items: 1,
+        item: input,
+        admissionExempt: input.admissionExempt === true,
+        run: async () => [await runFenced(input)],
+      });
+    },
     stats: () => ({ ...stats }),
     get: sessionId => sessions.get(sessionId)?.pump,
   };

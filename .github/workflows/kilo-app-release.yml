@@ -233,11 +233,6 @@ jobs:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
-          # The tag pushes below need Workflows: write. GitHub refuses a
-          # GITHUB_TOKEN tag push when the tagged commit's .github/workflows
-          # differs from every branch tip, which happens whenever a workflow
-          # change merges while this job runs.
-          token: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -336,8 +331,22 @@ jobs:
       # same commit pushes a second, distinct marker instead of failing on a
       # name that already exists. An annotated tag needs a tagger identity; the
       # runner has none.
+      # Both tag pushes use KILO_APP_RELEASE_TOKEN (workflow scope): GitHub
+      # refuses a GITHUB_TOKEN tag push when the tagged commit's
+      # .github/workflows differs from every branch tip, which happens whenever
+      # a workflow change merges while this job runs. The token reaches only
+      # these two steps, never .git/config, so pnpm and eas-cli cannot read it.
+      # GIT_CONFIG_* is command-line level: the empty value drops the persisted
+      # GITHUB_TOKEN header, and the second entry sends the release token.
       - name: Mark the iOS upload
+        env:
+          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
         run: |
+          AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $AUTH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           MARKER="kilo-app-upload/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -359,7 +368,14 @@ jobs:
       # Release detection only: the next run reads this to find the last release.
       # The upload cap never counts it (a partial run writes no release tag).
       - name: Tag release
+        env:
+          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
         run: |
+          AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $AUTH"
           TAG="kilo-app-release/$(date -u +%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
           # The tag name is deterministic, so a rerun of this commit recomputes
           # the tag a failed attempt already pushed. Reuse it: the failure that

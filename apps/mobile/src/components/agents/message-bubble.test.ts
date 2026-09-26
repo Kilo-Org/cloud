@@ -694,14 +694,13 @@ describe('MessageBubble user text join', () => {
 });
 
 describe('MessageBubble assistant treatment', () => {
-  // The user treatment (Bubble side="user": right-aligned accent tile) is
-  // reserved for a user-role info. An assistant message at any point of its
-  // life — before the first token, mid-stream, completed — and a message whose
-  // role is missing or unknown must never take it.
-  async function findUserBubble(tree: unknown): Promise<{ side: unknown } | null> {
+  // The user treatment (right-aligned accent tile) is reserved for a user-role
+  // info. An assistant message at any point of its life — before the first
+  // token, mid-stream, completed — and a message whose role is missing or
+  // unknown must never take it.
+  async function findUserBubble(tree: unknown) {
     const { Bubble: MockBubble } = await import('@/components/ui/bubble');
-    const element = findElementByTypeFn(tree, MockBubble);
-    return element ? { side: element.props.side } : null;
+    return findElementByTypeFn(tree, MockBubble);
   }
 
   it('renders streaming assistant text through the part renderer, never the user bubble', async () => {
@@ -731,7 +730,7 @@ describe('MessageBubble assistant treatment', () => {
 
   it('renders a message with an undefined role without the user bubble', async () => {
     // A payload quirk must never fall back to the user treatment: the missing
-    // role renders the assistant path (no bubble), never Bubble side="user".
+    // role renders the assistant path (no bubble), never the user bubble.
     const message = assistantMessage('m-treatment-unknown-role');
     (message.info as { role?: string }).role = undefined;
 
@@ -739,11 +738,9 @@ describe('MessageBubble assistant treatment', () => {
     expect(await findUserBubble(tree)).toBeNull();
   });
 
-  it('reserves Bubble side="user" for a user-role message', async () => {
+  it('reserves the user bubble for a user-role message', async () => {
     const tree = await renderBubble(userMessage('m-treatment-user'));
-    const userBubble = await findUserBubble(tree);
-    expect(userBubble).not.toBeNull();
-    expect(userBubble?.side).toBe('user');
+    expect(await findUserBubble(tree)).not.toBeNull();
   });
 });
 

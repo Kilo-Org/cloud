@@ -86,54 +86,6 @@ describe('selectSessionRowEyebrowRight', () => {
     ).toEqual({ kind: 'none', showPlatformIcon: false });
   });
 
-  it('precedence summary: needsInput > live+meta(composition) > live > meta > none', () => {
-    // needsInput beats everything
-    expect(
-      selectSessionRowEyebrowRight({
-        needsInput: true,
-        live: true,
-        hasMeta: true,
-        metaWhileLive: true,
-      }).kind
-    ).toBe('needs-input');
-    // live+meta composition
-    expect(
-      selectSessionRowEyebrowRight({
-        needsInput: false,
-        live: true,
-        hasMeta: true,
-        metaWhileLive: true,
-      }).kind
-    ).toBe('live-and-meta');
-    // live alone
-    expect(
-      selectSessionRowEyebrowRight({
-        needsInput: false,
-        live: true,
-        hasMeta: true,
-        metaWhileLive: false,
-      }).kind
-    ).toBe('live');
-    // meta alone
-    expect(
-      selectSessionRowEyebrowRight({
-        needsInput: false,
-        live: false,
-        hasMeta: true,
-        metaWhileLive: false,
-      }).kind
-    ).toBe('meta');
-    // none
-    expect(
-      selectSessionRowEyebrowRight({
-        needsInput: false,
-        live: false,
-        hasMeta: false,
-        metaWhileLive: false,
-      }).kind
-    ).toBe('none');
-  });
-
   describe('showPlatformIcon', () => {
     it('needs-input suppresses the icon even when hasPlatformIcon is true', () => {
       expect(

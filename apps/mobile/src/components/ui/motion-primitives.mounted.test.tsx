@@ -14,6 +14,9 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#8A8680' }),
+}));
 vi.mock('@/lib/a11y/motion', () => ({
   useMotionPolicy: () => ({
     reducedMotion: policy.reducedMotion,

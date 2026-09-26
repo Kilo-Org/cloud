@@ -2,7 +2,7 @@ import { type ScrollViewProps, View } from 'react-native';
 
 import { Loader2 } from '@/components/ui/icons';
 import { useProvidedMotionPolicy } from '@/lib/a11y/motion-context';
-import { darkColors } from '@/lib/hooks/theme-colors.generated';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type RefreshProgressProps = {
   refreshControl: NonNullable<ScrollViewProps['refreshControl']>;
@@ -19,6 +19,7 @@ export const REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT = 31.5;
 
 export function RefreshProgress({ refreshControl }: Readonly<RefreshProgressProps>) {
   const reducedMotion = useProvidedMotionPolicy()?.reducedMotion ?? false;
+  const themeColors = useThemeColors();
   const { colors, refreshing, tintColor } = refreshControl.props;
   const showStaticProgress = reducedMotion && refreshing;
 
@@ -30,7 +31,7 @@ export function RefreshProgress({ refreshControl }: Readonly<RefreshProgressProp
       pointerEvents="none"
     >
       {showStaticProgress ? (
-        <Loader2 color={tintColor ?? colors?.[0] ?? darkColors.mutedForeground} size={20} />
+        <Loader2 color={tintColor ?? colors?.[0] ?? themeColors.mutedForeground} size={20} />
       ) : null}
     </View>
   );

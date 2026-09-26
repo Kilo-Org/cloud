@@ -42,8 +42,7 @@ const buttonVariants = cva(
 const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 
 // Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
-// but is identical in both themes (global.css --accent-soft-foreground).
+// buttonTextVariants below).
 function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
   if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
     return colors.foreground;
@@ -52,7 +51,7 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
     return colors.primary;
   }
   if (variant === 'accent-soft') {
-    return '#1A1A10';
+    return colors.accentSoftForeground;
   }
   // default, destructive
   return colors.primaryForeground;

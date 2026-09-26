@@ -90,13 +90,23 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     : null;
   const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
   const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
+  // A missing `withMembers` payload is not "off": the query can be paused
+  // offline or have errored with no persisted copy, so an org with the alert
+  // enabled must never read as disabled. Only a loaded payload with no stored
+  // threshold is genuinely off.
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
-  const lowBalanceSubtitle =
-    minimumBalance != null
-      ? t('organization.hub.lowBalanceBelow', {
-          amount: formatMoney(minimumBalance, i18n.language),
-        })
-      : t('common.off');
+  let lowBalanceSubtitle: string;
+  if (minimumBalance != null) {
+    lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
+      amount: formatMoney(minimumBalance, i18n.language),
+    });
+  } else if (orgWithMembers.data != null) {
+    lowBalanceSubtitle = t('common.off');
+  } else if (orgWithMembers.isError) {
+    lowBalanceSubtitle = t('common.unknown');
+  } else {
+    lowBalanceSubtitle = t('common.loading');
+  }
 
   return (
     <View className="flex-1 bg-background">

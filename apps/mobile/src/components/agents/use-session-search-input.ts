@@ -8,18 +8,8 @@ import {
   resolveSearchRestoreDecision,
   type SessionSearchController,
 } from '@/components/agents/session-search-state';
-import type * as DraftsModule from '@/lib/persist/drafts';
-
-// Durable draft persistence is loaded lazily via dynamic import so pure unit
-// tests that import this hook never load encrypted-kv (expo-sqlite/drizzle).
-
-let draftsPromise: Promise<typeof DraftsModule> | null = null;
-
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-function getDrafts(): Promise<typeof DraftsModule> {
-  draftsPromise ??= import('@/lib/persist/drafts');
-  return draftsPromise;
-}
+import { SESSION_SEARCH_DRAFT_KEY, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 /** TextInput remount key while the durable draft is still loading / empty. */
 const SESSION_SEARCH_DEFAULT_INPUT_KEY = 'session-search-empty';
@@ -109,21 +99,24 @@ export function useSessionSearchInput({
   const [searchInputKey, setSearchInputKey] = useState(SESSION_SEARCH_DEFAULT_INPUT_KEY);
   const [searchDefaultValue, setSearchDefaultValue] = useState<string | undefined>(undefined);
 
-  // Persist the visible typed string (durable, flushed). Skipped while the
+  // Persist the visible typed string through the 500 ms durable draft
+  // debounce — the per-key pending timer is left to commit on its own so
+  // typing never forces an encrypted write per keystroke. Skipped while the
   // account has not resolved (DEC-01 account scope).
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
+
+  // The debounced write still has to survive a background/kill inside the
+  // window, so flush the pending search draft when the app leaves `active`
+  // and on unmount.
+  useDraftFlushOnBackground(userId, SESSION_SEARCH_DRAFT_KEY, true);
 
   const saveSearchDraft = useCallback((text: string) => {
     const uid = userIdRef.current;
     if (!uid) {
       return;
     }
-    void (async () => {
-      const { saveDraft, flushDraft, SESSION_SEARCH_DRAFT_KEY } = await getDrafts();
-      saveDraft(uid, SESSION_SEARCH_DRAFT_KEY, text);
-      void flushDraft(uid, SESSION_SEARCH_DRAFT_KEY);
-    })();
+    saveDraft(uid, SESSION_SEARCH_DRAFT_KEY, text);
   }, []);
 
   const handleSearchChange = useCallback(

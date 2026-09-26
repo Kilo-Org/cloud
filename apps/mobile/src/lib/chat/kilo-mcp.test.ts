@@ -275,6 +275,27 @@ describe('the snapshot a screen draws', () => {
 
     expect(seen).toEqual(['connecting', 'ready']);
   });
+
+  it('draws the answer it serves from the cache, over another scope that is connecting', async () => {
+    await ensureKiloMcp(place);
+    const gate: { release?: () => void } = {};
+    answer = () =>
+      Effect.async<readonly Tool[], RemoteMcpError>(resume => {
+        gate.release = () => {
+          resume(Effect.succeed([tool]));
+        };
+      });
+    const other = ensureKiloMcp({ ...place, chatScope: 'user-1:org-1' });
+    expect(kiloMcpState()).toEqual({ status: 'connecting' });
+
+    await ensureKiloMcp(place);
+
+    /* The registry builds a chat from the snapshot, so a cached answer that is
+       served but not drawn opens the chat on the base tools. */
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+    gate.release?.();
+    await other;
+  });
 });
 
 describe('a call that could not reach the server', () => {

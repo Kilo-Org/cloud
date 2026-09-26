@@ -209,6 +209,12 @@ async function connect(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
 async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpState> {
   const key = keyFor(place);
   if (cached?.key === key && cached.state.status === 'ready') {
+    /* The registry reads the snapshot, not this return value. Another scope's
+       discovery may have published over it since, so the answer served is
+       published too. */
+    if (snapshot !== cached.state) {
+      publish(cached.state);
+    }
     return cached.state;
   }
   if (inFlight?.key === key) {

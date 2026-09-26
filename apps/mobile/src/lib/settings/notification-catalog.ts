@@ -20,6 +20,7 @@ const NOTIFICATION_DESCRIPTIONS = {
   kiloclawActivity: 'Notify about KiloClaw activity.',
   balanceAlerts: 'Notify about balance alerts.',
   securityFindings: 'Notify about security findings.',
+  spendAlerts: 'Notify about spend alerts: threshold crossings and hourly spikes.',
 } satisfies Record<NotificationCategoryKey, string>;
 
 export const notificationToggleEntries: readonly AppSettingEntry[] = NOTIFICATION_CATEGORY_KEYS.map(

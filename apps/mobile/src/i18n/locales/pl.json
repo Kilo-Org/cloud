@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozytoria",
     "securityAgent": "Agent bezpieczeństwa",
     "unknown": "Brak danych",
@@ -1564,7 +1564,7 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -2945,7 +2945,7 @@
       "editA11y": "Edytuj komentarz do wysłania: {{location}}",
       "editOutdatedA11y": "Edytuj nieaktualny komentarz do wysłania: {{location}}",
       "noCommentsQueued": "Nie ma komentarzy do wysłania. Przegląd zostanie wysłany tylko z wybranym powyżej rodzajem przeglądu.",
-      "staleHint": "pR zmienił się od czasu napisania tego komentarza.",
+      "staleHint": "PR zmienił się od czasu napisania tego komentarza.",
       "staleQueueHint": "Komentarze dotyczące starszego commita nie są wysyłane. Pozostają w kolejce. Możesz je edytować lub usunąć.",
       "summaryA11y": "Podsumowanie przeglądu",
       "summaryPlaceholder": "Opcjonalne podsumowanie przeglądu"

@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { deflateRawSync } from 'node:zlib';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   checkResourceShrinking,
@@ -163,4 +165,54 @@ test('inspectJsBundles lacks maskAllText when the bundle omits it', () => {
 test('inspectJsBundles reports hasDebugId false when debug-id markers are absent', () => {
   const result = withFixture([['index.jsbundle', INSPECT_JS_NEEDLES.join(' ')]], inspectJsBundles);
   assert.equal(result.hasDebugId, false);
+});
+
+function runSelect(builds) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-select-test-'));
+  const buildJsonPath = join(work, 'build.json');
+  try {
+    writeFileSync(buildJsonPath, JSON.stringify(builds));
+    return spawnSync(
+      'node',
+      [
+        fileURLToPath(new URL('./inspect-mobile-artifacts.mjs', import.meta.url)),
+        '--select',
+        buildJsonPath,
+      ],
+      { encoding: 'utf8' }
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('--select prints the iOS, Android and iOS build artifacts URLs, and requires the last', () => {
+  const ios = {
+    platform: 'IOS',
+    status: 'FINISHED',
+    artifacts: {
+      applicationArchiveUrl: 'https://example.invalid/app.ipa',
+      buildArtifactsUrl: 'https://example.invalid/build-artifacts.tar.gz',
+    },
+  };
+  const android = {
+    platform: 'ANDROID',
+    status: 'FINISHED',
+    artifacts: { applicationArchiveUrl: 'https://example.invalid/app.aab' },
+  };
+
+  const selected = runSelect([android, ios]);
+  assert.equal(selected.status, 0, selected.stderr);
+  assert.equal(
+    selected.stdout,
+    'https://example.invalid/app.ipa\nhttps://example.invalid/app.aab\nhttps://example.invalid/build-artifacts.tar.gz\n'
+  );
+
+  const missing = runSelect([
+    { ...ios, artifacts: { applicationArchiveUrl: ios.artifacts.applicationArchiveUrl } },
+    android,
+  ]);
+  assert.equal(missing.status, 1);
+  assert.equal(missing.stdout, '');
+  assert.match(missing.stderr, /IOS build has no artifacts\.buildArtifactsUrl/);
 });

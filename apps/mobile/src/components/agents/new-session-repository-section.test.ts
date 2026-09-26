@@ -109,6 +109,33 @@ beforeEach(() => {
   collapseState.setConnectCtaCollapsed.mockClear();
 });
 
+describe('NewSessionRepositorySection repository picker', () => {
+  it('renders the picker under the Repository heading when no provider has rows yet', () => {
+    // Findings 1 and 2: with both providers settled-empty but no rows, the
+    // picker was gated off (`hasRepos || anyLoading`), leaving only the
+    // `Repository` heading above the Start session button — a blank void with
+    // no control under it. The picker trigger reserves its height and already
+    // covers loading, empty and disabled, so it must always render.
+    const renderer = mountSection({
+      repositories: [],
+      groups: [group('github', 'repos'), group('gitlab', 'repos')],
+    });
+
+    expect(renderer.root.findAllByType('RepoSelector' as never)).toHaveLength(1);
+  });
+
+  it('renders the picker in its loading state while every provider is unsettled', () => {
+    const renderer = mountSection({
+      repositories: [],
+      groups: [group('github', 'loading'), group('gitlab', 'loading')],
+    });
+
+    const picker = renderer.root.findAllByType('RepoSelector' as never)[0];
+    expect(picker).toBeDefined();
+    expect(picker?.props.isLoading).toBe(true);
+  });
+});
+
 describe('NewSessionRepositorySection branch row', () => {
   it.each([
     ['github:owner/repo', githubRow],

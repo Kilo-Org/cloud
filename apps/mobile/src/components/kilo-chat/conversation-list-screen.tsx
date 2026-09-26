@@ -33,7 +33,7 @@ import {
   useLeaveConversation,
 } from './hooks/use-conversations';
 import { useInstancePresence } from './hooks/use-instance-presence';
-import { useNowTicker } from './hooks/use-now-ticker';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 
 type Props = {

@@ -712,7 +712,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editatu bidaltzeko dagoen iruzkin zaharkitua: {{location}}",
       "editA11y": "Editatu bidaltzeko dagoen iruzkina: {{location}}",
-      "staleHint": "pRa aldatu da hau idatzi zenuenetik.",
+      "staleHint": "PRa aldatu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu bidaltzeko dagoen iruzkina: {{location}}",
       "deletedAnnouncement": "Bidaltzeko zegoen iruzkina ezabatuta",
       "noCommentsQueued": "Ez dago iruzkinik ilaran. Berrikuspena goiko gertaerarekin soilik bidaliko da.",

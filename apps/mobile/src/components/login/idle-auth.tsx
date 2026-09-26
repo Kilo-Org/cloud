@@ -268,8 +268,10 @@ export function IdleAuth({
           variant="outline"
           size="lg"
           // min-h (not fixed h) so Dynamic Type can grow the control; keep
-          // Apple-parity 44pt floor and full-width rounded chrome. No flex-wrap:
-          // the label must stay on the icon's line, never wrap to its own.
+          // Apple-parity 44pt floor and full-width rounded chrome. The row is
+          // pinned to one line (no flex-wrap) so the Google and passkey buttons
+          // keep the same height: a wrapped label made the passkey button a row
+          // taller than the Google button above it (2026-09-20 device finding).
           className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
           onPress={() => void signInWithGoogle()}
@@ -293,8 +295,12 @@ export function IdleAuth({
             variant="outline"
             size="lg"
             // min-h (not fixed h) so Dynamic Type can grow the control, matching
-            // the Google button's Apple-parity 44pt floor. No flex-wrap: the label
-            // must stay on the icon's line, never wrap to its own.
+            // the Google button's Apple-parity 44pt floor. No flex-wrap: the
+            // label must stay on the icon's line, never wrap to its own. The
+            // Arabic label ("تسجيل الدخول بمفتاح المرور") wrapped onto two lines
+            // and made this button visibly taller than the single-line Google
+            // button directly above it; the flex-1 label box gives the copy the
+            // whole remaining row width, so the stack keeps one row height.
             className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
             disabled={authBusy}
             onPress={() => {

@@ -110,8 +110,8 @@ function useReportedKeyboardHeight(): number {
 export function useAppAwareKeyboardPadding(): number {
   const { bottom } = useSafeAreaInsets();
   const reportedHeight = useReportedKeyboardHeight();
-  // `resolveKeyboardBottomPadding` reserves the bottom bar alone at rest; this
-  // view reserves nothing until the keyboard is up.
+  // `resolveKeyboardBottomPadding` reserves the bottom chrome alone at rest;
+  // this view reserves nothing until the keyboard is up.
   return reportedHeight > 0
     ? resolveKeyboardBottomPadding({
         keyboardHeight: reportedHeight,

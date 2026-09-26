@@ -3209,6 +3209,7 @@
     "emptyTitle": "Nema pouzdanih hostova",
     "emptyDescription": "Kada označiš host kao pouzdan, linkovi ka njemu otvaraju se bez ponovne potvrde.",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
+    "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
     "backToPreferences": "Nazad na podešavanja"
   },
   "quickChat": {

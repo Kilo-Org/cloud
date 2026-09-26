@@ -3209,6 +3209,7 @@
     "emptyTitle": "No hi ha servidors de confiança",
     "emptyDescription": "Quan confies en el servidor d'un enllaç, els seus enllaços s'obren sense tornar a demanar confirmació.",
     "revoke": "Deixa de confiar en {{host}}",
+    "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
     "backToPreferences": "Torna a les preferències"
   },
   "quickChat": {

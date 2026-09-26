@@ -3166,6 +3166,7 @@
     "emptyTitle": "Geen vertroude gashere nie",
     "emptyDescription": "As jy 'n skakel se gasheer vertrou, maak skakels na daardie gasheer oop sonder om weer toestemming te vra.",
     "revoke": "Herroep vertroue in {{host}}",
+    "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
     "backToPreferences": "Terug na voorkeure"
   },
   "quickChat": {

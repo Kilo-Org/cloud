@@ -3166,6 +3166,7 @@
     "emptyTitle": "Kāore he paetukutuku whirinaki",
     "emptyDescription": "Ina whakawhirinaki koe ki te paetukutuku o tētahi hononga, ka tuwhera taua hononga me te kore pātai anō.",
     "revoke": "Whakakorea te whirinaki ki {{host}}",
+    "revokeMessage": "Ka pātai anō ngā hononga ki tēnei paetukutuku mō te whakaaetanga.",
     "backToPreferences": "Hoki ki ngā manakohanga"
   },
   "quickChat": {

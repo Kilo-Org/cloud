@@ -3166,6 +3166,7 @@
     "emptyTitle": "신뢰하는 호스트 없음",
     "emptyDescription": "링크의 호스트를 신뢰하도록 설정하면 다음부터 확인 없이 링크가 열립니다.",
     "revoke": "{{host}} 신뢰 해제",
+    "revokeMessage": "이 호스트로 향하는 링크는 다시 확인을 요청합니다.",
     "backToPreferences": "환경설정으로 돌아가기"
   },
   "quickChat": {

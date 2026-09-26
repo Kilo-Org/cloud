@@ -3166,6 +3166,7 @@
     "emptyTitle": "Pa gen domèn ou fè konfyans",
     "emptyDescription": "Lè ou fè domèn yon lyen konfyans, lyen an louvri san li pa mande konfimasyon ankò.",
     "revoke": "Retire {{host}}",
+    "revokeMessage": "Lyen pou domèn sa a ap mande konfimasyon ankò.",
     "backToPreferences": "Tounen nan preferans yo"
   },
   "quickChat": {

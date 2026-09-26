@@ -3252,6 +3252,7 @@
     "emptyTitle": "Brak zaufanych hostów",
     "emptyDescription": "Gdy zaufasz hostowi, linki do niego będą otwierane bez ponownego pytania.",
     "revoke": "Cofnij zaufanie do {{host}}",
+    "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
     "backToPreferences": "Wróć do preferencji"
   },
   "quickChat": {

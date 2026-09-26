@@ -3209,6 +3209,7 @@
     "emptyTitle": "Nenhum domínio confiável",
     "emptyDescription": "Ao marcar um domínio como confiável, seus links abrem sem pedir confirmação novamente.",
     "revoke": "Deixar de confiar em {{host}}",
+    "revokeMessage": "Os links para este domínio voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {

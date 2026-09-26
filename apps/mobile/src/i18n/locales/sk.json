@@ -3252,6 +3252,7 @@
     "emptyTitle": "Žiadne dôveryhodné servery",
     "emptyDescription": "Ak označíš server za dôveryhodný, odkazy naň sa budú otvárať bez ďalšieho potvrdenia.",
     "revoke": "Zrušiť dôveru serveru {{host}}",
+    "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
     "backToPreferences": "Späť na predvoľby"
   },
   "quickChat": {

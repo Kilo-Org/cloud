@@ -3166,6 +3166,7 @@
     "emptyTitle": "Ingen betroede domæner",
     "emptyDescription": "Hvis du har tillid til et domæne, åbnes links til det uden at spørge dig igen.",
     "revoke": "Fjern tillid til {{host}}",
+    "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
     "backToPreferences": "Tilbage til indstillinger"
   },
   "quickChat": {

@@ -3166,6 +3166,7 @@
     "emptyTitle": "沒有信任的主機",
     "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
     "revoke": "撤銷對 {{host}} 的信任",
+    "revokeMessage": "前往此主機的連結將再次要求確認。",
     "backToPreferences": "返回偏好設定"
   },
   "quickChat": {

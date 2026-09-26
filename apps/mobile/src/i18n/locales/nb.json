@@ -3166,6 +3166,7 @@
     "emptyTitle": "Ingen godkjente verter",
     "emptyDescription": "Når du godkjenner verten til en lenke, åpnes lenker til denne verten uten ny bekreftelse.",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
+    "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
     "backToPreferences": "Tilbake til innstillinger"
   },
   "quickChat": {

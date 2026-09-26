@@ -3166,6 +3166,7 @@
     "emptyTitle": "Ma jiraan martigeliyeyaal la aaminay",
     "emptyDescription": "Markaad aaminto martigeliyaha xiriiriyaha, xiriiriyuhu wuu furmaa adigoon mar kale la weydiin.",
     "revoke": "Ka noqo aaminaadda {{host}}",
+    "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
     "backToPreferences": "Ku noqo doorashooyinka"
   },
   "quickChat": {

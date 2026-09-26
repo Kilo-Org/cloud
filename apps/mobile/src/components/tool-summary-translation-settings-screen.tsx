@@ -45,7 +45,14 @@ export function ToolSummaryTranslationSettingsScreen() {
   // failed state through the refetch leaves the block in place and lets the
   // Retry button show the busy state until the request settles. Same contract
   // as `use-current-user-id`.
-  const catalogueError = isError || (isLoading && isFetched);
+  //
+  // Only a catalogue with nothing to fall back on is an error: a failed
+  // background refetch (remount after `staleTime`, or reconnect) still holds
+  // the populated cache, so the stored model and the loaded catalogue keep
+  // working. Blanking the row to `—` and disabling the picker there would drop
+  // a working selection, which the voice-input sibling never does (it treats a
+  // failed refetch as `error` only while `models` is empty).
+  const catalogueError = (isError || (isLoading && isFetched)) && models.length === 0;
 
   // Only a live catalogue can open the picker; while off, loading, failed, or
   // empty there is nothing to pick (retry lives in the state below).

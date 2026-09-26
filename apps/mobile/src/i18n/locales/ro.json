@@ -3209,6 +3209,7 @@
     "emptyTitle": "Nicio gazdă de încredere",
     "emptyDescription": "Dacă marchezi gazda unui link ca fiind de încredere, linkurile acesteia se vor deschide fără o nouă confirmare.",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
+    "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
     "backToPreferences": "Înapoi la preferințe"
   },
   "quickChat": {

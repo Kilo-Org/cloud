@@ -3166,6 +3166,7 @@
     "emptyTitle": "Chưa có máy chủ được tin cậy",
     "emptyDescription": "Khi bạn đánh dấu máy chủ là tin cậy, liên kết đến máy chủ đó sẽ mở mà không cần xác nhận lại.",
     "revoke": "Bỏ tin cậy {{host}}",
+    "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
     "backToPreferences": "Quay lại cài đặt"
   },
   "quickChat": {

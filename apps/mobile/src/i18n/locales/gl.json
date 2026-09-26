@@ -3166,6 +3166,7 @@
     "emptyTitle": "Non hai dominios de confianza",
     "emptyDescription": "Se confías no dominio dunha ligazón, as súas ligazóns abriranse sen pedir confirmación.",
     "revoke": "Revogar a confianza en {{host}}",
+    "revokeMessage": "As ligazóns a este dominio volverán pedir confirmación.",
     "backToPreferences": "Volver ás preferencias"
   },
   "quickChat": {

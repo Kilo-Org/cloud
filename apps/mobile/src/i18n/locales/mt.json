@@ -3295,6 +3295,7 @@
     "emptyTitle": "L-ebda ospitant fdat",
     "emptyDescription": "Meta tafda lill-ospitant ta' rabta, ir-rabta tinfetaħ mingħajr ma tintalab konferma oħra.",
     "revoke": "Irtira l-fiduċja f'{{host}}",
+    "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
     "backToPreferences": "Lura għall-preferenzi"
   },
   "quickChat": {

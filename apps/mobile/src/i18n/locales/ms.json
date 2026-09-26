@@ -3166,6 +3166,7 @@
     "emptyTitle": "Tiada hos yang dipercayai",
     "emptyDescription": "Jika anda mempercayai hos sesuatu pautan, pautan ke hos itu akan dibuka tanpa meminta pengesahan lagi.",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
+    "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
     "backToPreferences": "Kembali ke keutamaan"
   },
   "quickChat": {

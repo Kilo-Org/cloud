@@ -1123,8 +1123,8 @@
       "includeExistingFindingsAnalysisSubtitle": "Analyse aussi les signalements déjà synchronisés. Cela peut consommer des crédits supplémentaires.",
       "includeExistingFindingsRemediationSubtitle": "Ajoute aussi à la file d'attente les signalements admissibles déjà analysés. Les PR en double ne sont pas créées.",
       "minimumSeverity": "Gravité minimale",
-      "queued": "{{displayCount}} problèmes déjà détectés ont été mis en file d'attente pour analyse.",
-      "queued_other": "{{displayCount}} problèmes déjà détectés ont été mis en file d'attente pour analyse.",
+      "queued": "{{displayCount}} signalements déjà détectés ont été mis en file d'attente pour analyse.",
+      "queued_other": "{{displayCount}} signalements déjà détectés ont été mis en file d'attente pour analyse.",
       "queued_one": "{{displayCount}} signalement existant ajouté à la file d'attente d'analyse.",
       "requireApproval": "Exiger une approbation avant la correction automatique",
       "requireApprovalSubtitle": "La correction automatique attend votre approbation avant d'ouvrir des PR.",
@@ -1133,7 +1133,7 @@
       "severityHighAndAbove": "Élevée ou plus",
       "severityMediumAndAbove": "Moyenne ou plus",
       "title": "Automatisation",
-      "queued_many": "{{displayCount}} vulnérabilités existantes mises en attente d'analyse."
+      "queued_many": "{{displayCount}} signalements existants mis en attente d'analyse."
     },
     "dashboard": {
       "actFirst": "Actions prioritaires",

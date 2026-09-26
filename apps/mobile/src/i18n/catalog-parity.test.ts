@@ -27,8 +27,13 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * No key is pending. Every catalog has the profile-editor and preview copy.
- * Keep the missing-key assertion strict.
+ * Empty: the `notifications.category.*Unavailable` reasons, the profile-editor
+ * validation copy (the duplicate-key refusal and the MCP bound messages), the
+ * session-preview copy, and the `/` suggestion list's skill-row keys
+ * (`agentChat.slashCommands.skillBadge` and
+ * `agentChat.slashCommands.useSkillCommand`, added by
+ * `slash-command-suggestions.tsx`) have all landed in every catalog, so the
+ * missing-key assertion is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

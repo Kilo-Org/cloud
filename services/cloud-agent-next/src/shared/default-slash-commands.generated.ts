@@ -11,9 +11,10 @@ export type SlashCommandInfo = {
 /**
  * Source Kilo version / ref used to generate this catalog.
  *
- * Note: skills (source: 'skill') are intentionally omitted. The Kilo TUI
- * filters them from slash-command autocomplete, so they never appear in the
- * local `/` list even though they can be invoked by typing the name manually.
+ * Note: this snapshot is generated with project config disabled, so it carries
+ * the commands the CLI always has and no session skills. Skills are surfaced
+ * from the live wrapper-reported catalog, which keeps every `source: 'skill'`
+ * row the CLI reports for the session.
  *
  * Regenerate with `pnpm --filter cloud-agent-next update-default-slash-commands`.
  */

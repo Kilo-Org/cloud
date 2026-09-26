@@ -312,7 +312,10 @@ export function resetEncryptedKvOpenForTests(): void {
 export async function getItem(scope: string, k: string): Promise<string | null> {
   validateItemKey(scope, k);
   const db = await openDatabase();
-  const row = db
+  // The row type is spelled out so type-aware lint sees the selected value as a
+  // non-nullish `string` on every TypeScript line; the select builder's derived
+  // return type is otherwise read as always-nullish by tsgolint on TS 7.
+  const row: { v: string } | undefined = db
     .select({ v: kv.v })
     .from(kv)
     .where(and(eq(kv.scope, scope), eq(kv.k, k)))

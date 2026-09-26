@@ -413,7 +413,7 @@ function withPodfileLock(text, run) {
   }
 }
 
-test('readPodfileLockComponents lists one versioned, hashed component per root pod', () => {
+test('readPodfileLockComponents lists one versioned component per root pod', () => {
   const podfileLock = `PODS:
   - EXConstants (17.0.8):
     - ExpoModulesCore
@@ -443,32 +443,51 @@ COCOAPODS: 1.15.2
     readPodfileLockComponents({ podfileLockPath })
   );
 
+  // SPEC CHECKSUMS hashes the podspec, so it is a labelled property, never a
+  // component hash that would claim to identify the shipped code.
+  const podspec = checksum =>
+    checksum === undefined
+      ? [{ name: 'kilo:sbom:ios-kind', value: 'podfile-lock' }]
+      : [
+          { name: 'kilo:sbom:ios-kind', value: 'podfile-lock' },
+          { name: 'kilo:sbom:podspec-checksum', value: checksum },
+        ];
   assert.deepEqual(
-    components.map(({ name, version, purl, hashes }) => ({ name, version, purl, hashes })),
+    components.map(({ name, version, purl, hashes, extraProperties }) => ({
+      name,
+      version,
+      purl,
+      hashes,
+      extraProperties,
+    })),
     [
       {
         name: 'EXConstants',
         version: '17.0.8',
         purl: 'pkg:cocoapods/EXConstants@17.0.8',
-        hashes: [{ alg: 'SHA-1', content: 'fcfc75800824ac2d5c592b5bc74130bad17b146b' }],
+        hashes: [],
+        extraProperties: podspec('fcfc75800824ac2d5c592b5bc74130bad17b146b'),
       },
       {
         name: 'hermes-engine',
         version: '0.76.9',
         purl: 'pkg:cocoapods/hermes-engine@0.76.9',
-        hashes: [{ alg: 'SHA-1', content: '06a9c6900587420b90accc394199527c64259db4' }],
+        hashes: [],
+        extraProperties: podspec('06a9c6900587420b90accc394199527c64259db4'),
       },
       {
         name: 'React-Core',
         version: '0.76.9',
         purl: 'pkg:cocoapods/React-Core@0.76.9',
-        hashes: [{ alg: 'SHA-1', content: '4f1ba1b2a3b94ba77d4b0c9d5ebcd2c9fd9d2d8e' }],
+        hashes: [],
+        extraProperties: podspec('4f1ba1b2a3b94ba77d4b0c9d5ebcd2c9fd9d2d8e'),
       },
       {
         name: 'RCT-Folly',
         version: '2024.10.14.00',
         purl: 'pkg:cocoapods/RCT-Folly@2024.10.14.00',
-        hashes: [{ alg: 'SHA-1', content: '84578c8756030547307e4572ab1947de1685c599' }],
+        hashes: [],
+        extraProperties: podspec('84578c8756030547307e4572ab1947de1685c599'),
       },
       // Listed only as a subspec and absent from SPEC CHECKSUMS.
       {
@@ -476,20 +495,19 @@ COCOAPODS: 1.15.2
         version: '8.48.0',
         purl: 'pkg:cocoapods/Sentry@8.48.0',
         hashes: [],
+        extraProperties: podspec(undefined),
       },
     ]
   );
   for (const component of components) {
     assert.equal(component.ecosystem, 'cocoapods');
-    assert.deepEqual(component.extraProperties, [
-      { name: 'kilo:sbom:ios-kind', value: 'podfile-lock' },
-    ]);
   }
 });
 
 test('readPodfileLockComponents rejects a missing, empty or malformed Podfile.lock', () => {
   assert.throws(
-    () => readPodfileLockComponents({ podfileLockPath: join(tmpdir(), 'kilo-missing-Podfile.lock') }),
+    () =>
+      readPodfileLockComponents({ podfileLockPath: join(tmpdir(), 'kilo-missing-Podfile.lock') }),
     /cannot read Podfile\.lock/
   );
   assert.throws(

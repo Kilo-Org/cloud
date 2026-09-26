@@ -46,7 +46,7 @@ const ECOSYSTEM_ORDER = ['npm', 'cocoapods', 'maven', 'native-library'];
 const ECOSYSTEM_SOURCES = {
   npm: 'pnpm-lock.yaml production dependency closure of apps/mobile (the minified shipped JS bundle carries no package metadata)',
   cocoapods:
-    'Podfile.lock of the EAS build (one component per root pod in PODS:, subspecs collapsed, hash = SPEC CHECKSUMS podspec SHA-1) plus an IPA scan: Mach-O LC_LOAD_DYLIB/weak/reexport install names and Payload/*.app/Frameworks/ (OS-provided /usr/lib and /System/Library libraries excluded)',
+    'Podfile.lock of the EAS build (one component per root pod in PODS:, subspecs collapsed; the SPEC CHECKSUMS podspec checksum is the kilo:sbom:podspec-checksum property, not a component hash) plus an IPA scan: Mach-O LC_LOAD_DYLIB/weak/reexport install names and Payload/*.app/Frameworks/ (OS-provided /usr/lib and /System/Library libraries excluded)',
   maven:
     'AAB BUNDLE-METADATA/com.android.tools.build.libraries/dependencies.pb (Android Gradle Plugin resolved Maven artifacts)',
   'native-library': 'AAB base/lib/**/*.so',

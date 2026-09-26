@@ -61,7 +61,10 @@ const KILO_IOS_KIND = 'kilo:sbom:ios-kind';
 const KIND_LOAD_COMMAND = 'dylib-load-command';
 const KIND_DYNAMIC_FRAMEWORK = 'dynamic-framework';
 const KIND_PODFILE_LOCK = 'podfile-lock';
-const SHA1_RE = /^[0-9a-f]{40}$/;
+// SPEC CHECKSUMS is SHA-1 in current CocoaPods; accept SHA-256 so a CocoaPods
+// upgrade cannot block a release.
+const PODSPEC_CHECKSUM_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const KILO_PODSPEC_CHECKSUM = 'kilo:sbom:podspec-checksum';
 // A top-level PODS: entry, `  - Name (1.2.3)`, with a trailing `:` when it lists
 // dependencies. Its dependency lines are indented further and never match.
 const POD_ENTRY_RE = /^ {2}- (.+?):?$/;
@@ -441,7 +444,7 @@ function parsePodfileLock(text, podfileLockPath) {
   let section = null;
   for (const line of text.split(/\r?\n/)) {
     // Section headers are unindented; PODS: holds the resolved pods and
-    // SPEC CHECKSUMS: the podspec SHA-1 of each root pod.
+    // SPEC CHECKSUMS: the checksum of each root pod's podspec.
     if (/^\S/.test(line)) {
       section = line;
       continue;
@@ -478,8 +481,9 @@ function parsePodfileLock(text, podfileLockPath) {
 
 /**
  * Read one CocoaPods component per root pod the Podfile.lock resolved, in
- * lockfile order: subspecs collapse into their root pod, the version is the
- * locked one, and the hash is the pod's `SPEC CHECKSUMS` SHA-1 when listed.
+ * lockfile order: subspecs collapse into their root pod and the version is the
+ * locked one. `SPEC CHECKSUMS` hashes the podspec, not the shipped code, so it
+ * is a labelled property, never a component hash.
  * An unreadable lockfile, or one that declares no pods, throws.
  */
 export function readPodfileLockComponents({ podfileLockPath } = {}) {
@@ -498,18 +502,22 @@ export function readPodfileLockComponents({ podfileLockPath } = {}) {
   }
   const components = [...versions].map(([pod, version]) => {
     const checksum = checksums.get(pod);
-    if (checksum !== undefined && !SHA1_RE.test(checksum)) {
+    if (checksum !== undefined && !PODSPEC_CHECKSUM_RE.test(checksum)) {
       throw new Error(
         `Podfile.lock ${podfileLockPath} has a malformed SPEC CHECKSUMS entry for ${pod}: ${JSON.stringify(checksum)}`
       );
+    }
+    const extraProperties = [{ name: KILO_IOS_KIND, value: KIND_PODFILE_LOCK }];
+    if (checksum !== undefined) {
+      extraProperties.push({ name: KILO_PODSPEC_CHECKSUM, value: checksum });
     }
     return {
       ecosystem: 'cocoapods',
       name: pod,
       version,
       purl: `pkg:cocoapods/${encodeURIComponent(pod)}@${encodeURIComponent(version)}`,
-      hashes: checksum === undefined ? [] : [{ alg: 'SHA-1', content: checksum }],
-      extraProperties: [{ name: KILO_IOS_KIND, value: KIND_PODFILE_LOCK }],
+      hashes: [],
+      extraProperties,
     };
   });
   return { components };

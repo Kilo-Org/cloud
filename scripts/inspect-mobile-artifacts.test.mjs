@@ -174,7 +174,11 @@ function runSelect(builds) {
     writeFileSync(buildJsonPath, JSON.stringify(builds));
     return spawnSync(
       'node',
-      [fileURLToPath(new URL('./inspect-mobile-artifacts.mjs', import.meta.url)), '--select', buildJsonPath],
+      [
+        fileURLToPath(new URL('./inspect-mobile-artifacts.mjs', import.meta.url)),
+        '--select',
+        buildJsonPath,
+      ],
       { encoding: 'utf8' }
     );
   } finally {

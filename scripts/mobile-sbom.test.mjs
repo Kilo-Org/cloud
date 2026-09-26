@@ -387,26 +387,38 @@ test('writes one CycloneDX document per platform with the ecosystems that platfo
         property => property.name === 'kilo:sbom:ios-kind' && property.value === 'podfile-lock'
       )
     );
+    const podspecChecksum = component =>
+      component.properties.find(property => property.name === 'kilo:sbom:podspec-checksum')
+        ?.value ?? null;
     assert.deepEqual(
-      pods.map(({ name, version, purl, hashes }) => ({ name, version, purl, hashes })),
+      pods.map(component => ({
+        name: component.name,
+        version: component.version,
+        purl: component.purl,
+        hashes: component.hashes,
+        podspecChecksum: podspecChecksum(component),
+      })),
       [
         {
           name: 'React',
           version: '0.72.0',
           purl: 'pkg:cocoapods/React@0.72.0',
-          hashes: [{ alg: 'SHA-1', content: REACT_CHECKSUM }],
+          hashes: [],
+          podspecChecksum: REACT_CHECKSUM,
         },
         {
           name: 'React-Core',
           version: '0.72.0',
           purl: 'pkg:cocoapods/React-Core@0.72.0',
           hashes: [],
+          podspecChecksum: null,
         },
         {
           name: 'SDWebImage',
           version: '5.19.0',
           purl: 'pkg:cocoapods/SDWebImage@5.19.0',
           hashes: [],
+          podspecChecksum: null,
         },
       ]
     );

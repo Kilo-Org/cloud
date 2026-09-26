@@ -80,8 +80,9 @@ artifact you hold to confirm the SBOM describes those bytes.
   in `apps/mobile/eas.json` uploads `ios/Podfile.lock` through `buildArtifactPaths`, and the release
   workflow downloads it from the build's `buildArtifactsUrl` next to the IPA. Every root pod under
   `PODS:` becomes one component (subspecs such as `React-Core/Default` collapse into `React-Core`)
-  with its locked version, a `pkg:cocoapods/<Name>@<version>` purl and, when listed, its
-  `SPEC CHECKSUMS` podspec SHA-1; `kilo:sbom:ios-kind` is `podfile-lock`. This is the only source
+  with its locked version and a `pkg:cocoapods/<Name>@<version>` purl; `kilo:sbom:ios-kind` is
+  `podfile-lock`. The `SPEC CHECKSUMS` value, when listed, is the `kilo:sbom:podspec-checksum`
+  property, not a component hash: it hashes the podspec, not the shipped code. This is the only source
   for pods statically linked into the executable. The IPA scan adds the Mach-O
   `LC_LOAD_DYLIB`/weak/reexport load commands plus `Payload/*.app/Frameworks/*` (`kilo:sbom:ios-kind`
   `dylib-load-command` or `dynamic-framework`). Load commands naming an OS-provided library

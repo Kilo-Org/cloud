@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
     "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
     "signInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
-    "networkError": "Ein Netzwerkfehler ist aufgetreten. Bitte versuche es erneut.",
     "accessDeniedByUser": "Der Benutzer hat den Zugriff verweigert.",
     "codeExpired": "Der Code ist abgelaufen.",
     "tooManySignInAttempts": "Du hast zu viele Anmeldeversuche unternommen. Bitte warte einen Moment und versuche es erneut."

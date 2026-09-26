@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Gagal memulakan log masuk. Sila cuba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka penyemak imbas. Sila cuba lagi.",
     "signInTimedOut": "Masa untuk log masuk telah tamat. Sila cuba lagi.",
-    "networkError": "Ralat rangkaian. Sila cuba lagi.",
     "accessDeniedByUser": "Akses ditolak oleh pengguna.",
     "codeExpired": "Kod telah tamat tempoh.",
     "tooManySignInAttempts": "Terlalu banyak percubaan log masuk. Sila tunggu dan cuba lagi."

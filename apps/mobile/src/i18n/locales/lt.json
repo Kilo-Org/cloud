@@ -3219,7 +3219,6 @@
     "startSignInFailed": "Nepavyko pradėti prisijungimo. Bandyk dar kartą.",
     "couldNotOpenBrowser": "Nepavyko atidaryti naršyklės. Bandyk dar kartą.",
     "signInTimedOut": "Prisijungimui skirtas laikas baigėsi. Bandyk dar kartą.",
-    "networkError": "Tinklo klaida. Bandyk dar kartą.",
     "accessDeniedByUser": "Naudotojas nesuteikė prieigos.",
     "codeExpired": "Kodo galiojimas baigėsi.",
     "tooManySignInAttempts": "Per daug bandymų prisijungti. Palauk ir bandyk dar kartą."

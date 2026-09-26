@@ -3176,7 +3176,6 @@
     "startSignInFailed": "Neizdevās sākt pierakstīšanos. Mēģini vēlreiz.",
     "couldNotOpenBrowser": "Neizdevās atvērt pārlūku. Mēģini vēlreiz.",
     "signInTimedOut": "Pierakstīšanās laiks ir beidzies. Mēģini vēlreiz.",
-    "networkError": "Tīkla kļūda. Mēģini vēlreiz.",
     "accessDeniedByUser": "Lietotājs liedza piekļuvi.",
     "codeExpired": "Koda derīguma termiņš ir beidzies.",
     "tooManySignInAttempts": "Pārāk daudz pierakstīšanās mēģinājumu. Uzgaidi un mēģini vēlreiz."

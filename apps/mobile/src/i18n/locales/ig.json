@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Enweghị ike ịmalite nbanye. Biko nwaa ọzọ.",
     "couldNotOpenBrowser": "Enweghị ike imepe ihe nchọgharị. Biko nwaa ọzọ.",
     "signInTimedOut": "Oge nbanye agwụla. Biko nwaa ọzọ.",
-    "networkError": "Njehie netwọk. Biko nwaa ọzọ.",
     "accessDeniedByUser": "Onye ọrụ jụrụ inye ikike.",
     "codeExpired": "Oge koodu agwụla.",
     "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."

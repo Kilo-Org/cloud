@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Kunde inte starta inloggningen. Försök igen.",
     "couldNotOpenBrowser": "Kunde inte öppna webbläsaren. Försök igen.",
     "signInTimedOut": "Inloggningen tog för lång tid. Försök igen.",
-    "networkError": "Nätverksfel. Försök igen.",
     "accessDeniedByUser": "Användaren nekade åtkomst.",
     "codeExpired": "Koden har gått ut.",
     "tooManySignInAttempts": "För många inloggningsförsök. Vänta ett tag och försök igen."

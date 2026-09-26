@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Non se puido comezar o proceso de inicio de sesión. Téntao de novo.",
     "couldNotOpenBrowser": "Non se puido abrir o navegador. Téntao de novo.",
     "signInTimedOut": "Esgotouse o tempo para iniciar sesión. Téntao de novo.",
-    "networkError": "Erro de rede. Téntao de novo.",
     "accessDeniedByUser": "O usuario denegou o acceso.",
     "codeExpired": "O código caducou.",
     "tooManySignInAttempts": "Demasiados intentos de inicio de sesión. Agarda e téntao de novo."

@@ -3176,7 +3176,6 @@
     "startSignInFailed": "Impossible de lancer la connexion. Réessayez.",
     "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",
     "signInTimedOut": "Le délai de connexion a expiré. Réessayez.",
-    "networkError": "Erreur réseau. Veuillez réessayer.",
     "accessDeniedByUser": "L'utilisateur a refusé l'accès.",
     "codeExpired": "Le code a expiré.",
     "tooManySignInAttempts": "Trop de tentatives de connexion. Veuillez patienter et réessayer."

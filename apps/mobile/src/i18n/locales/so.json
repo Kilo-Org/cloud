@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Soo gelitaanka lama bilaabi karin. Fadlan mar kale isku day.",
     "couldNotOpenBrowser": "Biraawsarka lama furi karin. Fadlan mar kale isku day.",
     "signInTimedOut": "Waqtigii loo qabtay soo gelitaanka wuu dhammaaday. Fadlan mar kale isku day.",
-    "networkError": "Khalad shabakadeed. Fadlan mar kale isku day.",
     "accessDeniedByUser": "Isticmaalaha ayaa diiday gelitaanka.",
     "codeExpired": "Koodhku wuu dhacay.",
     "tooManySignInAttempts": "Isku dayo soo gelitaan oo aad u badan. Fadlan sug oo mar kale isku day."

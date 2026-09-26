@@ -3133,7 +3133,6 @@
     "startSignInFailed": "An kasa fara shiga. Sake gwadawa.",
     "couldNotOpenBrowser": "Ba a iya buɗe burauza ba. Sake gwadawa.",
     "signInTimedOut": "Wa'adin shiga ya ƙare. Sake gwadawa.",
-    "networkError": "An samu matsalar hanyar sadarwa. Sake gwadawa.",
     "accessDeniedByUser": "Mai amfani bai ba da izini ba.",
     "codeExpired": "Wa'adin lambar ya ƙare.",
     "tooManySignInAttempts": "An yi ƙoƙarin shiga da yawa. Jira ɗan lokaci ka sake gwadawa."

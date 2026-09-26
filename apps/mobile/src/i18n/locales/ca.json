@@ -3176,7 +3176,6 @@
     "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
     "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
     "signInTimedOut": "S'ha esgotat el temps per iniciar la sessió. Torna-ho a provar.",
-    "networkError": "Error de xarxa. Torna-ho a provar.",
     "accessDeniedByUser": "L'usuari ha denegat l'accés.",
     "codeExpired": "El codi ha caducat.",
     "tooManySignInAttempts": "Has fet massa intents d'inici de sessió. Espera un moment i torna-ho a provar."

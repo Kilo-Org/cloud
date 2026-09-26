@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Hindi masimulan ang pag-sign in. Pakisubukan muli.",
     "couldNotOpenBrowser": "Hindi mabuksan ang browser. Pakisubukan muli.",
     "signInTimedOut": "Naubos ang oras para sa pag-sign in. Pakisubukan muli.",
-    "networkError": "May problema sa network. Pakisubukan muli.",
     "accessDeniedByUser": "Tinanggihan ng user ang access.",
     "codeExpired": "Wala nang bisa ang code.",
     "tooManySignInAttempts": "Masyadong maraming pagtatangkang mag-sign in. Pakihintay at subukan muli."

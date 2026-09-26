@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Ekki tókst að hefja innskráningu. Reyndu aftur.",
     "couldNotOpenBrowser": "Ekki tókst að opna vafrann. Reyndu aftur.",
     "signInTimedOut": "Innskráning tók of langan tíma. Reyndu aftur.",
-    "networkError": "Netvilla. Reyndu aftur.",
     "accessDeniedByUser": "Notandinn hafnaði aðgangi.",
     "codeExpired": "Kóðinn er útrunninn.",
     "tooManySignInAttempts": "Of margar innskráningartilraunir. Bíddu og reyndu aftur."

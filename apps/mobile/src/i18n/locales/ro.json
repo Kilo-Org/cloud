@@ -3176,7 +3176,6 @@
     "startSignInFailed": "Nu s-a putut începe autentificarea. Încearcă din nou.",
     "couldNotOpenBrowser": "Nu s-a putut deschide browserul. Încearcă din nou.",
     "signInTimedOut": "Timpul alocat autentificării a expirat. Încearcă din nou.",
-    "networkError": "Eroare de rețea. Încearcă din nou.",
     "accessDeniedByUser": "Utilizatorul a refuzat accesul.",
     "codeExpired": "Codul a expirat.",
     "tooManySignInAttempts": "Prea multe încercări de autentificare. Așteaptă și încearcă din nou."

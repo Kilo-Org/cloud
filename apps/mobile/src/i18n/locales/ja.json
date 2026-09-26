@@ -3133,7 +3133,6 @@
     "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
     "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
     "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",
-    "networkError": "ネットワークエラーが発生しました。もう一度お試しください。",
     "accessDeniedByUser": "ユーザーがアクセスを拒否しました。",
     "codeExpired": "コードの有効期限が切れました。",
     "tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらく待ってから、もう一度お試しください。"

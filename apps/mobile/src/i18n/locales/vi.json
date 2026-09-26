@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
     "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
     "signInTimedOut": "Đã hết thời gian chờ đăng nhập. Vui lòng thử lại.",
-    "networkError": "Lỗi mạng. Vui lòng thử lại.",
     "accessDeniedByUser": "Người dùng đã từ chối cấp quyền truy cập.",
     "codeExpired": "Mã đã hết hạn.",
     "tooManySignInAttempts": "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một lát rồi thử lại."

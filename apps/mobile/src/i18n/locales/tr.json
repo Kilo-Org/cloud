@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Oturum açma işlemi başlatılamadı. Lütfen tekrar dene.",
     "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar dene.",
     "signInTimedOut": "Oturum açma işlemi zaman aşımına uğradı. Lütfen tekrar dene.",
-    "networkError": "Ağ hatası oluştu. Lütfen tekrar dene.",
     "accessDeniedByUser": "Kullanıcı erişimi reddetti.",
     "codeExpired": "Kodun süresi doldu.",
     "tooManySignInAttempts": "Çok fazla oturum açma denemesi yapıldı. Lütfen biraz bekle ve tekrar dene."

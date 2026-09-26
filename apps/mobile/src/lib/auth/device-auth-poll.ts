@@ -177,10 +177,16 @@ export function startDeviceAuthPoll(params: {
       if (error instanceof Error && error.name === 'AbortError') {
         return;
       }
-      cleanup();
-      setState(previous =>
-        errorDeviceAuthState(code, i18n.t('authErrors.networkError'), previous.verificationUrl)
-      );
+      // A transient network failure must not discard an approval the browser
+      // may already have delivered: back off like a throttled poll and keep
+      // retrying within the overall budget. Our own backoff stays bypassable
+      // by a foreground poll, so a resume can retry promptly. The boundary
+      // check on a later tick surfaces the timeout if connectivity never
+      // returns, so the 5-minute budget still bounds the flow. The wait is
+      // capped by the time left so it cannot schedule a tick past the budget.
+      retryDelay = Math.min(retryDelay * 2, POLL_MAX_INTERVAL_MS);
+      const remaining = POLL_OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
+      scheduleNext(Math.min(retryDelay, Math.max(0, remaining)));
     }
   };
 

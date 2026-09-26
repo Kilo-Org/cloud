@@ -3219,7 +3219,6 @@
     "startSignInFailed": "Přihlášení se nepodařilo zahájit. Zkus to znovu.",
     "couldNotOpenBrowser": "Prohlížeč se nepodařilo otevřít. Zkus to znovu.",
     "signInTimedOut": "Vypršel časový limit pro přihlášení. Zkus to znovu.",
-    "networkError": "Došlo k chybě sítě. Zkus to znovu.",
     "accessDeniedByUser": "Uživatel zamítl přístup.",
     "codeExpired": "Platnost kódu vypršela.",
     "tooManySignInAttempts": "Proběhlo příliš mnoho pokusů o přihlášení. Chvíli počkej a zkus to znovu."

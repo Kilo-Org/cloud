@@ -3176,7 +3176,6 @@
     "startSignInFailed": "Não foi possível iniciar o login. Tente novamente.",
     "couldNotOpenBrowser": "Não foi possível abrir o navegador. Tente novamente.",
     "signInTimedOut": "O tempo para fazer login esgotou. Tente novamente.",
-    "networkError": "Erro de rede. Tente novamente.",
     "accessDeniedByUser": "O usuário negou o acesso.",
     "codeExpired": "O código expirou.",
     "tooManySignInAttempts": "Muitas tentativas de login. Aguarde e tente novamente."

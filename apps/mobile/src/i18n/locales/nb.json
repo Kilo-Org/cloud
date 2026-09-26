@@ -3133,7 +3133,6 @@
     "startSignInFailed": "Kunne ikke starte påloggingen. Prøv igjen.",
     "couldNotOpenBrowser": "Kunne ikke åpne nettleseren. Prøv igjen.",
     "signInTimedOut": "Tiden for pålogging er utløpt. Prøv igjen.",
-    "networkError": "Nettverksfeil. Prøv igjen.",
     "accessDeniedByUser": "Brukeren nektet tilgang.",
     "codeExpired": "Koden er utløpt.",
     "tooManySignInAttempts": "For mange påloggingsforsøk. Vent og prøv igjen."

@@ -3133,7 +3133,6 @@
     "startSignInFailed": "로그인을 시작하지 못했습니다. 다시 시도하세요.",
     "couldNotOpenBrowser": "브라우저를 열지 못했습니다. 다시 시도하세요.",
     "signInTimedOut": "로그인 제한 시간이 초과되었습니다. 다시 시도하세요.",
-    "networkError": "네트워크 오류가 발생했습니다. 다시 시도하세요.",
     "accessDeniedByUser": "사용자가 접근을 거부했습니다.",
     "codeExpired": "코드가 만료되었습니다.",
     "tooManySignInAttempts": "로그인 시도가 너무 많습니다. 잠시 기다린 후 다시 시도하세요."

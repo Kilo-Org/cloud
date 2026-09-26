@@ -250,16 +250,23 @@ export function AgentSessionListScreen() {
     </View>
   );
 
+  // One handler shared by every row: with the row memoised, a poll that writes
+  // an unchanged payload leaves each row's props referentially stable and
+  // skips its render entirely. The row's relative timestamp does not come
+  // through these props: the row samples the shared clock itself, so it ages
+  // without a new payload.
+  const handleRowPress = useCallback(
+    (session: ActiveSession) => {
+      navigateToSession(session.id, organizationId);
+    },
+    [navigateToSession, organizationId]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
-      <RemoteSessionRow
-        session={item}
-        onPress={() => {
-          navigateToSession(item.id, organizationId);
-        }}
-      />
+      <RemoteSessionRow session={item} onPress={handleRowPress} />
     ),
-    [navigateToSession, organizationId]
+    [handleRowPress]
   );
 
   // The FAB style, the side padding, the body measurement, and the centered

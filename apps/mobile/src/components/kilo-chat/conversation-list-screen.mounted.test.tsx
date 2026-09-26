@@ -75,7 +75,7 @@ vi.mock('./app-aware-keyboard-padding', () => ({ AppAwareKeyboardPaddingView: 'K
 vi.mock('./hooks/use-kilo-chat-client', () => ({ useKiloChatClient: vi.fn() }));
 vi.mock('./hooks/use-instance-presence', () => ({ useInstancePresence: vi.fn() }));
 vi.mock('./hooks/use-app-active-and-focused', () => ({ useAppActiveAndFocused: () => true }));
-vi.mock('./hooks/use-now-ticker', () => ({ useNowTicker: () => 1_800_000_000_000 }));
+vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => 1_800_000_000_000 }));
 vi.mock('./hooks/use-conversations', () => ({
   useConversations: mocks.list,
   useCreateConversation: () => ({ mutate: mocks.create, isPending: false }),

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
 import { hashKey, type QueryFunction, useQuery, useQueryClient } from '@tanstack/react-query';
-import { usePathname } from 'expo-router';
+import { usePathname, useSegments } from 'expo-router';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import {
+  isLiveAgentsSurfaceSegments,
+  useActiveSessionsFloorPoll,
+} from '@/lib/active-sessions-floor-poll';
 import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
 import {
   buildActiveSessionsTrayInput,
@@ -13,6 +17,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { resolveAnsweredRaises } from '@/lib/glanceable/attention-rows';
 import { readAgentPushPreferenceIfLoaded } from '@/lib/hooks/agent-push-preference';
+import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 import {
   applyNeedsInputNotifications,
   type NeedsInputNotificationRow,
@@ -48,6 +53,18 @@ function useActiveSessionsLiveSync(): void {
         .queryFn as QueryFunction<CachedActiveSessionsData>,
     [trpc, input]
   );
+  const segments = useSegments();
+  const connected = useUserWebConnectionState();
+  // The floor poll owns `activeSessions.list` refresh, and only while a route
+  // that shows live agents is focused; the query no longer polls on its own.
+  useActiveSessionsFloorPoll({
+    enabled,
+    visible: isLiveAgentsSurfaceSegments(segments),
+    connected,
+    queryClient,
+    queryKey,
+    queryFn,
+  });
   // An unresolved selection must never attach the default personal context.
   useEffect(() => {
     if (!enabled || isSignOutActive()) {

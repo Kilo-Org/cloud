@@ -7,7 +7,7 @@
       "instanceLifecycle": "Votre instance a une mise à jour",
       "scheduledAction": "Une action planifiée a une mise à jour",
       "lowBalance": "Votre solde nécessite une attention",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Vos dépenses nécessitent une attention",
       "securityFinding": "Un résultat de sécurité nécessite une attention",
       "activeAgentsGlanceable": "Les agents actifs ont une mise à jour"
     }
@@ -44,8 +44,8 @@
       "body": "Le solde de {{organizationName}} est passé sous ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Alerte de dépenses",
+      "body": "Les dépenses de {{scopeName}} ont dépassé ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nouveau résultat de sécurité ({{severity}})",

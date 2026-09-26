@@ -461,9 +461,10 @@ export const activeSessionSchema = z
     parentSessionId: z.string().optional(),
     /**
      * Per-session capabilities advertised by the owning CLI in its
-     * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
-     * gates the remote-CLI attachment path; absent / false means the CLI
-     * either predates the capability or has not yet reported it.
+     * `sessions.heartbeat` / `sessions.list` payload. Only an explicit
+     * `attachments: false` closes the remote-CLI attachment path; absent
+     * (the CLI predates the capability or has not yet reported it) is
+     * treated as supported.
      *
      * Declared here (rather than relying on `.passthrough()`) so typed
      * consumers can reason about the shape without an extra `as` cast. The

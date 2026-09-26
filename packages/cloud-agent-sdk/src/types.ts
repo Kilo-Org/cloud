@@ -293,10 +293,11 @@ export type ResolvedSession =
       kiloSessionId: KiloSessionId;
       /**
        * Per-session capabilities reported by the owning CLI's most recent
-       * heartbeat or `sessions.list`. A `remote` session supports attachments
-       * only when `capabilities?.attachments === true`; absent / false is a
-       * structural no-attachments state (older CLIs, CLIs that have not yet
-       * advertised the capability, or CLIs that have downgraded).
+       * heartbeat or `sessions.list`. The gate is optimistic: a `remote`
+       * session supports attachments while the capability is unknown
+       * (`undefined` — older CLIs, CLIs that have not yet advertised it, or a
+       * mid-reconnect snapshot). Only an explicit `attachments: false`
+       * downgrades it.
        */
       capabilities?: { attachments?: boolean };
     }

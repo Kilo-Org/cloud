@@ -41,6 +41,12 @@ export type McpSettingsView = {
    * there is nothing to use: a server that is not there cannot be turned on.
    */
   readonly enabled: boolean;
+  /**
+   * Whether the switch can be moved. Not when there is nothing to use: the
+   * position reads off while the chat's setting is still on, so a tap would
+   * only write the setting it already has and the switch would snap back.
+   */
+  readonly toggleable: boolean;
   readonly statusKey: McpStatusKey;
   readonly descriptionKey: McpDescriptionKey | null;
   readonly toolCount: number;
@@ -54,6 +60,7 @@ export type McpSettingsView = {
 /** The switch is off, so no server was contacted and no tool is sent. */
 const OFF: McpSettingsView = {
   enabled: false,
+  toggleable: true,
   statusKey: 'modelChat.mcp.off',
   descriptionKey: 'modelChat.mcp.offDescription',
   toolCount: 0,
@@ -66,6 +73,7 @@ const OFF: McpSettingsView = {
 function unavailable(tone: McpTone): McpSettingsView {
   return {
     enabled: false,
+    toggleable: false,
     statusKey: 'modelChat.mcp.unavailable',
     descriptionKey: 'modelChat.mcp.unavailableDescription',
     toolCount: 0,
@@ -84,6 +92,7 @@ function retryable(kind: 'unauthorized' | 'unreachable' | 'missing' | 'protocol'
   const refused = kind === 'unauthorized';
   return {
     enabled: true,
+    toggleable: true,
     statusKey: refused ? 'modelChat.mcp.unauthorized' : 'modelChat.mcp.unreachable',
     descriptionKey: refused
       ? 'modelChat.mcp.unauthorizedDescription'
@@ -102,6 +111,7 @@ export function mcpSettingsView(state: KiloMcpState, enabled: boolean): McpSetti
   if (state.status === 'connecting') {
     return {
       enabled: true,
+      toggleable: true,
       statusKey: 'modelChat.mcp.connecting',
       descriptionKey: null,
       toolCount: 0,
@@ -114,6 +124,7 @@ export function mcpSettingsView(state: KiloMcpState, enabled: boolean): McpSetti
     if (state.tools.length === 0) {
       return {
         enabled: true,
+        toggleable: true,
         statusKey: 'modelChat.mcp.none',
         descriptionKey: 'modelChat.mcp.noneDescription',
         toolCount: 0,
@@ -124,6 +135,7 @@ export function mcpSettingsView(state: KiloMcpState, enabled: boolean): McpSetti
     }
     return {
       enabled: true,
+      toggleable: true,
       statusKey: 'modelChat.mcp.available',
       descriptionKey: null,
       toolCount: state.tools.length,

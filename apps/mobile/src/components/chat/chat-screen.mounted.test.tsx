@@ -80,6 +80,7 @@ vi.mock('@/components/chat/mcp-settings-sheet', () => ({
   useMcpSettings: () => ({
     view: {
       enabled: false,
+      toggleable: true,
       statusKey: 'modelChat.mcp.off',
       descriptionKey: null,
       toolCount: 0,

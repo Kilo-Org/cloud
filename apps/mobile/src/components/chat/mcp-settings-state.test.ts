@@ -58,11 +58,14 @@ describe('what the Kilo MCP sheet shows', () => {
     });
   });
 
-  it('offers no CTA and reads off when the server is not there', () => {
+  it('offers no CTA, reads off, and locks the switch when the server is not there', () => {
     const view = mcpSettingsView({ status: 'failed', kind: 'missing', retryable: false }, true);
 
+    /* The setting is still on, so a tap would write what is already stored and
+       the switch would snap back: a live switch here does nothing. */
     expect(view).toMatchObject({
       enabled: false,
+      toggleable: false,
       statusKey: 'modelChat.mcp.unavailable',
       retry: false,
     });
@@ -84,6 +87,7 @@ describe('what the Kilo MCP sheet shows', () => {
 
     expect(view).toMatchObject({
       enabled: false,
+      toggleable: true,
       statusKey: 'modelChat.mcp.off',
       toolCount: 0,
       retry: false,

@@ -135,7 +135,7 @@ export function McpSettingsSheet({
           title={t('modelChat.mcp.use')}
           subtitle={t('modelChat.mcp.useDescription')}
           value={view.enabled}
-          disabled={false}
+          disabled={!view.toggleable}
           busy={view.busy}
           onValueChange={onValueChange}
         />

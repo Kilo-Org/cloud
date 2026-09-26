@@ -3755,6 +3755,29 @@ describe('session detail duplicate failure state', () => {
     expect(className).toContain('bg-background');
     expect(className).not.toContain('absolute');
   });
+
+  it('renders the fixed footer error row without a position transition', async () => {
+    // A Reanimated layout transition on the footer wrapper animates its Y
+    // across the keyboard show/hide and blocking-card mount/unmount resizes.
+    // An entry measured inside that resize storm can strand the row at its
+    // pre-change position — floating mid-screen over the transcript, where
+    // the red error line drew on top of a transcript row (question-kb-down
+    // capture). The footer's position must always be plain layout.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const node = indicatorNodes(view)[0];
+    if (!node) {
+      throw new Error('footer indicator did not render');
+    }
+    let wrapper = node.parent;
+    while (wrapper && wrapper.props.layout === undefined) {
+      wrapper = wrapper.parent;
+    }
+    expect(wrapper).toBeNull();
+  });
 });
 
 function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {

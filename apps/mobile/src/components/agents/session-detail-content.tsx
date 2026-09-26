@@ -2166,6 +2166,7 @@ export function SessionDetailContent({
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
+            headerRightShrinks
             className="pb-1"
             {...(rename.isTitleInteractive
               ? {

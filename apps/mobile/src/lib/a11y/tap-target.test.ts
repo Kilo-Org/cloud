@@ -12,6 +12,9 @@ import {
   COMPACT_H11_FRAME_DP,
   COMPACT_H11_HIT_SLOP_DP,
   compactControlTargetDp,
+  COMPOSER_CONTROL_GAP_DP,
+  COMPOSER_CONTROL_HIT_SLOP_DP,
+  composerControlClearanceDp,
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
@@ -21,6 +24,7 @@ import {
   MIN_TAP_TARGET_DP,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
+  VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
@@ -159,5 +163,22 @@ describe('shared tap-target geometry', () => {
     });
 
     rtl.isRTL = false;
+  });
+});
+
+describe('composer input row control separation', () => {
+  it('spells the row gap as the rem width of the class the row applies', () => {
+    // `ms-3` is 0.75rem, and NativeWind's rem measures 14pt on device, so the
+    // constant and the class have to move together.
+    expect(COMPOSER_CONTROL_GAP_DP).toBe(0.75 * 14);
+  });
+
+  it('leaves positive clearance between two adjacent controls tap areas', () => {
+    // The regression this guards: the send/stop control carried no gap, so it
+    // rendered flush against the microphone and the two tap areas overlapped.
+    expect(composerControlClearanceDp()).toBeGreaterThan(0);
+    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(
+      VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP
+    );
   });
 });

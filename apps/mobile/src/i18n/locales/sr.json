@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepovezano",
     "notifications": "Obaveštenja",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitorijumi",
     "securityAgent": "Bezbednosni agent",
     "unknown": "Nepoznato",
@@ -727,7 +727,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Izmeni zastareli komentar na čekanju za {{location}}",
       "editA11y": "Izmeni komentar na čekanju za {{location}}",
-      "staleHint": "pR je izmenjen nakon pisanja ovog komentara.",
+      "staleHint": "PR je izmenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju za {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je obrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Pregled će biti poslat samo sa vrstom pregleda izabranom iznad.",
@@ -2686,7 +2686,7 @@
       "open": "otvoren PR",
       "closed": "zatvoren zahtev za spajanje",
       "merged": "spojen zahtev za spajanje",
-      "draft": "pR u nacrtu",
+      "draft": "PR u nacrtu",
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

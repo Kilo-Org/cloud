@@ -62,8 +62,16 @@ interface RemoteMcpFetchHost {
   fetch(url: string | URL, init?: RemoteMcpRequest): Promise<Response>;
 }
 
-/** How long one connection and its calls may take when the caller names none. */
+/** How long discovery may take when the caller names no deadline. */
 const defaultTimeoutMs = 15_000;
+
+/**
+ * How long one call may take when the caller names no deadline. It must stay
+ * above the 15 seconds a remote tool is waited on inline (`tools.ts`): the
+ * session backgrounds a call at that point, and a deadline that ends at the
+ * same moment would fail the call instead of letting it answer.
+ */
+const defaultCallTimeoutMs = 60_000;
 
 /** One deadline, and the ways it ends. */
 interface Deadline {
@@ -147,4 +155,4 @@ const headersFor = (
 ): Readonly<Record<string, string>> => ({ ...server.headers, ...credential });
 
 export type { Deadline, RemoteMcpAbort, RemoteMcpFetch, RemoteMcpFetchHost, RemoteMcpRequest };
-export { bounded, defaultTimeoutMs, headersFor, makeDeadline };
+export { bounded, defaultCallTimeoutMs, defaultTimeoutMs, headersFor, makeDeadline };

@@ -46,9 +46,9 @@ const SERVER_ID = 'kilo';
  * the failure is the thing being given another chance.
  *
  * It bounds the discovery and nothing else. A tool call keeps the harness's own
- * bound — fifteen seconds, the tool's own `inlineFor` — so a slow call answers,
- * or is backgrounded by the session, instead of failing at the chat-open
- * deadline.
+ * bound — sixty seconds, above the tool's fifteen-second `inlineFor` — so a
+ * slow call answers, or is backgrounded by the session and still answers,
+ * instead of failing at the chat-open deadline.
  */
 const AUTOMATIC_TIMEOUT_MS = 4000;
 const RETRY_TIMEOUT_MS = 15_000;

@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Duration, Effect } from 'effect';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   remoteMcpClient,
@@ -6,6 +6,7 @@ import {
   type RemoteMcpClientDeps,
   type RemoteMcpError,
 } from './index.js';
+import { defaultCallTimeoutMs } from './http.js';
 import {
   callOf,
   deps,
@@ -101,6 +102,13 @@ describe('a remote server that says no', () => {
 });
 
 describe('a call', () => {
+  it('keeps its default deadline past the time it is waited on inline', async () => {
+    const offered = await run(remoteMcpTools(serverFor('work', fixture.url, token), deps()));
+    const inline = Duration.toMillis(Duration.decode(only(offered).inlineFor ?? 0));
+    expect(inline).toBeGreaterThan(0);
+    expect(defaultCallTimeoutMs).toBeGreaterThan(inline);
+  });
+
   it('outlives the discovery deadline and still answers', async () => {
     /* Discovery answers at once and the call sleeps 600 ms, past the 200 ms
        discovery deadline. The call keeps the harness's own bound, so the

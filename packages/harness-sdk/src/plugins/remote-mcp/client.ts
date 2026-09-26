@@ -12,6 +12,7 @@ import { Effect, unsafeCoerce } from 'effect';
 import { credentialFor, type RemoteMcpToken } from './credential.js';
 import {
   bounded,
+  defaultCallTimeoutMs,
   defaultTimeoutMs,
   headersFor,
   makeDeadline,
@@ -80,7 +81,11 @@ interface RemoteMcpClientDeps {
   token?: RemoteMcpToken;
   /** The caller's own signal, linked into the deadline of every request. */
   signal?: RemoteMcpAbort;
-  /** How long one operation may take. 15 seconds by default. */
+  /**
+   * How long one operation may take. A call gets 60 seconds by default, longer
+   * than the 15 seconds a remote tool is waited on inline, so a call the
+   * session backgrounds still answers. Discovery gets 15.
+   */
   timeoutMs?: number;
   /** How long tool discovery may take. The per-operation `timeoutMs` by default. */
   discoverTimeoutMs?: number;
@@ -230,7 +235,7 @@ const withServer = <A>(
   Effect.scoped(
     Effect.gen(function* () {
       const deadline = yield* Effect.acquireRelease(
-        Effect.sync(() => makeDeadline(deps.timeoutMs ?? defaultTimeoutMs, deps.signal)),
+        Effect.sync(() => makeDeadline(deps.timeoutMs ?? defaultCallTimeoutMs, deps.signal)),
         made => Effect.sync(made.stop)
       );
       const credential = yield* credentialFor(server, deps.token, deadline);
@@ -244,11 +249,16 @@ const withServer = <A>(
   );
 
 /**
- * The deps discovery runs under, where the caller's `discoverTimeoutMs` stands
- * in for the `timeoutMs` that `withServer` reads. A call keeps `deps` untouched.
+ * The deps discovery runs under: the caller's `discoverTimeoutMs`, else its
+ * `timeoutMs`, else 15 seconds, stands in for the `timeoutMs` that `withServer`
+ * reads. A call keeps `deps` untouched, so its deadline is `timeoutMs`, else
+ * 60 seconds: longer than a remote tool is waited on inline (`tools.ts`), so a
+ * call the session moves to the background can still answer.
  */
-const discoveryDeps = (deps: RemoteMcpClientDeps): RemoteMcpClientDeps =>
-  deps.discoverTimeoutMs === undefined ? deps : { ...deps, timeoutMs: deps.discoverTimeoutMs };
+const discoveryDeps = (deps: RemoteMcpClientDeps): RemoteMcpClientDeps => ({
+  ...deps,
+  timeoutMs: deps.discoverTimeoutMs ?? deps.timeoutMs ?? defaultTimeoutMs,
+});
 
 /** The mapper that tells the surface about a call the server did not answer. */
 const tellingSurface =

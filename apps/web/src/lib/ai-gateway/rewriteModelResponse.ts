@@ -15,7 +15,7 @@ import { db } from '@/lib/drizzle';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
 import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
-import { type ApiRequestLogBlobs, uploadApiRequestLogBlobs } from '@/lib/r2/api-request-log';
+import { uploadApiRequestLogBlobs } from '@/lib/r2/api-request-log';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
@@ -147,15 +147,12 @@ async function createRequestLogCapture(
               }
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
-      let blobs: ApiRequestLogBlobs | null = null;
-      let r2UploadError: string | undefined;
-      try {
-        blobs = await uploadApiRequestLogBlobs({
-          request: JSON.stringify(redactApiRequestLogRequest(request)),
-          response: responseText,
-        });
-      } catch (e) {
-        r2UploadError = String(e).substring(0, 4000);
+      const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
+        request: JSON.stringify(redactApiRequestLogRequest(request)),
+        response: responseText,
+      });
+      const r2UploadError = uploadError?.substring(0, 4000);
+      if (r2UploadError !== undefined) {
         logExceptInTest(
           `[rewriteModelResponse] failed to upload api_request_log blobs to R2 (user=${user?.id}, status=${status}, model=${model}): ${r2UploadError}`
         );
@@ -175,7 +172,7 @@ async function createRequestLogCapture(
           model,
           provider,
           error: sanitizeJsonbValue(error),
-          ...blobs,
+          ...blobColumns,
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(

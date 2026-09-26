@@ -20,6 +20,7 @@ import { db } from '@/lib/drizzle';
 import { r2Client } from '@/lib/r2/client';
 import type { FakeR2Client } from '@/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 
 jest.mock('@/lib/r2/client', () => {
   const { createFakeR2Client } = jest.requireActual<{
@@ -1576,8 +1577,31 @@ describe('api_request_log storage', () => {
       r2_region: null,
       request_r2_key: null,
       response_r2_key: null,
-      error: { r2_upload_error: 'Error: R2 unavailable' },
+      error: {
+        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+      },
     });
+  });
+
+  test('records the key of a body that was uploaded when the other upload fails', async () => {
+    process.env.VERCEL_REGION = 'fra1';
+    const send = fakeR2.send.bind(fakeR2);
+    jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
+      if (command instanceof PutObjectCommand && command.input.Key?.endsWith('/response.txt')) {
+        throw new Error('R2 unavailable');
+      }
+      return send(command);
+    });
+
+    await logUpstreamError();
+
+    const row = await selectLoggedRow();
+    expect(row).toMatchObject({
+      r2_region: 'eu',
+      response_r2_key: null,
+      error: { r2_upload_error: 'response: Error: R2 unavailable' },
+    });
+    expect(fakeR2.objects.has(`test-api-request-log-eu/${row.request_r2_key}`)).toBe(true);
   });
 });
 

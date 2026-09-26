@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 
@@ -284,6 +284,15 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const navigateToSession = useAgentSessionNavigator();
+  // One handler shared by every card row: with the row memoised, an unchanged
+  // payload leaves each row's props referentially stable and skips its render.
+  // The handler reads only the id, so it takes the shape it needs.
+  const handleRowPress = useCallback(
+    (session: { id: string }) => {
+      navigateToSession(session.id);
+    },
+    [navigateToSession]
+  );
   const content = liveSessionContent(context, sessions);
 
   return (
@@ -343,9 +352,7 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
                 session={session}
                 variant="card"
                 interactive={false}
-                onPress={() => {
-                  navigateToSession(session.id);
-                }}
+                onPress={handleRowPress}
               />
             </View>
           ))}

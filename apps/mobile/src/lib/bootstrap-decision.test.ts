@@ -253,16 +253,39 @@ describe('resolveBootstrapDecision derivations', () => {
 
 describe('shouldShowBootstrapLoading', () => {
   it('paints the loading surface only for a hidden tree after startup settled', () => {
-    expect(shouldShowBootstrapLoading({ startupFinished: true, hidden: true })).toBe(true);
+    expect(
+      shouldShowBootstrapLoading({ startupFinished: true, hidden: true, signingOut: false })
+    ).toBe(true);
   });
 
   it('stays off while the splash covers the initial launch', () => {
-    expect(shouldShowBootstrapLoading({ startupFinished: false, hidden: true })).toBe(false);
+    expect(
+      shouldShowBootstrapLoading({ startupFinished: false, hidden: true, signingOut: false })
+    ).toBe(false);
   });
 
   it('stays off when the tree is visible', () => {
-    expect(shouldShowBootstrapLoading({ startupFinished: true, hidden: false })).toBe(false);
-    expect(shouldShowBootstrapLoading({ startupFinished: false, hidden: false })).toBe(false);
+    expect(
+      shouldShowBootstrapLoading({ startupFinished: true, hidden: false, signingOut: false })
+    ).toBe(false);
+    expect(
+      shouldShowBootstrapLoading({ startupFinished: false, hidden: false, signingOut: false })
+    ).toBe(false);
+  });
+
+  // The teardown window: the session revoke and credential deletes run before
+  // the token clears, so `hidden` is still false while the profile behind the
+  // surface is already stale (explorer signout-loading).
+  it('covers the sign-out teardown, before the redirect hides the tree', () => {
+    expect(
+      shouldShowBootstrapLoading({ startupFinished: true, hidden: false, signingOut: true })
+    ).toBe(true);
+  });
+
+  it('stays off while the splash still covers a pre-startup sign-out', () => {
+    expect(
+      shouldShowBootstrapLoading({ startupFinished: false, hidden: false, signingOut: true })
+    ).toBe(false);
   });
 
   it('covers the post-sign-in window: settled startup, hidden tree', () => {
@@ -271,8 +294,12 @@ describe('shouldShowBootstrapLoading', () => {
     // check hide the tree with no splash over it.
     const decision = resolveBootstrapDecision({ ...ready, consentChecked: false });
     expect(decision.hidden).toBe(true);
-    expect(shouldShowBootstrapLoading({ startupFinished: true, hidden: decision.hidden })).toBe(
-      true
-    );
+    expect(
+      shouldShowBootstrapLoading({
+        startupFinished: true,
+        hidden: decision.hidden,
+        signingOut: false,
+      })
+    ).toBe(true);
   });
 });

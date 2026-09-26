@@ -65,23 +65,28 @@ const OPEN_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as con
 const LABEL_LINE =
   /static var title: LocalizedStringResource|@Parameter\(title:|shortTitle:|String\(localized:/;
 
-/** The body of `struct <name>: … { … }`, braces balanced. */
-function swiftStruct(name: string): string {
-  const declaration = intents.indexOf(`struct ${name}:`);
-  expect(declaration, `${name} is not declared`).toBeGreaterThanOrEqual(0);
-  const open = intents.indexOf('{', declaration);
+/** The body of the braced block `declaration` opens in `source`, braces balanced. */
+function swiftBlock(source: string, declaration: string): string {
+  const start = source.indexOf(declaration);
+  expect(start, `${declaration} is not declared`).toBeGreaterThanOrEqual(0);
+  const open = source.indexOf('{', start);
   let depth = 0;
-  for (let index = open; index < intents.length; index += 1) {
-    if (intents[index] === '{') {
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') {
       depth += 1;
-    } else if (intents[index] === '}') {
+    } else if (source[index] === '}') {
       depth -= 1;
       if (depth === 0) {
-        return intents.slice(open, index + 1);
+        return source.slice(open, index + 1);
       }
     }
   }
-  throw new Error(`${name} is never closed`);
+  throw new Error(`${declaration} is never closed`);
+}
+
+/** The body of `struct <name>: … { … }` in the intents source. */
+function swiftStruct(name: string): string {
+  return swiftBlock(intents, `struct ${name}:`);
 }
 
 /** The value the struct declares for `openAppWhenRun`, or null when it does not. */
@@ -250,6 +255,35 @@ describe('the native handshake', () => {
     expect(bridge).toContain('func perform(payload: [String: String]) async throws -> String');
   });
 
+  it('resumes a parked wait from register instead of polling for one', () => {
+    // The old wait re-checked `registered()` and slept 50 ms in a loop for up to
+    // 25 s — up to 500 wakeups for a value `register(...)` can hand over. The
+    // bridge now parks each waiting run's continuation and resumes it from the
+    // registration; one deadline task is the only sleep left.
+    expect(bridge, 'the poll interval is gone').not.toContain('registrationPollInterval');
+    expect(bridge, 'no continuation store').toMatch(
+      /waiters: \[\s*UUID: CheckedContinuation<\(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime\), Error>\s*\]/
+    );
+
+    const wait = swiftBlock(bridge, 'func waitUntilRegistered');
+    expect(wait).toContain('withCheckedThrowingContinuation');
+    expect(wait, 'the wait must not sleep in a loop').not.toContain('Task.sleep');
+
+    // `register(...)` stores the pair and hands it to every parked waiter.
+    const register = swiftBlock(bridge, 'func register(');
+    expect(register).toMatch(/waiters = \[:\]/);
+    expect(register).toContain('.resume(returning: (dispatcher, runtime))');
+
+    // The one deadline task fails the waiter that outlived registration.
+    expect([...bridge.matchAll(/Task\.sleep/g)], 'one sleep, the deadline').toHaveLength(1);
+    const deadline = swiftBlock(bridge, 'func startDeadline');
+    expect(deadline).toContain('Task.sleep');
+    expect(deadline).toContain('failWaiter(id, seconds: Int(timeout))');
+    expect(swiftBlock(bridge, 'func failWaiter')).toContain(
+      'KiloAppActionError.dispatcherUnavailable(seconds: seconds)'
+    );
+  });
+
   it('marks the throwing runtime lookup with try', () => {
     // `AppContext.runtime` is a throwing property: it raises `RuntimeLost` until
     // the runtime exists, so an unmarked read stops the pod compiling. The ios
@@ -272,6 +306,11 @@ describe('the native handshake', () => {
     expect(bridge).toContain('func unregister()');
     expect(actionsModule).toContain('OnDestroy');
     expect(actionsModule).toContain('KiloAppActionBridge.shared.unregister()');
+    // A teardown must fail the parked runs now rather than leave them to the
+    // deadline.
+    const teardown = swiftBlock(bridge, 'func unregister()');
+    expect(teardown).toMatch(/waiters = \[:\]/);
+    expect(teardown).toContain('KiloAppActionError.dispatcherUnavailable');
   });
 
   it('reads the result fields the JS contract answers with', () => {

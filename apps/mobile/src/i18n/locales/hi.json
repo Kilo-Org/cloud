@@ -2066,7 +2066,11 @@
       "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
       "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।",
       "insert": "डालें",
-      "useCommand": "/{{command}} का उपयोग करें"
+      "useCommand": "/{{command}} का उपयोग करें",
+      "useSkillCommand": "/{{command}} स्किल का उपयोग करें",
+      "skillBadge": "स्किल",
+      "catalogFull": "कमांड सूची भर गई है, इसलिए कुछ कमांड छिपे हैं।",
+      "catalogOverLimit": "स्किल सूची आकार सीमा से बड़ी है, इसलिए हर स्किल दिखाया गया है।"
     },
     "contextUsage": {
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",

@@ -23,7 +23,6 @@ import type {
   ConnectedEventData,
   CommandsAvailableData,
 } from '../shared/protocol.js';
-import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
@@ -89,10 +88,11 @@ export type QueuedMessageSnapshot = {
 export type StreamHandlerOptions = {
   deriveCloudStatus?: () => Promise<CloudStatusData['cloudStatus'] | null>;
   /**
-   * Read the cached slash-command catalog. The DO replies from cache on every
-   * connect — it never calls back to the wrapper at this point.
+   * Read the cached slash-command catalog and its bound status. The DO replies
+   * from cache on every connect — it never calls back to the wrapper at this
+   * point.
    */
-  getAvailableCommands?: () => Promise<SlashCommandInfo[]>;
+  getAvailableCommands?: () => Promise<CommandsAvailableData>;
   deriveQueuedMessages?: () => Promise<QueuedMessageSnapshot[]>;
   deriveSessionStatus?: () => Promise<ConnectedEventData['sessionStatus']>;
   derivePendingInteractions?: () => Promise<ConnectedEventData['pendingInteractions']>;
@@ -315,8 +315,7 @@ export function createStreamHandler(
           !eventTypes || eventTypes.length === 0 || eventTypes.includes('commands.available');
 
         if (shouldSendCatalog) {
-          const commands = await options.getAvailableCommands();
-          const data: CommandsAvailableData = { commands };
+          const data = await options.getAvailableCommands();
           server.send(
             JSON.stringify({
               // eventId: 0 — synthetic, non-persisted (same sentinel as the connected event above)

@@ -2114,7 +2114,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Initial discovery: state carries the parsed commands and `idle`.
     const idleState = commandStates.at(-1);
     expect(idleState).toEqual({
       ownerConnectionId: 'owner',
@@ -2133,7 +2132,6 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: PARSED_COMMAND_CATALOG,
     });
 
-    // Transient failure: error state keeps the same cached commands.
     rejectRefresh?.(new Error('command catalog timed out'));
     await Promise.resolve();
     await Promise.resolve();
@@ -2186,7 +2184,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
 
-    // Malformed refresh: cache cleared.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
@@ -2197,13 +2194,11 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: [],
     });
 
-    // Reconnect, retry → recovers cache.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
     expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
 
-    // CATALOG_TOO_LARGE: cache cleared.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
@@ -2214,13 +2209,11 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: [],
     });
 
-    // Reconnect, retry → recovers cache.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
     expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
 
-    // CLI_UPGRADE_REQUIRED: cache cleared and upgrade-required surfaced.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
@@ -2231,7 +2224,6 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: [],
     });
 
-    // Owner disconnect clears the cache.
     connection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
     expect(commandStates.at(-1)).toEqual({
       ownerConnectionId: null,
@@ -2300,7 +2292,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     expect(transport.retryRemoteCommands).toBeDefined();
 
-    // Reconnect kicks off a refresh that we will then reject.
     connection.emitReconnect();
     await Promise.resolve();
     expect(
@@ -2312,7 +2303,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Retry must re-issue exactly one more list_commands call and recover.
     transport.retryRemoteCommands?.();
     await Promise.resolve();
     await Promise.resolve();
@@ -2322,7 +2312,6 @@ describe('CliLiveTransport remote command catalog', () => {
         .mock.calls.filter(([, command]) => command === 'list_commands')
     ).toHaveLength(3);
 
-    // After recovery the cached commands are published again.
     const finalService = transport as unknown as {
       // accessor used by serviceEvent assertion helper is not exposed;
       // the cache is observed through the state callback instead.
@@ -2398,7 +2387,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Grab the event the transport published.
     const availableEvent = serviceEvents.find(
       (event): event is Extract<typeof event, { type: 'commands.available' }> =>
         event.type === 'commands.available'
@@ -2462,7 +2450,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Grab the commands array from the last published state.
     const stateCommands = commandStates.at(-1)!.commands;
     expect(stateCommands).toEqual(PARSED_COMMAND_CATALOG);
     const stateFirst = stateCommands[0];
@@ -2518,7 +2505,6 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Clear discovery calls so we can assert exactly the create_session call.
     jest.mocked(userWebConnection.sendCommand).mockClear();
     const result = await transport.createSession?.();
     expect(result).toBe(NEW_KILO_SESSION_ID);
@@ -3394,7 +3380,6 @@ describe('CliLiveTransport page-seam + reconnect', () => {
 
     expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {});
     expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
-    // session.created from the page must have flowed through.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
     transport.destroy();
   });
@@ -3482,7 +3467,6 @@ describe('CliLiveTransport page-seam + reconnect', () => {
 
     expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
-    // No session.created was emitted because no successful page replayed.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
     expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
     transport.destroy();

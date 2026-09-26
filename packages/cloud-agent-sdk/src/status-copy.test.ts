@@ -19,9 +19,6 @@ import type {
 } from './types';
 import { kiloId, cloudAgentId } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// Every code the union defines, with the exact English copy the SDK ships.
-// ---------------------------------------------------------------------------
 const EXPECTED_COPY: Record<SdkStatusMessageCode, string> = {
   'agent-connection-lost': 'Agent connection lost',
   'session-stopped': 'Session stopped',
@@ -215,10 +212,6 @@ beforeEach(() => {
   mockSession.interrupt.mockResolvedValue({});
 });
 
-// ---------------------------------------------------------------------------
-// Service-state emitters
-// ---------------------------------------------------------------------------
-
 describe('service state copy codes', () => {
   function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
     return { rootSessionId: 'root-1', ...overrides };
@@ -286,10 +279,6 @@ describe('service state copy codes', () => {
     expect(forwardedStatus.code).toBeUndefined();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Session-manager indicator emitters
-// ---------------------------------------------------------------------------
 
 describe('session manager indicator copy codes', () => {
   it('codes the generic preparing and finalizing indicators', async () => {
@@ -406,10 +395,6 @@ describe('session manager indicator copy codes', () => {
     );
   });
 });
-
-// ---------------------------------------------------------------------------
-// formatError / formatErrorDetail — the web app's string input is unchanged.
-// ---------------------------------------------------------------------------
 
 describe('formatErrorDetail pairs each error string with its code', () => {
   it.each<[string, unknown, SdkStatusMessageCode]>([

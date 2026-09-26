@@ -41,10 +41,6 @@ function createTestSession() {
   return { storage, serviceState, feedEvent };
 }
 
-// ---------------------------------------------------------------------------
-// Typed stub factories for SessionSnapshot tests
-// ---------------------------------------------------------------------------
-
 function stubSessionInfo(overrides: Partial<SessionInfo> & { id: string }): SessionInfo {
   return { id: overrides.id, parentID: overrides.parentID };
 }

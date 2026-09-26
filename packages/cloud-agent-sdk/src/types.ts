@@ -48,10 +48,6 @@ export type SendMessagePayload =
       arguments: string;
     };
 
-// ---------------------------------------------------------------------------
-// Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
-// ---------------------------------------------------------------------------
-
 /** Kilo platform session ID (e.g. `ses_abc123…`). Used for DB lookups and CLI sessions. */
 export type KiloSessionId = string & { readonly __brand: 'KiloSessionId' };
 /** Cloud Agent session ID (e.g. `agent_12345678-1234-…`). Used for DO routing and tRPC calls. */
@@ -94,10 +90,6 @@ export type SessionPhase =
   | { status: 'idle' }
   | { status: 'stopped'; reason: 'interrupted' | 'error' | 'disconnected' }
   | { status: 'retrying'; attempt: number; message: string; next: number };
-
-// ---------------------------------------------------------------------------
-// Service state types — separated from chat data
-// ---------------------------------------------------------------------------
 
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 
@@ -283,10 +275,6 @@ export type ServiceStateSnapshot = {
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
 };
 
-// ---------------------------------------------------------------------------
-// Session resolution — determines session type and transport routing
-// ---------------------------------------------------------------------------
-
 export type ResolvedSession =
   | {
       type: 'remote';
@@ -303,10 +291,6 @@ export type ResolvedSession =
     }
   | { type: 'cloud-agent'; kiloSessionId: KiloSessionId; cloudAgentSessionId: CloudAgentSessionId }
   | { type: 'read-only'; kiloSessionId: KiloSessionId };
-
-// ---------------------------------------------------------------------------
-// Historical session snapshot — used by CLI historical transport
-// ---------------------------------------------------------------------------
 
 export type SessionSnapshot = {
   info: SessionInfo;

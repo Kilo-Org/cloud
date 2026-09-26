@@ -12,10 +12,6 @@ import type {
 import { createCliHistoricalTransport } from './cli-historical-transport';
 import { kiloId, makeSnapshot, stubUserMessage, stubTextPart } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const SES_ID = 'ses-1';
 
 function createTransportWithSinks(
@@ -38,10 +34,6 @@ function createTransportWithSinks(
 
   return { transport, chatEvents, serviceEvents };
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('CliHistoricalTransport', () => {
   it('replays snapshot in correct order', async () => {
@@ -68,7 +60,6 @@ describe('CliHistoricalTransport', () => {
     transport.connect();
     await Promise.resolve();
 
-    // Chat events: msg1, part1a, part1b, msg2, part2a
     expect(chatEvents).toHaveLength(5);
     expect(chatEvents[0]).toEqual(
       expect.objectContaining({ type: 'message.updated', info: snapshot.messages[0].info })
@@ -86,7 +77,6 @@ describe('CliHistoricalTransport', () => {
       expect.objectContaining({ type: 'message.part.updated', part: snapshot.messages[1].parts[0] })
     );
 
-    // Service events: session.created, stopped(complete)
     expect(serviceEvents).toHaveLength(2);
     expect(serviceEvents[0]).toEqual(
       expect.objectContaining({ type: 'session.created', info: snapshot.info })
@@ -184,7 +174,6 @@ describe('CliHistoricalTransport', () => {
     transport.connect();
     transport.disconnect();
 
-    // Resolve after disconnect — should be discarded
     resolveSnapshot?.(
       makeSnapshot({ id: SES_ID }, [
         {
@@ -211,7 +200,6 @@ describe('CliHistoricalTransport', () => {
     transport.connect();
     transport.destroy();
 
-    // Resolve after destroy — should be discarded
     resolveSnapshot?.(
       makeSnapshot({ id: SES_ID }, [
         {

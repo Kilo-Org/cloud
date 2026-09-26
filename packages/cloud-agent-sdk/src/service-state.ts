@@ -308,7 +308,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     if (event.info.parentID == null) {
       rootSessionId = event.info.id;
     }
-    // Only track root session info
     let info = event.info;
     if (isRootSession(event.info.id)) {
       info = preserveGoalReason(sessionInfo, event.info);
@@ -861,7 +860,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       };
     }
 
-    // Set cloudStatus (undefined means not provided — leave as null)
     cloudStatus = event.cloudStatus ?? null;
 
     // Clear question/permission — if still pending on the server the wrapper
@@ -870,7 +868,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // callbacks first so consumers (e.g. dock atoms) also clear.
     clearPendingInteractions();
 
-    // Clear terminated on connected
     terminated = false;
     if (
       status.type === 'disconnected' &&

@@ -3166,6 +3166,7 @@
     "emptyTitle": "Keine vertrauenswürdigen Hosts",
     "emptyDescription": "Wenn du dem Host eines Links vertraust, öffnen sich seine Links ohne erneute Rückfrage.",
     "revoke": "Vertrauen in {{host}} widerrufen",
+    "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
   "quickChat": {

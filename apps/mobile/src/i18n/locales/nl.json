@@ -3166,6 +3166,7 @@
     "emptyTitle": "Geen vertrouwde hosts",
     "emptyDescription": "Als je de host van een link vertrouwt, openen links naar die host voortaan zonder bevestiging.",
     "revoke": "Vertrouwen in {{host}} intrekken",
+    "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {

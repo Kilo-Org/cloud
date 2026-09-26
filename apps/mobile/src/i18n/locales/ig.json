@@ -3166,6 +3166,7 @@
     "emptyTitle": "Enweghị saịtị a tụkwasịrị obi",
     "emptyDescription": "Mgbe ị tụkwasịrị saịtị njikọ obi, njikọ ya na-emeghe na-enweghị ịjụ gị ọzọ.",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
+    "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
     "backToPreferences": "Laghachi na nhọrọ"
   },
   "quickChat": {

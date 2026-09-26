@@ -3166,6 +3166,7 @@
     "emptyTitle": "Kò sí ojúlé tí a gbẹ́kẹ̀ lé",
     "emptyDescription": "Tí o bá gbẹ́kẹ̀ lé ojúlé ọ̀nà àsopọ̀ kan, ó máa ṣí láìbéèrè lọ́wọ́ rẹ mọ́.",
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
+    "revokeMessage": "Àwọn ọ̀nà àsopọ̀ sí ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
   "quickChat": {

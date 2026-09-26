@@ -3166,6 +3166,7 @@
     "emptyTitle": "Inga betrodda webbplatser",
     "emptyDescription": "Om du anger att du litar på en webbplats öppnas länkar dit utan att du behöver bekräfta igen.",
     "revoke": "Sluta lita på {{host}}",
+    "revokeMessage": "Länkar till den här webbplatsen kommer att be om bekräftelse igen.",
     "backToPreferences": "Tillbaka till inställningarna"
   },
   "quickChat": {

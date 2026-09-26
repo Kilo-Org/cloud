@@ -3166,6 +3166,7 @@
     "emptyTitle": "Hakuna tovuti zinazoaminika",
     "emptyDescription": "Ukiamini tovuti ya kiungo, viungo vyake hufunguka bila kuomba ruhusa tena.",
     "revoke": "Ondoa uaminifu kwa {{host}}",
+    "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
     "backToPreferences": "Rudi kwenye mapendeleo"
   },
   "quickChat": {

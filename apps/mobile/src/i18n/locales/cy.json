@@ -3338,6 +3338,7 @@
     "emptyTitle": "Dim gwesteiwyr dibynadwy",
     "emptyDescription": "Pan fyddwch yn ymddiried yng ngwesteiwr dolen, bydd y ddolen yn agor heb ofyn eto.",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
+    "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
   "quickChat": {

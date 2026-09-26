@@ -3166,6 +3166,7 @@
     "emptyTitle": "Nuk ka serverë të besuar",
     "emptyDescription": "Kur i beson serverit të një lidhjeje, lidhja hapet pa kërkuar përsëri konfirmim.",
     "revoke": "Hiq besimin për {{host}}",
+    "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
     "backToPreferences": "Kthehu te preferencat"
   },
   "quickChat": {

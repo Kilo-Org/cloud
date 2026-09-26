@@ -3252,6 +3252,7 @@
     "emptyTitle": "Patikimų svetainių nėra",
     "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
+    "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {

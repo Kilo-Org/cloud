@@ -3209,6 +3209,7 @@
     "emptyTitle": "Nema pouzdanih poslužitelja",
     "emptyDescription": "Kad označiš poslužitelj pouzdanim, njegove se poveznice otvaraju bez ponovne potvrde.",
     "revoke": "Opozovi povjerenje za {{host}}",
+    "revokeMessage": "Poveznice na ovaj poslužitelj ponovno će tražiti potvrdu.",
     "backToPreferences": "Natrag na postavke"
   },
   "quickChat": {

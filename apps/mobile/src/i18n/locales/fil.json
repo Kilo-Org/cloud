@@ -3166,6 +3166,7 @@
     "emptyTitle": "Walang pinagkakatiwalaang host",
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
     "revoke": "Bawiin ang tiwala sa {{host}}",
+    "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
     "backToPreferences": "Bumalik sa mga setting"
   },
   "quickChat": {

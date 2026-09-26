@@ -3166,6 +3166,7 @@
     "emptyTitle": "Güvenilen sunucu yok",
     "emptyDescription": "Bir bağlantının sunucusunu güvenilir olarak işaretlediğinde o sunucunun bağlantıları tekrar onay istemeden açılır.",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
+    "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
     "backToPreferences": "Tercihlere dön"
   },
   "quickChat": {

@@ -3166,6 +3166,7 @@
     "emptyTitle": "Engir traustir vefþjónar",
     "emptyDescription": "Þegar þú treystir vefþjóni opnast tenglar á hann án þess að beðið sé um staðfestingu aftur.",
     "revoke": "Afturkalla traust á {{host}}",
+    "revokeMessage": "Tenglar á þennan vefþjón munu biðja um staðfestingu aftur.",
     "backToPreferences": "Til baka í stillingar"
   },
   "quickChat": {

@@ -3166,6 +3166,7 @@
     "emptyTitle": "暂无受信任的网站",
     "emptyDescription": "信任某个网站后，打开该网站的链接时将不再询问。",
     "revoke": "撤销对 {{host}} 的信任",
+    "revokeMessage": "指向此网站的链接将再次请求确认。",
     "backToPreferences": "返回偏好设置"
   },
   "quickChat": {

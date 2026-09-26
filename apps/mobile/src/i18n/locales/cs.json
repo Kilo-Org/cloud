@@ -3252,6 +3252,7 @@
     "emptyTitle": "Žádné důvěryhodné domény",
     "emptyDescription": "Odkazy na důvěryhodné domény se otevírají bez dalšího potvrzení.",
     "revoke": "Odebrat důvěru doméně {{host}}",
+    "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
     "backToPreferences": "Zpět na předvolby"
   },
   "quickChat": {

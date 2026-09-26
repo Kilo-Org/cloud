@@ -3166,6 +3166,7 @@
     "emptyTitle": "Babu rukunin yanar gizo da aka amince da shi",
     "emptyDescription": "Idan ka amince da rukunin yanar gizon mahaɗi, za a buɗe shi ba tare da sake tambaya ba.",
     "revoke": "Soke amincewa da {{host}}",
+    "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
   "quickChat": {

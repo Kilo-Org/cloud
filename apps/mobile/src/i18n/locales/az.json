@@ -3166,6 +3166,7 @@
     "emptyTitle": "Etibarlı sayt yoxdur",
     "emptyDescription": "Sayta etibar etdikdə onun keçidləri bir daha təsdiq istəmədən açılır.",
     "revoke": "{{host}} üçün etibarı ləğv et",
+    "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
     "backToPreferences": "Parametrlərə qayıt"
   },
   "quickChat": {

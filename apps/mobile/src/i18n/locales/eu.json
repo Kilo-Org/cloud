@@ -3166,6 +3166,7 @@
     "emptyTitle": "Ez dago konfiantzako ostalaririk",
     "emptyDescription": "Esteka baten ostalariari konfiantza ematen badiozu, haren estekak berriro galdetu gabe irekiko dira.",
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
+    "revokeMessage": "Ostalari honetarako estekek berriro eskatuko dute berrespena.",
     "backToPreferences": "Itzuli hobespenetara"
   },
   "quickChat": {

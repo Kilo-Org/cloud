@@ -3166,6 +3166,7 @@
     "emptyTitle": "Ei luotettuja verkkotunnuksia",
     "emptyDescription": "Kun luotat verkkotunnukseen, sen linkit avataan ilman uutta vahvistusta.",
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
+    "revokeMessage": "Tämän verkkotunnuksen linkit kysyvät jatkossa vahvistusta uudelleen.",
     "backToPreferences": "Takaisin asetuksiin"
   },
   "quickChat": {

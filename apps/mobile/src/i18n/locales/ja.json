@@ -3166,6 +3166,7 @@
     "emptyTitle": "信頼済みホストはありません",
     "emptyDescription": "リンク先のホストを信頼済みにすると、次回から確認せずに開けます。",
     "revoke": "{{host}}を信頼済みホストから削除",
+    "revokeMessage": "このホストへのリンクは再び確認を求めます。",
     "backToPreferences": "設定に戻る"
   },
   "quickChat": {

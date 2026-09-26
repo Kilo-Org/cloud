@@ -3166,6 +3166,7 @@
     "emptyTitle": "Usaldatud hoste pole",
     "emptyDescription": "Kui usaldad lingi hosti, avatakse selle hosti lingid edaspidi kinnitust küsimata.",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
+    "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
   "quickChat": {

@@ -3252,6 +3252,7 @@
     "emptyTitle": "Ni zaupanja vrednih gostiteljev",
     "emptyDescription": "Ko gostitelja označiš kot zaupanja vrednega, se njegove povezave odprejo brez ponovne potrditve.",
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
+    "revokeMessage": "Povezave do tega gostitelja bodo znova zahtevale potrditev.",
     "backToPreferences": "Nazaj na nastavitve"
   },
   "quickChat": {

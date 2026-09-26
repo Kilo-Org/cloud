@@ -3209,6 +3209,7 @@
     "emptyTitle": "No hay dominios de confianza",
     "emptyDescription": "Si marcas un dominio como de confianza, sus enlaces se abrirán sin volver a pedir confirmación.",
     "revoke": "Dejar de confiar en {{host}}",
+    "revokeMessage": "Los enlaces a este dominio volverán a pedir confirmación.",
     "backToPreferences": "Volver a preferencias"
   },
   "quickChat": {

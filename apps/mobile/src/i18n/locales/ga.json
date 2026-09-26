@@ -3295,6 +3295,7 @@
     "emptyTitle": "Níl aon óstach iontaofa ann",
     "emptyDescription": "Má chuireann tú muinín in óstach naisc, osclófar naisc chuige gan deimhniú a iarraidh arís.",
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
+    "revokeMessage": "Iarrfaidh naisc chuig an óstach seo deimhniú arís.",
     "backToPreferences": "Ar ais go dtí na roghanna"
   },
   "quickChat": {

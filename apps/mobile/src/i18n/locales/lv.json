@@ -3209,6 +3209,7 @@
     "emptyTitle": "Nav uzticamu resursdatoru",
     "emptyDescription": "Ja uzticies saites resursdatoram, tā saites turpmāk atveras bez atkārtota apstiprinājuma.",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
+    "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
   "quickChat": {

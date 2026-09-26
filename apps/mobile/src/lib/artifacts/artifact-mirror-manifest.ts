@@ -169,7 +169,7 @@ export function safeArtifactSessionName({
 export function uniqueArtifactDisplayNames(files: ArtifactMirrorFile[]): ArtifactMirrorFile[] {
   const used = new Set<string>();
   return files.map(file => {
-    const name = uniqueArtifactDisplayName(file.name, file.id, file.mime, used);
+    const name = uniqueArtifactDisplayName(file, used);
     used.add(name);
     return name === file.name ? file : { ...file, name };
   });
@@ -182,16 +182,11 @@ export function uniqueArtifactDisplayNames(files: ArtifactMirrorFile[]): Artifac
  * so the counter never runs out of room. One candidate per taken name is tried,
  * so a free one always exists.
  */
-function uniqueArtifactDisplayName(
-  baseName: string,
-  id: string,
-  mime: string,
-  used: ReadonlySet<string>
-): string {
-  if (!used.has(baseName)) {
-    return baseName;
+function uniqueArtifactDisplayName(file: ArtifactMirrorFile, used: ReadonlySet<string>): string {
+  if (!used.has(file.name)) {
+    return file.name;
   }
-  const { stem, extension } = splitArtifactExtension(baseName);
+  const { stem, extension } = splitArtifactExtension(file.name);
   const boundedExtension = truncateUtf8(extension, MAX_ARTIFACT_DISPLAY_NAME_BYTES / 2);
   for (let index = 2; index <= used.size + 2; index += 1) {
     const suffix = ` (${index})`;
@@ -202,11 +197,17 @@ function uniqueArtifactDisplayName(
       return candidate;
     }
   }
-  return safeArtifactDisplayName({ id, name: '', mime });
+  return safeArtifactDisplayName({ id: file.id, name: '', mime: file.mime });
 }
 
+/** The stem and extension (with the dot) of a sanitized display name. */
+type ArtifactDisplayNameParts = {
+  extension: string;
+  stem: string;
+};
+
 /** Split a sanitized display name into its stem and extension (with the dot). */
-function splitArtifactExtension(name: string): { extension: string; stem: string } {
+function splitArtifactExtension(name: string): ArtifactDisplayNameParts {
   const extensionStart = name.lastIndexOf('.');
   if (extensionStart > 0 && extensionStart < name.length - 1) {
     return { extension: name.slice(extensionStart), stem: name.slice(0, extensionStart) };

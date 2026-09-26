@@ -2,7 +2,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 import { confirmRemoteSessionExit } from './remote-session-exit-confirmation';
-import { isNonRetryableExitError } from './remote-session-exit-messages';
+import { exitErrorCopy, isNonRetryableExitError } from './remote-session-exit-messages';
 
 type ExitRemoteSessionFromListInput = {
   confirm: () => Promise<boolean>;
@@ -39,14 +39,18 @@ export async function exitRemoteSessionFromList({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToExit');
+        // The three pinned SDK messages are a producer/consumer contract,
+        // matched in English by `remote-session-exit-messages`. Once matched,
+        // show the reader their own language.
+        const shown = exitErrorCopy(message) ?? message;
         if (isNonRetryableExitError(message)) {
           // Fail-closed: the SDK signalled "do not send". No CTA so the user
           // sees the copy but cannot trigger another attempt.
-          announcingToast.error(message);
+          announcingToast.error(shown);
         } else {
           // Retryable transport / ACK failure. The retry action re-runs the
           // send without a second confirm.
-          announcingToast.error(message, {
+          announcingToast.error(shown, {
             action: {
               label: i18n.t('common.tryAgain'),
               onClick: () => {

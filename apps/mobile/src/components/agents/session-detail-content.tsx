@@ -347,6 +347,7 @@ export function SessionDetailContent({
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const availableCommandsCatalogStatus = useAtomValue(manager.atoms.availableCommandsCatalogStatus);
   const sessionInfo = useAtomValue(manager.atoms.sessionInfo);
   const sessionGoal = selectVisibleGoal(sessionInfo, isReadOnly);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
@@ -2499,6 +2500,7 @@ export function SessionDetailContent({
                 attachmentsEnabled={supportsAttachments}
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
+                commandCatalogStatus={availableCommandsCatalogStatus}
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}

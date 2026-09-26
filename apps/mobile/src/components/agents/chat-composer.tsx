@@ -5,7 +5,11 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type SlashCommandInfo, type StandaloneSuggestion } from '@kilocode/cloud-agent-sdk';
+import {
+  type SlashCommandCatalogStatus,
+  type SlashCommandInfo,
+  type StandaloneSuggestion,
+} from '@kilocode/cloud-agent-sdk';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import {
@@ -48,6 +52,7 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
+  getSlashCommandCatalogNotice,
   getSlashCommandSuggestions,
   isGoalCommandDraft,
   parseChatComposerSubmission,
@@ -194,6 +199,12 @@ type ChatComposerProps = {
   activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
   /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
   commands?: SlashCommandInfo[];
+  /**
+   * Bound status the wrapper reported for `commands`. Present when the wrapper
+   * bounded the catalog, so the open slash menu says that rows are missing or
+   * that the catalog is over its size limit instead of looking complete.
+   */
+  commandCatalogStatus?: SlashCommandCatalogStatus | null;
   /** Remote command state — empty for non-remote sessions. */
   commandState?: RemoteCommandState | null;
   /** Share-gate delivery id; composer takes the payload and clears the route param. */
@@ -249,6 +260,7 @@ export function ChatComposer({
   attachmentsEnabled = true,
   activeSessionType = null,
   commands = [],
+  commandCatalogStatus = null,
   commandState = null,
   shareId,
   autoSend,
@@ -760,6 +772,10 @@ export function ChatComposer({
   );
   const slashCommandSuggestions =
     slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commandList);
+  // The bound notice belongs beside the open slash menu: that is where the
+  // reader expects to see every command, and a dropped row is otherwise
+  // invisible.
+  const slashCommandCatalogNotice = getSlashCommandCatalogNotice(commandCatalogStatus);
 
   // The strip must show share-prefilled files before the session resolves.
   const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
@@ -1268,6 +1284,14 @@ export function ChatComposer({
           <AccessibleStatus
             tone="error"
             message={i18n.t('agentChat.composer.photoMetadataNotRemoved')}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
+
+        {slashCommandInput !== null && slashCommandCatalogNotice !== null && !isSending ? (
+          <AccessibleStatus
+            tone="status"
+            message={slashCommandCatalogNotice}
             className="mb-2 px-4 text-xs"
           />
         ) : null}

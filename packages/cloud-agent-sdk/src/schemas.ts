@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
-import type { KiloSessionId } from './types';
+import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -935,8 +935,16 @@ export const slashCommandInfoSchema = z.object({
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
 
+export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatus> = z.object({
+  dropped: z.number().int().nonnegative(),
+  overLimit: z.boolean(),
+});
+
 export const commandsAvailableDataSchema = z.object({
   commands: z.array(slashCommandInfoSchema),
+  // The notice is a nicety and the catalog is essential, so a malformed status
+  // is dropped instead of failing the whole event and losing the catalog.
+  catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
 

@@ -29,8 +29,8 @@ import {
   type CompleteEventData,
   type KilocodeEventData,
   type CloudStatusData,
+  type CommandsAvailableData,
 } from '../shared/protocol.js';
-import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
@@ -254,8 +254,11 @@ export type IngestDOContext = {
     params: TerminalizeParams & { assistantMessageId?: string },
     wrapperRunId: string
   ) => Promise<void>;
-  /** Persist the slash-command catalog so connecting clients can be hydrated. */
-  setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
+  /**
+   * Persist the slash-command catalog and its bound status so connecting
+   * clients can be hydrated with the notice that rows are missing.
+   */
+  setAvailableCommands: (data: CommandsAvailableData) => Promise<void>;
   /**
    * Optional callback invoked for qualifying question/permission kilocode
    * events. Synchronous/fire-and-forget; the DO owns any `waitUntil` for
@@ -740,7 +743,7 @@ export function createIngestHandler(
 
         if (eventType === 'commands.available') {
           await handleCommandsAvailable(ingestEvent.data, {
-            setAvailableCommands: cmds => doContext.setAvailableCommands(cmds),
+            setAvailableCommands: data => doContext.setAvailableCommands(data),
             logger: console,
           });
         }

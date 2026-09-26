@@ -64,6 +64,8 @@ function SlashCommandSuggestionRow({
     isRuntimeDescription,
     SLASH_COMMAND_ITEM_PREFIX + command.name
   );
+  // A skill row is marked so the user can tell it apart from a plain command.
+  const isSkill = command.source === 'skill';
 
   return (
     <Pressable
@@ -71,7 +73,10 @@ function SlashCommandSuggestionRow({
         onSelect(command);
       }}
       accessibilityRole="button"
-      accessibilityLabel={t('agentChat.slashCommands.useCommand', { command: command.name })}
+      accessibilityLabel={t(
+        isSkill ? 'agentChat.slashCommands.useSkillCommand' : 'agentChat.slashCommands.useCommand',
+        { command: command.name }
+      )}
       accessibilityHint={sourceDescription ? description : undefined}
       hitSlop={4}
       className={cn(
@@ -80,7 +85,16 @@ function SlashCommandSuggestionRow({
       )}
     >
       <View className="flex-1">
-        <Text className="text-sm font-semibold text-foreground">/{command.name}</Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm font-semibold text-foreground">/{command.name}</Text>
+          {isSkill ? (
+            <View className="rounded-full bg-muted px-2 py-0.5">
+              <Text className="text-[10px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">
+                {t('agentChat.slashCommands.skillBadge')}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         {sourceDescription ? (
           <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
             {description}

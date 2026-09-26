@@ -12,6 +12,7 @@ import {
   type OverviewSectionKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
+import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -30,9 +31,8 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import {
   type AgentProfileDetail,
   useAgentProfile,
@@ -93,15 +93,25 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
   const nameRef = useRef(profile.name);
   const descriptionRef = useRef(profile.description ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = () => {
     const name = nameRef.current.trim();
-    if (validateProfileName(name) !== null) {
-      setNameError(t('profiles.nameRequired'));
+    const nameIssue = validateProfileName(name);
+    if (nameIssue !== null) {
+      setNameError(
+        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
+      );
+      return;
+    }
+    const description = descriptionRef.current.trim();
+    if (validateProfileDescription(description) !== null) {
+      setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
     setNameError(null);
-    onSave({ name, description: descriptionRef.current.trim() });
+    setDescriptionError(null);
+    onSave({ name, description });
   };
 
   return (
@@ -125,59 +135,21 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
         label={t('profiles.descriptionLabel')}
         placeholder={t('profiles.descriptionPlaceholder')}
         defaultValue={profile.description ?? ''}
+        error={descriptionError ?? undefined}
         multiline
         textAlignVertical="top"
         className="min-h-20 leading-5"
         disabled={isSaving}
         onChangeText={value => {
           descriptionRef.current = value;
+          if (descriptionError !== null && validateProfileDescription(value) === null) {
+            setDescriptionError(null);
+          }
         }}
       />
       <Button loading={isSaving} disabled={isSaving} onPress={submit}>
         <Text>{t('common.save')}</Text>
       </Button>
-    </View>
-  );
-}
-
-/**
- * Content-shaped loading rows in the same slots as the loaded screen (two
- * fields, the default row, the six section rows, the delete button) so the
- * swap to real content does not move anything.
- */
-function ProfileOverviewSkeleton() {
-  return (
-    <View className="gap-6">
-      <View className="gap-4">
-        <View className="gap-1.5">
-          <Skeleton className="h-4 w-24 rounded" />
-          <Skeleton className="h-[44px] w-full rounded-md" />
-        </View>
-        <View className="gap-1.5">
-          <Skeleton className="h-4 w-32 rounded" />
-          <Skeleton className="h-20 w-full rounded-md" />
-        </View>
-        <Skeleton className="h-[44px] w-full rounded-md" />
-      </View>
-      <Skeleton className="h-16 w-full rounded-lg" />
-      <View className="gap-3 rounded-lg border border-border p-3">
-        <View className="flex-row items-center justify-between gap-2">
-          <Skeleton className="h-4 w-40 rounded" />
-          <Skeleton className="h-9 w-28 rounded-md" />
-        </View>
-        <Skeleton className="h-4 w-full rounded" />
-        <Skeleton className="h-9 w-full rounded-md" />
-      </View>
-      <View className="gap-1">
-        <Skeleton className="h-4 w-28 rounded" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-      </View>
-      <Skeleton className="h-[44px] w-full rounded-md" />
     </View>
   );
 }

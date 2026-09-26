@@ -15,6 +15,7 @@ import { db } from '@/lib/drizzle';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
 import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
+import { type ApiRequestLogBlobs, uploadApiRequestLogBlobs } from '@/lib/r2/api-request-log';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
@@ -73,10 +74,10 @@ type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
 
-export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
+export function redactApiRequestLogRequest(request: GatewayRequest): unknown {
   const gateway = request.body.providerOptions?.gateway;
   if (!gateway?.byok) {
-    return sanitizeJsonbValue(request.body);
+    return request.body;
   }
 
   const redactedByok = Object.fromEntries(
@@ -86,13 +87,13 @@ export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
     ])
   );
 
-  return sanitizeJsonbValue({
+  return {
     ...request.body,
     providerOptions: {
       ...request.body.providerOptions,
       gateway: { ...gateway, byok: redactedByok },
     },
-  });
+  };
 }
 
 async function createRequestLogCapture(
@@ -137,7 +138,7 @@ async function createRequestLogCapture(
       );
     }
     try {
-      const error =
+      const detectedError =
         responseText !== undefined
           ? responseReadError !== undefined
             ? {
@@ -146,6 +147,23 @@ async function createRequestLogCapture(
               }
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
+      let blobs: ApiRequestLogBlobs | null = null;
+      let r2UploadError: string | undefined;
+      try {
+        blobs = await uploadApiRequestLogBlobs({
+          request: JSON.stringify(redactApiRequestLogRequest(request)),
+          response: responseText,
+        });
+      } catch (e) {
+        r2UploadError = String(e).substring(0, 4000);
+        logExceptInTest(
+          `[rewriteModelResponse] failed to upload api_request_log blobs to R2 (user=${user?.id}, status=${status}, model=${model}): ${r2UploadError}`
+        );
+      }
+      const error =
+        r2UploadError === undefined
+          ? detectedError
+          : { ...(detectedError ?? {}), r2_upload_error: r2UploadError };
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({
@@ -156,9 +174,8 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: sanitizeApiRequestLogRequest(request),
-          response: responseText,
           error: sanitizeJsonbValue(error),
+          ...blobs,
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(

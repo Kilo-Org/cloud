@@ -2817,12 +2817,19 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
+    /** Legacy inline request body; new rows store it in R2 under `request_r2_key`. */
     request: jsonb(),
+    /** Legacy inline response body; new rows store it in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
+    r2_region: text().$type<'us' | 'eu'>(),
+    request_r2_key: text(),
+    response_r2_key: text(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
+
+export type ApiRequestLog = typeof api_request_log.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',

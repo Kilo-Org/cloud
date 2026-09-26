@@ -88,4 +88,52 @@ describe('createCachedFetch', () => {
     expect(await get()).toBe(10); // stale fallback
     expect(await get()).toBe(20); // recovered
   });
+
+  test('shares one fetcher call between concurrent callers', async () => {
+    let resolve: (value: number) => void = () => {};
+    const fetcher = jest.fn<() => Promise<number>>(
+      () =>
+        new Promise(r => {
+          resolve = r;
+        })
+    );
+    const get = createCachedFetch(fetcher, 10_000, 0);
+
+    const pending = Promise.all([get(), get()]);
+    resolve(7);
+
+    expect(await pending).toEqual([7, 7]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  test('remembers a failure for failureTtlMs before retrying', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    const fetcher = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('down'))
+      .mockResolvedValueOnce('up');
+    const get = createCachedFetch(fetcher, 10_000, 'default', { failureTtlMs: 500 });
+
+    expect(await get()).toBe('default');
+    now.mockReturnValue(1400);
+    expect(await get()).toBe('default');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(1500);
+    expect(await get()).toBe('up');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  test('retries a synchronously throwing fetcher once the failure window passes', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    const fetcher = jest.fn<() => Promise<number>>(() => {
+      throw new Error('sync');
+    });
+    const get = createCachedFetch(fetcher, 10_000, 0, { failureTtlMs: 100 });
+
+    expect(await get()).toBe(0);
+    now.mockReturnValue(1100);
+    expect(await get()).toBe(0);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });

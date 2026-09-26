@@ -261,6 +261,32 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('marks the queued-message cancel action as destructive while Copy and Select text stay neutral', async () => {
+    const message = storedMessage(userInfo(), [textPart('queued')]);
+    const renderer = await mountSheet(message, {
+      canCancelQueued: true,
+      onCancelQueued: vi.fn<(value: StoredMessage) => void>(),
+    });
+
+    const cancel = findByTestID(renderer.root, 'message-details-cancel-queued')[0];
+    expect(cancel?.props.className).toContain('border-destructive');
+    expect(cancel?.findAllByType(Text)[0]?.props.className).toContain('text-destructive');
+
+    const copy = findByTestID(renderer.root, 'message-details-copy')[0];
+    expect(copy?.props.className).toContain('border-border');
+    expect(copy?.props.className).not.toContain('destructive');
+    expect(copy?.findAllByType(Text)[0]?.props.className).toContain('text-foreground');
+    expect(copy?.findAllByType(Text)[0]?.props.className).not.toContain('destructive');
+
+    const selectText = findByTestID(renderer.root, 'message-details-select-text')[0];
+    expect(selectText?.props.className).toContain('border-border');
+    expect(selectText?.props.className).not.toContain('destructive');
+    expect(selectText?.findAllByType(Text)[0]?.props.className).toContain('text-foreground');
+    expect(selectText?.findAllByType(Text)[0]?.props.className).not.toContain('destructive');
+
+    await unmount(renderer);
+  });
+
   it('announces an identical failure again after a cleared retry, without speech on hiding', async () => {
     const message = storedMessage(userInfo(), [textPart('queued')]);
     const failure = 'Could not cancel the queued message.';

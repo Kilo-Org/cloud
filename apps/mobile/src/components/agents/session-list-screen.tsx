@@ -24,6 +24,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
@@ -38,7 +39,6 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { Skeleton } from '@/components/ui/skeleton';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -48,8 +48,6 @@ import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-
 import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
-
-const SKELETON_ROW_COUNT = 8;
 
 export function AgentSessionListScreen() {
   const router = useRouter();
@@ -264,16 +262,23 @@ export function AgentSessionListScreen() {
     </View>
   );
 
+  // One handler shared by every row: with the row memoised, a poll that writes
+  // an unchanged payload leaves each row's props referentially stable and
+  // skips its render entirely. The row's relative timestamp does not come
+  // through these props: the row samples the shared clock itself, so it ages
+  // without a new payload.
+  const handleRowPress = useCallback(
+    (session: ActiveSession) => {
+      navigateToSession(session.id, organizationId);
+    },
+    [navigateToSession, organizationId]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
-      <RemoteSessionRow
-        session={item}
-        onPress={() => {
-          navigateToSession(item.id, organizationId);
-        }}
-      />
+      <RemoteSessionRow session={item} onPress={handleRowPress} />
     ),
-    [navigateToSession, organizationId]
+    [handleRowPress]
   );
 
   // The FAB style, the side padding, the body measurement, and the centered
@@ -332,15 +337,7 @@ export function AgentSessionListScreen() {
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
-    body = (
-      <View className="pt-[18px]">
-        {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-          <View key={i} className="py-1.5" style={sidePadding}>
-            <Skeleton className="h-[76px] rounded-none" />
-          </View>
-        ))}
-      </View>
-    );
+    body = <SessionListSkeletonRows sidePadding={sidePadding} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
     // filter), so the native control gets the same treatment as the rows

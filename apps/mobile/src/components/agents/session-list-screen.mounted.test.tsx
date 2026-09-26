@@ -723,7 +723,7 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('RemoteSessionRow')[0]?.props.session).toMatchObject({ status: 'running' });
     expect(text()).toContain('No internet connection');
     expect(text()).not.toContain('Reconnecting…');
-    (originalRow.props.onPress as () => void)();
+    (originalRow.props.onPress as (session: ActiveSession) => void)(row);
     expect(state.sessionId).toBe('live-1');
   });
 

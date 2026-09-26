@@ -12,7 +12,6 @@ import {
   getSnapshotModelVariantId,
   narrowProviderSlugsToVariant,
 } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { VIRTUAL_PROVIDER } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const MODEL = 'nvidia/nemotron-3.5-lightning';
 const FREE_MODEL = `${MODEL}:free`;
@@ -296,42 +295,5 @@ describe('createModelsByProviderIndexLoader', () => {
     await expect(getProviderSlugsForModel(modelId)).resolves.toEqual(
       new Set(['anthropic', 'google-vertex'])
     );
-  });
-
-  describe('toUpstreamProviderOnly', () => {
-    const ROUTER = 'openrouter/auto';
-
-    function loaderWithRouter() {
-      const snapshot = makeSnapshot();
-      snapshot.providers.push({
-        ...VIRTUAL_PROVIDER,
-        models: [snapshotModel(ROUTER, null)],
-      });
-      return loader(storedModels, {}, snapshot);
-    }
-
-    it('expands the virtual provider to every real provider for routers', async () => {
-      const { toUpstreamProviderOnly } = loaderWithRouter();
-
-      await expect(toUpstreamProviderOnly(ROUTER, [VIRTUAL_PROVIDER.slug])).resolves.toEqual([
-        'deepinfra',
-        'coreweave',
-        'nvidia',
-      ]);
-    });
-
-    it('drops the virtual provider for models served by real providers', async () => {
-      const { toUpstreamProviderOnly } = loaderWithRouter();
-
-      await expect(
-        toUpstreamProviderOnly(MODEL, ['deepinfra', VIRTUAL_PROVIDER.slug])
-      ).resolves.toEqual(['deepinfra']);
-    });
-
-    it('leaves lists without the virtual provider unchanged', async () => {
-      const { toUpstreamProviderOnly } = loaderWithRouter();
-
-      await expect(toUpstreamProviderOnly(ROUTER, ['deepinfra'])).resolves.toEqual(['deepinfra']);
-    });
   });
 });

@@ -23,6 +23,11 @@ export const VIRTUAL_PROVIDER = {
   },
 } satisfies OpenRouterProvider;
 
+/** Upstream gateways do not know the snapshot-only virtual provider slug. */
+export function withoutVirtualProvider(providerSlugs: readonly string[]): string[] {
+  return providerSlugs.filter(slug => slug !== VIRTUAL_PROVIDER.slug);
+}
+
 type ProviderModels = Array<{
   provider: OpenRouterProvider;
   models: OpenRouterModel[];

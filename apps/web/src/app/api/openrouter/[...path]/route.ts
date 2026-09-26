@@ -116,7 +116,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { toUpstreamProviderOnly } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;
@@ -690,18 +690,14 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
       groupModelAllowed = groupDecision.allowed;
       if (groupDecision.eligibleProviderRoutes) {
         const currentOnly = providerConfig?.only;
-        const only = currentOnly
-          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
-          : [...groupDecision.eligibleProviderRoutes];
+        const only = withoutVirtualProvider(
+          currentOnly
+            ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
+            : [...groupDecision.eligibleProviderRoutes]
+        );
         groupProvidersAllowed = only.length > 0;
         effectiveProviderConfig = { ...providerConfig, only };
       }
-    }
-    if (effectiveProviderConfig?.only) {
-      effectiveProviderConfig = {
-        ...effectiveProviderConfig,
-        only: await toUpstreamProviderOnly(modelId, effectiveProviderConfig.only),
-      };
     }
     return {
       balance,

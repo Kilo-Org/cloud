@@ -288,6 +288,21 @@ jobs:
         working-directory: apps/mobile
         run: node ../../scripts/inspect-mobile-artifacts.mjs artifacts/app.ipa artifacts/app.aab build.json
 
+      # A plain step with no `if:` and no `continue-on-error`, placed before the
+      # first submission: a build that cannot be documented is never submitted.
+      - name: Generate SBOMs
+        working-directory: apps/mobile
+        run: node ../../scripts/mobile-sbom.mjs --ipa artifacts/app.ipa --aab artifacts/app.aab --build-json build.json --out-dir artifacts
+
+      # The retained second copy, matching sbom.yml's cloud-sbom-<sha> pattern.
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-sbom-${{ github.sha }}
+          path: apps/mobile/artifacts/*.cyclonedx.json
+          retention-days: 90
+          if-no-files-found: error
+
       # Read the identity the stores will receive from the built artifact. This
       # fails the run before the upload when the IPA does not carry the version
       # in app.config.ts, so a mismatched artifact never reaches the stores.
@@ -341,8 +356,59 @@ jobs:
       - name: Tag release
         run: |
           TAG="kilo-app-release/$(date -u +%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
-          git tag "$TAG"
-          git push origin "$TAG"
+          # The tag name is deterministic, so a rerun of this commit recomputes
+          # the tag a failed attempt already pushed. Reuse it: the failure that
+          # needs a rerun is usually the release publication below, and that must
+          # not be blocked by the tag the failed attempt created.
+          if git ls-remote --exit-code --tags origin "$TAG" > /dev/null 2>&1; then
+            echo "Tag $TAG already exists — reusing it."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
+      # The SBOMs live with the build, so a user who holds an artifact can
+      # retrieve the matching inventory. The notes carry the two artifact
+      # SHA-256 values so the SBOM can be checked against the binary.
+      - name: Publish SBOM release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SUMMARY=apps/mobile/artifacts/mobile-sbom-summary.json
+          APP_VERSION=$(jq -r '.ios.appVersion' "$SUMMARY")
+          IOS_BUILD=$(jq -r '.ios.appBuildVersion' "$SUMMARY")
+          ANDROID_BUILD=$(jq -r '.android.appBuildVersion' "$SUMMARY")
+          IOS_BUILD_ID=$(jq -r '.ios.easBuildId' "$SUMMARY")
+          ANDROID_BUILD_ID=$(jq -r '.android.easBuildId' "$SUMMARY")
+
+          NOTES=apps/mobile/artifacts/mobile-sbom-notes.md
+          jq -r '
+            "## kilo-app " + .ios.appVersion + " SBOMs\n\n" +
+            "| Platform | Artifact | SHA-256 | Components |\n" +
+            "| --- | --- | --- | --- |\n" +
+            ([.ios, .android] | map(
+              "| " + .platform + " | " + .artifactName + " | `" + .artifactSha256 + "` | " +
+              ([.counts | to_entries[] | select(.value > 0) | "\(.key)=\(.value)"] | join(", ")) +
+              " |"
+            ) | join("\n")) +
+            "\n\nThe SHA-256 names the artifact submitted to the store, the same bytes the SBOM describes.\n"
+          ' "$SUMMARY" > "$NOTES"
+
+          TITLE="kilo-app $APP_VERSION (iOS build $IOS_BUILD, Android build $ANDROID_BUILD) — EAS builds $IOS_BUILD_ID, $ANDROID_BUILD_ID"
+
+          # Publication must survive a rerun: the tag above can already carry a
+          # release when a previous attempt failed during the upload, and that
+          # release has to receive the assets instead of failing the rerun.
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "$TITLE" --notes-file "$NOTES"
+            gh release upload "$RELEASE_TAG" apps/mobile/artifacts/*.cyclonedx.json --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "$TITLE" \
+              --notes-file "$NOTES" \
+              apps/mobile/artifacts/*.cyclonedx.json
+          fi
 
   # A store release needs a version string that was not released before, so the
   # marketing version is patch-bumped for the next one. This runs beside

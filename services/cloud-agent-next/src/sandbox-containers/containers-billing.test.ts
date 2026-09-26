@@ -58,6 +58,7 @@ type StoredRecord = {
   lastSnapshot: { id: string; sourceAllocation: string } | null;
   instance?: string;
   billingConfigured?: true;
+  wrapperAttempt?: string;
 };
 
 type StoredSchedule = { dueAtMs: number; payload?: unknown };
@@ -220,7 +221,7 @@ class FakeContainer {
 }
 
 function execProcess(exitCode: number): ExecProcess {
-  return { exitCode: Promise.resolve(exitCode) } as unknown as ExecProcess;
+  return { pid: 1, exitCode: Promise.resolve(exitCode) } as unknown as ExecProcess;
 }
 
 function setup(
@@ -756,6 +757,7 @@ describe('ContainersBilling resumed launch activation', () => {
       ...readRecord(first.storage),
       state: 'launching',
       allocationRef: REF_A,
+      wrapperAttempt: 'not_started',
     });
     first.container.execHandler = cmd => execProcess(cmd[0] === 'pgrep' ? 1 : 0);
     first.container.startBehavior = 'effect-then-reject';
@@ -777,6 +779,97 @@ describe('ContainersBilling resumed launch activation', () => {
     expect(readSchedules(first.storage)?.billingHeartbeatTick).toMatchObject({
       payload: generation,
     });
+  });
+
+  it('activates the stored generation for both a found adoption and an absent probe', async () => {
+    for (const probeExitCode of [0, 1] as const) {
+      const first = setup();
+      await admit(first.instance, 'standard-4');
+      const generation = readGeneration(first.storage);
+      // Force the activation to be observable: a new start acknowledgement is
+      // only re-sent when the stored generation is activated again.
+      first.storage.map.delete(START_ACK_KEY);
+      first.storage.map.set(RECORD_KEY, {
+        ...readRecord(first.storage),
+        state: 'launching',
+        allocationRef: REF_A,
+      });
+      first.container.running = true;
+      first.container.execHandler = () => execProcess(probeExitCode);
+      const startsBefore = first.meter.recordStartInputs.length;
+
+      const resumed = setup({
+        storage: first.storage,
+        container: first.container,
+        meter: first.meter,
+      });
+
+      if (probeExitCode === 0) {
+        await expect(launch(resumed.instance, REF_A, 'standard-4')).resolves.toEqual({
+          started: true,
+        });
+        await flushPending(resumed.pendingTasks);
+        expect(readRecord(first.storage)).toMatchObject({
+          state: 'running',
+          wrapperAttempt: 'exec_pending',
+        });
+      } else {
+        await expect(launch(resumed.instance, REF_A, 'standard-4')).rejects.toThrow(
+          'pending and no wrapper was found'
+        );
+        await flushPending(resumed.pendingTasks);
+        expect(readRecord(first.storage)).toMatchObject({
+          state: 'launching',
+          wrapperAttempt: 'exec_pending',
+        });
+      }
+
+      expect(first.meter.recordStartInputs.length).toBe(startsBefore + 1);
+      expect(readGeneration(first.storage)).toBe(generation);
+      expect(readMeasurementStarted(first.storage)).toBe(true);
+      expect(readSchedules(first.storage)?.billingHeartbeatTick).toMatchObject({
+        payload: generation,
+      });
+    }
+  });
+
+  it('adopts a found wrapper across a reconstructed pending fence without a new bun', async () => {
+    const first = setup({
+      record: {
+        state: 'launching',
+        allocationRef: REF_A,
+        stopOpId: null,
+        lastSnapshot: null,
+        wrapperAttempt: 'exec_pending',
+      },
+    });
+    first.container.running = true;
+
+    const reconstructed = setup({
+      storage: first.storage,
+      container: first.container,
+      meter: first.meter,
+    });
+    let buns = 0;
+    let probes = 0;
+    reconstructed.container.execHandler = cmd => {
+      if (cmd[0] === 'bun') buns += 1;
+      if (cmd[0] === 'pgrep') probes += 1;
+      return execProcess(0);
+    };
+
+    await expect(launch(reconstructed.instance, REF_A, 'standard-2')).resolves.toEqual({
+      started: true,
+    });
+
+    expect(probes).toBe(1);
+    expect(buns).toBe(0);
+    expect(readRecord(first.storage)).toMatchObject({
+      state: 'running',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+    expect(first.meter.recordStartInputs).toHaveLength(0);
   });
 
   it('does not activate for a resumed launch with a different allocation ref', async () => {
@@ -825,7 +918,13 @@ describe('ContainersBilling launch instance persistence', () => {
 
   it('persists the supplied instance when a resumed launch start succeeds then the wrapper exec fails', async () => {
     const first = setup({
-      record: { state: 'launching', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: {
+        state: 'launching',
+        allocationRef: REF_A,
+        stopOpId: null,
+        lastSnapshot: null,
+        wrapperAttempt: 'not_started',
+      },
     });
     first.container.execHandler = cmd => {
       if (cmd[0] === 'pgrep') return execProcess(1);
@@ -1266,8 +1365,12 @@ describe('ContainersBilling inert pre-change records', () => {
     const resumed = setup({
       record: { state: 'launching', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
     });
+    resumed.container.running = true;
     resumed.container.execHandler = () => execProcess(0);
     await expect(launch(resumed.instance, REF_A, 'standard-2')).resolves.toEqual({ started: true });
+    expect(readRecord(resumed.storage).state).toBe('running');
+    expect(readRecord(resumed.storage).wrapperAttempt).toBe('exec_pending');
+    expect(readRecord(resumed.storage).instance).toBeUndefined();
     expect(readRecord(resumed.storage).billingConfigured).toBeUndefined();
     expect(resumed.storage.map.get(SCHEDULES_KEY)).toBeUndefined();
     expect(resumed.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();

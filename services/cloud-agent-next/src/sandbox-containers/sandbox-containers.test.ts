@@ -42,6 +42,7 @@ type StoredRecord = {
   lastSnapshot: { id: string; sourceAllocation: string } | null;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
+  wrapperAttempt?: string;
 };
 
 const idleRecord: StoredRecord = {
@@ -52,20 +53,25 @@ const idleRecord: StoredRecord = {
 };
 
 type ExecBehavior = {
+  pid?: number;
   exitCode?: number;
   exitError?: Error;
+  exitCodePromise?: Promise<number>;
   stdout?: string;
   stderr?: string;
   outputError?: Error;
 };
 
 function makeExecProcess(behavior: ExecBehavior = {}): ExecProcess {
-  const exitCode = behavior.exitError
-    ? Promise.resolve().then((): number => {
-        throw behavior.exitError;
-      })
-    : Promise.resolve(behavior.exitCode ?? 0);
+  const exitCode = behavior.exitCodePromise
+    ? behavior.exitCodePromise
+    : behavior.exitError
+      ? Promise.resolve().then((): number => {
+          throw behavior.exitError;
+        })
+      : Promise.resolve(behavior.exitCode ?? 0);
   return {
+    pid: behavior.pid ?? 1,
     exitCode,
     output: async () => {
       if (behavior.outputError) throw behavior.outputError;
@@ -87,6 +93,7 @@ type DeferredSnapshot = { resolve: (id: string) => void; reject: (error: Error) 
 class FakeContainer {
   running = false;
   images: Record<string, string> = { app: 'registry.example/kilo/app:test' };
+  calls: string[] = [];
   startCalls: ContainerStartupOptions[] = [];
   execCalls: { cmd: string[]; options?: ContainerExecOptions }[] = [];
   httpsIntercepts: string[] = [];
@@ -102,9 +109,11 @@ class FakeContainer {
   snapshotBehavior: SnapshotBehavior = { kind: 'resolve', id: 'snap-1' };
   deferredSnapshots: DeferredSnapshot[] = [];
   deferredDestroy: { resolve: () => void; reject: (error: Error) => void } | null = null;
-  execHandler: (cmd: string[]) => ExecProcess = () => makeExecProcess({ exitCode: 0 });
+  execHandler: (cmd: string[]) => ExecProcess | Promise<ExecProcess> = () =>
+    makeExecProcess({ exitCode: 0 });
 
   start(options?: ContainerStartupOptions): void {
+    this.calls.push('start');
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');
     this.running = true;
@@ -114,6 +123,7 @@ class FakeContainer {
   }
 
   async exec(cmd: string[], options?: ContainerExecOptions): Promise<ExecProcess> {
+    this.calls.push(`exec:${cmd[0]}`);
     this.execCalls.push({ cmd, options });
     return this.execHandler(cmd);
   }
@@ -148,10 +158,12 @@ class FakeContainer {
   }
 
   async interceptOutboundHttps(addr: string, _binding: Fetcher): Promise<void> {
+    this.calls.push('https-intercept');
     this.httpsIntercepts.push(addr);
   }
 
   async interceptAllOutboundHttp(_binding: Fetcher): Promise<void> {
+    this.calls.push('http-intercept');
     this.httpIntercepts.push('*');
   }
 
@@ -164,16 +176,35 @@ class FakeContainer {
   }
 }
 
+type PutDecision = 'pass' | 'hold' | 'fail';
+
 function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {}) {
   const container = new FakeContainer();
   let alarm: number | undefined;
   const pendingTasks: Promise<unknown>[] = [];
+  let putGate: ((value: unknown) => PutDecision) | undefined;
+  let releaseHeldPut: (() => void) | undefined;
   const storage = {
     map: new Map<string, unknown>(),
     async get<T>(key: string): Promise<T | undefined> {
       return storage.map.get(key) as T | undefined;
     },
     async put(key: string, value: unknown): Promise<void> {
+      const decision = putGate?.(value) ?? 'pass';
+      if (decision === 'fail') {
+        putGate = undefined;
+        throw new Error('storage put failed');
+      }
+      if (decision === 'hold') {
+        putGate = undefined;
+        await new Promise<void>(resolve => {
+          releaseHeldPut = () => {
+            storage.map.set(key, value);
+            resolve();
+          };
+        });
+        return;
+      }
       storage.map.set(key, value);
     },
     async delete(key: string): Promise<boolean> {
@@ -201,7 +232,21 @@ function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {
   } as unknown as DurableObjectState;
   const instance = new SandboxContainers(ctx, {} as Env);
   const readRecord = () => storage.map.get(RECORD_KEY) as StoredRecord;
-  return { storage, container, instance, readRecord, pendingTasks, getAlarm: () => alarm };
+  return {
+    storage,
+    container,
+    instance,
+    readRecord,
+    pendingTasks,
+    getAlarm: () => alarm,
+    setPutGate: (gate: (value: unknown) => PutDecision) => {
+      putGate = gate;
+    },
+    releaseHeldPut: () => {
+      releaseHeldPut?.();
+      releaseHeldPut = undefined;
+    },
+  };
 }
 
 function launch(
@@ -293,9 +338,14 @@ describe('SandboxContainers launch', () => {
     ]);
   });
 
-  it('resumes a contained launch into a wrapper that carries the intercept env', async () => {
+  it('resumes a contained pre-exec launch into a wrapper that carries the intercept env', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
     });
     const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
     (
@@ -331,6 +381,7 @@ describe('SandboxContainers launch', () => {
     expect(failed.readRecord()).toMatchObject({ state: 'launching', allocationRef: REF_A });
 
     const adopts = setup({ record: { ...idleRecord, state: 'launching', allocationRef: REF_A } });
+    adopts.container.running = true;
     adopts.container.execHandler = () => makeExecProcess({ exitCode: 0 });
     const adopted = await launch(adopts.instance, REF_A);
     expect(adopted).toEqual({ started: true });
@@ -338,7 +389,12 @@ describe('SandboxContainers launch', () => {
     expect(adopts.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep']);
 
     const reexecs = setup({
-      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
     });
     reexecs.container.execHandler = cmd =>
       makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
@@ -348,9 +404,444 @@ describe('SandboxContainers launch', () => {
     expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
   });
 
-  it('applies the requested instance when resuming a launch whose start never took effect', async () => {
+  it('detects a wrapper that appears late while the pid-0 handle exitCode stays pending', async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    const { instance, container, readRecord } = setup();
+    let activeProbes = 0;
+    let maxActiveProbes = 0;
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') {
+        activeProbes += 1;
+        maxActiveProbes = Math.max(maxActiveProbes, activeProbes);
+        const proc = makeExecProcess({ exitCode: Date.now() - startedAt >= 70_000 ? 0 : 1 });
+        void proc.exitCode.finally(() => {
+          activeProbes -= 1;
+        });
+        return proc;
+      }
+      return new Promise<ExecProcess>(resolve => {
+        setTimeout(() => {
+          resolve(
+            makeExecProcess({
+              pid: 0,
+              // The wrapper is long-lived: its exitCode never settles.
+              exitCodePromise: new Promise<number>(() => {}),
+            })
+          );
+        }, 65_000);
+      });
+    };
+
+    let settled = false;
+    const pending = launch(instance, REF_A).finally(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(65_000);
+    expect(settled).toBe(false);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun', 'pgrep']);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(pending).resolves.toEqual({ started: true });
+    expect(maxActiveProbes).toBe(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.at(-1)?.cmd[0]).toBe('pgrep');
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('retries one bun only after the pid-0 handle exitCode fulfils and a fresh absent probe', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    let buns = 0;
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') return makeExecProcess({ exitCode: 1 });
+      buns += 1;
+      if (buns === 1) {
+        return makeExecProcess({
+          pid: 0,
+          exitCodePromise: new Promise<number>(res => setTimeout(() => res(1), 40_000)),
+        });
+      }
+      return makeExecProcess({ pid: 2 });
+    };
+
+    const pending = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(39_000);
+    expect(buns).toBe(1);
+    expect(container.execCalls[0]?.cmd[0]).toBe('bun');
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(pending).resolves.toEqual({ started: true });
+    expect(buns).toBe(2);
+    expect(container.execCalls.at(-1)?.cmd[0]).toBe('bun');
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('does not retry the bun when the fresh post-completion probe is ambiguous', async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    const { instance, container, readRecord } = setup();
+    let absentProbes = 0;
+    let ambiguousProbes = 0;
+    container.execHandler = cmd => {
+      if (cmd[0] !== 'pgrep') {
+        return makeExecProcess({
+          pid: 0,
+          exitCodePromise: new Promise<number>(res => setTimeout(() => res(0), 5_000)),
+        });
+      }
+      if (Date.now() - startedAt >= 5_000) {
+        ambiguousProbes += 1;
+        return makeExecProcess({ exitCode: 2 });
+      }
+      absentProbes += 1;
+      return makeExecProcess({ exitCode: 1 });
+    };
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(outcome).resolves.toBe('rejected');
+    expect(absentProbes).toBeGreaterThanOrEqual(1);
+    expect(ambiguousProbes).toBeGreaterThanOrEqual(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('discards a stale pre-completion probe and probes fresh after the handle exitCode fulfils', async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    const { instance, container, readRecord } = setup();
+    let resolveWrapperExit!: (code: number) => void;
+    let resolveFirstProbeExit!: (code: number) => void;
+    let buns = 0;
+    let pgrepExecs = 0;
+    let activeProbes = 0;
+    let maxActiveProbes = 0;
+    const pgrepStarts: number[] = [];
+    const pgrepSettles: number[] = [];
+
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') {
+        pgrepExecs += 1;
+        pgrepStarts.push(Date.now() - startedAt);
+        activeProbes += 1;
+        maxActiveProbes = Math.max(maxActiveProbes, activeProbes);
+        const exitCode = new Promise<number>(resolve => {
+          if (pgrepExecs === 1) resolveFirstProbeExit = resolve;
+          else resolve(0);
+        });
+        void exitCode.then(() => {
+          pgrepSettles.push(Date.now() - startedAt);
+          activeProbes -= 1;
+        });
+        return makeExecProcess({ exitCodePromise: exitCode });
+      }
+      buns += 1;
+      return makeExecProcess({
+        pid: 0,
+        exitCodePromise: new Promise<number>(resolve => {
+          resolveWrapperExit = resolve;
+        }),
+      });
+    };
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(buns).toBe(1);
+    expect(pgrepExecs).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(40_000);
+    resolveWrapperExit(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pgrepExecs).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    resolveFirstProbeExit(1);
+    await vi.advanceTimersByTimeAsync(0);
+
+    await expect(outcome).resolves.toBe('resolved');
+    expect(buns).toBe(1);
+    expect(pgrepExecs).toBe(2);
+    expect(maxActiveProbes).toBe(1);
+    expect(pgrepStarts[1] ?? -1).toBeGreaterThanOrEqual(pgrepSettles[0] ?? Number.MAX_SAFE_INTEGER);
+    expect(pgrepStarts[0] ?? -1).toBe(0);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('fences an unresolved wrapper exec at the readiness deadline without probing or a retry', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    container.execHandler = () => new Promise<never>(() => {}) as unknown as ExecProcess;
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    await vi.advanceTimersByTimeAsync(89_000);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun']);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(outcome).resolves.toBe('rejected');
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun']);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    container.running = false;
+    await expect(launch(instance, REF_A)).rejects.toThrow(
+      'pending and the container is not running'
+    );
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+  });
+
+  it('does not start a second bun while a pid-0 handle exitCode is pending', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    container.execHandler = cmd =>
+      cmd[0] === 'pgrep'
+        ? makeExecProcess({ exitCode: 1 })
+        : makeExecProcess({ pid: 0, exitCodePromise: new Promise<number>(() => {}) });
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    await expect(outcome).resolves.toBe('rejected');
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('does not overlap a pgrep whose native call is unsettled, even when the handle exitCode settles', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    let resolveHandleExit!: (code: number) => void;
+    let pgrepCalls = 0;
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') {
+        pgrepCalls += 1;
+        return new Promise<never>(() => {}) as unknown as ExecProcess;
+      }
+      return makeExecProcess({
+        pid: 0,
+        exitCodePromise: new Promise<number>(res => {
+          resolveHandleExit = res;
+        }),
+      });
+    };
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+
+    await vi.advanceTimersByTimeAsync(50_000);
+    expect(pgrepCalls).toBe(1);
+    resolveHandleExit(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pgrepCalls).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(40_000);
+    await expect(outcome).resolves.toBe('rejected');
+    expect(pgrepCalls).toBe(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('rejects a found probe when the retained handle exitCode rejected while it was pending', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    let rejectHandleExit!: (error: Error) => void;
+    let resolveProbe!: (proc: ExecProcess) => void;
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') {
+        return new Promise<ExecProcess>(resolve => {
+          resolveProbe = resolve;
+        });
+      }
+      return makeExecProcess({
+        pid: 0,
+        exitCodePromise: new Promise<number>((_resolve, reject) => {
+          rejectHandleExit = reject;
+        }),
+      });
+    };
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    rejectHandleExit(new Error('wrapper handle failed'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    resolveProbe(makeExecProcess({ exitCode: 0 }));
+    await expect(outcome).resolves.toBe('rejected');
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('bounds a probe by the remaining budget and queues no probe behind a hung exitCode', async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    const { instance, container, readRecord } = setup();
+    let pgrepCalls = 0;
+    let absentProbes = 0;
+    let hungProbes = 0;
+    let hungAtElapsed: number | undefined;
+    container.execHandler = cmd => {
+      if (cmd[0] !== 'pgrep') {
+        return makeExecProcess({
+          pid: 0,
+          exitCodePromise: new Promise<number>(res => setTimeout(() => res(1), 88_000)),
+        });
+      }
+      pgrepCalls += 1;
+      if (Date.now() - startedAt >= 88_000) {
+        hungProbes += 1;
+        hungAtElapsed = Date.now() - startedAt;
+        return makeExecProcess({ exitCodePromise: new Promise<number>(() => {}) });
+      }
+      absentProbes += 1;
+      return makeExecProcess({ exitCode: 1 });
+    };
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    await vi.advanceTimersByTimeAsync(89_000);
+    expect(absentProbes).toBeGreaterThanOrEqual(1);
+    expect(hungProbes).toBe(1);
+    expect(hungAtElapsed).toBe(88_000);
+    const probesAt89 = pgrepCalls;
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(outcome).resolves.toBe('rejected');
+    expect(pgrepCalls).toBe(probesAt89);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('does not start a pgrep when the final sleep lands on the deadline', async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    const { instance, container, readRecord } = setup();
+    const execStarts: number[] = [];
+    const pgrepStarts: number[] = [];
+    container.execHandler = cmd => {
+      const elapsed = Date.now() - startedAt;
+      execStarts.push(elapsed);
+      if (cmd[0] === 'pgrep') {
+        pgrepStarts.push(elapsed);
+        return makeExecProcess({
+          exitCodePromise: new Promise<number>(res => setTimeout(() => res(1), 700)),
+        });
+      }
+      return makeExecProcess({ pid: 0, exitCodePromise: new Promise<number>(() => {}) });
+    };
+
+    const pending = launch(instance, REF_A);
+    const failure = pending.then(
+      () => null,
+      (error: unknown) => error
+    );
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    const error = await failure;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('wrapper exec timed out');
+    expect(pgrepStarts.length).toBeGreaterThan(1);
+    expect(pgrepStarts.at(-1) ?? 0).toBeGreaterThanOrEqual(88_000);
+    expect(execStarts.filter(start => start >= 90_000)).toEqual([]);
+    expect(pgrepStarts.filter(start => start >= 90_000)).toEqual([]);
+    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('fences a rejected wrapper exec and never bun-execs on a later same-ref probe', async () => {
+    const rejected = setup();
+    rejected.container.execHandler = () => {
+      throw new Error('spawn failed');
+    };
+
+    await expect(launch(rejected.instance, REF_A)).rejects.toThrow('spawn failed');
+    expect(rejected.readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    // A later same-ref entry on the running container only probes: absent never re-execs.
+    rejected.container.running = true;
+    rejected.container.execHandler = cmd =>
+      makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    await expect(launch(rejected.instance, REF_A)).rejects.toThrow(
+      'pending and no wrapper was found'
+    );
+    expect(rejected.container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+
+    // An ambiguous probe never re-execs either.
+    rejected.container.execHandler = () => makeExecProcess({ exitCode: 2 });
+    await expect(launch(rejected.instance, REF_A)).rejects.toThrow('Wrapper probe was ambiguous');
+    expect(rejected.container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+  });
+
+  it('applies the requested instance when resuming a pre-exec launch whose start never took effect', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
     });
     container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
 
@@ -385,6 +876,7 @@ describe('SandboxContainers launch', () => {
     const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
     });
+    container.running = true;
     container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 2 : 0 });
 
     await expect(launch(instance, REF_A)).rejects.toThrow();
@@ -398,6 +890,7 @@ describe('SandboxContainers launch', () => {
     const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
     });
+    container.running = true;
     container.execHandler = () => new Promise<never>(() => {}) as unknown as ExecProcess;
 
     const pending = launch(instance, REF_A);
@@ -453,6 +946,281 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toHaveLength(1);
     expect([REF_A, REF_B]).toContain(readRecord().allocationRef);
+  });
+});
+
+describe('SandboxContainers wrapper attempt gate', () => {
+  function attachOutbound(instance: SandboxContainers): void {
+    const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+    (
+      instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
+    ).ctx.exports = { ContainersOutbound: outbound };
+  }
+
+  it('refuses an idle record that already carries a wrapper attempt before any physical call', async () => {
+    for (const wrapperAttempt of ['exec_pending', 'not_started'] as const) {
+      const { instance, container, readRecord } = setup({
+        record: { ...idleRecord, wrapperAttempt },
+      });
+
+      await expect(launch(instance, REF_A)).rejects.toThrow();
+
+      expect(container.startCalls).toHaveLength(0);
+      expect(container.execCalls).toHaveLength(0);
+      expect(readRecord()).toMatchObject({ state: 'idle', wrapperAttempt });
+    }
+  });
+
+  it('fails closed on an unknown wrapper attempt phase', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'bogus',
+      },
+    });
+
+    await expect(launch(instance, REF_A)).rejects.toThrow();
+
+    expect(container.startCalls).toHaveLength(0);
+    expect(container.execCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'launching', wrapperAttempt: 'bogus' });
+  });
+
+  it('leaves a running record that carries a pending fence untouched and unbackfilled', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        instance: 'standard-1',
+        wrapperAttempt: 'exec_pending',
+      },
+    });
+    container.running = true;
+
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: false });
+
+    expect(container.startCalls).toHaveLength(0);
+    expect(container.execCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({
+      state: 'running',
+      allocationRef: REF_A,
+      instance: 'standard-1',
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('adopts a found wrapper on a running pending or legacy record without launching again', async () => {
+    for (const wrapperAttempt of ['exec_pending', undefined] as const) {
+      const { instance, container, readRecord } = setup({
+        record: {
+          ...idleRecord,
+          state: 'launching',
+          allocationRef: REF_A,
+          instance: 'standard-1',
+          ...(wrapperAttempt === undefined ? {} : { wrapperAttempt }),
+        },
+      });
+      container.running = true;
+      container.execHandler = () => makeExecProcess({ exitCode: 0 });
+
+      await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+
+      expect(container.startCalls).toHaveLength(0);
+      expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep']);
+      expect(readRecord()).toMatchObject({
+        state: 'running',
+        allocationRef: REF_A,
+        instance: 'standard-1',
+        wrapperAttempt: 'exec_pending',
+      });
+    }
+  });
+
+  it('refuses a running pending or legacy record when the wrapper is absent or ambiguous', async () => {
+    const absent = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    absent.container.running = true;
+    absent.container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    await expect(launch(absent.instance, REF_A)).rejects.toThrow(
+      'pending and no wrapper was found'
+    );
+    expect(absent.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep']);
+    expect(absent.readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    const ambiguous = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'exec_pending',
+      },
+    });
+    ambiguous.container.running = true;
+    ambiguous.container.execHandler = () => makeExecProcess({ exitCode: 2 });
+
+    await expect(launch(ambiguous.instance, REF_A)).rejects.toThrow('Wrapper probe was ambiguous');
+    expect(ambiguous.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep']);
+    expect(ambiguous.readRecord()).toMatchObject({
+      state: 'launching',
+      wrapperAttempt: 'exec_pending',
+    });
+  });
+
+  it('refuses a stopped pending or legacy record without proxy, probe, billing, start or bun', async () => {
+    for (const wrapperAttempt of ['exec_pending', undefined] as const) {
+      const { instance, container, readRecord } = setup({
+        record: {
+          ...idleRecord,
+          state: 'launching',
+          allocationRef: REF_A,
+          ...(wrapperAttempt === undefined ? {} : { wrapperAttempt }),
+        },
+      });
+      attachOutbound(instance);
+
+      await expect(
+        instance.launchWrapper({
+          allocationRef: REF_A,
+          env: {},
+          instance: 'standard-2',
+          containment: true,
+        })
+      ).rejects.toThrow('pending and the container is not running');
+
+      expect(container.httpsIntercepts).toHaveLength(0);
+      expect(container.httpIntercepts).toHaveLength(0);
+      expect(container.startCalls).toHaveLength(0);
+      expect(container.execCalls).toHaveLength(0);
+      expect(readRecord()).toMatchObject({ state: 'launching', allocationRef: REF_A });
+    }
+  });
+
+  it('installs the containment proxy before the adoption probe', async () => {
+    const { instance, container } = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    container.running = true;
+    container.execHandler = () => makeExecProcess({ exitCode: 0 });
+    attachOutbound(instance);
+
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-2',
+      containment: true,
+    });
+
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'exec:pgrep']);
+  });
+
+  it('orders containment before start and exec on a fresh contained launch', async () => {
+    const { instance, container } = setup();
+    attachOutbound(instance);
+
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-2',
+      containment: true,
+    });
+
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:bun']);
+  });
+
+  it('orders containment before start, probe and bun on a stopped pre-exec resume', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    attachOutbound(instance);
+
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-2',
+      containment: true,
+    });
+
+    expect(container.calls).toEqual([
+      'https-intercept',
+      'http-intercept',
+      'start',
+      'exec:pgrep',
+      'exec:bun',
+    ]);
+  });
+});
+
+describe('SandboxContainers readiness deadline', () => {
+  it('does not invoke the native exec when the awaited phase write returns past the deadline, and rolls back', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup();
+    setPutGate(value =>
+      (value as { wrapperAttempt?: string }).wrapperAttempt === 'exec_pending' ? 'hold' : 'pass'
+    );
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    // The launch is suspended on the awaited durable write; time passes the deadline.
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(container.execCalls).toHaveLength(0);
+
+    releaseHeldPut();
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(outcome).resolves.toBe('rejected');
+    expect(container.execCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'not_started',
+    });
+  });
+
+  it('keeps the pending fence when the post-deadline rollback write fails', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup();
+    setPutGate(value =>
+      (value as { wrapperAttempt?: string }).wrapperAttempt === 'exec_pending' ? 'hold' : 'pass'
+    );
+
+    const pending = launch(instance, REF_A);
+    const outcome = pending.then(
+      () => 'resolved' as const,
+      () => 'rejected' as const
+    );
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(container.execCalls).toHaveLength(0);
+
+    // The rollback write fails; the durable exec_pending fence must remain.
+    setPutGate(value =>
+      (value as { wrapperAttempt?: string }).wrapperAttempt === 'not_started' ? 'fail' : 'pass'
+    );
+    releaseHeldPut();
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(outcome).resolves.toBe('rejected');
+    expect(container.execCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
   });
 });
 
@@ -781,6 +1549,83 @@ describe('SandboxContainers stop', () => {
     expect(result).toBe('terminal');
     expect(container.destroyCalls).toBe(1);
     expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
+  });
+
+  it('does not clear a pending phase when a timed-out destroy later resolves, but a confirmed stop does', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'exec_pending',
+      },
+    });
+    container.destroyBehavior = 'deferred';
+
+    const first = instance.stop(REF_A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(container.destroyCalls).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(first).resolves.toBe('retryable');
+    expect(readRecord()).toMatchObject({
+      state: 'stopping',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    // The late resolution has no continuation that could clear the phase.
+    container.deferredDestroy?.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readRecord()).toMatchObject({
+      state: 'stopping',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    container.destroyBehavior = 'ok';
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+    expect(readRecord().wrapperAttempt).toBeUndefined();
+  });
+
+  it('does not clear a pending or legacy phase when the container is missing, but clears not_started', async () => {
+    const pending = setup({
+      attachContainer: false,
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'exec_pending',
+      },
+    });
+    await expect(pending.instance.stop(REF_A)).resolves.toBe('retryable');
+    expect(pending.readRecord()).toMatchObject({
+      state: 'stopping',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+
+    const legacy = setup({
+      attachContainer: false,
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    await expect(legacy.instance.stop(REF_A)).resolves.toBe('retryable');
+    expect(legacy.readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
+
+    const preExec = setup({
+      attachContainer: false,
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
+    });
+    await expect(preExec.instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(preExec.readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+    expect(preExec.readRecord().wrapperAttempt).toBeUndefined();
   });
 });
 

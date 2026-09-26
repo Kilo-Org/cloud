@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as Config from '@/lib/config';
+
 // config.ts evaluates its values at import: it needs the baked extra, and the
 // URL contract runs over the required keys. The mock reads `state.extra` when
 // config.ts loads, so each case sets it before the dynamic import.
@@ -37,8 +39,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// vitest.setup.ts stubs '@/lib/config' for every pure suite, so a plain import
+// returns the stub. importActual loads the real module over the mocked extra.
 async function mcpUrl(): Promise<string | undefined> {
-  const config = await import('@/lib/config');
+  const config = await vi.importActual<typeof Config>('@/lib/config');
   return config.KILO_MCP_URL;
 }
 

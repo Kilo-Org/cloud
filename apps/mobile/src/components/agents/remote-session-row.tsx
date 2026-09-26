@@ -158,7 +158,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     // Otherwise announce the same timestamp as `remoteMeta` (prefer
     // lastActivityAt, fall back to updatedAt).
     const isScheduled = session.status === 'scheduled';
-    const scheduledWake =
+    const scheduledWakeValue =
       isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
     const metaTimestamp = activeSessionMetaTimestamp(session);
     const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp, now) : null;
@@ -178,9 +178,9 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
               prNumber: session.associatedPr?.number,
             }),
       spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
-      scheduledWake,
+      scheduledWake: scheduledWakeValue,
       spokenMeta: isScheduled
-        ? scheduledWake
+        ? scheduledWakeValue
         : selectRemoteRowSpokenMeta({
             needsInput,
             costSpoken: formatSpokenCost(session.totalCostMicrodollars),

@@ -55,8 +55,6 @@ export type FixturePair = {
    * identity the fixture's rows have always had.
    */
   ownerEmail: string;
-  /** Ids of the organizations the pair is already a member of. */
-  organizationIds: ReadonlySet<string>;
 };
 
 export type FixtureOrganizationIdentity = {
@@ -99,15 +97,24 @@ function legacyOwnerEmail(name: string): string {
 }
 
 /**
- * True when `row` names this owner as the one the fixture created it for: the
- * marker value is the owner email, or the legacy `[seed:w4c-org-pair]
- * <owner-email>` name carries it.
+ * True when `row` is an organization of `pair`'s fixture run.
  *
- * A marker naming an owner is authoritative — only a run for that owner may
- * claim the row — so a second pair never inherits the first pair's
- * organization.
+ * Only the fixture's own evidence counts: the settings marker naming this
+ * owner, or a legacy `[seed:w4c-org-pair] <owner-email>` name carrying it. A
+ * marker that names another owner belongs to that owner's run, so a second
+ * pair never inherits the first pair's organization.
+ *
+ * The generic {@link SEEDED_ORGANIZATION_NAME} name plus a membership is
+ * deliberately NOT evidence. An owner can create a real organization named
+ * `Acme Corp` through the app, and the fixture must never delete it, relabel
+ * it, stamp its marker on it, or add the pair to it. A row that carries no
+ * marker and no legacy name is therefore not this pair's organization, however
+ * it is named and whoever is a member of it: an unmarked row the fixture
+ * created before it wrote markers is left untouched, which is the safe
+ * reading. Rows the fixture inserts carry the marker, so a rerun still
+ * converges on one organization per owner.
  */
-function namesPairOwner(row: FixtureOrganizationIdentity, pair: FixturePair): boolean {
+export function isPairOrganization(row: FixtureOrganizationIdentity, pair: FixturePair): boolean {
   const markedOwner = markedOwnerEmail(row.settings);
   if (markedOwner !== undefined) {
     return normalizeSeedEmail(markedOwner) === pair.ownerEmail;
@@ -119,40 +126,18 @@ function namesPairOwner(row: FixtureOrganizationIdentity, pair: FixturePair): bo
 }
 
 /**
- * True when `row` is an organization of `pair`'s fixture run.
- *
- * Besides the rows {@link namesPairOwner} accepts, rows created after #6332
- * and before the fixture marked anything were named {@link
- * SEEDED_ORGANIZATION_NAME} and left no other trace, so they are claimed only
- * when the pair is already a member of them — the fixture's own footprint. A
- * marker that names a different owner belongs to that owner's run, and an
- * unrelated `Acme Corp` the pair does not belong to is not an organization of
- * this pair either.
- */
-export function isPairOrganization(row: FixtureOrganizationIdentity, pair: FixturePair): boolean {
-  if (namesPairOwner(row, pair)) {
-    return true;
-  }
-  if (markedOwnerEmail(row.settings) !== undefined) {
-    return false;
-  }
-  return row.name === SEEDED_ORGANIZATION_NAME && pair.organizationIds.has(row.id);
-}
-
-/**
  * The oldest organization of `pair` among `rows` (by `created_at`, then `id`),
  * or `undefined` when the fixture has none for this pair.
  *
- * Rows the fixture names for this owner win over rows recognized only through
- * the pair's membership, so an older unrelated `Acme Corp` the pair happens to
- * belong to is never preferred over the fixture's own organization.
+ * Only rows the fixture names for this owner are candidates, so an older
+ * organization the pair merely belongs to is never adopted, relabeled or
+ * duplicated over.
  */
 export function selectSeededOrganization(
   rows: readonly FixtureOrganizationRow[],
   pair: FixturePair
 ): FixtureOrganizationRow | undefined {
-  const owned = rows.filter(row => namesPairOwner(row, pair));
-  const candidates = owned.length > 0 ? owned : rows.filter(row => isPairOrganization(row, pair));
+  const candidates = rows.filter(row => isPairOrganization(row, pair));
   const oldestFirst = candidates.sort((left, right) => {
     if (left.created_at !== right.created_at) {
       return left.created_at < right.created_at ? -1 : 1;
@@ -168,7 +153,8 @@ export function selectSeededOrganization(
 /**
  * Memberships of `userIds` in one of `pair`'s organizations other than
  * `keepOrganizationId`. A membership of an organization this fixture did not
- * create for the pair is never returned.
+ * name for the pair is never returned, so an organization the owner created
+ * itself keeps every membership it has.
  */
 export function membershipsToPrune(
   rows: readonly FixtureMembershipRow[],

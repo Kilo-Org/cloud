@@ -203,9 +203,7 @@ export default function RepoPickerScreen() {
                 <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
                   {repo.fullName}
                 </Text>
-                {isSelected ? (
-                  <Check size={18} color={colors.primary} />
-                ) : null}
+                {isSelected ? <Check size={18} color={colors.primary} /> : null}
               </Pressable>
             );
           })}

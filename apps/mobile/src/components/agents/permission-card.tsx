@@ -96,6 +96,10 @@ export function PermissionCard({
   // never offer Always Allow for them.
   const isSkillShell = metadata?.skillShell === true;
 
+  // Only the command is display copy. Other metadata entries are control flags
+  // or machine payloads and must not reach the card as raw key/value rows.
+  const command = typeof metadata?.command === 'string' ? metadata.command : null;
+
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
@@ -132,13 +136,12 @@ export function PermissionCard({
             </View>
           ) : null}
 
-          {metadata && Object.keys(metadata).length > 0 ? (
-            <View className="gap-1">
-              {Object.entries(metadata).map(([key, value]) => (
-                <Text key={key} className="text-xs text-muted-foreground">
-                  {key}: {String(value)}
-                </Text>
-              ))}
+          {command ? (
+            <View className="gap-1 rounded-lg bg-muted p-2">
+              <Text className="text-xs font-medium text-muted-foreground">
+                {t('profiles.commandLabel')}
+              </Text>
+              <Text className="text-xs text-muted-foreground">{command}</Text>
             </View>
           ) : null}
         </View>

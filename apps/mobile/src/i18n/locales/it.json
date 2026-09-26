@@ -1497,6 +1497,7 @@
       "couldNotSearch": "Impossibile cercare le sessioni.",
       "completedWillAppear": "Le sessioni completate appariranno qui.",
       "noPastSessions": "Nessuna sessione precedente",
+      "pastSessions": "Sessioni precedenti",
       "live": "IN TEMPO REALE",
       "updating": "Aggiornamento in corso"
     },

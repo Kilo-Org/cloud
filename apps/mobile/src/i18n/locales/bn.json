@@ -2023,6 +2023,7 @@
       "couldNotSearch": "সেশন খোঁজা যায়নি।",
       "completedWillAppear": "শেষ হওয়া সেশনগুলো এখানে দেখা যাবে।",
       "noPastSessions": "আগের কোনো সেশন নেই",
+      "pastSessions": "আগের সেশনগুলো",
       "live": "লাইভ",
       "updating": "আপডেট হচ্ছে"
     },

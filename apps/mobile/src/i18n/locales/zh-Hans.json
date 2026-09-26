@@ -1519,6 +1519,7 @@
       "couldNotSearch": "无法搜索会话。",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "暂无历史会话",
+      "pastSessions": "历史会话",
       "live": "实时",
       "updating": "正在更新"
     },

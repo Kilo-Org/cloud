@@ -27,7 +27,8 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * Empty: the `notifications.category.*Unavailable` reasons, the profile-editor
+ * Empty: the `notifications.category.*Unavailable` reasons, the Agents tab
+ * header link (`agents.sessionList.pastSessions`), the profile-editor
  * validation copy (the duplicate-key refusal and the MCP bound messages), and
  * the `/` suggestion list's skill-row keys
  * (`agentChat.slashCommands.skillBadge` and

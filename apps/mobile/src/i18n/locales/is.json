@@ -2023,6 +2023,7 @@
       "couldNotSearch": "Ekki tókst að leita í lotum.",
       "completedWillAppear": "Hér birtast lotur sem er lokið.",
       "noPastSessions": "Engar fyrri lotur",
+      "pastSessions": "Fyrri lotur",
       "live": "Í RAUNTÍMA",
       "updating": "Uppfæri"
     },

@@ -2023,6 +2023,7 @@
       "couldNotSearch": "Nem sikerült keresni a munkamenetek között.",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
+      "pastSessions": "Korábbi munkamenetek",
       "live": "ÉLŐ",
       "updating": "Frissítés"
     },

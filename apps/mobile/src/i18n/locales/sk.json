@@ -2073,6 +2073,7 @@
       "couldNotSearch": "Relácie sa nepodarilo vyhľadať.",
       "completedWillAppear": "Tu sa zobrazia dokončené relácie.",
       "noPastSessions": "Žiadne predchádzajúce relácie",
+      "pastSessions": "Predchádzajúce relácie",
       "live": "NAŽIVO",
       "updating": "Aktualizuje sa"
     },

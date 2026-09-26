@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import {
   AppState,
+  I18nManager,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -38,12 +39,13 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { Text } from '@/components/ui/text';
+import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
@@ -203,7 +205,7 @@ export function AgentSessionListScreen() {
 
   const navigateToSession = useAgentSessionNavigator();
 
-  const seeAllLabel = t('home.seeAll');
+  const historyLabel = t('agents.sessionList.pastSessions');
   // The list controls share the title's row through the header's `inlineActions`
   // slot, trailing the eyebrow + title heading. The heading keeps
   // `min-w-0 flex-1`, so the 30px title keeps its tail ellipsis while the
@@ -230,12 +232,22 @@ export function AgentSessionListScreen() {
         // left slop capped against the gap, right slop reaches 44pt wide
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
         accessibilityRole="button"
-        accessibilityLabel={seeAllLabel}
+        accessibilityLabel={historyLabel}
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Eyebrow numberOfLines={1} className="shrink text-center text-[11px] text-primary">
-          {seeAllLabel}
+        {/* An eyebrow-scale label, with the same LTR-only treatment: the
+            letterspaced capitals break a cursive script's joins, so an RTL
+            label drops them (home-ar-loading) while the variant and
+            `SectionHeader` keep the identical class string. */}
+        <Eyebrow
+          numberOfLines={1}
+          className={cn(
+            'shrink text-center text-[11px] text-primary',
+            !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
+          )}
+        >
+          {historyLabel}
         </Eyebrow>
       </Pressable>
       {query.canFilter ? (

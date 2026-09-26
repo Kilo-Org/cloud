@@ -2023,6 +2023,7 @@
       "couldNotSearch": "Sessiyaları axtarmaq mümkün olmadı.",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
+      "pastSessions": "Keçmiş sessiyalar",
       "live": "CANLI",
       "updating": "Yenilənir"
     },

@@ -2023,6 +2023,7 @@
       "couldNotSearch": "Seansse ei õnnestunud otsida.",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Varasemaid seansse pole",
+      "pastSessions": "Varasemad seansid",
       "live": "REAALAJAS",
       "updating": "Uuendamine"
     },

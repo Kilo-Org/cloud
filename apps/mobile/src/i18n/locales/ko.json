@@ -1519,6 +1519,7 @@
       "couldNotSearch": "세션을 검색하지 못했습니다.",
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
+      "pastSessions": "지난 세션",
       "live": "실시간",
       "updating": "업데이트 중"
     },

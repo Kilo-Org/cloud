@@ -2023,6 +2023,7 @@
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນໄດ້.",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດແລ້ວຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
+      "pastSessions": "ເຊດຊັນທີ່ຜ່ານມາ",
       "live": "ສົດ",
       "updating": "ກຳລັງອັບເດດ"
     },

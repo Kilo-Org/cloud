@@ -2023,6 +2023,7 @@
       "couldNotSearch": "Kunde inte söka bland sessionerna.",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
+      "pastSessions": "Tidigare sessioner",
       "live": "I REALTID",
       "updating": "Uppdaterar"
     },

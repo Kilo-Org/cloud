@@ -2073,6 +2073,7 @@
       "couldNotSearch": "Nepavyko atlikti sesijų paieškos.",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
+      "pastSessions": "Ankstesnės sesijos",
       "live": "TIESIOGIAI",
       "updating": "Atnaujinama"
     },

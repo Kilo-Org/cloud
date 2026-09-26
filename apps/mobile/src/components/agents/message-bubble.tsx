@@ -218,7 +218,7 @@ function MessageBubbleImpl({
         <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
           <View className="items-end gap-1">
             {message.parts.some(partRendersContent) ? (
-              <Bubble side="user">
+              <Bubble>
                 <InMessageBubbleContext.Provider value>
                   {userTextContent ? (
                     <ChatMarkdownText

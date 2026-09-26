@@ -9,8 +9,8 @@
 // light/dark appearance and exposes no app-token override, so there is no iOS
 // half to write. This suite runs the plugin's mods in node and holds the path
 // to that: the one platform-specific module is the Android plugin, it writes
-// the app tokens for day and night, it adds nothing on iOS, and the shared
-// sign-out confirmation carries no per-platform branch.
+// the app tokens for day and night, it adds nothing on iOS, and neither the
+// delete-account native alert nor the sign-out dialog branches on a platform.
 
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
@@ -36,7 +36,7 @@ const withAlertDialogTheme = plugin as unknown as (config: AlertThemeConfig) => 
 const DIRECTORY = fileURLToPath(new URL('./', import.meta.url));
 const PLUGIN_PATH = `${DIRECTORY}../../plugins/withAndroidAlertDialogTheme.js`;
 const CONFIG_PATH = `${DIRECTORY}../../app.config.ts`;
-const SIGN_OUT_PATH = `${DIRECTORY}../components/profile-screen.tsx`;
+const PROFILE_PATH = `${DIRECTORY}../components/profile-screen.tsx`;
 
 /**
  * A per-platform branch in shared JS: a `Platform.OS`/`Platform.select` check,
@@ -174,17 +174,20 @@ describe('one implementation for both platforms on the alert dialog path', () =>
     );
   });
 
-  it('runs the one shared confirmation on both platforms', () => {
+  it('runs the shared native alert on both platforms', () => {
     expect(
       readFileSync(CONFIG_PATH, 'utf8').match(/withAndroidAlertDialogTheme/g) ?? []
     ).toHaveLength(1);
-    const confirmation = readFileSync(SIGN_OUT_PATH, 'utf8');
-    expect(confirmation, 'the sign-out confirmation is the shared native alert').toMatch(
-      /Alert\.alert\(t\('profile\.signOutTitle'\)/
+    const profile = readFileSync(PROFILE_PATH, 'utf8');
+    // Signing out is the in-app `DestructiveConfirmDialog` (see
+    // `use-sign-out-confirmation.ts`), so `Alert.alert` is not on that path;
+    // deleting the account still confirms through the shared native alert this
+    // plugin restyles, on both platforms.
+    expect(profile, 'the delete-account confirmation is the shared native alert').toMatch(
+      /Alert\.alert\(t\('profile\.deleteAccountTitle'\)/
     );
-    expect(
-      PLATFORM_BRANCH.test(confirmation),
-      'profile-screen.tsx carries a per-platform branch'
-    ).toBe(false);
+    expect(PLATFORM_BRANCH.test(profile), 'profile-screen.tsx carries a per-platform branch').toBe(
+      false
+    );
   });
 });

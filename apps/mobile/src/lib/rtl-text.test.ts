@@ -92,12 +92,18 @@ describe('JOINED_SCRIPT', () => {
 });
 
 describe('containsJoinedScript', () => {
-  it.each(['الجلسات الجارية الآن', 'الرئيسية', 'الوكلاء', 'الملف الشخصي', 'عرض الكل'])(
-    'detects Arabic in %j',
-    value => {
-      expect(containsJoinedScript(value)).toBe(true);
-    }
-  );
+  it.each([
+    ['Arabic heading', 'التفصيلات'],
+    ['Arabic section label', 'أعلام المميزات'],
+    ['Farsi', 'تنظیمات'],
+    ['Urdu', 'ترجیحات'],
+    ['Kurdish (Sorani)', 'ڕێکخستنەکان'],
+    ['Pashto', 'تنظیمات'],
+    ['Arabic presentation form', '\uFB50\uFB51'],
+    ['a Latin run quoting an Arabic word', 'Saved · محفوظ'],
+  ])('reads a joined script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(true);
+  });
 
   it.each([
     ['Arabic base', '\u0600'],
@@ -109,9 +115,32 @@ describe('containsJoinedScript', () => {
     expect(containsJoinedScript(value)).toBe(true);
   });
 
+  it.each(['الجلسات الجارية الآن', 'الرئيسية', 'الوكلاء', 'الملف الشخصي', 'عرض الكل'])(
+    'detects Arabic in %j',
+    value => {
+      expect(containsJoinedScript(value)).toBe(true);
+    }
+  );
+
+  it.each([
+    ['English', 'Preferences'],
+    ['Hebrew (right-to-left, not joined)', 'הגדרות'],
+    ['Greek', 'Ρυθμίσεις'],
+    ['Cyrillic', 'Настройки'],
+    ['a number', '1.0.12'],
+  ])('does not read a joined script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(false);
+  });
+
   it('detects Arabic inside a mixed array of strings', () => {
     expect(containsJoinedScript(['عرض', ' ', 'الكل'])).toBe(true);
     expect(containsJoinedScript(['Live now', 'عرض الكل'])).toBe(true);
+  });
+
+  it('reads every string in a child array and ignores non-text children', () => {
+    expect(containsJoinedScript(['المظهر', undefined, 3, null])).toBe(true);
+    expect(containsJoinedScript(['Appearance', 3])).toBe(false);
+    expect(containsJoinedScript(3)).toBe(false);
   });
 
   it('is false for Latin, Hebrew, digits and punctuation', () => {
@@ -134,6 +163,11 @@ describe('containsJoinedScript', () => {
     expect(containsJoinedScript(4)).toBe(false);
     expect(containsJoinedScript(createElement('Text', null, 'الرئيسية'))).toBe(false);
   });
+
+  it('leaves a nested element to its own run', () => {
+    // A nested Text is a separate run and applies its own letter spacing.
+    expect(containsJoinedScript(createElement('Text', null, 'التفصيلات'))).toBe(false);
+  });
 });
 
 describe('withoutMonoFamily', () => {
@@ -153,6 +187,11 @@ describe('withoutMonoFamily', () => {
 });
 
 describe('textLetterSpacing', () => {
+  it('returns the natural-spacing override only for a joined run', () => {
+    expect(textLetterSpacing('المظهر')).toEqual(NATURAL_LETTER_SPACING);
+    expect(textLetterSpacing('Appearance')).toBeUndefined();
+  });
+
   it('returns the natural spacing for a joined script', () => {
     expect(textLetterSpacing('الرئيسية')).toBe(NATURAL_LETTER_SPACING);
     expect(textLetterSpacing(['عرض', ' الكل'])).toBe(NATURAL_LETTER_SPACING);

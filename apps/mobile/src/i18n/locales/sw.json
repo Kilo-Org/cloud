@@ -3168,14 +3168,6 @@
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "backToPreferences": "Rudi kwenye mapendeleo"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Anza mazungumzo",
-      "description": "Tuma ujumbe ili kuzungumza na modeli."
-    },
-    "historyRetry": "Imeshindikana kupakia historia ya mazungumzo.",
-    "sendError": "Imeshindikana kutuma ujumbe. Jaribu tena."
-  },
   "glanceable": {
     "waiting": "Inasasisha mawakala",
     "empty": "Hakuna kazi inayoendelea",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Endesha Kilo kwenye kompyuta yako mwenyewe kupitia CLI ya `kilo remote`.",
     "skip": "Ruka ziara",
     "tutorialLabel": "Mafunzo"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Anza mazungumzo",
+      "description": "Tuma ujumbe ili uongee na mfano."
+    },
+    "list": {
+      "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
+      "new": "Gumzo jipya",
+      "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kufuta.",
+      "deleteTitle": "Futa gumzo hili?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Zana za Kilo",
+      "use": "Tumia zana za Kilo",
+      "useDescription": "Ruhusu mazungumzo haya yatumie zana ambazo seva ya Kilo inatoa.",
+      "off": "Zana za Kilo zimezimwa",
+      "offDescription": "Mazungumzo haya hayatuma zana yoyote ya Kilo kwa modeli.",
+      "connecting": "Inaunganisha na zana za Kilo…",
+      "available": "Zana zinazopatikana: {{count}}",
+      "none": "Hakuna zana zinazopatikana",
+      "noneDescription": "Seva ya Kilo haikurudisha zana yoyote.",
+      "unreachable": "Imeshindwa kufikia zana za Kilo",
+      "unreachableDescription": "Seva haikujibu. Angalia muunganisho wako, kisha ujaribu tena.",
+      "unauthorized": "Zana za Kilo zilikataa kipindi hiki",
+      "unauthorizedDescription": "Ingia tena ili kutumia zana za Kilo katika mazungumzo haya.",
+      "unavailable": "Zana za Kilo hazipatikani",
+      "unavailableDescription": "Seva ya Kilo haipatikani kwa akaunti hii."
+    }
   },
   "appActions": {
     "start": {

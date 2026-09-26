@@ -3211,14 +3211,6 @@
     "revoke": "Retirer {{host}} des sites de confiance",
     "backToPreferences": "Retour aux préférences"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Démarrer une discussion",
-      "description": "Envoyez un message pour discuter avec un modèle."
-    },
-    "historyRetry": "Impossible de charger l'historique de la conversation.",
-    "sendError": "Impossible d'envoyer le message. Réessayez."
-  },
   "glanceable": {
     "waiting": "Actualisation des agents",
     "empty": "Aucun travail en cours",
@@ -3264,6 +3256,36 @@
     "remoteOptionBody": "Exécutez Kilo sur votre propre machine via le CLI `kilo remote`.",
     "skip": "Passer la visite",
     "tutorialLabel": "Tutoriel"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Démarrer une discussion",
+      "description": "Envoyez un message pour discuter avec un modèle."
+    },
+    "list": {
+      "loadFailed": "Impossible de charger l'historique de la conversation.",
+      "new": "Nouvelle discussion",
+      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
+      "deleteTitle": "Supprimer cette discussion ?"
+    },
+    "beta": "Bêta",
+    "mcp": {
+      "title": "Outils Kilo",
+      "use": "Utiliser les outils Kilo",
+      "useDescription": "Autorisez cette discussion à utiliser les outils proposés par le serveur Kilo.",
+      "off": "Les outils Kilo sont désactivés",
+      "offDescription": "Cette discussion n'envoie aucun outil Kilo au modèle.",
+      "connecting": "Connexion aux outils Kilo…",
+      "available": "Outils disponibles : {{count}}",
+      "none": "Aucun outil disponible",
+      "noneDescription": "Le serveur Kilo n'a renvoyé aucun outil.",
+      "unreachable": "Impossible de joindre les outils Kilo",
+      "unreachableDescription": "Le serveur n'a pas répondu. Vérifiez votre connexion, puis réessayez.",
+      "unauthorized": "Les outils Kilo ont refusé cette session",
+      "unauthorizedDescription": "Reconnectez-vous pour utiliser les outils Kilo dans cette discussion.",
+      "unavailable": "Les outils Kilo ne sont pas disponibles",
+      "unavailableDescription": "Le serveur Kilo n'est pas disponible pour ce compte."
+    }
   },
   "appActions": {
     "start": {

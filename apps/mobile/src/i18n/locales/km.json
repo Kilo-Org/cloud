@@ -2848,7 +2848,7 @@
     "legalConnectorPrivacy": " និងទទួលស្គាល់ ",
     "manageFailed": "មិនអាចបើកការគ្រប់គ្រងការជាវ App Store បានទេ។",
     "kiloPassSetup": "ការរៀបចំ Kilo Pass",
-    "subscriptionHeaderDescription": "ការជាវប្រចាំខែដែលបន្ថែមឥណទានទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App.",
+    "subscriptionHeaderDescription": "ការជាវប្រចាំខែដែលបន្ថែមឥណទានទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។",
     "tierDescription": "បន្ថែមក្រេឌីតដែលបានទិញក្នុងតម្លៃ {{price}} រៀងរាល់ខែ សម្រាប់ប្រើក្នុង Kilo App។",
     "subscribe": "ជាវ",
     "subscribeDescription": "ក្រេឌីតប្រចាំខែ និងវឌ្ឍនភាពឆ្ពោះទៅរកប្រាក់រង្វាន់",
@@ -3168,14 +3168,6 @@
     "revoke": "ដកហូតការជឿទុកចិត្តលើ {{host}}",
     "backToPreferences": "ត្រឡប់ទៅការកំណត់"
   },
-  "quickChat": {
-    "empty": {
-      "title": "ចាប់ផ្តើមជជែក",
-      "description": "ផ្ញើសារដើម្បីជជែកជាមួយម៉ូដែល។"
-    },
-    "historyRetry": "មិនអាចផ្ទុកប្រវត្តិជជែកបានទេ។",
-    "sendError": "មិនអាចផ្ញើសារបានទេ។ សូមព្យាយាមម្តងទៀត។"
-  },
   "glanceable": {
     "waiting": "កំពុងធ្វើបច្ចុប្បន្នភាពស្ថានភាពភ្នាក់ងារ",
     "empty": "គ្មានការងារកំពុងដំណើរការ",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "ដំណើរការ Kilo លើម៉ាស៊ីនរបស់អ្នកតាមរយៈ CLI `kilo remote`។",
     "skip": "រំលងដំណើរ",
     "tutorialLabel": "ការណែនាំ"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "ចាប់ផ្តើមជជែក",
+      "description": "ផ្ញើសារដើម្បីនិយាយជាមួយគំរូមួយ។"
+    },
+    "list": {
+      "loadFailed": "មិនអាចផ្ទុកប្រវត្តិជជែកបានទេ។",
+      "new": "ការជជែកថ្មី",
+      "openHint": "បើកការជជែក។ ចុចឱ្យយូរដើម្បីលុប។",
+      "deleteTitle": "លុបការជជែកនេះ?"
+    },
+    "beta": "បេតា",
+    "mcp": {
+      "title": "ឧបករណ៍ Kilo",
+      "use": "ប្រើឧបករណ៍ Kilo",
+      "useDescription": "អនុញ្ញាតឱ្យការជជែកនេះប្រើឧបករណ៍ដែលម៉ាស៊ីនបម្រើ Kilo ផ្តល់ជូន។",
+      "off": "ឧបករណ៍ Kilo ត្រូវបានបិទ",
+      "offDescription": "ការជជែកនេះមិនផ្ញើឧបករណ៍ Kilo ណាមួយទៅគំរូទេ។",
+      "connecting": "កំពុងភ្ជាប់ទៅឧបករណ៍ Kilo…",
+      "available": "ឧបករណ៍ដែលអាចប្រើបាន: {{count}}",
+      "none": "គ្មានឧបករណ៍ដែលអាចប្រើបាន",
+      "noneDescription": "ម៉ាស៊ីនបម្រើ Kilo មិនបានផ្តល់ឧបករណ៍ណាមួយមកវិញទេ។",
+      "unreachable": "មិនអាចទៅដល់ឧបករណ៍ Kilo បានទេ",
+      "unreachableDescription": "ម៉ាស៊ីនបម្រើមិនបានឆ្លើយតបទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក រួចព្យាយាមម្តងទៀត។",
+      "unauthorized": "ឧបករណ៍ Kilo បានបដិសេធវគ្គនេះ",
+      "unauthorizedDescription": "ចូលម្តងទៀតដើម្បីប្រើឧបករណ៍ Kilo ក្នុងការជជែកនេះ។",
+      "unavailable": "ឧបករណ៍ Kilo មិនអាចប្រើបានទេ",
+      "unavailableDescription": "ម៉ាស៊ីនបម្រើ Kilo មិនមានសម្រាប់គណនីនេះទេ។"
+    }
   },
   "appActions": {
     "start": {

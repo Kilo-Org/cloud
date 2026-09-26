@@ -3168,14 +3168,6 @@
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "backToPreferences": "Tilbake til innstillinger"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start en chat",
-      "description": "Send en melding for å snakke med en modell."
-    },
-    "historyRetry": "Kunne ikke laste inn chathistorikken.",
-    "sendError": "Kunne ikke sende meldingen. Prøv igjen."
-  },
   "glanceable": {
     "waiting": "Oppdaterer agenter",
     "empty": "Ingen oppgaver pågår",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Kjør Kilo på din egen maskin via `kilo remote`-CLI-en.",
     "skip": "Hopp over omvisning",
     "tutorialLabel": "Opplæring"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en melding for å snakke med en modell."
+    },
+    "list": {
+      "loadFailed": "Kunne ikke laste inn chathistorikken.",
+      "new": "Ny chat",
+      "openHint": "Åpner chatten. Trykk og hold for å slette.",
+      "deleteTitle": "Slette denne chatten?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-verktøy",
+      "use": "Bruk Kilo-verktøy",
+      "useDescription": "La denne chatten bruke verktøyene som Kilo-serveren tilbyr.",
+      "off": "Kilo-verktøy er av",
+      "offDescription": "Denne chatten sender ingen Kilo-verktøy til modellen.",
+      "connecting": "Kobler til Kilo-verktøy…",
+      "available": "Tilgjengelige verktøy: {{count}}",
+      "none": "Ingen verktøy tilgjengelige",
+      "noneDescription": "Kilo-serveren svarte uten verktøy.",
+      "unreachable": "Kunne ikke nå Kilo-verktøy",
+      "unreachableDescription": "Serveren svarte ikke. Sjekk tilkoblingen og prøv igjen.",
+      "unauthorized": "Kilo-verktøy avviste denne økten",
+      "unauthorizedDescription": "Logg inn igjen for å bruke Kilo-verktøyene i denne chatten.",
+      "unavailable": "Kilo-verktøy er ikke tilgjengelige",
+      "unavailableDescription": "Kilo-serveren er ikke tilgjengelig for denne kontoen."
+    }
   },
   "appActions": {
     "start": {

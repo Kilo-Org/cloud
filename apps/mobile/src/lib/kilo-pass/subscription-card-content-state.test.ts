@@ -62,7 +62,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       actionLabel: 'Retry',
       description: 'Try again from Profile.',
       kind: 'error',
-      title: 'Kilo Pass unavailable',
+      title: "Couldn't load Kilo Pass.",
     });
   });
 

@@ -3168,14 +3168,6 @@
     "revoke": "پر {{host}} باور لغوه کړئ",
     "backToPreferences": "بېرته تنظیماتو ته ورشئ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "خبرې اترې پیل کړئ",
-      "description": "له ماډل سره د خبرو لپاره پیغام ولېږئ."
-    },
-    "historyRetry": "د خبرو اترو تاریخچه بار نه شوه.",
-    "sendError": "پیغام و نه لېږل شو. بیا هڅه وکړئ."
-  },
   "glanceable": {
     "waiting": "اجنټان تازه کېږي",
     "empty": "هېڅ کار روان نه دی",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Kilo په خپل کمپیوټر کې د `kilo remote` CLI له لارې وچلوه.",
     "skip": "سفر پرېږدئ",
     "tutorialLabel": "زده کړه"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "چټ پیل کړئ",
+      "description": "د ماډل سره د خبرو کولو لپاره پیغام ولېږئ."
+    },
+    "list": {
+      "loadFailed": "د چټ تاریخ بار کیدلای نه شو.",
+      "new": "نوې خبرې اترې",
+      "openHint": "خبرې اترې پرانیزي. د حذف لپاره اوږده کېکاږئ.",
+      "deleteTitle": "دا خبرې اترې حذف کړئ؟"
+    },
+    "beta": "بیټا",
+    "mcp": {
+      "title": "د Kilo وسیلې",
+      "use": "د Kilo وسیلې وکاروئ",
+      "useDescription": "اجازه ورکړئ چې دا خبرې اترې د Kilo سرور وړاندې کړې وسیلې وکاروي.",
+      "off": "د Kilo وسیلې بندې دي",
+      "offDescription": "دا خبرې اترې ماډل ته هیڅ د Kilo وسیله نه لیږي.",
+      "connecting": "د Kilo وسیلو سره نښلول…",
+      "available": "د لاسرسي وړ وسیلې: {{count}}",
+      "none": "هیڅ وسیله نشته",
+      "noneDescription": "د Kilo سرور هیڅ وسیله بیرته ورنکړه.",
+      "unreachable": "د Kilo وسیلو ته رسیدل ممکن نه شول",
+      "unreachableDescription": "سرور ځواب ورنکړ. خپل اتصال وګورئ او بیا هڅه وکړئ.",
+      "unauthorized": "د Kilo وسیلو دا غونډه رد کړه",
+      "unauthorizedDescription": "په دې خبرو اترو کې د Kilo وسیلو کارولو لپاره بیا ننوځئ.",
+      "unavailable": "د Kilo وسیلې شتون نلري",
+      "unavailableDescription": "د Kilo سرور د دې حساب لپاره شتون نلري."
+    }
   },
   "appActions": {
     "start": {

@@ -3168,14 +3168,6 @@
     "revoke": "Hiq besimin për {{host}}",
     "backToPreferences": "Kthehu te preferencat"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Fillo një bisedë",
-      "description": "Dërgo një mesazh për të biseduar me një model."
-    },
-    "historyRetry": "Nuk u ngarkua historiku i bisedës.",
-    "sendError": "Nuk u dërgua mesazhi. Provo përsëri."
-  },
   "glanceable": {
     "waiting": "Po përditësohen agjentët",
     "empty": "Nuk ka punë në vazhdim",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
     "tutorialLabel": "Tutoriali"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "list": {
+      "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
+      "new": "Bisedë e re",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
+      "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Mjetet Kilo",
+      "use": "Përdor mjetet Kilo",
+      "useDescription": "Lejo këtë bisedë të përdorë mjetet që ofron serveri Kilo.",
+      "off": "Mjetet Kilo janë të fikura",
+      "offDescription": "Kjo bisedë nuk dërgon asnjë mjet Kilo te modeli.",
+      "connecting": "Po lidhet me mjetet Kilo…",
+      "available": "Mjetet e disponueshme: {{count}}",
+      "none": "Nuk ka mjete të disponueshme",
+      "noneDescription": "Serveri Kilo nuk ktheu asnjë mjet.",
+      "unreachable": "Nuk u arritën mjetet Kilo",
+      "unreachableDescription": "Serveri nuk u përgjigj. Kontrollo lidhjen dhe provo përsëri.",
+      "unauthorized": "Mjetet Kilo refuzuan këtë sesion",
+      "unauthorizedDescription": "Hyr përsëri për të përdorur mjetet Kilo në këtë bisedë.",
+      "unavailable": "Mjetet Kilo nuk janë të disponueshme",
+      "unavailableDescription": "Serveri Kilo nuk është i disponueshëm për këtë llogari."
+    }
   },
   "appActions": {
     "start": {

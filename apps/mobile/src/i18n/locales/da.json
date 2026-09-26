@@ -3168,14 +3168,6 @@
     "revoke": "Fjern tillid til {{host}}",
     "backToPreferences": "Tilbage til indstillinger"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start en chat",
-      "description": "Send en besked for at tale med en model."
-    },
-    "historyRetry": "Chathistorikken kunne ikke indlæses.",
-    "sendError": "Kunne ikke sende beskeden. Prøv igen."
-  },
   "glanceable": {
     "waiting": "Opdaterer agenter",
     "empty": "Intet arbejde i gang",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Kør Kilo på din egen maskin via `kilo remote`-CLI'en.",
     "skip": "Spring omvisning over",
     "tutorialLabel": "Vejledning"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en besked for at tale med en model."
+    },
+    "list": {
+      "loadFailed": "Kunne ikke indlæse chathistorik.",
+      "new": "Ny chat",
+      "openHint": "Åbner chatten. Tryk og hold for at slette.",
+      "deleteTitle": "Slet denne chat?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-værktøjer",
+      "use": "Brug Kilo-værktøjer",
+      "useDescription": "Lad denne chat bruge de værktøjer, som Kilo-serveren tilbyder.",
+      "off": "Kilo-værktøjer er slået fra",
+      "offDescription": "Denne chat sender ingen Kilo-værktøjer til modellen.",
+      "connecting": "Opretter forbindelse til Kilo-værktøjer…",
+      "available": "Tilgængelige værktøjer: {{count}}",
+      "none": "Ingen værktøjer tilgængelige",
+      "noneDescription": "Kilo-serveren svarede uden værktøjer.",
+      "unreachable": "Kunne ikke nå Kilo-værktøjer",
+      "unreachableDescription": "Serveren svarede ikke. Tjek din forbindelse, og prøv igen.",
+      "unauthorized": "Kilo-værktøjer afviste denne session",
+      "unauthorizedDescription": "Log ind igen for at bruge Kilo-værktøjerne i denne chat.",
+      "unavailable": "Kilo-værktøjer er ikke tilgængelige",
+      "unavailableDescription": "Kilo-serveren er ikke tilgængelig for denne konto."
+    }
   },
   "appActions": {
     "start": {

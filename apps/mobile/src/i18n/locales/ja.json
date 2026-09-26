@@ -3168,14 +3168,6 @@
     "revoke": "{{host}}を信頼済みホストから削除",
     "backToPreferences": "設定に戻る"
   },
-  "quickChat": {
-    "empty": {
-      "title": "チャットを開始",
-      "description": "モデルと話すにはメッセージを送信してください。"
-    },
-    "historyRetry": "チャット履歴を読み込めませんでした。",
-    "sendError": "メッセージを送信できませんでした。もう一度お試しください。"
-  },
   "glanceable": {
     "waiting": "エージェントの状態を更新中",
     "empty": "進行中の作業はありません",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
     "skip": "ツアーをスキップ",
     "tutorialLabel": "チュートリアル"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "チャットを開始",
+      "description": "モデルと話すにはメッセージを送信してください。"
+    },
+    "list": {
+      "loadFailed": "チャット履歴を読み込めませんでした。",
+      "new": "新しいチャット",
+      "openHint": "チャットを開きます。長押しで削除します。",
+      "deleteTitle": "このチャットを削除しますか？"
+    },
+    "beta": "ベータ",
+    "mcp": {
+      "title": "Kiloツール",
+      "use": "Kiloツールを使う",
+      "useDescription": "このチャットでKiloサーバーが提供するツールを使えるようにします。",
+      "off": "Kiloツールはオフです",
+      "offDescription": "このチャットはモデルにKiloツールを送信しません。",
+      "connecting": "Kiloツールに接続しています…",
+      "available": "利用可能なツール：{{count}}",
+      "none": "利用可能なツールはありません",
+      "noneDescription": "Kiloサーバーはツールを返しませんでした。",
+      "unreachable": "Kiloツールに接続できませんでした",
+      "unreachableDescription": "サーバーが応答しませんでした。接続を確認して、もう一度お試しください。",
+      "unauthorized": "Kiloツールがこのセッションを拒否しました",
+      "unauthorizedDescription": "このチャットでKiloツールを使うには、もう一度サインインしてください。",
+      "unavailable": "Kiloツールは利用できません",
+      "unavailableDescription": "このアカウントではKiloサーバーを利用できません。"
+    }
   },
   "appActions": {
     "start": {

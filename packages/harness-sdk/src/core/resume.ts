@@ -23,7 +23,16 @@ type ResumeContext = SessionContext | SessionStore;
 
 type ResumeError = StoreError | SessionNotFoundError | ToolMissingError;
 
-/** What the session was opened with, as `wiringFor` wants it. */
+/**
+ * What the session was opened with, as `wiringFor` wants it.
+ *
+ * The tool names come back with it for the same reason the system prompt does:
+ * a tool's definition sits in front of every message, so a different tool set
+ * is a different prefix. That is why moving a chat onto another set of remote
+ * MCP tools is a copy of it and not a continued session: a continued session
+ * may not change any part of the prefix, so the copy opens as a session of its
+ * own with the new names.
+ */
 const optionsOf = (stored: StoredSession): SessionOptions => ({
   system: stored.system,
   model: stored.model,
@@ -35,15 +44,25 @@ const optionsOf = (stored: StoredSession): SessionOptions => ({
 /**
  * What a clone may be opened with instead of what the store holds.
  *
- * These two and nothing else, because these two are why a caller clones rather
- * than continues: a session freezes its model and its effort for the life of
- * the cached prefix, so moving a conversation to another model is a copy of it.
+ * These three and nothing else, because these three are why a caller clones
+ * rather than continues. A session freezes its model and its effort for the
+ * life of the cached prefix, so moving a conversation to another model is a
+ * copy of it. It freezes the tools it offers for the same reason — their
+ * definitions sit in front of every message — so moving a chat onto another
+ * tool set, such as gaining or losing a remote MCP server, is a copy too.
  * Everything else still comes from the store, and for the usual reason: a
  * system prompt that differs by one byte drops the whole prefix.
  */
 interface CloneOptions {
   readonly model?: string;
   readonly effort?: Effort;
+  /**
+   * The tools the copy offers, by name, in the order the model sees them. A
+   * different set is a different prefix, which is what makes this a reason to
+   * clone: a chat opened onto the names a caller has now reaches the tools it
+   * is meant to. An absent field is the stored set, never none.
+   */
+  readonly tools?: readonly string[];
 }
 
 const storedOf = (
@@ -85,6 +104,7 @@ const movedOnto = (options: SessionOptions, onto: CloneOptions | undefined): Ses
   ...options,
   ...(onto?.model === undefined ? {} : { model: onto.model }),
   ...(onto?.effort === undefined ? {} : { effort: onto.effort }),
+  ...(onto?.tools === undefined ? {} : { tools: onto.tools }),
 });
 
 /**
@@ -179,6 +199,9 @@ const cloneSession = (
     const options = movedOnto(optionsOf(stored), onto);
     return yield* copyOnto(store, options, {
       source,
+      /* Only another model drops the thinking: a signature is read back by the
+         model that issued it and by nothing else. A tool set is not a model, so
+         a copy moved onto other tools keeps its thinking. */
       moved: options.model !== stored.model,
       prompted: stored.prompted ?? 0,
     });

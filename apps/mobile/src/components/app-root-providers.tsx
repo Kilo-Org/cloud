@@ -141,7 +141,7 @@ function AppToaster() {
   // padding), so the toast cannot disagree with what the bar renders. See
   // `lib/toast-offset.ts`.
   const tabBarHeight =
-    (segments as readonly string[]).includes('(tabs)') && !shouldHideTabBar(pathname)
+    (segments as readonly string[]).includes('(tabs)') && !shouldHideTabBar(pathname, segments)
       ? getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale })
       : 0;
 

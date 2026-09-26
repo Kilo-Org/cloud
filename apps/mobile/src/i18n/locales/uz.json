@@ -2848,7 +2848,7 @@
     "legalConnectorPrivacy": " va quyidagi hujjat bilan tanishganingizni tasdiqlaysiz: ",
     "manageFailed": "App Store obunalarini boshqarish sahifasini ochib bo'lmadi.",
     "kiloPassSetup": "Kilo Passni sozlash",
-    "subscriptionHeaderDescription": "Kilo App'idagi AI kodlash sessiyalari.",
+    "subscriptionHeaderDescription": "Kilo App ilovasida sun'iy intellekt yordamida kod yozish uchun Kilo balansingizga kreditlar qo'shadigan oylik obuna.",
     "tierDescription": "Kilo App ilovasidan foydalanish uchun har oy {{price}} qiymatidagi pulli kreditlar qo'shiladi.",
     "subscribe": "Obuna bo'lish",
     "subscribeDescription": "Bonusga yaqinlashtiradigan oylik kreditlar",
@@ -3168,14 +3168,6 @@
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "backToPreferences": "Sozlamalarga qaytish"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Suhbatni boshlang",
-      "description": "Model bilan gaplashish uchun xabar yuboring."
-    },
-    "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
-    "sendError": "Xabarni yuborib bo'lmadi. Qayta urinib ko'ring."
-  },
   "glanceable": {
     "waiting": "Agentlar yangilanmoqda",
     "empty": "Bajarilayotgan ish yo'q",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Kilo'ni o'z mashinangizda `kilo remote` CLI orqali ishga tushiring.",
     "skip": "Sayohatni o'tkazib yuborish",
     "tutorialLabel": "Qo'llanma"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Suhbatni boshlang",
+      "description": "Model bilan gaplashish uchun xabar yuboring."
+    },
+    "list": {
+      "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
+      "new": "Yangi chat",
+      "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
+      "deleteTitle": "Bu chat oʻchirilsinmi?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo vositalari",
+      "use": "Kilo vositalaridan foydalanish",
+      "useDescription": "Bu suhbatga Kilo serveri taklif qilgan vositalardan foydalanishga ruxsat ber.",
+      "off": "Kilo vositalari o'chirilgan",
+      "offDescription": "Bu suhbat modelga hech qanday Kilo vositasi yubormaydi.",
+      "connecting": "Kilo vositalariga ulanmoqda…",
+      "available": "Mavjud vositalar: {{count}}",
+      "none": "Mavjud vosita yo'q",
+      "noneDescription": "Kilo serveri hech qanday vosita qaytarmadi.",
+      "unreachable": "Kilo vositalariga yetib bo'lmadi",
+      "unreachableDescription": "Server javob bermadi. Ulanishni tekshirib, qayta urinib ko'ring.",
+      "unauthorized": "Kilo vositalari bu sessiyani rad etdi",
+      "unauthorizedDescription": "Bu suhbatda Kilo vositalaridan foydalanish uchun qayta kiring.",
+      "unavailable": "Kilo vositalari mavjud emas",
+      "unavailableDescription": "Kilo serveri bu hisob uchun mavjud emas."
+    }
   },
   "appActions": {
     "start": {

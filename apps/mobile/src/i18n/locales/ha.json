@@ -3168,14 +3168,6 @@
     "revoke": "Soke amincewa da {{host}}",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Fara tattaunawa",
-      "description": "Aika saƙo don tattaunawa da samfuri."
-    },
-    "historyRetry": "An kasa loda tarihin tattaunawa.",
-    "sendError": "An kasa aika saƙon. Sake gwadawa."
-  },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",
     "empty": "Babu aikin da ke gudana",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
     "skip": "Tsallake kaita",
     "tutorialLabel": "Koyarwa"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Fara tattaunawa",
+      "description": "Aika saƙo don tattaunawa da samfurin."
+    },
+    "list": {
+      "loadFailed": "Ba a iya loda tarihin tattaunawa.",
+      "new": "Sabuwar tattaunawa",
+      "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
+      "deleteTitle": "A share wannan tattaunawar?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kayan aikin Kilo",
+      "use": "Yi amfani da kayan aikin Kilo",
+      "useDescription": "Ka bar wannan tattaunawa ta yi amfani da kayan aikin da uwar garken Kilo ke bayarwa.",
+      "off": "An kashe kayan aikin Kilo",
+      "offDescription": "Wannan tattaunawa ba ta aika wani kayan aikin Kilo zuwa samfurin ba.",
+      "connecting": "Ana haɗi da kayan aikin Kilo…",
+      "available": "Kayan aiki da suke akwai: {{count}}",
+      "none": "Babu kayan aiki da suke akwai",
+      "noneDescription": "Uwar garken Kilo bai mayar da wani kayan aiki ba.",
+      "unreachable": "Ba a iya isa kayan aikin Kilo ba",
+      "unreachableDescription": "Uwar garken ba ta amsa ba. Duba haɗin ka, sannan ka sake gwadawa.",
+      "unauthorized": "Kayan aikin Kilo sun ƙi wannan zaman",
+      "unauthorizedDescription": "Sake shiga don amfani da kayan aikin Kilo a wannan tattaunawa.",
+      "unavailable": "Kayan aikin Kilo ba su da samuwa",
+      "unavailableDescription": "Uwar garken Kilo ba ta samuwa ga wannan asusun ba."
+    }
   },
   "appActions": {
     "start": {

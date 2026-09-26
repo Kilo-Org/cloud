@@ -1,5 +1,5 @@
-import { QuickChatScreen } from '@/components/quick-chat/quick-chat-screen';
+import { ChatListScreen } from '@/components/chat/chat-list-screen';
 
-export default function QuickChatIndex() {
-  return <QuickChatScreen />;
+export default function ChatIndex() {
+  return <ChatListScreen />;
 }

@@ -3168,14 +3168,6 @@
     "revoke": "{{host}} को विश्वसनीय होस्ट से हटाएँ",
     "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "चैट शुरू करें",
-      "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
-    },
-    "historyRetry": "चैट का इतिहास लोड नहीं हो सका।",
-    "sendError": "संदेश भेजा नहीं जा सका। फिर से कोशिश करें।"
-  },
   "glanceable": {
     "waiting": "एजेंट की जानकारी अपडेट हो रही है",
     "empty": "अभी कोई काम नहीं चल रहा",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "अपने मशीन पर `kilo remote` CLI से Kilo चलाएँ।",
     "skip": "टूर छोड़ें",
     "tutorialLabel": "ट्यूटोरियल"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "चैट शुरू करें",
+      "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
+    },
+    "list": {
+      "loadFailed": "चैट इतिहास लोड नहीं किया जा सका।",
+      "new": "नई चैट",
+      "openHint": "चैट खोलता है। मिटाने के लिए देर तक दबाएँ।",
+      "deleteTitle": "यह चैट मिटाएँ?"
+    },
+    "beta": "बीटा",
+    "mcp": {
+      "title": "Kilo टूल",
+      "use": "Kilo टूल का उपयोग करें",
+      "useDescription": "इस चैट को Kilo सर्वर द्वारा दिए जाने वाले टूल का उपयोग करने दें।",
+      "off": "Kilo टूल बंद हैं",
+      "offDescription": "यह चैट मॉडल को कोई भी Kilo टूल नहीं भेजती।",
+      "connecting": "Kilo टूल से कनेक्ट हो रहा है…",
+      "available": "उपलब्ध टूल: {{count}}",
+      "none": "कोई टूल उपलब्ध नहीं",
+      "noneDescription": "Kilo सर्वर ने कोई टूल नहीं लौटाया।",
+      "unreachable": "Kilo टूल तक नहीं पहुँच सका",
+      "unreachableDescription": "सर्वर ने जवाब नहीं दिया। अपना कनेक्शन जाँचें, फिर दोबारा कोशिश करें।",
+      "unauthorized": "Kilo टूल ने इस सत्र को अस्वीकार किया",
+      "unauthorizedDescription": "इस चैट में Kilo टूल का उपयोग करने के लिए दोबारा साइन इन करें।",
+      "unavailable": "Kilo टूल उपलब्ध नहीं हैं",
+      "unavailableDescription": "इस खाते के लिए Kilo सर्वर उपलब्ध नहीं है।"
+    }
   },
   "appActions": {
     "start": {

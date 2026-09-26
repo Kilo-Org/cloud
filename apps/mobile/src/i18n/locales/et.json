@@ -3168,14 +3168,6 @@
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Alusta vestlust",
-      "description": "Mudeliga vestlemiseks saada sõnum."
-    },
-    "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
-    "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
-  },
   "glanceable": {
     "waiting": "Agentide oleku värskendamine",
     "empty": "Ühtegi tööd pole pooleli",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Käivita Kilo omas arvutis `kilo remote` CLI kaudu.",
     "skip": "Jäta tiivustus vahele",
     "tutorialLabel": "Õpetus"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "list": {
+      "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
+      "new": "Uus vestlus",
+      "openHint": "Avab vestluse. Kustutamiseks hoia all.",
+      "deleteTitle": "Kas kustutada see vestlus?"
+    },
+    "beta": "Beeta",
+    "mcp": {
+      "title": "Kilo tööriistad",
+      "use": "Kasuta Kilo tööriistu",
+      "useDescription": "Luba sellel vestlusel kasutada tööriistu, mida Kilo server pakub.",
+      "off": "Kilo tööriistad on välja lülitatud",
+      "offDescription": "See vestlus ei saada mudelile ühtegi Kilo tööriista.",
+      "connecting": "Ühendumine Kilo tööriistadega…",
+      "available": "Saadaolevad tööriistad: {{count}}",
+      "none": "Tööriistu pole saadaval",
+      "noneDescription": "Kilo server ei tagastanud ühtegi tööriista.",
+      "unreachable": "Kilo tööriistadeni ei õnnestunud jõuda",
+      "unreachableDescription": "Server ei vastanud. Kontrolli ühendust ja proovi uuesti.",
+      "unauthorized": "Kilo tööriistad keeldusid sellest seansist",
+      "unauthorizedDescription": "Logi uuesti sisse, et selles vestluses Kilo tööriistu kasutada.",
+      "unavailable": "Kilo tööriistad pole saadaval",
+      "unavailableDescription": "Kilo server pole selle konto jaoks saadaval."
+    }
   },
   "appActions": {
     "start": {

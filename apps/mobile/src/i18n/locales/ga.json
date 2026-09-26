@@ -3297,14 +3297,6 @@
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
     "backToPreferences": "Ar ais go dtí na roghanna"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Tosaigh comhrá",
-      "description": "Seol teachtaireacht chun labhairt le samhail."
-    },
-    "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
-    "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
-  },
   "glanceable": {
     "waiting": "Gníomhairí á nuashonrú",
     "empty": "Níl aon obair ar siúl",
@@ -3350,6 +3342,36 @@
     "remoteOptionBody": "Rith Kilo ar do mheicín féin tríd an CLI `kilo remote`.",
     "skip": "Scipeáil an turas",
     "tutorialLabel": "Treoir"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Tosaigh comhrá",
+      "description": "Seol teachtaireacht chun labhairt le samhail."
+    },
+    "list": {
+      "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
+      "new": "Comhrá nua",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
+      "deleteTitle": "An comhrá seo a scriosadh?"
+    },
+    "beta": "Béite",
+    "mcp": {
+      "title": "Uirlisí Kilo",
+      "use": "Úsáid uirlisí Kilo",
+      "useDescription": "Lig don chomhrá seo na huirlisí a chuireann freastalaí Kilo ar fáil a úsáid.",
+      "off": "Tá uirlisí Kilo múchta",
+      "offDescription": "Ní sheolann an comhrá seo aon uirlis Kilo chuig an tsamhail.",
+      "connecting": "Ag nascadh le huirlisí Kilo…",
+      "available": "Uirlisí ar fáil: {{count}}",
+      "none": "Níl aon uirlis ar fáil",
+      "noneDescription": "Níor chuir freastalaí Kilo aon uirlis ar ais.",
+      "unreachable": "Níorbh fhéidir uirlisí Kilo a shroicheadh",
+      "unreachableDescription": "Níor fhreagair an freastalaí. Seiceáil do nasc, ansin bain triail eile as.",
+      "unauthorized": "Dhiúltaigh uirlisí Kilo don seisiún seo",
+      "unauthorizedDescription": "Sínigh isteach arís chun uirlisí Kilo a úsáid sa chomhrá seo.",
+      "unavailable": "Níl uirlisí Kilo ar fáil",
+      "unavailableDescription": "Níl freastalaí Kilo ar fáil don chuntas seo."
+    }
   },
   "appActions": {
     "start": {

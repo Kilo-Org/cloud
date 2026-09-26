@@ -2848,7 +2848,7 @@
     "legalConnectorPrivacy": " मा सहमत हुनुहुन्छ र ",
     "manageFailed": "App Store को सदस्यता व्यवस्थापन खोल्न सकिएन।",
     "kiloPassSetup": "Kilo Pass सेटअप",
-    "subscriptionHeaderDescription": "Kilo App मा AI कोडिङ सत्रहरू।",
+    "subscriptionHeaderDescription": "यो मासिक सदस्यताले Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo मौज्दातमा क्रेडिट थप्छ।",
     "tierDescription": "Kilo App प्रयोग गर्न हरेक महिना {{price}} बराबरको खरिद गरिएको क्रेडिट थपिन्छ।",
     "subscribe": "सदस्यता लिनुहोस्",
     "subscribeDescription": "मासिक क्रेडिट र बोनसतर्फको प्रगति",
@@ -3168,14 +3168,6 @@
     "revoke": "{{host}} को विश्वसनीयता हटाउनुहोस्",
     "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
   },
-  "quickChat": {
-    "empty": {
-      "title": "कुराकानी सुरु गर्नुहोस्",
-      "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
-    },
-    "historyRetry": "कुराकानीको इतिहास लोड गर्न सकिएन।",
-    "sendError": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
-  },
   "glanceable": {
     "waiting": "एजेन्टहरूको जानकारी अद्यावधिक गर्दै",
     "empty": "कुनै काम चलिरहेको छैन",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "आफ्नो मेसिनमा `kilo remote` CLI मार्फत Kilo चलाउनुहोस्।",
     "skip": "भ्रमण छोड्नुहोस्",
     "tutorialLabel": "ट्युटोरियल"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "कुराकानी सुरु गर्नुहोस्",
+      "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
+    },
+    "list": {
+      "loadFailed": "कुराकानी इतिहास लोड गर्न सकिएन।",
+      "new": "नयाँ च्याट",
+      "openHint": "च्याट खोल्छ। मेट्न लामो थिच्नुहोस्।",
+      "deleteTitle": "यो च्याट मेट्ने?"
+    },
+    "beta": "बिटा",
+    "mcp": {
+      "title": "Kilo उपकरण",
+      "use": "Kilo उपकरण प्रयोग गर्नुहोस्",
+      "useDescription": "यो कुराकानीलाई Kilo सर्भरले दिने उपकरण प्रयोग गर्न दिनुहोस्।",
+      "off": "Kilo उपकरण बन्द छन्",
+      "offDescription": "यो कुराकानीले मोडेलमा कुनै पनि Kilo उपकरण पठाउँदैन।",
+      "connecting": "Kilo उपकरणमा जोडिँदै…",
+      "available": "उपलब्ध उपकरण: {{count}}",
+      "none": "कुनै उपकरण उपलब्ध छैन",
+      "noneDescription": "Kilo सर्भरले कुनै उपकरण फर्काएन।",
+      "unreachable": "Kilo उपकरणसम्म पुग्न सकिएन",
+      "unreachableDescription": "सर्भरले जवाफ दिएन। आफ्नो जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "unauthorized": "Kilo उपकरणले यो सत्र अस्वीकार गरे",
+      "unauthorizedDescription": "यो कुराकानीमा Kilo उपकरण प्रयोग गर्न फेरि साइन इन गर्नुहोस्।",
+      "unavailable": "Kilo उपकरण उपलब्ध छैनन्",
+      "unavailableDescription": "यो खाताका लागि Kilo सर्भर उपलब्ध छैन।"
+    }
   },
   "appActions": {
     "start": {

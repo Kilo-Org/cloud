@@ -3168,14 +3168,6 @@
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "backToPreferences": "Buyela ezilungiselelweni"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Qala ingxoxo",
-      "description": "Thumela umlayezo ukuze uxoxe nemodeli."
-    },
-    "historyRetry": "Asikwazanga ukulayisha umlando wengxoxo.",
-    "sendError": "Asikwazanga ukuthumela umlayezo. Zama futhi."
-  },
   "glanceable": {
     "waiting": "Kubuyekezwa ama-ejenti",
     "empty": "Awukho umsebenzi oqhubekayo",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Sebenzisa i-Kilo ekhompyutheni yakho ngokusebenzisa i-CLI ethi `kilo remote`.",
     "skip": "Qeda uhambo",
     "tutorialLabel": "Uqeqesho"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Qala ingxoxo",
+      "description": "Thumela umlayezo ukuze uxoxe nomodeli."
+    },
+    "list": {
+      "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
+      "new": "Ingxoxo entsha",
+      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
+      "deleteTitle": "Susa le ngxoxo?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Amathuluzi e-Kilo",
+      "use": "Sebenzisa amathuluzi e-Kilo",
+      "useDescription": "Vumela le ngxoxo ukuthi isebenzise amathuluzi anikezwa iseva ye-Kilo.",
+      "off": "Amathuluzi e-Kilo avaliwe",
+      "offDescription": "Le ngxoxo ayithumeli noma yiliphi ithuluzi le-Kilo kumodeli.",
+      "connecting": "Ixhumeka kumathuluzi e-Kilo…",
+      "available": "Amathuluzi atholakalayo: {{count}}",
+      "none": "Awekho amathuluzi atholakalayo",
+      "noneDescription": "Iseva ye-Kilo ayibuyisanga lithuluzi.",
+      "unreachable": "Ayikwazanga ukufinyelela kumathuluzi e-Kilo",
+      "unreachableDescription": "Iseva ayiphendulanga. Hlola ukuxhumana kwakho, bese uzama futhi.",
+      "unauthorized": "Amathuluzi e-Kilo enqabile le seshini",
+      "unauthorizedDescription": "Ngena futhi ukuze usebenzise amathuluzi e-Kilo kule ngxoxo.",
+      "unavailable": "Amathuluzi e-Kilo awatholakali",
+      "unavailableDescription": "Iseva ye-Kilo ayitholakali kule akhawunti."
+    }
   },
   "appActions": {
     "start": {

@@ -3168,14 +3168,6 @@
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "ເລີ່ມການສົນທະນາ",
-      "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
-    },
-    "historyRetry": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
-    "sendError": "ບໍ່ສາມາດສົ່ງຂໍ້ຄວາມໄດ້. ລອງອີກຄັ້ງ."
-  },
   "glanceable": {
     "waiting": "ກຳລັງອັບເດດເອເຈນ",
     "empty": "ບໍ່ມີວຽກທີ່ດຳເນີນຢູ່",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "ແລ່ນ Kilo ໃນເຄື່ອງຂອງທ່ານເອງຜ່ານ CLI `kilo remote`.",
     "skip": "ຂ້າມການທ່ອງທ່ຽວ",
     "tutorialLabel": "ຄູ່ມື"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "ເລີ່ມການສົນທະນາ",
+      "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
+    },
+    "list": {
+      "loadFailed": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
+      "new": "ແຊັດໃໝ່",
+      "openHint": "ເປີດແຊັດ. ກົດຄ້າງເພື່ອລຶບ.",
+      "deleteTitle": "ລຶບແຊັດນີ້ບໍ?"
+    },
+    "beta": "ເບຕ້າ",
+    "mcp": {
+      "title": "ເຄື່ອງມື Kilo",
+      "use": "ໃຊ້ເຄື່ອງມື Kilo",
+      "useDescription": "ໃຫ້ການສົນທະນານີ້ໃຊ້ເຄື່ອງມືທີ່ເຊີບເວີ Kilo ສະເໜີ.",
+      "off": "ເຄື່ອງມື Kilo ປິດຢູ່",
+      "offDescription": "ການສົນທະນານີ້ບໍ່ສົ່ງເຄື່ອງມື Kilo ໃດໆໄປຫາໂມເດວ.",
+      "connecting": "ກຳລັງເຊື່ອມຕໍ່ກັບເຄື່ອງມື Kilo…",
+      "available": "ເຄື່ອງມືທີ່ມີ: {{count}}",
+      "none": "ບໍ່ມີເຄື່ອງມື",
+      "noneDescription": "ເຊີບເວີ Kilo ບໍ່ໄດ້ສົ່ງເຄື່ອງມືກັບມາ.",
+      "unreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຄື່ອງມື Kilo ໄດ້",
+      "unreachableDescription": "ເຊີບເວີບໍ່ຕອບສະໜອງ. ກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານ, ແລ້ວລອງອີກຄັ້ງ.",
+      "unauthorized": "ເຄື່ອງມື Kilo ປະຕິເສດເຊສຊັນນີ້",
+      "unauthorizedDescription": "ເຂົ້າສູ່ລະບົບອີກຄັ້ງເພື່ອໃຊ້ເຄື່ອງມື Kilo ໃນການສົນທະນານີ້.",
+      "unavailable": "ເຄື່ອງມື Kilo ບໍ່ມີ",
+      "unavailableDescription": "ເຊີບເວີ Kilo ບໍ່ມີສຳລັບບັນຊີນີ້."
+    }
   },
   "appActions": {
     "start": {

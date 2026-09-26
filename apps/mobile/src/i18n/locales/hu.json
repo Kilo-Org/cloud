@@ -3168,14 +3168,6 @@
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "backToPreferences": "Vissza a beállításokhoz"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Csevegés indítása",
-      "description": "Küldj egy üzenetet, hogy beszélgethess egy modellel."
-    },
-    "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
-    "sendError": "Nem sikerült elküldeni az üzenetet. Próbáld újra."
-  },
   "glanceable": {
     "waiting": "Ügynökök frissítése",
     "empty": "Nincs folyamatban lévő munka",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Futtasd a Kilót a saját gépeden a `kilo remote` CLI-n keresztül.",
     "skip": "Bemutató kihagyása",
     "tutorialLabel": "Oktatóprogram"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Kezdjen csevegést",
+      "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
+    },
+    "list": {
+      "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
+      "new": "Új csevegés",
+      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
+      "deleteTitle": "Törli ezt a csevegést?"
+    },
+    "beta": "Béta",
+    "mcp": {
+      "title": "Kilo-eszközök",
+      "use": "Kilo-eszközök használata",
+      "useDescription": "Engedélyezd, hogy ez a csevegés a Kilo-kiszolgáló által kínált eszközöket használja.",
+      "off": "A Kilo-eszközök ki vannak kapcsolva",
+      "offDescription": "Ez a csevegés egyetlen Kilo-eszközt sem küld a modellnek.",
+      "connecting": "Csatlakozás a Kilo-eszközökhöz…",
+      "available": "Elérhető eszközök: {{count}}",
+      "none": "Nincsenek elérhető eszközök",
+      "noneDescription": "A Kilo-kiszolgáló nem adott vissza eszközöket.",
+      "unreachable": "Nem sikerült elérni a Kilo-eszközöket",
+      "unreachableDescription": "A kiszolgáló nem válaszolt. Ellenőrizd a kapcsolatot, majd próbáld újra.",
+      "unauthorized": "A Kilo-eszközök elutasították ezt a munkamenetet",
+      "unauthorizedDescription": "Jelentkezz be újra, hogy használhasd a Kilo-eszközöket ebben a csevegésben.",
+      "unavailable": "A Kilo-eszközök nem érhetők el",
+      "unavailableDescription": "A Kilo-kiszolgáló nem érhető el ehhez a fiókhoz."
+    }
   },
   "appActions": {
     "start": {

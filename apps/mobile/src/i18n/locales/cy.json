@@ -3340,14 +3340,6 @@
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Dechrau sgwrs",
-      "description": "Anfonwch neges i siarad â model."
-    },
-    "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
-    "sendError": "Ni ellid anfon y neges. Ceisiwch eto."
-  },
   "glanceable": {
     "waiting": "Yn diweddaru asiantau",
     "empty": "Dim gwaith ar y gweill",
@@ -3393,6 +3385,36 @@
     "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
     "skip": "Hepgor y daith",
     "tutorialLabel": "Tiwtorial"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Dechrau sgwrs",
+      "description": "Anfonwch neges i siarad â model."
+    },
+    "list": {
+      "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
+      "new": "Sgwrs newydd",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
+      "deleteTitle": "Dileu'r sgwrs hon?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Offer Kilo",
+      "use": "Defnyddio offer Kilo",
+      "useDescription": "Gadewch i'r sgwrs hon ddefnyddio'r offer y mae gweinydd Kilo yn eu cynnig.",
+      "off": "Mae offer Kilo i ffwrdd",
+      "offDescription": "Nid yw'r sgwrs hon yn anfon unrhyw offeryn Kilo at y model.",
+      "connecting": "Yn cysylltu ag offer Kilo…",
+      "available": "Offer ar gael: {{count}}",
+      "none": "Dim offer ar gael",
+      "noneDescription": "Ni chyflwynodd gweinydd Kilo unrhyw offer.",
+      "unreachable": "Ni ellid cyrraedd offer Kilo",
+      "unreachableDescription": "Ni wnaeth y gweinydd ateb. Gwiriwch eich cysylltiad, yna ceisiwch eto.",
+      "unauthorized": "Gwrthododd offer Kilo y sesiwn hon",
+      "unauthorizedDescription": "Mewngofnodwch eto i ddefnyddio offer Kilo yn y sgwrs hon.",
+      "unavailable": "Nid yw offer Kilo ar gael",
+      "unavailableDescription": "Nid yw gweinydd Kilo ar gael ar gyfer y cyfrif hwn."
+    }
   },
   "appActions": {
     "start": {

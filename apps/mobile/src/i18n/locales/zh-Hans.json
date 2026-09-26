@@ -3168,14 +3168,6 @@
     "revoke": "撤销对 {{host}} 的信任",
     "backToPreferences": "返回偏好设置"
   },
-  "quickChat": {
-    "empty": {
-      "title": "开始聊天",
-      "description": "发送一条消息，即可与模型对话。"
-    },
-    "historyRetry": "无法加载历史聊天记录。",
-    "sendError": "无法发送消息。请重试。"
-  },
   "glanceable": {
     "waiting": "正在更新智能体状态",
     "empty": "暂无进行中的任务",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "通过 `kilo remote` CLI 在你自己的电脑上运行 Kilo。",
     "skip": "跳过导览",
     "tutorialLabel": "教程"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "开始聊天",
+      "description": "发送消息以与模型对话。"
+    },
+    "list": {
+      "loadFailed": "无法加载聊天历史。",
+      "new": "新对话",
+      "openHint": "打开对话。长按可删除。",
+      "deleteTitle": "删除这个对话？"
+    },
+    "beta": "测试版",
+    "mcp": {
+      "title": "Kilo 工具",
+      "use": "使用 Kilo 工具",
+      "useDescription": "允许此对话使用 Kilo 服务器提供的工具。",
+      "off": "Kilo 工具已关闭",
+      "offDescription": "此对话不会向模型发送任何 Kilo 工具。",
+      "connecting": "正在连接 Kilo 工具…",
+      "available": "可用工具：{{count}}",
+      "none": "没有可用工具",
+      "noneDescription": "Kilo 服务器未返回任何工具。",
+      "unreachable": "无法连接 Kilo 工具",
+      "unreachableDescription": "服务器没有响应。请检查网络连接，然后重试。",
+      "unauthorized": "Kilo 工具拒绝了此会话",
+      "unauthorizedDescription": "请重新登录以在此对话中使用 Kilo 工具。",
+      "unavailable": "Kilo 工具不可用",
+      "unavailableDescription": "此账户无法使用 Kilo 服务器。"
+    }
   },
   "appActions": {
     "start": {

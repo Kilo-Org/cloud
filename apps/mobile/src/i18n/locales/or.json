@@ -2848,7 +2848,7 @@
     "legalConnectorPrivacy": " ଏବଂ ସ୍ୱୀକାର କରୁଛନ୍ତି: ",
     "manageFailed": "App Store ସବସ୍କ୍ରିପସନ୍ ପରିଚାଳନା ଖୋଲାଯାଇପାରିଲା ନାହିଁ।",
     "kiloPassSetup": "Kilo Pass ସେଟଅପ୍",
-    "subscriptionHeaderDescription": "ଏକ ମାସିକ ସବସ୍କ୍ରିପସନ୍ ଯାହା Kilo ଆପ୍।",
+    "subscriptionHeaderDescription": "Kilo App ରେ AI କୋଡିଂ ସେସନ୍ ଚଲାଇବା ପାଇଁ ଆପଣଙ୍କ Kilo ବାଲାନ୍ସରେ କ୍ରେଡିଟ୍ ଯୋଡ଼ୁଥିବା ମାସିକ ସବସ୍କ୍ରିପସନ୍।",
     "tierDescription": "Kilo App ବ୍ୟବହାର ପାଇଁ ପ୍ରତି ମାସରେ {{price}} ମୂଲ୍ୟର କିଣା କ୍ରେଡିଟ୍ ଯୋଡ଼ାଯାଏ।",
     "subscribe": "ସବସ୍କ୍ରାଇବ୍ କରନ୍ତୁ",
     "subscribeDescription": "ମାସିକ କ୍ରେଡିଟ୍ ସହ ବୋନସ୍ ପାଇବା ଦିଗରେ ଅଗ୍ରଗତି",
@@ -3168,14 +3168,6 @@
     "revoke": "{{host}} ପ୍ରତି ବିଶ୍ୱାସ ପ୍ରତ୍ୟାହାର କରନ୍ତୁ",
     "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
-      "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
-    },
-    "historyRetry": "ଚାଟ୍ ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-    "sendError": "ସନ୍ଦେଶ ପଠାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
-  },
   "glanceable": {
     "waiting": "ଏଜେଣ୍ଟଙ୍କ ସ୍ଥିତି ଅପଡେଟ୍ ହେଉଛି",
     "empty": "କୌଣସି କାର୍ଯ୍ୟ ଚାଲୁ ନାହିଁ",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "ଆପଣଙ୍କ ନିଜ ମେସିନରେ `kilo remote` CLI ମାଧ୍ୟମରେ Kilo ଚଲାନ୍ତୁ।",
     "skip": "ଭ୍ରମଣ ଛାଡ଼ନ୍ତୁ",
     "tutorialLabel": "ଶିକ୍ଷା"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
+      "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
+    },
+    "list": {
+      "loadFailed": "ଚାଟ୍ ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "new": "ନୂଆ ଚାଟ୍",
+      "openHint": "ଚାଟ୍ ଖୋଲେ। ବିଲୋପ କରିବାକୁ ଦବାଇ ଧରନ୍ତୁ।",
+      "deleteTitle": "ଏହି ଚାଟ୍ ବିଲୋପ କରିବେ?"
+    },
+    "beta": "ବିଟା",
+    "mcp": {
+      "title": "Kilo ସାଧନ",
+      "use": "Kilo ସାଧନ ବ୍ୟବହାର କରନ୍ତୁ",
+      "useDescription": "ଏହି ଚାଟ୍‌କୁ Kilo ସର୍ଭର ଦେଉଥିବା ସାଧନ ବ୍ୟବହାର କରିବାକୁ ଦିଅନ୍ତୁ।",
+      "off": "Kilo ସାଧନ ବନ୍ଦ ଅଛି",
+      "offDescription": "ଏହି ଚାଟ୍ ମଡେଲ୍‌କୁ କୌଣସି Kilo ସାଧନ ପଠାଏ ନାହିଁ।",
+      "connecting": "Kilo ସାଧନ ସହିତ ସଂଯୋଗ ହେଉଛି…",
+      "available": "ଉପଲବ୍ଧ ସାଧନ: {{count}}",
+      "none": "କୌଣସି ସାଧନ ଉପଲବ୍ଧ ନାହିଁ",
+      "noneDescription": "Kilo ସର୍ଭର କୌଣସି ସାଧନ ଫେରାଇ ନାହିଁ।",
+      "unreachable": "Kilo ସାଧନ ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
+      "unreachableDescription": "ସର୍ଭର ଉତ୍ତର ଦେଲା ନାହିଁ। ତୁମର ସଂଯୋଗ ଯାଞ୍ଚ କର, ତାପରେ ପୁଣି ଚେଷ୍ଟା କର।",
+      "unauthorized": "Kilo ସାଧନ ଏହି ଅଧିବେଶନକୁ ଅସ୍ୱୀକାର କଲା",
+      "unauthorizedDescription": "ଏହି ଚାଟ୍‌ରେ Kilo ସାଧନ ବ୍ୟବହାର କରିବାକୁ ପୁଣି ସାଇନ୍ ଇନ୍ କର।",
+      "unavailable": "Kilo ସାଧନ ଉପଲବ୍ଧ ନାହିଁ",
+      "unavailableDescription": "ଏହି ଖାତା ପାଇଁ Kilo ସର୍ଭର ନାହିଁ।"
+    }
   },
   "appActions": {
     "start": {

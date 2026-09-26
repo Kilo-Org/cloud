@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewSubmit } from './pr-review-submit';
+import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   type PendingReviewItem,
@@ -141,6 +142,7 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
 }));
 vi.mock('@/lib/feedback', () => ({
   maybeAskAfterSuccessfulOutcome: feedbackMock.maybeAskAfterSuccessfulOutcome,
+  showFeedbackPrompt: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
@@ -193,19 +195,24 @@ function mount(prRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
     renderer = TestRenderer.create(
-      <PendingReviewProvider>
-        <Consumer />
-        <PrReviewSubmit
-          owner="acme"
-          repo="kilo"
-          number={42}
-          headSha="head-1"
-          title={SUBMIT_TITLE}
-          eyebrow="acme/kilo#42"
-          prRef={prRef}
-          onDismiss={vi.fn(() => undefined)}
-        />
-      </PendingReviewProvider>
+      // The sheet requests the post-submit prompt through the
+      // FeedbackPromptProvider host mounted by the PR-review layout, so the
+      // mount mirrors that wiring.
+      <FeedbackPromptProvider>
+        <PendingReviewProvider>
+          <Consumer />
+          <PrReviewSubmit
+            owner="acme"
+            repo="kilo"
+            number={42}
+            headSha="head-1"
+            title={SUBMIT_TITLE}
+            eyebrow="acme/kilo#42"
+            prRef={prRef}
+            onDismiss={vi.fn(() => undefined)}
+          />
+        </PendingReviewProvider>
+      </FeedbackPromptProvider>
     );
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
@@ -324,7 +331,13 @@ describe('PrReviewSubmit queue retention', () => {
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
     expect(latestItems.map(item => item.id)).toEqual([]);
     expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledTimes(1);
-    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledWith('user-1');
+    // The second argument is the platform prompt surface the claim presents
+    // through (`useFeedbackPrompt`): the native alert on iOS, the in-app dialog
+    // on Android.
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledWith(
+      'user-1',
+      expect.any(Function)
+    );
   });
 });
 

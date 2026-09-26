@@ -8,7 +8,13 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { i18n } from '@/i18n';
-import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
+import {
+  getLastGlanceableSnapshot,
+  isGlanceableRestoreSettled,
+  isGlanceableRestoreUnavailable,
+  restorePersistedGlanceable,
+  whenGlanceableRestoresSettle,
+} from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
@@ -305,6 +311,107 @@ export function adoptNativeActivity(
   if (activity !== null) {
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
   }
+}
+
+/**
+ * True while the persisted snapshot can still own a card: present, not a
+ * terminal blank, and not past its expiry. An absent, signed-out, privacy, or
+ * expired snapshot owns nothing — those are the states a card outlives its
+ * owner in.
+ *
+ * `expired` is checked by name, not only by timestamp:
+ * `GlanceablePublisher.applyExpiry()` stamps the lapsed snapshot with a renewed
+ * `expiresAt` eight hours out, so `now < expiresAt` alone would read an expired
+ * snapshot as an owner for the rest of that window.
+ *
+ * Counts are deliberately not part of this: an empty snapshot may cover a card
+ * a push-to-start raised for a session this process has not seen yet, and
+ * ending that card would tear down a surface the server already holds a token
+ * for. The publisher retires it moments later if the work really is gone, so
+ * keeping it never leaves a stray behind.
+ */
+function snapshotOwnsSurface(snapshot: GlanceableAgentsSnapshot | null, now: number): boolean {
+  return (
+    snapshot !== null &&
+    snapshot.status !== 'signed_out' &&
+    snapshot.status !== 'privacy' &&
+    snapshot.status !== 'expired' &&
+    now < Date.parse(snapshot.expiresAt)
+  );
+}
+
+/**
+ * End every native card this launch cannot own, so at most one survives.
+ *
+ * The start path cannot hold the one-card invariant by itself: a card outlives
+ * the process that raised it. A session that ends while the app is suspended,
+ * an app replaced by a new build, or a killed process leaves a card that no
+ * `startOrUpdate` or `publish` of the next launch will ever look at, and
+ * ActivityKit keeps drawing it at the counts it held when it started. Native
+ * discovery (`getInstances(true)`) is the only source of truth for those, and
+ * nothing read it at launch or on foreground.
+ *
+ * Runs after the persisted snapshot is restored on launch (see
+ * `adoptPushStartedActivity`) and on every foreground (see `register.ts`).
+ * When no snapshot can own a surface — or when the in-app switch is off —
+ * every instance is ended at once. Otherwise the persisted work may own one
+ * card this process has not adopted yet, so the normal reconciliation adopts it
+ * and ends every other instance immediately.
+ *
+ * A null snapshot is only proof that nothing owns the surface when the restore
+ * actually read the mirror: if that read failed, or has not finished yet,
+ * native discovery still collapses duplicates to one card, but that card is
+ * kept rather than every instance being ended, so a push-to-start this process
+ * woke to adopt survives a locked keychain or a launch whose read is still in
+ * flight.
+ */
+export function sweepStrayActivities(): void {
+  if (activityKitDeniedState) {
+    return;
+  }
+  if (!getLiveActivityEnabled()) {
+    // `endNow` reads native truth itself and cleans each instance's token, so a
+    // card this process never held is retired as thoroughly as its own.
+    void endNow();
+    return;
+  }
+  const snapshot = getLastGlanceableSnapshot();
+  if (snapshot === null && !isGlanceableRestoreSettled()) {
+    // The read has not finished yet, so a null snapshot means "unknown", not
+    // "nothing can own the surface". This runs at import in the headless push
+    // process, and on the foreground edge before the launch restore settles,
+    // where ending every instance would tear down the card a push-to-start just
+    // raised before this process can adopt it. Reconciliation still ends every
+    // instance but the one native discovery keeps, so the surface never holds
+    // more than one card.
+    //
+    // The deferral must not drop the sweep: the read this sweep waited for is
+    // the only thing that will settle it, and without a rerun an unowned card
+    // would stay on the Lock Screen until the next foreground or publisher
+    // update. Wait for the last read to land and sweep again.
+    void (async () => {
+      await whenGlanceableRestoresSettle();
+      sweepStrayActivities();
+    })();
+    refreshActivity();
+    return;
+  }
+  if (snapshot === null && isGlanceableRestoreUnavailable()) {
+    // The persisted owner could not be read, so a null snapshot means
+    // "unknown", not "nothing can own the surface": the mirror may still name a
+    // card owner and this process cannot tell. Reconciliation ends every
+    // instance but the one native discovery keeps, and a later foreground or
+    // publisher update sweeps again.
+    refreshActivity();
+    return;
+  }
+  if (!snapshotOwnsSurface(snapshot, Date.now())) {
+    // `endNow` reads native truth itself and cleans each instance's token, so a
+    // card this process never held is retired as thoroughly as its own.
+    void endNow();
+    return;
+  }
+  refreshActivity();
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */

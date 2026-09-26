@@ -7,11 +7,11 @@ import {
   SCREEN_TRACKING_SETTLE_DEBOUNCE_MS,
   type ScreenTrackingCapture,
 } from '@/lib/hooks/screen-tracking-decision';
-import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
-
-// The telemetry controller exposes no subscription, so the generation counter
-// is polled while mounted.
-export const SCREEN_TRACKING_GENERATION_POLL_MS = 500;
+import {
+  allowsOptional,
+  currentGeneration,
+  subscribeToTelemetryGeneration,
+} from '@/lib/telemetry/controller';
 
 /**
  * Captures a PostHog `$screen` event for the settled visible leaf route: the
@@ -57,22 +57,11 @@ export function useScreenTracking(bootstrapSettled: boolean): void {
 
   const settled = settledSegmentsKey === segmentsKey && navState?.stale === false;
 
-  // Re-evaluate on account generation changes. The telemetry controller
-  // exposes no subscription, so poll its generation counter while mounted.
-  const [generationTick, setGenerationTick] = useState(0);
-  useEffect(() => {
-    let lastGeneration = currentGeneration();
-    const timer = setInterval(() => {
-      const nextGeneration = currentGeneration();
-      if (nextGeneration !== lastGeneration) {
-        lastGeneration = nextGeneration;
-        setGenerationTick(tick => tick + 1);
-      }
-    }, SCREEN_TRACKING_GENERATION_POLL_MS);
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
+  // Re-evaluate on account generation changes. The controller notifies its
+  // subscribers when the account changes (or the decision is cleared), so the
+  // generation is read as an external store instead of polled on a timer: the
+  // JS thread idles in the foreground between real account transitions.
+  const generation = useSyncExternalStore(subscribeToTelemetryGeneration, currentGeneration);
 
   // The analytics module does not export its client generation, so observe it
   // when readiness flips true (`initPostHog` records it just before notifying).
@@ -88,7 +77,6 @@ export function useScreenTracking(bootstrapSettled: boolean): void {
   }, [analyticsReady]);
 
   useEffect(() => {
-    const generation = currentGeneration();
     const decision = decideScreenTracking({
       segments,
       settled,
@@ -107,12 +95,5 @@ export function useScreenTracking(bootstrapSettled: boolean): void {
       // eslint-disable-next-line no-console -- dev-only E2E assertion hook for screen tracking
       console.log('[screen-tracking]', decision.screenName);
     }
-  }, [
-    segments,
-    settled,
-    analyticsReady,
-    bootstrapSettled,
-    generationTick,
-    postHogClientGeneration,
-  ]);
+  }, [segments, settled, analyticsReady, bootstrapSettled, generation, postHogClientGeneration]);
 }

@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { useFeedbackPromptRequest } from '@/components/use-feedback-prompt';
 import { cn } from '@/lib/utils';
 
 import {
@@ -184,6 +185,15 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { t } = useTranslation();
   const submitReview = useSubmitReviewMutation(prRef ?? { owner, repo, number });
   const { userId } = useCurrentUserId();
+  // The post-submit prompt's surface is platform-specific
+  // (`feedback-prompt-platform.ts`): the claim below presents through it.
+  // The request goes to the FeedbackPromptProvider host mounted by the
+  // PR-review layout, not to a dialog hosted in this sheet's tree: the
+  // deferred claim runs after `onDismiss()` has dismissed this sheet
+  // (`router.back`), and a host inside the sheet would unmount before the
+  // claim presents — the Android in-app dialog would never render. The
+  // layout outlives the dismissal, so its host presents over the overview.
+  const requestFeedbackPrompt = useFeedbackPromptRequest();
   const { prReviewFooter, hasLoaded: prReviewFooterLoaded } = usePrReviewFooterPreference();
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
@@ -330,7 +340,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         onDismiss();
         // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
         InteractionManager.runAfterInteractions(() => {
-          void maybeAskAfterSuccessfulOutcome(userId);
+          void maybeAskAfterSuccessfulOutcome(userId, requestFeedbackPrompt);
         });
       }
     } catch {

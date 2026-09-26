@@ -4,7 +4,11 @@
  * `src/shared/default-slash-commands.generated.ts`.
  *
  * Rules (matching the Kilo TUI):
- *   - Exclude commands where source === "skill" (skills are hidden from slash autocomplete)
+ *   - Keep every command the CLI reports, including `source: "skill"` rows: the
+ *     mobile composer lists and invokes skills, so they must not be filtered.
+ *     The catalog is generated with project config disabled, so it only carries
+ *     the commands the CLI always has; session skills come from the live
+ *     wrapper catalog instead.
  *   - Sort deterministically by name
  *   - Strip the `template` field (server-side only)
  *
@@ -190,11 +194,9 @@ async function main() {
     const commands = raw
       .map(trimCommand)
       .filter(Boolean)
-      // Match TUI behavior: skills are hidden from slash autocomplete
-      .filter(cmd => cmd.source !== 'skill')
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    console.log(`fetched ${raw.length} commands, ${commands.length} after filtering skills`);
+    console.log(`fetched ${raw.length} commands, ${commands.length} after trimming`);
 
     const sourceLine = `kilo@${version}`;
     const json = JSON.stringify(commands, null, 2);
@@ -212,9 +214,10 @@ async function main() {
 /**
  * Source Kilo version / ref used to generate this catalog.
  *
- * Note: skills (source: 'skill') are intentionally omitted. The Kilo TUI
- * filters them from slash-command autocomplete, so they never appear in the
- * local \`/\` list even though they can be invoked by typing the name manually.
+ * Note: this snapshot is generated with project config disabled, so it carries
+ * the commands the CLI always has and no session skills. Skills are surfaced
+ * from the live wrapper-reported catalog, which keeps every \`source: 'skill'\`
+ * row the CLI reports for the session.
  *
  * Regenerate with \`pnpm --filter cloud-agent-next update-default-slash-commands\`.
  */

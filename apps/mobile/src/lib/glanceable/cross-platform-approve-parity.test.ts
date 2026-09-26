@@ -97,6 +97,13 @@ vi.mock('@/glanceable-android/android-sink', () => ({
   renderStoredSnapshotWithNotice: mocks.androidRender,
 }));
 
+// The Android card's Approve retires the raise's app-owned needs-input
+// notification; the real module loads expo-notifications, which this suite
+// cannot.
+vi.mock('@/lib/needs-input-notification', () => ({
+  dismissNeedsInputNotification: vi.fn(),
+}));
+
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 vi.mock('@/lib/deep-link-launch', () => ({ setPendingDeepLink: mocks.setPendingDeepLink }));
 

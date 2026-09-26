@@ -28,6 +28,9 @@ import { QuickChatScreen } from './quick-chat-screen';
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
+vi.mock('@/components/agents/session-preview-overlay', () => ({
+  SessionPreviewOverlay: () => null,
+}));
 
 const listMessagesQueryFn = vi.hoisted(() => vi.fn());
 const getOrCreateThreadMutate = vi.hoisted(() => vi.fn());

@@ -1,27 +1,22 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
-import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
-import { Platform, Pressable, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
+import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import {
-  namedSessionTitle,
-  SESSION_TITLE_MAX_LENGTH,
-  useUserSessionTitlesRevision,
-} from './session-detail-rename-state';
+import { useTRPC } from '@/lib/trpc';
+import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
@@ -31,17 +26,12 @@ import {
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
+import { openSessionPreviewStore } from './session-preview-state';
 import {
   formatSpokenCost,
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
-import {
-  copySessionId,
-  showDeleteConfirm,
-  showRenamePrompt,
-  showSessionActionMenu,
-} from './session-row-actions';
 
 /** Container shape only. `'list'` (default) keeps the Agents list look
  * (`stripMode="inline"`, inner padding so the strip sits inside the
@@ -79,7 +69,7 @@ type StoredSessionRowProps = {
   variant?: RowVariant;
   /**
    * Whether the row is fully interactive. `false` removes the long-press
-   * manage menu (and gates any rename/delete/copy-id actions it owns).
+   * preview (and gates any rename/delete/copy-id actions it owns).
    * Tap is preserved either way. Defaults to `true`.
    */
   interactive?: boolean;
@@ -108,29 +98,20 @@ export function StoredSessionRow({
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const themedSheet = useThemedActionSheetOptions();
-  const { showActionSheetWithOptions } = useActionSheet();
-  // One derivation for the visible label, the spoken label and the rename
-  // prompt: the server's creation-default title (`New session - <ISO
-  // timestamp>`) is an internal marker, never row copy, so a creation
-  // placeholder title reads as "Untitled session" — the row falls back to the
-  // localized unnamed name the same way the session header does.
-  // `namedSessionTitle` makes that judgement through the shared
-  // `sessionDisplayTitle` helper and additionally keeps a placeholder-shaped
-  // title the user's own rename wrote, so the same label feeds the row, the
-  // accessibility label, and the rename prompt. The subscription repaints the
-  // row once the durable record hydrates after a cold start.
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+  // The backend names an unnamed session with a raw ISO placeholder
+  // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
+  // should see. `namedSessionTitle` uses the shared display helper and keeps
+  // a placeholder-shaped title saved by a user. The subscription repaints
+  // the row once the durable record hydrates after a cold start.
   useUserSessionTitlesRevision();
   const title =
     namedSessionTitle(session.title, session.session_id) ?? t('agents.sessionRow.untitled');
-  // The rename field seeds the name a person wrote, never the backend default
-  // or the display fallback: a session still carrying `New session - <ISO>`
-  // opens an empty field (the "Session name" placeholder prompts for a name)
-  // instead of the machine string the row hides. Both save paths already
-  // refuse an unchanged or blank value, so a no-edit confirm cannot persist
-  // the empty seed. A title the user's own rename wrote is still seeded.
+  // Seed Rename with the same visible title. The server's creation-default
+  // title is hidden; a placeholder-shaped title saved by a user is retained.
+  // Both save paths refuse an unchanged or blank value.
   const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
-  const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
@@ -146,31 +127,26 @@ export function StoredSessionRow({
     reconcileSessionAttention(session.session_id, session.status, session.status_updated_at);
   }, [session.session_id, session.status, session.status_updated_at, revision]);
 
+  const statusKind = session.status === null ? null : glanceableStatusKind(session.status);
+
   const handleLongPress = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    showSessionActionMenu({
-      showActionSheetWithOptions,
-      themedSheet,
-      onCopySessionId: () => {
-        void copySessionId(session.session_id);
-      },
-      onRename: onRename
-        ? () => {
-            if (Platform.OS === 'ios') {
-              showRenamePrompt(renameInitialValue, newTitle => {
-                onRename(newTitle);
-              });
-            } else {
-              setRenameVisible(true);
-            }
-          }
-        : undefined,
-      onDelete: onDelete
-        ? () => {
-            showDeleteConfirm(onDelete);
-          }
-        : undefined,
+    openSessionPreviewStore({
+      sessionId: session.session_id,
+      title,
+      initialRenameValue: renameInitialValue,
+      live,
+      statusKind,
+      needsInput,
+      totalCostMicrodollars: session.total_cost_microdollars,
+      onRename,
+      onDelete,
     });
+  };
+
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'manage') {
+      handleLongPress();
+    }
   };
 
   // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
@@ -223,57 +199,51 @@ export function StoredSessionRow({
       </View>
     ) : undefined;
 
-  return (
-    <>
-      <Pressable
-        onPress={onPress}
-        onLongPress={canManage ? handleLongPress : undefined}
-        accessibilityRole="button"
-        accessibilityLabel={sessionRowAccessibilityLabel({
-          title,
-          needsInput,
-          live: variant === 'list' && live,
-          badge: agentLabel,
-          meta: spokenMeta,
-          subtitle: session.git_branch,
-          prNumber: spokenPrNumber,
-          platform: a11yPlatform,
-        })}
-        className="active:opacity-70"
-      >
-        <SessionRow
-          agentLabel={agentLabel}
-          title={title}
-          subtitle={subtitle}
-          meta={visibleMeta}
-          live={live}
-          statusKind={session.status === null ? null : glanceableStatusKind(session.status)}
-          metaWhileLive={metaWhileLive}
-          needsInput={needsInput}
-          platformIcon={platformIcon}
-          stripMode={variant === 'card' ? 'edge' : 'inline'}
-          last={variant === 'card' ? true : undefined}
-          className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
-        />
-      </Pressable>
+  const handlePressIn = canManage
+    ? () => {
+        void prefetchSessionTranscript(
+          queryClient,
+          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
+        );
+      }
+    : undefined;
 
-      {renameVisible && (
-        <RenameModal
-          title={t('agentChat.session.renameSession')}
-          placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={renameInitialValue}
-          maxLength={SESSION_TITLE_MAX_LENGTH}
-          onClose={() => {
-            setRenameVisible(false);
-          }}
-          onSave={async name => {
-            // Resolve immediately so RenameModal closes like today's list flow;
-            // mutation errors toast + roll back outside the modal (r5b-3).
-            onRename?.(name);
-            await Promise.resolve();
-          }}
-        />
-      )}
-    </>
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onLongPress={canManage ? handleLongPress : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={sessionRowAccessibilityLabel({
+        title,
+        needsInput,
+        live: variant === 'list' && live,
+        badge: agentLabel,
+        meta: spokenMeta,
+        subtitle: session.git_branch,
+        prNumber: spokenPrNumber,
+        platform: a11yPlatform,
+      })}
+      accessibilityActions={
+        canManage ? [{ name: 'manage', label: t('agents.sessionRow.actions') }] : undefined
+      }
+      onAccessibilityAction={canManage ? handleAccessibilityAction : undefined}
+      className="active:opacity-70"
+    >
+      <SessionRow
+        agentLabel={agentLabel}
+        title={title}
+        subtitle={subtitle}
+        meta={visibleMeta}
+        live={live}
+        statusKind={statusKind}
+        metaWhileLive={metaWhileLive}
+        needsInput={needsInput}
+        platformIcon={platformIcon}
+        stripMode={variant === 'card' ? 'edge' : 'inline'}
+        last={variant === 'card' ? true : undefined}
+        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
+      />
+    </Pressable>
   );
 }

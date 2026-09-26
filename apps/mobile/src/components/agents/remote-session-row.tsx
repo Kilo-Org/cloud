@@ -1,7 +1,5 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -9,17 +7,16 @@ import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
-import { Platform, Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
+import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -29,11 +26,7 @@ import {
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
-import {
-  namedSessionTitle,
-  SESSION_TITLE_MAX_LENGTH,
-  useUserSessionTitlesRevision,
-} from './session-detail-rename-state';
+import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
@@ -45,8 +38,8 @@ import {
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
+import { openSessionPreviewStore } from './session-preview-state';
 import { type RowVariant } from './session-row';
-import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import {
   formatSpokenCost,
   formatSpokenTimeAgo,
@@ -71,8 +64,6 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 }: Readonly<RemoteSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const themedSheet = useThemedActionSheetOptions();
-  const { showActionSheetWithOptions } = useActionSheet();
   const { renameSession } = useSessionMutations();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -112,7 +103,6 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   // string, and the save paths reject an unchanged or blank value. A title the
   // user's own rename wrote is still seeded, so a chosen name is not blanked.
   const renameInitialValue = namedSessionTitle(session.title, session.id) ?? '';
-  const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
 
   const revision = useSessionAttentionRevision();
@@ -246,85 +236,80 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     if (exitingRef.current) {
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    showSessionActionMenu({
-      showActionSheetWithOptions,
-      themedSheet,
-      onCopySessionId: () => {
-        void copySessionId(session.id);
-      },
-      onRename: () => {
-        if (Platform.OS === 'ios') {
-          showRenamePrompt(renameInitialValue, newTitle => {
-            renameSession(session.id, newTitle);
-          });
-        } else {
-          setRenameVisible(true);
-        }
+    openSessionPreviewStore({
+      sessionId: session.id,
+      title,
+      initialRenameValue: renameInitialValue,
+      live: true,
+      statusKind: glanceableStatusKind(session.status),
+      needsInput,
+      totalCostMicrodollars: session.totalCostMicrodollars ?? null,
+      onRename: newTitle => {
+        renameSession(session.id, newTitle);
       },
       onExit: canExit ? handleExit : undefined,
     });
   };
 
-  return (
-    <>
-      <Pressable
-        onPress={() => {
-          onPress(session);
-        }}
-        onLongPress={canManage ? handleLongPress : undefined}
-        accessibilityRole="button"
-        accessibilityLabel={sessionRowAccessibilityLabel({
-          title,
-          needsInput,
-          // Tray rows are always live: the glyph below draws the shared
-          // derivation's kind, and the spoken label names the same state.
-          live: true,
-          statusKind,
-          badge: agentLabel,
-          meta: spokenMeta,
-          subtitle: session.gitBranch ?? null,
-          prNumber: spokenPrNumber,
-          platform: spokenPlatform,
-        })}
-        className="active:opacity-70"
-      >
-        <SessionRow
-          agentLabel={agentLabel}
-          title={title}
-          subtitle={subtitle}
-          meta={composeActiveSessionVisibleMeta(
-            formatSessionTotalCost(session.totalCostMicrodollars),
-            remoteMeta(session, now)
-          )}
-          live
-          statusKind={statusKind}
-          needsInput={needsInput}
-          metaWhileLive
-          platformIcon={platformIcon}
-          stripMode={variant === 'card' ? 'edge' : 'inline'}
-          last={variant === 'card' ? true : undefined}
-          className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
-        />
-      </Pressable>
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'manage') {
+      handleLongPress();
+    }
+  };
 
-      {renameVisible && (
-        <RenameModal
-          title={t('agentChat.session.renameSession')}
-          placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={renameInitialValue}
-          maxLength={SESSION_TITLE_MAX_LENGTH}
-          onClose={() => {
-            setRenameVisible(false);
-          }}
-          onSave={async name => {
-            // Fire-and-forget: modal closes immediately like stored rows.
-            // Mutation owns toast + cache rollback on error (r5b-3).
-            renameSession(session.id, name);
-            await Promise.resolve();
-          }}
-        />
-      )}
-    </>
+  const handlePressIn = canManage
+    ? () => {
+        void prefetchSessionTranscript(
+          queryClient,
+          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
+        );
+      }
+    : undefined;
+
+  return (
+    <Pressable
+      onPress={() => {
+        onPress(session);
+      }}
+      onPressIn={handlePressIn}
+      onLongPress={canManage ? handleLongPress : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={sessionRowAccessibilityLabel({
+        title,
+        needsInput,
+        // Tray rows are always live: the glyph below draws the shared
+        // derivation's kind, and the spoken label names the same state.
+        live: true,
+        statusKind,
+        badge: agentLabel,
+        meta: spokenMeta,
+        subtitle: session.gitBranch ?? null,
+        prNumber: spokenPrNumber,
+        platform: spokenPlatform,
+      })}
+      accessibilityActions={
+        canManage ? [{ name: 'manage', label: t('agents.sessionRow.actions') }] : undefined
+      }
+      onAccessibilityAction={canManage ? handleAccessibilityAction : undefined}
+      className="active:opacity-70"
+    >
+      <SessionRow
+        agentLabel={agentLabel}
+        title={title}
+        subtitle={subtitle}
+        meta={composeActiveSessionVisibleMeta(
+          formatSessionTotalCost(session.totalCostMicrodollars),
+          remoteMeta(session, now)
+        )}
+        live
+        statusKind={statusKind}
+        needsInput={needsInput}
+        metaWhileLive
+        platformIcon={platformIcon}
+        stripMode={variant === 'card' ? 'edge' : 'inline'}
+        last={variant === 'card' ? true : undefined}
+        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
+      />
+    </Pressable>
   );
 });

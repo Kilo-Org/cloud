@@ -14,7 +14,7 @@ import { i18n } from '@/i18n';
  * Pinned to the SDK's exported `REMOTE_SESSION_EXIT_NOT_SUPPORTED` constant
  * (see `packages/cloud-agent-sdk/src/session.ts`).
  */
-export const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
+const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
   'Remote session exit is not supported for the current session';
 
 /**
@@ -22,10 +22,10 @@ export const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
  * reports a non-`true` `canExitSession`. The SDK does not export the constant,
  * so the literal is matched here.
  */
-export const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
+const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
   'Remote session exit is unavailable for the current session';
 
-export const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
+const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
 
 const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
   REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,

@@ -92,12 +92,13 @@ import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission
 import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
-  getPendingDeepLink,
+  consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
+import { useOrganization } from '@/lib/organization-context';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -212,6 +213,9 @@ function RootLayoutNav({
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  // The gated pending-deep-link consumer below switches to the tapped
+  // notification's organization through this provider before it navigates.
+  const { setOrganizationId } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
@@ -788,11 +792,23 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady) {
       return;
     }
-    const navigation = resolvePendingNavigation(getPendingDeepLink());
+    const pending = consumePendingDeepLink();
+    if (!pending) {
+      return;
+    }
+    // Switch to the destination's organization before navigating, in the same
+    // effect body with nothing awaited between: the route reads the new
+    // organization on its first render instead of fetching the old scope and
+    // showing an empty list. A destination with no organization (Personal)
+    // leaves the selection unchanged.
+    if (pending.organizationId !== null) {
+      setOrganizationId(pending.organizationId);
+    }
+    const navigation = resolvePendingNavigation(pending.href);
     if (navigation) {
       router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, router]);
+  }, [pendingDeepLink, isShellReady, router, setOrganizationId]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady) {
@@ -867,8 +883,28 @@ function RootLayoutNav({
   // Post-startup hidden windows (a sign-in's redirect + consent check, a
   // sign-out's redirect to login) have no splash over them, so the hidden
   // wrapper would otherwise paint an empty background. Keep one spinner up
-  // for exactly those windows (app-blank-after-oauth).
-  const showBootstrapLoading = shouldShowBootstrapLoading({ startupFinished, hidden });
+  // for exactly those windows (app-blank-after-oauth). A sign-out is the same
+  // exposed window for its teardown: the session is revoked over the network
+  // while the signed-in tree is still published, and the profile it leaves
+  // behind is already stale (explorer signout-loading).
+  //
+  // The teardown half is bounded by the token, not by `isSigningOut` alone:
+  // that flag flips at the start of sign-out and only clears when a *later*
+  // sign-in publishes credentials, so gating on it would hold the surface over
+  // the login screen forever. Once the token clears, `hidden` owns the window
+  // until the login route mounts, so the surface is continuous either way.
+  const signingOutWindow = startupFinished && isSigningOut && token != null;
+  const showBootstrapLoading = shouldShowBootstrapLoading({
+    startupFinished,
+    hidden,
+    signingOut: isSigningOut && token != null,
+  });
+
+  // The wait surface owns the screen for a sign-out's whole teardown too, so
+  // the tree leaves both accessibility trees and stops taking touches for
+  // `wrapperObscured`, and the same signal drives the entry announcement: the
+  // login screen is the deterministic entry context in both cases.
+  const wrapperObscured = hidden || signingOutWindow;
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
@@ -886,11 +922,11 @@ function RootLayoutNav({
   // render's frame can fire, so an interrupted reveal never focuses a stale
   // wrapper.
   const wrapperRef = useRef<View>(null);
-  const wasHiddenRef = useRef(hidden);
+  const wasHiddenRef = useRef(wrapperObscured);
   useEffect(() => {
     const wasHidden = wasHiddenRef.current;
-    wasHiddenRef.current = hidden;
-    if (!wasHidden || hidden || hasBootstrapError) {
+    wasHiddenRef.current = wrapperObscured;
+    if (!wasHidden || wrapperObscured || hasBootstrapError) {
       return undefined;
     }
     announceForA11y(i18n.t('bootstrap.contentReady'));
@@ -900,7 +936,7 @@ function RootLayoutNav({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [hidden, hasBootstrapError]);
+  }, [wrapperObscured, hasBootstrapError]);
 
   // The restore-error surface is settled, but a successful Retry does not
   // reveal the app immediately: the token publish, the user fetch, and the
@@ -919,7 +955,22 @@ function RootLayoutNav({
     isSigningOut,
   });
 
-  if (hasUserBootstrapError) {
+  // The wait surface (or the held restore surface) covers the tree: it leaves
+  // both accessibility trees, stops taking touches, and paints nothing that
+  // would show through the opaque surface above it.
+  const obscureTree = wrapperObscured || showRestoreError;
+
+  // Sign-out from either error screen below outranks the error: the failure
+  // belongs to the account being revoked, and its Sign out starts the teardown
+  // behind the screen, so the branch would leave the stale error (and the
+  // account copy on it) over the app for the whole revoke (explorer
+  // signout-loading). While `signingOutWindow` owns the screen, the shared
+  // render below paints its wait surface; the error flags below both require
+  // the token, so clearing the token cannot bring the screen back, and the
+  // fall-through also keeps Slot mounted for the login replace.
+  const bootstrapErrorOwnsScreen = !signingOutWindow;
+
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
@@ -936,7 +987,7 @@ function RootLayoutNav({
     );
   }
 
-  if (hasConsentBootstrapError) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}
@@ -1010,10 +1061,10 @@ function RootLayoutNav({
         // `bg-background` keeps the root surface opaque: while a rotation
         // relayout runs, frames before React's first commit must show the
         // app's own background, never the window's foreign default.
-        accessibilityElementsHidden={hidden || showRestoreError}
-        importantForAccessibility={hidden || showRestoreError ? 'no-hide-descendants' : 'auto'}
-        className={`flex-1 bg-background ${hidden || showRestoreError ? 'opacity-0' : 'opacity-100'}`}
-        pointerEvents={hidden || showRestoreError ? 'none' : 'auto'}
+        accessibilityElementsHidden={obscureTree}
+        importantForAccessibility={obscureTree ? 'no-hide-descendants' : 'auto'}
+        className={`flex-1 bg-background ${obscureTree ? 'opacity-0' : 'opacity-100'}`}
+        pointerEvents={obscureTree ? 'none' : 'auto'}
       >
         <Slot />
       </View>

@@ -1,4 +1,5 @@
 export const GEMMA_4_26B_A4B_IT_ID = 'google/gemma-4-26b-a4b-it';
+export const GEMMA_4_26B_A4B_IT_FREE_ID = 'google/gemma-4-26b-a4b-it:free';
 
 export function isGeminiModel(model: string) {
   return model.includes('gemini');

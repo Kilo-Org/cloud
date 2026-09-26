@@ -242,6 +242,78 @@ describe('feedback store-review write', () => {
     expect(alertMock.alert).toHaveBeenCalledOnce();
   });
 
+  // The post-submit prompt presents through the platform surface its caller
+  // renders (the in-app dialog on Android), never through the native alert.
+  it('presents through the caller-supplied surface when the marker is claimed', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    const present = vi.fn<(userId: string | undefined) => boolean>(() => true);
+
+    await maybeAskAfterSuccessfulOutcome('user-1', present);
+
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'feedback-last-asked-at',
+      expect.any(String)
+    );
+    expect(present).toHaveBeenCalledWith('user-1');
+    expect(alertMock.alert).not.toHaveBeenCalled();
+  });
+
+  // A surface whose host unmounted before the deferred claim runs cannot
+  // present. The marker must stay unset then, so the prompt is asked again on
+  // the next successful outcome instead of being lost as already asked.
+  it('leaves the marker unset when the surface reports that it did not present', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    const present = vi.fn<(userId: string | undefined) => boolean>(() => false);
+
+    await maybeAskAfterSuccessfulOutcome('user-1', present);
+
+    expect(present).toHaveBeenCalledWith('user-1');
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    expect(alertMock.alert).not.toHaveBeenCalled();
+  });
+
+  // The Android surface reports only once its dialog is shown, so the claim has
+  // to wait for that answer: writing the marker first would record a one-time
+  // prompt the user never saw.
+  it('waits for a deferred surface answer before it writes the marker', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    // Placeholder first, so no reader sees an uninitialized callback; the
+    // promise executor replaces it before this test can settle it.
+    const answer: { resolve: (presented: boolean) => void } = { resolve: () => undefined };
+    const pending = new Promise<boolean>(resolve => {
+      answer.resolve = resolve;
+    });
+    const present = vi.fn<(userId: string | undefined) => Promise<boolean>>(async () => {
+      const presented = await pending;
+      return presented;
+    });
+
+    const ask = maybeAskAfterSuccessfulOutcome('user-1', present);
+    await flushMicrotasks();
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+
+    answer.resolve(true);
+    await ask;
+
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'feedback-last-asked-at',
+      expect.any(String)
+    );
+  });
+
+  it('does not present through the caller-supplied surface when the marker is set', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');
+    const present = vi.fn<(userId: string | undefined) => boolean>(() => true);
+
+    await maybeAskAfterSuccessfulOutcome('user-1', present);
+
+    expect(present).not.toHaveBeenCalled();
+  });
+
   it('showFeedbackPrompt still alerts when the last-asked marker is set', async () => {
     const { showFeedbackPrompt } = await import('./feedback');
     secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');

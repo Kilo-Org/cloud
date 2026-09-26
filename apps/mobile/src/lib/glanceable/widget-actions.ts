@@ -11,12 +11,15 @@ import { resolveNewSessionPromptForCreate } from '@/components/agents/new-sessio
 import { buildActiveSessionsTrayInput, isAttentionStatus } from '@/lib/active-sessions-live';
 import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { contextKey, parseStoredModelPreference } from '@/lib/hooks/agent-model-preference';
+import { dismissNeedsInputNotification } from '@/lib/needs-input-notification';
 import { clearDraft, isStringDraft, loadDraft, NEW_SESSION_DRAFT_KEY } from '@/lib/persist/drafts';
+import { ackSessionAttention } from '@/lib/session-attention';
 import {
   ACTIVE_USER_ID_KEY,
   AGENT_MODEL_PREFERENCE_KEY,
   ORGANIZATION_STORAGE_KEY,
 } from '@/lib/storage-keys';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -25,7 +28,7 @@ import { pickFrontApprovableSession } from './front-approval';
 import { resolveAnsweredRaises } from './attention-rows';
 import { newestSessionTitle } from './newest-session';
 import { getLastGlanceableSnapshot } from './persist';
-import { forEachSink } from './sink-registry';
+import { getGlanceableSinks, writeGlanceableFrame } from './sink-registry';
 import {
   getSurfaceExtras,
   type GlanceableActionFeedback,
@@ -80,6 +83,27 @@ export function failureFeedback(action: WidgetAction): GlanceableActionFeedback 
 type WidgetActionResultKind = 'approved' | 'created' | 'none' | 'no-permission' | 'failed';
 
 export type WidgetActionResult = { kind: WidgetActionResultKind };
+
+/**
+ * One approve attempt: the outcome the widget reports, plus the tray session it
+ * answered. The id is what `runWidgetAction` retires the raise's app-owned
+ * notification with; every other outcome answers nothing, so it is null.
+ *
+ * A successful approve also records the answer before it returns
+ * (`ackSessionAttention`), the way every other answer path does after a
+ * successful response — the in-app permission card (`use-interaction-handlers`),
+ * the notification's Approve and Reply (`notification-action-interaction`), and
+ * the wrist control (`approve-front-agent`). The republish `runWidgetAction`
+ * runs next derives its counts from the tray through `resolveAnsweredRaises`,
+ * and the tray row's status trails the control plane's sync: without the ack
+ * that row still counts as waiting, so the redraw `register.ts` performs right
+ * after the action shows the pre-action counts — the answered session still
+ * presented as waiting — until the sync lands or the user refreshes.
+ */
+type ApproveOutcome = {
+  kind: WidgetActionResultKind;
+  answeredSessionId: string | null;
+};
 
 /** One tray row, as the active-sessions cache returns it. */
 export type WaitingSessionRow = {
@@ -172,10 +196,25 @@ export function oldestPendingPermissionId(permissions: readonly unknown[]): stri
   return null;
 }
 
+/**
+ * One read whose failure must stay observable: reported at warning level and
+ * rethrown, so the widget action settles on `failed` rather than acting on a
+ * value it could not read — the same report-and-rethrow shape
+ * `writeStoredValue` has for the write side.
+ */
+async function readStoredValueReported(key: string): Promise<string | null> {
+  try {
+    return await readStoredValue(key);
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    throw error;
+  }
+}
+
 async function readStoredScope(): Promise<WidgetScope> {
   const [organizationId, userId] = await Promise.all([
-    readStoredValue(ORGANIZATION_STORAGE_KEY),
-    readStoredValue(ACTIVE_USER_ID_KEY),
+    readStoredValueReported(ORGANIZATION_STORAGE_KEY),
+    readStoredValueReported(ACTIVE_USER_ID_KEY),
   ]);
   return { organizationId: organizationId ?? null, userId: userId ?? null };
 }
@@ -186,9 +225,7 @@ async function readStoredScope(): Promise<WidgetScope> {
  * free-form question waits, and `none` otherwise — the caller opens the app for
  * either.
  */
-async function approveWaitingSession(
-  organizationId: string | null
-): Promise<WidgetActionResultKind> {
+async function approveWaitingSession(organizationId: string | null): Promise<ApproveOutcome> {
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(organizationId)
   );
@@ -203,14 +240,17 @@ async function approveWaitingSession(
   if (waiting === null) {
     // Nothing approvable: a free-form question opens the app for an answer,
     // while a tray with nothing to act on needs only the agents list.
-    return resolveWaitingSession(sessions) === null ? 'none' : 'no-permission';
+    return {
+      kind: resolveWaitingSession(sessions) === null ? 'none' : 'no-permission',
+      answeredSessionId: null,
+    };
   }
   // Only a cloud-agent session carries pending interactions the control plane
   // can answer; a remote CLI session has none, so the app owns it.
   const session = await trpcClient.cliSessionsV2.get.query({ session_id: waiting.id });
   const cloudAgentSessionId = session.cloud_agent_session_id;
   if (cloudAgentSessionId === null) {
-    return 'none';
+    return { kind: 'none', answeredSessionId: null };
   }
   // The personal `getPendingInteractions` refuses an organization session (its
   // ownership check requires a null `organization_id`), so pick the
@@ -225,7 +265,7 @@ async function approveWaitingSession(
       });
   const permissionId = oldestPendingPermissionId(pending.permissions);
   if (permissionId === null) {
-    return 'no-permission';
+    return { kind: 'no-permission', answeredSessionId: null };
   }
   const answer = { sessionId: cloudAgentSessionId, permissionId, response: 'once' as const };
   if (organizationId) {
@@ -233,10 +273,12 @@ async function approveWaitingSession(
       ...answer,
       organizationId,
     });
-    return 'approved';
+    ackSessionAttention(waiting.id);
+    return { kind: 'approved', answeredSessionId: waiting.id };
   }
   await trpcClient.cloudAgentNext.answerPermission.mutate(answer);
-  return 'approved';
+  ackSessionAttention(waiting.id);
+  return { kind: 'approved', answeredSessionId: waiting.id };
 }
 
 type RecentRepositoryField =
@@ -304,7 +346,7 @@ async function resolveRecentRepository(
 async function readPersistedModel(
   organizationId: string | null
 ): Promise<{ model: string; variant: string } | null> {
-  const raw = await readStoredValue(AGENT_MODEL_PREFERENCE_KEY);
+  const raw = await readStoredValueReported(AGENT_MODEL_PREFERENCE_KEY);
   const entry = parseStoredModelPreference(raw)[contextKey(organizationId ?? undefined)];
   return entry ?? null;
 }
@@ -408,9 +450,13 @@ async function republishTray(scope: WidgetScope, blankEpochAtStart: number): Pro
     ...getSurfaceExtras(),
     newestSessionTitle: newestSessionTitle(sessions),
   });
-  forEachSink('widget_action_republish', sink => {
-    sink.publish(snapshot);
-  });
+  // `writeGlanceableFrame` with the action's scope, never a bare `publish`: the
+  // ongoing card outlives the JS process, and a widget press runs in a fresh
+  // headless one, where the sink has no card it started itself. Only
+  // `startOrUpdate` re-posts the fixed native id from the post-action counts —
+  // `publish` alone only updates a card this process already started, so the
+  // shade would keep the pre-action snapshot.
+  writeGlanceableFrame(getGlanceableSinks(), snapshot, scope);
 }
 
 /**
@@ -426,11 +472,11 @@ export async function runWidgetAction(action: WidgetAction): Promise<WidgetActio
     // rejection must settle the widget on its failure line instead of leaving
     // the progress line up with nothing driving it.
     const scope = await readStoredScope();
-    const kind =
+    const outcome =
       action === 'approve'
         ? await approveWaitingSession(scope.organizationId)
-        : await createAgentFromDraft(scope);
-    if (kind === 'approved' || kind === 'created') {
+        : { kind: await createAgentFromDraft(scope), answeredSessionId: null };
+    if (outcome.kind === 'approved' || outcome.kind === 'created') {
       // A republish that fails must not turn a completed action into `failed`:
       // the approve or create landed, the failure is reported by the sink
       // guard, and the next tray event redraws the counts.
@@ -440,7 +486,18 @@ export async function runWidgetAction(action: WidgetAction): Promise<WidgetActio
         // Contained: the action's own result stands.
       }
     }
-    return { kind };
+    if (outcome.answeredSessionId !== null) {
+      // Retire the raise's app-owned notification. The mount that re-plans the
+      // posted set is not mounted on this headless path, and a widget press
+      // posts no result notification the way the notification's own Approve
+      // does, so nothing else takes the answered raise off the shade: it would
+      // keep presenting an idle session as needs-input with its Approve action.
+      // Awaited — the headless task ends with this promise — and contained,
+      // because the approve already landed and a failed dismissal must not turn
+      // it into the widget's failure line.
+      await dismissNeedsInputNotification(outcome.answeredSessionId);
+    }
+    return { kind: outcome.kind };
   } catch {
     return { kind: 'failed' };
   }

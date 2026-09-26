@@ -59,6 +59,16 @@ export type NeedsInputNotificationPlan = {
   publish: NeedsInputNotificationRow[];
   /** Identifiers to dismiss, derived from the session id. */
   dismiss: string[];
+  /**
+   * Session ids in `publish` whose post replaces a raise already on screen. They
+   * exist to move the notification's actions to the raise's current shape, so
+   * their post must update the notification quietly: Android replays the
+   * attention channel's sound on every `notify` of an existing notification, so
+   * a kind flip would otherwise alert the user again for a raise they were
+   * already told about. A session the same plan dismisses is never listed here —
+   * its dismissal runs first, so its post is a new notification that must alert.
+   */
+  updates: string[];
 };
 
 /**
@@ -231,7 +241,7 @@ export function planNeedsInputNotifications({
   // fallback would drop a raise the user still wants, so the plan waits for the
   // row and leaves both the posted set and the notified set untouched.
   if (attentionEnabled === undefined && !signedOut) {
-    return { publish: [], dismiss: [] };
+    return { publish: [], dismiss: [], updates: [] };
   }
 
   const presentsAttention = !signedOut && attentionEnabled === true;
@@ -252,28 +262,54 @@ export function planNeedsInputNotifications({
   const publish: NeedsInputNotificationRow[] = [];
   if (presentsAttention) {
     for (const [sessionId, { row, kind }] of attention) {
-      if (shouldPublishForSession({ appState, pathname, sessionId })) {
-        const notifiedRow = alreadyNotified.has(sessionId)
-          ? previous.find(previousRow => previousRow.sessionId === sessionId)
-          : undefined;
-        // An already-notified raise is still waiting under its standing
-        // notification. Re-publish in place only when the action-relevant
-        // shape changed: the kind moved, or the associated PR appeared or
-        // changed. A raise posted before the PR link reached the cache would
-        // otherwise never offer Open PR, and a kind flip would keep offering
-        // the wrong controls.
-        if (
-          notifiedRow === undefined ||
-          notifiedRow.kind !== kind ||
-          (notifiedRow.prUrl ?? null) !== (row.associatedPr?.url ?? null)
-        ) {
-          publish.push(toNotificationRow(row, kind));
-        }
+      const notifiedRow = alreadyNotified.has(sessionId)
+        ? previous.find(previousRow => previousRow.sessionId === sessionId)
+        : undefined;
+      // An already-notified raise is still waiting under its standing
+      // notification. Re-publish in place only when the action-relevant shape
+      // changed: the kind moved, or the associated PR appeared or changed. A
+      // raise posted before the PR link reached the cache would otherwise never
+      // offer Open PR, and a kind flip would keep offering the wrong controls.
+      if (
+        shouldPublishForSession({ appState, pathname, sessionId }) &&
+        needsRepublish(notifiedRow, row, kind)
+      ) {
+        publish.push(toNotificationRow(row, kind));
       }
     }
   }
+  // A post whose session is already in `previous` replaces the notification on
+  // screen, so it must update it quietly (see `updates`). A session this plan
+  // dismisses is not one of those: the dismissal runs before the first post, so
+  // the notification the post creates is new and must alert like any first post.
+  const dismissed = new Set(dismiss);
+  const updates = publish
+    .filter(
+      row =>
+        alreadyNotified.has(row.sessionId) &&
+        !dismissed.has(notificationIdentifierForSession(row.sessionId))
+    )
+    .map(row => row.sessionId);
 
-  return { publish, dismiss };
+  return { publish, dismiss, updates };
+}
+
+/**
+ * Whether a still-waiting raise's standing notification must be re-published in
+ * place: never notified, or its action-relevant shape moved — the kind, or the
+ * associated PR link the notification's Open PR action carries.
+ */
+function needsRepublish(
+  notifiedRow: NeedsInputNotificationRow | undefined,
+  row: CachedActiveSession,
+  kind: NeedsInputAttentionKind
+): boolean {
+  if (notifiedRow === undefined) {
+    return true;
+  }
+  return (
+    notifiedRow.kind !== kind || (notifiedRow.prUrl ?? null) !== (row.associatedPr?.url ?? null)
+  );
 }
 
 /** The push `data` a posted raise carries, matching the server's attention push. */
@@ -286,6 +322,7 @@ function pushDataForRow(
     category: 'attention',
     attentionKind: row.kind,
     ...(row.prUrl === null ? {} : { prUrl: row.prUrl }),
+    ...(row.organizationId === null ? {} : { organizationId: row.organizationId }),
   };
 }
 
@@ -305,8 +342,18 @@ function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
  * is reported and swallowed: the app-owned carrier must never crash the mount
  * that owns it. Returns whether the post reached the OS, so the caller does not
  * remember a raise that never appeared.
+ *
+ * `replacesPosted` marks a post that replaces a notification already on screen
+ * (the plan's `updates`). It carries `sound: false`, and
+ * `ExpoNotificationBuilder.applySoundsAndVibrations` then builds it silent —
+ * which suppresses Android 8+'s channel sound too, since Android replays the
+ * channel's sound on every `notify` of an existing notification. iOS reads the
+ * same field and stays quiet as well.
  */
-async function publishRow(row: NeedsInputNotificationRow): Promise<boolean> {
+async function publishRow(
+  row: NeedsInputNotificationRow,
+  replacesPosted: boolean
+): Promise<boolean> {
   const data = pushDataForRow(row);
   try {
     await Notifications.scheduleNotificationAsync({
@@ -317,6 +364,7 @@ async function publishRow(row: NeedsInputNotificationRow): Promise<boolean> {
         data,
         categoryIdentifier: needsInputCategoryId({ kind: row.kind, hasPr: row.prUrl !== null }),
         interruptionLevel: 'timeSensitive',
+        ...(replacesPosted ? { sound: false } : {}),
       },
       // A channel-aware trigger delivers immediately on both platforms: Android
       // routes to the shared attention channel, iOS reads it as a null trigger.
@@ -344,6 +392,22 @@ async function dismissIdentifier(identifier: string): Promise<boolean> {
 }
 
 /**
+ * Retire the app-owned notification for a raise the user answered somewhere
+ * other than its own action — the in-place widget Approve. The mount that
+ * re-plans the posted set is not mounted on that headless path, and a widget
+ * press posts no result notification the way the notification's own Approve
+ * does, so without this the shade keeps presenting the answered session as
+ * needs-input with its Approve action.
+ *
+ * Awaited by the caller: the headless task ends with its promise, and a
+ * dismissal that never lands leaves the stale raise behind. A rejection is
+ * reported and swallowed, exactly like a plan's dismissal.
+ */
+export async function dismissNeedsInputNotification(kiloSessionId: string): Promise<void> {
+  await dismissIdentifier(notificationIdentifierForSession(kiloSessionId));
+}
+
+/**
  * Apply a plan. Every dismissal is issued before the first post, so a
  * dismiss/publish pair for one identifier ends with the notification posted.
  * Every native call is reported and swallowed, so the returned promise never
@@ -360,9 +424,10 @@ export async function applyNeedsInputNotifications(
     }
   }
   const published: NeedsInputNotificationRow[] = [];
+  const updates = new Set(plan.updates);
   for (const row of plan.publish) {
     // eslint-disable-next-line no-await-in-loop -- ordered so a dismiss/publish pair for one identifier ends posted
-    if (await publishRow(row)) {
+    if (await publishRow(row, updates.has(row.sessionId))) {
       published.push(row);
     }
   }
@@ -371,7 +436,11 @@ export async function applyNeedsInputNotifications(
 
 /** What the caller committed optimistically, paired with the applier's result. */
 export type NeedsInputApplyCorrection = {
-  plan: NeedsInputNotificationPlan;
+  /**
+   * The plan the applier ran, minus `updates`: a correction undoes posts and
+   * dismissals, and never needs to know which posts replaced a raise.
+   */
+  plan: Pick<NeedsInputNotificationPlan, 'publish' | 'dismiss'>;
   /** Every row the optimistic commit removed from the notified set. */
   dropped: readonly NeedsInputNotificationRow[];
   result: NeedsInputNotificationApplyResult;

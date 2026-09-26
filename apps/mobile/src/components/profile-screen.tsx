@@ -30,16 +30,17 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
+import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
-import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
+  getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { useScreenSideInsets } from '@/lib/screen-insets';
@@ -110,6 +111,9 @@ export function ProfileScreen() {
   const orgName = selectedOrg?.organizationName;
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
+  // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
+  // the tile requests it and the screen renders whichever one applies.
+  const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
 
@@ -190,11 +194,20 @@ export function ProfileScreen() {
             hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
-            last
             onPress={() => {
               if (agentScope) {
                 router.push(getSecurityAgentPath(agentScope));
               }
+            }}
+          />
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('profiles.title')}
+            subtitle={t('profiles.entrySubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getProfilesPath());
             }}
           />
         </View>
@@ -358,7 +371,7 @@ export function ProfileScreen() {
             label={t('profile.feedback')}
             hue="fern"
             onPress={() => {
-              showFeedbackPrompt(userId);
+              void feedbackPrompt.requestPrompt(userId);
             }}
           />
           <ActionTile
@@ -408,6 +421,8 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
+
+      {feedbackPrompt.promptDialog}
     </View>
   );
 }

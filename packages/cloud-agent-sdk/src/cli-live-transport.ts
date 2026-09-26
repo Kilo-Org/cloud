@@ -92,8 +92,9 @@ type CliLiveTransportConfig = {
    * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
    * reconnect, or absent). The payload is the latest capabilities — `undefined`
    * means the CLI has not reported any (older CLIs, mid-reconnect, or a CLI
-   * whose session list dropped this session). The session manager uses this
-   * to recompute the `supportsAttachments` gate.
+   * whose session list dropped this session), which the session manager's
+   * gate treats as supported. The session manager uses this to recompute the
+   * `supportsAttachments` gate.
    */
   onCapabilitiesChange?:
     | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
@@ -241,9 +242,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
       }
       // A CLI handoff or a permanent drop invalidates whatever the prior
-      // owner reported — the new owner has to re-advertise before any
-      // capability re-enables. Empty currentCapabilities also drives the
-      // existing 'idle' reset on the consumer side.
+      // owner reported. The session manager's gate is optimistic, so it keeps
+      // the feature available until the new owner's next heartbeat /
+      // sessions.list reports an explicit negative. Empty currentCapabilities
+      // also drives the existing 'idle' reset on the consumer side.
       publishCapabilities(undefined);
       config.onCapabilityChange?.();
 
@@ -837,9 +839,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           handleSystemMessage(msg.event, msg.data);
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
-          // Recompute the capability gate fail-closed immediately. The prior
-          // owner may have been attachment-capable, but after a reconnect we
-          // must wait for the next heartbeat / sessions.list to re-advertise.
+          // Publish the absent capabilities immediately. The session manager's
+          // gate is optimistic, so it keeps reporting supported until the next
+          // heartbeat / sessions.list either re-advertises the capability or
+          // explicitly denies it.
           publishCapabilities(undefined);
           replayCurrentSnapshot(false);
           // The snapshot store lags the live stream, and the CLI only forwards

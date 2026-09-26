@@ -81,8 +81,8 @@ function findTitlePressable(root: TestInstance): TestInstance {
 
 /**
  * The row the header puts `headerRight` on when the window is too narrow for
- * the title and the actions to share one. Only that variant carries `mt-2`
- * without the single-row wrapper's `max-w-[50%]`.
+ * the title and the actions to share one. Only that variant carries `mt-2`;
+ * the single-row variant wraps the cluster in an `ms-3 shrink-0` View instead.
  */
 function isStackedActionsRow(node: TestInstance): boolean {
   const className = String(node.props.className ?? '');
@@ -90,7 +90,7 @@ function isStackedActionsRow(node: TestInstance): boolean {
     typeof node.type === 'string' &&
     (node.type as string) === 'View' &&
     className.includes('mt-2') &&
-    !className.includes('max-w-[50%]')
+    !className.includes('shrink-0')
   );
 }
 
@@ -193,18 +193,19 @@ function findHeaderRight(root: TestInstance): TestInstance {
 
 /**
  * The trailing wrapper that carries `inlineActions`. It shares the `ms-3`
- * start margin with the `headerRight` wrapper but drops the half-row
- * `max-w-[50%]` cap.
+ * start margin with the `headerRight` cluster and is the second trailing slot
+ * in the row, so the last match wins.
  */
 function findInlineActionsWrapper(root: TestInstance): TestInstance {
-  const wrapper = root.findAll(
+  const wrappers = root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
       typeof node.props.className === 'string' &&
       /(^|\s)ms-3(\s|$)/.test(node.props.className) &&
-      !node.props.className.includes('max-w-[50%]')
-  )[0];
+      !node.props.className.includes('shrink-0')
+  );
+  const wrapper = wrappers.at(-1);
   if (!wrapper) {
     throw new Error('inlineActions view not found');
   }
@@ -278,32 +279,34 @@ describe('ScreenHeader mounted', () => {
     expect(await compiledMarginProperties(headerRight.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
-    expect(headerRight.props.className).toContain('max-w-[50%]');
-    expect(headerRight.props.className).toContain('shrink');
-    expect(headerRight.props.className).not.toContain('shrink-0');
+    // The cluster is content-sized and never shrinks, so a fixed-width
+    // trailing control keeps its full width instead of being clamped and
+    // painting past the screen edge (session-compose-kbup capture).
+    expect(headerRight.props.className).toContain('shrink-0');
+    expect(headerRight.props.className).not.toContain('max-w-[50%]');
+    expect(headerRight.children).toEqual(['RIGHT']);
   });
 
-  it('renders inlineActions in the title row uncapped while headerRight keeps its cap', () => {
+  it('renders inlineActions in the title row uncapped beside the content-sized cluster', () => {
     const renderer = renderHeader({
       title: 'Agents',
       headerRight: 'RIGHT',
       inlineActions: 'ACTIONS',
     });
 
-    const capped = findHeaderRight(renderer.root);
+    const cluster = findHeaderRight(renderer.root);
     const inline = findInlineActionsWrapper(renderer.root);
 
     // Both trailing slots sit in the title row beside the heading, so the
     // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
-    expect(inline.parent).toBe(capped.parent);
+    expect(inline.parent).toBe(cluster.parent);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
     const heading = inline.parent?.children[0] as TestInstance;
     expect(heading.props.className).toContain('min-w-0 flex-1');
-    // `headerRight` keeps its half-row cap; `inlineActions` keeps its full width
-    // instead of wrapping the controls.
-    expect(capped.props.className).toContain('max-w-[50%]');
-    expect(inline.props.className).not.toContain('max-w-[50%]');
+    // Neither trailing slot clamps itself: `headerRight` sizes to its content
+    // and `inlineActions` keeps its full width instead of wrapping the controls.
+    expect(cluster.children).toEqual(['RIGHT']);
     expect(inline.props.className).toContain('min-w-0');
     expect(inline.props.className).toContain('shrink');
   });
@@ -313,14 +316,16 @@ describe('ScreenHeader mounted', () => {
 
     const inline = findInlineActionsWrapper(renderer.root);
     expect(inline.parent?.props.className).toContain('flex-row');
-    const capped = renderer.root.findAll(
+    // The inline slot is the row's only trailing wrapper: no `headerRight`
+    // cluster is rendered beside it.
+    const trailing = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
         typeof node.props.className === 'string' &&
-        node.props.className.includes('max-w-[50%]')
+        /(^|\s)ms-3(\s|$)/.test(node.props.className)
     );
-    expect(capped).toHaveLength(0);
+    expect(trailing).toEqual([inline]);
   });
 
   it('renders inlineActions beside a centered title too', () => {
@@ -332,7 +337,7 @@ describe('ScreenHeader mounted', () => {
     const inline = findInlineActionsWrapper(renderer.root);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
-    expect(inline.props.className).not.toContain('max-w-[50%]');
+    expect(inline.props.className).toContain('min-w-0');
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     expect(title.props.className).toContain('text-center');
   });
@@ -379,6 +384,18 @@ describe('ScreenHeader mounted', () => {
       // The rendered font size plus the 13pt top/bottom slop must clear 44pt.
       expect(fontSize + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  it('paints the large route title in the foreground token, never a muted one', () => {
+    // Explorer finding 5 (profile, f2181ae79) reported the Profile title muted
+    // gray while every other heading is white. A pixel measure of the capture
+    // refuted it: the large title is text-foreground, the same white as the
+    // Kilo Pass row. Pin the token so the top of the hierarchy cannot silently
+    // drop to text-muted-foreground.
+    const renderer = renderHeader({ title: 'Profile', size: 'large' });
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-foreground');
+    expect(title.props.className).not.toContain('text-muted-foreground');
   });
 
   it('returns to the previous screen by default', () => {
@@ -802,15 +819,12 @@ describe('header actions row', () => {
     const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
-    const actions = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        String(node.props.className ?? '').includes('max-w-[50%]')
-    );
-    // The inline wrapper's gap is the logical start margin (`ms-3`), which the
-    // RTL swap cannot mirror away; the title's box keeps its `shrink` cap.
-    expect(actions.props.className).toContain('ms-3');
+    const cluster = findHeaderRight(renderer.root);
+    // The cluster's gap is the logical start margin (`ms-3`), which the RTL
+    // swap cannot mirror away; it sizes to its content and never shrinks, so
+    // the heading's `flex-1 min-w-0` box is what absorbs the squeeze.
+    expect(cluster.props.className).toContain('ms-3');
+    expect(cluster.props.className).toContain('shrink-0');
   });
 
   it('drops the actions to their own row when the window cannot hold the title beside them', () => {
@@ -821,12 +835,13 @@ describe('header actions row', () => {
     const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    // The single-row cluster is gone: the actions own a full-width row.
     expect(
       renderer.root.findAll(
         node =>
           typeof node.type === 'string' &&
           (node.type as string) === 'View' &&
-          String(node.props.className ?? '').includes('max-w-[50%]')
+          String(node.props.className ?? '').includes('ms-3 shrink-0')
       )
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.
@@ -848,6 +863,38 @@ describe('header actions row', () => {
     layout.width = 160;
     layout.fontScale = 1.5;
     const renderer = renderHeader({ title: 'Agents', size: 'large' });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+
+  it('drops a declared trailing cluster to its own row before it squeezes the title', () => {
+    // PR review at 320dp with a font scale of 2: Share, Submit review and
+    // Merge (236dp of fixed-width controls) left the title a few characters
+    // while the width-only rule kept them all on one row.
+    layout.width = 320;
+    layout.fontScale = 2;
+    const renderer = renderHeader({
+      title: 'PR review #7',
+      eyebrow: 'owner/repo',
+      headerRight: 'RIGHT',
+      headerRightWidth: 236,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+  });
+
+  it('keeps a narrower declared cluster on the title row', () => {
+    // A normal phone width: the suite's `beforeEach` does not cover this
+    // describe, and the test above leaves a 320dp / scale 2 window behind.
+    layout.width = 390;
+    layout.fontScale = 1;
+    // Share and Merge alone: 44 + 44 + the `gap-1` between them.
+    const renderer = renderHeader({
+      title: 'PR review #7',
+      eyebrow: 'owner/repo',
+      headerRight: 'RIGHT',
+      headerRightWidth: 92,
+    });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
@@ -883,6 +930,19 @@ describe('shouldStackHeaderActions', () => {
     expect(shouldStackHeaderActions(160, 1)).toBe(true);
     expect(shouldStackHeaderActions(220, 1.5)).toBe(true);
     expect(shouldStackHeaderActions(320, 2.5)).toBe(true);
+  });
+
+  it('reflows for a declared trailing cluster the title cannot share the row with', () => {
+    // The PR review header at 320dp with a font scale of 2: the width-only
+    // rule kept Share, Submit review and Merge on the title's row, which left
+    // the title a few characters. The declared cluster width reflows it.
+    expect(shouldStackHeaderActions(320, 2)).toBe(false);
+    expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
+    // A cluster the title still fits beside keeps the single row, and the PR
+    // review cluster stacks even at a normal phone width: 390 - 44 - 12 - 236
+    // leaves the title 98dp, below its 120dp minimum.
+    expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
+    expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
   });
 
   it('treats a missing window measurement as a single row', () => {

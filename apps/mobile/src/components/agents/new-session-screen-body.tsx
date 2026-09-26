@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -27,6 +27,7 @@ import {
   readCloneSourceTitle,
 } from '@/components/agents/new-session-prefill';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
+import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -51,6 +52,7 @@ import {
   resolveNewSessionStartDisabled,
 } from '@/lib/new-session-submit';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -60,6 +62,7 @@ import {
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
+import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import {
   PRESELECT_CLOUD_RUN_ON,
   readPreselectRunOn,
@@ -97,6 +100,7 @@ function AndroidPendingPickerRecovery({
 export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
+  const router = useRouter();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const searchParams = useLocalSearchParams<{
@@ -126,6 +130,13 @@ export function NewSessionScreenBody() {
   // Start is never a silent no-op; a retryable one keeps the Retry control.
   const [cloudCreateError, setCloudCreateError] = useState<CloudCreateFailure | null>(null);
   const [hasPrompt, setHasPrompt] = useState(false);
+  // The profile picked for THIS session; null keeps the effective default.
+  const [overrideProfileId, setOverrideProfileId] = useState<string | null>(null);
+  // The manual env vars and setup commands typed under Advanced Configuration.
+  // Owned here (not by the panel) so the create body carries them even when the
+  // user starts without saving a profile.
+  const [manualVars, setManualVars] = useState<VariableEdit[]>([]);
+  const [manualCommands, setManualCommands] = useState<string[]>([]);
   // Commit choice for the cloud session: Leave changes (false) is the default.
   const [autoCommit, setAutoCommit] = useState(false);
   // Relative launch folder the folder picker confirmed (`""` = launch directory).
@@ -280,8 +291,29 @@ export function NewSessionScreenBody() {
     profileId,
     isLoading: isProfileLoading,
     isError: isProfileError,
+    overrideNeedsAttention: profileOverrideNeedsAttention,
     refetch: refetchProfile,
-  } = useEffectiveAgentProfile(organizationId);
+  } = useEffectiveAgentProfile(organizationId, overrideProfileId);
+
+  // The picker opens as the app's standard native formSheet. The bridge carries
+  // the current pick; the sheet reports the new one back through `onSelect`.
+  const handleOpenProfilePicker = useCallback(() => {
+    profilePickerSlot.set(UNFENCED_ROUTE_KEY, {
+      organizationId,
+      selectedOverrideProfileId: overrideProfileId,
+      // The server resolves a repo's bound profile at session creation; the
+      // picker base layer stays empty here.
+      repoBindingProfileId: null,
+      onSelect: id => {
+        setOverrideProfileId(id);
+      },
+    });
+    router.push('/(app)/agent-chat/profile-picker' as Href);
+  }, [organizationId, overrideProfileId, router]);
+
+  const handleOpenRepoDefaults = useCallback(() => {
+    router.push(getRepoBindingsPath(organizationId));
+  }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
   const {
@@ -391,6 +423,18 @@ export function NewSessionScreenBody() {
     cloneNavigateBypassRef.current = true;
   }, []);
 
+  // The manual draft as the create body carries it: one plaintext value per key
+  // (the editor already refuses a key that cleans onto an existing one) and the
+  // non-blank setup commands in list order.
+  const manualEnvVars = useMemo(
+    () => Object.fromEntries(manualVars.map(variable => [variable.key, variable.value])),
+    [manualVars]
+  );
+  const setupCommands = useMemo(
+    () => manualCommands.filter(command => command.trim().length > 0),
+    [manualCommands]
+  );
+
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
     mode,
@@ -403,6 +447,8 @@ export function NewSessionScreenBody() {
     variant: displayVariant,
     autoCommit,
     profileId,
+    manualEnvVars,
+    setupCommands,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -536,7 +582,7 @@ export function NewSessionScreenBody() {
     attachments.releaseUnclaimedUploads();
   }, [userId, promptRef, attachments]);
 
-  useNewSessionDiscardGuard({
+  const { discardConfirm } = useNewSessionDiscardGuard({
     dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
     hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
@@ -604,10 +650,15 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null;
-  const instanceHasSessionClone = runOnInstance?.capabilities?.sessionClone === true;
-  // Clone entry: an incapable CLI shows the inline "cannot continue" reason
-  // immediately; a delivered clone/import failure overrides it after a Start
-  // attempt. Both clear when Run-on changes (see handleRunOnChange).
+  // Optimistic CLI-capability gate: an instance that has not advertised
+  // `sessionClone` is treated as capable; only an explicit
+  // `sessionClone: false` marks it incapable.
+  const instanceHasSessionClone =
+    runOnInstance !== null && runOnInstance.capabilities?.sessionClone !== false;
+  // Clone entry: a CLI the picker reported as incapable shows the inline
+  // "cannot continue" reason immediately; a delivered clone/import failure
+  // overrides it after a Start attempt. Both clear when Run-on changes (see
+  // handleRunOnChange).
   const incapableCliSelected = isCloneEntry && runOnInstance !== null && !instanceHasSessionClone;
   let runOnInlineNote: string | null = null;
   if (incapableCliSelected) {
@@ -661,8 +712,9 @@ export function NewSessionScreenBody() {
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
-        // Live CLI import: the dispatch carries the clone source id only when
-        // the instance advertises `sessionClone` (fail-closed otherwise).
+        // Live CLI import: the dispatch carries the clone source id unless the
+        // instance explicitly reported `sessionClone: false` (unknown is
+        // treated as capable).
         remoteSpawn.onStart();
         return;
       }
@@ -777,7 +829,16 @@ export function NewSessionScreenBody() {
         profile={profile}
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}
+        profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
+        onOpenProfilePicker={handleOpenProfilePicker}
+        selectedProfileId={overrideProfileId}
+        onSelectProfile={setOverrideProfileId}
+        manualVars={manualVars}
+        manualCommands={manualCommands}
+        onManualVarsChange={setManualVars}
+        onManualCommandsChange={setManualCommands}
+        onOpenRepoDefaults={handleOpenRepoDefaults}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
@@ -786,6 +847,9 @@ export function NewSessionScreenBody() {
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
       />
+      {/* The discard confirm: a Modal overlay, so the composer behind it keeps
+          its layout while the destructive choice keeps its red fill. */}
+      {discardConfirm}
     </View>
   );
 }

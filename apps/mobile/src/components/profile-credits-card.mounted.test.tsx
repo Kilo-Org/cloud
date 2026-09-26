@@ -87,6 +87,17 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 
+// The mounted OrganizationProvider resolves its default from this list; an
+// empty settled list keeps the card's own selection assertions unchanged.
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [],
+    isFetched: true,
+    isFetching: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 

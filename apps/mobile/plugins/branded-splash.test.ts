@@ -5,7 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compileModsAsync, type ConfigPlugin, type ExportedConfig } from 'expo/config-plugins';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Each case runs expo-splash-screen's image pipeline through `compileModsAsync`,
+// and the idempotence case compiles twice. On a loaded machine (the full gate
+// saturates every core) that real filesystem work can stretch past the project's
+// 15 s budget and fail a healthy test. The file-wide timeout leaves that
+// headroom; a genuinely hung compile still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
 
 const require = createRequire(import.meta.url);
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -212,6 +219,7 @@ describe('shared branded splash', () => {
                 _: '@drawable/splashscreen_window_background',
               },
               { $: { name: 'postSplashScreenTheme' }, _: '@style/Theme.App.Launch' },
+              { $: { name: 'android:windowLightStatusBar' }, _: 'true' },
             ]),
           }),
         ]),

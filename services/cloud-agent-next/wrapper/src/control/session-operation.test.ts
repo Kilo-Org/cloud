@@ -19,6 +19,7 @@ import {
   type SessionActivityRegistry,
 } from './sandbox-control-handlers';
 import type { WrapperKiloClient } from '../kilo-api';
+import { STABLE_ROOT_IDLE_MS } from '../lifecycle';
 import {
   acknowledgeOperation,
   completion,
@@ -60,6 +61,15 @@ function onlyOperation(handlerDeps: HandlerDeps) {
   return record;
 }
 
+/** Root idle plus the 3s stable-idle window: the only real seal. */
+async function sealRootIdle(handlerDeps: HandlerDeps): Promise<void> {
+  handlerDeps.operations.observeRootEvent({
+    type: 'session.idle',
+    sessionID: session.kiloSessionId,
+  });
+  await Bun.sleep(STABLE_ROOT_IDLE_MS + 50);
+}
+
 describe('operation results and delivery', () => {
   it('keeps native-tagged live events separate from sealed result delivery after replacement', async () => {
     const releaseDelivery = Promise.withResolvers<void>();
@@ -94,6 +104,7 @@ describe('operation results and delivery', () => {
     );
     const record = onlyOperation(handlerDeps);
     try {
+      await sealRootIdle(handlerDeps);
       await record.done;
       await sending.promise;
       const sealed = record.deliveryResult();
@@ -142,6 +153,7 @@ describe('operation results and delivery', () => {
         operationAuthorization()
       );
       const record = onlyOperation(handlerDeps);
+      await sealRootIdle(handlerDeps);
       await record.done;
       await record.waitForDelivery();
       expect(record.snapshot().finalization.autoCommit).toEqual({
@@ -296,6 +308,7 @@ describe('operation results and delivery', () => {
       handlerDeps,
       authorization
     );
+    await sealRootIdle(handlerDeps);
     await entered.promise;
     const record = onlyOperation(handlerDeps);
     record.cancel('Late work cancellation', 'cancelled');
@@ -672,6 +685,136 @@ describe('operation results and delivery', () => {
     });
   });
 
+  it('keeps native abort active while an admitted follow-up is unsealed after the original returns', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const aborts: string[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+        abortSession: async opts => {
+          aborts.push(opts.sessionId);
+          return true;
+        },
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      operationAuthorization('session.prompt', 'next')
+    );
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+
+    // The original prompt returns and its follow-up admission finishes, but the
+    // batch never seals (no root idle). Cleanup evidence must stay unconfirmed
+    // because the batch is unsealed, not because the native turn is still pending.
+    running.resolve(completion());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(record.snapshot().native.state).toBe('completed');
+    expect(record.snapshot().cleanupEvidence).toBe('unconfirmed');
+
+    await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'msg_1',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      handlerDeps
+    );
+    // The unconfirmed batch must still issue a native abort.
+    expect(aborts).toEqual([session.kiloSessionId]);
+    await record.done;
+  });
+
+  it('treats an admitted batch as finished cleanup evidence once it seals', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      operationAuthorization('session.prompt', 'next')
+    );
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    if (!record) throw new Error('Missing operation');
+
+    running.resolve(completion());
+    record.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await record.done;
+    await record.waitForDelivery();
+
+    expect(record.snapshot().cleanupEvidence).toBe('finished');
+  });
+
+  it('treats a completed single prompt as finished cleanup evidence', async () => {
+    const aborts: string[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => completion(),
+        abortSession: async opts => {
+          aborts.push(opts.sessionId);
+          return true;
+        },
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+
+    // With no admitted batch the seal gate must not apply: a completed turn is
+    // finished evidence, so Stop cleanup must not issue a native abort.
+    expect(record.snapshot().cleanupEvidence).toBe('finished');
+    await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'msg_1',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() + 500,
+      },
+      handlerDeps
+    );
+    expect(aborts).toEqual([]);
+  });
+
   it('does not attach assistant facts to an auto-commit failure', async () => {
     const handlerDeps = deps({
       runAutoCommit: async () => ({ success: false, error: 'git push failed' }),
@@ -685,6 +828,7 @@ describe('operation results and delivery', () => {
       operationAuthorization()
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
     const outcome = record.snapshot().outcome;
@@ -814,6 +958,7 @@ describe('operation results and delivery', () => {
       authorization
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
     const delivery = record.deliveryResult();
@@ -888,6 +1033,7 @@ describe('operation results and delivery', () => {
       operationAuthorization()
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
     const delivery = record.deliveryResult();
@@ -977,6 +1123,7 @@ describe('operation results and delivery', () => {
       operationAuthorization()
     );
     const record = onlyOperation(handlerDeps);
+    await sealRootIdle(handlerDeps);
     await record.done;
     await record.waitForDelivery();
 

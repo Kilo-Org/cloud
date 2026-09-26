@@ -115,6 +115,11 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
+import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
@@ -342,6 +347,7 @@ export function SessionDetailContent({
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const availableCommandsCatalogStatus = useAtomValue(manager.atoms.availableCommandsCatalogStatus);
   const sessionInfo = useAtomValue(manager.atoms.sessionInfo);
   const sessionGoal = selectVisibleGoal(sessionInfo, isReadOnly);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
@@ -493,6 +499,53 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  // The session's active-profile chip: the profile this session runs on. It
+  // resolves from the session's own recorded `profileId`, so an explicit
+  // override or a repository-bound profile — not the context's current
+  // effective default — names it. Only a session that recorded none (created
+  // before profile recording, or one whose create resolved no profile) falls
+  // back to the effective default. A recorded id that no longer resolves shows
+  // no chip rather than naming a different profile. Tapping opens that
+  // profile's editor.
+  const {
+    allProfiles: sessionProfiles,
+    effectiveDefaultId,
+    isLoading: isSessionProfileLoading,
+    isError: isSessionProfileError,
+  } = useEffectiveAgentProfile(organizationId);
+  // `fetchSession` is the only source of the session's own profile id, and the
+  // atom can still hold the previous session's row. Until the CURRENT session's
+  // read resolves, the chip stays hidden rather than briefly naming the context
+  // default for a session that recorded a different profile.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
+  const activeSessionProfileId = sessionDataLoaded
+    ? (recordedSessionProfileId ?? effectiveDefaultId)
+    : null;
+  const sessionProfile =
+    activeSessionProfileId === null
+      ? null
+      : (sessionProfiles.find(profile => profile.id === activeSessionProfileId) ?? null);
+  const sessionProfileIndicatorState = buildActiveProfileIndicatorState({
+    selectedProfileName: sessionProfile?.name ?? null,
+    repoBoundProfileName: null,
+    hasManualEnvVars: false,
+    hasManualSetupCommands: false,
+    hasSelectedProfileId: sessionProfile !== null,
+    isProfilesLoading: isSessionProfileLoading || !sessionDataLoaded,
+    hasProfileError: isSessionProfileError,
+  });
+  const openSessionProfileEditor = () => {
+    if (sessionProfile) {
+      router.push(
+        getProfileOverviewPath(
+          sessionProfile.id,
+          profileOrganizationId(organizationId, sessionProfile)
+        )
+      );
+    }
+  };
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
     sessionId,
@@ -851,6 +904,32 @@ export function SessionDetailContent({
   const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [canceledQueuedMessages, setCanceledQueuedMessages] =
     useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
+  // Ids whose failed submission a retry accepted, plus the ids a re-send
+  // superseded while it is still in flight. The re-send is a new submission with
+  // its own row, so the original row must stop rendering even when it is
+  // server-confirmed (the SDK can only delete the client-materialised ghost).
+  // The row's preparation attempts go with it, or the filtered row's preparation
+  // would be re-emitted at the end of the transcript.
+  //
+  // Both records live in the manager, keyed by the session that owns the row:
+  // the re-send is awaited, so the user can switch sessions while it is in
+  // flight, and the row must stay hidden when the transcript is opened again —
+  // by another screen instance, or after a relaunch.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const supersededMessageIds = useMemo(() => {
+    if (supersededInFlightMessageIds.size === 0) {
+      return resolvedDeliveryFailures;
+    }
+    if (resolvedDeliveryFailures.size === 0) {
+      return supersededInFlightMessageIds;
+    }
+    const merged = new Set(supersededInFlightMessageIds);
+    for (const id of resolvedDeliveryFailures) {
+      merged.add(id);
+    }
+    return merged;
+  }, [supersededInFlightMessageIds, resolvedDeliveryFailures]);
   const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
   const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
     null
@@ -925,9 +1004,11 @@ export function SessionDetailContent({
 
   const visibleMessages = useMemo(() => {
     const base =
-      droppedQueuedIds.size === 0
+      droppedQueuedIds.size === 0 && supersededMessageIds.size === 0
         ? messages
-        : messages.filter(m => !droppedQueuedIds.has(m.info.id));
+        : messages.filter(
+            m => !droppedQueuedIds.has(m.info.id) && !supersededMessageIds.has(m.info.id)
+          );
     if (canceledQueuedMessages.size === 0) {
       return base;
     }
@@ -949,7 +1030,7 @@ export function SessionDetailContent({
       }
       return 0;
     });
-  }, [messages, droppedQueuedIds, canceledQueuedMessages]);
+  }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
 
   // Visibility-only strip for the "Hide thinking details" option. Applied once
   // here so the transcript, the message-details sheet, and the subagent views
@@ -985,10 +1066,18 @@ export function SessionDetailContent({
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
-  const baseTranscript = useMemo(
-    () => mergeSessionTranscript(displayedMessages, preparationAttempts, pendingMessages),
-    [displayedMessages, preparationAttempts, pendingMessages]
-  );
+  const baseTranscript = useMemo(() => {
+    // A superseded submission's preparation goes with its row: dropping only
+    // the row would leave `mergeSessionTranscript` re-emitting the attempt at
+    // the end (its trigger id is no longer in the message list).
+    const attempts =
+      supersededMessageIds.size === 0
+        ? preparationAttempts
+        : preparationAttempts.filter(
+            attempt => !supersededMessageIds.has(attempt.triggerMessageId)
+          );
+    return mergeSessionTranscript(displayedMessages, attempts, pendingMessages);
+  }, [displayedMessages, preparationAttempts, pendingMessages, supersededMessageIds]);
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
   //
@@ -1048,6 +1137,9 @@ export function SessionDetailContent({
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
     setDroppedQueuedIds(EMPTY_IDS);
+    // The superseded ids are not cleared here: the manager keys them by the
+    // session that owns the row, so switching back before an in-flight re-send
+    // settles must still hide the row it superseded.
     setCanceledQueuedMessages(EMPTY_CANCELED);
     setCancelQueuedStatus(null);
     setCancelQueuedSheetStatus(null);
@@ -1172,6 +1264,12 @@ export function SessionDetailContent({
       if (prompt === null) {
         return;
       }
+      // Only a user row may be superseded: `retryFailedMessage` never clears an
+      // assistant failure, so an assistant row added here would be hidden
+      // permanently (its preparation attempts are tied to a user
+      // `triggerMessageId`, but the row itself is not).
+      const messageId = message.info.id;
+      const isUser = message.info.role === 'user';
       // Same guard handleSend opens with: when no model resolves, run the send
       // anyway (the user gets the existing toast) and keep the failed row.
       if (requiresModel && !(pinned.model ?? currentModel)) {
@@ -1185,13 +1283,43 @@ export function SessionDetailContent({
       // outlive it: switching sessions while the re-send is in flight must not
       // record this resolution under the session the user switched to.
       const ownerSessionId = sessionId;
+      // The manager records the supersede against the session that owns the
+      // row. The re-send is awaited, so the user can switch sessions while it
+      // is in flight; a write under the switched-to session would put another
+      // transcript's id in its set, and a screen-local record would be lost
+      // with the screen that hosted the retry.
       void retryFailedMessage({
         message,
         send: async () => {
-          await handleSend(prompt);
+          try {
+            // Hide the original row in the same tap as the retry. The re-send
+            // inserts its own optimistic row before the transport round-trip
+            // (and fires this hook right after), so waiting for the send to
+            // settle would render the prompt twice for the whole round-trip.
+            await handleSend(prompt, {
+              onOptimisticSend: () => {
+                if (isUser) {
+                  manager.markMessageSuperseded(messageId, ownerSessionId);
+                }
+              },
+            });
+          } catch (retryError) {
+            // A rejected re-send restored nothing: bring the original failed row
+            // and its Retry control back. `retryFailedMessage` swallows the
+            // rejection, so its contract is unchanged.
+            if (isUser) {
+              manager.unmarkMessageSuperseded(messageId, ownerSessionId);
+            }
+            throw retryError;
+          }
         },
-        clearFailedMessage: messageId => {
-          manager.clearFailedMessage(messageId, ownerSessionId);
+        clearFailedMessage: clearedMessageId => {
+          // The manager records the resolution for the owning session and
+          // republishes it on `atoms.resolvedDeliveryFailures`, which already
+          // feeds the transcript filter. An accepted re-send therefore needs no
+          // local write, and the accepted id stays hidden across a switch-back
+          // and a relaunch.
+          manager.clearFailedMessage(clearedMessageId, ownerSessionId);
         },
       });
     },
@@ -1628,9 +1756,11 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session". The route's
-    // cached metadata can hold the backend's ISO placeholder, which must not
-    // paint either, while a title the user's own rename wrote is kept.
+    // title it opened with instead of blinking back to "Session". A creation
+    // placeholder cached in the list is not a title: fall back to "Session".
+    // The route's cached metadata can hold the backend's ISO placeholder,
+    // which must not paint either, while a title the user's own rename wrote
+    // is kept.
     fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
@@ -2037,6 +2167,7 @@ export function SessionDetailContent({
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
+            headerRightShrinks
             className="pb-1"
             {...(rename.isTitleInteractive
               ? {
@@ -2047,6 +2178,19 @@ export function SessionDetailContent({
                 }
               : {})}
           />
+          {sessionProfileIndicatorState ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+              className="px-4 pb-1"
+            >
+              <ActiveProfileIndicator
+                state={sessionProfileIndicatorState}
+                onPress={openSessionProfileEditor}
+              />
+            </Animated.View>
+          ) : null}
           {sessionGoal !== null || hasPrRow ? (
             <Animated.View
               entering={FadeIn.duration(200)}
@@ -2356,6 +2500,7 @@ export function SessionDetailContent({
                 attachmentsEnabled={supportsAttachments}
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
+                commandCatalogStatus={availableCommandsCatalogStatus}
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}

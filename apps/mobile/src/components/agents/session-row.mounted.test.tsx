@@ -354,6 +354,23 @@ describe('StoredSessionRow live speech', () => {
     }
   );
 
+  it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {
+    const renderer = mount(
+      row({
+        session: {
+          ...session,
+          title: 'New session - 2026-09-22T17:26:31.465Z',
+          git_branch: null,
+          total_cost_microdollars: null,
+        },
+      })
+    );
+    expect(texts(renderer)).toContain(i18n.t('agents.sessionRow.untitled'));
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-22');
+  });
+
   const placeholderTitle = 'New session - 2026-09-21T15:44:47.176Z';
 
   it('renders the generic untitled label for the server creation-default title', () => {
@@ -495,7 +512,10 @@ describe('RemoteSessionRow live speech', () => {
     await i18n.changeLanguage('en');
   });
 
-  function mountRemote(overrides: Partial<ActiveSession> = {}) {
+  function mountRemote(
+    overrides: Partial<ActiveSession> = {},
+    onPress: (session: ActiveSession) => void = () => undefined
+  ) {
     return mount(
       createElement(
         QueryClientProvider,
@@ -512,7 +532,7 @@ describe('RemoteSessionRow live speech', () => {
             }),
             ...overrides,
           },
-          onPress: () => undefined,
+          onPress,
         })
       )
     );
@@ -584,5 +604,30 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
+  });
+
+  it('hands the pressed row its own session', () => {
+    // The per-row closure moved inside the memo boundary: the row calls the
+    // shared handler with its own session instead of the parent closing over
+    // each item.
+    const onPress = vi.fn<(session: ActiveSession) => void>();
+    const renderer = mountRemote({}, onPress);
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row pressable');
+    }
+    act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(onPress.mock.calls).toHaveLength(1);
+    expect(onPress.mock.calls[0]?.[0]).toMatchObject({ id: 'remote-1' });
+  });
+
+  it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {
+    const renderer = mountRemote({ title: 'New session - 2026-09-22T17:26:31.465Z' });
+    expect(texts(renderer)).toContain(i18n.t('agents.sessionRow.untitled'));
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-22');
   });
 });

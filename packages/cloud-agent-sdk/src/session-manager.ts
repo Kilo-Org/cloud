@@ -51,6 +51,7 @@ import type {
   QuestionState,
   PermissionState,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
@@ -189,6 +190,18 @@ const RETAINED_MESSAGE_WINDOW = 200;
 const EMPTY_PARTS: Part[] = [];
 
 /**
+ * Shared empty sentinel for the read-only resolved-delivery projection, so a
+ * session with no recorded resolution does not allocate a Set per derivation.
+ */
+const EMPTY_RESOLVED_DELIVERY_FAILURES: ReadonlySet<string> = new Set();
+
+/**
+ * Shared empty sentinel for the read-only in-flight-supersede projection, for
+ * the same reason as `EMPTY_RESOLVED_DELIVERY_FAILURES`.
+ */
+const EMPTY_SUPERSEDED_IN_FLIGHT: ReadonlySet<string> = new Set();
+
+/**
  * Flatten a `ModelSelection` into the Decision 5 create_session model object.
  * `variant` is nested only when present (no second top-level field).
  */
@@ -284,6 +297,12 @@ type FetchedSessionData = {
   totalCostMicrodollars?: number | null;
   /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
   createdOnPlatform?: string | null;
+  /**
+   * The profile the session was prepared with, as recorded on the session row.
+   * Null for a session created before profile recording, or one whose create
+   * origin resolved no profile. Populated by the mobile and extension adapters.
+   */
+  profileId?: string | null;
 };
 
 type PrepareInput = {
@@ -344,6 +363,18 @@ type SessionManagerConfig = {
    * is unchanged.
    */
   isStalledTransportError?: (err: unknown) => boolean;
+  /**
+   * The consumer's send path can deliver remote-CLI attachment parts: it
+   * materializes the presigned GET parts and passes them as `attachmentParts`.
+   * The `supportsAttachments` gate reports a `remote` session supported only
+   * when this is set, and the send guard refuses `attachmentParts` from a
+   * consumer that did not declare it — a consumer that knows only the
+   * cloud-only `attachments` field (web) would otherwise render an attachment
+   * control whose send the session manager rejects with `Only Cloud Agent
+   * sessions support attachments`. The mobile adapter is the canonical
+   * provider; web passes nothing, so its remote sessions stay unsupported.
+   */
+  supportsRemoteAttachmentParts?: boolean;
   websocketBaseUrl?: string;
   userWebConnection: UserWebConnection;
   api: CloudAgentApi;
@@ -412,7 +443,12 @@ type SessionManagerAtoms = {
   isRefreshingCachedTranscript: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
-  /** Active resolved transport can deliver canonical Cloud Agent attachments. */
+  /**
+   * The active resolved transport can deliver attachments for this session
+   * through a path its consumer supports: the cloud-only `attachments` field
+   * for `cloud-agent`, or remote-CLI `attachmentParts` for a `remote` session
+   * when the consumer declared `supportsRemoteAttachmentParts`.
+   */
   supportsAttachments: W<boolean>;
   activeSessionType: W<ActiveSessionType | null>;
   remoteModelState: W<RemoteModelState>;
@@ -452,6 +488,11 @@ type SessionManagerAtoms = {
   fetchedSessionData: W<FetchedSessionData | null>;
   /** Slash command catalog reported by the wrapper for the current session. */
   availableCommands: W<SlashCommandInfo[]>;
+  /**
+   * Bound status of that catalog, or `null` when the wrapper sent the whole
+   * catalog. Present when rows were dropped or the kept rows exceed a bound.
+   */
+  availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
@@ -478,6 +519,20 @@ type SessionManagerAtoms = {
    * (pre-clear messages may reappear — accepted tradeoff).
    */
   transcriptCleared: W<boolean>;
+  /**
+   * Ids whose delivery failure the user resolved by retrying, for the active
+   * session. Seeded from the durable resolved-delivery record on open, so a
+   * superseded row stays hidden across a switch-back and a relaunch.
+   */
+  resolvedDeliveryFailures: Atom<ReadonlySet<string>>;
+  /**
+   * Ids whose failed row a re-send superseded while it is still in flight, for
+   * the active session. The row must stop rendering in the same tap as the
+   * retry, before the manager can record the accepted resolution, so the caller
+   * marks it with `markMessageSuperseded`. The record is keyed by the session
+   * that owns the row, so switching away and back keeps the row hidden.
+   */
+  supersededInFlightMessageIds: Atom<ReadonlySet<string>>;
 };
 
 type SessionManager = {
@@ -518,13 +573,15 @@ type SessionManager = {
     attachments?: CloudAgentAttachments;
     images?: Images;
     /**
-     * Ready file parts to forward to a CAPABLE remote CLI session (the CLI
-     * advertised `capabilities.attachments: true` in its most recent
-     * heartbeat). Distinct from the cloud-only `attachments` field: cloud
-     * sessions use `attachments`, remote sessions use `attachmentParts`.
-     * Session-manager enforces the gate — a non-null payload for a
-     * non-capable session is rejected with a typed error before it can
-     * reach the transport.
+     * Ready file parts to forward to a remote CLI session. Distinct from the
+     * cloud-only `attachments` field: cloud sessions use `attachments`, remote
+     * sessions use `attachmentParts`. The gate is optimistic: a remote session
+     * accepts parts while the CLI has not advertised the capability, and only
+     * an explicit `capabilities.attachments: false` in its most recent
+     * heartbeat rejects them. Session-manager enforces the gate — a non-null
+     * payload for a session the CLI reported incapable (or for a non-remote
+     * session) is rejected with a typed error before it can reach the
+     * transport.
      */
     attachmentParts?: RemoteAttachmentPart[];
     /**
@@ -566,6 +623,20 @@ type SessionManager = {
    * Omitted, the currently active session is assumed.
    */
   clearFailedMessage(messageId: string, ownerSessionId?: KiloSessionId): void;
+  /**
+   * Mark a failed row as superseded by a re-send that is still in flight, for
+   * the session that owns the row. The row stops rendering from this call, so
+   * the caller makes it in the same tap as the retry instead of waiting for the
+   * transport round-trip, which would render the prompt twice for its duration.
+   * The mark is removed by `unmarkMessageSuperseded` when the re-send is
+   * rejected and replaced by the resolved record when it is accepted.
+   */
+  markMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void;
+  /**
+   * Undo `markMessageSuperseded` after a re-send was rejected: nothing was
+   * delivered, so the failed row must render again with its retry control.
+   */
+  unmarkMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -877,6 +948,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const isRefreshingCachedTranscriptAtom = atom(false);
   const isReadOnlyAtom = atom(false);
+  // False while no session is active; once a session resolves the gate is
+  // computed optimistically (see `recomputeSupportsAttachments`), so a remote
+  // session whose CLI has not advertised `capabilities.attachments` still
+  // reports supported — for a consumer that declared it can deliver remote
+  // attachment parts (`supportsRemoteAttachmentParts`). A consumer without
+  // that path (web) keeps remote sessions unsupported.
   const supportsAttachmentsAtom = atom(false);
   const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
   const remoteModelStateAtom = atom<RemoteModelState>(EMPTY_REMOTE_MODEL_STATE);
@@ -917,6 +994,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * DO) and on every wrapper push. Empty list = wrapper hasn't reported yet.
    */
   const availableCommandsAtom = atom<SlashCommandInfo[]>([]);
+  /**
+   * Bound status reported with the catalog: present only when the wrapper
+   * bounded it, so the composer can say that rows are missing instead of
+   * hiding them silently. Cleared with the catalog.
+   */
+  const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
@@ -925,6 +1008,95 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
+
+  // Bumped whenever the active session or its resolved-delivery record changes,
+  // so the read-only projection below re-derives on a switch, on a recorded
+  // retry, and on the durable seed. A storage read cannot serve as the trigger:
+  // a cached re-open preserves the storage object, and `destroy` nulls it
+  // before clearing the active session id.
+  const resolvedDeliveryFailuresRevisionAtom = atom(0);
+  /**
+   * Memo for the read-only projection below, keyed by the session and revision
+   * it was derived from, so the returned Set keeps a stable identity between
+   * bumps (see the derivation for why the identity must change on a bump).
+   */
+  let resolvedDeliveryProjectionCache: {
+    sessionId: KiloSessionId;
+    revision: number;
+    value: ReadonlySet<string>;
+  } | null = null;
+  /**
+   * Ids whose delivery failure the user resolved by retrying, for the active
+   * session. A superseded row must stay hidden after the screen that hosted
+   * the retry unmounts: only a client-materialised ghost is deleted from
+   * storage, so a server-confirmed failed row is still history and would
+   * render again beside the retry's own row. The durable record seeded on open
+   * is the cross-launch source, and this projection is how the transcript
+   * filter reaches it.
+   */
+  const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get => {
+    const revision = get(resolvedDeliveryFailuresRevisionAtom);
+    if (activeSessionId === null) {
+      return EMPTY_RESOLVED_DELIVERY_FAILURES;
+    }
+    if (
+      resolvedDeliveryProjectionCache !== null &&
+      resolvedDeliveryProjectionCache.sessionId === activeSessionId &&
+      resolvedDeliveryProjectionCache.revision === revision
+    ) {
+      return resolvedDeliveryProjectionCache.value;
+    }
+    // The record is mutated in place (the live session predicate holds the same
+    // Set), and jotai compares a derived value with `Object.is`: returning the
+    // mutated Set would leave its identity unchanged and notify no subscriber.
+    // A fresh Set per revision keeps the identity stable between bumps while
+    // making a bump observable.
+    const recorded = resolvedDeliveryFailuresBySession.get(activeSessionId);
+    const value =
+      recorded === undefined || recorded.size === 0
+        ? EMPTY_RESOLVED_DELIVERY_FAILURES
+        : new Set(recorded);
+    resolvedDeliveryProjectionCache = { sessionId: activeSessionId, revision, value };
+    return value;
+  });
+
+  // Bumped whenever the active session's in-flight supersede record changes: on
+  // a mark, an unmark, an accepted resolution, a session switch, and a destroy.
+  // Same reason for a revision trigger as `resolvedDeliveryFailuresRevisionAtom`.
+  const supersededInFlightRevisionAtom = atom(0);
+  /**
+   * Memo for the read-only projection below, for the same identity reason as
+   * `resolvedDeliveryProjectionCache`.
+   */
+  let supersededInFlightProjectionCache: {
+    sessionId: KiloSessionId;
+    revision: number;
+    value: ReadonlySet<string>;
+  } | null = null;
+  /**
+   * Ids whose failed row a re-send superseded while it is still in flight, for
+   * the active session. The record is mutated in place, so a fresh Set per
+   * revision keeps the projection's identity stable between bumps while making
+   * a bump observable.
+   */
+  const supersededInFlightMessageIdsAtom = atom<ReadonlySet<string>>(get => {
+    const revision = get(supersededInFlightRevisionAtom);
+    if (activeSessionId === null) {
+      return EMPTY_SUPERSEDED_IN_FLIGHT;
+    }
+    if (
+      supersededInFlightProjectionCache !== null &&
+      supersededInFlightProjectionCache.sessionId === activeSessionId &&
+      supersededInFlightProjectionCache.revision === revision
+    ) {
+      return supersededInFlightProjectionCache.value;
+    }
+    const marked = supersededInFlightBySession.get(activeSessionId);
+    const value =
+      marked === undefined || marked.size === 0 ? EMPTY_SUPERSEDED_IN_FLIGHT : new Set(marked);
+    supersededInFlightProjectionCache = { sessionId: activeSessionId, revision, value };
+    return value;
+  });
 
   // Memoized per-row StoredMessage objects. Reused while both `info` and the
   // parts array keep the same reference, so unchanged rows keep object identity
@@ -1022,6 +1194,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * only way to reach any set.
    */
   const resolvedDeliveryFailuresBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Failed rows a re-send superseded while it is still in flight, keyed by the
+   * session that owns the row. The transcript filter needs the row hidden
+   * before the accepted resolution can be recorded, and keeping the record per
+   * session is what makes the hide survive a switch away and back — the screen
+   * that hosted the retry may not be the one that renders the row again. An
+   * entry is removed on either outcome, so this map only ever holds the
+   * sessions with a re-send in flight and needs no eviction bound.
+   */
+  const supersededInFlightBySession = new Map<KiloSessionId, Set<string>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1030,7 +1212,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * capability change (upgrade, downgrade, reconnect, absent) — not only at
    * the initial `onResolved` moment. `undefined` means the CLI has not
    * reported any (older CLIs, mid-reconnect, or a session that the active
-   * CLI no longer claims).
+   * CLI no longer claims); the gate treats that as supported.
    */
   let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
   let observedModelSource: ObservedModelSource | null = null;
@@ -1161,6 +1343,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(childSessionErrorsAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
+    store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
@@ -1456,20 +1639,36 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Optimistic CLI-capability gate. A capability the CLI has not reported yet
+   * (`undefined` — older CLI, mid-reconnect, or a `sessions.list` row without
+   * the field) reports supported, so a feature gated on CLI support does not
+   * disappear until the CLI explicitly denies it. Only an explicit `false`
+   * from the most recent `sessions.heartbeat` / `sessions.list` payload
+   * downgrades the gate. Read-only sessions never reach this helper: the
+   * caller keeps them unsupported.
+   */
+  function cliCapabilitySupported(value: boolean | undefined): boolean {
+    return value !== false;
+  }
+
+  /**
    * Recompute the `supportsAttachments` gate for the active session. Called
    * on every `onResolved` (initial resolution) AND every
    * `onTransportCapabilitiesChange` (heartbeat upgrade/downgrade/reconnect/
-   * absent) so the UI gate tracks the CLI's most recent advertisement.
+   * absent) so the UI gate tracks the CLI's most recent advertisement — the
+   * downgrade lands as soon as an explicit negative is reported.
    *
    * Rules:
    *  - `cloud-agent`: always supports attachments (S3a is a no-op for
    *    cloud-agent sessions, but cloud-agent attachments flow through
    *    the existing `attachments` field, not the new `attachmentParts`).
-   *  - `remote`: supports attachments only when the live CLI reported
-   *    `capabilities.attachments === true` in its most recent heartbeat
-   *    or `sessions.list`. Any other state (absent, false, mid-reconnect)
-   *    → `false`, matching today's "no paperclip" parity for non-capable
-   *    remote sessions.
+   *  - `remote`: optimistic for a consumer that declared it can deliver
+   *    remote attachment parts (`supportsRemoteAttachmentParts`). While the
+   *    CLI has not advertised the capability the gate reports supported; only
+   *    an explicit `capabilities.attachments === false` in its most recent
+   *    heartbeat or `sessions.list` downgrades it. A consumer without that
+   *    path (web) never reports a remote session supported: it knows only the
+   *    cloud-only `attachments` field, whose send this manager rejects.
    *  - `read-only`: never supports attachments.
    */
   function recomputeSupportsAttachments(sessionType: ActiveSessionType | null): void {
@@ -1477,7 +1676,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (sessionType === 'cloud-agent') {
       supports = true;
     } else if (sessionType === 'remote') {
-      supports = currentCapabilities?.attachments === true;
+      supports =
+        config.supportsRemoteAttachmentParts === true &&
+        cliCapabilitySupported(currentCapabilities?.attachments);
     } else {
       supports = false;
     }
@@ -1888,6 +2089,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return created;
   }
 
+  /**
+   * Bump the in-flight projection only for the session that owns the change:
+   * the atom projects the active session, so another session's record changes
+   * nothing a reader can see (the switch back re-derives it).
+   */
+  function bumpSupersededInFlight(ownerSessionId: KiloSessionId): void {
+    if (ownerSessionId !== activeSessionId) {
+      return;
+    }
+    store.set(supersededInFlightRevisionAtom, store.get(supersededInFlightRevisionAtom) + 1);
+  }
+
+  function markMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void {
+    const existing = supersededInFlightBySession.get(ownerSessionId);
+    if (existing === undefined) {
+      supersededInFlightBySession.set(ownerSessionId, new Set([messageId]));
+      bumpSupersededInFlight(ownerSessionId);
+      return;
+    }
+    if (existing.has(messageId)) {
+      return;
+    }
+    existing.add(messageId);
+    bumpSupersededInFlight(ownerSessionId);
+  }
+
+  function unmarkMessageSuperseded(messageId: string, ownerSessionId: KiloSessionId): void {
+    const existing = supersededInFlightBySession.get(ownerSessionId);
+    if (existing === undefined || !existing.delete(messageId)) {
+      return;
+    }
+    if (existing.size === 0) {
+      supersededInFlightBySession.delete(ownerSessionId);
+    }
+    bumpSupersededInFlight(ownerSessionId);
+  }
+
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     // A retry of a failed metadata refresh must keep the transcript mounted.
     // A real session switch (or a caller without caching) still starts clean.
@@ -1905,6 +2143,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const expectedGeneration = switchGeneration;
     activeSessionId = kiloSessionId;
     activeSessionType = null;
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
+    store.set(supersededInFlightRevisionAtom, store.get(supersededInFlightRevisionAtom) + 1);
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -1926,6 +2169,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (expectedGeneration !== switchGeneration) return;
           for (const id of ids) {
             resolvedFailures.add(id);
+          }
+          if (ids.length > 0) {
+            store.set(
+              resolvedDeliveryFailuresRevisionAtom,
+              store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+            );
           }
           for (const id of ids) {
             // `clearFailedMessage` reports when the pruned entry was also the
@@ -2216,8 +2465,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // Seed capabilities from the resolved session so the initial gate
         // reflects whatever the mobile-side `resolveSession` adapter had
         // to work with (e.g. the current `activeSessions.list` snapshot).
-        // Subsequent heartbeat changes arrive via `onTransportCapabilitiesChange`
-        // and overwrite this.
+        // An absent snapshot still reports supported (optimistic); subsequent
+        // heartbeat changes arrive via `onTransportCapabilitiesChange` and
+        // overwrite this, including an explicit downgrade.
         currentCapabilities = resolved.type === 'remote' ? resolved.capabilities : undefined;
         recomputeSupportsAttachments(resolved.type);
         updateCapabilityAtoms(session);
@@ -2322,8 +2572,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         if (event.type === 'commands.available') {
           // Replace the catalog wholesale. The DO sends the full list on
-          // every connect, so we never need to merge incrementally.
+          // every connect, so we never need to merge incrementally. The bound
+          // status is replaced with it: a catalog the wrapper bounded keeps its
+          // notice, and an unbounded one clears any previous notice.
           store.set(availableCommandsAtom, event.commands);
+          store.set(availableCommandsCatalogStatusAtom, event.catalogStatus ?? null);
           return;
         }
         if (event.type === 'queue.changed' && activeSessionType === 'remote') {
@@ -2559,12 +2812,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         throw new Error('Only Cloud Agent sessions support attachments');
       }
       if (input.attachmentParts && input.attachmentParts.length > 0) {
-        if (sessionType !== 'remote' || currentCapabilities?.attachments !== true) {
-          // A non-null `attachmentParts` for a non-capable session is a
-          // UI-bug: the paperclip is supposed to be hidden whenever this
-          // gate fails, so we should never see payload here. Refuse to
-          // forward rather than silently drop — same policy as the
-          // cloud-only branch above.
+        if (
+          sessionType !== 'remote' ||
+          !cliCapabilitySupported(currentCapabilities?.attachments) ||
+          config.supportsRemoteAttachmentParts !== true
+        ) {
+          // A non-null `attachmentParts` for a session whose CLI explicitly
+          // reported `attachments: false` (or for a non-remote session) is a
+          // UI-bug: the paperclip is supposed to be hidden whenever this gate
+          // fails, so we should never see payload here. Refuse to forward
+          // rather than silently drop — same policy as the cloud-only branch
+          // above.
+          //
+          // The consumer path is part of the gate: the UI gate reports a
+          // remote session supported only for a consumer that declared it can
+          // deliver remote attachment parts, so a caller that supplies parts
+          // without that declaration is the same kind of bug.
           throw new Error('Only capable remote CLI sessions support attachments');
         }
       }
@@ -2760,8 +3023,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // transcript's id applied to its state or atom.
     const owner = ownerSessionId ?? activeSessionId;
     if (owner === null) return;
-    if (owner === activeSessionId) {
+    const ownerIsActive = owner === activeSessionId;
+    if (ownerIsActive) {
       currentSession?.state.clearFailedMessage(messageId);
+      // A client-materialised row is a local ghost: the accepted re-send
+      // supersedes its content and materialises its own row, so leaving the
+      // original would render the prompt twice — once for the failed
+      // submission and once for the retry. Delete it outright so it stays
+      // gone across a relaunch. A confirmed row (`synthetic` undefined) is
+      // server history and must be kept.
+      const info = currentSession?.storage.getMessageInfo(messageId);
+      if (info?.role === 'user' && info.synthetic === true) {
+        currentSession?.storage.deleteMessage(messageId);
+      }
       const next = new Map(store.get(pendingMessagesAtom));
       next.delete(messageId);
       store.set(pendingMessagesAtom, next);
@@ -2774,7 +3048,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // switches back before the durable write below lands; that write is what
     // keeps the clear across a relaunch.
     resolvedFailuresForSession(owner).add(messageId);
+    // The accepted resolution replaces the in-flight mark: one record per id,
+    // and the resolved record is the one that survives a relaunch.
+    unmarkMessageSuperseded(messageId, owner);
     config.persistResolvedDeliveryFailure?.(owner, messageId);
+    // Only the active session's projection is on screen; a resolution recorded
+    // for another session changes nothing a reader can see here, and the switch
+    // back re-derives anyway.
+    if (ownerIsActive) {
+      store.set(
+        resolvedDeliveryFailuresRevisionAtom,
+        store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+      );
+    }
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -2868,8 +3154,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     clearAllAtoms();
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
+    supersededInFlightBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
+    store.set(
+      resolvedDeliveryFailuresRevisionAtom,
+      store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+    );
+    store.set(supersededInFlightRevisionAtom, store.get(supersededInFlightRevisionAtom) + 1);
   }
 
   return {
@@ -2895,6 +3187,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     acceptSuggestion,
     dismissSuggestion,
     clearFailedMessage,
+    markMessageSuperseded,
+    unmarkMessageSuperseded,
     createAndStart,
     clearError: () => {
       store.set(errorAtom, null);
@@ -2941,6 +3235,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       billingFailure: billingFailureAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       availableCommands: availableCommandsAtom,
+      availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
@@ -2955,6 +3250,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       olderMessagesError: olderMessagesErrorAtom,
       olderMessagesOmittedItemCount: olderMessagesOmittedItemCountAtom,
       transcriptCleared: transcriptClearedAtom,
+      resolvedDeliveryFailures: resolvedDeliveryFailuresAtom,
+      supersededInFlightMessageIds: supersededInFlightMessageIdsAtom,
     },
   };
 }

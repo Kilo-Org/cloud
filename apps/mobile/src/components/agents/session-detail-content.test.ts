@@ -28,7 +28,7 @@ import {
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
-import { kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
+import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { ChildSessionSection } from '@/components/agents/child-session-section';
 import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
@@ -49,8 +49,10 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -104,6 +106,16 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// The personal `agentProfiles.list` rows the header's active-profile chip
+// reads; tests set it before mounting to drive the chip's presence.
+const profileRowsState = vi.hoisted(() => ({
+  personal: [] as unknown[],
+  combined: {
+    orgProfiles: [] as unknown[],
+    personalProfiles: [] as unknown[],
+    effectiveDefaultId: null as string | null,
+  },
+}));
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -196,6 +208,7 @@ vi.mock('@/components/ui/icons', () => ({
   Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'ChevronLeft',
@@ -349,30 +362,57 @@ vi.mock('@/components/agents/use-interaction-handlers', () => ({
     },
   }),
 }));
+// The selected model the mocked config-sync hook reports; the default '' keeps
+// every other test on the no-model path. A cloud-agent retry needs a Kilo model
+// for its transport payload to normalise.
+const sessionConfigSync = vi.hoisted(() => ({ currentModel: '' }));
 vi.mock('@/components/agents/use-session-config-sync', () => ({
-  useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
+  useSessionConfigSync: () => ({
+    currentMode: 'code',
+    currentModel: sessionConfigSync.currentModel,
+    currentVariant: '',
+  }),
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
 // Mirrors the real hook's modal fields; a test opens the dialog by flipping
 // `isOpen` so it can inspect the RenameModal the screen renders.
 const renameModalState = vi.hoisted(() => ({ isOpen: false, initialValue: '' }));
-vi.mock('@/components/agents/use-session-detail-rename', () => ({
-  useSessionDetailRename: ({
-    serverTitle,
-    fallbackTitle,
-  }: {
-    serverTitle?: string;
-    fallbackTitle: string;
-  }) => ({
-    title: serverTitle ?? fallbackTitle,
-    isTitleInteractive: serverTitle !== undefined,
-    isModalOpen: renameModalState.isOpen,
-    modalInitialValue: renameModalState.initialValue,
-    openModal: openRenameModal,
-    closeModal: vi.fn(),
-    submit: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
+vi.mock('@/components/agents/use-session-detail-rename', async () => {
+  // Mirror the real hook's title derivation (the shared pure helper) instead of
+  // re-stating a simpler rule, so the header assertions below exercise the
+  // production placeholder handling. Only the mutation/connection wiring the
+  // component does not touch here is stubbed out; the modal fields come from
+  // `renameModalState` so a test can open the dialog directly.
+  const { getSessionDetailRenameState, initialRenameState } =
+    await import('@/components/agents/session-detail-rename-state');
+  return {
+    useSessionDetailRename: ({
+      isLoaded = true,
+      serverTitle,
+      fallbackTitle,
+    }: {
+      isLoaded?: boolean;
+      serverTitle?: string;
+      fallbackTitle: string;
+    }) => {
+      const state = getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded,
+        serverTitle,
+        renameState: initialRenameState(),
+      });
+      return {
+        title: state.title,
+        isTitleInteractive: state.isTitleInteractive,
+        isModalOpen: renameModalState.isOpen,
+        modalInitialValue: renameModalState.initialValue,
+        openModal: openRenameModal,
+        closeModal: vi.fn(),
+        submit: vi.fn().mockResolvedValue(undefined),
+      };
+    },
+  };
+});
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),
   MESSAGE_SENT_EVENT: 'sent',
@@ -464,6 +504,25 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
+    // The session header's active-profile chip reads the context profiles; the
+    // hoisted rows let a test resolve a default, and the empty default keeps
+    // the chip absent so the existing header assertions hold.
+    agentProfiles: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'list'],
+          queryFn: () => profileRowsState.personal,
+          initialData: profileRowsState.personal,
+        }),
+      },
+      listCombined: {
+        queryOptions: () => ({
+          queryKey: ['agentProfiles', 'listCombined'],
+          queryFn: () => profileRowsState.combined,
+          initialData: profileRowsState.combined,
+        }),
+      },
+    },
     // The real context sheet resolves the "running on" row from the connected
     // CLI instances; the row is inert here, so an empty instance list keeps the
     // sheet rendering without a network read.
@@ -500,7 +559,10 @@ const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
  * Goal/type overrides for the goal-visibility tests. A module-level slot keeps
  * the shared `mountDetails` fixture at its existing three-parameter signature.
  */
-let goalMountOptions: { goal?: SessionGoal; resolvedType?: 'read-only' | 'remote' } = {};
+let goalMountOptions: {
+  goal?: SessionGoal;
+  resolvedType?: 'read-only' | 'remote' | 'cloud-agent';
+} = {};
 /** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
 let associatedPrMountOption: AssociatedPrData | null = null;
 const ASSOCIATED_PR: AssociatedPrData = {
@@ -627,6 +689,13 @@ let rootPageNextCursor: string | null = null;
 // reports this session title instead of the short default.
 let sessionTitleOverride: string | null = null;
 
+/**
+ * A gate the cloud-agent `api.send` mock awaits, so a retry's transport
+ * round-trip can be held open while its in-flight transcript is asserted.
+ * `null` resolves immediately.
+ */
+let pendingSend: Promise<unknown> | null = null;
+
 function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
@@ -650,6 +719,8 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  profileRowsState.personal = [];
+  profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   openRenameModal.mockClear();
   renameModalState.isOpen = false;
   renameModalState.initialValue = '';
@@ -662,8 +733,10 @@ beforeEach(() => {
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
   sessionTitleOverride = null;
+  pendingSend = null;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
+  sessionConfigSync.currentModel = '';
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
@@ -673,10 +746,16 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
-  /** The route's cached metadata title, as `[session-id].tsx` passes it. */
+  /**
+   * The route's cached list title, seeded before the session record loads, as
+   * `[session-id].tsx` passes it.
+   */
   cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
+  sessionOrganizationId?: string;
+  /** The profile id the session row recorded, as `fetchSession` reports it. */
+  sessionProfileId?: string | null;
 };
 
 async function mountDetails(
@@ -712,10 +791,23 @@ async function mountDetails(
       if (goalMountOptions.resolvedType === 'remote') {
         return { type: 'remote', kiloSessionId: id };
       }
+      if (goalMountOptions.resolvedType === 'cloud-agent') {
+        // A cloud-agent session is the only harness type whose `api.send` the
+        // test can resolve, so a real `manager.send` materialises the retry's
+        // optimistic row instead of throwing for a missing transport.
+        return {
+          type: 'cloud-agent',
+          kiloSessionId: id,
+          cloudAgentSessionId: cloudAgentId('cag-1'),
+        };
+      }
       return { type: 'read-only', kiloSessionId: id };
     },
     getTicket: vi.fn(),
     fetchSnapshot: vi.fn(),
+    // Required by the cloud-agent transport factory; unused by read-only and
+    // remote sessions.
+    websocketBaseUrl: 'wss://example.test',
     fetchSnapshotPage: async id => {
       const response = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
       requests.push({ id, response });
@@ -740,7 +832,9 @@ async function mountDetails(
         })
       : undefined,
     api: {
-      send: vi.fn(),
+      send: vi.fn(async () => {
+        await pendingSend;
+      }),
       interrupt: vi.fn(),
       answer: vi.fn(),
       reject: vi.fn(),
@@ -754,7 +848,8 @@ async function mountDetails(
         kiloSessionId: id,
         cloudAgentSessionId: null,
         title: sessionTitleOverride ?? `Root ${id}`,
-        organizationId: null,
+        organizationId: options.sessionOrganizationId ?? null,
+        profileId: options.sessionProfileId ?? null,
         gitUrl: null,
         gitBranch: null,
         mode: null,
@@ -888,6 +983,11 @@ function renderedText(node: ReactTestInstance) {
     .join('\n');
 }
 
+/** How many times `needle` occurs in the rendered transcript text. */
+function occurrencesOf(root: ReactTestInstance, needle: string): number {
+  return renderedText(root).split(needle).length - 1;
+}
+
 /**
  * Page text outside the context sheet. The sheet stays mounted (invisible) as
  * soon as usage is known, so a "nothing renders on the page" assertion must not
@@ -958,6 +1058,126 @@ describe('SessionDetailContent display scope', () => {
   });
 });
 
+describe('session detail active-profile indicator', () => {
+  const PROFILE_ROW = {
+    id: 'p1',
+    name: 'Production',
+    description: null,
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 2,
+    commandCount: 1,
+    mcpServerCount: 1,
+    skillCount: 1,
+    agentCount: 1,
+    kiloCommandCount: 1,
+  };
+
+  function findChip(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith(i18n.t('agentChat.newSession.profileActive'))
+    );
+  }
+
+  it('shows the chip for the session context effective default and opens its editor', async () => {
+    profileRowsState.personal = [PROFILE_ROW];
+    const { renderer } = await mountDetails();
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Production');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+  });
+
+  it.each(['user', 'organization'] as const)(
+    'opens a %s default from an organization session in its owner scope',
+    async ownerType => {
+      const profile = { ...PROFILE_ROW, ownerType };
+      profileRowsState.combined = {
+        personalProfiles: ownerType === 'user' ? [profile] : [],
+        orgProfiles: ownerType === 'organization' ? [profile] : [],
+        effectiveDefaultId: profile.id,
+      };
+      const { renderer } = await mountDetails([], {
+        sessionOrganizationId: 'org-a',
+        displayScope: { organizationId: 'org-a', isResolved: true },
+      });
+      await waitFor(() => findChip(renderer).length > 0);
+      const [chip] = findChip(renderer);
+      if (!chip) {
+        throw new Error('the active-profile chip did not render');
+      }
+      act(() => {
+        (chip.props.onPress as () => void)();
+      });
+      expect(navigationRoutes.at(-1)).toBe(
+        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+      );
+    }
+  );
+
+  it('renders no chip when the context has no profiles', async () => {
+    const { renderer } = await mountDetails();
+
+    expect(findChip(renderer)).toHaveLength(0);
+  });
+
+  it('names the profile the session recorded, not the context effective default', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+      { ...PROFILE_ROW, id: 'p-recorded', name: 'Recorded', isDefault: false },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Recorded');
+    expect(chip.props.accessibilityLabel).not.toContain('Default');
+    act(() => {
+      (chip.props.onPress as () => void)();
+    });
+    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+  });
+
+  it('falls back to the effective default only when the session recorded no profile', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const { renderer } = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => findChip(renderer).length > 0);
+    const [chip] = findChip(renderer);
+    if (chip === undefined) {
+      throw new Error('the active-profile chip did not render');
+    }
+    expect(chip.props.accessibilityLabel).toContain('Default');
+  });
+
+  it('renders no chip when the session profile id no longer resolves', async () => {
+    profileRowsState.personal = [
+      { ...PROFILE_ROW, id: 'p-default', name: 'Default', isDefault: true },
+    ];
+    const view = await mountDetails([], { sessionProfileId: 'p-deleted' });
+
+    // Wait for the session metadata read so the assertion is not merely the
+    // pre-load window; a fallback to the context default would surface here.
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
 describe('SessionDetailContent header title', () => {
   // The title shares its row with a 44pt context pill and a copy action, so on
   // a narrow phone the title column is a fraction of the row width. The header
@@ -974,6 +1194,45 @@ describe('SessionDetailContent header title', () => {
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  // The ingest service names a session `New session - <ISO>` at creation, so a
+  // freshly started session has no user-readable name. The header must show the
+  // same localized `Session` label a title-less session shows, and the title
+  // stays pressable so the user can still rename it.
+  it('shows the localized fallback when the loaded server title is the machine placeholder', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T16:37:00.000Z';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(header.props.onTitlePress).toBeTypeOf('function');
+  });
+
+  // The route seeds the header from the session-list cache before the metadata
+  // read settles (and the metadata read can fail with a Retry). A placeholder
+  // cached title must never be painted on either path.
+  it('never paints a placeholder cached list title, even after the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+      cachedTitle: 'New session - 2026-09-22T16:37:00.000Z',
+    });
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retryable failure keeps the same fallback name on screen.
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
   });
 
   it('shows the fallback name instead of the generated placeholder title', async () => {
@@ -1028,6 +1287,21 @@ describe('SessionDetailContent header title', () => {
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
   // flexShrink is 0: unless the cluster and the pill opt in, their children
   // keep their natural width and paint past the row's right edge, off-screen.
+  // The route seeds the header with the cached list title it opened from. A
+  // session created through cloud-agent-next carries the creation placeholder
+  // `New session - <ISO instant>` there, and the header must fall back to its
+  // own title rather than paint the machine string while the record loads.
+  it('shows the fallback title instead of a placeholder cached title', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], {
+      metadataReady: metadata.promise,
+      cachedTitle: 'New session - 2026-09-22T17:26:31.465Z',
+    });
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(String(header.props.title)).not.toContain('2026-09-22');
+  });
+
   it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
     const { renderer } = await mountDetails();
     const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {
@@ -1042,6 +1316,62 @@ describe('SessionDetailContent header title', () => {
     ).className;
     expect(metricsClassName).toContain('shrink');
     expect(metricsClassName).toContain('min-w-0');
+  });
+});
+
+describe('session detail header right cluster', () => {
+  it('caps the right cluster inside the header slot and renders no copy control', async () => {
+    const { renderer } = await mountDetails([]);
+    const header = renderer.root.findByType(ScreenHeader);
+    // The copy-link action left the header in #6343 (7fad4e808) and now lives
+    // in the context sheet, so the sliced chain-link control the explorer
+    // captured cannot paint here any more.
+    expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
+
+    // The header caps its right slot at half the row...
+    const slot = header.findAll(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
+    );
+    expect(slot).toHaveLength(1);
+    expect(slot[0]?.props.className).toContain('min-w-0');
+    expect(slot[0]?.props.className).toContain('shrink');
+
+    // ...and the cluster inside it shrinks into that cap, so it can never paint
+    // past the slot edge. It holds the context pill and nothing else: the PR
+    // badge now shares the goal row instead.
+    const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
+    expect(cluster?.props.className).toContain('min-w-0');
+    expect(cluster?.props.className).toContain('shrink');
+    expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(1);
+
+    // The pill is the flexible part of the cluster: it shrinks into the cap
+    // with it, so the cluster can never paint past the slot edge.
+    const metrics = header.findByProps({ testID: 'session-context-metrics' });
+    expect(metrics.props.className).toContain('min-w-0');
+    expect(metrics.props.className).toContain('shrink');
+  });
+
+  // The cost is the only unbounded string in the cluster: a long total must
+  // truncate inside the capped pill instead of crossing the gutter.
+  it('truncates a long cost inside the capped pill', async () => {
+    const priced = assistantMessage('msg-priced');
+    if (priced.info.role !== 'assistant') {
+      throw new Error('expected an assistant message');
+    }
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    const { renderer } = await mountDetails([priced]);
+    const expected = formatSessionTotalCost(1234.56 * 1_000_000);
+    expect(expected).not.toBeNull();
+    const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const cost = metrics.find(
+      node =>
+        Object.is(node.type, 'Text') &&
+        node.children.some(child => typeof child === 'string' && child === expected)
+    );
+    expect(cost.props.numberOfLines).toBe(1);
+    expect(cost.props.className).toContain('shrink');
   });
 });
 
@@ -1117,6 +1447,252 @@ describe('session detail failed delivery retry', () => {
     // resolution is never recorded under a session the user switched to while
     // the re-send was in flight.
     expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed', ROOT_ID);
+  });
+
+  it('shows the retried prompt once: the superseded failed row stops rendering', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    // A Kilo model is required to normalise a cloud-agent transport payload.
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    // The failed row is the prompt's only surface before the retry.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Wait for the re-send to materialise its own row; only then is the
+    // duplicate the retry used to leave observable.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+
+    // The retry's row carries the prompt; the superseded failed row must not
+    // render a second copy of it.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+
+  it('hides the failed row in the same tap, while the re-send is still in flight', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    // A Kilo model is required to normalise a cloud-agent transport payload.
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open. The retry's own row lands before
+    // `api.send` settles, so the window the explorer captured is observable.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row is present while the send is unresolved, yet
+    // the prompt has a single surface: the original failed row was superseded
+    // with the same tap instead of waiting for the round-trip.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+
+  it('restores the failed row and its Retry when the re-send is rejected', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // In flight the original row is superseded, so the prompt is stated once.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.reject(new Error('network down'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Nothing was delivered: the retry's optimistic row is gone and the original
+    // failed row is back, so the transcript is again its single surface.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 1);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    const restoredRetry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(typeof restoredRetry.props.onPress).toBe('function');
+  });
+
+  it('keeps the superseded row hidden across a session switch while the re-send is pending', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open: the retry is still in flight when the
+    // user leaves the session and comes straight back.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row landed, and the row it superseded with the same
+    // tap is already hidden.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // What the second open of this session serves: the failed row the retry
+    // superseded beside the retry's own row.
+    const rows = [...view.store.get(view.manager.atoms.messagesList)];
+
+    await view.switchRoot(NEXT_ROOT_ID);
+    await view.switchRoot(ROOT_ID);
+    await view.respond(ROOT_ID, rows);
+
+    // The hide belongs to the session that owns the row, so coming back before
+    // the send settles still shows only the retry's copy of the prompt.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The accepted re-send records the resolution for the same session, so the
+    // superseded row stays hidden after the round-trip lands.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
   });
 });
 
@@ -3178,6 +3754,29 @@ describe('session detail duplicate failure state', () => {
     const className = String(footer?.props.className ?? '');
     expect(className).toContain('bg-background');
     expect(className).not.toContain('absolute');
+  });
+
+  it('renders the fixed footer error row without a position transition', async () => {
+    // A Reanimated layout transition on the footer wrapper animates its Y
+    // across the keyboard show/hide and blocking-card mount/unmount resizes.
+    // An entry measured inside that resize storm can strand the row at its
+    // pre-change position — floating mid-screen over the transcript, where
+    // the red error line drew on top of a transcript row (question-kb-down
+    // capture). The footer's position must always be plain layout.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const node = indicatorNodes(view)[0];
+    if (!node) {
+      throw new Error('footer indicator did not render');
+    }
+    let wrapper = node.parent;
+    while (wrapper && wrapper.props.layout === undefined) {
+      wrapper = wrapper.parent;
+    }
+    expect(wrapper).toBeNull();
   });
 });
 

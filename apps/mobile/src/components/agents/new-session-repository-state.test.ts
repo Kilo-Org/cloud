@@ -27,6 +27,22 @@ describe('resolveProviderStatus', () => {
     ).toBe('loading');
   });
 
+  it('returns loading while the provider query has produced no data yet', () => {
+    // A paused query (iOS boot / NetInfo probe not settled) reports
+    // `isLoading === false` and leaves `data` undefined, so
+    // `integrationInstalled` is undefined. That provider's list is not known
+    // yet and must never read as settled (`'repos'`), or the section renders a
+    // heading with no control under it.
+    expect(
+      resolveProviderStatus({
+        isLoading: false,
+        isError: false,
+        integrationInstalled: undefined,
+        repositoryCount: 0,
+      })
+    ).toBe('loading');
+  });
+
   it('returns error when the query failed with no cached repos', () => {
     expect(
       resolveProviderStatus({
@@ -39,11 +55,14 @@ describe('resolveProviderStatus', () => {
   });
 
   it('keeps cached repos visible after a background refetch error', () => {
+    // Cached rows and the integration flag come from the same query data, so a
+    // background refetch error that keeps its rows keeps a defined
+    // `integrationInstalled` too; `undefined` is reserved for "no data yet".
     expect(
       resolveProviderStatus({
         isLoading: false,
         isError: true,
-        integrationInstalled: undefined,
+        integrationInstalled: true,
         repositoryCount: 3,
       })
     ).toBe('repos');

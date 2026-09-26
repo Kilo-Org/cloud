@@ -55,8 +55,9 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
     sortOrder: String?,
   ): Cursor {
     val cursor = MatrixCursor(resolveProjection(projection, DEFAULT_DOCUMENT_PROJECTION))
+    val sessions = readSessions()
     if (parentDocumentId == ROOT_ID) {
-      for (session in readSessions()) {
+      for (session in sessions) {
         sessionRow(session).addTo(cursor)
       }
       return cursor
@@ -64,7 +65,7 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
     // A session with no files, a session the snapshot dropped and an unknown
     // parent all return an empty cursor: the file browser shows an empty folder
     // instead of an error.
-    val session = readSessions().firstOrNull { it.id == parentDocumentId } ?: return cursor
+    val session = sessions.firstOrNull { it.id == parentDocumentId } ?: return cursor
     for (file in session.files) {
       fileRow(session.id, file).addTo(cursor)
     }
@@ -158,17 +159,51 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
     return ArtifactFile(session, entry)
   }
 
+  /** Parsed manifest, keyed by [cachedManifestStamp]. */
+  private var cachedSessions: List<ManifestSession>? = null
+
+  /** `lastModified()` plus `length()` of the file [cachedSessions] was parsed from. */
+  private var cachedManifestStamp: ManifestStamp? = null
+
+  /**
+   * The parsed manifest, re-read and re-parsed only when the file's stamp
+   * changed. The mirror rewrites `manifest.json` wholesale through a `.part`
+   * file and a rename, so both `lastModified()` and `length()` change on every
+   * rewrite. A missing or unreadable file is an empty location, never a stale
+   * cache. `@Synchronized` because DocumentsProvider callbacks arrive on binder
+   * threads.
+   *
+   * Serving the mirror in-process from `context.filesDir` is the capability
+   * Android has and iOS does not: Android has no app group. iOS's counterpart,
+   * `targets/ArtifactsFileProvider/ArtifactsFileProviderExtension.swift`,
+   * memoizes the same index out of the shared app group on the same
+   * modification-date-and-size stamp, so one browse costs one parse per platform
+   * instead of one per row.
+   */
+  @Synchronized
   private fun readSessions(): List<ManifestSession> {
     val manifest = File(artifactsDirectory, MANIFEST_FILE_NAME)
     if (!manifest.isFile) {
+      cachedSessions = null
+      cachedManifestStamp = null
       return emptyList()
     }
+    val stamp = ManifestStamp(manifest.lastModified(), manifest.length())
+    val cached = cachedSessions
+    if (cached != null && stamp == cachedManifestStamp) {
+      return cached
+    }
     return try {
-      parseManifest(manifest.readText())
+      val sessions = parseManifest(manifest.readText())
+      cachedSessions = sessions
+      cachedManifestStamp = stamp
+      sessions
     } catch (error: Exception) {
       // A malformed manifest is an empty location in the file browser, never a
       // crash inside DocumentsUI; the mirror only writes derived data.
       Log.w(TAG, "Ignoring unreadable artifact manifest", error)
+      cachedSessions = null
+      cachedManifestStamp = null
       emptyList()
     }
   }
@@ -268,6 +303,9 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
   private data class ManifestSession(val id: String, val title: String, val files: List<ManifestFile>)
 
   private data class ArtifactFile(val session: ManifestSession, val entry: ManifestFile)
+
+  /** The manifest file's identity: a rewrite changes at least one of the pair. */
+  private data class ManifestStamp(val lastModified: Long, val length: Long)
 
   companion object {
     /** The single root id the file browser sees. */

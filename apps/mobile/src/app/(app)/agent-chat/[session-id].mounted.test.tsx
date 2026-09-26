@@ -217,7 +217,7 @@ vi.mock('@/lib/hooks/use-session-mutations', () => ({
 vi.mock('@/components/agents/session-detail-content', async () => {
   const { mergeSessionTranscript } = await import('@/components/agents/session-transcript');
   const { MessageBubble } = await import('@/components/agents/message-bubble');
-  const { displaySessionTitle } = await import('@/components/agents/session-detail-rename-state');
+  const { sessionDisplayTitle } = await import('@/lib/session-display-title');
   return {
     SessionDetailContent: function SessionDetailContent(
       props: Readonly<{ sessionId: KiloSessionId; cachedTitle?: string }>
@@ -237,7 +237,7 @@ vi.mock('@/components/agents/session-detail-content', async () => {
       const rename = useSessionDetailRename({
         sessionId,
         isLoaded: isSessionLoaded,
-        serverTitle: isSessionLoaded ? displaySessionTitle(fetchedData.title) : undefined,
+        serverTitle: isSessionLoaded ? sessionDisplayTitle(fetchedData.title) : undefined,
         fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
       });
       if (realTranscriptProbe.active) {

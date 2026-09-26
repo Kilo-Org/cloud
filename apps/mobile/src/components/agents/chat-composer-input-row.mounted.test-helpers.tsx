@@ -13,8 +13,10 @@ export type RenderProps = {
   canSend?: boolean;
   hasSendableContent?: boolean;
   inputEditable: boolean;
+  inputEmpty?: boolean;
   isStreaming?: boolean;
   onSubmit?: () => void;
+  placeholder?: string;
   returnSendsMessage?: boolean;
   voiceInputAvailable?: boolean;
 };
@@ -27,6 +29,7 @@ export function makeProps(overrides: Partial<RenderProps> = {}) {
     hasSendableContent: false,
     inputAccessibilityDisabled: false,
     inputEditable: false,
+    inputEmpty: true,
     inputRef: { current: null },
     isSending: false,
     isStreaming: false,

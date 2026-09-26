@@ -1770,6 +1770,33 @@ describe('normalize', () => {
       expect(result).toEqual({ type: 'commands.available', commands: [] });
     });
 
+    it('carries the bound status so a bounded catalog is not silent', () => {
+      const result = normalize(
+        createRaw('commands.available', {
+          commands: [{ name: 'review', hints: [] }],
+          catalogStatus: { dropped: 7, overLimit: false },
+        })
+      );
+      expect(result).toEqual({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+        catalogStatus: { dropped: 7, overLimit: false },
+      });
+    });
+
+    it('keeps the catalog when the bound status is malformed', () => {
+      const result = normalize(
+        createRaw('commands.available', {
+          commands: [{ name: 'review', hints: [] }],
+          catalogStatus: { dropped: 'many', overLimit: false },
+        })
+      );
+      expect(result).toEqual({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+    });
+
     it('returns null when commands array is missing', () => {
       expect(normalize(createRaw('commands.available', {}))).toBeNull();
     });

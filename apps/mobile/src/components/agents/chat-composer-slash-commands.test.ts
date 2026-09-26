@@ -10,6 +10,7 @@ import {
   getLocalExitSlashCommand,
   getLocalNewSlashCommand,
   getSlashCommandCandidate,
+  getSlashCommandCatalogNotice,
   getSlashCommandDescription,
   getSlashCommandSuggestions,
   isCatalogueSlashCommand,
@@ -82,6 +83,28 @@ describe('createMobileSlashCommandList', () => {
   it('returns the live catalog verbatim for cloud-agent sessions without injecting /new', () => {
     const list = createMobileSlashCommandList('cloud-agent', SAMPLE_COMMANDS, null);
     expect(list).toBe(SAMPLE_COMMANDS);
+  });
+
+  it('keeps a cloud-agent skill row in the mobile suggestion list and invokes it like any other command', () => {
+    // The mobile layer only has to pass a reported skill row through; the
+    // wrapper guarantee that skills survive `commands.available` is pinned by
+    // `services/cloud-agent-next/wrapper/src/kilo-api.test.ts`.
+    const skill: SlashCommandInfo = {
+      name: 'kilo-config',
+      description: 'Guide for Kilo configuration',
+      source: 'skill',
+      hints: [],
+    };
+    const list = createMobileSlashCommandList('cloud-agent', [COMPACT, skill], null);
+
+    expect(getSlashCommandSuggestions('/', list)).toEqual([COMPACT, skill]);
+    expect(
+      parseChatComposerSubmission('/kilo-config', list, {
+        hasAttachments: false,
+        sessionType: 'cloud-agent',
+        remoteCommandState: null,
+      })
+    ).toEqual({ type: 'command', command: 'kilo-config', arguments: '' });
   });
 
   it('does not strip a CLI-reported /goal from a remote catalog', () => {
@@ -485,5 +508,26 @@ describe('isCatalogueSlashCommand', () => {
 
   it('accounts for a command this client registered', () => {
     expect(isCatalogueSlashCommand(getLocalNewSlashCommand())).toBe(true);
+  });
+});
+
+describe('getSlashCommandCatalogNotice', () => {
+  it('says nothing when the wrapper sent the whole catalog', () => {
+    expect(getSlashCommandCatalogNotice(null)).toBeNull();
+    expect(getSlashCommandCatalogNotice(undefined)).toBeNull();
+    expect(getSlashCommandCatalogNotice({ dropped: 0, overLimit: false })).toBeNull();
+  });
+
+  it('says that commands are hidden when rows were dropped', () => {
+    expect(getSlashCommandCatalogNotice({ dropped: 7, overLimit: false })).toBe(
+      en.agentChat.slashCommands.catalogFull
+    );
+  });
+
+  it('says that every skill is listed when an over-limit catalog dropped nothing', () => {
+    const notice = getSlashCommandCatalogNotice({ dropped: 0, overLimit: true });
+    expect(notice).toBe(en.agentChat.slashCommands.catalogOverLimit);
+    // The catalog is complete in this case, so the dropped-rows copy would lie.
+    expect(notice).not.toBe(en.agentChat.slashCommands.catalogFull);
   });
 });

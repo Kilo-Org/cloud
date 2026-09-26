@@ -35,6 +35,7 @@ vi.mock('@/lib/a11y/motion', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   ArrowUp: 'ArrowUp',
   CornerDownLeft: 'CornerDownLeft',
@@ -306,6 +307,52 @@ describe('ChatComposerInputRow mounted — control separation', () => {
     expect(stop).not.toBeNull();
     expect(hasGapWrapper(mic ?? null)).toBe(true);
     expect(hasGapWrapper(stop)).toBe(true);
+
+    renderer.unmount();
+  });
+});
+
+describe('ChatComposerInputRow mounted — single-line placeholder', () => {
+  it('draws the placeholder as a one-line overlay instead of the native hint', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      placeholder: "Configuration de l'environnement…",
+    });
+
+    // The native hint has no line cap on Android, so it wrapped onto a second
+    // line that the field's height clipped against its border.
+    const input = findTextInput(renderer.root);
+    expect(input.props.placeholder).toBeUndefined();
+
+    const overlay = renderer.root.findByProps({
+      children: "Configuration de l'environnement…",
+    });
+    expect(overlay.props.numberOfLines).toBe(1);
+    expect(overlay.props.ellipsizeMode).toBe('tail');
+    expect(overlay.props.pointerEvents).toBe('none');
+    // Screens readers get the name from the input, not a decorative overlay.
+    expect(overlay.props.accessible).toBe(false);
+    expect(input.props.accessibilityLabel).toBe("Configuration de l'environnement…");
+    // Pinned under the input so the first keystroke paints over it.
+    const siblings = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'View')
+      .flatMap(view => view.children);
+    const overlayIndex = siblings.indexOf(overlay);
+    expect(overlayIndex).toBeGreaterThanOrEqual(0);
+    expect(overlayIndex).toBeLessThan(siblings.indexOf(input));
+
+    renderer.unmount();
+  });
+
+  it('hides the overlay once the input holds text', async () => {
+    const renderer = await renderRow({ inputEditable: true, inputEmpty: false });
+
+    const hintCopy = findAllByType(renderer.root, 'Text').filter(
+      node => node.props.children === 'Message the agent'
+    );
+    expect(hintCopy).toHaveLength(0);
+    // The accessible name survives the missing hint.
+    expect(findTextInput(renderer.root).props.accessibilityLabel).toBe('Message the agent');
 
     renderer.unmount();
   });

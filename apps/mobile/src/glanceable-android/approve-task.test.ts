@@ -35,6 +35,13 @@ const mocks = vi.hoisted(() => {
     setGlanceableActionNotice: vi.fn<(notice: string | null) => void>(),
     renderStoredSnapshotWithNotice:
       vi.fn<(ctx: { userId: string; organizationId: string | null }) => void | Promise<void>>(),
+    // The raise's app-owned needs-input notification, retired by an ended ask.
+    // Mocked because the real module loads expo-notifications, which this pure
+    // suite cannot.
+    dismissNeedsInputNotification: vi.fn(async (sessionId: string) => {
+      await Promise.resolve();
+      order.push(`dismiss:${sessionId}`);
+    }),
     language: {
       whenLanguagePreferenceLoaded: vi.fn<() => Promise<void>>(),
       getResolvedLanguage: vi.fn<() => SupportedLanguage>(),
@@ -88,6 +95,10 @@ vi.mock('./android-sink', () => ({
   androidSink: mocks.sink,
   setGlanceableActionNotice: mocks.setGlanceableActionNotice,
   renderStoredSnapshotWithNotice: mocks.renderStoredSnapshotWithNotice,
+}));
+
+vi.mock('@/lib/needs-input-notification', () => ({
+  dismissNeedsInputNotification: mocks.dismissNeedsInputNotification,
 }));
 
 // The task must run with no Activity and no rendered tree: AppRegistry is the
@@ -183,6 +194,9 @@ describe('handleApproveTask', () => {
       answeredKiloSessionId: 'ses_1',
       askEnded: true,
     });
+    // The raise is presented twice — this card and the app-owned needs-input
+    // notification — so the ended ask retires that notification too.
+    expect(mocks.dismissNeedsInputNotification).toHaveBeenCalledWith('ses_1');
   });
 
   it('shows the catalog copy for the retryable key', () => {
@@ -195,6 +209,8 @@ describe('handleApproveTask', () => {
     await handleApproveTask();
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
+    // The raise is still waiting, so its notification must stay offered.
+    expect(mocks.dismissNeedsInputNotification).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).toHaveBeenCalledTimes(2);
     expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(1, APPROVE_FAILED);
     expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(2, APPROVE_FAILED);

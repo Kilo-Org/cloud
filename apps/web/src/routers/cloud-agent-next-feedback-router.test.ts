@@ -112,7 +112,7 @@ describe('cloudAgentNextFeedback.list', () => {
     expect(result.map(row => row.feedback_text)).toEqual(['limited 2', 'limited 1']);
   });
 
-  it('caps the maximum limit and rejects out-of-range input', async () => {
+  it('accepts the maximum limit and rejects out-of-range input', async () => {
     await db.insert(cloud_agent_feedback).values(
       Array.from({ length: 25 }, (_, index) => ({
         kilo_user_id: regularUser.id,

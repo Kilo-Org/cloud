@@ -8,6 +8,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import * as z from 'zod';
 import { desc, eq } from 'drizzle-orm';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
+import { toIsoTimestamp } from '@/lib/feedback/feedback-history';
 import type { Owner } from '@/lib/integrations/core/types';
 
 const DEFAULT_FEEDBACK_HISTORY_LIMIT = 5;
@@ -16,20 +17,6 @@ const MAX_FEEDBACK_HISTORY_LIMIT = 20;
 const ListAppBuilderFeedbackInputSchema = z.object({
   limit: z.number().int().min(1).max(MAX_FEEDBACK_HISTORY_LIMIT).optional(),
 });
-
-/**
- * Normalize a Postgres `timestamptz` value to UTC ISO for the JSON boundary.
- * The driver returns text ("YYYY-MM-DD HH:MM:SS.sss+00"), which strict
- * validators reject. Return null for missing or invalid values.
- */
-function toIsoTimestamp(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const iso = value.includes('T')
-    ? value
-    : value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
-  const time = new Date(iso).getTime();
-  return Number.isNaN(time) ? null : new Date(time).toISOString();
-}
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useSyncExternalStore } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { MessageSquareWarning, Loader2, Check } from 'lucide-react';
+import { useState, useCallback, useEffect, useId, useRef, useSyncExternalStore } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MessageSquareWarning, Loader2, Check, History } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,9 +15,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useProject } from './ProjectSession';
+import { formatFeedbackTimestamp } from '@/lib/feedback/feedback-history';
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import { isTextPart } from '@/components/cloud-agent-next/types';
+
+/** How many prior submissions the dialog shows. */
+const FEEDBACK_HISTORY_LIMIT = 5;
 
 type FeedbackDialogProps = {
   disabled?: boolean;
@@ -31,6 +35,27 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
 
   const { manager, state } = useProject();
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyHeadingId = useId();
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  // Prior submissions from this account, so the dialog can show that feedback
+  // was already sent instead of starting blank every time. Only fetched while
+  // the dialog is open.
+  const historyQuery = useQuery({
+    ...trpc.appBuilderFeedback.list.queryOptions({ limit: FEEDBACK_HISTORY_LIMIT }),
+    enabled: isOpen,
+  });
+  const history = historyQuery.data ?? [];
+  const historyError = historyQuery.isError;
+  const historyLoading = historyQuery.isPending;
+  const showHistorySection = historyLoading || historyError || history.length > 0;
 
   // Get the active session (last in state.sessions)
   const activeSession =
@@ -55,7 +80,8 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
     trpc.appBuilderFeedback.create.mutationOptions({
       onSuccess: () => {
         setShowSuccess(true);
-        setTimeout(() => {
+        void queryClient.invalidateQueries(trpc.appBuilderFeedback.list.queryFilter());
+        closeTimerRef.current = setTimeout(() => {
           setIsOpen(false);
         }, 1200);
       },
@@ -64,6 +90,10 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
       setIsOpen(open);
       // Reset state on both open and close so re-opening always starts fresh
       setFeedbackText('');
@@ -124,7 +154,7 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
           <MessageSquareWarning className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
           <DialogDescription>
@@ -133,9 +163,9 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           {showSuccess ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
               <Check className="h-6 w-6 text-green-500" />
               <span className="ml-2 text-sm text-green-500">Thank you for your feedback!</span>
             </div>
@@ -151,7 +181,7 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
               />
 
               {error && (
-                <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400">
+                <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400" role="alert">
                   Failed to send feedback. Please try again.
                 </div>
               )}
@@ -172,6 +202,40 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
                   )}
                 </Button>
               </div>
+
+              {showHistorySection && (
+                <div className="border-t pt-4">
+                  <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5" aria-hidden="true" />
+                    <h3 id={historyHeadingId} className="text-xs font-medium">
+                      Your recent feedback
+                    </h3>
+                  </div>
+                  {history.length > 0 ? (
+                    <ul aria-labelledby={historyHeadingId} className="space-y-2 pr-1">
+                      {history.map(item => {
+                        const timestamp = formatFeedbackTimestamp(item.created_at);
+                        return (
+                          <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
+                            <p className="text-foreground line-clamp-2 text-sm break-words">
+                              {item.feedback_text}
+                            </p>
+                            {timestamp && (
+                              <p className="text-muted-foreground mt-0.5 text-xs">{timestamp}</p>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : historyLoading ? (
+                    <p className="text-muted-foreground text-xs">Loading recent feedback...</p>
+                  ) : historyError ? (
+                    <p className="text-muted-foreground text-xs" role="status">
+                      Could not load recent feedback. Close and reopen the dialog to try again.
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </>
           )}
         </div>

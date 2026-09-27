@@ -77,9 +77,7 @@ describe('EditProfileDialog validation', () => {
     cleanup = undefined;
   });
 
-  it('links both invalid URL fields to their errors after Save', () => {
-    const dom = installDom();
-    cleanup = dom.cleanup;
+  function mountDialog(dom: { container: HTMLElement }) {
     act(() => {
       root = createRoot(dom.container);
       root.render(
@@ -92,13 +90,9 @@ describe('EditProfileDialog validation', () => {
         })
       );
     });
+  }
 
-    for (const field of ['linkedin-url', 'github-url']) {
-      const input = dom.container.querySelector(`#${field}`);
-      expect(input?.getAttribute('aria-invalid')).toBe('false');
-      expect(input?.hasAttribute('aria-describedby')).toBe(false);
-    }
-
+  function pressSave(dom: { container: HTMLElement }) {
     const save = Array.from(dom.container.querySelectorAll('button')).find(
       button => button.textContent === 'Save'
     );
@@ -106,6 +100,20 @@ describe('EditProfileDialog validation', () => {
     act(() => {
       save.dispatchEvent(new Event('click', { bubbles: true }));
     });
+  }
+
+  it('links both invalid URL fields to their errors after Save', () => {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    mountDialog(dom);
+
+    for (const field of ['linkedin-url', 'github-url']) {
+      const input = dom.container.querySelector(`#${field}`);
+      expect(input?.getAttribute('aria-invalid')).toBe('false');
+      expect(input?.hasAttribute('aria-describedby')).toBe(false);
+    }
+
+    pressSave(dom);
 
     for (const field of ['linkedin-url', 'github-url']) {
       const input = dom.container.querySelector(`#${field}`);
@@ -115,6 +123,36 @@ describe('EditProfileDialog validation', () => {
       const error = dom.container.querySelector(`#${errorId}`);
       expect(error?.getAttribute('role')).toBe('alert');
       expect(error?.textContent).toContain('http://');
+    }
+  });
+
+  it('drops the error association when the form resets', () => {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    mountDialog(dom);
+    pressSave(dom);
+
+    const input = dom.container.querySelector('#linkedin-url');
+    if (!input) throw new Error('LinkedIn input missing');
+    expect(input.getAttribute('aria-describedby')).toBe('linkedin-url-error');
+
+    act(() => {
+      root?.render(
+        createElement(EditProfileDialog, {
+          open: true,
+          onOpenChange: () => undefined,
+          linkedinUrl: 'https://linkedin.com/in/example',
+          githubUrl: 'https://github.com/example',
+          githubLinkedViaOAuth: false,
+        })
+      );
+    });
+
+    for (const field of ['linkedin-url', 'github-url']) {
+      const currentInput = dom.container.querySelector(`#${field}`);
+      expect(currentInput?.getAttribute('aria-invalid')).toBe('false');
+      expect(currentInput?.hasAttribute('aria-describedby')).toBe(false);
+      expect(dom.container.querySelector(`#${field}-error`)).toBeNull();
     }
   });
 });

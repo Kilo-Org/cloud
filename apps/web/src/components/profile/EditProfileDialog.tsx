@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+// Default `React` is required by Jest's SWC classic JSX transform; production
+// uses the automatic JSX runtime from tsconfig.
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';

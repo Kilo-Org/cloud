@@ -10,7 +10,9 @@ import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
 const JWT_SECRET = NEXTAUTH_SECRET;
 
 export async function POST(request: NextRequest) {
-  const { token } = await request.json();
+  const body: unknown = await request.json().catch(() => undefined);
+  const token =
+    typeof body === 'object' && body !== null && 'token' in body ? body.token : undefined;
 
   if (!token) {
     return NextResponse.json({ error: 'Token is required' }, { status: 400 });

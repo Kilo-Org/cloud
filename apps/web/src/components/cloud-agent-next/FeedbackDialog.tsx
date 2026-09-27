@@ -19,7 +19,7 @@ import { useManager } from './CloudAgentProvider';
 import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
-import { formatFeedbackTimestamp } from './feedback-history';
+import { formatFeedbackTimestamp } from '@/lib/feedback/feedback-history';
 
 /** How many prior submissions the dialog shows. */
 const FEEDBACK_HISTORY_LIMIT = 5;

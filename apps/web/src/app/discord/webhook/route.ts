@@ -77,17 +77,27 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Invalid signature', { status: 401 });
   }
 
-  const body = JSON.parse(rawBody);
+  // Bad JSON must return 400. Do not let it become 500.
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return new NextResponse('Invalid interaction payload', { status: 400 });
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return new NextResponse('Invalid interaction payload', { status: 400 });
+  }
+  const interaction = body as { type?: unknown; data?: { name?: unknown } | null };
 
   // Handle PING (Discord endpoint verification)
-  if (body.type === InteractionType.PING) {
+  if (interaction.type === InteractionType.PING) {
     console.log('[DiscordBot:Webhook] PING received, responding with PONG');
     return NextResponse.json({ type: InteractionResponseType.PONG });
   }
 
   // Handle Application Commands (slash commands) - placeholder for future
-  if (body.type === InteractionType.APPLICATION_COMMAND) {
-    console.log('[DiscordBot:Webhook] Slash command received:', body.data?.name);
+  if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+    console.log('[DiscordBot:Webhook] Slash command received:', interaction.data?.name);
     return NextResponse.json({
       type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
       data: {

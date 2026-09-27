@@ -563,6 +563,21 @@ export function NewSessionScreenBody() {
     }
   }
 
+  // The composer mounts before `user.getMe` resolves, so a prompt typed in that
+  // window has no account to write under and `handlePromptChange` skips the
+  // save. Persist the current prompt once the identity arrives (and if it
+  // changes), so text typed before the query settled survives a background or
+  // kill rather than waiting for the next keystroke.
+  useEffect(() => {
+    if (isCloneEntry || !userId) {
+      return;
+    }
+    const text = promptRef.current;
+    if (text.trim().length > 0) {
+      saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
+    }
+  }, [userId, isCloneEntry, promptRef]);
+
   // Discard confirm: leaving with a non-empty prompt or unsent uploads asks
   // first. Discard clears the stored draft and the route-owned prompt ref, then
   // releases admitted uploads before the captured navigation action is

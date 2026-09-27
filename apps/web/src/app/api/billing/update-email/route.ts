@@ -6,7 +6,9 @@ import { captureException } from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
-  const { email } = await request.json();
+  const body: unknown = await request.json().catch(() => undefined);
+  const email =
+    typeof body === 'object' && body !== null && 'email' in body ? body.email : undefined;
 
   if (!email || typeof email !== 'string') {
     return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });

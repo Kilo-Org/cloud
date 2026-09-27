@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
-import { resolveBotModelSlug } from '@/lib/bot/model';
+import { resolveBotModelSettings } from '@/lib/bot/model';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
@@ -86,11 +86,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return redirectToError(url.origin, 'fix_session_failed');
     }
 
+    const { modelSlug, thinkingEffort } = resolveBotModelSettings(integration);
+
     const sessionInput = {
       githubRepo: review.repo_full_name,
       prompt: buildFixReviewPrompt(review.pr_url),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: resolveBotModelSlug(integration),
+      model: modelSlug,
+      ...(thinkingEffort ? { variant: thinkingEffort } : {}),
       autoInitiate: true,
       autoCommit: false,
     };

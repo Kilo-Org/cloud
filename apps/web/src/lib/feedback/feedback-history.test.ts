@@ -1,4 +1,4 @@
-import { formatFeedbackTimestamp } from './feedback-history';
+import { formatFeedbackTimestamp, toIsoTimestamp } from './feedback-history';
 
 const now = new Date('2026-02-10T12:00:00.000Z');
 
@@ -16,5 +16,22 @@ describe('formatFeedbackTimestamp', () => {
     expect(formatFeedbackTimestamp('', now)).toBe('');
     expect(formatFeedbackTimestamp('not-a-date', now)).toBe('');
     expect(formatFeedbackTimestamp('2026-02-01T00:00:00', now)).toBe('');
+  });
+});
+
+describe('toIsoTimestamp', () => {
+  it('normalizes Postgres timestamptz text to UTC ISO', () => {
+    expect(toIsoTimestamp('2026-01-01 00:00:00.000+00')).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('rejects input with no UTC offset', () => {
+    expect(toIsoTimestamp('2026-01-01T00:00:00')).toBeNull();
+    expect(toIsoTimestamp('2026-01-01 00:00:00.000')).toBeNull();
+  });
+
+  it('returns null for missing or invalid input', () => {
+    expect(toIsoTimestamp(null)).toBeNull();
+    expect(toIsoTimestamp('')).toBeNull();
+    expect(toIsoTimestamp('not-a-date')).toBeNull();
   });
 });

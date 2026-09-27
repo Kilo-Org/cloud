@@ -9,20 +9,25 @@ import { formatDistance } from 'date-fns';
  * passes a value straight from a `mode: 'string'` column.
  */
 export function formatFeedbackTimestamp(value: string | null, now: Date = new Date()): string {
-  const date = parseFeedbackTimestamp(value);
-  if (!date) return '';
-  return formatDistance(date, now, { addSuffix: true });
+  const iso = toIsoTimestamp(value);
+  if (!iso) return '';
+  return formatDistance(new Date(iso), now, { addSuffix: true });
 }
 
-function parseFeedbackTimestamp(value: string | null): Date | null {
+/**
+ * Normalize a Postgres `timestamptz` value to UTC ISO for the JSON boundary.
+ * The driver returns text ("YYYY-MM-DD HH:MM:SS.sss+00"), which strict
+ * validators reject. Return null for missing or invalid values.
+ *
+ * A string with no offset is rejected rather than parsed as server-local
+ * time.
+ */
+export function toIsoTimestamp(value: string | null | undefined): string | null {
   if (!value) return null;
-  // Postgres `timestamptz` text is "YYYY-MM-DD HH:MM:SS.sss+00", which is
-  // not ISO-8601. Normalize before parsing. A string with no offset is
-  // rejected rather than parsed as local time.
   const iso = value.includes('T')
     ? value
     : value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
   if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) return null;
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const time = new Date(iso).getTime();
+  return Number.isNaN(time) ? null : new Date(time).toISOString();
 }

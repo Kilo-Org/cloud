@@ -465,14 +465,23 @@ export function NewSessionScreenBody() {
   const [promptSeed, setPromptSeed] = useState<'pending' | 'settled' | 'restore'>('pending');
   useEffect(() => {
     if (!draftState.settled) {
-      if (promptSeed !== 'pending') {
-        // The identity or entity changed, so the input remounts empty: clear
-        // the route-owned prompt state with it, or Start would submit text the
-        // user can no longer see.
-        promptRef.current = '';
-        setHasPrompt(false);
-        setPromptSeed('pending');
+      if (promptSeed === 'pending') {
+        return;
       }
+      // The identity or entity changed. A `restore` seed is a stored draft the
+      // input remounts away, so clear the route-owned prompt with it. A
+      // `settled` seed that still holds text is the user's own typing: the
+      // remount key stays `empty`, so the input keeps showing that text and
+      // clearing the route-owned prompt (which Start and the create body read)
+      // would desync it from the visible field. Preserve it instead — the
+      // persist effect below then saves the pre-identity prompt under the
+      // settled identity.
+      if (promptSeed === 'settled' && promptRef.current !== '') {
+        return;
+      }
+      promptRef.current = '';
+      setHasPrompt(false);
+      setPromptSeed('pending');
       return;
     }
     if (promptSeed !== 'pending') {

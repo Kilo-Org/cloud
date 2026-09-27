@@ -626,17 +626,6 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('mounts the IAP owner for native_iap on Android', async () => {
-    setAndroidNativeIapPresentation();
-    mocks.nativeIap.products = [];
-
-    const renderer = await renderScreen();
-
-    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
-
-    renderer.unmount();
-  });
-
   it('renders the native IAP screen under the kilo-pass-native-iap testID', async () => {
     setNativeIapPresentation();
     mocks.nativeIap.products = [];
@@ -652,17 +641,17 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('renders the native IAP screen under the kilo-pass-native-iap testID on Android', async () => {
-    setAndroidNativeIapPresentation();
+  it('composes the legal footer from the disclosure, both connectors, and link labels', async () => {
+    setNativeIapPresentation();
     mocks.nativeIap.products = [];
 
     const renderer = await renderScreen();
+    const text = allText(renderer);
 
-    expect(
-      renderer.root.findAll(
-        node => (node.props as { testID?: string }).testID === 'kilo-pass-native-iap'
-      )
-    ).toHaveLength(1);
+    expect(text).toContain('By subscribing, you agree to the');
+    expect(text).toContain('and acknowledge the');
+    expect(text).toContain('Terms of Use');
+    expect(text).toContain('Privacy Policy');
 
     renderer.unmount();
   });

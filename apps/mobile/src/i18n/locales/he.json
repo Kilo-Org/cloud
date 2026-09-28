@@ -1529,6 +1529,7 @@
       "couldNotSearch": "לא ניתן היה לחפש שיחות.",
       "completedWillAppear": "שיחות שהסתיימו יופיעו כאן.",
       "noPastSessions": "אין שיחות קודמות",
+      "pastSessions": "שיחות קודמות",
       "live": "בזמן אמת",
       "updating": "העדכון מתבצע"
     },

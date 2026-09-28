@@ -1520,6 +1520,7 @@
       "couldNotSearch": "Oturumlar aranamadı.",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
+      "pastSessions": "Geçmiş oturumlar",
       "live": "CANLI",
       "updating": "Güncelleniyor"
     },

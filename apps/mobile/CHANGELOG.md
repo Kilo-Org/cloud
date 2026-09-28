@@ -1,3 +1,7 @@
+## 1.0.12 (build 334)
+
+- fix(mobile): keep sign-in labels on one line and clear the bottom safe area (#6528)
+
 ## 1.0.12 (build 333)
 
 - fix(kilo-app): push release tags with a token that has Workflows: write (#6741)

@@ -455,7 +455,7 @@ describe('applyPreferredProvider', () => {
 
     expect(request.body.provider).toEqual({
       zdr: true,
-      order: ['amazon-bedrock', 'google-vertex', 'anthropic'],
+      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
     });
   });
 
@@ -502,7 +502,7 @@ describe('applyPreferredProvider', () => {
     applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'google-vertex', 'anthropic'],
+      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
     });
   });
 });

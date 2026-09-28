@@ -140,8 +140,8 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     // specifying this for fable breaks the opus fallback on vercel
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
+      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
     ];
   }
   if (isMinimaxModel(requestedModel)) {

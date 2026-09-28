@@ -12,10 +12,11 @@ import { listActiveSessions } from '@/lib/active-sessions-list';
  * the mobile publisher derives from its own tray cache — the snapshot is the
  * extracted active-sessions list, never a second session source.
  *
- * The shared `buildGlanceableSnapshot` reads only each session's `status`, so
- * title, git, id, and every other raw field are structurally excluded from the
- * output. `accountEpoch` is intentionally omitted: the mobile client applies
- * its own local epoch when it adopts a remote snapshot.
+ * The shared `buildGlanceableSnapshot` reads each session's `status` and
+ * optional `scheduledAt`, so title, git, id, and every other raw field are
+ * structurally excluded from the output. `accountEpoch` is intentionally
+ * omitted: the mobile client applies its own local epoch when it adopts a
+ * remote snapshot.
  */
 export async function buildGlanceableSnapshotForUser({
   userId,

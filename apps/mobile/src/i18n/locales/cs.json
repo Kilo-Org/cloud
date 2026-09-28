@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Zpět",
     "idle": "Nečinný",
+    "scheduled": "Naplánováno",
     "keepEditing": "Pokračovat v úpravách",
     "keepRunning": "Nechat běžet",
     "kiloclaw": "KiloClaw",
@@ -587,7 +588,14 @@
       "moreLinesAbove_one": "… další řádky výše: {{displayCount}}",
       "moreLinesAbove_other": "… další řádky výše: {{displayCount}}",
       "moreLinesAbove_few": "… další řádky výše: {{displayCount}}",
-      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}"
+      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}",
+      "deleteComment": "Smazat komentář",
+      "deleteCommentTitle": "Smazat komentář?",
+      "deleteCommentMessage": "Tento komentář bude smazán z PR.",
+      "commentEditFailed": "Tvůj komentář se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.",
+      "commentEditUnavailable": "Tento komentář nelze upravit. Možná byl smazán.",
+      "commentDeleteFailed": "Tvůj komentář se nepodařilo smazat. Zkontroluj připojení a zkus to znovu.",
+      "commentDeleteUnavailable": "Tento komentář nelze smazat."
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
@@ -778,6 +786,8 @@
     "linkPasteNotAPullRequest": "Tohle není odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentář odeslán",
+      "commentUpdated": "Komentář aktualizován",
+      "commentDeleted": "Komentář smazán",
       "reviewSubmitted": "Revize odeslána",
       "autoMergeEnabled": "Automatické sloučení zapnuto"
     },
@@ -2066,12 +2076,14 @@
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst.",
       "couldNotRefresh": "Obnovení se nezdařilo",
       "noSessionsYetDescription": "Zadej programovací úkol z telefonu. Tady se zobrazí tvé relace.",
+      "viewHistory": "Historie relací",
       "noMatches": "Žádné odpovídající relace",
       "tryDifferentSearch": "Zkus jiný hledaný výraz.",
       "tryAdjustFilters": "Zkus upravit nebo zrušit filtry.",
       "couldNotSearch": "Relace se nepodařilo vyhledat.",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné předchozí relace",
+      "pastSessions": "Předchozí relace",
       "live": "ŽIVĚ",
       "updating": "Aktualizace"
     },
@@ -2841,7 +2853,8 @@
     "optionsExpiredDescription": "Vraťte se na předchozí obrazovku a znovu otevřete tento výběr."
   },
   "sessionRow": {
-    "needsInput": "ČEKÁ NA REAKCI"
+    "needsInput": "ČEKÁ NA REAKCI",
+    "scheduled": "NAPLÁNOVÁNO"
   },
   "voiceInput": {
     "listening": "Poslouchám…",
@@ -3280,7 +3293,8 @@
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
     "openSession": "Otevřít",
     "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
-    "newestResult": "Nejnovější výsledek"
+    "newestResult": "Nejnovější výsledek",
+    "scheduledWakes": "probudí se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model přepisu",

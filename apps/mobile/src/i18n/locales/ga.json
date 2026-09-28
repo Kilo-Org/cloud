@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Téigh ar ais",
     "idle": "Díomhaoin",
+    "scheduled": "Sceidealaithe",
     "keepEditing": "Lean den eagarthóireacht",
     "keepRunning": "Fág ag rith é",
     "kiloclaw": "KiloClaw",
@@ -598,7 +599,14 @@
       "moreLinesAbove_other": "… {{displayCount}} líne eile thuas",
       "moreLinesAbove_two": "… {{displayCount}} líne eile thuas",
       "moreLinesAbove_few": "… {{displayCount}} líne eile thuas",
-      "moreLinesAbove_many": "… {{displayCount}} líne eile thuas"
+      "moreLinesAbove_many": "… {{displayCount}} líne eile thuas",
+      "deleteComment": "Scrios an trácht",
+      "deleteCommentTitle": "Scrios an trácht?",
+      "deleteCommentMessage": "Scriosfar an trácht seo ón iarratas tarraingthe.",
+      "commentEditFailed": "Níorbh fhéidir do thrácht a shábháil. Seiceáil do nasc agus bain triail as arís.",
+      "commentEditUnavailable": "Ní féidir an trácht seo a chur in eagar. Seans gur scriosadh é.",
+      "commentDeleteFailed": "Níorbh fhéidir do thrácht a scriosadh. Seiceáil do nasc agus bain triail as arís.",
+      "commentDeleteUnavailable": "Ní féidir an trácht seo a scriosadh."
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",
@@ -794,6 +802,8 @@
     "linkPasteNotAPullRequest": "Ní nasc d’iarratas tarraingthe ná d’iarratas cumaisc é seo",
     "announce": {
       "commentPosted": "Trácht postáilte",
+      "commentUpdated": "Trácht nuashonraithe",
+      "commentDeleted": "Trácht scriosta",
       "reviewSubmitted": "Athbhreithniú seolta",
       "autoMergeEnabled": "Cumasc uathoibríoch cumasaithe"
     },
@@ -2091,12 +2101,14 @@
       "couldNotLoadActive": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
       "couldNotRefresh": "Níorbh fhéidir athnuachan a dhéanamh",
       "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
+      "viewHistory": "Stair na seisiún",
       "noMatches": "Gan aon seisiún comhoiriúnach",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
       "tryAdjustFilters": "Bain triail as do scagairí a choigeartú nó a ghlanadh.",
       "couldNotSearch": "Níorbh fhéidir na seisiúin a chuardach.",
       "completedWillAppear": "Beidh seisiúin chríochnaithe le feiceáil anseo.",
       "noPastSessions": "Gan aon seisiún roimhe seo",
+      "pastSessions": "Seisiúin roimhe seo",
       "live": "BEO",
       "updating": "Ag nuashonrú"
     },
@@ -2882,7 +2894,8 @@
     "optionsExpiredDescription": "Téigh ar ais agus athoscail an roghnóir seo ón scáileán roimhe seo."
   },
   "sessionRow": {
-    "needsInput": "IONCHUR DE DHÍTH"
+    "needsInput": "IONCHUR DE DHÍTH",
+    "scheduled": "SCEIDEALAITHE"
   },
   "voiceInput": {
     "listening": "Ag éisteacht...",
@@ -3323,7 +3336,8 @@
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
     "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
-    "newestResult": "An toradh is nuaí"
+    "newestResult": "An toradh is nuaí",
+    "scheduledWakes": "dúisíonn {{time}}"
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",

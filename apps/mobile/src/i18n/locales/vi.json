@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Quay lại",
     "idle": "Đang rảnh",
+    "scheduled": "Đã lên lịch",
     "keepEditing": "Tiếp tục chỉnh sửa",
     "keepRunning": "Tiếp tục chạy",
     "kiloclaw": "KiloClaw",
@@ -1512,12 +1513,14 @@
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
       "couldNotRefresh": "Không thể làm mới",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
+      "viewHistory": "Lịch sử phiên",
       "noMatches": "Không có phiên phù hợp",
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
       "tryAdjustFilters": "Thử điều chỉnh hoặc bỏ bộ lọc.",
       "couldNotSearch": "Không thể tìm kiếm phiên.",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Chưa có phiên đã hoàn tất",
+      "pastSessions": "Các phiên trước đây",
       "live": "TRỰC TIẾP",
       "updating": "Đang cập nhật"
     },
@@ -2255,7 +2258,8 @@
     "optionsExpiredDescription": "Quay lại màn hình trước rồi mở lại danh sách lựa chọn này."
   },
   "sessionRow": {
-    "needsInput": "CẦN PHẢN HỒI"
+    "needsInput": "CẦN PHẢN HỒI",
+    "scheduled": "ĐÃ LÊN LỊCH"
   },
   "voiceInput": {
     "listening": "Đang nghe...",
@@ -2619,7 +2623,14 @@
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
       "moreLinesAbove_one": "… Còn {{displayCount}} dòng ở trên.",
-      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
+      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên.",
+      "deleteComment": "Xóa bình luận",
+      "deleteCommentTitle": "Xóa bình luận?",
+      "deleteCommentMessage": "Bình luận này sẽ bị xóa khỏi PR.",
+      "commentEditFailed": "Không thể lưu bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentEditUnavailable": "Không thể chỉnh sửa bình luận này. Có thể nó đã bị xóa.",
+      "commentDeleteFailed": "Không thể xóa bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentDeleteUnavailable": "Không thể xóa bình luận này."
     },
     "entry": {
       "eyebrow": "Mở PR hoặc merge request bằng URL",
@@ -2932,6 +2943,8 @@
     "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",
+      "commentUpdated": "Đã cập nhật bình luận",
+      "commentDeleted": "Đã xóa bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
       "autoMergeEnabled": "Đã bật tự động hợp nhất"
     },
@@ -3194,7 +3207,8 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "newestResult": "Kết quả mới nhất"
+    "newestResult": "Kết quả mới nhất",
+    "scheduledWakes": "thức dậy {{time}}"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",

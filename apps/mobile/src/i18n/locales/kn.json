@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ಹಿಂದೆ ಹೋಗಿ",
     "idle": "ಕೆಲಸವಿಲ್ಲ",
+    "scheduled": "ನಿಗದಿತ",
     "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
     "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
     "kiloclaw": "KiloClaw",
@@ -565,7 +566,14 @@
       "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
       "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "moreLinesAbove_one": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲು.",
-      "moreLinesAbove_other": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳಿವೆ."
+      "moreLinesAbove_other": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳಿವೆ.",
+      "deleteComment": "ಕಾಮೆಂಟ್ ಅಳಿಸಿ",
+      "deleteCommentTitle": "ಕಾಮೆಂಟ್ ಅಳಿಸುವುದೇ?",
+      "deleteCommentMessage": "ಈ ಕಾಮೆಂಟ್ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನಿಂದ ಅಳಿಸಲಾಗುತ್ತದೆ.",
+      "commentEditFailed": "ನಿಮ್ಮ ಕಾಮೆಂಟ್ ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "commentEditUnavailable": "ಈ ಕಾಮೆಂಟ್ ಸಂಪಾದಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದನ್ನು ಅಳಿಸಿರಬಹುದು.",
+      "commentDeleteFailed": "ನಿಮ್ಮ ಕಾಮೆಂಟ್ ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "commentDeleteUnavailable": "ಈ ಕಾಮೆಂಟ್ ಅಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
@@ -746,6 +754,8 @@
     "linkPasteNotAPullRequest": "ಇದು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
     "announce": {
       "commentPosted": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ",
+      "commentUpdated": "ಕಾಮೆಂಟ್ ನವೀಕರಿಸಲಾಗಿದೆ",
+      "commentDeleted": "ಕಾಮೆಂಟ್ ಅಳಿಸಲಾಗಿದೆ",
       "reviewSubmitted": "ಪರಿಶೀಲನೆ ಸಲ್ಲಿಸಲಾಗಿದೆ",
       "autoMergeEnabled": "ಸ್ವಯಂ-ವಿಲೀನ ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ"
     },
@@ -2016,12 +2026,14 @@
       "couldNotLoadActive": "ಸಕ್ರಿಯ ಸೆಶನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotRefresh": "ರಿಫ್ರೆಶ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "noSessionsYetDescription": "ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಕೋಡಿಂಗ್ ಕೆಲಸವನ್ನು ಪ್ರಾರಂಭಿಸಿ. ನಿಮ್ಮ ಸೆಶನ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
+      "viewHistory": "ಸೆಶನ್ ಇತಿಹಾಸ",
       "noMatches": "ಹೊಂದುವ ಸೆಶನ್‌ಗಳಿಲ್ಲ",
       "tryDifferentSearch": "ಬೇರೆ ಪದ ಬಳಸಿ ಹುಡುಕಿ.",
       "tryAdjustFilters": "ನಿಮ್ಮ ಫಿಲ್ಟರ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಿ ಅಥವಾ ತೆರವುಗೊಳಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "couldNotSearch": "ಸೆಶನ್‌ಗಳನ್ನು ಹುಡುಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "completedWillAppear": "ಪೂರ್ಣಗೊಂಡ ಸೆಶನ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "noPastSessions": "ಹಿಂದಿನ ಸೆಶನ್‌ಗಳಿಲ್ಲ",
+      "pastSessions": "ಹಿಂದಿನ ಸೆಶನ್‌ಗಳು",
       "live": "ನೇರ",
       "updating": "ನವೀಕರಿಸಲಾಗುತ್ತಿದೆ"
     },
@@ -2759,7 +2771,8 @@
     "optionsExpiredDescription": "ಹಿಂದಿನ ಪರದೆಗೆ ಹಿಂತಿರುಗಿ ಈ ಆಯ್ಕೆ ಪಟ್ಟಿಯನ್ನು ಮತ್ತೆ ತೆರೆಯಿರಿ."
   },
   "sessionRow": {
-    "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ"
+    "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+    "scheduled": "ನಿಗದಿತ"
   },
   "voiceInput": {
     "listening": "ಆಲಿಸಲಾಗುತ್ತಿದೆ...",
@@ -3194,7 +3207,8 @@
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
     "openSession": "ತೆರೆಯಿರಿ",
     "approveFailed": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು $t(common.approve) ಟ್ಯಾಪ್ ಮಾಡಿ.",
-    "newestResult": "ಇತ್ತೀಚಿನ ಫಲಿತಾಂಶ"
+    "newestResult": "ಇತ್ತೀಚಿನ ಫಲಿತಾಂಶ",
+    "scheduledWakes": "{{time}} ಎಚ್ಚರಗೊಳ್ಳುತ್ತದೆ"
   },
   "transcriptionModel": {
     "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",

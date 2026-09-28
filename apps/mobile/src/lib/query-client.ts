@@ -220,10 +220,23 @@ function removePermissionDeniedQueries(
   queryClient.removeQueries({ queryKey: query.queryKey });
 }
 
+/**
+ * Default freshness for app queries. Screens paint persisted-cache rows before
+ * the network answers (U4); this keeps a mount or focus regain from re-requesting
+ * the same payload for 30 s. Explicit `staleTime: 0` call sites still override it.
+ */
+export const DEFAULT_QUERY_STALE_TIME_MS = 30_000;
+
 export function createKiloAppQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        // Keep the persisted-cache first paint: cached rows are fresh for the
+        // default window, so a mount or focus regain does not immediately
+        // re-request what is already on screen. Every explicit invalidation path
+        // (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh)
+        // still refetches, and call sites that pass `staleTime: 0` still override.
+        staleTime: DEFAULT_QUERY_STALE_TIME_MS,
         // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also woke frozen background tabs.
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {

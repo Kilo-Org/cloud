@@ -6,7 +6,11 @@ import {
   organizations,
   user_notification_preferences,
 } from '@kilocode/db/schema';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  createOrganization,
+  removeUserFromOrganization,
+} from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   authorizedBillingContacts,
@@ -344,10 +348,13 @@ describe('authorizedBillingContacts', () => {
     }
   });
 
-  it('resolves only the billing roles of the one scope', async () => {
+  it('resolves the owner and billing managers of the one scope, excluding an admin and a member', async () => {
     const owner = await insertTestUser({ google_user_email: `sa-owner-${Date.now()}@example.com` });
     const billingManager = await insertTestUser({
       google_user_email: `sa-billing-${Date.now()}@example.com`,
+    });
+    const admin = await insertTestUser({
+      google_user_email: `sa-admin-${Date.now()}@example.com`,
     });
     const member = await insertTestUser({
       google_user_email: `sa-member-${Date.now()}@example.com`,
@@ -359,6 +366,7 @@ describe('authorizedBillingContacts', () => {
     const organization = await createOrganization('Spend alert recipients', owner.id);
     createdOrganizationIds.push(organization.id);
     await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, admin.id, 'admin');
     await addUserToOrganization(organization.id, member.id, 'member');
     const otherOrganization = await createOrganization('Spend alert other org', otherOwner.id);
     createdOrganizationIds.push(otherOrganization.id);
@@ -368,12 +376,123 @@ describe('authorizedBillingContacts', () => {
       organizationId: organization.id,
     });
 
+    // The owner is the organization's creator (membership role `owner`); the
+    // billing_manager is a recipient by role. An admin holds billing authority
+    // but has no billing duty, so it does not receive the alert.
     expect(new Set(contacts.userIds)).toEqual(new Set([owner.id, billingManager.id]));
     expect(new Set(contacts.emails)).toEqual(
       new Set([owner.google_user_email, billingManager.google_user_email])
     );
+    expect(contacts.userIds).not.toContain(admin.id);
     expect(contacts.userIds).not.toContain(member.id);
     expect(contacts.userIds).not.toContain(otherOwner.id);
+  });
+
+  it('includes the owner whose membership role is member', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-owner-member-${Date.now()}@example.com`,
+    });
+
+    // The organization's creator without an owner membership row, added later
+    // as a plain member: the owner is resolved from created_by_kilo_user_id.
+    const organization = await createOrganization('Spend alert member owner', owner.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, owner.id, 'member');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
+  });
+
+  it('stops delivering to the creator whose membership was removed', async () => {
+    const creator = await insertTestUser({
+      google_user_email: `sa-owner-removed-${Date.now()}@example.com`,
+    });
+    const billingManager = await insertTestUser({
+      google_user_email: `sa-removed-billing-${Date.now()}@example.com`,
+    });
+
+    const organization = await createOrganization('Spend alert removed owner', creator.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    // The creator held access and lost it. The organization keeps their id in
+    // `created_by_kilo_user_id`, so resolution must follow the membership row
+    // or the removed creator keeps receiving the organization's spend.
+    await addUserToOrganization(organization.id, creator.id, 'owner');
+    await removeUserFromOrganization(organization.id, creator.id);
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts.userIds).not.toContain(creator.id);
+    expect(contacts.emails).not.toContain(creator.google_user_email);
+    expect(new Set(contacts.userIds)).toEqual(new Set([billingManager.id]));
+  });
+
+  it('includes a co-owner whose membership role is owner, not only the creator', async () => {
+    const creator = await insertTestUser({
+      google_user_email: `sa-creator-${Date.now()}@example.com`,
+    });
+    const coOwner = await insertTestUser({
+      google_user_email: `sa-co-owner-${Date.now()}@example.com`,
+    });
+
+    // The creator holds no membership row, so they no longer receive the alert;
+    // the co-owner holds the `owner` role and does.
+    const organization = await createOrganization('Spend alert co-owner', creator.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, coOwner.id, 'owner');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(new Set(contacts.userIds)).toEqual(new Set([coOwner.id]));
+    expect(contacts.userIds).not.toContain(creator.id);
+  });
+
+  it('includes the owner membership role of an organization with no creator', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-sponsored-owner-${Date.now()}@example.com`,
+    });
+
+    // An OSS-sponsored organization: created_by_kilo_user_id is null and the
+    // sponsor is added with the `owner` membership role
+    // (routers/admin/oss-sponsorship-router.ts).
+    const organization = await createOrganization('Spend alert sponsored owner');
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, owner.id, 'owner');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
+  });
+
+  it('never duplicates the owner who is also a billing_manager', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-owner-billing-${Date.now()}@example.com`,
+    });
+
+    const organization = await createOrganization('Spend alert owner billing', owner.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, owner.id, 'billing_manager');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts.userIds).toEqual([owner.id]);
+    expect(contacts.emails).toEqual([owner.google_user_email]);
   });
 
   it('resolves the owner alone for a personal scope', async () => {

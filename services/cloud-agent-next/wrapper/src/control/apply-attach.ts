@@ -554,7 +554,7 @@ async function executeSessionAttach(
             await configureWorkspaceGitAuthor(
               directory,
               (args, options) => runGit(args, options?.cwd, options?.signal),
-              undefined,
+              attach.git.author,
               signal
             );
             signal.throwIfAborted();
@@ -613,6 +613,16 @@ async function executeSessionAttach(
               true
             );
           }
+        }
+        if (alreadyBootstrapped && attach.git?.author) {
+          stage = 'git_setup';
+          await configureWorkspaceGitAuthor(
+            directory,
+            (args, options) => runGit(args, options?.cwd, options?.signal),
+            attach.git.author,
+            signal
+          );
+          signal.throwIfAborted();
         }
       } catch (error) {
         if (error instanceof WrapperBootstrapError) {

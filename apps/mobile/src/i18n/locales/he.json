@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "חזרה",
     "idle": "בהמתנה",
+    "scheduled": "מתוזמן",
     "keepEditing": "המשך עריכה",
     "keepRunning": "המשך הרצה",
     "kiloclaw": "KiloClaw",
@@ -1521,12 +1522,14 @@
       "couldNotLoadActive": "לא ניתן היה לטעון את השיחות הפעילות.",
       "couldNotRefresh": "לא ניתן היה לרענן",
       "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך. השיחות שלך יופיעו כאן.",
+      "viewHistory": "היסטוריית השיחות",
       "noMatches": "אין שיחות תואמות",
       "tryDifferentSearch": "כדאי לנסות מונח חיפוש אחר.",
       "tryAdjustFilters": "נסה לשנות או לנקות את המסננים.",
       "couldNotSearch": "לא ניתן היה לחפש שיחות.",
       "completedWillAppear": "שיחות שהסתיימו יופיעו כאן.",
       "noPastSessions": "אין שיחות קודמות",
+      "pastSessions": "שיחות קודמות",
       "live": "בזמן אמת",
       "updating": "העדכון מתבצע"
     },
@@ -2280,7 +2283,8 @@
     "optionsExpiredDescription": "חזור למסך הקודם ופתח מחדש את חלון הבחירה."
   },
   "sessionRow": {
-    "needsInput": "נדרש קלט"
+    "needsInput": "נדרש קלט",
+    "scheduled": "מתוזמן"
   },
   "voiceInput": {
     "listening": "בהאזנה...",
@@ -2649,7 +2653,14 @@
       "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה.",
       "moreLinesAbove_one": "… עוד {{displayCount}} שורה למעלה.",
       "moreLinesAbove_other": "… עוד {{displayCount}} שורות למעלה.",
-      "moreLinesAbove_two": "… עוד {{displayCount}} שורות למעלה."
+      "moreLinesAbove_two": "… עוד {{displayCount}} שורות למעלה.",
+      "deleteComment": "מחיקת תגובה",
+      "deleteCommentTitle": "למחוק את התגובה?",
+      "deleteCommentMessage": "התגובה הזו תימחק מבקשת המשיכה.",
+      "commentEditFailed": "שמירת התגובה שלך נכשלה. בדוק את החיבור ונסה שוב.",
+      "commentEditUnavailable": "לא ניתן לערוך את התגובה הזו. ייתכן שהיא נמחקה.",
+      "commentDeleteFailed": "מחיקת התגובה שלך נכשלה. בדוק את החיבור ונסה שוב.",
+      "commentDeleteUnavailable": "לא ניתן למחוק את התגובה הזו."
     },
     "entry": {
       "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
@@ -2974,6 +2985,8 @@
     "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
     "announce": {
       "commentPosted": "התגובה פורסמה",
+      "commentUpdated": "התגובה עודכנה",
+      "commentDeleted": "התגובה נמחקה",
       "reviewSubmitted": "הסקירה נשלחה",
       "autoMergeEnabled": "מיזוג אוטומטי הופעל"
     },
@@ -3237,7 +3250,8 @@
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
     "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
-    "newestResult": "התוצאה החדשה ביותר"
+    "newestResult": "התוצאה החדשה ביותר",
+    "scheduledWakes": "מתעורר {{time}}"
   },
   "transcriptionModel": {
     "title": "מודל תמלול",

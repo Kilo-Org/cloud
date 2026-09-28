@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Rudi nyuma",
     "idle": "Bila kazi",
+    "scheduled": "Imepangwa",
     "keepEditing": "Endelea kuhariri",
     "keepRunning": "Acha iendelee",
     "kiloclaw": "KiloClaw",
@@ -565,7 +566,14 @@
       "deletedUser": "mtumiaji aliyefutwa",
       "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
       "moreLinesAbove_one": "… kuna mstari mwingine {{displayCount}} hapo juu.",
-      "moreLinesAbove_other": "… kuna mistari mingine {{displayCount}} hapo juu."
+      "moreLinesAbove_other": "… kuna mistari mingine {{displayCount}} hapo juu.",
+      "deleteComment": "Futa maoni",
+      "deleteCommentTitle": "Unataka kufuta maoni?",
+      "deleteCommentMessage": "Maoni haya yatafutwa kutoka kwa ombi la kuunganisha.",
+      "commentEditFailed": "Imeshindikana kuhifadhi maoni yako. Angalia muunganisho wako kisha ujaribu tena.",
+      "commentEditUnavailable": "Maoni haya hayawezi kuhaririwa. Huenda yamefutwa.",
+      "commentDeleteFailed": "Imeshindikana kufuta maoni yako. Angalia muunganisho wako kisha ujaribu tena.",
+      "commentDeleteUnavailable": "Maoni haya hayawezi kufutwa."
     },
     "couldNotOpenGitHubAppSettings": "Imeshindikana kufungua mipangilio ya programu ya GitHub.",
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",
@@ -746,6 +754,8 @@
     "linkPasteNotAPullRequest": "Sio kiungo cha ombi la kuunganisha",
     "announce": {
       "commentPosted": "Maoni yamechapishwa",
+      "commentUpdated": "Maoni yamesasishwa",
+      "commentDeleted": "Maoni yamefutwa",
       "reviewSubmitted": "Ukaguzi umewasilishwa",
       "autoMergeEnabled": "Muunganisho wa kiotomatiki umewashwa"
     },
@@ -2016,12 +2026,14 @@
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
       "couldNotRefresh": "Imeshindikana kuonyesha upya",
       "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
+      "viewHistory": "Historia ya vikao",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "tryAdjustFilters": "Jaribu kurekebisha au kuondoa vichujio vyako.",
       "couldNotSearch": "Imeshindikana kutafuta vikao.",
       "completedWillAppear": "Vikao vilivyokamilika vitaonekana hapa.",
       "noPastSessions": "Hakuna vikao vya zamani",
+      "pastSessions": "Vikao vya zamani",
       "live": "MOJA KWA MOJA",
       "updating": "Inasasisha"
     },
@@ -2759,7 +2771,8 @@
     "optionsExpiredDescription": "Rudi nyuma na ufungue kichagua hiki tena kutoka kwenye skrini iliyopita."
   },
   "sessionRow": {
-    "needsInput": "INASUBIRI JIBU"
+    "needsInput": "INASUBIRI JIBU",
+    "scheduled": "IMEPANGWA"
   },
   "voiceInput": {
     "listening": "Inasikiliza...",
@@ -3194,7 +3207,8 @@
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
     "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
-    "newestResult": "Matokeo mapya zaidi"
+    "newestResult": "Matokeo mapya zaidi",
+    "scheduledWakes": "itaamka {{time}}"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",

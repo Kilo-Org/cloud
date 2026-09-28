@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Kthehu",
     "idle": "Në pritje",
+    "scheduled": "E planifikuar",
     "keepEditing": "Vazhdo redaktimin",
     "keepRunning": "Vazhdo ekzekutimin",
     "kiloclaw": "KiloClaw",
@@ -565,7 +566,14 @@
       "deletedUser": "përdorues i fshirë",
       "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} rresht tjetër më sipër",
-      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër"
+      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër",
+      "deleteComment": "Fshi komentin",
+      "deleteCommentTitle": "Të fshihet komenti?",
+      "deleteCommentMessage": "Ky koment do të fshihet nga kërkesa për bashkim.",
+      "commentEditFailed": "Nuk u arrit të ruhej komenti yt. Kontrollo lidhjen dhe provo përsëri.",
+      "commentEditUnavailable": "Ky koment nuk mund të redaktohet. Mund të jetë fshirë.",
+      "commentDeleteFailed": "Nuk u arrit të fshihej komenti yt. Kontrollo lidhjen dhe provo përsëri.",
+      "commentDeleteUnavailable": "Ky koment nuk mund të fshihet."
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
@@ -746,6 +754,8 @@
     "linkPasteNotAPullRequest": "Kjo nuk është lidhje për një kërkesë për bashkim ose kërkesë integrimi",
     "announce": {
       "commentPosted": "Komenti u postua",
+      "commentUpdated": "Komenti u përditësua",
+      "commentDeleted": "Komenti u fshi",
       "reviewSubmitted": "Rishikimi u dërgua",
       "autoMergeEnabled": "Bashkimi automatik u aktivizua"
     },
@@ -2016,12 +2026,14 @@
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive.",
       "couldNotRefresh": "Rifreskimi dështoi",
       "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt. Seancat e tua do të shfaqen këtu.",
+      "viewHistory": "Historiku i seancave",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provo një term tjetër kërkimi.",
       "tryAdjustFilters": "Provo t'i ndryshosh ose t'i pastrosh filtrat.",
       "couldNotSearch": "Kërkimi i seancave dështoi.",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
+      "pastSessions": "Seanca të kaluara",
       "live": "DREJTPËRDREJT",
       "updating": "Po përditësohet"
     },
@@ -2759,7 +2771,8 @@
     "optionsExpiredDescription": "Kthehu prapa dhe rihap këtë zgjedhës nga ekrani i mëparshëm."
   },
   "sessionRow": {
-    "needsInput": "PRET PËRGJIGJE"
+    "needsInput": "PRET PËRGJIGJE",
+    "scheduled": "E PLANIFIKUAR"
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
@@ -3194,7 +3207,8 @@
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
-    "newestResult": "Rezultati më i ri"
+    "newestResult": "Rezultati më i ri",
+    "scheduledWakes": "zgjohet {{time}}"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",

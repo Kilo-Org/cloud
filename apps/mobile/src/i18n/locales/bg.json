@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Върни се назад",
     "idle": "Без активност",
+    "scheduled": "Планирана",
     "keepEditing": "Продължи редактирането",
     "keepRunning": "Продължи изпълнението",
     "kiloclaw": "KiloClaw",
@@ -565,7 +566,14 @@
       "deletedUser": "изтрит потребител",
       "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}.",
       "moreLinesAbove_one": "… още {{displayCount}} ред по-горе",
-      "moreLinesAbove_other": "… още {{displayCount}} реда по-горе"
+      "moreLinesAbove_other": "… още {{displayCount}} реда по-горе",
+      "deleteComment": "Изтрий коментара",
+      "deleteCommentTitle": "Да се изтрие ли коментарът?",
+      "deleteCommentMessage": "Този коментар ще бъде изтрит от заявката за обединяване.",
+      "commentEditFailed": "Коментарът ти не можа да бъде запазен. Провери връзката си и опитай отново.",
+      "commentEditUnavailable": "Този коментар не може да бъде редактиран. Възможно е да е изтрит.",
+      "commentDeleteFailed": "Коментарът ти не можа да бъде изтрит. Провери връзката си и опитай отново.",
+      "commentDeleteUnavailable": "Този коментар не може да бъде изтрит."
     },
     "couldNotOpenGitHubAppSettings": "Настройките на приложението в GitHub не се отвориха.",
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
@@ -746,6 +754,8 @@
     "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
     "announce": {
       "commentPosted": "Коментарът е публикуван",
+      "commentUpdated": "Коментарът е обновен",
+      "commentDeleted": "Коментарът е изтрит",
       "reviewSubmitted": "Прегледът е изпратен",
       "autoMergeEnabled": "Автоматичното обединяване е активирано"
     },
@@ -2016,12 +2026,14 @@
       "couldNotLoadActive": "Не можахме да заредим активните сесии.",
       "couldNotRefresh": "Не можахме да опресним",
       "noSessionsYetDescription": "Започни задача за програмиране от телефона си. Сесиите ти ще се появят тук.",
+      "viewHistory": "История на сесиите",
       "noMatches": "Няма сесии за това търсене",
       "tryDifferentSearch": "Опитай с друга дума за търсене.",
       "tryAdjustFilters": "Опитай да промениш или изчистиш филтрите си.",
       "couldNotSearch": "Не можахме да извършим търсенето на сесии.",
       "completedWillAppear": "Завършените сесии ще се появят тук.",
       "noPastSessions": "Няма предишни сесии",
+      "pastSessions": "Предишни сесии",
       "live": "НА ЖИВО",
       "updating": "Актуализиране"
     },
@@ -2759,7 +2771,8 @@
     "optionsExpiredDescription": "Върни се назад и отвори отново този прозорец за избор от предишния екран."
   },
   "sessionRow": {
-    "needsInput": "НУЖЕН Е ОТГОВОР"
+    "needsInput": "НУЖЕН Е ОТГОВОР",
+    "scheduled": "ПЛАНИРАНА"
   },
   "voiceInput": {
     "listening": "Слушам…",
@@ -3194,7 +3207,8 @@
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
     "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
-    "newestResult": "Най-нов резултат"
+    "newestResult": "Най-нов резултат",
+    "scheduledWakes": "се събужда {{time}}"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",

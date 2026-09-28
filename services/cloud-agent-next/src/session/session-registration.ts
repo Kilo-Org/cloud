@@ -49,7 +49,6 @@ import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
-import jwt from 'jsonwebtoken';
 
 import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
@@ -82,6 +81,7 @@ import { sha256Hex } from '../utils/sha256.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';
+import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
   AcceptedExecutionTurn,
@@ -561,15 +561,7 @@ async function issueSessionRuntimeAuthorization(
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
-  // authMiddleware has verified this bearer (including legacy tokens) against
-  // its audience and current pepper. Decode only selects the compatibility path;
-  // createRuntimeAuthorization re-verifies modern claims and runtime admission.
-  const claims = jwt.decode(ctx.authToken);
-  const isPolicyBearing =
-    claims !== null &&
-    typeof claims === 'object' &&
-    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
-  if (isPolicyBearing) {
+  if (isPolicyBearingAuthToken(ctx.authToken)) {
     if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();

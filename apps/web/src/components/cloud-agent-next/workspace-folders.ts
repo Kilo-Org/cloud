@@ -20,7 +20,7 @@ export function getWorkspaceFolderColor(color: WorkspaceFolderColor): string {
   );
 }
 
-const controlPlaneSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+export const controlPlaneSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const collapsedFolderIdsSchema = z.array(z.uuid());
 
 export function isFolderWorkspace(group: SidebarWorktreeGroup): boolean {

@@ -14,7 +14,7 @@ function history(overrides?: Partial<SessionFailureHistory>): SessionFailureHist
     },
     setupFailure: null,
     runs: [],
-    retention: { runWindowDays: 90, diagnosticDays: 30 },
+    retention: { runWindowDays: 90, diagnosticDays: 30, historyRunLimit: 50 },
     ...overrides,
   };
 }
@@ -37,6 +37,7 @@ function run(
     userVisibleError: null,
     diagnostic: null,
     diagnosticExpiresAt: null,
+    wrapperRunId: null,
   };
 }
 
@@ -57,7 +58,10 @@ describe('summarizeSessionFailureHistory', () => {
 
     expect(summary.hasFailures).toBe(true);
     expect(summary.completedCount).toBe(1);
-    expect(summary.failedRuns.map(item => item.messageId)).toEqual(['msg_failed', 'msg_failed_2']);
+    expect(summary.failedRuns.map(item => item.messageId)).toEqual([
+      'msg_failed_one',
+      'msg_failed_2',
+    ]);
   });
 
   it('treats a setup failure as a failure even with no failed runs', () => {

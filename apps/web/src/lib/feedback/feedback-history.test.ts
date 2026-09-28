@@ -29,6 +29,13 @@ describe('toIsoTimestamp', () => {
     expect(toIsoTimestamp('2026-01-01 00:00:00.000')).toBeNull();
   });
 
+  it('rejects a bare z/Z that is not at the end (offset must be anchored)', () => {
+    // The old alternation `[zZ]|[+-]\d{2}:?\d{2}$` matched a z anywhere in the
+    // string, so "2026-01-01T00:00:00zfoo" wrongly passed the offset guard.
+    expect(toIsoTimestamp('2026-01-01T00:00:00zfoo')).toBeNull();
+    expect(toIsoTimestamp('2026-01-01T00:00:00Zfoo')).toBeNull();
+  });
+
   it('returns null for missing or invalid input', () => {
     expect(toIsoTimestamp(null)).toBeNull();
     expect(toIsoTimestamp('')).toBeNull();

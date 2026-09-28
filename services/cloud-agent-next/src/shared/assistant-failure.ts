@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
@@ -118,9 +119,88 @@ function classifySdkErrorName(source: unknown): CloudAgentAssistantFailureReason
       return 'content_filter';
     case 'StructuredOutputError':
       return 'structured_output';
+    // A malformed provider stream. The AI SDK raises it while decoding the
+    // response, so the cause is the model-serving path, not the request.
+    case 'AI_InvalidResponseDataError':
+      return 'provider_unavailable';
     default:
       return undefined;
   }
+}
+
+const MAX_RESPONSE_BODY_LENGTH = 64 * 1024;
+
+const httpStatusSchema = z.number().int().min(100).max(599);
+
+/**
+ * The AI SDK's `APIError` often carries no `statusCode`, only the raw provider
+ * `responseBody`. Providers emit loosely-typed bodies, so each field is parsed
+ * independently: an unexpected type on one field must not discard a valid
+ * `error_type` on another. `.catch(() => undefined)` makes a missing or
+ * malformed field read as absent rather than failing the whole body.
+ */
+const asOptional = <T extends z.ZodType>(schema: T) => schema.optional().catch(() => undefined);
+
+const optionalString = asOptional(z.string());
+const optionalHttpStatus = asOptional(httpStatusSchema);
+
+const providerErrorBodySchema = z.object({
+  error_type: optionalString,
+  metadata: asOptional(z.object({ error_type: optionalString })),
+  status: optionalHttpStatus,
+  statusCode: optionalHttpStatus,
+  code: optionalHttpStatus,
+  name: optionalString,
+});
+
+type ProviderErrorBody = z.infer<typeof providerErrorBodySchema>;
+
+function parseResponseBody(value: unknown): ProviderErrorBody | undefined {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_RESPONSE_BODY_LENGTH) {
+    return undefined;
+  }
+  try {
+    const parsed = providerErrorBodySchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function classifyHttpStatus(status: number): CloudAgentAssistantFailureReason | undefined {
+  if (status === 402) return 'insufficient_credits';
+  if (status === 429) return 'rate_limited';
+  if (status === 401 || status === 403) return 'provider_authentication';
+  if (status === 408 || status === 504) return 'timeout';
+  if (status >= 500) return 'provider_unavailable';
+  if (status >= 400) return 'invalid_request';
+  return undefined;
+}
+
+/**
+ * Bounded `error_type` tokens emitted by the gateway and upstream providers.
+ * An unrecognized token is ignored rather than guessed. A Map (not an object)
+ * because the key is caller-supplied text and an object lookup for
+ * `constructor` would resolve an inherited member.
+ */
+const ASSISTANT_ERROR_TYPE_REASONS = new Map<string, CloudAgentAssistantFailureReason>([
+  ['provider_unavailable', 'provider_unavailable'],
+  ['upstream_error', 'provider_unavailable'],
+  ['upstream_disconnect', 'provider_unavailable'],
+  ['temporarily_unavailable', 'provider_unavailable'],
+  ['rate_limit_exceeded', 'rate_limited'],
+  ['insufficient_credits', 'insufficient_credits'],
+  ['context_length_exceeded', 'context_limit'],
+  ['model_not_found', 'model_unavailable'],
+  ['unavailable_model', 'model_unavailable'],
+  ['authentication_required', 'provider_authentication'],
+  ['invalid_request', 'invalid_request'],
+]);
+
+function classifyErrorType(value: unknown): CloudAgentAssistantFailureReason | undefined {
+  return typeof value === 'string'
+    ? ASSISTANT_ERROR_TYPE_REASONS.get(value.toLocaleLowerCase())
+    : undefined;
 }
 
 function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | undefined {
@@ -131,22 +211,36 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
     source.name !== 'APIError' ||
     !('data' in source) ||
     typeof source.data !== 'object' ||
-    source.data === null ||
-    !('statusCode' in source.data)
+    source.data === null
   ) {
     return undefined;
   }
-  const status = source.data.statusCode;
-  if (typeof status !== 'number' || !Number.isInteger(status) || status < 100 || status > 599) {
+  const data = source.data as Record<string, unknown>;
+
+  const directStatus = httpStatusSchema.safeParse(data.statusCode);
+  if (directStatus.success) {
+    const reason = classifyHttpStatus(directStatus.data);
+    if (reason !== undefined) return reason;
+    // A well-formed but unmapped status (100–399) is authoritative: do not
+    // fall through to a body-derived cause.
     return undefined;
   }
-  if (status === 402) return 'insufficient_credits';
-  if (status === 429) return 'rate_limited';
-  if (status === 401 || status === 403) return 'provider_authentication';
-  if (status === 408 || status === 504) return 'timeout';
-  if (status >= 500) return 'provider_unavailable';
-  if (status >= 400) return 'invalid_request';
-  return undefined;
+
+  const responseBody = parseResponseBody(data.responseBody);
+  if (responseBody === undefined) return undefined;
+
+  const errorType =
+    classifyErrorType(responseBody.error_type) ??
+    classifyErrorType(responseBody.metadata?.error_type);
+  if (errorType !== undefined) return errorType;
+
+  const bodyStatus = responseBody.status ?? responseBody.statusCode ?? responseBody.code;
+  if (bodyStatus !== undefined) {
+    const reason = classifyHttpStatus(bodyStatus);
+    if (reason !== undefined) return reason;
+  }
+
+  return classifySdkErrorName({ name: responseBody.name });
 }
 
 function classifyAssistantFailureText(message: string): CloudAgentAssistantFailureReason {

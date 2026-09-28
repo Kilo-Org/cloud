@@ -16,6 +16,7 @@ const folderC = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const worktreeA = `worktree_${folderA}`;
 const worktreeB = `worktree_${folderB}`;
 const hiddenWorktree = `worktree_${folderC}`;
+const standaloneSession = `workspace_${folderC}`;
 
 function makeSession(id: string, overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -164,6 +165,36 @@ describe('workspace folder drops', () => {
         visibleWorktrees
       )
     ).toBeNull();
+  });
+
+  it('files a dragged session onto a folder and rejects unknown folder targets', () => {
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        folderTarget(folderB),
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toEqual({ type: 'move-session', sessionId: standaloneSession, folderId: folderB });
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        folderTarget('missing'),
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toBeNull();
+  });
+
+  it('unfiles a dragged session via Ungrouped', () => {
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        { type: 'ungrouped' },
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toEqual({ type: 'move-session', sessionId: standaloneSession, folderId: null });
   });
 
   it('reorders a folder before an earlier folder while preserving all members', () => {

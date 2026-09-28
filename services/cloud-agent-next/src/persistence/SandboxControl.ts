@@ -5763,6 +5763,7 @@ export class SandboxControl extends DurableObject<Env> {
         allocation: record,
         credentialExpiryAt: anchors.credentialExpiryAt,
         socketHandshakeAt: anchors.socketHandshakeAt,
+        billingDueAt: null,
       }
     );
   }

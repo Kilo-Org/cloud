@@ -1,34 +1,28 @@
 import { NextRequest } from 'next/server';
 
 jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
-jest.mock('@/lib/spend-alerts/sweep', () => ({
-  createSpendAlertSweepStore: jest.fn(() => ({ loadScopeSnapshot: jest.fn() })),
-  runSpendAlertSweep: jest.fn(),
+jest.mock('@/lib/spend-alerts/retention', () => ({
+  pruneSpendAlertHourly: jest.fn(),
+  SPEND_ALERT_HOURLY_RETENTION_DAYS: 30,
 }));
 const mockSentryLog = jest.fn();
 jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSentryLog) }));
 
-import { runSpendAlertSweep } from '@/lib/spend-alerts/sweep';
+import { pruneSpendAlertHourly } from '@/lib/spend-alerts/retention';
 import { GET, maxDuration } from './route';
 
-const mockRunSpendAlertSweep = jest.mocked(runSpendAlertSweep);
+const mockPruneSpendAlertHourly = jest.mocked(pruneSpendAlertHourly);
 
 function request(secret: string): NextRequest {
-  return new NextRequest('http://localhost:3000/api/cron/dispatch-spend-alerts', {
+  return new NextRequest('http://localhost:3000/api/cron/prune-spend-alert-hourly', {
     headers: { authorization: `Bearer ${secret}` },
   });
 }
 
-describe('GET /api/cron/dispatch-spend-alerts', () => {
+describe('GET /api/cron/prune-spend-alert-hourly', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockRunSpendAlertSweep.mockResolvedValue({
-      sweptScopes: 4,
-      candidateScopes: 2,
-      fired: 3,
-      cleared: 1,
-      deliveriesEnqueued: 3,
-    });
+    mockPruneSpendAlertHourly.mockResolvedValue({ deleted: 12 });
   });
 
   test('rejects invalid cron authorization', async () => {
@@ -36,25 +30,24 @@ describe('GET /api/cron/dispatch-spend-alerts', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-    expect(mockRunSpendAlertSweep).not.toHaveBeenCalled();
+    expect(mockPruneSpendAlertHourly).not.toHaveBeenCalled();
   });
 
-  test('sweeps and reports the scopesTouched and alertsFired summary', async () => {
+  test('prunes with the 30-day window and reports the deleted count', async () => {
     const response = await GET(request('cron-secret'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      summary: { scopesTouched: 2, alertsFired: 3 },
+      summary: { deleted: 12, retentionDays: 30 },
     });
-    expect(mockRunSpendAlertSweep).toHaveBeenCalledWith(
+    expect(mockPruneSpendAlertHourly).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ store: expect.anything() }),
       expect.objectContaining({ now: expect.any(Date) })
     );
     expect(mockSentryLog).toHaveBeenCalledWith(
-      'Spend alert sweep completed',
-      expect.objectContaining({ scopesTouched: 2, alertsFired: 3 })
+      'Spend alert hourly retention prune completed',
+      expect.objectContaining({ deleted: 12, retentionDays: 30 })
     );
   });
 
